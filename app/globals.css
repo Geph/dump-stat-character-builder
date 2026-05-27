@@ -3,128 +3,144 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Flat UI Design - Bright, Solid Colors inspired by Android Material */
-:root {
-  /* Primary - Vibrant Teal/Cyan */
-  --primary: oklch(0.7 0.15 185);
-  --primary-foreground: oklch(1 0 0);
-  
-  /* Secondary - Coral/Salmon */
-  --secondary: oklch(0.72 0.16 30);
-  --secondary-foreground: oklch(1 0 0);
-  
-  /* Accent - Golden Yellow */
-  --accent: oklch(0.85 0.17 85);
-  --accent-foreground: oklch(0.2 0 0);
-  
-  /* Background - Clean white */
-  --background: oklch(0.985 0.002 90);
-  --foreground: oklch(0.25 0.02 260);
-  
-  /* Card - Pure white with subtle border */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 260);
-  
-  /* Muted - Soft gray */
-  --muted: oklch(0.95 0.005 260);
-  --muted-foreground: oklch(0.5 0.02 260);
-  
-  /* Border - Crisp gray */
-  --border: oklch(0.9 0.005 260);
-  --input: oklch(0.97 0.003 260);
-  --ring: oklch(0.7 0.15 185);
-  
-  /* Semantic colors - Flat, solid */
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  
-  --success: oklch(0.65 0.17 155);
-  --success-foreground: oklch(1 0 0);
-  
-  --warning: oklch(0.8 0.15 75);
-  --warning-foreground: oklch(0.2 0 0);
-  
-  /* Info blue */
-  --info: oklch(0.65 0.15 240);
-  --info-foreground: oklch(1 0 0);
-  
-  /* Popover */
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 260);
-  
-  /* Charts - Vibrant palette */
-  --chart-1: oklch(0.7 0.15 185);
-  --chart-2: oklch(0.72 0.16 30);
-  --chart-3: oklch(0.85 0.17 85);
-  --chart-4: oklch(0.65 0.18 300);
-  --chart-5: oklch(0.65 0.17 155);
-  
-  /* Flat UI specific - more rounded corners */
-  --radius: 1rem;
-  
-  /* Sidebar */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.25 0.02 260);
-  --sidebar-primary: oklch(0.7 0.15 185);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0.005 260);
-  --sidebar-accent-foreground: oklch(0.25 0.02 260);
-  --sidebar-border: oklch(0.9 0.005 260);
-  --sidebar-ring: oklch(0.7 0.15 185);
+/* =========================================================
+   Solbera D&D Fonts (CC BY-SA 4.0 — Solbera / Ryrok)
+   https://jonathonf.github.io/solbera-dnd-fonts/
+   ========================================================= */
+@font-face {
+  font-family: 'Nodesto Caps Condensed';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Nodesto%20Caps%20Condensed/Nodesto%20Caps%20Condensed.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Nodesto Caps Condensed';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Nodesto%20Caps%20Condensed/Nodesto%20Caps%20Condensed%20Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Bookinsanity';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Bookinsanity/Bookinsanity.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Bookinsanity';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Bookinsanity/Bookinsanity%20Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Scaly Sans';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Scaly%20Sans/Scaly%20Sans.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Scaly Sans';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Scaly%20Sans/Scaly%20Sans%20Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Mr Eaves Small Caps';
+  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Mr%20Eaves%20Small%20Caps/Mr%20Eaves%20Small%20Caps.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
 }
 
-.dark {
-  /* Dark mode - vibrant on dark */
-  --primary: oklch(0.75 0.15 185);
-  --primary-foreground: oklch(0.1 0 0);
-  
-  --secondary: oklch(0.75 0.16 30);
+/* =========================================================
+   Design Tokens — Dark Arcane Theme
+   Dark gray/black base + purple mid-tones
+   Neon accents: lime, lemon, orange, magenta
+   ========================================================= */
+:root {
+  /* Primary — electric purple */
+  --primary: oklch(0.62 0.26 290);
+  --primary-foreground: oklch(0.98 0 0);
+
+  /* Secondary — neon lime */
+  --secondary: oklch(0.82 0.24 130);
   --secondary-foreground: oklch(0.1 0 0);
-  
-  --accent: oklch(0.85 0.17 85);
-  --accent-foreground: oklch(0.1 0 0);
-  
-  --background: oklch(0.13 0.02 260);
-  --foreground: oklch(0.95 0 0);
-  
-  --card: oklch(0.17 0.02 260);
-  --card-foreground: oklch(0.95 0 0);
-  
-  --muted: oklch(0.22 0.02 260);
-  --muted-foreground: oklch(0.6 0 0);
-  
-  --border: oklch(0.28 0.02 260);
-  --input: oklch(0.2 0.02 260);
-  --ring: oklch(0.75 0.15 185);
-  
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.95 0 0);
-  
-  --success: oklch(0.7 0.17 155);
+
+  /* Accent — neon magenta */
+  --accent: oklch(0.68 0.3 335);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Highlight lime */
+  --lime: oklch(0.84 0.26 132);
+  --lime-foreground: oklch(0.1 0 0);
+
+  /* Highlight lemon */
+  --lemon: oklch(0.9 0.22 100);
+  --lemon-foreground: oklch(0.1 0 0);
+
+  /* Highlight neon orange */
+  --orange: oklch(0.76 0.2 55);
+  --orange-foreground: oklch(0.1 0 0);
+
+  /* Highlight magenta */
+  --magenta: oklch(0.68 0.3 335);
+  --magenta-foreground: oklch(0.98 0 0);
+
+  /* Background — near-black dark gray */
+  --background: oklch(0.11 0.015 280);
+  --foreground: oklch(0.94 0.01 270);
+
+  /* Cards — dark surface */
+  --card: oklch(0.16 0.018 280);
+  --card-foreground: oklch(0.94 0.01 270);
+
+  /* Muted */
+  --muted: oklch(0.22 0.02 280);
+  --muted-foreground: oklch(0.55 0.02 280);
+
+  /* Border — subtle purple tint */
+  --border: oklch(0.28 0.04 285);
+  --input: oklch(0.2 0.02 280);
+  --ring: oklch(0.62 0.26 290);
+
+  /* Semantic */
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.72 0.2 145);
   --success-foreground: oklch(0.1 0 0);
-  
-  --warning: oklch(0.8 0.15 75);
+  --warning: oklch(0.88 0.18 90);
   --warning-foreground: oklch(0.1 0 0);
-  
-  --info: oklch(0.7 0.15 240);
-  --info-foreground: oklch(0.95 0 0);
-  
-  --popover: oklch(0.17 0.02 260);
-  --popover-foreground: oklch(0.95 0 0);
-  
-  --sidebar: oklch(0.15 0.02 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.75 0.15 185);
-  --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.22 0.02 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.28 0.02 260);
-  --sidebar-ring: oklch(0.75 0.15 185);
+  --info: oklch(0.65 0.18 240);
+  --info-foreground: oklch(0.98 0 0);
+
+  /* Popover */
+  --popover: oklch(0.18 0.02 280);
+  --popover-foreground: oklch(0.94 0.01 270);
+
+  /* Charts */
+  --chart-1: oklch(0.62 0.26 290);
+  --chart-2: oklch(0.82 0.24 130);
+  --chart-3: oklch(0.88 0.18 90);
+  --chart-4: oklch(0.68 0.3 335);
+  --chart-5: oklch(0.76 0.2 55);
+
+  --radius: 0.75rem;
+
+  /* Sidebar */
+  --sidebar: oklch(0.14 0.018 280);
+  --sidebar-foreground: oklch(0.94 0.01 270);
+  --sidebar-primary: oklch(0.62 0.26 290);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.22 0.02 280);
+  --sidebar-accent-foreground: oklch(0.94 0.01 270);
+  --sidebar-border: oklch(0.28 0.04 285);
+  --sidebar-ring: oklch(0.62 0.26 290);
 }
 
 @theme inline {
-  --font-sans: 'Nunito', 'Geist', system-ui, sans-serif;
+  /* Typography — Solbera stack with system fallbacks */
+  --font-sans: 'Scaly Sans', 'Bookinsanity', system-ui, sans-serif;
+  --font-display: 'Nodesto Caps Condensed', 'Mr Eaves Small Caps', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -145,8 +161,14 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
+  --color-lime: var(--lime);
+  --color-lime-foreground: var(--lime-foreground);
+  --color-lemon: var(--lemon);
+  --color-lemon-foreground: var(--lemon-foreground);
+  --color-orange: var(--orange);
+  --color-orange-foreground: var(--orange-foreground);
+  --color-magenta: var(--magenta);
+  --color-magenta-foreground: var(--magenta-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -159,7 +181,6 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -177,100 +198,34 @@
   body {
     @apply bg-background text-foreground;
   }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
 }
 
-/* Flat button styles */
-.btn-flat {
-  @apply font-bold rounded-2xl shadow-none border-0 transition-all;
-}
+/* Neon glow helpers */
+.glow-primary { box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 60%, transparent); }
+.glow-lime    { box-shadow: 0 0 12px color-mix(in oklch, var(--lime) 60%, transparent); }
+.glow-orange  { box-shadow: 0 0 12px color-mix(in oklch, var(--orange) 60%, transparent); }
+.glow-magenta { box-shadow: 0 0 12px color-mix(in oklch, var(--magenta) 60%, transparent); }
 
-.btn-flat:hover {
-  @apply brightness-95;
-}
-
-.btn-flat:active {
-  @apply scale-[0.98];
-}
-
-/* Card elevation (subtle shadow for flat UI) */
+/* Card */
 .card-flat {
-  @apply bg-card rounded-2xl border-2 border-border;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-}
-
-.card-flat:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
-}
-
-/* Input styles for flat UI */
-.input-flat {
-  @apply bg-input border-2 border-border rounded-xl px-4 py-3 font-medium;
-  @apply focus:outline-none focus:border-primary focus:ring-0;
-  @apply placeholder:text-muted-foreground;
-}
-
-/* Badge styles */
-.badge-flat {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold;
-}
-
-/* Tab styles */
-.tab-flat {
-  @apply px-4 py-2 rounded-xl font-semibold transition-colors;
-}
-
-.tab-flat-active {
-  @apply bg-primary text-primary-foreground;
-}
-
-.tab-flat-inactive {
-  @apply bg-transparent text-muted-foreground hover:bg-muted;
+  @apply bg-card rounded-xl border border-border;
 }
 
 /* Modern scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 8px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
-
-/* Hide scrollbar but keep functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-/* Animations for flat UI */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
 }
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* Progress bar */
-.progress-flat {
-  @apply h-3 bg-muted rounded-full overflow-hidden;
-}
-
-.progress-flat-fill {
-  @apply h-full rounded-full transition-all duration-300;
-}
+.animate-float { animation: float 3s ease-in-out infinite; }

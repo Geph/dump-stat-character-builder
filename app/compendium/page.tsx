@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit } from "lucide-react"

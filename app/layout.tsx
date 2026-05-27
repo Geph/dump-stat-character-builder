@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next'
-import { Nunito, Geist_Mono } from 'next/font/google'
+import { Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
+// Solbera fonts are loaded via @font-face in globals.css
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#26A69A', // Flat UI Teal
+  themeColor: '#1a1025',
 }
 
 export default function RootLayout({
@@ -40,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background">
-      <body className={`${nunito.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${geistMono.variable} font-sans antialiased`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
