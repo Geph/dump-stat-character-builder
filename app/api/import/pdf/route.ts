@@ -1,0 +1,172 @@
+import { createClient } from "@/lib/supabase/server"
+import { NextRequest, NextResponse } from "next/server"
+import { generateText, Output } from "ai"
+import { z } from "zod"
+
+// Schema for AI extraction
+const ContentSchema = z.object({
+  species: z.array(z.object({
+    name: z.string(),
+    description: z.string().nullable(),
+    speed: z.number().nullable(),
+    size: z.string().nullable(),
+    traits: z.array(z.object({
+      name: z.string(),
+      description: z.string()
+    }))
+  })).optional(),
+  classes: z.array(z.object({
+    name: z.string(),
+    description: z.string().nullable(),
+    hit_die: z.number(),
+    primary_ability: z.array(z.string()).nullable(),
+    features: z.array(z.object({
+      level: z.number(),
+      name: z.string(),
+      description: z.string()
+    }))
+  })).optional(),
+  backgrounds: z.array(z.object({
+    name: z.string(),
+    description: z.string().nullable(),
+    skill_proficiencies: z.array(z.string()).nullable(),
+    feat_granted: z.string().nullable(),
+    ability_bonuses: z.record(z.string(), z.number()).nullable()
+  })).optional(),
+  spells: z.array(z.object({
+    name: z.string(),
+    level: z.number(),
+    school: z.string(),
+    casting_time: z.string().nullable(),
+    range: z.string().nullable(),
+    components: z.array(z.string()).nullable(),
+    duration: z.string().nullable(),
+    concentration: z.boolean(),
+    description: z.string().nullable(),
+    classes: z.array(z.string()).nullable()
+  })).optional(),
+  feats: z.array(z.object({
+    name: z.string(),
+    description: z.string().nullable(),
+    prerequisite: z.string().nullable()
+  })).optional(),
+  equipment: z.array(z.object({
+    name: z.string(),
+    category: z.string(),
+    subcategory: z.string().nullable(),
+    description: z.string().nullable()
+  })).optional()
+})
+
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData()
+    const file = formData.get("pdf") as File
+    
+    if (!file) {
+      return NextResponse.json({ error: "No PDF file provided" }, { status: 400 })
+    }
+
+    // Convert file to buffer
+    const buffer = Buffer.from(await file.arrayBuffer())
+    
+    // Dynamic import for pdf-parse (CommonJS module)
+    const pdfParse = (await import("pdf-parse")).default
+    const pdfData = await pdfParse(buffer)
+    const text = pdfData.text
+
+    // Truncate text if too long (AI context limits)
+    const maxLength = 50000
+    const truncatedText = text.length > maxLength 
+      ? text.slice(0, maxLength) + "\n...[truncated]" 
+      : text
+
+    // Use AI to extract structured content
+    const result = await generateText({
+      model: "openai/gpt-4o",
+      system: `You are a D&D 2024 content parser. Extract game content from the provided PDF text.
+      
+Important D&D 2024 rules:
+- "Species" is the new term (not "Race")
+- Backgrounds grant ability score bonuses (+2 to one, +1 to another, or +1/+1/+1)
+- Backgrounds grant a 1st-level feat
+- Species no longer grant ability score bonuses
+
+Extract ONLY the content types you find in the text. Return empty arrays for types not present.
+Be thorough and extract all instances of each content type found.`,
+      prompt: `Extract D&D content from this PDF text:\n\n${truncatedText}`,
+      output: Output.object({ schema: ContentSchema })
+    })
+
+    const content = result.output
+    const supabase = await createClient()
+    let totalImported = 0
+
+    // Insert species
+    if (content.species && content.species.length > 0) {
+      const { error } = await supabase
+        .from("species")
+        .upsert(content.species.map(s => ({ ...s, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.species.length
+    }
+
+    // Insert classes
+    if (content.classes && content.classes.length > 0) {
+      const { error } = await supabase
+        .from("classes")
+        .upsert(content.classes.map(c => ({ ...c, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.classes.length
+    }
+
+    // Insert backgrounds
+    if (content.backgrounds && content.backgrounds.length > 0) {
+      const { error } = await supabase
+        .from("backgrounds")
+        .upsert(content.backgrounds.map(b => ({ ...b, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.backgrounds.length
+    }
+
+    // Insert spells
+    if (content.spells && content.spells.length > 0) {
+      const { error } = await supabase
+        .from("spells")
+        .upsert(content.spells.map(s => ({ ...s, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.spells.length
+    }
+
+    // Insert feats
+    if (content.feats && content.feats.length > 0) {
+      const { error } = await supabase
+        .from("feats")
+        .upsert(content.feats.map(f => ({ ...f, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.feats.length
+    }
+
+    // Insert equipment
+    if (content.equipment && content.equipment.length > 0) {
+      const { error } = await supabase
+        .from("equipment")
+        .upsert(content.equipment.map(e => ({ ...e, source: "PDF Import" })), { onConflict: "name" })
+      if (!error) totalImported += content.equipment.length
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      count: totalImported,
+      breakdown: {
+        species: content.species?.length || 0,
+        classes: content.classes?.length || 0,
+        backgrounds: content.backgrounds?.length || 0,
+        spells: content.spells?.length || 0,
+        feats: content.feats?.length || 0,
+        equipment: content.equipment?.length || 0,
+      }
+    })
+  } catch (error) {
+    console.error("PDF import error:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to import PDF" },
+      { status: 500 }
+    )
+  }
+}
