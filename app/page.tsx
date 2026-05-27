@@ -52,8 +52,8 @@ export default function HomePage() {
               </div>
               
               <h1 className="text-5xl md:text-7xl font-black text-foreground mb-6 text-balance">
-                Build Your
-                <span className="text-primary"> Hero</span>
+                Sheet
+                <span className="text-primary"> Happens</span>
               </h1>
               
               <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty">
@@ -201,7 +201,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
-          <p>HeroForge - D&D 5.5e Character Builder</p>
+          <p>Sheet Happens - D&D 5.5e Character Builder</p>
           <p className="mt-1">Uses content from the D&D SRD 5.2 under the Creative Commons license.</p>
         </div>
       </footer>

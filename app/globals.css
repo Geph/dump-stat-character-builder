@@ -3,120 +3,128 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Duolingo-inspired vibrant color scheme */
+/* Flat UI Design - Bright, Solid Colors inspired by Android Material */
 :root {
-  /* Primary - Vibrant Green (like Duolingo) */
-  --primary: oklch(0.72 0.19 145);
+  /* Primary - Vibrant Teal/Cyan */
+  --primary: oklch(0.7 0.15 185);
   --primary-foreground: oklch(1 0 0);
   
-  /* Secondary - Electric Blue */
-  --secondary: oklch(0.65 0.18 250);
+  /* Secondary - Coral/Salmon */
+  --secondary: oklch(0.72 0.16 30);
   --secondary-foreground: oklch(1 0 0);
   
-  /* Accent - Warm Orange */
-  --accent: oklch(0.75 0.18 55);
+  /* Accent - Golden Yellow */
+  --accent: oklch(0.85 0.17 85);
   --accent-foreground: oklch(0.2 0 0);
   
-  /* Background - Clean off-white */
-  --background: oklch(0.98 0.005 90);
-  --foreground: oklch(0.2 0.02 280);
+  /* Background - Clean white */
+  --background: oklch(0.985 0.002 90);
+  --foreground: oklch(0.25 0.02 260);
   
-  /* Card - Pure white */
+  /* Card - Pure white with subtle border */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 280);
+  --card-foreground: oklch(0.25 0.02 260);
   
-  /* Muted - Light gray with warm tint */
-  --muted: oklch(0.94 0.01 90);
-  --muted-foreground: oklch(0.5 0.02 280);
+  /* Muted - Soft gray */
+  --muted: oklch(0.95 0.005 260);
+  --muted-foreground: oklch(0.5 0.02 260);
   
-  /* Border - Soft gray */
-  --border: oklch(0.88 0.01 90);
-  --input: oklch(0.94 0.01 90);
-  --ring: oklch(0.72 0.19 145);
+  /* Border - Crisp gray */
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.97 0.003 260);
+  --ring: oklch(0.7 0.15 185);
   
-  /* Semantic colors */
-  --destructive: oklch(0.6 0.22 25);
+  /* Semantic colors - Flat, solid */
+  --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(1 0 0);
   
-  --success: oklch(0.72 0.19 145);
+  --success: oklch(0.65 0.17 155);
   --success-foreground: oklch(1 0 0);
   
-  --warning: oklch(0.8 0.18 85);
+  --warning: oklch(0.8 0.15 75);
   --warning-foreground: oklch(0.2 0 0);
+  
+  /* Info blue */
+  --info: oklch(0.65 0.15 240);
+  --info-foreground: oklch(1 0 0);
   
   /* Popover */
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 280);
+  --popover-foreground: oklch(0.25 0.02 260);
   
-  /* Charts */
-  --chart-1: oklch(0.72 0.19 145);
-  --chart-2: oklch(0.65 0.18 250);
-  --chart-3: oklch(0.75 0.18 55);
-  --chart-4: oklch(0.7 0.2 330);
-  --chart-5: oklch(0.65 0.15 200);
+  /* Charts - Vibrant palette */
+  --chart-1: oklch(0.7 0.15 185);
+  --chart-2: oklch(0.72 0.16 30);
+  --chart-3: oklch(0.85 0.17 85);
+  --chart-4: oklch(0.65 0.18 300);
+  --chart-5: oklch(0.65 0.17 155);
   
-  --radius: 0.75rem;
+  /* Flat UI specific - more rounded corners */
+  --radius: 1rem;
   
   /* Sidebar */
   --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.2 0.02 280);
-  --sidebar-primary: oklch(0.72 0.19 145);
+  --sidebar-foreground: oklch(0.25 0.02 260);
+  --sidebar-primary: oklch(0.7 0.15 185);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.01 90);
-  --sidebar-accent-foreground: oklch(0.2 0.02 280);
-  --sidebar-border: oklch(0.88 0.01 90);
-  --sidebar-ring: oklch(0.72 0.19 145);
+  --sidebar-accent: oklch(0.95 0.005 260);
+  --sidebar-accent-foreground: oklch(0.25 0.02 260);
+  --sidebar-border: oklch(0.9 0.005 260);
+  --sidebar-ring: oklch(0.7 0.15 185);
 }
 
 .dark {
-  /* Dark mode - keep it vibrant */
-  --primary: oklch(0.75 0.2 145);
-  --primary-foreground: oklch(0.15 0 0);
+  /* Dark mode - vibrant on dark */
+  --primary: oklch(0.75 0.15 185);
+  --primary-foreground: oklch(0.1 0 0);
   
-  --secondary: oklch(0.68 0.18 250);
-  --secondary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.75 0.16 30);
+  --secondary-foreground: oklch(0.1 0 0);
   
-  --accent: oklch(0.78 0.18 55);
-  --accent-foreground: oklch(0.15 0 0);
+  --accent: oklch(0.85 0.17 85);
+  --accent-foreground: oklch(0.1 0 0);
   
-  --background: oklch(0.15 0.02 280);
+  --background: oklch(0.13 0.02 260);
   --foreground: oklch(0.95 0 0);
   
-  --card: oklch(0.2 0.02 280);
+  --card: oklch(0.17 0.02 260);
   --card-foreground: oklch(0.95 0 0);
   
-  --muted: oklch(0.25 0.02 280);
-  --muted-foreground: oklch(0.65 0 0);
+  --muted: oklch(0.22 0.02 260);
+  --muted-foreground: oklch(0.6 0 0);
   
-  --border: oklch(0.3 0.02 280);
-  --input: oklch(0.25 0.02 280);
-  --ring: oklch(0.75 0.2 145);
+  --border: oklch(0.28 0.02 260);
+  --input: oklch(0.2 0.02 260);
+  --ring: oklch(0.75 0.15 185);
   
-  --destructive: oklch(0.55 0.22 25);
+  --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.95 0 0);
   
-  --success: oklch(0.75 0.2 145);
-  --success-foreground: oklch(0.15 0 0);
+  --success: oklch(0.7 0.17 155);
+  --success-foreground: oklch(0.1 0 0);
   
-  --warning: oklch(0.8 0.18 85);
-  --warning-foreground: oklch(0.15 0 0);
+  --warning: oklch(0.8 0.15 75);
+  --warning-foreground: oklch(0.1 0 0);
   
-  --popover: oklch(0.2 0.02 280);
+  --info: oklch(0.7 0.15 240);
+  --info-foreground: oklch(0.95 0 0);
+  
+  --popover: oklch(0.17 0.02 260);
   --popover-foreground: oklch(0.95 0 0);
   
-  --sidebar: oklch(0.18 0.02 280);
+  --sidebar: oklch(0.15 0.02 260);
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.75 0.2 145);
-  --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.25 0.02 280);
+  --sidebar-primary: oklch(0.75 0.15 185);
+  --sidebar-primary-foreground: oklch(0.1 0 0);
+  --sidebar-accent: oklch(0.22 0.02 260);
   --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.3 0.02 280);
-  --sidebar-ring: oklch(0.75 0.2 145);
+  --sidebar-border: oklch(0.28 0.02 260);
+  --sidebar-ring: oklch(0.75 0.15 185);
 }
 
 @theme inline {
-  --font-sans: 'Nunito', 'Geist', sans-serif;
-  --font-mono: 'Geist Mono', monospace;
+  --font-sans: 'Nunito', 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -137,6 +145,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -149,6 +159,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -168,20 +179,67 @@
   }
 }
 
-/* Custom scrollbar for a modern look */
+/* Flat button styles */
+.btn-flat {
+  @apply font-bold rounded-2xl shadow-none border-0 transition-all;
+}
+
+.btn-flat:hover {
+  @apply brightness-95;
+}
+
+.btn-flat:active {
+  @apply scale-[0.98];
+}
+
+/* Card elevation (subtle shadow for flat UI) */
+.card-flat {
+  @apply bg-card rounded-2xl border-2 border-border;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.card-flat:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Input styles for flat UI */
+.input-flat {
+  @apply bg-input border-2 border-border rounded-xl px-4 py-3 font-medium;
+  @apply focus:outline-none focus:border-primary focus:ring-0;
+  @apply placeholder:text-muted-foreground;
+}
+
+/* Badge styles */
+.badge-flat {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold;
+}
+
+/* Tab styles */
+.tab-flat {
+  @apply px-4 py-2 rounded-xl font-semibold transition-colors;
+}
+
+.tab-flat-active {
+  @apply bg-primary text-primary-foreground;
+}
+
+.tab-flat-inactive {
+  @apply bg-transparent text-muted-foreground hover:bg-muted;
+}
+
+/* Modern scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--muted);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -196,4 +254,23 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Animations for flat UI */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Progress bar */
+.progress-flat {
+  @apply h-3 bg-muted rounded-full overflow-hidden;
+}
+
+.progress-flat-fill {
+  @apply h-full rounded-full transition-all duration-300;
 }

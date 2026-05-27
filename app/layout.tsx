@@ -7,7 +7,7 @@ const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: 'HeroForge - D&D 5.5e Character Builder',
+  title: 'Sheet Happens - D&D 5.5e Character Builder',
   description: 'Create and manage your D&D 2024 characters with an intuitive, modern interface. Build heroes, track stats, and import content from any source.',
   generator: 'v0.app',
   icons: {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#58CC02',
+  themeColor: '#26A69A', // Flat UI Teal
 }
 
 export default function RootLayout({

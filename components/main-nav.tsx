@@ -22,11 +22,11 @@ export function MainNav() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center">
-              <span className="text-xl font-black text-white">D</span>
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-xl font-black text-primary-foreground">S</span>
             </div>
             <span className="font-black text-xl text-foreground hidden sm:inline">
-              HeroForge
+              Sheet Happens
             </span>
           </Link>
 

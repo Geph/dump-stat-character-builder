@@ -171,6 +171,27 @@ function parseSpell(html: string, url: string) {
   }
 }
 
+function parseFeat(html: string, url: string) {
+  const $ = cheerio.load(html)
+  const name = $("#page-title").text().trim().replace(/^Feat:\s*/i, "") || $("h1").first().text().trim()
+  
+  const mainContent = $("#page-content, .page-content, article").first()
+  const fullText = mainContent.text()
+  
+  // Get description
+  const description = mainContent.find("p").first().text().trim()
+  
+  // Extract prerequisite
+  const prereqMatch = fullText.match(/Prerequisite[s]?[:\s]*([^\n.]+)/i)
+  
+  return {
+    name,
+    description,
+    prerequisite: prereqMatch ? prereqMatch[1].trim() : null,
+    source: new URL(url).hostname
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json()
@@ -197,23 +218,50 @@ export async function POST(request: NextRequest) {
     let result
     let tableName: string
     
-    if (path.includes("/lineage:") || path.includes("/species:")) {
+    // More flexible path matching for dnd2024.wikidot.com
+    // Common patterns: /lineage:elf, /class:fighter, /spell:fireball, /artificer:main (class), /feat:alert
+    const pathLower = path.toLowerCase()
+    
+    // Class names on wikidot often use format like /artificer:main, /barbarian:main
+    const classNames = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"]
+    const isClassPage = classNames.some(c => pathLower.includes(`/${c}:`))
+    
+    if (pathLower.includes("/lineage:") || pathLower.includes("/species:") || pathLower.includes("/race:")) {
       result = parseSpecies(html, url)
       tableName = "species"
-    } else if (path.includes("/class:")) {
+    } else if (pathLower.includes("/class:") || isClassPage) {
       result = parseClass(html, url)
       tableName = "classes"
-    } else if (path.includes("/background:")) {
+    } else if (pathLower.includes("/background:")) {
       result = parseBackground(html, url)
       tableName = "backgrounds"
-    } else if (path.includes("/spell:")) {
+    } else if (pathLower.includes("/spell:")) {
       result = parseSpell(html, url)
       tableName = "spells"
+    } else if (pathLower.includes("/feat:")) {
+      result = parseFeat(html, url)
+      tableName = "feats"
     } else {
-      return NextResponse.json(
-        { error: "Could not determine content type from URL. Use URLs like /lineage:elf, /class:fighter, /spell:fireball" },
-        { status: 400 }
-      )
+      // Try to auto-detect from page content
+      const $ = cheerio.load(html)
+      const pageTitle = $("#page-title").text().toLowerCase()
+      const breadcrumb = $(".breadcrumb, .page-tags").text().toLowerCase()
+      
+      if (pageTitle.includes("spell") || breadcrumb.includes("spell")) {
+        result = parseSpell(html, url)
+        tableName = "spells"
+      } else if (pageTitle.includes("feat") || breadcrumb.includes("feat")) {
+        result = parseFeat(html, url)
+        tableName = "feats"
+      } else if (breadcrumb.includes("class") || pageTitle.includes("class")) {
+        result = parseClass(html, url)
+        tableName = "classes"
+      } else {
+        return NextResponse.json(
+          { error: "Could not determine content type from URL. Try URLs like /lineage:elf, /class:fighter, /spell:fireball, /feat:alert, or /background:sage" },
+          { status: 400 }
+        )
+      }
     }
 
     const { error } = await supabase

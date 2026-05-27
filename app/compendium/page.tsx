@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment } from "@/lib/types"
 
 type ContentType = "species" | "classes" | "backgrounds" | "spells" | "feats" | "equipment"
@@ -66,17 +66,30 @@ export default function CompendiumPage() {
 
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
+    const editPath = `/compendium/${activeTab}/${data.id}`
     
     return (
       <motion.div
         key={data.id as string}
         layoutId={data.id as string}
-        onClick={() => setSelectedItem(item)}
-        className="bg-card rounded-2xl p-5 border-2 border-border hover:border-primary cursor-pointer transition-colors"
+        className="bg-card rounded-2xl p-5 border-2 border-border hover:border-primary transition-colors"
         whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
       >
-        <h3 className="font-bold text-lg text-foreground mb-2">{data.name as string}</h3>
+        <div className="flex items-start justify-between mb-2">
+          <h3 
+            className="font-bold text-lg text-foreground cursor-pointer hover:text-primary"
+            onClick={() => setSelectedItem(item)}
+          >
+            {data.name as string}
+          </h3>
+          <Link
+            href={editPath}
+            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            title="Edit"
+          >
+            <Edit className="w-4 h-4" />
+          </Link>
+        </div>
         {activeTab === "classes" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
@@ -155,9 +168,18 @@ export default function CompendiumPage() {
       <MainNav />
       
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
-          <p className="text-muted-foreground text-lg">Browse all available D&D content</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
+            <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
+          </div>
+          <Link
+            href={`/compendium/${activeTab === "classes" ? "classes" : activeTab === "species" ? "species" : activeTab === "backgrounds" ? "backgrounds" : activeTab}/new`}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New {activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}
+          </Link>
         </div>
 
         {/* Search */}
