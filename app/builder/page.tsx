@@ -519,7 +519,7 @@ export default function BuilderPage() {
                 
                 <p className="text-xs text-muted-foreground mb-2">Click a class to add it, or increase its level if already selected.</p>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto pr-[10px] pb-[10px]">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto pl-[10px] pt-[10px] pr-[10px] pb-[10px]">
                   {classes
                     .filter(cls => cls.name.toLowerCase().includes(classSearch.toLowerCase()))
                     .map((cls) => {
