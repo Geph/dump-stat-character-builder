@@ -7,10 +7,14 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import type { UsesConfig } from "@/lib/types"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
 const WEAPON_TYPES = ["Simple weapons", "Martial weapons", "Specific weapon"]
+const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
+const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
+const DIE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
 const SKILLS = [
   "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception",
   "History", "Insight", "Intimidation", "Investigation", "Medicine",
@@ -22,6 +26,7 @@ interface ClassFeature {
   level: number
   name: string
   description: string
+  limitedUses?: UsesConfig | null
 }
 
 interface ClassFormData {
@@ -531,8 +536,8 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
             
             <div className="space-y-4">
               {form.features.map((feature, index) => (
-                <div key={index} className="bg-card border-2 border-border rounded-xl p-4">
-                  <div className="flex items-start gap-4 mb-3">
+                <div key={index} className="bg-card border-2 border-border rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <input
                         type="text"
@@ -542,16 +547,16 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                         className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
                       />
                     </div>
-                    <div className="w-24">
-                      <input
-                        type="number"
-                        min={1}
-                        max={20}
+                    <div className="w-32">
+                      <select
                         value={feature.level}
-                        onChange={(e) => updateFeature(index, "level", parseInt(e.target.value) || 1)}
-                        placeholder="Level"
+                        onChange={(e) => updateFeature(index, "level", parseInt(e.target.value))}
                         className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-foreground text-center focus:outline-none focus:border-primary"
-                      />
+                      >
+                        {LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>Level {lvl}</option>
+                        ))}
+                      </select>
                     </div>
                     <button
                       type="button"
@@ -568,6 +573,172 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                     rows={2}
                     className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
                   />
+                  
+                  {/* Limited Uses Checkbox */}
+                  <label className="flex items-center gap-2 cursor-pointer text-sm pt-2 border-t border-border">
+                    <input
+                      type="checkbox"
+                      checked={feature.limitedUses !== null && feature.limitedUses !== undefined}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const newFeatures = [...form.features]
+                          newFeatures[index] = { ...newFeatures[index], limitedUses: { type: "unlimited" } }
+                          setForm({ ...form, features: newFeatures })
+                        } else {
+                          const newFeatures = [...form.features]
+                          newFeatures[index] = { ...newFeatures[index], limitedUses: null }
+                          setForm({ ...form, features: newFeatures })
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-muted-foreground">Has limited uses</span>
+                  </label>
+
+                  {/* Limited Uses Configuration */}
+                  {feature.limitedUses && (
+                    <div className="bg-card-lighter border-2 border-primary/30 rounded-lg p-3 space-y-3 ml-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1">
+                            Uses Type
+                          </label>
+                          <select
+                            value={feature.limitedUses.type}
+                            onChange={(e) => {
+                              const newFeatures = [...form.features]
+                              newFeatures[index] = {
+                                ...newFeatures[index],
+                                limitedUses: { ...feature.limitedUses!, type: e.target.value as UsesConfig["type"] }
+                              }
+                              setForm({ ...form, features: newFeatures })
+                            }}
+                            className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+                          >
+                            <option value="unlimited">Unlimited (At Will)</option>
+                            <option value="fixed">Fixed Number</option>
+                            <option value="proficiency">Proficiency Modifier</option>
+                            <option value="ability_modifier">Ability Modifier</option>
+                            <option value="at_level">Based on Level</option>
+                          </select>
+                        </div>
+
+                        {feature.limitedUses.type === "fixed" && (
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-1">
+                              Number of Uses
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={feature.limitedUses.fixedAmount ?? 1}
+                              onChange={(e) => {
+                                const newFeatures = [...form.features]
+                                newFeatures[index] = {
+                                  ...newFeatures[index],
+                                  limitedUses: { ...feature.limitedUses!, fixedAmount: parseInt(e.target.value) || 1 }
+                                }
+                                setForm({ ...form, features: newFeatures })
+                              }}
+                              className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm"
+                            />
+                          </div>
+                        )}
+
+                        {feature.limitedUses.type === "ability_modifier" && (
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-1">
+                              Ability Score
+                            </label>
+                            <select
+                              value={feature.limitedUses.abilityModifier || ""}
+                              onChange={(e) => {
+                                const newFeatures = [...form.features]
+                                newFeatures[index] = {
+                                  ...newFeatures[index],
+                                  limitedUses: { ...feature.limitedUses!, abilityModifier: e.target.value as any }
+                                }
+                                setForm({ ...form, features: newFeatures })
+                              }}
+                              className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm"
+                            >
+                              <option value="">Select...</option>
+                              {ABILITY_MODIFIERS.map((mod) => (
+                                <option key={mod} value={mod}>{mod}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1">
+                            Recharges On
+                          </label>
+                          <select
+                            value={feature.limitedUses.recharge || ""}
+                            onChange={(e) => {
+                              const newFeatures = [...form.features]
+                              newFeatures[index] = {
+                                ...newFeatures[index],
+                                limitedUses: { ...feature.limitedUses!, recharge: e.target.value as any }
+                              }
+                              setForm({ ...form, features: newFeatures })
+                            }}
+                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs"
+                          >
+                            <option value="">No recharge</option>
+                            <option value="short_rest">Short Rest</option>
+                            <option value="long_rest">Long Rest</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1">
+                            Die Count
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={feature.limitedUses.dieCount ?? ""}
+                            onChange={(e) => {
+                              const newFeatures = [...form.features]
+                              newFeatures[index] = {
+                                ...newFeatures[index],
+                                limitedUses: { ...feature.limitedUses!, dieCount: e.target.value ? parseInt(e.target.value) : undefined }
+                              }
+                              setForm({ ...form, features: newFeatures })
+                            }}
+                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-center"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-foreground mb-1">
+                            Die Type
+                          </label>
+                          <select
+                            value={feature.limitedUses.dieType || ""}
+                            onChange={(e) => {
+                              const newFeatures = [...form.features]
+                              newFeatures[index] = {
+                                ...newFeatures[index],
+                                limitedUses: { ...feature.limitedUses!, dieType: e.target.value as any }
+                              }
+                              setForm({ ...form, features: newFeatures })
+                            }}
+                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs"
+                          >
+                            <option value="">None</option>
+                            {DIE_TYPES.map((die) => (
+                              <option key={die} value={die}>{die}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

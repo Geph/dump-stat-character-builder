@@ -418,7 +418,7 @@ export default function BuilderPage() {
                     </span>
                   </div>
                   {index < STEPS.length - 1 && (
-                    <div className={`w-4 md:w-12 h-1 mx-1 md:mx-2 rounded ${
+                    <div className={`flex-1 h-1 mx-1 md:mx-2 rounded ${
                       isComplete ? "bg-success" : "bg-muted"
                     }`} />
                   )}
