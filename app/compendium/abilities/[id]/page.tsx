@@ -607,7 +607,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               <div>
                 <span className="font-semibold text-foreground">Show in Character Builder</span>
                 <p className="text-sm text-muted-foreground">
-                  When enabled, this custom ability will appear in the &quot;Custom&quot; tab of the character builder preview.
+                  When enabled, this custom ability will appear in the &quot;Custom&quot; tab of the character builder preview as well as character sheet.
                 </p>
               </div>
             </label>
