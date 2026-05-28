@@ -251,15 +251,15 @@ export default function HomePage() {
         >
           {/* Dark overlay for readability */}
           <div className="absolute inset-0 bg-background/55 pointer-events-none" />
-          {/* Inset purple border */}
-          <div className="absolute inset-4 border-2 border-primary/30 rounded-xl pointer-events-none z-5" />
           <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="bg-card-lighter border border-border rounded-2xl p-8 md:p-12"
+              className="relative bg-card-lighter border border-border rounded-2xl p-8 md:p-12"
             >
+              {/* Inset purple border */}
+              <div className="absolute inset-3 border-2 border-primary/30 rounded-xl pointer-events-none" />
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
                 <div>
                   <h2
