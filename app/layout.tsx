@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: 'Dump Stat - D&D 5.5e Character Builder',
-  description: 'Create and manage your D&D 2024 characters with an intuitive, modern interface. Build heroes, track stats, and import content from any source.',
+  description: 'A vibe-coded D&D 5.5e character creator with support for custom classes and content',
   generator: 'v0.app',
   icons: {
     icon: [
