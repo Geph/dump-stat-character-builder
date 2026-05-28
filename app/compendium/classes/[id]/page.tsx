@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Plus, X } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
 
@@ -138,6 +138,25 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
     router.push("/compendium?tab=classes")
   }
 
+  const handleExport = () => {
+    const exportData = {
+      type: "dnd-class",
+      version: 1,
+      data: {
+        ...form,
+        features: form.features.filter(f => f.name.trim()),
+        spellcasting: hasSpellcasting ? form.spellcasting : null,
+      }
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${form.name.toLowerCase().replace(/\s+/g, "-")}-class.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this class?")) return
     
@@ -226,13 +245,22 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
           </div>
           
           {id !== "new" && (
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
           )}
         </div>
 

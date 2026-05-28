@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Plus, X, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Plus, X, ChevronDown, ChevronRight, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
 
@@ -128,6 +128,25 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
     
     setSaving(false)
     router.push("/compendium?tab=species")
+  }
+
+  const handleExport = () => {
+    const exportData = {
+      type: "dnd-species",
+      version: 1,
+      data: {
+        ...form,
+        traits: form.traits.filter(t => t.name.trim()),
+        lineages: form.lineages.map(l => ({ ...l, traits: l.traits.filter(t => t.name.trim()) }))
+      }
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${form.name.toLowerCase().replace(/\s+/g, "-")}-species.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleDelete = async () => {
@@ -287,13 +306,22 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
           </div>
           
           {id !== "new" && (
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
           )}
         </div>
 

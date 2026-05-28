@@ -19,7 +19,12 @@ import {
   X,
   Wand2,
   Search,
-  Info
+  Info,
+  Heart,
+  Swords,
+  Sparkles,
+  Plus,
+  Minus
 } from "lucide-react"
 import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft } from "@/lib/types"
 
@@ -88,6 +93,16 @@ export default function BuilderPage() {
     type: "class" | "species" | "background" | "spell" | "equipment" | null
     item: DndClass | Species | Background | Spell | Equipment | null
   }>({ type: null, item: null })
+  
+  // Preview tabs
+  const [previewTab, setPreviewTab] = useState<"summary" | "combat" | "features">("summary")
+  
+  // Multiclass support - tracks class levels
+  const [classLevels, setClassLevels] = useState<{ classId: string; level: number }[]>([])
+  
+  // Current HP tracker
+  const [currentHp, setCurrentHp] = useState<number | null>(null)
+  const [tempHp, setTempHp] = useState(0)
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -188,23 +203,45 @@ export default function BuilderPage() {
     setSaving(true)
     const supabase = createClient()
 
-    const selectedClass = classes.find(c => c.id === character.class_id)
-    const selectedSpecies = species.find(s => s.id === character.species_id)
+    const cls = classes.find(c => c.id === character.class_id)
+    const sp = species.find(s => s.id === character.species_id)
 
-    // Calculate derived stats
+    // Calculate derived stats using our computed values
+    const calculatedLevel = classLevels.length > 0 
+      ? classLevels.reduce((sum, cl) => sum + cl.level, 0) 
+      : character.level
     const conMod = Math.floor((character.constitution - 10) / 2)
     const dexMod = Math.floor((character.dexterity - 10) / 2)
-    const hitPointMax = selectedClass ? selectedClass.hit_die + conMod : 8 + conMod
-    const speed = selectedSpecies?.speed || 30
+    
+    // Calculate proper HP for multiclass
+    let hitPointMax = 0
+    const classesForHp = classLevels.length > 0 
+      ? classLevels.map(cl => ({ cls: classes.find(c => c.id === cl.classId), level: cl.level }))
+      : cls ? [{ cls, level: calculatedLevel }] : []
+    
+    let isFirst = true
+    for (const { cls: c, level } of classesForHp) {
+      if (!c) continue
+      for (let i = 0; i < level; i++) {
+        if (isFirst) {
+          hitPointMax += c.hit_die + conMod
+          isFirst = false
+        } else {
+          hitPointMax += Math.floor(c.hit_die / 2) + 1 + conMod
+        }
+      }
+    }
+    hitPointMax = Math.max(hitPointMax, 1)
 
     const characterData = {
       ...character,
+      level: calculatedLevel,
       local_id: `local_${Date.now()}`,
       hit_point_max: hitPointMax,
       hit_points: hitPointMax,
       armor_class: 10 + dexMod,
-      speed,
-      proficiency_bonus: 2,
+      speed: sp?.speed || 30,
+      proficiency_bonus: Math.floor((calculatedLevel - 1) / 4) + 2,
     }
 
     const { data, error } = await supabase
@@ -227,10 +264,100 @@ export default function BuilderPage() {
   const selectedClass = classes.find(c => c.id === character.class_id)
   const selectedSpecies = species.find(s => s.id === character.species_id)
   const selectedBackground = backgrounds.find(b => b.id === character.background_id)
+  
+  // Calculate total level from all class levels
+  const totalLevel = classLevels.length > 0 
+    ? classLevels.reduce((sum, cl) => sum + cl.level, 0)
+    : character.level
+  
+  // Get proficiency bonus based on total level
+  const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
+  
+  // Get all classes the character has levels in
+  const characterClasses = classLevels.map(cl => ({
+    ...classes.find(c => c.id === cl.classId)!,
+    level: cl.level
+  })).filter(c => c)
+  
+  // Primary class (first or highest level)
+  const primaryClass = characterClasses.length > 0 ? characterClasses[0] : selectedClass
+  
+  // Compute ability modifiers
+  const abilityMods = {
+    strength: Math.floor((character.strength - 10) / 2),
+    dexterity: Math.floor((character.dexterity - 10) / 2),
+    constitution: Math.floor((character.constitution - 10) / 2),
+    intelligence: Math.floor((character.intelligence - 10) / 2),
+    wisdom: Math.floor((character.wisdom - 10) / 2),
+    charisma: Math.floor((character.charisma - 10) / 2),
+  }
+  
+  // Calculate max HP (hit die + con mod at level 1, average + con mod thereafter)
+  const calculateMaxHp = () => {
+    if (characterClasses.length === 0 && !selectedClass) return 8 + abilityMods.constitution
+    let hp = 0
+    let isFirstLevel = true
+    for (const cls of characterClasses.length > 0 ? characterClasses : [{ ...selectedClass!, level: character.level }]) {
+      if (!cls) continue
+      for (let i = 0; i < cls.level; i++) {
+        if (isFirstLevel) {
+          hp += cls.hit_die + abilityMods.constitution
+          isFirstLevel = false
+        } else {
+          hp += Math.floor(cls.hit_die / 2) + 1 + abilityMods.constitution
+        }
+      }
+    }
+    return Math.max(hp, 1)
+  }
+  const maxHp = calculateMaxHp()
+  
+  // Armor Class (base 10 + dex, can be modified by armor later)
+  const armorClass = 10 + abilityMods.dexterity
+  
+  // Speed from species
+  const speed = selectedSpecies?.speed || 30
+  
+  // Passive Perception (10 + wis mod + proficiency if proficient)
+  const passivePerception = 10 + abilityMods.wisdom + 
+    (character.skill_proficiencies.includes("Perception") ? proficiencyBonus : 0)
+  
+  // Initiative (dex mod)
+  const initiative = abilityMods.dexterity
+  
+  // Darkvision from species traits
+  const darkvision = selectedSpecies?.traits?.find(t => 
+    t.name.toLowerCase().includes("darkvision")
+  )?.description?.match(/(\d+)/)?.[1] || "0"
+  
+  // All skills with calculated modifiers
+  const SKILLS_DATA: { name: string; ability: keyof typeof abilityMods }[] = [
+    { name: "Acrobatics", ability: "dexterity" },
+    { name: "Animal Handling", ability: "wisdom" },
+    { name: "Arcana", ability: "intelligence" },
+    { name: "Athletics", ability: "strength" },
+    { name: "Deception", ability: "charisma" },
+    { name: "History", ability: "intelligence" },
+    { name: "Insight", ability: "wisdom" },
+    { name: "Intimidation", ability: "charisma" },
+    { name: "Investigation", ability: "intelligence" },
+    { name: "Medicine", ability: "wisdom" },
+    { name: "Nature", ability: "intelligence" },
+    { name: "Perception", ability: "wisdom" },
+    { name: "Performance", ability: "charisma" },
+    { name: "Persuasion", ability: "charisma" },
+    { name: "Religion", ability: "intelligence" },
+    { name: "Sleight of Hand", ability: "dexterity" },
+    { name: "Stealth", ability: "dexterity" },
+    { name: "Survival", ability: "wisdom" },
+  ]
+  
+  // Get saving throw proficiencies from class
+  const savingThrowProficiencies = primaryClass?.saving_throws || []
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return !!character.class_id
+      case 1: return !!character.class_id || classLevels.length > 0
       case 2: return !!character.species_id && !!character.background_id
       case 3: return true
       case 4: return true
@@ -319,6 +446,62 @@ export default function BuilderPage() {
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Class</h2>
                 <p className="text-muted-foreground mb-4">Your class determines your combat abilities and special features.</p>
                 
+                {/* Current Class Levels */}
+                {classLevels.length > 0 && (
+                  <div className="mb-4 p-3 bg-muted rounded-xl">
+                    <p className="text-xs text-muted-foreground mb-2 uppercase font-bold">Current Classes (Total Level: {totalLevel})</p>
+                    <div className="space-y-2">
+                      {classLevels.map((cl, idx) => {
+                        const cls = classes.find(c => c.id === cl.classId)
+                        return (
+                          <div key={idx} className="flex items-center gap-2 bg-card rounded-lg p-2">
+                            <span className="font-bold text-sm text-foreground flex-1">{cls?.name}</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newLevels = [...classLevels]
+                                  if (newLevels[idx].level > 1) {
+                                    newLevels[idx].level--
+                                    setClassLevels(newLevels)
+                                  } else {
+                                    setClassLevels(newLevels.filter((_, i) => i !== idx))
+                                  }
+                                }}
+                                className="p-1 bg-muted hover:bg-destructive/20 rounded"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="w-6 text-center font-bold text-sm">{cl.level}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (totalLevel < 20) {
+                                    const newLevels = [...classLevels]
+                                    newLevels[idx].level++
+                                    setClassLevels(newLevels)
+                                  }
+                                }}
+                                disabled={totalLevel >= 20}
+                                className="p-1 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setClassLevels(classLevels.filter((_, i) => i !== idx))}
+                              className="p-1 text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Search */}
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -331,39 +514,73 @@ export default function BuilderPage() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+                <p className="text-xs text-muted-foreground mb-2">Click a class to add it, or increase its level if already selected.</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
                   {classes
                     .filter(cls => cls.name.toLowerCase().includes(classSearch.toLowerCase()))
-                    .map((cls) => (
-                    <motion.button
-                      key={cls.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setCharacter({ ...character, class_id: cls.id })}
-                      className={`p-3 rounded-xl border-2 text-left transition-all ${
-                        character.class_id === cls.id
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-sm text-foreground">{cls.name}</h3>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDetailsModal({ type: "class", item: cls })
+                    .map((cls) => {
+                      const existingLevel = classLevels.find(cl => cl.classId === cls.id)
+                      const isSelected = !!existingLevel || character.class_id === cls.id
+                      return (
+                        <motion.button
+                          key={cls.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            if (existingLevel) {
+                              // Increase level of existing class
+                              if (totalLevel < 20) {
+                                setClassLevels(classLevels.map(cl => 
+                                  cl.classId === cls.id ? { ...cl, level: cl.level + 1 } : cl
+                                ))
+                              }
+                            } else {
+                              // Add new class at level 1
+                              if (classLevels.length === 0) {
+                                setCharacter({ ...character, class_id: cls.id })
+                              }
+                              if (totalLevel < 20) {
+                                setClassLevels([...classLevels, { classId: cls.id, level: 1 }])
+                                if (!character.class_id) {
+                                  setCharacter({ ...character, class_id: cls.id })
+                                }
+                              }
+                            }
                           }}
-                          className="p-1 text-muted-foreground hover:text-primary"
+                          disabled={totalLevel >= 20 && !existingLevel}
+                          className={`p-3 rounded-xl border-2 text-left transition-all disabled:opacity-50 ${
+                            isSelected
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card hover:border-primary/50"
+                          }`}
                         >
-                          <Info className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {cls.source || "Custom"}
-                      </p>
-                    </motion.button>
-                  ))}
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-bold text-sm text-foreground">{cls.name}</h3>
+                            <div className="flex items-center gap-1">
+                              {existingLevel && (
+                                <span className="text-xs px-1.5 py-0.5 bg-primary text-primary-foreground rounded">
+                                  Lv{existingLevel.level}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDetailsModal({ type: "class", item: cls })
+                                }}
+                                className="p-1 text-muted-foreground hover:text-primary"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {cls.source || "Custom"}
+                          </p>
+                        </motion.button>
+                      )
+                    })}
                 </div>
               </div>
             )}
@@ -889,116 +1106,296 @@ export default function BuilderPage() {
 
           {/* Right Column: Character Sheet Preview */}
           <div id="builder-preview" className="lg:col-span-2">
-            <div className="bg-card rounded-2xl border-2 border-border p-6 sticky top-24">
-              <h3 className="text-xl font-black text-foreground mb-4" style={{ fontFamily: "var(--font-display)" }}>
-                {character.name || "New Character"}
-              </h3>
-              
-              {/* Class and Origin Summary */}
-              <div className="mb-4 pb-4 border-b border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  {selectedClass && (
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-sm font-bold rounded-full">
-                      {selectedClass.name}
+            <div className="bg-card rounded-2xl border-2 border-border p-4 sticky top-24">
+              {/* Header with name, classes and hit die */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-black text-foreground truncate" style={{ fontFamily: "var(--font-display)" }}>
+                  {character.name || "New Character"}
+                </h3>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground">Lv</span>
+                  <span className="text-sm font-black text-foreground">{totalLevel}</span>
+                  {primaryClass && (
+                    <span className="px-1.5 py-0.5 bg-destructive/10 text-destructive text-[10px] font-bold rounded ml-1">
+                      d{primaryClass.hit_die}
                     </span>
                   )}
-                  {selectedClass && (
-                    <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs font-bold rounded">
-                      d{selectedClass.hit_die}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  {selectedSpecies && <span>{selectedSpecies.name}</span>}
-                  {selectedSpecies && selectedBackground && <span>&bull;</span>}
-                  {selectedBackground && <span>{selectedBackground.name}</span>}
                 </div>
               </div>
               
-              {/* Ability Scores */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {ABILITY_NAMES.map((ability) => {
-                  const score = character[ability]
-                  const mod = Math.floor((score - 10) / 2)
-                  return (
-                    <div key={ability} className="text-center bg-muted rounded-lg p-2">
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
-                      <p className="text-lg font-black text-foreground">{score}</p>
-                      <p className="text-xs text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
+              {/* Class & Origin line */}
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3 flex-wrap">
+                {characterClasses.length > 0 ? (
+                  characterClasses.map((cls, i) => (
+                    <span key={cls.id}>
+                      {i > 0 && <span className="mx-1">/</span>}
+                      <span className="text-primary font-medium">{cls.name} {cls.level}</span>
+                    </span>
+                  ))
+                ) : primaryClass ? (
+                  <span className="text-primary font-medium">{primaryClass.name}</span>
+                ) : null}
+                {selectedSpecies && <span className="mx-1">-</span>}
+                {selectedSpecies && <span>{selectedSpecies.name}</span>}
+                {selectedBackground && <span className="mx-1">-</span>}
+                {selectedBackground && <span>{selectedBackground.name}</span>}
+              </div>
+              
+              {/* Preview Tabs */}
+              <div className="flex gap-1 mb-3 border-b border-border">
+                {[
+                  { id: "summary", label: "Summary", icon: UserCircle },
+                  { id: "combat", label: "Combat", icon: Swords },
+                  { id: "features", label: "Features", icon: Sparkles },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setPreviewTab(tab.id as typeof previewTab)}
+                    className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-t-lg transition-colors ${
+                      previewTab === tab.id
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <tab.icon className="w-3 h-3" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Summary Tab */}
+              {previewTab === "summary" && (
+                <div className="space-y-3">
+                  {/* Ability Scores - horizontal row */}
+                  <div className="grid grid-cols-6 gap-1">
+                    {ABILITY_NAMES.map((ability) => {
+                      const score = character[ability]
+                      const mod = abilityMods[ability]
+                      return (
+                        <div key={ability} className="text-center">
+                          <p className="text-[8px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
+                          <p className="text-sm font-black text-foreground">{score}</p>
+                          <p className="text-[10px] text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  {/* Two column layout */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Left column */}
+                    <div className="space-y-2">
+                      <div className="p-2 bg-muted/50 rounded-lg">
+                        <p className="text-[8px] text-muted-foreground uppercase">Proficiency</p>
+                        <p className="text-lg font-black text-lime">+{proficiencyBonus}</p>
+                      </div>
+                      <div className="p-2 bg-muted/50 rounded-lg">
+                        <p className="text-[8px] text-muted-foreground uppercase">Passive Perception</p>
+                        <p className="text-lg font-black text-foreground">{passivePerception}</p>
+                      </div>
+                      {/* Skills */}
+                      <div className="p-2 bg-muted/30 rounded-lg">
+                        <p className="text-[8px] text-muted-foreground uppercase mb-1">Skills</p>
+                        <div className="space-y-0.5 max-h-32 overflow-y-auto text-[9px]">
+                          {SKILLS_DATA.map((skill) => {
+                            const isProficient = character.skill_proficiencies.includes(skill.name)
+                            const mod = abilityMods[skill.ability] + (isProficient ? proficiencyBonus : 0)
+                            return (
+                              <div key={skill.name} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                                <span>{skill.name}</span>
+                                <span>{mod >= 0 ? `+${mod}` : mod}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
-
-              {/* Derived Stats */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="flex flex-col items-center p-3 bg-primary/10 rounded-xl border border-primary/20">
-                  <span className="text-[10px] text-primary uppercase font-bold">HP</span>
-                  <span className="text-2xl font-black text-primary">
-                    {selectedClass ? selectedClass.hit_die + Math.floor((character.constitution - 10) / 2) : "—"}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-3 bg-secondary/10 rounded-xl border border-secondary/20">
-                  <span className="text-[10px] text-secondary uppercase font-bold">AC</span>
-                  <span className="text-2xl font-black text-secondary">
-                    {10 + Math.floor((character.dexterity - 10) / 2)}
-                  </span>
-                </div>
-                <div className="flex flex-col items-center p-3 bg-accent/10 rounded-xl border border-accent/20">
-                  <span className="text-[10px] text-accent uppercase font-bold">Speed</span>
-                  <span className="text-2xl font-black text-accent">
-                    {selectedSpecies?.speed || 30}
-                  </span>
-                </div>
-              </div>
-
-              {/* Additional Stats */}
-              <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                <div className="flex flex-col p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase">Prof Bonus</span>
-                  <span className="font-bold text-lime">+2</span>
-                </div>
-                <div className="flex flex-col p-2 bg-muted/50 rounded-lg">
-                  <span className="text-[10px] text-muted-foreground uppercase">Level</span>
-                  <span className="font-bold text-foreground">{character.level}</span>
-                </div>
-              </div>
-
-              {/* Equipment & Spells */}
-              {(character.equipment_ids.length > 0 || character.spell_ids.length > 0) && (
-                <div className="pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Selections</p>
-                  <div className="flex gap-3">
-                    {character.equipment_ids.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Package className="w-4 h-4 text-lime" />
-                        <span className="text-sm text-foreground">{character.equipment_ids.length}</span>
+                    
+                    {/* Right column */}
+                    <div className="space-y-2">
+                      <div className="p-2 bg-muted/50 rounded-lg text-center">
+                        <Shield className="w-4 h-4 mx-auto text-secondary mb-0.5" />
+                        <p className="text-[8px] text-muted-foreground uppercase">AC</p>
+                        <p className="text-xl font-black text-secondary">{armorClass}</p>
                       </div>
-                    )}
-                    {character.spell_ids.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Wand2 className="w-4 h-4 text-magenta" />
-                        <span className="text-sm text-foreground">{character.spell_ids.length}</span>
+                      <div className="p-2 bg-muted/50 rounded-lg text-center">
+                        <Heart className="w-4 h-4 mx-auto text-destructive mb-0.5" />
+                        <p className="text-[8px] text-muted-foreground uppercase">HP</p>
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            value={currentHp ?? maxHp}
+                            onChange={(e) => setCurrentHp(Math.min(maxHp, Math.max(0, parseInt(e.target.value) || 0)))}
+                            className="w-10 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold"
+                          />
+                          <span className="text-sm text-muted-foreground">/ {maxHp}</span>
+                        </div>
+                        {tempHp > 0 && <p className="text-[9px] text-cyan">+{tempHp} temp</p>}
                       </div>
-                    )}
+                      <div className="p-2 bg-muted/50 rounded-lg text-center">
+                        <p className="text-[8px] text-muted-foreground uppercase">Speed</p>
+                        <p className="text-lg font-black text-accent">{speed} ft</p>
+                      </div>
+                      {/* Saving Throws */}
+                      <div className="p-2 bg-muted/30 rounded-lg">
+                        <p className="text-[8px] text-muted-foreground uppercase mb-1">Saves</p>
+                        <div className="grid grid-cols-2 gap-x-2 text-[9px]">
+                          {ABILITY_NAMES.map((ability) => {
+                            const isProficient = savingThrowProficiencies.includes(ability.charAt(0).toUpperCase() + ability.slice(1))
+                            const mod = abilityMods[ability] + (isProficient ? proficiencyBonus : 0)
+                            return (
+                              <div key={ability} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                                <span>{ability.slice(0, 3).toUpperCase()}</span>
+                                <span>{mod >= 0 ? `+${mod}` : mod}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      {/* Darkvision */}
+                      <div className="p-2 bg-muted/50 rounded-lg text-center">
+                        <p className="text-[8px] text-muted-foreground uppercase">Darkvision</p>
+                        <p className="text-sm font-bold text-foreground">{darkvision} ft</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Species Traits Preview */}
-              {selectedSpecies?.traits && selectedSpecies.traits.length > 0 && (
-                <div className="pt-3 mt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2">Traits</p>
-                  <div className="space-y-1">
-                    {selectedSpecies.traits.slice(0, 3).map((trait, i) => (
-                      <p key={i} className="text-xs text-foreground">
-                        <span className="font-bold">{trait.name}</span>
-                      </p>
-                    ))}
-                    {selectedSpecies.traits.length > 3 && (
-                      <p className="text-xs text-muted-foreground">+{selectedSpecies.traits.length - 3} more</p>
-                    )}
+              
+              {/* Combat Tab */}
+              {previewTab === "combat" && (
+                <div className="space-y-3">
+                  {/* Top combat stats row */}
+                  <div className="grid grid-cols-4 gap-1 text-center">
+                    <div className="p-2 bg-muted/50 rounded-lg">
+                      <Shield className="w-3 h-3 mx-auto text-secondary mb-0.5" />
+                      <p className="text-[8px] text-muted-foreground">AC</p>
+                      <p className="text-lg font-black text-secondary">{armorClass}</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-lg">
+                      <Heart className="w-3 h-3 mx-auto text-destructive mb-0.5" />
+                      <p className="text-[8px] text-muted-foreground">HP</p>
+                      <p className="text-lg font-black text-foreground">{currentHp ?? maxHp}/{maxHp}</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-lg">
+                      <p className="text-[8px] text-muted-foreground">Speed</p>
+                      <p className="text-lg font-black text-accent">{speed}</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-lg">
+                      <p className="text-[8px] text-muted-foreground">Initiative</p>
+                      <p className="text-lg font-black text-lime">{initiative >= 0 ? `+${initiative}` : initiative}</p>
+                    </div>
                   </div>
+                  
+                  {/* Equipped Items */}
+                  <div className="p-2 bg-muted/30 rounded-lg">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Equipped Items</p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <p className="text-muted-foreground mb-0.5">Armor</p>
+                        <select className="w-full bg-background border border-border rounded px-1 py-0.5 text-foreground text-[10px]">
+                          <option>None (Unarmored)</option>
+                          {equipment.filter(e => e.category === "Armor").map(e => (
+                            <option key={e.id} value={e.id}>{e.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-0.5">Shield</p>
+                        <select className="w-full bg-background border border-border rounded px-1 py-0.5 text-foreground text-[10px]">
+                          <option>None</option>
+                          {equipment.filter(e => e.name.toLowerCase().includes("shield")).map(e => (
+                            <option key={e.id} value={e.id}>{e.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <p className="text-muted-foreground mb-0.5">Main Weapon</p>
+                      <select className="w-full bg-background border border-border rounded px-1 py-0.5 text-foreground text-[10px]">
+                        <option>None</option>
+                        {equipment.filter(e => e.category === "Weapon").map(e => (
+                          <option key={e.id} value={e.id}>{e.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Proficiencies */}
+                  <div className="p-2 bg-muted/30 rounded-lg">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Weapon Proficiencies</p>
+                    <p className="text-[10px] text-foreground italic">
+                      {primaryClass?.weapon_proficiencies?.join(", ") || "None"}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-muted/30 rounded-lg">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Armor Proficiencies</p>
+                    <p className="text-[10px] text-foreground italic">
+                      {primaryClass?.armor_proficiencies?.join(", ") || "None"}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Features Tab */}
+              {previewTab === "features" && (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {/* Class Features */}
+                  {characterClasses.length > 0 ? (
+                    characterClasses.map((cls) => (
+                      <div key={cls.id}>
+                        <p className="text-[9px] text-primary uppercase font-bold mb-1">{cls.name} Features</p>
+                        <div className="space-y-1">
+                          {cls.features?.filter(f => f.level <= cls.level).map((feature, i) => (
+                            <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
+                              <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
+                              <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : primaryClass?.features ? (
+                    <div>
+                      <p className="text-[9px] text-primary uppercase font-bold mb-1">{primaryClass.name} Features</p>
+                      <div className="space-y-1">
+                        {primaryClass.features.filter(f => f.level <= totalLevel).map((feature, i) => (
+                          <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
+                            <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
+                            <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Select a class to see features</p>
+                  )}
+                  
+                  {/* Species Traits */}
+                  {selectedSpecies?.traits && selectedSpecies.traits.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-secondary uppercase font-bold mb-1">{selectedSpecies.name} Traits</p>
+                      <div className="space-y-1">
+                        {selectedSpecies.traits.map((trait, i) => (
+                          <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
+                            <p className="font-bold text-foreground">{trait.name}</p>
+                            <p className="text-muted-foreground line-clamp-2">{trait.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Background Feature */}
+                  {selectedBackground?.feature && (
+                    <div>
+                      <p className="text-[9px] text-accent uppercase font-bold mb-1">{selectedBackground.name} Feature</p>
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="font-bold text-foreground">{selectedBackground.feature.name}</p>
+                        <p className="text-muted-foreground line-clamp-3">{selectedBackground.feature.description}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

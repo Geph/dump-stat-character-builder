@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2 } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Download } from "lucide-react"
 import Link from "next/link"
 
 const CATEGORIES = [
@@ -110,6 +110,17 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     router.push("/compendium?tab=equipment")
   }
 
+  const handleExport = () => {
+    const exportData = { type: "dnd-equipment", version: 1, data: form }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${form.name.toLowerCase().replace(/\s+/g, "-")}-equipment.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this equipment?")) return
     
@@ -155,13 +166,22 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
           </div>
           
           {id !== "new" && (
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
           )}
         </div>
 
