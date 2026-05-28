@@ -306,7 +306,7 @@ export default function HomePage() {
       <footer id="home-footer" className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
           <p>Dump Stat — D&D 5.5e Character Builder</p>
-          <p>Uses content from the D&D 5.5e SRD under the Creative Commons license.</p>
+          <p className="pt-0">Uses content from the D&D 5.5e SRD under the Creative Commons license.</p>
           <p>
             Logo icon:{" "}
             <a
