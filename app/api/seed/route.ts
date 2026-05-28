@@ -686,10 +686,16 @@ export async function POST() {
       class_id: classIdMap.get(sc.class_name) || null,
     })).filter(sc => sc.class_id !== null)
     
-    // Insert subclasses
+    // Insert subclasses - delete existing SRD ones first, then insert
+    // (subclasses table may not have a unique constraint on name alone)
+    await supabase
+      .from("subclasses")
+      .delete()
+      .eq("source", "SRD")
+    
     const { error: subclassesError } = await supabase
       .from("subclasses")
-      .upsert(subclassesWithIds, { onConflict: "name" })
+      .insert(subclassesWithIds)
     
     if (subclassesError) throw new Error(`Subclasses: ${subclassesError.message}`)
 

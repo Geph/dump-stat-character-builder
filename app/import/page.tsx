@@ -3,17 +3,23 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
-import { Upload, Globe, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { Upload, Globe, FileText, CheckCircle, AlertCircle, Loader2, ClipboardPaste, Info } from "lucide-react"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "success" | "error"
 
 export default function ImportPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
+  const [pdfSpecificContent, setPdfSpecificContent] = useState("")
   const [webUrl, setWebUrl] = useState("")
+  const [textContent, setTextContent] = useState("")
+  const [textContentType, setTextContentType] = useState<string>("all")
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
   const [webStatus, setWebStatus] = useState<ImportStatus>("idle")
+  const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
   const [message, setMessage] = useState("")
+  const [showAiInfo, setShowAiInfo] = useState(false)
 
   const handlePdfUpload = async () => {
     if (!pdfFile) return
@@ -23,6 +29,10 @@ export default function ImportPage() {
 
     const formData = new FormData()
     formData.append("pdf", pdfFile)
+    formData.append("contentType", pdfContentType)
+    if (pdfContentType === "specific" && pdfSpecificContent) {
+      formData.append("specificContent", pdfSpecificContent)
+    }
 
     try {
       setPdfStatus("processing")
@@ -35,7 +45,13 @@ export default function ImportPage() {
 
       if (response.ok) {
         setPdfStatus("success")
-        setMessage(`Successfully imported ${data.count} items`)
+        const breakdownText = data.breakdown 
+          ? Object.entries(data.breakdown)
+              .filter(([, count]) => (count as number) > 0)
+              .map(([type, count]) => `${count} ${type}`)
+              .join(", ")
+          : ""
+        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}`)
       } else {
         setPdfStatus("error")
         setMessage(data.error || "Failed to import PDF")
@@ -43,6 +59,43 @@ export default function ImportPage() {
     } catch (err) {
       setPdfStatus("error")
       setMessage(err instanceof Error ? err.message : "Failed to upload PDF. Please try again.")
+    }
+  }
+
+  const handleTextImport = async () => {
+    if (!textContent.trim()) return
+
+    setTextStatus("processing")
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/import/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          text: textContent,
+          contentType: textContentType
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setTextStatus("success")
+        const breakdownText = data.breakdown 
+          ? Object.entries(data.breakdown)
+              .filter(([, count]) => (count as number) > 0)
+              .map(([type, count]) => `${count} ${type}`)
+              .join(", ")
+          : ""
+        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}`)
+      } else {
+        setTextStatus("error")
+        setMessage(data.error || "Failed to import text")
+      }
+    } catch (err) {
+      setTextStatus("error")
+      setMessage(err instanceof Error ? err.message : "Failed to import text. Please try again.")
     }
   }
 
@@ -120,7 +173,7 @@ export default function ImportPage() {
         <div id="import-header" className="mb-8">
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className="text-muted-foreground text-lg">
-            Add new content from PDFs or online sources
+            Add new content from PDFs, copied text, or online sources
           </p>
         </div>
 
@@ -129,7 +182,7 @@ export default function ImportPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className={`p-4 rounded-xl mb-6 ${
-              pdfStatus === "success" || webStatus === "success" || seedStatus === "success"
+              pdfStatus === "success" || webStatus === "success" || seedStatus === "success" || textStatus === "success"
                 ? "bg-success/10 text-success border border-success/20"
                 : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}
@@ -169,6 +222,68 @@ export default function ImportPage() {
             </div>
           </motion.div>
 
+          {/* Text Import (Paste) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-card rounded-2xl p-6 border-2 border-border"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 bg-lime/20 rounded-xl flex items-center justify-center shrink-0">
+                <ClipboardPaste className="w-7 h-7 text-lime" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-foreground mb-2">Import from Copied Text</h2>
+                <p className="text-muted-foreground mb-4">
+                  Paste D&D content text (class details, spells, species, etc.) and AI will extract structured data.
+                </p>
+                
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <label className="text-sm font-medium text-muted-foreground">Content type hint:</label>
+                    <select
+                      value={textContentType}
+                      onChange={(e) => setTextContentType(e.target.value)}
+                      className="px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-lime"
+                    >
+                      <option value="all">Auto-detect All</option>
+                      <option value="classes">Classes</option>
+                      <option value="subclasses">Subclasses</option>
+                      <option value="species">Species</option>
+                      <option value="backgrounds">Backgrounds</option>
+                      <option value="spells">Spells</option>
+                      <option value="feats">Feats</option>
+                      <option value="equipment">Equipment</option>
+                    </select>
+                  </div>
+                  
+                  <textarea
+                    placeholder="Paste D&D content here (class features, spell descriptions, species traits, etc.)..."
+                    value={textContent}
+                    onChange={(e) => setTextContent(e.target.value)}
+                    rows={8}
+                    className="w-full px-4 py-3 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime resize-y font-mono text-sm"
+                  />
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">
+                      {textContent.length} characters
+                    </span>
+                    <button
+                      onClick={handleTextImport}
+                      disabled={!textContent.trim() || textStatus === "processing"}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-lime text-lime-foreground rounded-xl font-bold hover:bg-lime/90 transition-colors disabled:opacity-50"
+                    >
+                      {getStatusIcon(textStatus)}
+                      {textStatus === "processing" ? "Processing..." : "Import Text"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
           {/* PDF Upload */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -181,34 +296,94 @@ export default function ImportPage() {
                 <Upload className="w-7 h-7 text-secondary" />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-foreground mb-2">Upload PDF</h2>
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-bold text-foreground">Upload PDF</h2>
+                  <button
+                    onClick={() => setShowAiInfo(!showAiInfo)}
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    title="How does AI processing work?"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                </div>
                 <p className="text-muted-foreground mb-4">
                   Upload a D&D sourcebook PDF and our AI will extract the content automatically.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <label className="flex-1">
+                {showAiInfo && (
+                  <div className="mb-4 p-4 bg-muted/50 rounded-xl border border-border">
+                    <h3 className="font-bold text-foreground mb-2">How AI Processing Works</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      PDF and text imports use <strong>OpenAI GPT-4o</strong> via the Vercel AI Gateway to parse and structure D&D content.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>No separate API key required - uses Vercel AI Gateway</li>
+                      <li>Extracts classes, species, spells, feats, equipment, and more</li>
+                      <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
+                      <li>Large PDFs are truncated to 50,000 characters for processing</li>
+                    </ul>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  {/* Content filtering options */}
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pdfContentType"
+                        checked={pdfContentType === "all"}
+                        onChange={() => setPdfContentType("all")}
+                        className="w-4 h-4 accent-secondary"
+                      />
+                      <span className="text-sm text-foreground">Extract all content</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pdfContentType"
+                        checked={pdfContentType === "specific"}
+                        onChange={() => setPdfContentType("specific")}
+                        className="w-4 h-4 accent-secondary"
+                      />
+                      <span className="text-sm text-foreground">Specific content only</span>
+                    </label>
+                  </div>
+                  
+                  {pdfContentType === "specific" && (
                     <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                      className="hidden"
+                      type="text"
+                      placeholder="e.g., Fighter class features, Fireball spell, Elf species..."
+                      value={pdfSpecificContent}
+                      onChange={(e) => setPdfSpecificContent(e.target.value)}
+                      className="w-full px-4 py-2 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary text-sm"
                     />
-                    <div className="flex items-center justify-center gap-2 px-4 py-3 bg-muted rounded-xl cursor-pointer hover:bg-muted/80 transition-colors">
-                      <FileText className="w-5 h-5" />
-                      <span className="font-medium truncate">
-                        {pdfFile ? pdfFile.name : "Choose PDF file..."}
-                      </span>
-                    </div>
-                  </label>
-                  <button
-                    onClick={handlePdfUpload}
-                    disabled={!pdfFile || pdfStatus === "processing" || pdfStatus === "uploading"}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/90 transition-colors disabled:opacity-50"
-                  >
-                    {getStatusIcon(pdfStatus)}
-                    {pdfStatus === "processing" ? "Processing..." : "Import"}
-                  </button>
+                  )}
+                  
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-muted rounded-xl cursor-pointer hover:bg-muted/80 transition-colors">
+                        <FileText className="w-5 h-5" />
+                        <span className="font-medium truncate">
+                          {pdfFile ? pdfFile.name : "Choose PDF file..."}
+                        </span>
+                      </div>
+                    </label>
+                    <button
+                      onClick={handlePdfUpload}
+                      disabled={!pdfFile || pdfStatus === "processing" || pdfStatus === "uploading"}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                    >
+                      {getStatusIcon(pdfStatus)}
+                      {pdfStatus === "processing" ? "Processing..." : "Import"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get("pdf") as File
+    const contentType = formData.get("contentType") as string | null
+    const specificContent = formData.get("specificContent") as string | null
     
     if (!file) {
       return NextResponse.json({ error: "No PDF file provided" }, { status: 400 })
@@ -105,10 +107,8 @@ export async function POST(request: NextRequest) {
       ? text.slice(0, maxLength) + "\n...[truncated]" 
       : text
 
-    // Use AI to extract structured content
-    const result = await generateText({
-      model: "openai/gpt-4o",
-      system: `You are a D&D 2024 content parser. Extract game content from the provided PDF text.
+    // Build system prompt based on content filtering options
+    let systemPrompt = `You are a D&D 2024 content parser. Extract game content from the provided PDF text.
       
 Important D&D 2024 rules:
 - "Species" is the new term (not "Race")
@@ -117,7 +117,18 @@ Important D&D 2024 rules:
 - Species no longer grant ability score bonuses
 
 Extract ONLY the content types you find in the text. Return empty arrays for types not present.
-Be thorough and extract all instances of each content type found.`,
+Be thorough and extract all instances of each content type found.`
+
+    if (contentType === "specific" && specificContent) {
+      systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`
+    } else if (contentType && contentType !== "all") {
+      systemPrompt += `\n\nFocus primarily on extracting: ${contentType}. You may still extract other content types if clearly present.`
+    }
+
+    // Use AI to extract structured content
+    const result = await generateText({
+      model: "openai/gpt-4o",
+      system: systemPrompt,
       prompt: `Extract D&D content from this PDF text:\n\n${truncatedText}`,
       output: Output.object({ schema: ContentSchema })
     })
