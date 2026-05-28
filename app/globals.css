@@ -92,6 +92,9 @@
   --card: oklch(0.16 0.018 280);
   --card-foreground: oklch(0.94 0.01 270);
 
+  /* Card Lighter — for nested cards or lighter sections */
+  --card-lighter: oklch(0.22 0.02 280);
+
   /* Muted */
   --muted: oklch(0.22 0.02 280);
   --muted-foreground: oklch(0.55 0.02 280);
@@ -145,6 +148,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-card-lighter: var(--card-lighter);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);

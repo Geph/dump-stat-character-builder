@@ -40,6 +40,7 @@ export interface Species {
   lineages: Lineage[]
   icon: string | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -66,6 +67,7 @@ export interface DndClass {
   } | null
   icon: string | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -81,6 +83,7 @@ export interface Subclass {
     spells_known?: number
   } | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -94,6 +97,7 @@ export interface CustomAbility {
   uses_type: 'fixed' | 'proficiency' | 'short_rest' | 'long_rest' | 'unlimited' | null
   uses_amount: number | null
   source: string
+  creator_url: string | null
   created_at: string
   updated_at: string
 }
@@ -109,6 +113,7 @@ export interface Background {
   equipment: unknown
   feature: { name: string; description: string } | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -128,6 +133,7 @@ export interface Spell {
   higher_levels: string | null
   classes: string[] | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -138,6 +144,7 @@ export interface Feat {
   prerequisite: string | null
   benefits: unknown
   source: string
+  creator_url: string | null
   created_at: string
 }
 
@@ -151,6 +158,7 @@ export interface Equipment {
   properties: unknown
   description: string | null
   source: string
+  creator_url: string | null
   created_at: string
 }
 

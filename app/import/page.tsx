@@ -40,9 +40,9 @@ export default function ImportPage() {
         setPdfStatus("error")
         setMessage(data.error || "Failed to import PDF")
       }
-    } catch {
+    } catch (err) {
       setPdfStatus("error")
-      setMessage("Failed to connect to server")
+      setMessage(err instanceof Error ? err.message : "Failed to upload PDF. Please try again.")
     }
   }
 
@@ -68,9 +68,9 @@ export default function ImportPage() {
         setWebStatus("error")
         setMessage(data.error || "Failed to import from web")
       }
-    } catch {
+    } catch (err) {
       setWebStatus("error")
-      setMessage("Failed to connect to server")
+      setMessage(err instanceof Error ? err.message : "Failed to import from web. Please try again.")
     }
   }
 
@@ -92,9 +92,9 @@ export default function ImportPage() {
         setSeedStatus("error")
         setMessage(data.error || "Failed to seed database")
       }
-    } catch {
+    } catch (err) {
       setSeedStatus("error")
-      setMessage("Failed to connect to server")
+      setMessage(err instanceof Error ? err.message : "Failed to seed database. Please try again.")
     }
   }
 
@@ -253,10 +253,14 @@ export default function ImportPage() {
                   <p className="text-sm font-medium text-foreground mb-2">Supported sources:</p>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>- dnd2024.wikidot.com/lineage:* (Species)</li>
-                    <li>- dnd2024.wikidot.com/class:* (Classes)</li>
+                    <li>- dnd2024.wikidot.com/artificer:main, /barbarian:main, etc. (Classes)</li>
                     <li>- dnd2024.wikidot.com/background:* (Backgrounds)</li>
                     <li>- dnd2024.wikidot.com/spell:* (Spells)</li>
+                    <li>- dnd2024.wikidot.com/feat:* (Feats)</li>
                   </ul>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Imported content will appear in the Compendium after import completes.
+                  </p>
                 </div>
               </div>
             </div>

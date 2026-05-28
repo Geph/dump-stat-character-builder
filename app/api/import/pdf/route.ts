@@ -76,11 +76,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to buffer
-    const buffer = Buffer.from(await file.arrayBuffer())
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
     
-    // Parse PDF
-    const pdfData = await parsePdf(buffer)
-    const text = pdfData.text
+    // Parse PDF with error handling
+    let text: string
+    try {
+      const pdfData = await parsePdf(buffer)
+      text = pdfData.text
+    } catch (pdfError) {
+      console.error("PDF parsing error:", pdfError)
+      return NextResponse.json(
+        { error: "Failed to parse PDF. Make sure it's a valid PDF file." },
+        { status: 400 }
+      )
+    }
+
+    if (!text || text.trim().length < 50) {
+      return NextResponse.json(
+        { error: "PDF appears to be empty or contains very little text." },
+        { status: 400 }
+      )
+    }
 
     // Truncate text if too long (AI context limits)
     const maxLength = 50000

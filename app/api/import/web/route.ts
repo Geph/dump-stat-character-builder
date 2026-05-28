@@ -45,7 +45,8 @@ function parseSpecies(html: string, url: string) {
     size: sizeMatch ? sizeMatch[1] : "Medium",
     speed: speedMatch ? parseInt(speedMatch[1]) : 30,
     traits,
-    source: new URL(url).hostname
+    source: new URL(url).hostname,
+    creator_url: url
   }
 }
 
@@ -81,7 +82,8 @@ function parseClass(html: string, url: string) {
     description,
     hit_die: hitDieMatch ? parseInt(hitDieMatch[1]) : 8,
     features: features.slice(0, 10), // Limit to first 10 features
-    source: new URL(url).hostname
+    source: new URL(url).hostname,
+    creator_url: url
   }
 }
 
@@ -122,7 +124,8 @@ function parseBackground(html: string, url: string) {
     skill_proficiencies: skills,
     feat_granted: featMatch ? featMatch[1].trim() : null,
     ability_bonuses: Object.keys(ability_bonuses).length > 0 ? ability_bonuses : null,
-    source: new URL(url).hostname
+    source: new URL(url).hostname,
+    creator_url: url
   }
 }
 
@@ -167,7 +170,8 @@ function parseSpell(html: string, url: string) {
     concentration: fullText.toLowerCase().includes("concentration"),
     description,
     classes: classNames,
-    source: new URL(url).hostname
+    source: new URL(url).hostname,
+    creator_url: url
   }
 }
 
@@ -188,7 +192,8 @@ function parseFeat(html: string, url: string) {
     name,
     description,
     prerequisite: prereqMatch ? prereqMatch[1].trim() : null,
-    source: new URL(url).hostname
+    source: new URL(url).hostname,
+    creator_url: url
   }
 }
 

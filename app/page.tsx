@@ -145,7 +145,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/compendium"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-card border border-border text-foreground rounded-xl font-bold text-lg hover:border-primary/50 hover:text-primary transition-all"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-lemon text-lemon-foreground rounded-xl font-bold text-lg hover:brightness-110 transition-all"
                 >
                   <BookOpen className="w-5 h-5" />
                   Browse Compendium
@@ -178,7 +178,7 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-4 border-t border-border bg-card">
+        <section className="py-20 px-4 border-t border-border bg-card-lighter">
           <div className="max-w-6xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -231,7 +231,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="bg-card border border-border rounded-2xl p-8 md:p-12"
+              className="bg-card-lighter border border-border rounded-2xl p-8 md:p-12"
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
                 <div>
