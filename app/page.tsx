@@ -18,7 +18,7 @@ const features = [
   {
     icon: BookOpen,
     title: "Complete Compendium",
-    description: "Browse species, classes, backgrounds, spells, feats, and equipment from the SRD and beyond.",
+    description: "Browse species, classes, backgrounds, spells, feats, and equipment from the D&D 5.5e SRD and beyond.",
     accent: "bg-lime",
     glow: "glow-lime",
   },
@@ -117,7 +117,7 @@ export default function HomePage() {
         {/* Hero Section */}
         <section
           id="hero-section"
-          className="relative overflow-hidden py-24 px-4"
+          className="relative overflow-hidden py-32 px-4"
           style={{
             backgroundImage: `url(${heroBg})`,
             backgroundSize: "cover",
@@ -190,8 +190,10 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section id="features-section" className="py-20 px-4 border-t border-border bg-card-lighter">
-          <div className="max-w-6xl mx-auto">
+        <section id="features-section" className="py-20 px-4 border-t border-border bg-card-lighter relative">
+          {/* Inset purple border */}
+          <div className="absolute inset-4 border-2 border-primary/30 rounded-xl pointer-events-none" />
+          <div className="max-w-6xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -249,6 +251,8 @@ export default function HomePage() {
         >
           {/* Dark overlay for readability */}
           <div className="absolute inset-0 bg-background/55 pointer-events-none" />
+          {/* Inset purple border */}
+          <div className="absolute inset-4 border-2 border-primary/30 rounded-xl pointer-events-none z-5" />
           <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -302,7 +306,7 @@ export default function HomePage() {
       <footer id="home-footer" className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
           <p>Dump Stat — D&D 5.5e Character Builder</p>
-          <p>Uses content from the D&D SRD 5.2 under the Creative Commons license.</p>
+          <p>Uses content from the D&D 5.5e SRD under the Creative Commons license.</p>
           <p>
             Logo icon:{" "}
             <a

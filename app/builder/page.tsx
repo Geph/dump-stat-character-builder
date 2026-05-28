@@ -822,7 +822,7 @@ export default function BuilderPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.source || "SRD"}</p>
+                          <p className="text-xs text-muted-foreground">{item.source || "D&D 5.5e SRD"}</p>
                         </div>
                         <button
                           type="button"
@@ -890,7 +890,7 @@ export default function BuilderPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm text-foreground truncate">{spell.name}</p>
-                              <p className="text-xs text-muted-foreground">{spell.source || "SRD"}</p>
+                              <p className="text-xs text-muted-foreground">{spell.source || "D&D 5.5e SRD"}</p>
                             </div>
                             <button
                               type="button"

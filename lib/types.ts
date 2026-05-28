@@ -13,31 +13,25 @@ export interface Feature {
   description: string
   isChoice?: boolean
   choices?: FeatureChoice
+  limitedUses?: UsesConfig | null
 }
 
 // Trait with choice support for species
 export interface Trait {
   name: string
   description: string
+  level?: number // level at which trait becomes available, defaults to 1
   isChoice?: boolean
   choices?: FeatureChoice
-}
-
-// Lineage for species variants
-export interface Lineage {
-  name: string
-  description: string
-  traits: Trait[]
 }
 
 export interface Species {
   id: string
   name: string
   description: string | null
-  speed: number
+  speed: number | { [key: string]: number } // e.g. { walking: 30, climbing: 30 }
   size: string | null
   traits: Trait[]
-  lineages: Lineage[]
   icon: string | null
   source: string
   creator_url: string | null
@@ -87,6 +81,23 @@ export interface Subclass {
   created_at: string
 }
 
+// Uses configuration for abilities with limited uses
+export interface UsesAtLevel {
+  level: number
+  count: number
+}
+
+export interface UsesConfig {
+  type: 'fixed' | 'proficiency' | 'ability_modifier' | 'custom_ability' | 'at_level' | 'unlimited'
+  fixedAmount?: number
+  abilityModifier?: 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
+  customAbilityId?: string
+  atLevelTable?: UsesAtLevel[]
+  recharge?: 'short_rest' | 'long_rest' | null
+  dieCount?: number
+  dieType?: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | null
+}
+
 export interface CustomAbility {
   id: string
   name: string
@@ -94,8 +105,7 @@ export interface CustomAbility {
   prerequisites: string | null
   attached_to_type: string | null
   attached_to_id: string | null
-  uses_type: 'fixed' | 'proficiency' | 'short_rest' | 'long_rest' | 'unlimited' | null
-  uses_amount: number | null
+  uses: UsesConfig | null
   source: string
   creator_url: string | null
   created_at: string
@@ -155,8 +165,18 @@ export interface Equipment {
   subcategory: string | null
   cost: { amount: number; unit: string } | null
   weight: number | null
-  properties: unknown
+  properties: string[] | null
   description: string | null
+  // Armor-specific fields
+  armor_class?: number | null
+  stealth_disadvantage?: boolean
+  // Weapon-specific fields
+  damage?: string | null // e.g. "1d8"
+  damage_type?: string | null // e.g. "slashing", "piercing", "bludgeoning"
+  range?: string | null // e.g. "5 ft" or "80/320 ft"
+  mastery?: string | null // e.g. "Cleave", "Graze"
+  // Attached abilities (for finesse, two-handed, etc.)
+  attached_ability_ids?: string[]
   source: string
   creator_url: string | null
   created_at: string

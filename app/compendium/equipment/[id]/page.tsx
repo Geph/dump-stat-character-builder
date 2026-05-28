@@ -13,13 +13,27 @@ const CATEGORIES = [
 
 const SUBCATEGORIES: Record<string, string[]> = {
   "Weapon": ["Simple Melee", "Simple Ranged", "Martial Melee", "Martial Ranged"],
-  "Armor": ["Light", "Medium", "Heavy", "Shield"],
+  "Armor": ["Light Armor", "Medium Armor", "Heavy Armor", "Shield"],
   "Adventuring Gear": ["Standard", "Equipment Pack", "Container"],
   "Tool": ["Artisan's Tools", "Gaming Set", "Musical Instrument", "Other"],
   "Mount": ["Common", "Exotic"],
   "Vehicle": ["Land", "Water", "Air"],
   "Trade Good": [],
 }
+
+const DAMAGE_TYPES = [
+  "Bludgeoning", "Piercing", "Slashing", "Acid", "Cold", "Fire", "Force", 
+  "Lightning", "Necrotic", "Poison", "Psychic", "Radiant", "Thunder"
+]
+
+const WEAPON_PROPERTIES = [
+  "Ammunition", "Finesse", "Heavy", "Light", "Loading", "Range", "Reach", 
+  "Special", "Thrown", "Two-Handed", "Versatile"
+]
+
+const WEAPON_MASTERIES = [
+  "Cleave", "Graze", "Nick", "Push", "Sap", "Slow", "Topple", "Vex"
+]
 
 interface EquipmentFormData {
   name: string
@@ -29,6 +43,15 @@ interface EquipmentFormData {
   weight: number | null
   description: string
   source: string
+  // Armor fields
+  armor_class: number | null
+  stealth_disadvantage: boolean
+  // Weapon fields
+  damage: string
+  damage_type: string
+  range: string
+  mastery: string
+  properties: string[]
 }
 
 const defaultEquipment: EquipmentFormData = {
@@ -39,6 +62,13 @@ const defaultEquipment: EquipmentFormData = {
   weight: null,
   description: "",
   source: "Custom",
+  armor_class: null,
+  stealth_disadvantage: false,
+  damage: "",
+  damage_type: "",
+  range: "",
+  mastery: "",
+  properties: [],
 }
 
 export default function EquipmentEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,6 +105,13 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             weight: data.weight,
             description: data.description || "",
             source: data.source || "Custom",
+            armor_class: data.armor_class ?? null,
+            stealth_disadvantage: data.stealth_disadvantage || false,
+            damage: data.damage || "",
+            damage_type: data.damage_type || "",
+            range: data.range || "",
+            mastery: data.mastery || "",
+            properties: data.properties || [],
           })
         }
         setLoading(false)
@@ -318,6 +355,133 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
               placeholder="Describe the item, including any special properties..."
             />
           </div>
+
+          {/* Armor-specific fields */}
+          {form.category === "Armor" && (
+            <div className="bg-card-lighter border-2 border-primary/30 rounded-xl p-4 space-y-4">
+              <h3 className="font-semibold text-foreground">Armor Properties</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Armor Class (AC)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.armor_class ?? ""}
+                    onChange={(e) => setForm({ 
+                      ...form, 
+                      armor_class: e.target.value ? parseInt(e.target.value) : null 
+                    })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                    placeholder="e.g. 14"
+                  />
+                </div>
+                <div className="flex items-center gap-3 pt-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.stealth_disadvantage}
+                      onChange={(e) => setForm({ ...form, stealth_disadvantage: e.target.checked })}
+                      className="w-5 h-5 rounded border-border accent-primary"
+                    />
+                    <span className="font-medium text-foreground">Disadvantage on Stealth</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Weapon-specific fields */}
+          {form.category === "Weapon" && (
+            <div className="bg-card-lighter border-2 border-secondary/30 rounded-xl p-4 space-y-4">
+              <h3 className="font-semibold text-foreground">Weapon Properties</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Damage
+                  </label>
+                  <input
+                    type="text"
+                    value={form.damage}
+                    onChange={(e) => setForm({ ...form, damage: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                    placeholder="e.g. 1d8"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Damage Type
+                  </label>
+                  <select
+                    value={form.damage_type}
+                    onChange={(e) => setForm({ ...form, damage_type: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Select type...</option>
+                    {DAMAGE_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Range
+                  </label>
+                  <input
+                    type="text"
+                    value={form.range}
+                    onChange={(e) => setForm({ ...form, range: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                    placeholder="e.g. 5 ft or 80/320 ft"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Mastery
+                  </label>
+                  <select
+                    value={form.mastery}
+                    onChange={(e) => setForm({ ...form, mastery: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="">None</option>
+                    {WEAPON_MASTERIES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Properties
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEAPON_PROPERTIES.map((prop) => (
+                      <label key={prop} className="flex items-center gap-1.5 cursor-pointer text-sm bg-background px-2 py-1 rounded-lg border border-border">
+                        <input
+                          type="checkbox"
+                          checked={form.properties.includes(prop)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setForm({ ...form, properties: [...form.properties, prop] })
+                            } else {
+                              setForm({ ...form, properties: form.properties.filter(p => p !== prop) })
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-border accent-secondary"
+                        />
+                        <span className="text-foreground">{prop}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-4 pt-4">
             <button

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Plus, X, ChevronDown, ChevronRight, Download } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
 
@@ -17,14 +17,9 @@ interface TraitChoice {
 interface Trait {
   name: string
   description: string
+  level?: number // level at which trait becomes available, defaults to 1
   isChoice?: boolean
   choices?: TraitChoice
-}
-
-interface Lineage {
-  name: string
-  description: string
-  traits: Trait[]
 }
 
 interface SpeciesFormData {
@@ -33,20 +28,19 @@ interface SpeciesFormData {
   speed: number
   size: string
   traits: Trait[]
-  lineages: Lineage[]
   icon: string | null
   source: string
 }
 
 const SIZES = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
+const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 const defaultSpecies: SpeciesFormData = {
   name: "",
   description: "",
   speed: 30,
   size: "Medium",
-  traits: [{ name: "", description: "" }],
-  lineages: [],
+  traits: [{ name: "", description: "", level: 1 }],
   icon: null,
   source: "Custom",
 }
@@ -57,7 +51,6 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [expandedLineage, setExpandedLineage] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -83,8 +76,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             description: data.description || "",
             speed: data.speed || 30,
             size: data.size || "Medium",
-            traits: data.traits?.length ? data.traits : [{ name: "", description: "" }],
-            lineages: data.lineages || [],
+            traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             icon: data.icon || null,
             source: data.source || "Custom",
           })
@@ -104,10 +96,6 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
     const payload = {
       ...form,
       traits: form.traits.filter(t => t.name.trim()),
-      lineages: form.lineages.map(l => ({
-        ...l,
-        traits: l.traits.filter(t => t.name.trim())
-      }))
     }
     
     if (id === "new") {
@@ -137,7 +125,6 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
       data: {
         ...form,
         traits: form.traits.filter(t => t.name.trim()),
-        lineages: form.lineages.map(l => ({ ...l, traits: l.traits.filter(t => t.name.trim()) }))
       }
     }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
@@ -161,7 +148,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
   const addTrait = () => {
     setForm(prev => ({
       ...prev,
-      traits: [...prev.traits, { name: "", description: "" }]
+      traits: [...prev.traits, { name: "", description: "", level: 1 }]
     }))
   }
 
@@ -224,48 +211,6 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
         )
       }
     })
-  }
-
-  // Lineage management
-  const addLineage = () => {
-    const newIndex = form.lineages.length
-    setForm(prev => ({
-      ...prev,
-      lineages: [...prev.lineages, { name: "", description: "", traits: [{ name: "", description: "" }] }]
-    }))
-    setExpandedLineage(newIndex)
-  }
-
-  const removeLineage = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      lineages: prev.lineages.filter((_, i) => i !== index)
-    }))
-    if (expandedLineage === index) setExpandedLineage(null)
-  }
-
-  const updateLineage = (index: number, field: keyof Lineage, value: string | Trait[]) => {
-    setForm(prev => ({
-      ...prev,
-      lineages: prev.lineages.map((l, i) => i === index ? { ...l, [field]: value } : l)
-    }))
-  }
-
-  const addLineageTrait = (lineageIndex: number) => {
-    const lineage = form.lineages[lineageIndex]
-    updateLineage(lineageIndex, "traits", [...lineage.traits, { name: "", description: "" }])
-  }
-
-  const removeLineageTrait = (lineageIndex: number, traitIndex: number) => {
-    const lineage = form.lineages[lineageIndex]
-    updateLineage(lineageIndex, "traits", lineage.traits.filter((_, i) => i !== traitIndex))
-  }
-
-  const updateLineageTrait = (lineageIndex: number, traitIndex: number, field: keyof Trait, value: string) => {
-    const lineage = form.lineages[lineageIndex]
-    updateLineage(lineageIndex, "traits", lineage.traits.map((t, i) => 
-      i === traitIndex ? { ...t, [field]: value } : t
-    ))
   }
 
   if (loading) {
@@ -413,12 +358,12 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          {/* Base Traits */}
+          {/* Traits */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <label className="text-sm font-semibold text-foreground">Base Traits</label>
-                <p className="text-xs text-muted-foreground">Traits shared by all members of this species</p>
+                <label className="text-sm font-semibold text-foreground">Traits</label>
+                <p className="text-xs text-muted-foreground">Racial traits for this species (use Level to set when they become available)</p>
               </div>
               <button
                 type="button"
@@ -441,6 +386,18 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
                       placeholder="Trait name (e.g., Darkvision)"
                       className="flex-1 px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
                     />
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground whitespace-nowrap">Level</label>
+                      <select
+                        value={trait.level || 1}
+                        onChange={(e) => updateTrait(index, { level: parseInt(e.target.value) })}
+                        className="w-16 px-2 py-2 bg-background border-2 border-border rounded-lg text-foreground text-center focus:outline-none focus:border-primary"
+                      >
+                        {LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>{lvl}</option>
+                        ))}
+                      </select>
+                    </div>
                     <label className="flex items-center gap-2 cursor-pointer text-sm">
                       <input
                         type="checkbox"
@@ -519,116 +476,6 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
                           </button>
                         </div>
                       ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Lineages */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <label className="text-sm font-semibold text-foreground">Lineages</label>
-                <p className="text-xs text-muted-foreground">Subspecies or variants players can choose from</p>
-              </div>
-              <button
-                type="button"
-                onClick={addLineage}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Lineage
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {form.lineages.map((lineage, lIndex) => (
-                <div key={lIndex} className="bg-card border-2 border-secondary/30 rounded-xl overflow-hidden">
-                  <div 
-                    className="flex items-center gap-3 p-4 cursor-pointer hover:bg-secondary/5"
-                    onClick={() => setExpandedLineage(expandedLineage === lIndex ? null : lIndex)}
-                  >
-                    {expandedLineage === lIndex ? (
-                      <ChevronDown className="w-4 h-4 text-secondary" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-secondary" />
-                    )}
-                    <input
-                      type="text"
-                      value={lineage.name}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        updateLineage(lIndex, "name", e.target.value)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      placeholder="Lineage name (e.g., High Elf)"
-                      className="flex-1 px-3 py-1.5 bg-background border border-border rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeLineage(lIndex)
-                      }}
-                      className="p-2 text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  {expandedLineage === lIndex && (
-                    <div className="p-4 pt-0 space-y-4">
-                      <textarea
-                        value={lineage.description}
-                        onChange={(e) => updateLineage(lIndex, "description", e.target.value)}
-                        placeholder="Lineage description..."
-                        rows={2}
-                        className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg resize-none"
-                      />
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-secondary">Lineage Traits</span>
-                          <button
-                            type="button"
-                            onClick={() => addLineageTrait(lIndex)}
-                            className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded hover:bg-secondary/20"
-                          >
-                            <Plus className="w-3 h-3 inline mr-1" />
-                            Trait
-                          </button>
-                        </div>
-                        
-                        {lineage.traits.map((trait, tIndex) => (
-                          <div key={tIndex} className="flex items-start gap-2 pl-4 border-l-2 border-secondary/30">
-                            <div className="flex-1 space-y-2">
-                              <input
-                                type="text"
-                                value={trait.name}
-                                onChange={(e) => updateLineageTrait(lIndex, tIndex, "name", e.target.value)}
-                                placeholder="Trait name"
-                                className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
-                              />
-                              <textarea
-                                value={trait.description}
-                                onChange={(e) => updateLineageTrait(lIndex, tIndex, "description", e.target.value)}
-                                placeholder="Trait description..."
-                                rows={2}
-                                className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm resize-none"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeLineageTrait(lIndex, tIndex)}
-                              className="p-1 text-muted-foreground hover:text-destructive"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>

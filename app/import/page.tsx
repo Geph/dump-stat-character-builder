@@ -87,7 +87,7 @@ export default function ImportPage() {
 
       if (response.ok) {
         setSeedStatus("success")
-        setMessage(`Successfully seeded ${data.total} items from SRD 5.2`)
+        setMessage(`Successfully seeded ${data.total} items from D&D 5.5e SRD`)
       } else {
         setSeedStatus("error")
         setMessage(data.error || "Failed to seed database")
@@ -151,10 +151,10 @@ export default function ImportPage() {
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-foreground mb-2">
-                  Quick Start: Seed SRD Content
+                  Quick Start: Seed D&D 5.5e SRD Content
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Instantly populate your database with the D&D 5.2 SRD content including 
+                  Instantly populate your database with the D&D 5.5e SRD content including 
                   classes, species, backgrounds, spells, and equipment.
                 </p>
                 <button
@@ -163,7 +163,7 @@ export default function ImportPage() {
                   className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {getStatusIcon(seedStatus)}
-                  {seedStatus === "processing" ? "Seeding..." : "Seed SRD Content"}
+                  {seedStatus === "processing" ? "Seeding..." : "Seed D&D 5.5e SRD Content"}
                 </button>
               </div>
             </div>
