@@ -102,16 +102,16 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             category: data.category || "Adventuring Gear",
             subcategory: data.subcategory || "",
             cost: data.cost || { amount: 1, unit: "gp" },
-            weight: data.weight,
+            weight: data.weight || null,
             description: data.description || "",
             source: data.source || "Custom",
-            armor_class: data.armor_class ?? null,
+            armor_class: data.armor_class || null,
             stealth_disadvantage: data.stealth_disadvantage || false,
             damage: data.damage || "",
             damage_type: data.damage_type || "",
             range: data.range || "",
             mastery: data.mastery || "",
-            properties: data.properties || [],
+            properties: Array.isArray(data.properties) ? data.properties : [],
           })
         }
         setLoading(false)

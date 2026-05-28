@@ -434,7 +434,7 @@ export default function BuilderPage() {
         {/* Two-Column Layout */}
         <div id="builder-content" className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Step Content (choices) */}
-          <div id="builder-step-panel" className="lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6">
+          <div id="builder-step-panel" className="lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6 min-h-[600px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -1140,15 +1140,15 @@ export default function BuilderPage() {
 
           {/* Right Column: Character Sheet Preview */}
           <div id="builder-preview" className="lg:col-span-2">
-            <div className="bg-card rounded-2xl border-2 border-border p-4 sticky top-24">
+            <div className="bg-card rounded-2xl border-2 border-border p-4 sticky top-24 min-h-[600px]">
               {/* Header with name, classes and hit die */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-black text-foreground truncate" style={{ fontFamily: "var(--font-display)" }}>
                   {character.name || "New Character"}
                 </h3>
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">Lv</span>
-                  <span className="text-sm font-black text-foreground">{totalLevel}</span>
+                  <span className="text-sm text-muted-foreground">Lv</span>
+                  <span className="text-xl font-black text-warning">{totalLevel}</span>
                   {primaryClass && (
                     <span className="px-1.5 py-0.5 bg-destructive/10 text-destructive text-[10px] font-bold rounded ml-1">
                       d{primaryClass.hit_die}
@@ -1218,27 +1218,19 @@ export default function BuilderPage() {
                   
                   {/* Two column layout */}
                   <div className="grid grid-cols-2 gap-2">
-                    {/* Left column */}
+                    {/* Left column - Skills */}
                     <div className="space-y-2">
-                      <div className="p-2 bg-muted/50 rounded-lg">
-                        <p className="text-[8px] text-muted-foreground uppercase">Proficiency</p>
-                        <p className="text-lg font-black text-lime">+{proficiencyBonus}</p>
-                      </div>
-                      <div className="p-2 bg-muted/50 rounded-lg">
-                        <p className="text-[8px] text-muted-foreground uppercase">Passive Perception</p>
-                        <p className="text-lg font-black text-foreground">{passivePerception}</p>
-                      </div>
                       {/* Skills */}
-                      <div className="p-3 bg-muted/30 rounded-lg text-base pr-[12px] pl-[10px]">
-                        <p className="text-base text-muted-foreground uppercase mb-1">Skills</p>
-                        <div className="grid grid-cols-1 gap-0.5 text-[9px]">
+                      <div className="p-3 bg-muted/30 rounded-lg">
+                        <p className="text-sm text-muted-foreground uppercase mb-1 font-bold">Skills</p>
+                        <div className="grid grid-cols-1 gap-0.5 text-xs">
                           {SKILLS_DATA.map((skill) => {
                             const isProficient = character.skill_proficiencies.includes(skill.name)
                             const mod = abilityMods[skill.ability] + (isProficient ? proficiencyBonus : 0)
                             const abilityAbbr = skill.ability.slice(0, 3).toUpperCase()
                             return (
                               <div key={skill.name} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                                <span>{skill.name} <span className="text-[7px] opacity-60">({abilityAbbr})</span></span>
+                                <span>{skill.name} <span className="text-[8px] opacity-60">({abilityAbbr})</span></span>
                                 <span>{mod >= 0 ? `+${mod}` : mod}</span>
                               </div>
                             )
@@ -1247,31 +1239,55 @@ export default function BuilderPage() {
                       </div>
                     </div>
                     
-                    {/* Right column */}
+                    {/* Right column - Combat Stats */}
                     <div className="space-y-2">
-                      <div className="p-2 bg-muted/50 rounded-lg text-center">
-                        <Shield className="w-4 h-4 mx-auto text-secondary mb-0.5" />
-                        <p className="text-[8px] text-muted-foreground uppercase">AC</p>
-                        <p className="text-xl font-black text-secondary">{armorClass}</p>
-                      </div>
-                      <div className="p-2 bg-muted/50 rounded-lg text-center">
-                        <Heart className="w-4 h-4 mx-auto text-destructive mb-0.5" />
-                        <p className="text-[8px] text-muted-foreground uppercase">HP</p>
-                        <div className="flex items-center justify-center gap-1">
-                          <input
-                            type="number"
-                            value={currentHp ?? maxHp}
-                            onChange={(e) => setCurrentHp(Math.min(maxHp, Math.max(0, parseInt(e.target.value) || 0)))}
-                            className="w-10 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold"
-                          />
-                          <span className="text-sm text-muted-foreground">/ {maxHp}</span>
+                      {/* Top row: AC and HP */}
+                      <div className="grid grid-cols-2 gap-1">
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <Shield className="w-3 h-3 mx-auto text-secondary mb-0.5" />
+                          <p className="text-[7px] text-muted-foreground uppercase">AC</p>
+                          <p className="text-base font-black text-secondary">{armorClass}</p>
                         </div>
-                        {tempHp > 0 && <p className="text-[9px] text-cyan">+{tempHp} temp</p>}
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <Heart className="w-3 h-3 mx-auto text-destructive mb-0.5" />
+                          <p className="text-[7px] text-muted-foreground uppercase">HP</p>
+                          <div className="flex items-center justify-center gap-0.5">
+                            <input
+                              type="number"
+                              value={currentHp ?? maxHp}
+                              onChange={(e) => setCurrentHp(Math.min(maxHp, Math.max(0, parseInt(e.target.value) || 0)))}
+                              className="w-8 text-center bg-background border border-border rounded px-0.5 py-0.5 text-xs font-bold"
+                            />
+                            <span className="text-[10px] text-muted-foreground">/{maxHp}</span>
+                          </div>
+                          {tempHp > 0 && <p className="text-[8px] text-cyan">+{tempHp}</p>}
+                        </div>
                       </div>
-                      <div className="p-2 bg-muted/50 rounded-lg text-center">
-                        <p className="text-[8px] text-muted-foreground uppercase">Speed</p>
-                        <p className="text-lg font-black text-accent">{speed} ft</p>
+                      
+                      {/* Second row: Speed and Initiative */}
+                      <div className="grid grid-cols-2 gap-1">
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <p className="text-[7px] text-muted-foreground uppercase">Speed</p>
+                          <p className="text-base font-black text-accent">{speed} ft</p>
+                        </div>
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <p className="text-[7px] text-muted-foreground uppercase">Initiative</p>
+                          <p className="text-base font-black text-lime">{initiative >= 0 ? `+${initiative}` : initiative}</p>
+                        </div>
                       </div>
+                      
+                      {/* Third row: Proficiency and Passive Perception */}
+                      <div className="grid grid-cols-2 gap-1">
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <p className="text-[7px] text-muted-foreground uppercase">Proficiency</p>
+                          <p className="text-base font-black text-lime">+{proficiencyBonus}</p>
+                        </div>
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <p className="text-[7px] text-muted-foreground uppercase">Passive</p>
+                          <p className="text-base font-black text-foreground">{passivePerception}</p>
+                        </div>
+                      </div>
+
                       {/* Saving Throws */}
                       <div className="p-2 bg-muted/30 rounded-lg">
                         <p className="text-[8px] text-muted-foreground uppercase mb-1">Saves</p>
@@ -1287,11 +1303,6 @@ export default function BuilderPage() {
                             )
                           })}
                         </div>
-                      </div>
-                      {/* Darkvision */}
-                      <div className="p-2 bg-muted/50 rounded-lg text-center">
-                        <p className="text-[8px] text-muted-foreground uppercase">Darkvision</p>
-                        <p className="text-sm font-bold text-foreground">{darkvision} ft</p>
                       </div>
                     </div>
                   </div>
@@ -1473,6 +1484,13 @@ export default function BuilderPage() {
                             <p className="text-muted-foreground line-clamp-2">{trait.description}</p>
                           </div>
                         ))}
+                        {/* Darkvision */}
+                        {darkvision > 0 && (
+                          <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                            <p className="font-bold text-foreground">Darkvision</p>
+                            <p className="text-muted-foreground">{darkvision} ft range</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
