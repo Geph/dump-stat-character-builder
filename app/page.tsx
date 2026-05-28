@@ -48,11 +48,11 @@ type LibraryStats = {
 }
 
 const HERO_IMAGES = [
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%281%29.png-qrYxONxHb4CpafnwwaKMSTRQXEFvEa.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%282%29.png-FM0PvUgk8sRE6443Qm8xsRfe6AvRkb.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%283%29.png-jsfzXboZqMINY048zLOBOlYSjVeMlX.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%284%29.png-NuaTU8L13wxEryBGXwrBZaU0T3hLmz.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%285%29.png-4YpGTcW5LFjjKdiYaUsT36DMJEB6Lh.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%282%29.png-lTMAKAxAk9aiCH20M7OEgf7cCAjfz4.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%281%29.png-jkIOsnsjzDsuQGxDZ9aEuKojaqHbbX.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%285%29.png-RP5MWN94zgr6Ju284Ct4ZtHSBL6gmr.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%283%29.png-PtWc4DkQOWfQklKa5PYDBmOxjSuCud.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%284%29.png-CuA5DQzxgCl6Paw1PmtYUgDG65Xu6a.jpeg",
 ]
 
 const LIBRARY_STATS_BG = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/library-stats-section.png-xI6gFjkk9x6YETqOPgj8680eSlMkL2.jpeg"
