@@ -140,13 +140,11 @@ export default function HomePage() {
                 className="text-6xl md:text-8xl font-bold text-foreground mb-6 text-balance"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Dump
-                <span className="text-primary"> Stat</span>
+                Dump Stat
               </h1>
 
-              <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto text-pretty">
-                The most intuitive D&D 5.5e character builder. Create characters,
-                track stats, and manage your adventure — all in one place.
+              <p className="text-lg mb-10 max-w-2xl mx-auto text-pretty">
+                A vibe-coded D&D 5.5e character creator with support for custom classes and content
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
