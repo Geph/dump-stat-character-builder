@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment } from "@/lib/types"
 
-type ContentType = "species" | "classes" | "backgrounds" | "spells" | "feats" | "equipment"
+type ContentType = "species" | "classes" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "classes", label: "Classes", icon: <Shield className="w-4 h-4" /> },
@@ -17,6 +17,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "spells", label: "Spells", icon: <Wand2 className="w-4 h-4" /> },
   { id: "feats", label: "Feats", icon: <Sparkles className="w-4 h-4" /> },
   { id: "equipment", label: "Equipment", icon: <Package className="w-4 h-4" /> },
+  { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-4 h-4" /> },
 ]
 
 export default function CompendiumPage() {
@@ -29,37 +30,74 @@ export default function CompendiumPage() {
     spells: [],
     feats: [],
     equipment: [],
+    abilities: [],
   })
   const [loading, setLoading] = useState(true)
   const [selectedItem, setSelectedItem] = useState<unknown | null>(null)
+  const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
+    species: 0,
+    classes: 0,
+    backgrounds: 0,
+    spells: 0,
+    feats: 0,
+    equipment: 0,
+    abilities: 0,
+  })
 
+  // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
-    const fetchContent = async () => {
+    const fetchCounts = async () => {
       const supabase = createClient()
-      setLoading(true)
-
-      const [speciesRes, classesRes, backgroundsRes, spellsRes, featsRes, equipmentRes] = await Promise.all([
-        supabase.from("species").select("*").order("name"),
-        supabase.from("classes").select("*").order("name"),
-        supabase.from("backgrounds").select("*").order("name"),
-        supabase.from("spells").select("*").order("level").order("name"),
-        supabase.from("feats").select("*").order("name"),
-        supabase.from("equipment").select("*").order("category").order("name"),
+      const [
+        { count: speciesCount },
+        { count: classesCount },
+        { count: backgroundsCount },
+        { count: spellsCount },
+        { count: featsCount },
+        { count: equipmentCount },
+        { count: abilitiesCount },
+      ] = await Promise.all([
+        supabase.from("species").select("*", { count: "exact", head: true }),
+        supabase.from("classes").select("*", { count: "exact", head: true }),
+        supabase.from("backgrounds").select("*", { count: "exact", head: true }),
+        supabase.from("spells").select("*", { count: "exact", head: true }),
+        supabase.from("feats").select("*", { count: "exact", head: true }),
+        supabase.from("equipment").select("*", { count: "exact", head: true }),
+        supabase.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
-
-      setContent({
-        species: speciesRes.data || [],
-        classes: classesRes.data || [],
-        backgrounds: backgroundsRes.data || [],
-        spells: spellsRes.data || [],
-        feats: featsRes.data || [],
-        equipment: equipmentRes.data || [],
+      setTabCounts({
+        species: speciesCount ?? 0,
+        classes: classesCount ?? 0,
+        backgrounds: backgroundsCount ?? 0,
+        spells: spellsCount ?? 0,
+        feats: featsCount ?? 0,
+        equipment: equipmentCount ?? 0,
+        abilities: abilitiesCount ?? 0,
       })
+    }
+    fetchCounts()
+  }, [])
+
+  // Fetch content only for active tab
+  useEffect(() => {
+    const fetchActiveTabContent = async () => {
+      setLoading(true)
+      const supabase = createClient()
+      
+      const tableName = activeTab === "abilities" ? "custom_abilities" : activeTab
+      const { data } = await supabase
+        .from(tableName)
+        .select("*")
+        .order("name")
+        .limit(100)
+      
+      setContent(prev => ({ ...prev, [activeTab]: data || [] }))
       setLoading(false)
     }
-
-    fetchContent()
-  }, [])
+    
+    fetchActiveTabContent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const filteredContent = (content[activeTab] as { name: string }[]).filter((item) =>
     item.name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -160,6 +198,23 @@ export default function CompendiumPage() {
             )}
           </div>
         )}
+        {activeTab === "abilities" && (
+          <div className="space-y-2">
+            {(data as { prerequisites?: string }).prerequisites && (
+              <p className="text-xs text-orange">
+                Prereq: {(data as { prerequisites: string }).prerequisites}
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {(data as { description?: string }).description}
+            </p>
+            {(data as { attached_to_type?: string }).attached_to_type && (
+              <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
+                For: {(data as { attached_to_type: string }).attached_to_type}
+              </span>
+            )}
+          </div>
+        )}
       </motion.div>
     )
   }
@@ -175,11 +230,11 @@ export default function CompendiumPage() {
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
           </div>
           <Link
-            href={`/compendium/${activeTab === "classes" ? "classes" : activeTab === "species" ? "species" : activeTab === "backgrounds" ? "backgrounds" : activeTab}/new`}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors"
+            href={`/compendium/${activeTab}/new`}
+            className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
-            New {activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}
+            <Plus className="w-5 h-5" />
+            New {activeTab === "abilities" ? "Custom Ability" : activeTab === "species" ? "Species" : activeTab.slice(0, -2).charAt(0).toUpperCase() + activeTab.slice(0, -2).slice(1)}
           </Link>
         </div>
 
@@ -212,7 +267,7 @@ export default function CompendiumPage() {
               <span className={`text-xs px-2 py-0.5 rounded-full ${
                 activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
               }`}>
-                {content[tab.id].length}
+                {tabCounts[tab.id]}
               </span>
             </button>
           ))}

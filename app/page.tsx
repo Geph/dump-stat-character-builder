@@ -178,7 +178,7 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-4 border-t border-border">
+        <section className="py-20 px-4 border-t border-border bg-card">
           <div className="max-w-6xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -276,7 +276,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-8 px-4 border-t border-border">
+      <footer className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
           <p>Sheet Happens — D&D 5.5e Character Builder</p>
           <p>Uses content from the D&D SRD 5.2 under the Creative Commons license.</p>

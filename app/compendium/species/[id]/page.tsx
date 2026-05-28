@@ -161,7 +161,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
           <div className="flex items-center gap-4">
             <Link 
               href="/compendium?tab=species"
-              className="p-2 hover:bg-muted rounded-xl transition-colors"
+              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>

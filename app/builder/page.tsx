@@ -733,12 +733,94 @@ export default function BuilderPage() {
           </motion.div>
         </AnimatePresence>
 
+        {/* Character Sheet Preview (like OrcPub) */}
+        <div className="mt-8 bg-card rounded-2xl border-2 border-border p-6">
+          <h3 className="text-lg font-bold text-foreground mb-4" style={{ fontFamily: "var(--font-display)" }}>
+            {character.name || "New Character"} {selectedClass?.name ? `(${selectedClass.name})` : ""}
+          </h3>
+          
+          {/* Ability Scores Row */}
+          <div className="grid grid-cols-6 gap-2 mb-4">
+            {ABILITY_NAMES.map((ability) => {
+              const score = character[ability]
+              const mod = Math.floor((score - 10) / 2)
+              return (
+                <div key={ability} className="text-center bg-muted rounded-lg p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
+                  <p className="text-xl font-black text-foreground">{score}</p>
+                  <p className="text-xs text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <span className="text-[10px] text-muted-foreground uppercase">Species</span>
+              <span className="font-bold text-foreground">{selectedSpecies?.name || "—"}</span>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <span className="text-[10px] text-muted-foreground uppercase">Background</span>
+              <span className="font-bold text-foreground">{selectedBackground?.name || "—"}</span>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <span className="text-[10px] text-muted-foreground uppercase">Level</span>
+              <span className="font-bold text-foreground">{character.level}</span>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
+              <span className="text-[10px] text-muted-foreground uppercase">Hit Die</span>
+              <span className="font-bold text-destructive">{selectedClass ? `d${selectedClass.hit_die}` : "—"}</span>
+            </div>
+          </div>
+
+          {/* Derived Stats */}
+          <div className="grid grid-cols-3 gap-3 mt-3 text-sm">
+            <div className="flex flex-col items-center p-2 bg-primary/10 rounded-lg border border-primary/20">
+              <span className="text-[10px] text-primary uppercase font-bold">Max HP</span>
+              <span className="text-xl font-black text-primary">
+                {selectedClass ? selectedClass.hit_die + Math.floor((character.constitution - 10) / 2) : "—"}
+              </span>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-secondary/10 rounded-lg border border-secondary/20">
+              <span className="text-[10px] text-secondary uppercase font-bold">AC</span>
+              <span className="text-xl font-black text-secondary">
+                {10 + Math.floor((character.dexterity - 10) / 2)}
+              </span>
+            </div>
+            <div className="flex flex-col items-center p-2 bg-accent/10 rounded-lg border border-accent/20">
+              <span className="text-[10px] text-accent uppercase font-bold">Speed</span>
+              <span className="text-xl font-black text-accent">
+                {selectedSpecies?.speed || 30} ft
+              </span>
+            </div>
+          </div>
+
+          {/* Equipment & Spells summary */}
+          {(character.equipment_ids.length > 0 || character.spell_ids.length > 0) && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <div className="flex gap-4 text-xs">
+                {character.equipment_ids.length > 0 && (
+                  <span className="text-muted-foreground">
+                    <span className="text-lime font-bold">{character.equipment_ids.length}</span> equipment
+                  </span>
+                )}
+                {character.spell_ids.length > 0 && (
+                  <span className="text-muted-foreground">
+                    <span className="text-magenta font-bold">{character.spell_ids.length}</span> spells
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Navigation Buttons */}
         <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
           <button
             onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+            className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
           >
             <ChevronLeft className="w-5 h-5" />
             Back

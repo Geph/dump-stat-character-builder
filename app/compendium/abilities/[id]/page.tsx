@@ -7,46 +7,41 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2 } from "lucide-react"
 import Link from "next/link"
 
-const CATEGORIES = [
-  "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
-]
-
-const SUBCATEGORIES: Record<string, string[]> = {
-  "Weapon": ["Simple Melee", "Simple Ranged", "Martial Melee", "Martial Ranged"],
-  "Armor": ["Light", "Medium", "Heavy", "Shield"],
-  "Adventuring Gear": ["Standard", "Equipment Pack", "Container"],
-  "Tool": ["Artisan's Tools", "Gaming Set", "Musical Instrument", "Other"],
-  "Mount": ["Common", "Exotic"],
-  "Vehicle": ["Land", "Water", "Air"],
-  "Trade Good": [],
-}
-
-interface EquipmentFormData {
+interface AbilityFormData {
   name: string
-  category: string
-  subcategory: string
-  cost: { amount: number; unit: string } | null
-  weight: number | null
   description: string
+  prerequisites: string
+  attached_to_type: string
+  attached_to_id: string
   source: string
 }
 
-const defaultEquipment: EquipmentFormData = {
+const defaultAbility: AbilityFormData = {
   name: "",
-  category: "Adventuring Gear",
-  subcategory: "",
-  cost: { amount: 1, unit: "gp" },
-  weight: null,
   description: "",
+  prerequisites: "",
+  attached_to_type: "",
+  attached_to_id: "",
   source: "Custom",
 }
 
-export default function EquipmentEditorPage({ params }: { params: Promise<{ id: string }> }) {
+const ATTACH_OPTIONS = [
+  { value: "", label: "None (Standalone)" },
+  { value: "class", label: "Class" },
+  { value: "species", label: "Species" },
+  { value: "background", label: "Background" },
+  { value: "feat", label: "Feat" },
+  { value: "equipment", label: "Equipment" },
+  { value: "spell", label: "Spell" },
+]
+
+export default function AbilityEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string | null>(null)
-  const [form, setForm] = useState<EquipmentFormData>(defaultEquipment)
+  const [form, setForm] = useState<AbilityFormData>(defaultAbility)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attachTargets, setAttachTargets] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -55,33 +50,57 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
 
   useEffect(() => {
     if (id && id !== "new") {
-      const fetchEquipment = async () => {
+      const fetchAbility = async () => {
         setLoading(true)
         const supabase = createClient()
         const { data, error } = await supabase
-          .from("equipment")
+          .from("custom_abilities")
           .select("*")
           .eq("id", id)
           .single()
         
         if (error) {
-          setError("Equipment not found")
+          setError("Custom Ability not found")
         } else if (data) {
           setForm({
             name: data.name || "",
-            category: data.category || "Adventuring Gear",
-            subcategory: data.subcategory || "",
-            cost: data.cost || { amount: 1, unit: "gp" },
-            weight: data.weight,
             description: data.description || "",
+            prerequisites: data.prerequisites || "",
+            attached_to_type: data.attached_to_type || "",
+            attached_to_id: data.attached_to_id || "",
             source: data.source || "Custom",
           })
         }
         setLoading(false)
       }
-      fetchEquipment()
+      fetchAbility()
     }
   }, [id])
+
+  // Fetch attach targets when type changes
+  useEffect(() => {
+    const fetchTargets = async () => {
+      if (!form.attached_to_type) {
+        setAttachTargets([])
+        return
+      }
+
+      const supabase = createClient()
+      const tableName = form.attached_to_type === "class" ? "classes" 
+        : form.attached_to_type === "species" ? "species"
+        : form.attached_to_type === "spell" ? "spells"
+        : `${form.attached_to_type}s`
+      
+      const { data } = await supabase
+        .from(tableName)
+        .select("id, name")
+        .order("name")
+        .limit(50)
+      
+      setAttachTargets(data || [])
+    }
+    fetchTargets()
+  }, [form.attached_to_type])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,16 +108,20 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     setError(null)
 
     const supabase = createClient()
+    const payload = {
+      ...form,
+      attached_to_id: form.attached_to_id || null,
+    }
     
     if (id === "new") {
-      const { error } = await supabase.from("equipment").insert([form])
+      const { error } = await supabase.from("custom_abilities").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("equipment").update(form).eq("id", id)
+      const { error } = await supabase.from("custom_abilities").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -107,15 +130,15 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     }
     
     setSaving(false)
-    router.push("/compendium?tab=equipment")
+    router.push("/compendium?tab=abilities")
   }
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this equipment?")) return
+    if (!confirm("Are you sure you want to delete this custom ability?")) return
     
     const supabase = createClient()
-    await supabase.from("equipment").delete().eq("id", id)
-    router.push("/compendium?tab=equipment")
+    await supabase.from("custom_abilities").delete().eq("id", id)
+    router.push("/compendium?tab=abilities")
   }
 
   if (loading) {
@@ -144,13 +167,13 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link 
-              href="/compendium?tab=equipment"
+              href="/compendium?tab=abilities"
               className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Equipment" : "Edit Equipment"}
+              {id === "new" ? "New Custom Ability" : "Edit Custom Ability"}
             </h1>
           </div>
           
@@ -175,7 +198,7 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
-                Item Name
+                Ability Name
               </label>
               <input
                 type="text"
@@ -183,7 +206,7 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
                 className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Longsword"
+                placeholder="e.g., Extra Attack"
               />
             </div>
             <div>
@@ -195,95 +218,60 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
                 value={form.source}
                 onChange={(e) => setForm({ ...form, source: e.target.value })}
                 className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Player's Handbook"
+                placeholder="Custom, Homebrew, etc."
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Prerequisites
+            </label>
+            <input
+              type="text"
+              value={form.prerequisites}
+              onChange={(e) => setForm({ ...form, prerequisites: e.target.value })}
+              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+              placeholder="e.g., Level 5, Strength 13 or higher"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
-                Category
+                Attach to Type
               </label>
               <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value, subcategory: "" })}
+                value={form.attached_to_type}
+                onChange={(e) => setForm({ ...form, attached_to_type: e.target.value, attached_to_id: "" })}
                 className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {ATTACH_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Subcategory
-              </label>
-              <select
-                value={form.subcategory}
-                onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-              >
-                <option value="">None</option>
-                {(SUBCATEGORIES[form.category] || []).map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Cost (Amount)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={form.cost?.amount || 0}
-                onChange={(e) => setForm({ 
-                  ...form, 
-                  cost: { ...form.cost!, amount: parseFloat(e.target.value) || 0 } 
-                })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Cost (Unit)
-              </label>
-              <select
-                value={form.cost?.unit || "gp"}
-                onChange={(e) => setForm({ 
-                  ...form, 
-                  cost: { ...form.cost!, unit: e.target.value } 
-                })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-              >
-                <option value="cp">Copper (cp)</option>
-                <option value="sp">Silver (sp)</option>
-                <option value="ep">Electrum (ep)</option>
-                <option value="gp">Gold (gp)</option>
-                <option value="pp">Platinum (pp)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Weight (lbs)
-              </label>
-              <input
-                type="number"
-                min={0}
-                step={0.1}
-                value={form.weight || ""}
-                onChange={(e) => setForm({ 
-                  ...form, 
-                  weight: e.target.value ? parseFloat(e.target.value) : null 
-                })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Optional"
-              />
-            </div>
+            {form.attached_to_type && (
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  Attach to {form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}
+                </label>
+                <select
+                  value={form.attached_to_id}
+                  onChange={(e) => setForm({ ...form, attached_to_id: e.target.value })}
+                  className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Select a {form.attached_to_type}...</option>
+                  {attachTargets.map((target) => (
+                    <option key={target.id} value={target.id}>
+                      {target.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>
@@ -293,9 +281,9 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
+              rows={8}
               className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
-              placeholder="Describe the item, including any special properties..."
+              placeholder="Describe what this ability does..."
             />
           </div>
 
@@ -306,11 +294,11 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
               className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Equipment"}
+              {saving ? "Saving..." : "Save Ability"}
             </button>
             <Link
-              href="/compendium?tab=equipment"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
+              href="/compendium?tab=abilities"
+              className="px-6 py-4 bg-lemon text-lemon-foreground rounded-xl font-bold hover:brightness-110 transition-colors"
             >
               Cancel
             </Link>
