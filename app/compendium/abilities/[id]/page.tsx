@@ -15,6 +15,7 @@ interface AbilityFormData {
   attached_to_type: string
   attached_to_id: string
   uses: UsesConfig | null
+  show_in_builder: boolean
   source: string
 }
 
@@ -25,6 +26,7 @@ const defaultAbility: AbilityFormData = {
   attached_to_type: "",
   attached_to_id: "",
   uses: null,
+  show_in_builder: false,
   source: "Custom",
 }
 
@@ -77,6 +79,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             attached_to_type: data.attached_to_type || "",
             attached_to_id: data.attached_to_id || "",
             uses: data.uses || null,
+            show_in_builder: data.show_in_builder ?? false,
             source: data.source || "Custom",
           })
         }
@@ -590,6 +593,24 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
               placeholder="Describe what this ability does..."
             />
+          </div>
+
+          {/* Show in Builder Checkbox */}
+          <div className="bg-card border-2 border-border rounded-xl p-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.show_in_builder}
+                onChange={(e) => setForm({ ...form, show_in_builder: e.target.checked })}
+                className="w-5 h-5 rounded border-border accent-primary"
+              />
+              <div>
+                <span className="font-semibold text-foreground">Show in Character Builder</span>
+                <p className="text-sm text-muted-foreground">
+                  When enabled, this custom ability will appear in the &quot;Custom&quot; tab of the character builder preview.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="flex gap-4 pt-4">

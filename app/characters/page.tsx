@@ -4,9 +4,9 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, User, Trash2, Shield, Heart, Zap } from "lucide-react"
+import { Plus, User, Trash2 } from "lucide-react"
 import Link from "next/link"
-import type { Character, DndClass, Species, Background } from "@/lib/types"
+import type { DndClass, Species, Background } from "@/lib/types"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -50,11 +50,6 @@ export default function CharactersPage() {
     if (!error) {
       setCharacters(characters.filter(c => c.id !== id))
     }
-  }
-
-  const getAbilityModifier = (score: number) => {
-    const mod = Math.floor((score - 10) / 2)
-    return mod >= 0 ? `+${mod}` : `${mod}`
   }
 
   return (
@@ -111,94 +106,67 @@ export default function CharactersPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {characters.map((character, index) => (
               <motion.div
                 key={character.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-card rounded-2xl p-6 border-2 border-border hover:border-primary/50 transition-colors group"
+                className="bg-card rounded-2xl border-2 border-border hover:border-primary/50 transition-colors group overflow-hidden"
               >
-                {/* Header */}
-                <div className="flex items-start gap-4 mb-4">
+                {/* Large Portrait as main focus */}
+                <Link href={`/characters/${character.id}`} className="block relative aspect-square">
                   {character.portrait_url ? (
                     <img
                       src={character.portrait_url}
                       alt={character.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-border"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="w-8 h-8 text-primary" />
+                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                      <User className="w-20 h-20 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-foreground truncate">{character.name}</h3>
-                    <p className="text-muted-foreground text-sm">
-                      Level {character.level} {character.classes?.name || "Adventurer"}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {character.species?.name} {character.backgrounds?.name ? `- ${character.backgrounds.name}` : ""}
-                    </p>
+                  {/* Level badge overlay */}
+                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
+                    <span className="text-xs font-bold text-white">Lvl {character.level}</span>
                   </div>
+                  {/* Delete button overlay */}
                   <button
-                    onClick={() => deleteCharacter(character.id)}
-                    className="p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      deleteCharacter(character.id)
+                    }}
+                    className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-sm rounded-lg text-white/70 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
                     title="Delete character"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                </div>
-
-                {/* Stats Row */}
-                <div className="flex gap-2 mb-4">
-                  <div className="flex-1 bg-destructive/10 rounded-lg p-2 text-center">
-                    <Heart className="w-4 h-4 text-destructive mx-auto mb-1" />
-                    <p className="text-sm font-bold text-foreground">{character.hit_point_max || "—"}</p>
-                    <p className="text-xs text-muted-foreground">HP</p>
-                  </div>
-                  <div className="flex-1 bg-primary/10 rounded-lg p-2 text-center">
-                    <Shield className="w-4 h-4 text-primary mx-auto mb-1" />
-                    <p className="text-sm font-bold text-foreground">{character.armor_class || "—"}</p>
-                    <p className="text-xs text-muted-foreground">AC</p>
-                  </div>
-                  <div className="flex-1 bg-warning/10 rounded-lg p-2 text-center">
-                    <Zap className="w-4 h-4 text-warning mx-auto mb-1" />
-                    <p className="text-sm font-bold text-foreground">{character.speed || 30}</p>
-                    <p className="text-xs text-muted-foreground">Speed</p>
-                  </div>
-                </div>
-
-                {/* Ability Scores */}
-                <div className="grid grid-cols-6 gap-1 mb-4">
-                  {[
-                    { key: "strength", label: "STR" },
-                    { key: "dexterity", label: "DEX" },
-                    { key: "constitution", label: "CON" },
-                    { key: "intelligence", label: "INT" },
-                    { key: "wisdom", label: "WIS" },
-                    { key: "charisma", label: "CHA" },
-                  ].map(({ key, label }) => (
-                    <div key={key} className="text-center">
-                      <p className="text-[10px] text-muted-foreground">{label}</p>
-                      <p className="text-xs font-bold text-foreground">
-                        {character[key as keyof Character] as number || 10}
-                      </p>
-                      <p className="text-[10px] text-primary">
-                        {getAbilityModifier((character[key as keyof Character] as number) || 10)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* View Button */}
-                <Link
-                  href={`/characters/${character.id}`}
-                  className="block w-full py-2 bg-muted text-center rounded-lg font-semibold text-foreground hover:bg-muted/80 transition-colors"
-                >
-                  View Character
                 </Link>
+                
+                {/* Character Info - Below the image */}
+                <div className="p-4">
+                  <Link href={`/characters/${character.id}`}>
+                    <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">
+                      {character.name}
+                    </h3>
+                  </Link>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-sm text-primary font-medium">
+                      {character.classes?.name || "Adventurer"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {character.species?.name || "Unknown Species"}
+                    </p>
+                    {character.backgrounds?.name && (
+                      <p className="text-xs text-muted-foreground">
+                        {character.backgrounds.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>

@@ -26,7 +26,7 @@ import {
   Plus,
   Minus
 } from "lucide-react"
-import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft } from "@/lib/types"
+import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft, CustomAbility } from "@/lib/types"
 
 const STEPS = [
   { id: 1, label: "Class", icon: Shield },
@@ -50,6 +50,7 @@ export default function BuilderPage() {
   const [backgrounds, setBackgrounds] = useState<Background[]>([])
   const [spells, setSpells] = useState<Spell[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
   const [loading, setLoading] = useState(true)
 
   // Character draft
@@ -95,7 +96,7 @@ export default function BuilderPage() {
   }>({ type: null, item: null })
   
   // Preview tabs
-  const [previewTab, setPreviewTab] = useState<"summary" | "combat" | "features">("summary")
+  const [previewTab, setPreviewTab] = useState<"summary" | "combat" | "features" | "custom">("summary")
   
   // Multiclass support - tracks class levels
   const [classLevels, setClassLevels] = useState<{ classId: string; level: number }[]>([])
@@ -108,12 +109,13 @@ export default function BuilderPage() {
     const fetchContent = async () => {
       const supabase = createClient()
       
-      const [classesRes, speciesRes, backgroundsRes, spellsRes, equipmentRes] = await Promise.all([
+      const [classesRes, speciesRes, backgroundsRes, spellsRes, equipmentRes, abilitiesRes] = await Promise.all([
         supabase.from("classes").select("*").order("name"),
         supabase.from("species").select("*").order("name"),
         supabase.from("backgrounds").select("*").order("name"),
         supabase.from("spells").select("*").order("level").order("name"),
         supabase.from("equipment").select("*").order("category").order("name"),
+        supabase.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
       ])
 
       setClasses(classesRes.data || [])
@@ -121,6 +123,7 @@ export default function BuilderPage() {
       setBackgrounds(backgroundsRes.data || [])
       setSpells(spellsRes.data || [])
       setEquipment(equipmentRes.data || [])
+      setCustomAbilities(abilitiesRes.data || [])
       setLoading(false)
     }
 
@@ -843,7 +846,9 @@ export default function BuilderPage() {
                 {selectedClass?.spellcasting && (
                   <div>
                     <h2 className="text-2xl font-black text-foreground mb-2">Select Spells</h2>
-                    <p className="text-muted-foreground mb-3">Choose your starting spells.</p>
+                    <p className="text-muted-foreground mb-3">
+                      Choose spells available to your {selectedClass.name} at level {totalLevel}.
+                    </p>
                     
                     {/* Search */}
                     <div className="relative mb-3">
@@ -857,55 +862,84 @@ export default function BuilderPage() {
                       />
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                      {spells
-                        .filter(s => s.classes?.includes(selectedClass.name) && s.level <= 1)
+                    {/* Spell level based on character level: 1-2=1st, 3-4=2nd, 5-6=3rd, etc. */}
+                    {(() => {
+                      const maxSpellLevel = Math.min(9, Math.ceil(totalLevel / 2))
+                      const availableSpells = spells
+                        .filter(s => s.classes?.includes(selectedClass.name) && s.level <= maxSpellLevel)
                         .filter(s => s.name.toLowerCase().includes(spellSearch.toLowerCase()))
-                        .slice(0, 30)
-                        .map((spell) => (
-                          <label
-                            key={spell.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
-                              character.spell_ids.includes(spell.id)
-                                ? "border-secondary bg-secondary/10"
-                                : "border-border bg-card hover:border-secondary/50"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={character.spell_ids.includes(spell.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setCharacter({ ...character, spell_ids: [...character.spell_ids, spell.id] })
-                                } else {
-                                  setCharacter({ ...character, spell_ids: character.spell_ids.filter(id => id !== spell.id) })
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                              character.spell_ids.includes(spell.id) ? "bg-secondary border-secondary" : "border-muted-foreground"
-                            }`}>
-                              {character.spell_ids.includes(spell.id) && <Check className="w-2.5 h-2.5 text-white" />}
+                      
+                      // Group by spell level
+                      const spellsByLevel: Record<number, typeof availableSpells> = {}
+                      availableSpells.forEach(s => {
+                        if (!spellsByLevel[s.level]) spellsByLevel[s.level] = []
+                        spellsByLevel[s.level].push(s)
+                      })
+                      
+                      return (
+                        <div className="space-y-4 max-h-64 overflow-y-auto">
+                          {Object.entries(spellsByLevel)
+                            .sort(([a], [b]) => Number(a) - Number(b))
+                            .map(([level, levelSpells]) => (
+                            <div key={level}>
+                              <p className="text-xs font-bold text-primary uppercase mb-2">
+                                {level === "0" ? "Cantrips" : `Level ${level} Spells`}
+                              </p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {levelSpells.slice(0, 15).map((spell) => (
+                                  <label
+                                    key={spell.id}
+                                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                                      character.spell_ids.includes(spell.id)
+                                        ? "border-secondary bg-secondary/10"
+                                        : "border-border bg-card hover:border-secondary/50"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={character.spell_ids.includes(spell.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setCharacter({ ...character, spell_ids: [...character.spell_ids, spell.id] })
+                                        } else {
+                                          setCharacter({ ...character, spell_ids: character.spell_ids.filter(id => id !== spell.id) })
+                                        }
+                                      }}
+                                      className="sr-only"
+                                    />
+                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                      character.spell_ids.includes(spell.id) ? "bg-secondary border-secondary" : "border-muted-foreground"
+                                    }`}>
+                                      {character.spell_ids.includes(spell.id) && <Check className="w-2.5 h-2.5 text-white" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm text-foreground truncate">{spell.name}</p>
+                                      <p className="text-xs text-muted-foreground">{spell.school}</p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setDetailsModal({ type: "spell", item: spell })
+                                      }}
+                                      className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
+                                    >
+                                      <Info className="w-3 h-3" />
+                                    </button>
+                                  </label>
+                                ))}
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-foreground truncate">{spell.name}</p>
-                              <p className="text-xs text-muted-foreground">{spell.source || "D&D 5.5e SRD"}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setDetailsModal({ type: "spell", item: spell })
-                              }}
-                              className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
-                            >
-                              <Info className="w-3 h-3" />
-                            </button>
-                          </label>
-                        ))}
-                    </div>
+                          ))}
+                          {availableSpells.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              No spells found for {selectedClass.name}.
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
@@ -1147,6 +1181,7 @@ export default function BuilderPage() {
                   { id: "summary", label: "Summary", icon: UserCircle },
                   { id: "combat", label: "Combat", icon: Swords },
                   { id: "features", label: "Features", icon: Sparkles },
+                  { id: "custom", label: "Custom", icon: Wand2 },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -1196,13 +1231,14 @@ export default function BuilderPage() {
                       {/* Skills */}
                       <div className="p-2 bg-muted/30 rounded-lg">
                         <p className="text-[8px] text-muted-foreground uppercase mb-1">Skills</p>
-                        <div className="space-y-0.5 max-h-32 overflow-y-auto text-[9px]">
+                        <div className="grid grid-cols-1 gap-0.5 text-[9px]">
                           {SKILLS_DATA.map((skill) => {
                             const isProficient = character.skill_proficiencies.includes(skill.name)
                             const mod = abilityMods[skill.ability] + (isProficient ? proficiencyBonus : 0)
+                            const abilityAbbr = skill.ability.slice(0, 3).toUpperCase()
                             return (
                               <div key={skill.name} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
-                                <span>{skill.name}</span>
+                                <span>{skill.name} <span className="text-[7px] opacity-60">({abilityAbbr})</span></span>
                                 <span>{mod >= 0 ? `+${mod}` : mod}</span>
                               </div>
                             )
@@ -1284,6 +1320,61 @@ export default function BuilderPage() {
                     <div className="p-2 bg-muted/50 rounded-lg">
                       <p className="text-[8px] text-muted-foreground">Initiative</p>
                       <p className="text-lg font-black text-lime">{initiative >= 0 ? `+${initiative}` : initiative}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Spellcasting Stats (if class has spellcasting) */}
+                  {primaryClass?.spellcasting && (
+                    <div className="p-2 bg-magenta/10 rounded-lg">
+                      <p className="text-[9px] text-magenta uppercase font-bold mb-1">Spellcasting ({primaryClass.spellcasting.ability})</p>
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        <div>
+                          <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
+                          <p className="text-xl font-black text-magenta">
+                            {8 + proficiencyBonus + abilityMods[primaryClass.spellcasting.ability.toLowerCase() as keyof typeof abilityMods]}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[8px] text-muted-foreground">Spell Attack</p>
+                          <p className="text-xl font-black text-magenta">
+                            +{proficiencyBonus + abilityMods[primaryClass.spellcasting.ability.toLowerCase() as keyof typeof abilityMods]}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Resistances */}
+                  <div className="p-2 bg-muted/30 rounded-lg">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Resistances</p>
+                    <p className="text-[10px] text-foreground italic">
+                      {selectedSpecies?.traits?.filter(t => 
+                        t.name.toLowerCase().includes("resistance") || 
+                        t.description?.toLowerCase().includes("resistance to")
+                      ).map(t => t.name).join(", ") || "None"}
+                    </p>
+                  </div>
+
+                  {/* Death Saves */}
+                  <div className="p-2 bg-muted/30 rounded-lg">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Death Saves</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-lime">Successes</span>
+                        <div className="flex gap-1">
+                          {[1, 2, 3].map(i => (
+                            <div key={i} className="w-3 h-3 border border-lime rounded-full" />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] text-destructive">Failures</span>
+                        <div className="flex gap-1">
+                          {[1, 2, 3].map(i => (
+                            <div key={i} className="w-3 h-3 border border-destructive rounded-full" />
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -1394,6 +1485,39 @@ export default function BuilderPage() {
                         <p className="font-bold text-foreground">{selectedBackground.feature.name}</p>
                         <p className="text-muted-foreground line-clamp-3">{selectedBackground.feature.description}</p>
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Custom Abilities Tab */}
+              {previewTab === "custom" && (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {customAbilities.length > 0 ? (
+                    <>
+                      <p className="text-[9px] text-magenta uppercase font-bold mb-1">Custom Abilities</p>
+                      <div className="space-y-1">
+                        {customAbilities.map((ability) => (
+                          <div key={ability.id} className="p-1.5 bg-muted/30 rounded text-[10px]">
+                            <p className="font-bold text-foreground">{ability.name}</p>
+                            <p className="text-muted-foreground line-clamp-2">{ability.description}</p>
+                            {ability.uses && ability.uses.type !== "unlimited" && (
+                              <p className="text-[8px] text-magenta mt-0.5">
+                                Uses: {ability.uses.type === "fixed" ? ability.uses.fixedAmount : ability.uses.type}
+                                {ability.uses.recharge && ` (${ability.uses.recharge.replace("_", " ")})`}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-6">
+                      <Wand2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground">No custom abilities available</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Custom abilities can be added in the Compendium and marked to show here.
+                      </p>
                     </div>
                   )}
                 </div>

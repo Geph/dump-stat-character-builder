@@ -106,6 +106,7 @@ export interface CustomAbility {
   attached_to_type: string | null
   attached_to_id: string | null
   uses: UsesConfig | null
+  show_in_builder: boolean
   source: string
   creator_url: string | null
   created_at: string
