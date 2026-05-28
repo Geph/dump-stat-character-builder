@@ -113,11 +113,11 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="import-root" className="min-h-screen bg-background">
       <MainNav />
       
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
+      <main id="import-main" className="max-w-4xl mx-auto px-4 py-8">
+        <div id="import-header" className="mb-8">
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className="text-muted-foreground text-lg">
             Add new content from PDFs or online sources

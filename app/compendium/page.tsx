@@ -136,15 +136,27 @@ export default function CompendiumPage() {
           </Link>
         </div>
         {activeTab === "classes" && (
-          <div className="flex gap-2 flex-wrap">
-            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-              d{(data as DndClass).hit_die} Hit Die
-            </span>
-            {(data as DndClass).primary_ability?.map((ability) => (
-              <span key={ability} className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
-                {ability}
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                d{(data as DndClass).hit_die} Hit Die
               </span>
-            ))}
+              {(data as DndClass).spellcasting && (
+                <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full">
+                  Spellcaster
+                </span>
+              )}
+              {(data as DndClass).weapon_proficiencies?.some(w => 
+                w.toLowerCase().includes("martial")
+              ) && (
+                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                  Martial
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Source: {(data as DndClass).source || "Custom"}
+            </p>
           </div>
         )}
         {activeTab === "subclasses" && (
@@ -158,13 +170,23 @@ export default function CompendiumPage() {
           </div>
         )}
         {activeTab === "species" && (
-          <div className="flex gap-2 flex-wrap">
-            <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
-              {(data as Species).size || "Medium"}
-            </span>
-            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {(data as Species).speed || 30} ft
-            </span>
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
+                {(data as Species).size || "Medium"}
+              </span>
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {(data as Species).speed || 30} ft
+              </span>
+              {(data as Species).lineages && (data as Species).lineages.length > 0 && (
+                <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
+                  {(data as Species).lineages.length} Lineage{(data as Species).lineages.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Source: {(data as Species).source || "Custom"}
+            </p>
           </div>
         )}
         {activeTab === "backgrounds" && (
@@ -197,9 +219,25 @@ export default function CompendiumPage() {
           </div>
         )}
         {activeTab === "feats" && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {(data as Feat).description}
-          </p>
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              {(data as Feat).prerequisite ? (
+                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                  {(data as Feat).prerequisite.includes("Level") || (data as Feat).prerequisite.includes("level") ? "Level Required" : "Has Prereq"}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
+                  Origin Feat
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {(data as Feat).description}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Source: {(data as Feat).source || "Custom"}
+            </p>
+          </div>
         )}
         {activeTab === "equipment" && (
           <div className="flex gap-2 flex-wrap">
@@ -236,11 +274,11 @@ export default function CompendiumPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="compendium-root" className="min-h-screen bg-background">
       <MainNav />
       
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-start justify-between mb-8">
+      <main id="compendium-main" className="max-w-7xl mx-auto px-4 py-8">
+        <div id="compendium-header" className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
@@ -255,7 +293,7 @@ export default function CompendiumPage() {
         </div>
 
         {/* Search */}
-        <div className="relative mb-6">
+        <div id="compendium-search" className="relative mb-6">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
@@ -267,7 +305,7 @@ export default function CompendiumPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+        <div id="compendium-tabs" className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}

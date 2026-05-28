@@ -96,12 +96,12 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="home-root" className="min-h-screen bg-background">
       <MainNav />
 
-      <main>
+      <main id="home-main">
         {/* Hero Section */}
-        <section className="relative overflow-hidden py-24 px-4">
+        <section id="hero-section" className="relative overflow-hidden py-24 px-4">
           {/* subtle background grid */}
           <div
             className="absolute inset-0 opacity-5 pointer-events-none"
@@ -117,7 +117,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/15 border border-primary/30 rounded-full text-primary font-semibold text-sm mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange/15 border border-orange/30 rounded-full text-orange font-semibold text-sm mb-6">
                 <Sparkles className="w-4 h-4" />
                 D&D 2024 Ready
               </div>
@@ -178,7 +178,7 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-4 border-t border-border bg-card-lighter">
+        <section id="features-section" className="py-20 px-4 border-t border-border bg-card-lighter">
           <div className="max-w-6xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -225,7 +225,7 @@ export default function HomePage() {
         </section>
 
         {/* Library Stats Section */}
-        <section className="py-20 px-4 border-t border-border">
+        <section id="library-stats-section" className="py-20 px-4 border-t border-border">
           <div className="max-w-5xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -276,7 +276,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-8 px-4 border-t border-border bg-card">
+      <footer id="home-footer" className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
           <p>Sheet Happens — D&D 5.5e Character Builder</p>
           <p>Uses content from the D&D SRD 5.2 under the Creative Commons license.</p>

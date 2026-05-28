@@ -214,14 +214,12 @@ export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "current
     if (!name) return
 
     const fetchIcon = async () => {
-      // Try delapouite first, then lorc
-      const urls = [
-        `https://raw.githubusercontent.com/game-icons/icons/master/delapouite/originals/svg/${name}.svg`,
-        `https://raw.githubusercontent.com/game-icons/icons/master/lorc/originals/svg/${name}.svg`,
-        `https://raw.githubusercontent.com/game-icons/icons/master/skoll/originals/svg/${name}.svg`,
-      ]
-
-      for (const url of urls) {
+      // Try multiple artist folders - game-icons uses different artists
+      const artists = ["delapouite", "lorc", "skoll", "cathelineau", "darkzaitzev"]
+      
+      for (const artist of artists) {
+        // Use the jsdelivr CDN which is more reliable than raw GitHub
+        const url = `https://cdn.jsdelivr.net/gh/game-icons/icons@master/${artist}/originals/svg/${name}.svg`
         try {
           const response = await fetch(url)
           if (response.ok) {

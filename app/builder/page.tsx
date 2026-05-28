@@ -17,7 +17,9 @@ import {
   ClipboardCheck,
   Upload,
   X,
-  Wand2
+  Wand2,
+  Search,
+  Info
 } from "lucide-react"
 import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft } from "@/lib/types"
 
@@ -73,6 +75,19 @@ export default function BuilderPage() {
   // Ability score generation method
   const [abilityMethod, setAbilityMethod] = useState<"pointbuy" | "standard" | "roll">("pointbuy")
   const [pointsRemaining, setPointsRemaining] = useState(27)
+  
+  // Search state for each step
+  const [classSearch, setClassSearch] = useState("")
+  const [speciesSearch, setSpeciesSearch] = useState("")
+  const [backgroundSearch, setBackgroundSearch] = useState("")
+  const [spellSearch, setSpellSearch] = useState("")
+  const [equipmentSearch, setEquipmentSearch] = useState("")
+  
+  // Details modal state
+  const [detailsModal, setDetailsModal] = useState<{
+    type: "class" | "species" | "background" | "spell" | "equipment" | null
+    item: DndClass | Species | Background | Spell | Equipment | null
+  }>({ type: null, item: null })
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -245,12 +260,12 @@ export default function BuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="builder-root" className="min-h-screen bg-background">
       <MainNav />
       
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main id="builder-main" className="max-w-7xl mx-auto px-4 py-8">
         {/* Step Indicator */}
-        <div className="mb-8">
+        <div id="builder-steps" className="mb-8">
           <div className="flex items-center justify-between mb-4">
             {STEPS.map((step, index) => {
               const Icon = step.icon
@@ -287,9 +302,9 @@ export default function BuilderPage() {
         </div>
 
         {/* Two-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div id="builder-content" className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Step Content (choices) */}
-          <div className="lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6">
+          <div id="builder-step-panel" className="lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -302,35 +317,51 @@ export default function BuilderPage() {
             {currentStep === 1 && (
               <div>
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Class</h2>
-                <p className="text-muted-foreground mb-6">Your class determines your combat abilities and special features.</p>
+                <p className="text-muted-foreground mb-4">Your class determines your combat abilities and special features.</p>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {classes.map((cls) => (
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search classes..."
+                    value={classSearch}
+                    onChange={(e) => setClassSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+                  {classes
+                    .filter(cls => cls.name.toLowerCase().includes(classSearch.toLowerCase()))
+                    .map((cls) => (
                     <motion.button
                       key={cls.id}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setCharacter({ ...character, class_id: cls.id })}
-                      className={`p-5 rounded-2xl border-2 text-left transition-all ${
+                      className={`p-3 rounded-xl border-2 text-left transition-all ${
                         character.class_id === cls.id
                           ? "border-primary bg-primary/10"
                           : "border-border bg-card hover:border-primary/50"
                       }`}
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-lg text-foreground">{cls.name}</h3>
-                        <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs font-bold rounded">
-                          d{cls.hit_die}
-                        </span>
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-bold text-sm text-foreground">{cls.name}</h3>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDetailsModal({ type: "class", item: cls })
+                          }}
+                          className="p-1 text-muted-foreground hover:text-primary"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{cls.description}</p>
-                      <div className="flex flex-wrap gap-1">
-                        {cls.primary_ability?.map((ability) => (
-                          <span key={ability} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                            {ability}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {cls.source || "Custom"}
+                      </p>
                     </motion.button>
                   ))}
                 </div>
@@ -339,29 +370,52 @@ export default function BuilderPage() {
 
             {/* Step 2: Origin (Species + Background) */}
             {currentStep === 2 && (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Species</h2>
-                  <p className="text-muted-foreground mb-4">Your species grants unique traits and abilities.</p>
+                  <p className="text-muted-foreground mb-3">Your species grants unique traits and abilities.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {species.map((sp) => (
+                  {/* Search */}
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search species..."
+                      value={speciesSearch}
+                      onChange={(e) => setSpeciesSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
+                    {species
+                      .filter(sp => sp.name.toLowerCase().includes(speciesSearch.toLowerCase()))
+                      .map((sp) => (
                       <motion.button
                         key={sp.id}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setCharacter({ ...character, species_id: sp.id })}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        className={`p-2 rounded-lg border-2 text-left transition-all ${
                           character.species_id === sp.id
                             ? "border-secondary bg-secondary/10"
                             : "border-border bg-card hover:border-secondary/50"
                         }`}
                       >
-                        <h3 className="font-bold text-foreground">{sp.name}</h3>
-                        <div className="flex gap-2 mt-2">
-                          <span className="text-xs px-2 py-0.5 bg-muted rounded">{sp.size || "Medium"}</span>
-                          <span className="text-xs px-2 py-0.5 bg-muted rounded">{sp.speed || 30} ft</span>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-sm text-foreground">{sp.name}</h3>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDetailsModal({ type: "species", item: sp })
+                            }}
+                            className="p-0.5 text-muted-foreground hover:text-primary"
+                          >
+                            <Info className="w-3 h-3" />
+                          </button>
                         </div>
+                        <p className="text-xs text-muted-foreground">{sp.source || "Custom"}</p>
                       </motion.button>
                     ))}
                   </div>
@@ -369,34 +423,49 @@ export default function BuilderPage() {
 
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Background</h2>
-                  <p className="text-muted-foreground mb-4">Your background provides ability bonuses and a 1st-level feat.</p>
+                  <p className="text-muted-foreground mb-3">Your background provides ability bonuses and a 1st-level feat.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {backgrounds.map((bg) => (
+                  {/* Search */}
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search backgrounds..."
+                      value={backgroundSearch}
+                      onChange={(e) => setBackgroundSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto">
+                    {backgrounds
+                      .filter(bg => bg.name.toLowerCase().includes(backgroundSearch.toLowerCase()))
+                      .map((bg) => (
                       <motion.button
                         key={bg.id}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setCharacter({ ...character, background_id: bg.id })}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        className={`p-2 rounded-lg border-2 text-left transition-all ${
                           character.background_id === bg.id
                             ? "border-accent bg-accent/10"
                             : "border-border bg-card hover:border-accent/50"
                         }`}
                       >
-                        <h3 className="font-bold text-foreground mb-1">{bg.name}</h3>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {bg.skill_proficiencies?.map((skill) => (
-                            <span key={skill} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
-                              {skill}
-                            </span>
-                          ))}
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-sm text-foreground">{bg.name}</h3>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDetailsModal({ type: "background", item: bg })
+                            }}
+                            className="p-0.5 text-muted-foreground hover:text-primary"
+                          >
+                            <Info className="w-3 h-3" />
+                          </button>
                         </div>
-                        {bg.feat_granted && (
-                          <span className="text-xs px-2 py-0.5 bg-warning/10 text-warning rounded-full">
-                            Feat: {bg.feat_granted}
-                          </span>
-                        )}
+                        <p className="text-xs text-muted-foreground">{bg.source || "Custom"}</p>
                       </motion.button>
                     ))}
                   </div>
@@ -487,16 +556,31 @@ export default function BuilderPage() {
 
             {/* Step 4: Equipment & Spells */}
             {currentStep === 4 && (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Select Equipment</h2>
-                  <p className="text-muted-foreground mb-4">Choose your starting gear.</p>
+                  <p className="text-muted-foreground mb-3">Choose your starting gear.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                    {equipment.slice(0, 20).map((item) => (
+                  {/* Search */}
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search equipment..."
+                      value={equipmentSearch}
+                      onChange={(e) => setEquipmentSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                    {equipment
+                      .filter(item => item.name.toLowerCase().includes(equipmentSearch.toLowerCase()))
+                      .slice(0, 30)
+                      .map((item) => (
                       <label
                         key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
                           character.equipment_ids.includes(item.id)
                             ? "border-primary bg-primary/10"
                             : "border-border bg-card hover:border-primary/50"
@@ -514,15 +598,26 @@ export default function BuilderPage() {
                           }}
                           className="sr-only"
                         />
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                           character.equipment_ids.includes(item.id) ? "bg-primary border-primary" : "border-muted-foreground"
                         }`}>
-                          {character.equipment_ids.includes(item.id) && <Check className="w-3 h-3 text-white" />}
+                          {character.equipment_ids.includes(item.id) && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.category}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.source || "SRD"}</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDetailsModal({ type: "equipment", item })
+                          }}
+                          className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
+                        >
+                          <Info className="w-3 h-3" />
+                        </button>
                       </label>
                     ))}
                   </div>
@@ -531,16 +626,29 @@ export default function BuilderPage() {
                 {selectedClass?.spellcasting && (
                   <div>
                     <h2 className="text-2xl font-black text-foreground mb-2">Select Spells</h2>
-                    <p className="text-muted-foreground mb-4">Choose your starting spells.</p>
+                    <p className="text-muted-foreground mb-3">Choose your starting spells.</p>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    {/* Search */}
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search spells..."
+                        value={spellSearch}
+                        onChange={(e) => setSpellSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                       {spells
                         .filter(s => s.classes?.includes(selectedClass.name) && s.level <= 1)
-                        .slice(0, 20)
+                        .filter(s => s.name.toLowerCase().includes(spellSearch.toLowerCase()))
+                        .slice(0, 30)
                         .map((spell) => (
                           <label
                             key={spell.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
                               character.spell_ids.includes(spell.id)
                                 ? "border-secondary bg-secondary/10"
                                 : "border-border bg-card hover:border-secondary/50"
@@ -558,17 +666,26 @@ export default function BuilderPage() {
                               }}
                               className="sr-only"
                             />
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                               character.spell_ids.includes(spell.id) ? "bg-secondary border-secondary" : "border-muted-foreground"
                             }`}>
-                              {character.spell_ids.includes(spell.id) && <Check className="w-3 h-3 text-white" />}
+                              {character.spell_ids.includes(spell.id) && <Check className="w-2.5 h-2.5 text-white" />}
                             </div>
-                            <div>
-                              <p className="font-medium text-foreground">{spell.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} - {spell.school}
-                              </p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">{spell.name}</p>
+                              <p className="text-xs text-muted-foreground">{spell.source || "SRD"}</p>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setDetailsModal({ type: "spell", item: spell })
+                              }}
+                              className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
+                            >
+                              <Info className="w-3 h-3" />
+                            </button>
                           </label>
                         ))}
                     </div>
@@ -771,7 +888,7 @@ export default function BuilderPage() {
           </div>
 
           {/* Right Column: Character Sheet Preview */}
-          <div className="lg:col-span-2">
+          <div id="builder-preview" className="lg:col-span-2">
             <div className="bg-card rounded-2xl border-2 border-border p-6 sticky top-24">
               <h3 className="text-xl font-black text-foreground mb-4" style={{ fontFamily: "var(--font-display)" }}>
                 {character.name || "New Character"}
@@ -888,6 +1005,196 @@ export default function BuilderPage() {
           </div>
         </div>
       </main>
+      
+      {/* Details Modal */}
+      <AnimatePresence>
+        {detailsModal.item && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setDetailsModal({ type: null, item: null })}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-card rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h2 className="text-xl font-black text-foreground">
+                  {(detailsModal.item as { name: string }).name}
+                </h2>
+                <button
+                  onClick={() => setDetailsModal({ type: null, item: null })}
+                  className="p-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {detailsModal.type === "class" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                      d{(detailsModal.item as DndClass).hit_die} Hit Die
+                    </span>
+                    {(detailsModal.item as DndClass).spellcasting && (
+                      <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full">
+                        Spellcaster
+                      </span>
+                    )}
+                    {(detailsModal.item as DndClass).weapon_proficiencies?.some(w => 
+                      w.toLowerCase().includes("martial")
+                    ) && (
+                      <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                        Martial Weapons
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {(detailsModal.item as DndClass).description}
+                  </p>
+                  {(detailsModal.item as DndClass).primary_ability && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Primary Abilities</p>
+                      <p className="text-sm text-foreground">
+                        {(detailsModal.item as DndClass).primary_ability?.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                  {(detailsModal.item as DndClass).armor_proficiencies && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Armor</p>
+                      <p className="text-sm text-foreground">
+                        {(detailsModal.item as DndClass).armor_proficiencies?.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {detailsModal.type === "species" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <span className="text-xs px-2 py-1 bg-muted rounded-full">
+                      {(detailsModal.item as Species).size || "Medium"}
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-muted rounded-full">
+                      {(detailsModal.item as Species).speed || 30} ft speed
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {(detailsModal.item as Species).description}
+                  </p>
+                  {(detailsModal.item as Species).traits?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-2">Traits</p>
+                      <div className="space-y-2">
+                        {(detailsModal.item as Species).traits.map((trait, i) => (
+                          <div key={i}>
+                            <p className="text-sm font-bold text-foreground">{trait.name}</p>
+                            <p className="text-xs text-muted-foreground">{trait.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {detailsModal.type === "background" && (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {(detailsModal.item as Background).description}
+                  </p>
+                  {(detailsModal.item as Background).skill_proficiencies && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Skills</p>
+                      <p className="text-sm text-foreground">
+                        {(detailsModal.item as Background).skill_proficiencies?.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                  {(detailsModal.item as Background).feat_granted && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Starting Feat</p>
+                      <p className="text-sm text-foreground">
+                        {(detailsModal.item as Background).feat_granted}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {detailsModal.type === "spell" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                      {(detailsModal.item as Spell).level === 0 ? "Cantrip" : `Level ${(detailsModal.item as Spell).level}`}
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
+                      {(detailsModal.item as Spell).school}
+                    </span>
+                    {(detailsModal.item as Spell).concentration && (
+                      <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
+                        Concentration
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Casting Time:</span> <span className="text-foreground">{(detailsModal.item as Spell).casting_time}</span></div>
+                    <div><span className="text-muted-foreground">Range:</span> <span className="text-foreground">{(detailsModal.item as Spell).range}</span></div>
+                    <div><span className="text-muted-foreground">Duration:</span> <span className="text-foreground">{(detailsModal.item as Spell).duration}</span></div>
+                    <div><span className="text-muted-foreground">Components:</span> <span className="text-foreground">{(detailsModal.item as Spell).components?.join(", ")}</span></div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {(detailsModal.item as Spell).description}
+                  </p>
+                </div>
+              )}
+              
+              {detailsModal.type === "equipment" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <span className="text-xs px-2 py-1 bg-muted rounded-full">
+                      {(detailsModal.item as Equipment).category}
+                    </span>
+                    {(detailsModal.item as Equipment).cost && (
+                      <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
+                        {((detailsModal.item as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
+                        {((detailsModal.item as Equipment).cost as { amount: number; unit: string })?.unit}
+                      </span>
+                    )}
+                  </div>
+                  {(detailsModal.item as Equipment).description && (
+                    <p className="text-sm text-muted-foreground">
+                      {(detailsModal.item as Equipment).description}
+                    </p>
+                  )}
+                  {(detailsModal.item as Equipment).properties && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Properties</p>
+                      <p className="text-sm text-foreground">
+                        {JSON.stringify((detailsModal.item as Equipment).properties)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <button
+                onClick={() => setDetailsModal({ type: null, item: null })}
+                className="mt-4 w-full py-2 bg-primary text-primary-foreground rounded-lg font-bold hover:bg-primary/90 transition-colors"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

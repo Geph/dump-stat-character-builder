@@ -52,38 +52,108 @@ function parseSpecies(html: string, url: string) {
 
 function parseClass(html: string, url: string) {
   const $ = cheerio.load(html)
-  const name = $("#page-title").text().trim().replace(/^Class:\s*/i, "") || $("h1").first().text().trim()
+  
+  // Try multiple selectors for class name - wikidot uses page-title with page-header class
+  let name = $(".page-title.page-header").text().trim()
+  if (!name) name = $("#page-title").text().trim()
+  if (!name) name = $("h1").first().text().trim()
+  name = name.replace(/^Class:\s*/i, "")
   
   const mainContent = $("#page-content, .page-content, article").first()
   const description = mainContent.find("p").first().text().trim()
+  const fullText = mainContent.text()
   
   // Try to extract hit die
-  const fullText = mainContent.text()
-  const hitDieMatch = fullText.match(/Hit\s*Die[:\s]*d(\d+)/i)
+  const hitDieMatch = fullText.match(/Hit\s*Die[:\s]*d(\d+)/i) || fullText.match(/Hit\s*Points.*?d(\d+)/i)
   
   // Extract features
   const features: { level: number; name: string; description: string }[] = []
-  mainContent.find("h3, h4").each((_, el) => {
+  mainContent.find("h3, h4, h2").each((_, el) => {
     const featureName = $(el).text().trim()
-    const featureDesc = $(el).next("p").text().trim()
+    const featureDesc = $(el).nextAll("p").first().text().trim()
     // Try to extract level from feature name
-    const levelMatch = featureName.match(/(\d+)(?:st|nd|rd|th)?\s*level/i)
-    if (featureName && featureDesc) {
+    const levelMatch = featureName.match(/(\d+)(?:st|nd|rd|th)?[- ]*level/i)
+    if (featureName && featureDesc && !featureName.match(/^(Table|Level|Features)/i)) {
       features.push({
         level: levelMatch ? parseInt(levelMatch[1]) : 1,
-        name: featureName.replace(/^\d+(?:st|nd|rd|th)?\s*level[:\s]*/i, ""),
+        name: featureName.replace(/^\d+(?:st|nd|rd|th)?[- ]*level[:\s]*/i, ""),
         description: featureDesc
       })
     }
   })
+  
+  // Check if the class has spellcasting by looking for spellcasting features
+  const hasSpellcasting = fullText.toLowerCase().includes("spellcasting") || 
+                          fullText.toLowerCase().includes("spell slot") ||
+                          fullText.toLowerCase().includes("cantrip") ||
+                          features.some(f => f.name.toLowerCase().includes("spellcasting"))
+  
+  // Try to extract proficiencies from traits table or text
+  const armorProfs: string[] = []
+  const weaponProfs: string[] = []
+  const skillOptions: string[] = []
+  const savingThrows: string[] = []
+  
+  // Look for proficiencies in tables and text
+  const profText = fullText.toLowerCase()
+  
+  // Armor proficiencies
+  if (profText.includes("light armor")) armorProfs.push("Light armor")
+  if (profText.includes("medium armor")) armorProfs.push("Medium armor")
+  if (profText.includes("heavy armor")) armorProfs.push("Heavy armor")
+  if (profText.includes("all armor")) armorProfs.push("All armor")
+  if (profText.includes("shields")) armorProfs.push("Shields")
+  
+  // Weapon proficiencies
+  if (profText.includes("simple weapons")) weaponProfs.push("Simple weapons")
+  if (profText.includes("martial weapons")) weaponProfs.push("Martial weapons")
+  if (profText.includes("firearm")) weaponProfs.push("Firearms")
+  
+  // Saving throws - common patterns
+  const savesMatch = fullText.match(/Saving\s*Throws[:\s]*([^\n]+)/i)
+  if (savesMatch) {
+    const saveText = savesMatch[1].toLowerCase()
+    const abilities = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+    abilities.forEach(ab => {
+      if (saveText.includes(ab.toLowerCase())) savingThrows.push(ab)
+    })
+  }
+  
+  // Skills
+  const skillsMatch = fullText.match(/Skills[:\s]*(?:Choose\s*\d+\s*from\s*)?([^\n]+)/i)
+  if (skillsMatch) {
+    const allSkills = ["Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception", "History", 
+                       "Insight", "Intimidation", "Investigation", "Medicine", "Nature", "Perception", 
+                       "Performance", "Persuasion", "Religion", "Sleight of Hand", "Stealth", "Survival"]
+    const skillText = skillsMatch[1].toLowerCase()
+    allSkills.forEach(skill => {
+      if (skillText.includes(skill.toLowerCase())) skillOptions.push(skill)
+    })
+  }
+  
+  // Determine spellcasting ability
+  let spellcastingAbility: string | null = null
+  if (hasSpellcasting) {
+    if (profText.includes("intelligence is your spellcasting")) spellcastingAbility = "Intelligence"
+    else if (profText.includes("wisdom is your spellcasting")) spellcastingAbility = "Wisdom"
+    else if (profText.includes("charisma is your spellcasting")) spellcastingAbility = "Charisma"
+    else if (name.toLowerCase().includes("artificer") || name.toLowerCase().includes("wizard")) spellcastingAbility = "Intelligence"
+    else if (name.toLowerCase().includes("cleric") || name.toLowerCase().includes("druid")) spellcastingAbility = "Wisdom"
+    else spellcastingAbility = "Intelligence" // Default for imports
+  }
 
   return {
     name,
     description,
     hit_die: hitDieMatch ? parseInt(hitDieMatch[1]) : 8,
-    features: features.slice(0, 10), // Limit to first 10 features
+    features: features.slice(0, 20), // Limit to first 20 features
     source: new URL(url).hostname,
-    creator_url: url
+    creator_url: url,
+    armor_proficiencies: armorProfs.length > 0 ? armorProfs : null,
+    weapon_proficiencies: weaponProfs.length > 0 ? weaponProfs : null,
+    saving_throws: savingThrows.length > 0 ? savingThrows : null,
+    skill_choices: skillOptions.length > 0 ? { count: 2, options: skillOptions } : null,
+    spellcasting: hasSpellcasting ? { ability: spellcastingAbility || "Intelligence", prepared: true } : null,
   }
 }
 
