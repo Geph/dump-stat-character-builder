@@ -117,7 +117,7 @@ export default function HomePage() {
         {/* Hero Section */}
         <section
           id="hero-section"
-          className="relative overflow-hidden py-32 px-4"
+          className="relative overflow-hidden pt-[170px] pb-20 px-4"
           style={{
             backgroundImage: `url(${heroBg})`,
             backgroundSize: "cover",
