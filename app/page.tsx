@@ -11,20 +11,20 @@ const features = [
   {
     icon: Sparkles,
     title: "Easy Character Creation",
-    description: "Build your hero step-by-step with our intuitive 6-step wizard following D&D 2024 rules.",
+    description: "Build your hero step-by-step with a simple 6-step wizard following D&D 2024 rules.",
     accent: "bg-primary",
     glow: "glow-primary",
   },
   {
     icon: BookOpen,
-    title: "Complete Compendium",
+    title: "Build Your Compendium",
     description: "Browse species, classes, backgrounds, spells, feats, and equipment from the D&D 5.5e SRD and beyond.",
     accent: "bg-lime",
     glow: "glow-lime",
   },
   {
     icon: Upload,
-    title: "Import Any Content",
+    title: "Import External Content",
     description: "Upload PDFs or import from web sources to expand your content library.",
     accent: "bg-orange",
     glow: "glow-orange",
