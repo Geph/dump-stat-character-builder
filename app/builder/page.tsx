@@ -106,6 +106,43 @@ export default function BuilderPage() {
   const [currentHp, setCurrentHp] = useState<number | null>(null)
   const [tempHp, setTempHp] = useState(0)
 
+  const resetCharacter = () => {
+    setCharacter({
+      name: "",
+      level: 1,
+      class_id: null,
+      species_id: null,
+      background_id: null,
+      strength: 8,
+      dexterity: 8,
+      constitution: 8,
+      intelligence: 8,
+      wisdom: 8,
+      charisma: 8,
+      skill_proficiencies: [],
+      languages: ["Common"],
+      spell_ids: [],
+      equipment_ids: [],
+      personality_traits: "",
+      ideals: "",
+      bonds: "",
+      flaws: "",
+      backstory: "",
+      portrait_url: null,
+    })
+    setClassLevels([])
+    setAbilityMethod("pointbuy")
+    setPointsRemaining(27)
+    setClassSearch("")
+    setSpeciesSearch("")
+    setBackgroundSearch("")
+    setSpellSearch("")
+    setEquipmentSearch("")
+    setCurrentHp(null)
+    setTempHp(0)
+    setCurrentStep(1)
+  }
+
   useEffect(() => {
     const fetchContent = async () => {
       const supabase = createClient()
@@ -469,7 +506,12 @@ export default function BuilderPage() {
                                     newLevels[idx].level--
                                     setClassLevels(newLevels)
                                   } else {
-                                    setClassLevels(newLevels.filter((_, i) => i !== idx))
+                                    newLevels.splice(idx, 1)
+                                    setClassLevels(newLevels)
+                                    // If no classes left, clear character.class_id
+                                    if (newLevels.length === 0) {
+                                      setCharacter({ ...character, class_id: null })
+                                    }
                                   }
                                 }}
                                 className="p-1 bg-muted hover:bg-destructive/20 rounded"
@@ -616,7 +658,7 @@ export default function BuilderPage() {
                         key={sp.id}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setCharacter({ ...character, species_id: sp.id })}
+                        onClick={() => setCharacter({ ...character, species_id: character.species_id === sp.id ? null : sp.id })}
                         className={`p-2 rounded-lg border-2 text-left transition-all ${
                           character.species_id === sp.id
                             ? "border-secondary bg-secondary/10"
@@ -666,7 +708,7 @@ export default function BuilderPage() {
                         key={bg.id}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => setCharacter({ ...character, background_id: bg.id })}
+                        onClick={() => setCharacter({ ...character, background_id: character.background_id === bg.id ? null : bg.id })}
                         className={`p-2 rounded-lg border-2 text-left transition-all ${
                           character.background_id === bg.id
                             ? "border-accent bg-accent/10"
@@ -1107,35 +1149,44 @@ export default function BuilderPage() {
         </AnimatePresence>
 
             {/* Navigation Buttons inside left column */}
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border gap-4">
               <button
-                onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                disabled={currentStep === 1}
-                className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
+                onClick={resetCharacter}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-destructive border border-border hover:border-destructive rounded-lg transition-colors"
               >
-                <ChevronLeft className="w-5 h-5" />
-                Back
+                Clear All
               </button>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                  disabled={currentStep === 1}
+                  className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  Back
+                </button>
 
-              {currentStep < 6 ? (
-                <button
-                  onClick={() => setCurrentStep(Math.min(6, currentStep + 1))}
-                  disabled={!canProceed()}
-                  className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                >
-                  Continue
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              ) : (
-                <button
-                  onClick={saveCharacter}
-                  disabled={saving || !canProceed()}
-                  className="flex items-center gap-2 px-6 py-3 bg-success text-white rounded-xl font-bold hover:bg-success/90 disabled:opacity-50 transition-colors"
-                >
-                  {saving ? "Saving..." : "Create Character"}
-                  <Check className="w-5 h-5" />
-                </button>
-              )}
+                {currentStep < 6 ? (
+                  <button
+                    onClick={() => setCurrentStep(Math.min(6, currentStep + 1))}
+                    disabled={!canProceed()}
+                    className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    Continue
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={saveCharacter}
+                    disabled={saving || !canProceed()}
+                    className="flex items-center gap-2 px-6 py-3 bg-success text-white rounded-xl font-bold hover:bg-success/90 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? "Saving..." : "Create Character"}
+                    <Check className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
