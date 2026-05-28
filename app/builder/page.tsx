@@ -519,7 +519,7 @@ export default function BuilderPage() {
                 
                 <p className="text-xs text-muted-foreground mb-2">Click a class to add it, or increase its level if already selected.</p>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto pr-[10px] pb-[10px]">
                   {classes
                     .filter(cls => cls.name.toLowerCase().includes(classSearch.toLowerCase()))
                     .map((cls) => {
@@ -1229,8 +1229,8 @@ export default function BuilderPage() {
                         <p className="text-lg font-black text-foreground">{passivePerception}</p>
                       </div>
                       {/* Skills */}
-                      <div className="p-2 bg-muted/30 rounded-lg">
-                        <p className="text-[8px] text-muted-foreground uppercase mb-1">Skills</p>
+                      <div className="p-3 bg-muted/30 rounded-lg text-base pr-[12px] pl-[10px]">
+                        <p className="text-base text-muted-foreground uppercase mb-1">Skills</p>
                         <div className="grid grid-cols-1 gap-0.5 text-[9px]">
                           {SKILLS_DATA.map((skill) => {
                             const isProficient = character.skill_proficiencies.includes(skill.name)
