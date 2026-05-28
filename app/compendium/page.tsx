@@ -39,6 +39,10 @@ export default function CompendiumPage() {
   const [selectedItem, setSelectedItem] = useState<unknown | null>(null)
   const [clearingAll, setClearingAll] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  // Spell-specific filters
+  const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
+  const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
+  const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
@@ -108,9 +112,28 @@ export default function CompendiumPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
-  const filteredContent = (content[activeTab] as { name: string }[]).filter((item) =>
-    item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Derive unique spell filter options from loaded spell data
+  const spellData = (content.spells as Spell[])
+  const spellClassOptions = Array.from(
+    new Set(spellData.flatMap((s) => s.classes ?? []))
+  ).sort()
+  const spellSchoolOptions = Array.from(
+    new Set(spellData.map((s) => s.school).filter(Boolean))
+  ).sort()
+  const spellLevelOptions = Array.from(
+    new Set(spellData.map((s) => s.level))
+  ).sort((a, b) => a - b)
+
+  const filteredContent = (content[activeTab] as { name: string }[]).filter((item) => {
+    if (!item.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    if (activeTab === "spells") {
+      const spell = item as Spell
+      if (spellFilterClass !== "all" && !(spell.classes ?? []).includes(spellFilterClass)) return false
+      if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
+      if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
+    }
+    return true
+  })
 
   const handleClearAll = async () => {
     setClearingAll(true)
@@ -370,7 +393,7 @@ export default function CompendiumPage() {
         )}
 
         {/* Search */}
-        <div id="compendium-search" className="relative mb-6">
+        <div id="compendium-search" className="relative mb-4">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
             type="text"
@@ -380,6 +403,78 @@ export default function CompendiumPage() {
             className="w-full pl-12 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
           />
         </div>
+
+        {/* Spell Filters — only shown on spells tab */}
+        {activeTab === "spells" && (
+          <div id="spell-filters" className="flex flex-wrap gap-3 mb-6">
+            {/* Class filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                Class
+              </label>
+              <select
+                value={spellFilterClass}
+                onChange={(e) => setSpellFilterClass(e.target.value)}
+                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="all">All Classes</option>
+                {spellClassOptions.map((cls) => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Level filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                Level
+              </label>
+              <select
+                value={spellFilterLevel}
+                onChange={(e) => setSpellFilterLevel(e.target.value)}
+                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="all">All Levels</option>
+                {spellLevelOptions.map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl === 0 ? "Cantrip" : `Level ${lvl}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* School filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                School
+              </label>
+              <select
+                value={spellFilterSchool}
+                onChange={(e) => setSpellFilterSchool(e.target.value)}
+                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="all">All Schools</option>
+                {spellSchoolOptions.map((school) => (
+                  <option key={school} value={school}>{school}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Active filter count / clear */}
+            {(spellFilterClass !== "all" || spellFilterLevel !== "all" || spellFilterSchool !== "all") && (
+              <button
+                onClick={() => {
+                  setSpellFilterClass("all")
+                  setSpellFilterLevel("all")
+                  setSpellFilterSchool("all")
+                }}
+                className="ml-auto px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div id="compendium-tabs" className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
