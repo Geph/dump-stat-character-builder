@@ -24,7 +24,8 @@ import {
   Swords,
   Sparkles,
   Plus,
-  Minus
+  Minus,
+  Eye
 } from "lucide-react"
 import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft, CustomAbility } from "@/lib/types"
 
@@ -1262,6 +1263,11 @@ export default function BuilderPage() {
                           </div>
                           {tempHp > 0 && <p className="text-[8px] text-cyan">+{tempHp}</p>}
                         </div>
+                        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <Eye className="w-3 h-3 mx-auto text-cyan mb-0.5" />
+                          <p className="text-[7px] text-muted-foreground uppercase">Darkvision</p>
+                          <p className="text-base font-black text-cyan">{darkvision > 0 ? `${darkvision} ft` : "—"}</p>
+                        </div>
                       </div>
                       
                       {/* Second row: Speed and Initiative */}
@@ -1290,7 +1296,7 @@ export default function BuilderPage() {
 
                       {/* Saving Throws */}
                       <div className="p-2 bg-muted/30 rounded-lg">
-                        <p className="text-[8px] text-muted-foreground uppercase mb-1">Saves</p>
+                        <p className="text-sm text-muted-foreground uppercase mb-1 font-bold">Saves</p>
                         <div className="grid grid-cols-2 gap-x-2 text-[9px]">
                           {ABILITY_NAMES.map((ability) => {
                             const isProficient = savingThrowProficiencies.includes(ability.charAt(0).toUpperCase() + ability.slice(1))
@@ -1484,13 +1490,6 @@ export default function BuilderPage() {
                             <p className="text-muted-foreground line-clamp-2">{trait.description}</p>
                           </div>
                         ))}
-                        {/* Darkvision */}
-                        {darkvision > 0 && (
-                          <div className="p-1.5 bg-muted/30 rounded text-[10px]">
-                            <p className="font-bold text-foreground">Darkvision</p>
-                            <p className="text-muted-foreground">{darkvision} ft range</p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
