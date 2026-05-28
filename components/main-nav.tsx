@@ -41,7 +41,7 @@ export function MainNav() {
               className="text-xl font-bold text-lime hidden sm:inline tracking-wide"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Sheet Happens
+              Dump Stat
             </span>
           </Link>
 

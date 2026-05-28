@@ -7,7 +7,7 @@ import './globals.css'
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: 'Sheet Happens - D&D 5.5e Character Builder',
+  title: 'Dump Stat - D&D 5.5e Character Builder',
   description: 'Create and manage your D&D 2024 characters with an intuitive, modern interface. Build heroes, track stats, and import content from any source.',
   generator: 'v0.app',
   icons: {

@@ -126,7 +126,7 @@ export default function HomePage() {
           }}
         >
           {/* Dark overlay so text stays readable */}
-          <div className="absolute inset-0 bg-background/75 pointer-events-none" />
+          <div className="absolute inset-0 bg-background/50 pointer-events-none" />
           {/* Subtle bottom fade into background */}
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
 
@@ -136,17 +136,12 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange/15 border border-orange/30 rounded-full text-orange font-semibold text-sm mb-6">
-                <Sparkles className="w-4 h-4" />
-                D&D 2024 Ready
-              </div>
-
               <h1
                 className="text-6xl md:text-8xl font-bold text-foreground mb-6 text-balance"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Sheet
-                <span className="text-primary"> Happens</span>
+                Dump
+                <span className="text-primary"> Stat</span>
               </h1>
 
               <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto text-pretty">
@@ -255,7 +250,7 @@ export default function HomePage() {
           }}
         >
           {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-background/80 pointer-events-none" />
+          <div className="absolute inset-0 bg-background/55 pointer-events-none" />
           <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -308,7 +303,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer id="home-footer" className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
-          <p>Sheet Happens — D&D 5.5e Character Builder</p>
+          <p>Dump Stat — D&D 5.5e Character Builder</p>
           <p>Uses content from the D&D SRD 5.2 under the Creative Commons license.</p>
           <p>
             Logo icon:{" "}
