@@ -204,9 +204,9 @@ export default function HomePage() {
                 className="text-3xl md:text-4xl font-bold text-foreground mb-4"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Everything You Need
+                Make Everything You Need
               </h2>
-              <p className="text-muted-foreground">All the tools to bring your characters to life</p>
+              <p className="text-muted-foreground">Build the components to bring your characters to life with custom classes and abilities</p>
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-6">
