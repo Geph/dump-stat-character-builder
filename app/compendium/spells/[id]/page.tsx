@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import type { Spell } from "@/lib/types"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -33,6 +34,7 @@ interface SpellFormData {
   higher_levels: string
   classes: string[]
   source: string
+  icon: string | null
 }
 
 const defaultSpell: SpellFormData = {
@@ -50,6 +52,7 @@ const defaultSpell: SpellFormData = {
   higher_levels: "",
   classes: [],
   source: "Custom",
+  icon: null,
 }
 
 export default function SpellEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -93,6 +96,7 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
             higher_levels: data.higher_levels || "",
             classes: data.classes || [],
             source: data.source || "Custom",
+            icon: data.icon || null,
           })
         }
         setLoading(false)
@@ -257,6 +261,13 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
               />
             </div>
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           {/* Classes */}
           <div>

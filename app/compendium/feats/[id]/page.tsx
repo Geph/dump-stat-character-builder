@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Download, X } from "lucide-react"
 import Link from "next/link"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -17,6 +18,7 @@ interface FeatFormData {
   level_requirement: number
   prerequisite_feat_ids: string[]
   source: string
+  icon: string | null
 }
 
 const defaultFeat: FeatFormData = {
@@ -26,6 +28,7 @@ const defaultFeat: FeatFormData = {
   level_requirement: 1,
   prerequisite_feat_ids: [],
   source: "Custom",
+  icon: null,
 }
 
 export default function FeatEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,6 +78,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             level_requirement: data.level_requirement ?? 1,
             prerequisite_feat_ids: data.prerequisite_feat_ids || [],
             source: data.source || "Custom",
+            icon: data.icon || null,
           })
         }
         setLoading(false)
@@ -215,6 +219,13 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
               />
             </div>
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           {/* Category + Level Requirement */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
