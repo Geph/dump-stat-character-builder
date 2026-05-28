@@ -6,12 +6,13 @@ import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment } from "@/lib/types"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
 
-type ContentType = "species" | "classes" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
+type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "classes", label: "Classes", icon: <Shield className="w-4 h-4" /> },
+  { id: "subclasses", label: "Subclasses", icon: <Shield className="w-4 h-4" /> },
   { id: "species", label: "Species", icon: <Users className="w-4 h-4" /> },
   { id: "backgrounds", label: "Backgrounds", icon: <BookOpen className="w-4 h-4" /> },
   { id: "spells", label: "Spells", icon: <Wand2 className="w-4 h-4" /> },
@@ -26,6 +27,7 @@ export default function CompendiumPage() {
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
     species: [],
     classes: [],
+    subclasses: [],
     backgrounds: [],
     spells: [],
     feats: [],
@@ -37,6 +39,7 @@ export default function CompendiumPage() {
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
+    subclasses: 0,
     backgrounds: 0,
     spells: 0,
     feats: 0,
@@ -51,6 +54,7 @@ export default function CompendiumPage() {
       const [
         { count: speciesCount },
         { count: classesCount },
+        { count: subclassesCount },
         { count: backgroundsCount },
         { count: spellsCount },
         { count: featsCount },
@@ -59,6 +63,7 @@ export default function CompendiumPage() {
       ] = await Promise.all([
         supabase.from("species").select("*", { count: "exact", head: true }),
         supabase.from("classes").select("*", { count: "exact", head: true }),
+        supabase.from("subclasses").select("*", { count: "exact", head: true }),
         supabase.from("backgrounds").select("*", { count: "exact", head: true }),
         supabase.from("spells").select("*", { count: "exact", head: true }),
         supabase.from("feats").select("*", { count: "exact", head: true }),
@@ -68,6 +73,7 @@ export default function CompendiumPage() {
       setTabCounts({
         species: speciesCount ?? 0,
         classes: classesCount ?? 0,
+        subclasses: subclassesCount ?? 0,
         backgrounds: backgroundsCount ?? 0,
         spells: spellsCount ?? 0,
         feats: featsCount ?? 0,
@@ -139,6 +145,16 @@ export default function CompendiumPage() {
                 {ability}
               </span>
             ))}
+          </div>
+        )}
+        {activeTab === "subclasses" && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {(data as Subclass).description?.slice(0, 80)}...
+            </p>
+            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+              {((data as Subclass).features || []).length} features
+            </span>
           </div>
         )}
         {activeTab === "species" && (

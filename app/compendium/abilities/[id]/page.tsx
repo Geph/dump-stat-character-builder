@@ -13,6 +13,8 @@ interface AbilityFormData {
   prerequisites: string
   attached_to_type: string
   attached_to_id: string
+  uses_type: string
+  uses_amount: number
   source: string
 }
 
@@ -22,6 +24,8 @@ const defaultAbility: AbilityFormData = {
   prerequisites: "",
   attached_to_type: "",
   attached_to_id: "",
+  uses_type: "unlimited",
+  uses_amount: 1,
   source: "Custom",
 }
 
@@ -68,6 +72,8 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             prerequisites: data.prerequisites || "",
             attached_to_type: data.attached_to_type || "",
             attached_to_id: data.attached_to_id || "",
+            uses_type: data.uses_type || "unlimited",
+            uses_amount: data.uses_amount ?? 1,
             source: data.source || "Custom",
           })
         }
@@ -234,6 +240,47 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               placeholder="e.g., Level 5, Strength 13 or higher"
             />
+          </div>
+
+          {/* Uses Configuration */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Uses Type
+              </label>
+              <select
+                value={form.uses_type}
+                onChange={(e) => setForm({ ...form, uses_type: e.target.value })}
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="unlimited">Unlimited (At Will)</option>
+                <option value="fixed">Fixed Number</option>
+                <option value="proficiency">Proficiency Modifier / Rest</option>
+                <option value="short_rest">Recharge on Short Rest</option>
+                <option value="long_rest">Recharge on Long Rest</option>
+              </select>
+            </div>
+            {form.uses_type !== "unlimited" && (
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  {form.uses_type === "proficiency" ? "Base Uses (+ Prof Mod)" : "Number of Uses"}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={form.uses_amount}
+                  onChange={(e) => setForm({ ...form, uses_amount: parseInt(e.target.value) || 1 })}
+                  className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {form.uses_type === "proficiency" && "Total uses = this number + proficiency bonus"}
+                  {form.uses_type === "fixed" && "Uses do not recharge automatically"}
+                  {form.uses_type === "short_rest" && "Recharges after a short or long rest"}
+                  {form.uses_type === "long_rest" && "Recharges only after a long rest"}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

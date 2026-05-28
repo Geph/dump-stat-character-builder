@@ -16,7 +16,8 @@ import {
   UserCircle, 
   ClipboardCheck,
   Upload,
-  X
+  X,
+  Wand2
 } from "lucide-react"
 import type { DndClass, Species, Background, Spell, Equipment, CharacterDraft } from "@/lib/types"
 
@@ -247,7 +248,7 @@ export default function BuilderPage() {
     <div className="min-h-screen bg-background">
       <MainNav />
       
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Step Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -260,7 +261,7 @@ export default function BuilderPage() {
                 <div key={step.id} className="flex items-center">
                   <div className="flex flex-col items-center">
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                      className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all ${
                         isComplete
                           ? "bg-success text-success-foreground"
                           : isActive
@@ -268,14 +269,14 @@ export default function BuilderPage() {
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {isComplete ? <Check className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
+                      {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                     </div>
-                    <span className={`text-xs mt-1 font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                    <span className={`text-[10px] md:text-xs mt-1 font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
                       {step.label}
                     </span>
                   </div>
                   {index < STEPS.length - 1 && (
-                    <div className={`w-8 md:w-16 h-1 mx-2 rounded ${
+                    <div className={`w-4 md:w-12 h-1 mx-1 md:mx-2 rounded ${
                       isComplete ? "bg-success" : "bg-muted"
                     }`} />
                   )}
@@ -285,15 +286,18 @@ export default function BuilderPage() {
           </div>
         </div>
 
-        {/* Step Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-          >
+        {/* Two-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left Column: Step Content (choices) */}
+          <div className="lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
             {/* Step 1: Class Selection */}
             {currentStep === 1 && (
               <div>
@@ -733,118 +737,155 @@ export default function BuilderPage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Character Sheet Preview (like OrcPub) */}
-        <div className="mt-8 bg-card rounded-2xl border-2 border-border p-6">
-          <h3 className="text-lg font-bold text-foreground mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            {character.name || "New Character"} {selectedClass?.name ? `(${selectedClass.name})` : ""}
-          </h3>
-          
-          {/* Ability Scores Row */}
-          <div className="grid grid-cols-6 gap-2 mb-4">
-            {ABILITY_NAMES.map((ability) => {
-              const score = character[ability]
-              const mod = Math.floor((score - 10) / 2)
-              return (
-                <div key={ability} className="text-center bg-muted rounded-lg p-2">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
-                  <p className="text-xl font-black text-foreground">{score}</p>
-                  <p className="text-xs text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
+            {/* Navigation Buttons inside left column */}
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+              <button
+                onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                disabled={currentStep === 1}
+                className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Back
+              </button>
+
+              {currentStep < 6 ? (
+                <button
+                  onClick={() => setCurrentStep(Math.min(6, currentStep + 1))}
+                  disabled={!canProceed()}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  Continue
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={saveCharacter}
+                  disabled={saving || !canProceed()}
+                  className="flex items-center gap-2 px-6 py-3 bg-success text-white rounded-xl font-bold hover:bg-success/90 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? "Saving..." : "Create Character"}
+                  <Check className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Character Sheet Preview */}
+          <div className="lg:col-span-2">
+            <div className="bg-card rounded-2xl border-2 border-border p-6 sticky top-24">
+              <h3 className="text-xl font-black text-foreground mb-4" style={{ fontFamily: "var(--font-display)" }}>
+                {character.name || "New Character"}
+              </h3>
+              
+              {/* Class and Origin Summary */}
+              <div className="mb-4 pb-4 border-b border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  {selectedClass && (
+                    <span className="px-3 py-1 bg-primary/10 text-primary text-sm font-bold rounded-full">
+                      {selectedClass.name}
+                    </span>
+                  )}
+                  {selectedClass && (
+                    <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs font-bold rounded">
+                      d{selectedClass.hit_die}
+                    </span>
+                  )}
                 </div>
-              )
-            })}
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <span className="text-[10px] text-muted-foreground uppercase">Species</span>
-              <span className="font-bold text-foreground">{selectedSpecies?.name || "—"}</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <span className="text-[10px] text-muted-foreground uppercase">Background</span>
-              <span className="font-bold text-foreground">{selectedBackground?.name || "—"}</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <span className="text-[10px] text-muted-foreground uppercase">Level</span>
-              <span className="font-bold text-foreground">{character.level}</span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-muted/50 rounded-lg">
-              <span className="text-[10px] text-muted-foreground uppercase">Hit Die</span>
-              <span className="font-bold text-destructive">{selectedClass ? `d${selectedClass.hit_die}` : "—"}</span>
-            </div>
-          </div>
-
-          {/* Derived Stats */}
-          <div className="grid grid-cols-3 gap-3 mt-3 text-sm">
-            <div className="flex flex-col items-center p-2 bg-primary/10 rounded-lg border border-primary/20">
-              <span className="text-[10px] text-primary uppercase font-bold">Max HP</span>
-              <span className="text-xl font-black text-primary">
-                {selectedClass ? selectedClass.hit_die + Math.floor((character.constitution - 10) / 2) : "—"}
-              </span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-secondary/10 rounded-lg border border-secondary/20">
-              <span className="text-[10px] text-secondary uppercase font-bold">AC</span>
-              <span className="text-xl font-black text-secondary">
-                {10 + Math.floor((character.dexterity - 10) / 2)}
-              </span>
-            </div>
-            <div className="flex flex-col items-center p-2 bg-accent/10 rounded-lg border border-accent/20">
-              <span className="text-[10px] text-accent uppercase font-bold">Speed</span>
-              <span className="text-xl font-black text-accent">
-                {selectedSpecies?.speed || 30} ft
-              </span>
-            </div>
-          </div>
-
-          {/* Equipment & Spells summary */}
-          {(character.equipment_ids.length > 0 || character.spell_ids.length > 0) && (
-            <div className="mt-4 pt-3 border-t border-border">
-              <div className="flex gap-4 text-xs">
-                {character.equipment_ids.length > 0 && (
-                  <span className="text-muted-foreground">
-                    <span className="text-lime font-bold">{character.equipment_ids.length}</span> equipment
-                  </span>
-                )}
-                {character.spell_ids.length > 0 && (
-                  <span className="text-muted-foreground">
-                    <span className="text-magenta font-bold">{character.spell_ids.length}</span> spells
-                  </span>
-                )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {selectedSpecies && <span>{selectedSpecies.name}</span>}
+                  {selectedSpecies && selectedBackground && <span>&bull;</span>}
+                  {selectedBackground && <span>{selectedBackground.name}</span>}
+                </div>
               </div>
+              
+              {/* Ability Scores */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {ABILITY_NAMES.map((ability) => {
+                  const score = character[ability]
+                  const mod = Math.floor((score - 10) / 2)
+                  return (
+                    <div key={ability} className="text-center bg-muted rounded-lg p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
+                      <p className="text-lg font-black text-foreground">{score}</p>
+                      <p className="text-xs text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Derived Stats */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="flex flex-col items-center p-3 bg-primary/10 rounded-xl border border-primary/20">
+                  <span className="text-[10px] text-primary uppercase font-bold">HP</span>
+                  <span className="text-2xl font-black text-primary">
+                    {selectedClass ? selectedClass.hit_die + Math.floor((character.constitution - 10) / 2) : "—"}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-secondary/10 rounded-xl border border-secondary/20">
+                  <span className="text-[10px] text-secondary uppercase font-bold">AC</span>
+                  <span className="text-2xl font-black text-secondary">
+                    {10 + Math.floor((character.dexterity - 10) / 2)}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-accent/10 rounded-xl border border-accent/20">
+                  <span className="text-[10px] text-accent uppercase font-bold">Speed</span>
+                  <span className="text-2xl font-black text-accent">
+                    {selectedSpecies?.speed || 30}
+                  </span>
+                </div>
+              </div>
+
+              {/* Additional Stats */}
+              <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                <div className="flex flex-col p-2 bg-muted/50 rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase">Prof Bonus</span>
+                  <span className="font-bold text-lime">+2</span>
+                </div>
+                <div className="flex flex-col p-2 bg-muted/50 rounded-lg">
+                  <span className="text-[10px] text-muted-foreground uppercase">Level</span>
+                  <span className="font-bold text-foreground">{character.level}</span>
+                </div>
+              </div>
+
+              {/* Equipment & Spells */}
+              {(character.equipment_ids.length > 0 || character.spell_ids.length > 0) && (
+                <div className="pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">Selections</p>
+                  <div className="flex gap-3">
+                    {character.equipment_ids.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Package className="w-4 h-4 text-lime" />
+                        <span className="text-sm text-foreground">{character.equipment_ids.length}</span>
+                      </div>
+                    )}
+                    {character.spell_ids.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Wand2 className="w-4 h-4 text-magenta" />
+                        <span className="text-sm text-foreground">{character.spell_ids.length}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Species Traits Preview */}
+              {selectedSpecies?.traits && selectedSpecies.traits.length > 0 && (
+                <div className="pt-3 mt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">Traits</p>
+                  <div className="space-y-1">
+                    {selectedSpecies.traits.slice(0, 3).map((trait, i) => (
+                      <p key={i} className="text-xs text-foreground">
+                        <span className="font-bold">{trait.name}</span>
+                      </p>
+                    ))}
+                    {selectedSpecies.traits.length > 3 && (
+                      <p className="text-xs text-muted-foreground">+{selectedSpecies.traits.length - 3} more</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
-          <button
-            onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-            disabled={currentStep === 1}
-            className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
-          >
-            <ChevronLeft className="w-5 h-5" />
-            Back
-          </button>
-
-          {currentStep < 6 ? (
-            <button
-              onClick={() => setCurrentStep(Math.min(6, currentStep + 1))}
-              disabled={!canProceed()}
-              className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              Continue
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          ) : (
-            <button
-              onClick={saveCharacter}
-              disabled={saving || !canProceed()}
-              className="flex items-center gap-2 px-6 py-3 bg-success text-white rounded-xl font-bold hover:bg-success/90 disabled:opacity-50 transition-colors"
-            >
-              {saving ? "Saving..." : "Create Character"}
-              <Check className="w-5 h-5" />
-            </button>
-          )}
+          </div>
         </div>
       </main>
     </div>

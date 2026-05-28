@@ -1,12 +1,44 @@
 // D&D 2024 Types
 
+// Feature with choice support
+export interface FeatureChoice {
+  category: string // e.g., "Fighting Style", "Skill Proficiency"
+  options: { name: string; description: string }[]
+  count: number // how many to choose
+}
+
+export interface Feature {
+  level: number
+  name: string
+  description: string
+  isChoice?: boolean
+  choices?: FeatureChoice
+}
+
+// Trait with choice support for species
+export interface Trait {
+  name: string
+  description: string
+  isChoice?: boolean
+  choices?: FeatureChoice
+}
+
+// Lineage for species variants
+export interface Lineage {
+  name: string
+  description: string
+  traits: Trait[]
+}
+
 export interface Species {
   id: string
   name: string
   description: string | null
   speed: number
   size: string | null
-  traits: { name: string; description: string }[]
+  traits: Trait[]
+  lineages: Lineage[]
+  icon: string | null
   source: string
   created_at: string
 }
@@ -22,7 +54,7 @@ export interface DndClass {
   weapon_proficiencies: string[] | null
   skill_choices: { count: number; options: string[] } | null
   starting_equipment: unknown
-  features: { level: number; name: string; description: string }[]
+  features: Feature[]
   spellcasting: {
     ability: string
     cantrips?: number
@@ -32,6 +64,7 @@ export interface DndClass {
     pact_magic?: boolean
     starts_at?: number
   } | null
+  icon: string | null
   source: string
   created_at: string
 }
@@ -41,9 +74,28 @@ export interface Subclass {
   class_id: string
   name: string
   description: string | null
-  features: { level: number; name: string; description: string }[]
+  features: Feature[]
+  spellcasting?: {
+    ability: string
+    cantrips?: number
+    spells_known?: number
+  } | null
   source: string
   created_at: string
+}
+
+export interface CustomAbility {
+  id: string
+  name: string
+  description: string | null
+  prerequisites: string | null
+  attached_to_type: string | null
+  attached_to_id: string | null
+  uses_type: 'fixed' | 'proficiency' | 'short_rest' | 'long_rest' | 'unlimited' | null
+  uses_amount: number | null
+  source: string
+  created_at: string
+  updated_at: string
 }
 
 export interface Background {

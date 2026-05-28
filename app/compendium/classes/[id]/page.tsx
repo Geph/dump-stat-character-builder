@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X } from "lucide-react"
 import Link from "next/link"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -37,6 +38,7 @@ interface ClassFormData {
     ability: string
     starts_at: number
   } | null
+  icon: string | null
   source: string
 }
 
@@ -51,6 +53,7 @@ const defaultClass: ClassFormData = {
   skill_choices: { count: 2, options: [] },
   features: [{ level: 1, name: "", description: "" }],
   spellcasting: null,
+  icon: null,
   source: "Custom",
 }
 
@@ -92,6 +95,7 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
             skill_choices: data.skill_choices || { count: 2, options: [] },
             features: data.features || [{ level: 1, name: "", description: "" }],
             spellcasting: data.spellcasting || null,
+            icon: data.icon || null,
             source: data.source || "Custom",
           })
           setHasSpellcasting(!!data.spellcasting)
@@ -267,6 +271,13 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
               />
             </div>
           </div>
+
+          {/* Icon Picker */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Class Icon"
+          />
 
           {/* Description */}
           <div>
