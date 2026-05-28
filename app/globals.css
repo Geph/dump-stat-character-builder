@@ -92,11 +92,11 @@
   --card: oklch(0.16 0.018 280);
   --card-foreground: oklch(0.94 0.01 270);
 
-  /* Card Lighter — for nested cards or lighter sections */
-  --card-lighter: oklch(0.22 0.02 280);
+  /* Card Lighter — mid-dark purple matching UI box elements */
+  --card-lighter: oklch(0.24 0.08 288);
 
   /* Muted */
-  --muted: oklch(0.22 0.02 280);
+  --muted: oklch(0.20 0.05 285);
   --muted-foreground: oklch(0.55 0.02 280);
 
   /* Border — subtle purple tint */

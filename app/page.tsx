@@ -47,10 +47,24 @@ type LibraryStats = {
   equipment: number
 }
 
+const HERO_IMAGES = [
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%281%29.png-qrYxONxHb4CpafnwwaKMSTRQXEFvEa.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%282%29.png-FM0PvUgk8sRE6443Qm8xsRfe6AvRkb.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%283%29.png-jsfzXboZqMINY048zLOBOlYSjVeMlX.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%284%29.png-NuaTU8L13wxEryBGXwrBZaU0T3hLmz.jpeg",
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%285%29.png-4YpGTcW5LFjjKdiYaUsT36DMJEB6Lh.jpeg",
+]
+
+const LIBRARY_STATS_BG = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/library-stats-section.png-xI6gFjkk9x6YETqOPgj8680eSlMkL2.jpeg"
+
 export default function HomePage() {
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
+
+  const [heroBg] = useState<string>(
+    () => HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
+  )
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -101,17 +115,22 @@ export default function HomePage() {
 
       <main id="home-main">
         {/* Hero Section */}
-        <section id="hero-section" className="relative overflow-hidden py-24 px-4">
-          {/* subtle background grid */}
-          <div
-            className="absolute inset-0 opacity-5 pointer-events-none"
-            style={{
-              backgroundImage: "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
-            }}
-          />
+        <section
+          id="hero-section"
+          className="relative overflow-hidden py-24 px-4"
+          style={{
+            backgroundImage: `url(${heroBg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center top",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          {/* Dark overlay so text stays readable */}
+          <div className="absolute inset-0 bg-background/75 pointer-events-none" />
+          {/* Subtle bottom fade into background */}
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
 
-          <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="max-w-4xl mx-auto text-center relative z-20">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -155,7 +174,7 @@ export default function HomePage() {
           </div>
 
           {/* Floating class icons */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
             {classHighlights.map((cls, index) => {
               const Icon = cls.icon
               return (
@@ -225,8 +244,19 @@ export default function HomePage() {
         </section>
 
         {/* Library Stats Section */}
-        <section id="library-stats-section" className="py-20 px-4 border-t border-border">
-          <div className="max-w-5xl mx-auto">
+        <section
+          id="library-stats-section"
+          className="py-20 px-4 border-t border-border relative overflow-hidden"
+          style={{
+            backgroundImage: `url(${LIBRARY_STATS_BG})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
+          {/* Dark overlay for readability */}
+          <div className="absolute inset-0 bg-background/80 pointer-events-none" />
+          <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
