@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import type { DndClass, Feature, FeatureChoice } from "@/lib/types"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 
@@ -19,6 +20,7 @@ interface SubclassFormData {
     ability: string
   } | null
   source: string
+  icon: string | null
 }
 
 const defaultSubclass: SubclassFormData = {
@@ -28,6 +30,7 @@ const defaultSubclass: SubclassFormData = {
   features: [{ level: 3, name: "", description: "" }],
   spellcasting: null,
   source: "Custom",
+  icon: null,
 }
 
 export default function SubclassEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,6 +78,7 @@ export default function SubclassEditorPage({ params }: { params: Promise<{ id: s
             features: data.features?.length ? data.features : [{ level: 3, name: "", description: "" }],
             spellcasting: data.spellcasting || null,
             source: data.source || "Custom",
+            icon: data.icon || null,
           })
           setHasSpellcasting(!!data.spellcasting)
         }
@@ -327,6 +331,13 @@ export default function SubclassEditorPage({ params }: { params: Promise<{ id: s
               placeholder="Player's Handbook"
             />
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           {/* Description */}
           <div>

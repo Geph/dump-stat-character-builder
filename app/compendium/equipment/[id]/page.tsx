@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Download } from "lucide-react"
 import Link from "next/link"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const CATEGORIES = [
   "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
@@ -52,6 +53,7 @@ interface EquipmentFormData {
   range: string
   mastery: string
   properties: string[]
+  icon: string | null
 }
 
 const defaultEquipment: EquipmentFormData = {
@@ -69,6 +71,7 @@ const defaultEquipment: EquipmentFormData = {
   range: "",
   mastery: "",
   properties: [],
+  icon: null,
 }
 
 export default function EquipmentEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -112,6 +115,7 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             range: data.range || "",
             mastery: data.mastery || "",
             properties: Array.isArray(data.properties) ? data.properties : [],
+            icon: data.icon || null,
           })
         }
         setLoading(false)
@@ -256,6 +260,13 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
               />
             </div>
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
