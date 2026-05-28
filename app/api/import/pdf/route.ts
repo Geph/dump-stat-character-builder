@@ -3,15 +3,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
-// We need to import pdf-parse carefully due to ESM/CJS compatibility
-let pdfParse: typeof import("pdf-parse")
-
-async function getPdfParser() {
-  if (!pdfParse) {
-    // Use require for CommonJS module compatibility
-    pdfParse = require("pdf-parse")
-  }
-  return pdfParse
+// Dynamic import for pdf-parse (CommonJS module)
+async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
+  // pdf-parse has CommonJS/ESM interop issues - we need to handle default export carefully
+  const pdfParse = await import("pdf-parse")
+  const parser = pdfParse.default || pdfParse
+  return parser(buffer)
 }
 
 // Schema for AI extraction
@@ -81,9 +78,8 @@ export async function POST(request: NextRequest) {
     // Convert file to buffer
     const buffer = Buffer.from(await file.arrayBuffer())
     
-    // Get pdf parser
-    const parser = await getPdfParser()
-    const pdfData = await parser(buffer)
+    // Parse PDF
+    const pdfData = await parsePdf(buffer)
     const text = pdfData.text
 
     // Truncate text if too long (AI context limits)
