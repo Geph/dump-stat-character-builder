@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2 } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
+import { GameIcon } from "@/components/game-icon-picker"
 
 type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
 
@@ -36,6 +37,8 @@ export default function CompendiumPage() {
   })
   const [loading, setLoading] = useState(true)
   const [selectedItem, setSelectedItem] = useState<unknown | null>(null)
+  const [clearingAll, setClearingAll] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
@@ -109,9 +112,23 @@ export default function CompendiumPage() {
     item.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const handleClearAll = async () => {
+    setClearingAll(true)
+    const supabase = createClient()
+    const tables = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "custom_abilities"]
+    for (const table of tables) {
+      await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
+    }
+    setContent({ species: [], classes: [], subclasses: [], backgrounds: [], spells: [], feats: [], equipment: [], abilities: [] })
+    setTabCounts({ species: 0, classes: 0, subclasses: 0, backgrounds: 0, spells: 0, feats: 0, equipment: 0, abilities: 0 })
+    setClearingAll(false)
+    setClearConfirmOpen(false)
+  }
+
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = `/compendium/${activeTab}/${data.id}`
+    const iconName = data.icon as string | null | undefined
     
     return (
       <motion.div
@@ -120,16 +137,23 @@ export default function CompendiumPage() {
         className="bg-card rounded-2xl p-5 border-2 border-border hover:border-primary transition-colors"
         whileHover={{ scale: 1.02 }}
       >
-        <div className="flex items-start justify-between mb-2">
-          <h3 
-            className="font-bold text-lg text-foreground cursor-pointer hover:text-primary"
-            onClick={() => setSelectedItem(item)}
-          >
-            {data.name as string}
-          </h3>
+        <div className="flex items-start justify-between mb-2 gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            {iconName && (
+              <div className="w-10 h-10 shrink-0 text-primary">
+                <GameIcon name={iconName} className="w-10 h-10" fallbackColor="currentColor" />
+              </div>
+            )}
+            <h3 
+              className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight"
+              onClick={() => setSelectedItem(item)}
+            >
+              {data.name as string}
+            </h3>
+          </div>
           <Link
             href={editPath}
-            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors shrink-0"
             title="Edit"
           >
             <Edit className="w-4 h-4" />
@@ -176,13 +200,11 @@ export default function CompendiumPage() {
                 {(data as Species).size || "Medium"}
               </span>
               <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {(data as Species).speed || 30} ft
+                {typeof (data as Species).speed === "object"
+                  ? Object.entries((data as Species).speed as Record<string, number>).map(([k, v]) => `${v}ft ${k}`).join(" / ")
+                  : `${(data as Species).speed || 30} ft`
+                }
               </span>
-              {(data as Species).lineages && (data as Species).lineages.length > 0 && (
-                <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-                  {(data as Species).lineages.length} Lineage{(data as Species).lineages.length > 1 ? "s" : ""}
-                </span>
-              )}
             </div>
             <p className="text-xs text-muted-foreground">
               Source: {(data as Species).source || "Custom"}
@@ -221,15 +243,25 @@ export default function CompendiumPage() {
         {activeTab === "feats" && (
           <div className="space-y-2">
             <div className="flex gap-2 flex-wrap">
-              {(data as Feat).prerequisite ? (
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                (data as Feat).category === "Origin"
+                  ? "bg-lime/10 text-lime"
+                  : (data as Feat).category === "Epic Boon"
+                  ? "bg-magenta/10 text-magenta"
+                  : "bg-primary/10 text-primary"
+              }`}>
+                {(data as Feat).category || "General"}
+              </span>
+              {((data as Feat).level_requirement ?? 1) > 1 && (
                 <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                  {(data as Feat).prerequisite.includes("Level") || (data as Feat).prerequisite.includes("level") ? "Level Required" : "Has Prereq"}
-                </span>
-              ) : (
-                <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-                  Origin Feat
+                  Lvl {(data as Feat).level_requirement}+
                 </span>
               )}
+              {(data as Feat).prerequisite_feat_ids?.length ? (
+                <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
+                  Has Prereqs
+                </span>
+              ) : null}
             </div>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {(data as Feat).description}
@@ -278,19 +310,64 @@ export default function CompendiumPage() {
       <MainNav />
       
       <main id="compendium-main" className="max-w-7xl mx-auto px-4 py-8">
-        <div id="compendium-header" className="flex items-start justify-between mb-8">
+        <div id="compendium-header" className="flex items-start justify-between mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
           </div>
-          <Link
-            href={`/compendium/${activeTab}/new`}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-5 h-5" />
-            New {activeTab === "abilities" ? "Custom Ability" : activeTab === "species" ? "Species" : activeTab.slice(0, -2).charAt(0).toUpperCase() + activeTab.slice(0, -2).slice(1)}
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setClearConfirmOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive border-2 border-destructive/30 rounded-xl font-semibold hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear All
+            </button>
+            <Link
+              href={`/compendium/${activeTab}/new`}
+              className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-5 h-5" />
+              New {activeTab === "abilities" ? "Custom Ability" : activeTab === "species" ? "Species" : activeTab.slice(0, -2).charAt(0).toUpperCase() + activeTab.slice(0, -2).slice(1)}
+            </Link>
+          </div>
         </div>
+
+        {/* Clear All Confirmation Dialog */}
+        {clearConfirmOpen && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl border-2 border-destructive/40 p-6 max-w-md w-full shadow-xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-destructive/10 rounded-xl flex items-center justify-center shrink-0">
+                  <Trash2 className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-foreground">Clear All Content?</h2>
+                  <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-muted-foreground mb-6">
+                This will permanently delete <strong className="text-foreground">all</strong> classes, species, backgrounds, spells, feats, equipment, subclasses, and custom abilities from your compendium. You will need to re-seed from the D&D 5.5e SRD or re-import your content afterward.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setClearConfirmOpen(false)}
+                  disabled={clearingAll}
+                  className="flex-1 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-semibold hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearAll}
+                  disabled={clearingAll}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {clearingAll ? "Clearing..." : "Yes, Clear Everything"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div id="compendium-search" className="relative mb-6">

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
-import type { UsesConfig } from "@/lib/types"
+import type { UsesConfig, FeatureChoice } from "@/lib/types"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -22,10 +22,23 @@ const SKILLS = [
   "Sleight of Hand", "Stealth", "Survival"
 ]
 
+// Starting equipment choice structure
+interface EquipmentOption {
+  label: string  // e.g. "(a) a longsword" - display label
+  items: { name: string; quantity: number }[]
+}
+
+interface StartingEquipmentGroup {
+  description: string  // e.g. "Choose one of the following"
+  options: EquipmentOption[]
+}
+
 interface ClassFeature {
   level: number
   name: string
   description: string
+  isChoice?: boolean
+  choices?: FeatureChoice
   limitedUses?: UsesConfig | null
 }
 
@@ -43,6 +56,8 @@ interface ClassFormData {
     ability: string
     starts_at: number
   } | null
+  starting_gold: number
+  starting_equipment_groups: StartingEquipmentGroup[]
   icon: string | null
   source: string
 }
@@ -58,6 +73,8 @@ const defaultClass: ClassFormData = {
   skill_choices: { count: 2, options: [] },
   features: [{ level: 1, name: "", description: "" }],
   spellcasting: null,
+  starting_gold: 0,
+  starting_equipment_groups: [],
   icon: null,
   source: "Custom",
 }
@@ -100,6 +117,8 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
             skill_choices: data.skill_choices || { count: 2, options: [] },
             features: data.features || [{ level: 1, name: "", description: "" }],
             spellcasting: data.spellcasting || null,
+            starting_gold: data.starting_gold ?? 0,
+            starting_equipment_groups: data.starting_equipment_groups || [],
             icon: data.icon || null,
             source: data.source || "Custom",
           })
@@ -210,6 +229,100 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
           : [...prev.skill_choices.options, skill]
       }
     }))
+  }
+
+  // Feature choice helpers
+  const toggleFeatureChoice = (index: number, checked: boolean) => {
+    const newFeatures = [...form.features]
+    newFeatures[index] = {
+      ...newFeatures[index],
+      isChoice: checked,
+      choices: checked
+        ? (newFeatures[index].choices || { category: "Feature Option", options: [{ name: "", description: "" }], count: 1 })
+        : undefined,
+    }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  const updateFeatureChoiceField = (featIndex: number, field: keyof FeatureChoice, value: unknown) => {
+    const newFeatures = [...form.features]
+    const existing = newFeatures[featIndex].choices || { category: "", options: [], count: 1 }
+    newFeatures[featIndex] = { ...newFeatures[featIndex], choices: { ...existing, [field]: value } }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  const addChoiceOption = (featIndex: number) => {
+    const newFeatures = [...form.features]
+    const existing = newFeatures[featIndex].choices!
+    newFeatures[featIndex] = {
+      ...newFeatures[featIndex],
+      choices: { ...existing, options: [...existing.options, { name: "", description: "" }] }
+    }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  const updateChoiceOption = (featIndex: number, optIndex: number, field: "name" | "description", value: string) => {
+    const newFeatures = [...form.features]
+    const existing = newFeatures[featIndex].choices!
+    const newOptions = existing.options.map((o, i) => i === optIndex ? { ...o, [field]: value } : o)
+    newFeatures[featIndex] = { ...newFeatures[featIndex], choices: { ...existing, options: newOptions } }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  const removeChoiceOption = (featIndex: number, optIndex: number) => {
+    const newFeatures = [...form.features]
+    const existing = newFeatures[featIndex].choices!
+    newFeatures[featIndex] = {
+      ...newFeatures[featIndex],
+      choices: { ...existing, options: existing.options.filter((_, i) => i !== optIndex) }
+    }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  // Starting equipment helpers
+  const addEquipmentGroup = () => {
+    setForm(prev => ({
+      ...prev,
+      starting_equipment_groups: [
+        ...prev.starting_equipment_groups,
+        { description: "Choose one of the following", options: [{ label: "(a)", items: [{ name: "", quantity: 1 }] }] }
+      ]
+    }))
+  }
+
+  const removeEquipmentGroup = (gi: number) => {
+    setForm(prev => ({ ...prev, starting_equipment_groups: prev.starting_equipment_groups.filter((_, i) => i !== gi) }))
+  }
+
+  const addEquipmentOption = (gi: number) => {
+    const groups = [...form.starting_equipment_groups]
+    const alpha = String.fromCharCode(97 + groups[gi].options.length)
+    groups[gi] = { ...groups[gi], options: [...groups[gi].options, { label: `(${alpha})`, items: [{ name: "", quantity: 1 }] }] }
+    setForm({ ...form, starting_equipment_groups: groups })
+  }
+
+  const removeEquipmentOption = (gi: number, oi: number) => {
+    const groups = [...form.starting_equipment_groups]
+    groups[gi] = { ...groups[gi], options: groups[gi].options.filter((_, i) => i !== oi) }
+    setForm({ ...form, starting_equipment_groups: groups })
+  }
+
+  const addItemToOption = (gi: number, oi: number) => {
+    const groups = [...form.starting_equipment_groups]
+    groups[gi].options[oi].items.push({ name: "", quantity: 1 })
+    setForm({ ...form, starting_equipment_groups: groups })
+  }
+
+  const updateOptionItem = (gi: number, oi: number, ii: number, field: "name" | "quantity", value: string | number) => {
+    const groups = [...form.starting_equipment_groups]
+    groups[gi].options[oi].items[ii] = { ...groups[gi].options[oi].items[ii], [field]: value }
+    setForm({ ...form, starting_equipment_groups: groups })
+  }
+
+  const removeOptionItem = (gi: number, oi: number, ii: number) => {
+    const groups = [...form.starting_equipment_groups]
+    groups[gi].options[oi].items = groups[gi].options[oi].items.filter((_, i) => i !== ii)
+    setForm({ ...form, starting_equipment_groups: groups })
   }
 
   if (loading) {
@@ -574,6 +687,81 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                     className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
                   />
                   
+                  {/* Is Choice Toggle */}
+                  <div className="pt-2 border-t border-border space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!feature.isChoice}
+                        onChange={(e) => toggleFeatureChoice(index, e.target.checked)}
+                        className="w-4 h-4 rounded border-border accent-primary"
+                      />
+                      <span className="text-muted-foreground">This feature offers a choice between options</span>
+                    </label>
+
+                    {feature.isChoice && feature.choices && (
+                      <div className="bg-background border-2 border-primary/20 rounded-xl p-3 space-y-3 ml-6">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-1">Category</label>
+                            <input
+                              type="text"
+                              value={feature.choices.category}
+                              onChange={(e) => updateFeatureChoiceField(index, "category", e.target.value)}
+                              placeholder="e.g. Fighting Style"
+                              className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-1">Number to Choose</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={feature.choices.count}
+                              onChange={(e) => updateFeatureChoiceField(index, "count", parseInt(e.target.value) || 1)}
+                              className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-center focus:outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-foreground">Options</span>
+                            <button
+                              type="button"
+                              onClick={() => addChoiceOption(index)}
+                              className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add Option
+                            </button>
+                          </div>
+                          {feature.choices.options.map((opt, oi) => (
+                            <div key={oi} className="flex gap-2">
+                              <input
+                                type="text"
+                                value={opt.name}
+                                onChange={(e) => updateChoiceOption(index, oi, "name", e.target.value)}
+                                placeholder="Option name"
+                                className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                              />
+                              <input
+                                type="text"
+                                value={opt.description}
+                                onChange={(e) => updateChoiceOption(index, oi, "description", e.target.value)}
+                                placeholder="Description (optional)"
+                                className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                              />
+                              <button type="button" onClick={() => removeChoiceOption(index, oi)}
+                                className="p-1.5 text-muted-foreground hover:text-destructive">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Limited Uses Checkbox */}
                   <label className="flex items-center gap-2 cursor-pointer text-sm pt-2 border-t border-border">
                     <input
@@ -742,6 +930,120 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Starting Equipment */}
+          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-semibold text-foreground">Starting Equipment</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Define equipment choice groups. Players pick one option per group.
+                </p>
+              </div>
+              <button type="button" onClick={addEquipmentGroup}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
+                <Plus className="w-4 h-4" />
+                Add Choice Group
+              </button>
+            </div>
+
+            {/* Starting Gold */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-semibold text-foreground shrink-0">Starting Gold (gp):</label>
+              <input
+                type="number"
+                min={0}
+                value={form.starting_gold}
+                onChange={(e) => setForm({ ...form, starting_gold: Math.max(0, parseInt(e.target.value) || 0) })}
+                className="w-28 px-3 py-2 bg-background border-2 border-border rounded-xl text-foreground text-center focus:outline-none focus:border-primary"
+              />
+              <span className="text-xs text-muted-foreground">
+                Players can take gold instead of equipment choices.
+              </span>
+            </div>
+
+            {/* Choice Groups */}
+            {form.starting_equipment_groups.map((group, gi) => (
+              <div key={gi} className="border-2 border-border rounded-xl p-3 space-y-3 bg-background">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={group.description}
+                    onChange={(e) => {
+                      const groups = [...form.starting_equipment_groups]
+                      groups[gi] = { ...groups[gi], description: e.target.value }
+                      setForm({ ...form, starting_equipment_groups: groups })
+                    }}
+                    placeholder="e.g. Choose one of the following weapons"
+                    className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary font-medium"
+                  />
+                  <button type="button" onClick={() => addEquipmentOption(gi)}
+                    className="px-2 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 text-xs font-semibold whitespace-nowrap">
+                    + Option
+                  </button>
+                  <button type="button" onClick={() => removeEquipmentGroup(gi)}
+                    className="p-2 text-muted-foreground hover:text-destructive">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {group.options.map((opt, oi) => (
+                  <div key={oi} className="pl-3 border-l-2 border-primary/20 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={opt.label}
+                        onChange={(e) => {
+                          const groups = [...form.starting_equipment_groups]
+                          groups[gi].options[oi] = { ...groups[gi].options[oi], label: e.target.value }
+                          setForm({ ...form, starting_equipment_groups: groups })
+                        }}
+                        placeholder="(a)"
+                        className="w-20 px-2 py-1 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                      <span className="text-xs text-muted-foreground">Label</span>
+                      <button type="button" onClick={() => addItemToOption(gi, oi)}
+                        className="ml-auto px-2 py-1 text-xs bg-muted text-muted-foreground rounded hover:bg-muted/80">
+                        + Item
+                      </button>
+                      <button type="button" onClick={() => removeEquipmentOption(gi, oi)}
+                        className="p-1 text-muted-foreground hover:text-destructive">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {opt.items.map((item, ii) => (
+                      <div key={ii} className="flex items-center gap-2 ml-2">
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateOptionItem(gi, oi, ii, "quantity", parseInt(e.target.value) || 1)}
+                          className="w-16 px-2 py-1 bg-card border border-border rounded-lg text-sm text-center focus:outline-none focus:border-primary"
+                        />
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => updateOptionItem(gi, oi, ii, "name", e.target.value)}
+                          placeholder="Item name"
+                          className="flex-1 px-3 py-1 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                        <button type="button" onClick={() => removeOptionItem(gi, oi, ii)}
+                          className="p-1 text-muted-foreground hover:text-destructive">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {form.starting_equipment_groups.length === 0 && (
+              <p className="text-sm text-muted-foreground italic text-center py-2">
+                No equipment choice groups yet. Click &quot;Add Choice Group&quot; to begin.
+              </p>
+            )}
           </div>
 
           {/* Submit */}

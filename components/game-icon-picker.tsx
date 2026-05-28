@@ -206,6 +206,9 @@ interface GameIconProps {
   fallbackColor?: string
 }
 
+// Cache for fetched SVGs to avoid redundant network requests
+const iconCache: Record<string, string | null> = {}
+
 export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "currentColor" }: GameIconProps) {
   const [svgContent, setSvgContent] = useState<string | null>(null)
   const [error, setError] = useState(false)
@@ -213,20 +216,43 @@ export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "current
   useEffect(() => {
     if (!name) return
 
+    // Return from cache immediately
+    if (iconCache[name] !== undefined) {
+      if (iconCache[name] === null) {
+        setError(true)
+      } else {
+        setSvgContent(iconCache[name])
+      }
+      return
+    }
+
     const fetchIcon = async () => {
-      // Try multiple artist folders - game-icons uses different artists
-      const artists = ["delapouite", "lorc", "skoll", "cathelineau", "darkzaitzev"]
-      
+      // Try all known artist folders in priority order
+      const artists = [
+        "delapouite",
+        "lorc",
+        "skoll",
+        "cathelineau",
+        "darkzaitzev",
+        "heavenly-dog",
+        "willdabeast",
+        "faithtoken",
+        "zeromancer",
+        "sparker",
+      ]
+
       for (const artist of artists) {
-        // Use the jsdelivr CDN which is more reliable than raw GitHub
         const url = `https://cdn.jsdelivr.net/gh/game-icons/icons@master/${artist}/originals/svg/${name}.svg`
         try {
           const response = await fetch(url)
           if (response.ok) {
-            let svg = await response.text()
-            // Remove any fill/stroke attributes to allow CSS styling
-            svg = svg.replace(/fill="[^"]*"/g, '')
+            const text = await response.text()
+            // Verify it's actually an SVG (not a 404 HTML page)
+            if (!text.includes("<svg")) continue
+            let svg = text
+            svg = svg.replace(/fill="[^"]*"/g, 'fill="currentColor"')
             svg = svg.replace(/stroke="[^"]*"/g, '')
+            iconCache[name] = svg
             setSvgContent(svg)
             setError(false)
             return
@@ -235,6 +261,7 @@ export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "current
           continue
         }
       }
+      iconCache[name] = null
       setError(true)
     }
 

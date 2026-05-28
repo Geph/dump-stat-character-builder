@@ -120,7 +120,9 @@ export interface Background {
   skill_proficiencies: string[] | null
   tool_proficiencies: string[] | null
   feat_granted: string | null
-  equipment: unknown
+  starting_gold: number | null
+  starting_equipment: { name: string; quantity: number }[] | null
+  equipment: unknown  // legacy field
   feature: { name: string; description: string } | null
   source: string
   creator_url: string | null
@@ -151,7 +153,10 @@ export interface Feat {
   id: string
   name: string
   description: string | null
-  prerequisite: string | null
+  category: string | null  // "Origin" | "General" | "Fighting Style" | "Epic Boon"
+  level_requirement: number | null
+  prerequisite: string | null  // legacy field
+  prerequisite_feat_ids: string[] | null
   benefits: unknown
   source: string
   creator_url: string | null

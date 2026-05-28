@@ -455,26 +455,40 @@ export default function SubclassEditorPage({ params }: { params: Promise<{ id: s
                     />
                   ) : (
                     <div className="space-y-3 pt-2 border-t border-border mt-2">
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground">Choose</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={5}
-                          value={feature.choices?.count || 1}
-                          onChange={(e) => updateFeature(index, {
-                            choices: { ...feature.choices!, count: parseInt(e.target.value) || 1 }
-                          })}
-                          className="w-16 px-2 py-1 bg-background border-2 border-border rounded-lg text-center text-sm"
-                        />
-                        <span className="text-sm text-muted-foreground">from options below:</span>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Category:</span>
+                          <input
+                            type="text"
+                            value={feature.choices?.category || ""}
+                            onChange={(e) => updateFeature(index, {
+                              choices: { ...feature.choices!, category: e.target.value }
+                            })}
+                            placeholder="e.g. Fighting Style"
+                            className="w-36 px-2 py-1 bg-background border-2 border-border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Choose</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={5}
+                            value={feature.choices?.count || 1}
+                            onChange={(e) => updateFeature(index, {
+                              choices: { ...feature.choices!, count: parseInt(e.target.value) || 1 }
+                            })}
+                            className="w-14 px-2 py-1 bg-background border-2 border-border rounded-lg text-center text-sm"
+                          />
+                          <span className="text-sm text-muted-foreground">from:</span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => addFeatureOption(index)}
                           className="ml-auto flex items-center gap-1 px-2 py-1 text-xs bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20"
                         >
                           <Plus className="w-3 h-3" />
-                          Option
+                          Add Option
                         </button>
                       </div>
                       
