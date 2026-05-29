@@ -222,9 +222,9 @@ export default function HomePage() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.1 }}
-                    className="bg-card rounded-xl p-6 border border-border hover:border-primary/40 transition-all hover:-translate-y-1"
+                    className="flex flex-col items-center text-center bg-card rounded-xl p-6 border border-border hover:border-primary/40 transition-all hover:-translate-y-1"
                   >
-                    <div className={`w-12 h-12 ${feature.accent} ${feature.glow} rounded-xl flex items-center justify-center mb-4`}>
+                    <div className={`w-12 h-12 shrink-0 ${feature.accent} ${feature.glow} rounded-xl flex items-center justify-center mb-4`}>
                       <Icon className="w-6 h-6 text-primary-foreground" />
                     </div>
                     <h3

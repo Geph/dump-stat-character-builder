@@ -11,6 +11,9 @@ export default function ImportPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
   const [pdfSpecificContent, setPdfSpecificContent] = useState("")
+  const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
+  const [pdfPageStart, setPdfPageStart] = useState("")
+  const [pdfPageEnd, setPdfPageEnd] = useState("")
   const [webUrl, setWebUrl] = useState("")
   const [textContent, setTextContent] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
@@ -27,9 +30,34 @@ export default function ImportPage() {
     setPdfStatus("uploading")
     setMessage("")
 
+    if (pdfPageScope === "range") {
+      const start = parseInt(pdfPageStart, 10)
+      const end = parseInt(pdfPageEnd, 10)
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        setPdfStatus("error")
+        setMessage("Enter a valid start and end page number.")
+        return
+      }
+      if (start < 1 || end < 1) {
+        setPdfStatus("error")
+        setMessage("Page numbers must be 1 or greater.")
+        return
+      }
+      if (start > end) {
+        setPdfStatus("error")
+        setMessage("Start page must be less than or equal to end page.")
+        return
+      }
+    }
+
     const formData = new FormData()
     formData.append("pdf", pdfFile)
     formData.append("contentType", pdfContentType)
+    formData.append("pageScope", pdfPageScope)
+    if (pdfPageScope === "range") {
+      formData.append("pageStart", pdfPageStart)
+      formData.append("pageEnd", pdfPageEnd)
+    }
     if (pdfContentType === "specific" && pdfSpecificContent) {
       formData.append("specificContent", pdfSpecificContent)
     }
@@ -51,7 +79,10 @@ export default function ImportPage() {
               .map(([type, count]) => `${count} ${type}`)
               .join(", ")
           : ""
-        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}`)
+        const pagesText = data.pagesParsed?.from
+          ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
+          : ""
+        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`)
       } else {
         setPdfStatus("error")
         setMessage(data.error || "Failed to import PDF")
@@ -289,18 +320,18 @@ export default function ImportPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-card rounded-2xl p-6 border-2 border-border"
+            className="bg-gradient-to-br from-orange/10 to-orange/5 rounded-2xl p-6 border-2 border-orange/25"
           >
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 bg-secondary/20 rounded-xl flex items-center justify-center shrink-0">
-                <Upload className="w-7 h-7 text-secondary" />
+              <div className="w-14 h-14 bg-orange/20 rounded-xl flex items-center justify-center shrink-0 glow-orange">
+                <Upload className="w-7 h-7 text-orange" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold text-foreground">Upload PDF</h2>
+                  <h2 className="text-xl font-bold text-orange">Upload PDF</h2>
                   <button
                     onClick={() => setShowAiInfo(!showAiInfo)}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1 text-orange/70 hover:text-orange transition-colors"
                     title="How does AI processing work?"
                   >
                     <Info className="w-4 h-4" />
@@ -311,8 +342,8 @@ export default function ImportPage() {
                 </p>
                 
                 {showAiInfo && (
-                  <div className="mb-4 p-4 bg-muted/50 rounded-xl border border-border">
-                    <h3 className="font-bold text-foreground mb-2">How AI Processing Works</h3>
+                  <div className="mb-4 p-4 bg-orange/10 rounded-xl border border-orange/20">
+                    <h3 className="font-bold text-orange mb-2">How AI Processing Works</h3>
                     <p className="text-sm text-muted-foreground mb-2">
                       PDF and text imports use <strong>OpenAI GPT-4o</strong> via the Vercel AI Gateway to parse and structure D&D content.
                     </p>
@@ -321,6 +352,7 @@ export default function ImportPage() {
                       <li>Extracts classes, species, spells, feats, equipment, and more</li>
                       <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
                       <li>Large PDFs are truncated to 50,000 characters for processing</li>
+                      <li>Optionally import only a specific page range (e.g. pages 12–24)</li>
                     </ul>
                   </div>
                 )}
@@ -334,7 +366,7 @@ export default function ImportPage() {
                         name="pdfContentType"
                         checked={pdfContentType === "all"}
                         onChange={() => setPdfContentType("all")}
-                        className="w-4 h-4 accent-secondary"
+                        className="w-4 h-4 accent-orange"
                       />
                       <span className="text-sm text-foreground">Extract all content</span>
                     </label>
@@ -344,7 +376,7 @@ export default function ImportPage() {
                         name="pdfContentType"
                         checked={pdfContentType === "specific"}
                         onChange={() => setPdfContentType("specific")}
-                        className="w-4 h-4 accent-secondary"
+                        className="w-4 h-4 accent-orange"
                       />
                       <span className="text-sm text-foreground">Specific content only</span>
                     </label>
@@ -356,9 +388,62 @@ export default function ImportPage() {
                       placeholder="e.g., Fighter class features, Fireball spell, Elf species..."
                       value={pdfSpecificContent}
                       onChange={(e) => setPdfSpecificContent(e.target.value)}
-                      className="w-full px-4 py-2 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary text-sm"
+                      className="w-full px-4 py-2 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-orange text-sm"
                     />
                   )}
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-orange/80">Pages to import</p>
+                    <div className="flex flex-wrap gap-4 items-center">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfPageScope"
+                          checked={pdfPageScope === "all"}
+                          onChange={() => setPdfPageScope("all")}
+                          className="w-4 h-4 accent-orange"
+                        />
+                        <span className="text-sm text-foreground">All pages</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfPageScope"
+                          checked={pdfPageScope === "range"}
+                          onChange={() => setPdfPageScope("range")}
+                          className="w-4 h-4 accent-orange"
+                        />
+                        <span className="text-sm text-foreground">Page range</span>
+                      </label>
+                    </div>
+                    {pdfPageScope === "range" && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          From
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="1"
+                            value={pdfPageStart}
+                            onChange={(e) => setPdfPageStart(e.target.value)}
+                            className="w-24 px-3 py-2 bg-muted rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-orange"
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          To
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="10"
+                            value={pdfPageEnd}
+                            onChange={(e) => setPdfPageEnd(e.target.value)}
+                            className="w-24 px-3 py-2 bg-muted rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-orange"
+                          />
+                        </label>
+                        <span className="text-xs text-muted-foreground">1-based page numbers</span>
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3">
                     <label className="flex-1">
@@ -368,8 +453,8 @@ export default function ImportPage() {
                         onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
                         className="hidden"
                       />
-                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-muted rounded-xl cursor-pointer hover:bg-muted/80 transition-colors">
-                        <FileText className="w-5 h-5" />
+                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-orange/10 border border-orange/20 rounded-xl cursor-pointer hover:bg-orange/15 transition-colors">
+                        <FileText className="w-5 h-5 text-orange" />
                         <span className="font-medium truncate">
                           {pdfFile ? pdfFile.name : "Choose PDF file..."}
                         </span>
@@ -377,8 +462,13 @@ export default function ImportPage() {
                     </label>
                     <button
                       onClick={handlePdfUpload}
-                      disabled={!pdfFile || pdfStatus === "processing" || pdfStatus === "uploading"}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                      disabled={
+                        !pdfFile ||
+                        pdfStatus === "processing" ||
+                        pdfStatus === "uploading" ||
+                        (pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim()))
+                      }
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange text-orange-foreground rounded-xl font-bold hover:bg-orange/90 transition-all glow-orange disabled:opacity-50"
                     >
                       {getStatusIcon(pdfStatus)}
                       {pdfStatus === "processing" ? "Processing..." : "Import"}

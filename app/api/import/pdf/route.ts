@@ -3,12 +3,37 @@ import { NextRequest, NextResponse } from "next/server"
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
-// Dynamic import for pdf-parse (CommonJS module)
-async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
-  // pdf-parse has CommonJS/ESM interop issues - we need to handle default export carefully
-  const pdfParse = await import("pdf-parse")
-  const parser = pdfParse.default || pdfParse
-  return parser(buffer)
+type PageRange = { first: number; last: number }
+
+function parsePageRange(
+  pageStart: string | null,
+  pageEnd: string | null
+): PageRange | null {
+  if (!pageStart?.trim() && !pageEnd?.trim()) return null
+  const first = parseInt(pageStart?.trim() || "", 10)
+  const last = parseInt(pageEnd?.trim() || "", 10)
+  if (!Number.isFinite(first) || !Number.isFinite(last)) {
+    throw new Error("Page range requires valid start and end page numbers.")
+  }
+  if (first < 1 || last < 1) {
+    throw new Error("Page numbers must be 1 or greater.")
+  }
+  if (first > last) {
+    throw new Error("Start page must be less than or equal to end page.")
+  }
+  return { first, last }
+}
+
+async function parsePdf(buffer: Buffer, pageRange?: PageRange | null): Promise<{ text: string; totalPages: number }> {
+  const { PDFParse } = await import("pdf-parse")
+  const parser = new PDFParse({ data: buffer })
+  try {
+    const parseParams = pageRange ? { first: pageRange.first, last: pageRange.last } : undefined
+    const result = await parser.getText(parseParams)
+    return { text: result.text, totalPages: result.total }
+  } finally {
+    await parser.destroy()
+  }
 }
 
 // Schema for AI extraction
@@ -72,6 +97,9 @@ export async function POST(request: NextRequest) {
     const file = formData.get("pdf") as File
     const contentType = formData.get("contentType") as string | null
     const specificContent = formData.get("specificContent") as string | null
+    const pageScope = formData.get("pageScope") as string | null
+    const pageStart = formData.get("pageStart") as string | null
+    const pageEnd = formData.get("pageEnd") as string | null
     
     if (!file) {
       return NextResponse.json({ error: "No PDF file provided" }, { status: 400 })
@@ -81,11 +109,37 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     
+    let pageRange: PageRange | null = null
+    if (pageScope === "range") {
+      try {
+        pageRange = parsePageRange(pageStart, pageEnd)
+        if (!pageRange) {
+          return NextResponse.json(
+            { error: "Enter a start and end page for the selected range." },
+            { status: 400 }
+          )
+        }
+      } catch (rangeError) {
+        return NextResponse.json(
+          { error: rangeError instanceof Error ? rangeError.message : "Invalid page range." },
+          { status: 400 }
+        )
+      }
+    }
+
     // Parse PDF with error handling
     let text: string
+    let totalPages: number
     try {
-      const pdfData = await parsePdf(buffer)
+      const pdfData = await parsePdf(buffer, pageRange)
       text = pdfData.text
+      totalPages = pdfData.totalPages
+      if (pageRange && pageRange.last > totalPages) {
+        return NextResponse.json(
+          { error: `End page ${pageRange.last} exceeds PDF length (${totalPages} pages).` },
+          { status: 400 }
+        )
+      }
     } catch (pdfError) {
       console.error("PDF parsing error:", pdfError)
       return NextResponse.json(
@@ -125,11 +179,15 @@ Be thorough and extract all instances of each content type found.`
       systemPrompt += `\n\nFocus primarily on extracting: ${contentType}. You may still extract other content types if clearly present.`
     }
 
+    const pageRangeNote = pageRange
+      ? `\n\nNote: Text was extracted from pages ${pageRange.first}–${pageRange.last} of ${totalPages} total pages.`
+      : ""
+
     // Use AI to extract structured content
     const result = await generateText({
       model: "openai/gpt-4o",
       system: systemPrompt,
-      prompt: `Extract D&D content from this PDF text:\n\n${truncatedText}`,
+      prompt: `Extract D&D content from this PDF text:${pageRangeNote}\n\n${truncatedText}`,
       output: Output.object({ schema: ContentSchema })
     })
 
@@ -188,6 +246,7 @@ Be thorough and extract all instances of each content type found.`
     return NextResponse.json({ 
       success: true, 
       count: totalImported,
+      pagesParsed: pageRange ? { from: pageRange.first, to: pageRange.last, total: totalPages } : { total: totalPages },
       breakdown: {
         species: content.species?.length || 0,
         classes: content.classes?.length || 0,
