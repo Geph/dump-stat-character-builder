@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { Plus, User, Trash2 } from "lucide-react"
 import Link from "next/link"
-import type { DndClass, Species, Background } from "@/lib/types"
+import type { Character, DndClass, Species, Background } from "@/lib/types"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass

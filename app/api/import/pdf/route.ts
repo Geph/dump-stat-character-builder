@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
+import { getDatabaseConfigError } from "@/lib/db/config"
+import { upsertByName } from "@/lib/db/repository"
+import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
 import { generateText, Output } from "ai"
 import { z } from "zod"
@@ -191,57 +193,26 @@ Be thorough and extract all instances of each content type found.`
       output: Output.object({ schema: ContentSchema })
     })
 
+    const configError = getDatabaseConfigError()
+    if (configError) {
+      return NextResponse.json({ error: configError }, { status: 503 })
+    }
+
     const content = result.output
-    const supabase = await createClient()
     let totalImported = 0
 
-    // Insert species
-    if (content.species && content.species.length > 0) {
-      const { error } = await supabase
-        .from("species")
-        .upsert(content.species.map(s => ({ ...s, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.species.length
+    const upsertSection = async (table: CompendiumTable, rows: Record<string, unknown>[] | undefined) => {
+      if (!rows?.length) return 0
+      await upsertByName(table, rows.map((r) => ({ ...r, source: "PDF Import" })))
+      return rows.length
     }
 
-    // Insert classes
-    if (content.classes && content.classes.length > 0) {
-      const { error } = await supabase
-        .from("classes")
-        .upsert(content.classes.map(c => ({ ...c, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.classes.length
-    }
-
-    // Insert backgrounds
-    if (content.backgrounds && content.backgrounds.length > 0) {
-      const { error } = await supabase
-        .from("backgrounds")
-        .upsert(content.backgrounds.map(b => ({ ...b, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.backgrounds.length
-    }
-
-    // Insert spells
-    if (content.spells && content.spells.length > 0) {
-      const { error } = await supabase
-        .from("spells")
-        .upsert(content.spells.map(s => ({ ...s, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.spells.length
-    }
-
-    // Insert feats
-    if (content.feats && content.feats.length > 0) {
-      const { error } = await supabase
-        .from("feats")
-        .upsert(content.feats.map(f => ({ ...f, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.feats.length
-    }
-
-    // Insert equipment
-    if (content.equipment && content.equipment.length > 0) {
-      const { error } = await supabase
-        .from("equipment")
-        .upsert(content.equipment.map(e => ({ ...e, source: "PDF Import" })), { onConflict: "name" })
-      if (!error) totalImported += content.equipment.length
-    }
+    totalImported += await upsertSection("species", content.species)
+    totalImported += await upsertSection("classes", content.classes)
+    totalImported += await upsertSection("backgrounds", content.backgrounds)
+    totalImported += await upsertSection("spells", content.spells)
+    totalImported += await upsertSection("feats", content.feats)
+    totalImported += await upsertSection("equipment", content.equipment)
 
     return NextResponse.json({ 
       success: true, 

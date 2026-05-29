@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
+import { getDatabaseConfigError } from "@/lib/db/config"
+import { upsertByName } from "@/lib/db/repository"
+import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
 import * as cheerio from "cheerio"
 
@@ -286,12 +288,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const configError = getDatabaseConfigError()
+    if (configError) {
+      return NextResponse.json({ error: configError }, { status: 503 })
+    }
+
     const html = await fetchPage(url)
-    const supabase = await createClient()
     const path = parsedUrl.pathname.toLowerCase()
     
     let result
-    let tableName: string
+    let tableName: CompendiumTable
     
     // More flexible path matching for dnd2024.wikidot.com
     // Common patterns: /lineage:elf, /class:fighter, /spell:fireball, /artificer:main (class), /feat:alert
@@ -339,13 +345,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { error } = await supabase
-      .from(tableName)
-      .upsert([result], { onConflict: "name" })
-
-    if (error) {
-      throw new Error(`Database error: ${error.message}`)
-    }
+    await upsertByName(tableName, [result])
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,11 @@
-import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
+import {
+  deleteWhere,
+  insertRows,
+  listRows,
+  upsertByName,
+} from "@/lib/db/repository"
 
 // SRD 5.2 Content - Core classes, species, backgrounds, spells, and equipment
 const SRD_CLASSES = [
@@ -661,21 +667,15 @@ const SRD_EQUIPMENT = [
 
 export async function POST() {
   try {
-    const supabase = await createClient()
-    
-    // Insert classes
-    const { error: classesError } = await supabase
-      .from("classes")
-      .upsert(SRD_CLASSES, { onConflict: "name" })
-    
-    if (classesError) throw new Error(`Classes: ${classesError.message}`)
+    const configError = getDatabaseConfigError()
+    if (configError) {
+      return NextResponse.json({ error: configError }, { status: 503 })
+    }
 
-    // Get class IDs for subclass linking
-    const { data: classData } = await supabase
-      .from("classes")
-      .select("id, name")
-    
-    const classIdMap = new Map(classData?.map(c => [c.name, c.id]) || [])
+    await upsertByName("classes", SRD_CLASSES)
+
+    const classData = await listRows("classes")
+    const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
     
     // Prepare subclasses with class_id references
     const subclassesWithIds = SRD_SUBCLASSES.map(sc => ({
@@ -688,51 +688,14 @@ export async function POST() {
     
     // Insert subclasses - delete existing SRD ones first, then insert
     // (subclasses table may not have a unique constraint on name alone)
-    await supabase
-      .from("subclasses")
-      .delete()
-      .eq("source", "SRD")
-    
-    const { error: subclassesError } = await supabase
-      .from("subclasses")
-      .insert(subclassesWithIds)
-    
-    if (subclassesError) throw new Error(`Subclasses: ${subclassesError.message}`)
+    await deleteWhere("subclasses", [{ op: "eq", column: "source", value: "SRD" }])
+    await insertRows("subclasses", subclassesWithIds)
 
-    // Insert species
-    const { error: speciesError } = await supabase
-      .from("species")
-      .upsert(SRD_SPECIES, { onConflict: "name" })
-    
-    if (speciesError) throw new Error(`Species: ${speciesError.message}`)
-
-    // Insert backgrounds
-    const { error: backgroundsError } = await supabase
-      .from("backgrounds")
-      .upsert(SRD_BACKGROUNDS, { onConflict: "name" })
-    
-    if (backgroundsError) throw new Error(`Backgrounds: ${backgroundsError.message}`)
-
-    // Insert spells
-    const { error: spellsError } = await supabase
-      .from("spells")
-      .upsert(SRD_SPELLS, { onConflict: "name" })
-    
-    if (spellsError) throw new Error(`Spells: ${spellsError.message}`)
-
-    // Insert feats
-    const { error: featsError } = await supabase
-      .from("feats")
-      .upsert(SRD_FEATS, { onConflict: "name" })
-    
-    if (featsError) throw new Error(`Feats: ${featsError.message}`)
-
-    // Insert equipment
-    const { error: equipmentError } = await supabase
-      .from("equipment")
-      .upsert(SRD_EQUIPMENT, { onConflict: "name" })
-    
-    if (equipmentError) throw new Error(`Equipment: ${equipmentError.message}`)
+    await upsertByName("species", SRD_SPECIES)
+    await upsertByName("backgrounds", SRD_BACKGROUNDS)
+    await upsertByName("spells", SRD_SPELLS)
+    await upsertByName("feats", SRD_FEATS)
+    await upsertByName("equipment", SRD_EQUIPMENT)
 
     const total = 
       SRD_CLASSES.length + 
