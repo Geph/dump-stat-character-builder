@@ -3,6 +3,7 @@ import { upsertByName } from "@/lib/db/repository"
 import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
 import * as cheerio from "cheerio"
+import { formatFeatDescription } from "@/lib/compendium/feat-description"
 
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
@@ -254,8 +255,14 @@ function parseFeat(html: string, url: string) {
   const mainContent = $("#page-content, .page-content, article").first()
   const fullText = mainContent.text()
   
-  // Get description
-  const description = mainContent.find("p").first().text().trim()
+  const description = formatFeatDescription(
+    mainContent
+      .find("p")
+      .map((_, el) => $(el).text().trim())
+      .get()
+      .filter(Boolean)
+      .join("\n\n"),
+  )
   
   // Extract prerequisite
   const prereqMatch = fullText.match(/Prerequisite[s]?[:\s]*([^\n.]+)/i)

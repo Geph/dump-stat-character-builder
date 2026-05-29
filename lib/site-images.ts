@@ -17,5 +17,15 @@ export const HERO_ROTATING_IMAGES = [
 
 export const LIBRARY_STATS_BACKGROUND = "/images/backgrounds/library-stats.jpeg"
 
+/**
+ * Home page “Make Everything You Need” cards — full-width image on each card.
+ * Drop replacements in public/images/features/ (same paths; JPEG/PNG/WebP OK if you update extensions here).
+ */
+export const FEATURE_CARD_IMAGES = {
+  characterCreation: "/images/features/character-creation.svg",
+  compendium: "/images/features/compendium.svg",
+  importContent: "/images/features/import-content.svg",
+} as const
+
 /** Screenshot for GitHub README (also under public/ for consistency) */
 export const README_HERO_IMAGE = "/images/readme/hero.png"

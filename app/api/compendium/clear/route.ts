@@ -24,8 +24,16 @@ export async function POST(request: NextRequest) {
     }
 
     await clearTable(resolved)
+
+    if (table === "classes") {
+      await clearTable("subclasses")
+    }
     
-    return NextResponse.json({ success: true, table })
+    return NextResponse.json({
+      success: true,
+      table,
+      alsoCleared: table === "classes" ? ["subclasses"] : [],
+    })
   } catch (err) {
     console.error("[v0] Clear section error:", err)
     return NextResponse.json({ error: "Failed to clear section" }, { status: 500 })

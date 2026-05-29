@@ -4,31 +4,35 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import Link from "next/link"
-import { Sparkles, BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
+import { BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { HERO_ROTATING_IMAGES, LIBRARY_STATS_BACKGROUND } from "@/lib/site-images"
+import {
+  FEATURE_CARD_IMAGES,
+  HERO_ROTATING_IMAGES,
+  LIBRARY_STATS_BACKGROUND,
+} from "@/lib/site-images"
 
 const features = [
   {
-    icon: Sparkles,
+    href: "/builder",
+    image: FEATURE_CARD_IMAGES.characterCreation,
+    imageAlt: "Easy Character Creation",
     title: "Easy Character Creation",
     description: "Build your hero step-by-step with a simple 6-step wizard following D&D 2024 rules.",
-    accent: "bg-primary",
-    glow: "glow-primary",
   },
   {
-    icon: BookOpen,
+    href: "/compendium",
+    image: FEATURE_CARD_IMAGES.compendium,
+    imageAlt: "Build Your Compendium",
     title: "Build Your Compendium",
     description: "Browse species, classes, backgrounds, spells, feats, and equipment from the D&D 5.5e SRD and beyond.",
-    accent: "bg-lime",
-    glow: "glow-lime",
   },
   {
-    icon: Upload,
+    href: "/import",
+    image: FEATURE_CARD_IMAGES.importContent,
+    imageAlt: "Import External Content",
     title: "Import External Content",
     description: "Upload PDFs or import from web sources to expand your content library.",
-    accent: "bg-orange",
-    glow: "glow-orange",
   },
 ]
 
@@ -204,30 +208,38 @@ export default function HomePage() {
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {features.map((feature, index) => {
-                const Icon = feature.icon
-                return (
-                  <motion.div
-                    key={feature.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex flex-col items-center text-center bg-card rounded-xl p-6 border border-border hover:border-primary/40 transition-all hover:-translate-y-1"
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Link
+                    href={feature.href}
+                    className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card-lighter"
                   >
-                    <div className={`w-12 h-12 shrink-0 ${feature.accent} ${feature.glow} rounded-xl flex items-center justify-center mb-4`}>
-                      <Icon className="w-6 h-6 text-primary-foreground" />
+                    <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={feature.image}
+                        alt={feature.imageAlt}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
                     </div>
-                    <h3
-                      className="text-lg font-bold text-foreground mb-2"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">{feature.description}</p>
-                  </motion.div>
-                )
-              })}
+                    <div className="flex flex-col items-center p-6">
+                      <h3
+                        className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {feature.title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm">{feature.description}</p>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>

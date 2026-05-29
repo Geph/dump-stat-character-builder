@@ -43,6 +43,7 @@ const ABILITY_NAMES = ["strength", "dexterity", "constitution", "intelligence", 
 export default function BuilderPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [maxStepReached, setMaxStepReached] = useState(1)
   const [saving, setSaving] = useState(false)
   
   // Content from database
@@ -141,6 +142,7 @@ export default function BuilderPage() {
     setCurrentHp(null)
     setTempHp(0)
     setCurrentStep(1)
+    setMaxStepReached(1)
   }
 
   useEffect(() => {
@@ -408,6 +410,19 @@ export default function BuilderPage() {
     }
   }
 
+  const goToStep = (stepId: number) => {
+    if (stepId >= 1 && stepId <= maxStepReached) {
+      setCurrentStep(stepId)
+    }
+  }
+
+  const advanceStep = () => {
+    if (!canProceed() || currentStep >= 6) return
+    const next = currentStep + 1
+    setCurrentStep(next)
+    setMaxStepReached((prev) => Math.max(prev, next))
+  }
+
   const getAbilityModifier = (score: number) => {
     const mod = Math.floor((score - 10) / 2)
     return mod >= 0 ? `+${mod}` : `${mod}`
@@ -438,29 +453,42 @@ export default function BuilderPage() {
             {STEPS.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
-              const isComplete = currentStep > step.id
+              const isReachable = step.id <= maxStepReached
+              const isComplete = step.id < currentStep || (step.id < maxStepReached && !isActive)
               
               return (
-                <div key={step.id} className="flex items-center">
-                  <div className="flex flex-col items-center">
+                <div key={step.id} className="flex items-center flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => goToStep(step.id)}
+                    disabled={!isReachable}
+                    className={`flex flex-col items-center flex-shrink-0 transition-opacity ${
+                      isReachable ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                    title={isReachable ? `Go to ${step.label}` : "Complete earlier steps first"}
+                  >
                     <div
                       className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all ${
                         isComplete
                           ? "bg-success text-success-foreground"
                           : isActive
                           ? "bg-primary text-primary-foreground scale-110"
+                          : isReachable
+                          ? "bg-muted text-foreground hover:bg-muted/80"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                     </div>
-                    <span className={`text-[10px] md:text-xs mt-1 font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                    <span className={`text-[10px] md:text-xs mt-1 font-medium ${
+                      isActive ? "text-primary" : isReachable ? "text-foreground" : "text-muted-foreground"
+                    }`}>
                       {step.label}
                     </span>
-                  </div>
+                  </button>
                   {index < STEPS.length - 1 && (
-                    <div className={`flex-1 h-1 mx-1 md:mx-2 rounded ${
-                      isComplete ? "bg-success" : "bg-muted"
+                    <div className={`flex-1 h-1 mx-1 md:mx-2 rounded min-w-[8px] ${
+                      step.id < maxStepReached ? "bg-success" : "bg-muted"
                     }`} />
                   )}
                 </div>
@@ -569,10 +597,17 @@ export default function BuilderPage() {
                       const existingLevel = classLevels.find(cl => cl.classId === cls.id)
                       const isSelected = !!existingLevel || character.class_id === cls.id
                       return (
-                        <motion.button
+                        <motion.div
                           key={cls.id}
+                          role="button"
+                          tabIndex={0}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return
+                            e.preventDefault()
+                            ;(e.currentTarget as HTMLDivElement).click()
+                          }}
                           onClick={() => {
                             if (existingLevel) {
                               // Increase level of existing class
@@ -594,8 +629,9 @@ export default function BuilderPage() {
                               }
                             }
                           }}
-                          disabled={totalLevel >= 20 && !existingLevel}
-                          className={`p-3 rounded-xl border-2 text-left transition-all disabled:opacity-50 ${
+                          className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                            totalLevel >= 20 && !existingLevel ? "opacity-50 pointer-events-none" : ""
+                          } ${
                             isSelected
                               ? "border-primary bg-primary/10"
                               : "border-border bg-card hover:border-primary/50"
@@ -624,7 +660,7 @@ export default function BuilderPage() {
                           <p className="text-xs text-muted-foreground">
                             {cls.source || "Custom"}
                           </p>
-                        </motion.button>
+                        </motion.div>
                       )
                     })}
                 </div>
@@ -654,12 +690,19 @@ export default function BuilderPage() {
                     {species
                       .filter(sp => sp.name.toLowerCase().includes(speciesSearch.toLowerCase()))
                       .map((sp) => (
-                      <motion.button
+                      <motion.div
                         key={sp.id}
+                        role="button"
+                        tabIndex={0}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" && e.key !== " ") return
+                          e.preventDefault()
+                          ;(e.currentTarget as HTMLDivElement).click()
+                        }}
                         onClick={() => setCharacter({ ...character, species_id: character.species_id === sp.id ? null : sp.id })}
-                        className={`p-2 rounded-lg border-2 text-left transition-all ${
+                        className={`p-2 rounded-lg border-2 text-left transition-all cursor-pointer ${
                           character.species_id === sp.id
                             ? "border-secondary bg-secondary/10"
                             : "border-border bg-card hover:border-secondary/50"
@@ -679,7 +722,7 @@ export default function BuilderPage() {
                           </button>
                         </div>
                         <p className="text-xs text-muted-foreground">{sp.source || "Custom"}</p>
-                      </motion.button>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
@@ -704,12 +747,19 @@ export default function BuilderPage() {
                     {backgrounds
                       .filter(bg => bg.name.toLowerCase().includes(backgroundSearch.toLowerCase()))
                       .map((bg) => (
-                      <motion.button
+                      <motion.div
                         key={bg.id}
+                        role="button"
+                        tabIndex={0}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" && e.key !== " ") return
+                          e.preventDefault()
+                          ;(e.currentTarget as HTMLDivElement).click()
+                        }}
                         onClick={() => setCharacter({ ...character, background_id: character.background_id === bg.id ? null : bg.id })}
-                        className={`p-2 rounded-lg border-2 text-left transition-all ${
+                        className={`p-2 rounded-lg border-2 text-left transition-all cursor-pointer ${
                           character.background_id === bg.id
                             ? "border-accent bg-accent/10"
                             : "border-border bg-card hover:border-accent/50"
@@ -729,7 +779,7 @@ export default function BuilderPage() {
                           </button>
                         </div>
                         <p className="text-xs text-muted-foreground">{bg.source || "Custom"}</p>
-                      </motion.button>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
@@ -1159,7 +1209,7 @@ export default function BuilderPage() {
               
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                  onClick={() => goToStep(currentStep - 1)}
                   disabled={currentStep === 1}
                   className="flex items-center gap-2 px-5 py-3 bg-lemon text-lemon-foreground rounded-xl font-bold disabled:opacity-30 transition-colors hover:brightness-110"
                 >
@@ -1169,7 +1219,7 @@ export default function BuilderPage() {
 
                 {currentStep < 6 ? (
                   <button
-                    onClick={() => setCurrentStep(Math.min(6, currentStep + 1))}
+                    onClick={advanceStep}
                     disabled={!canProceed()}
                     className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
@@ -1303,14 +1353,23 @@ export default function BuilderPage() {
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
                           <Heart className="w-3 h-3 mx-auto text-destructive mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">HP</p>
-                          <div className="flex items-center justify-center gap-0.5">
+                          <div className="flex items-center justify-center gap-1">
                             <input
                               type="number"
+                              min={0}
+                              max={maxHp}
                               value={currentHp ?? maxHp}
-                              onChange={(e) => setCurrentHp(Math.min(maxHp, Math.max(0, parseInt(e.target.value) || 0)))}
-                              className="w-8 text-center bg-background border border-border rounded px-0.5 py-0.5 text-xs font-bold"
+                              onChange={(e) => {
+                                const next = parseInt(e.target.value, 10)
+                                setCurrentHp(
+                                  Number.isNaN(next)
+                                    ? 0
+                                    : Math.min(maxHp, Math.max(0, next)),
+                                )
+                              }}
+                              className="w-12 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
-                            <span className="text-[10px] text-muted-foreground">/{maxHp}</span>
+                            <span className="text-[10px] text-muted-foreground">/ {maxHp}</span>
                           </div>
                           {tempHp > 0 && <p className="text-[8px] text-cyan">+{tempHp}</p>}
                         </div>

@@ -1,4 +1,7 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
+import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
+import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import {
   deleteWhere,
   insertRows,
@@ -83,7 +86,10 @@ const ContentSchema = z.object({
     name: z.string(),
     category: z.string(),
     subcategory: z.string().nullable(),
-    description: z.string().nullable()
+    description: z.string().nullable(),
+    cost: z.object({ amount: z.number(), unit: z.string() }).nullable().optional(),
+    weight: z.number().nullable().optional(),
+    properties: z.record(z.unknown()).nullable().optional(),
   })).optional(),
   abilities: z.array(z.object({
     name: z.string(),
@@ -123,18 +129,23 @@ Important D&D 2024 rules:
 Extract ONLY the content types you find in the text. Return empty arrays for types not present.
 Be thorough and extract all instances of each content type found.
 For class features, include the level they are gained at.
-For subclasses, include the parent class name in class_name field.`
+For subclasses, include the parent class name in class_name field.
+For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names.`
 
     if (contentType && contentType !== "all") {
       systemPrompt += `\n\nFocus primarily on extracting: ${contentType}. You may still extract other content types if clearly present.`
     }
 
-    // Use AI to extract structured content
+    const aiConfigError = getImportAiConfigError()
+    if (aiConfigError) {
+      return NextResponse.json({ error: aiConfigError }, { status: 503 })
+    }
+
     const result = await generateText({
-      model: "openai/gpt-4o",
+      model: getImportModel(),
       system: systemPrompt,
       prompt: `Extract D&D content from this text:\n\n${truncatedText}`,
-      output: Output.object({ schema: ContentSchema })
+      output: Output.object({ schema: ContentSchema }),
     })
 
     const configError = getDatabaseConfigError()
@@ -201,15 +212,25 @@ For subclasses, include the parent class name in class_name field.`
     }
 
     if (content.feats?.length) {
-      await upsertByName("feats", content.feats.map((f) => ({ ...f, source: "Text Import" })))
+      await upsertByName(
+        "feats",
+        content.feats.map((f) => ({
+          ...f,
+          source: "Text Import",
+          description: f.description ? formatFeatDescription(f.description) : null,
+        })),
+      )
       totalImported += content.feats.length
       breakdown.feats = content.feats.length
     }
 
     if (content.equipment?.length) {
-      await upsertByName("equipment", content.equipment.map((e) => ({ ...e, source: "Text Import" })))
-      totalImported += content.equipment.length
-      breakdown.equipment = content.equipment.length
+      const equipment = normalizeEquipmentRows(
+        content.equipment.map((e) => ({ ...e, source: "Text Import" })) as Record<string, unknown>[],
+      )
+      await upsertByName("equipment", equipment)
+      totalImported += equipment.length
+      breakdown.equipment = equipment.length
     }
 
     if (content.abilities?.length) {

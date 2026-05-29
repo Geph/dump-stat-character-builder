@@ -46,5 +46,11 @@ export function formatDatabaseError(context: string, message: string): string {
       `${context}: Database tables are missing. Run mysql/schema.sql on your Dreamhost MySQL database, then try again.`
     )
   }
+  if (message.includes("Unknown column")) {
+    return (
+      `${context}: Database schema is out of date (${message}). ` +
+      "Run Seed again (migrations apply automatically) or execute `pnpm db:migrate` with MYSQL_ROOT_PASSWORD set."
+    )
+  }
   return `${context}: ${message}`
 }

@@ -171,7 +171,15 @@ export default function ImportPage() {
 
       if (response.ok) {
         setSeedStatus("success")
-        setMessage(`Successfully seeded ${data.total} items from D&D 5.5e SRD`)
+        setMessage(
+          `Successfully seeded ${data.total} SRD items` +
+            (data.breakdown
+              ? ` (${Object.entries(data.breakdown)
+                  .filter(([, n]) => (n as number) > 0)
+                  .map(([k, n]) => `${n} ${k}`)
+                  .join(", ")})`
+              : ""),
+        )
       } else {
         setSeedStatus("error")
         setMessage(data.error || "Failed to seed database")
@@ -238,8 +246,9 @@ export default function ImportPage() {
                   Quick Start: Seed D&D 5.5e SRD Content
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Instantly populate your database with the D&D 5.5e SRD content including 
-                  classes, species, backgrounds, spells, and equipment.
+                  Populate your database with the full official SRD 5.2.1: 12 classes, 12 subclasses,
+                  9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries
+                  (parsed from the SRD, not a hand-picked sample).
                 </p>
                 <button
                   onClick={handleSeedSRD}
@@ -323,7 +332,7 @@ export default function ImportPage() {
             className="bg-gradient-to-br from-orange/10 to-orange/5 rounded-2xl p-6 border-2 border-orange/25"
           >
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 bg-orange/20 rounded-xl flex items-center justify-center shrink-0 glow-orange">
+              <div className="w-14 h-14 bg-orange/20 rounded-xl flex items-center justify-center shrink-0">
                 <Upload className="w-7 h-7 text-orange" />
               </div>
               <div className="flex-1">
@@ -345,10 +354,13 @@ export default function ImportPage() {
                   <div className="mb-4 p-4 bg-orange/10 rounded-xl border border-orange/20">
                     <h3 className="font-bold text-orange mb-2">How AI Processing Works</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      PDF and text imports use <strong>OpenAI GPT-4o</strong> via the Vercel AI Gateway to parse and structure D&D content.
+                      PDF and text imports use <strong>OpenAI</strong> (default model:{" "}
+                      <code className="text-xs">gpt-4o</code>) to parse and structure D&D content.
+                      Set <code className="text-xs">OPENAI_API_KEY</code> in your server environment.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>No separate API key required - uses Vercel AI Gateway</li>
+                      <li>Requires your own OpenAI API key on the server (not in the browser)</li>
+                      <li>Optional: override model with IMPORT_AI_MODEL (e.g. gpt-4o-mini)</li>
                       <li>Extracts classes, species, spells, feats, equipment, and more</li>
                       <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
                       <li>Large PDFs are truncated to 50,000 characters for processing</li>
@@ -493,7 +505,7 @@ export default function ImportPage() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-foreground mb-2">Import from Web</h2>
                 <p className="text-muted-foreground mb-4">
-                  Import content from dnd2024.wikidot.com or other supported sources.
+                  Paste a URL from dnd2024.wikidot.com to import species, classes, spells, and more into your compendium.
                 </p>
                 
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -514,19 +526,9 @@ export default function ImportPage() {
                   </button>
                 </div>
                 
-                <div className="mt-4 p-3 bg-muted rounded-xl">
-                  <p className="text-sm font-medium text-foreground mb-2">Supported sources:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>- dnd2024.wikidot.com/lineage:* (Species)</li>
-                    <li>- dnd2024.wikidot.com/artificer:main, /barbarian:main, etc. (Classes)</li>
-                    <li>- dnd2024.wikidot.com/background:* (Backgrounds)</li>
-                    <li>- dnd2024.wikidot.com/spell:* (Spells)</li>
-                    <li>- dnd2024.wikidot.com/feat:* (Feats)</li>
-                  </ul>
-                  <p className="text-xs text-muted-foreground mt-2 italic">
-                    Imported content will appear in the Compendium after import completes.
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Imported content will appear in the Compendium after import completes.
+                </p>
               </div>
             </div>
           </motion.div>

@@ -8,6 +8,11 @@ import { ArrowLeft, Save, Trash2, Download, Plus, X } from "lucide-react"
 import Link from "next/link"
 import type { UsesConfig, UsesAtLevel, CustomAbility } from "@/lib/types"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { attachTypeToTable } from "@/lib/db/attach-target-table"
+import {
+  EQUIPMENT_ATTACH_CATEGORIES,
+  isEquipmentCategoryAttach,
+} from "@/lib/compendium/attach-targets"
 
 interface AbilityFormData {
   name: string
@@ -41,6 +46,7 @@ const ATTACH_OPTIONS = [
   { value: "feat", label: "Feat" },
   { value: "equipment", label: "Equipment" },
   { value: "spell", label: "Spell" },
+  { value: "ability", label: "Custom Ability" },
 ]
 
 const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
@@ -93,7 +99,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     }
   }, [id])
 
-  // Fetch attach targets when type changes
+  // Fetch attach targets when type changes (equipment uses categories, not item IDs)
   useEffect(() => {
     const fetchTargets = async () => {
       if (!form.attached_to_type) {
@@ -101,22 +107,34 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
         return
       }
 
+      if (isEquipmentCategoryAttach(form.attached_to_type)) {
+        setAttachTargets(
+          EQUIPMENT_ATTACH_CATEGORIES.map((category) => ({
+            id: category,
+            name: category,
+          })),
+        )
+        return
+      }
+
+      const table = attachTypeToTable(form.attached_to_type)
+      if (!table) {
+        setAttachTargets([])
+        return
+      }
+
       const supabase = createClient()
-      const tableName = form.attached_to_type === "class" ? "classes" 
-        : form.attached_to_type === "species" ? "species"
-        : form.attached_to_type === "spell" ? "spells"
-        : `${form.attached_to_type}s`
-      
       const { data } = await supabase
-        .from(tableName)
+        .from(table)
         .select("id, name")
         .order("name")
-        .limit(50)
-      
-      setAttachTargets(data || [])
+        .limit(200)
+
+      const rows = (data || []).filter((row) => row.id !== id)
+      setAttachTargets(rows)
     }
     fetchTargets()
-  }, [form.attached_to_type])
+  }, [form.attached_to_type, id])
 
   // Fetch other abilities for the custom_ability uses type
   useEffect(() => {
@@ -575,20 +593,31 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             {form.attached_to_type && (
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
-                  Attach to {form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}
+                  {isEquipmentCategoryAttach(form.attached_to_type)
+                    ? "Equipment category"
+                    : `Attach to ${form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}`}
                 </label>
                 <select
                   value={form.attached_to_id}
                   onChange={(e) => setForm({ ...form, attached_to_id: e.target.value })}
                   className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
                 >
-                  <option value="">Select a {form.attached_to_type}...</option>
+                  <option value="">
+                    {isEquipmentCategoryAttach(form.attached_to_type)
+                      ? "Select category..."
+                      : `Select a ${form.attached_to_type}...`}
+                  </option>
                   {attachTargets.map((target) => (
                     <option key={target.id} value={target.id}>
                       {target.name}
                     </option>
                   ))}
                 </select>
+                {isEquipmentCategoryAttach(form.attached_to_type) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Applies to all items in that category (e.g. every Weapon), not a single item.
+                  </p>
+                )}
               </div>
             )}
           </div>
