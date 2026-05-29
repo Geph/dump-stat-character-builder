@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import Link from "next/link"
 import { Sparkles, BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { HERO_ROTATING_IMAGES, LIBRARY_STATS_BACKGROUND } from "@/lib/site-images"
 
 const features = [
   {
@@ -47,26 +48,16 @@ type LibraryStats = {
   equipment: number
 }
 
-const HERO_IMAGES = [
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%282%29.png-lTMAKAxAk9aiCH20M7OEgf7cCAjfz4.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%281%29.png-jkIOsnsjzDsuQGxDZ9aEuKojaqHbbX.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%285%29.png-RP5MWN94zgr6Ju284Ct4ZtHSBL6gmr.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%283%29.png-PtWc4DkQOWfQklKa5PYDBmOxjSuCud.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%284%29.png-CuA5DQzxgCl6Paw1PmtYUgDG65Xu6a.jpeg",
-]
-
-const LIBRARY_STATS_BG = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/library-stats-section.png-xI6gFjkk9x6YETqOPgj8680eSlMkL2.jpeg"
-
 export default function HomePage() {
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
 
   // Fixed initial image so SSR and hydration match; randomize after mount.
-  const [heroBg, setHeroBg] = useState(HERO_IMAGES[0])
+  const [heroBg, setHeroBg] = useState(HERO_ROTATING_IMAGES[0])
 
   useEffect(() => {
-    setHeroBg(HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)])
+    setHeroBg(HERO_ROTATING_IMAGES[Math.floor(Math.random() * HERO_ROTATING_IMAGES.length)])
   }, [])
 
   useEffect(() => {
@@ -246,7 +237,7 @@ export default function HomePage() {
           id="library-stats-section"
           className="py-20 px-4 border-t border-border relative overflow-hidden"
           style={{
-            backgroundImage: `url(${LIBRARY_STATS_BG})`,
+            backgroundImage: `url(${LIBRARY_STATS_BACKGROUND})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
