@@ -1,6 +1,8 @@
 # Dump Stat
 
-A modern D&D 5.5e character builder and compendium built with Next.js and Supabase.
+![Dump Stat — D&D 5.5e character creator](./docs/images/hero.png)
+
+A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 
 ## Features
 
@@ -31,8 +33,8 @@ A modern D&D 5.5e character builder and compendium built with Next.js and Supaba
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Database**: Supabase (PostgreSQL)
+- **Framework**: Next.js 16 (App Router)
+- **Database**: MySQL (Dreamhost VPS or any MySQL 8+ host)
 - **Styling**: Tailwind CSS 4
 - **UI Components**: shadcn/ui
 - **Icons**: Lucide React + Game Icons
@@ -40,66 +42,180 @@ A modern D&D 5.5e character builder and compendium built with Next.js and Supaba
 
 ## Requirements
 
-- Node.js 18+
-- pnpm (recommended) or npm
-- Supabase account (for database)
+- Node.js 18+ (20+ recommended)
+- pnpm (via Corepack) or npm
+- MySQL 8+ (Dreamhost VPS MySQL, or local MySQL for offline dev)
+- SSH access to your VPS (for remote DB setup and optional tunneling)
 
 ## Getting Started
 
-### 1. Clone the repository
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/Geph/v0-dump-stat-character-builder.git
 cd v0-dump-stat-character-builder
-```
-
-### 2. Install dependencies
-
-```bash
+corepack enable
 pnpm install
 ```
 
-### 3. Set up Supabase
+If `pnpm` is not on your PATH, use `corepack pnpm install` and `corepack pnpm dev`.
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Copy your project URL and anon key from Project Settings > API
-3. Create a `.env.local` file in the root directory:
+### 2. Create the MySQL database (Dreamhost)
+
+In the Dreamhost panel:
+
+1. Go to **Goodies → MySQL Databases**.
+2. Create a **new database** (note the full database name).
+3. Create a **MySQL user** and assign it to that database with full privileges.
+4. Note the **MySQL hostname** shown in the panel (often `mysql.yourdomain.com` or similar — not always `localhost` from your laptop).
+
+The app never talks to MySQL from the browser. Only the Next.js server connects, using credentials in `.env.local` (local dev) or environment variables on the VPS (production).
+
+### 3. Configure environment variables
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your Dreamhost credentials. Use **either** a single URL **or** separate fields:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Option A — recommended
+DATABASE_URL=mysql://DB_USER:DB_PASSWORD@mysql.yourdomain.com:3306/your_database_name
+
+# Option B — alternative
+# MYSQL_HOST=mysql.yourdomain.com
+# MYSQL_USER=your_db_user
+# MYSQL_PASSWORD=your_db_password
+# MYSQL_DATABASE=your_database_name
+# MYSQL_PORT=3306
+
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-### 4. Initialize the database
+URL-encode special characters in passwords (e.g. `@` → `%40`).
 
-Run the seed endpoint to create tables and populate with SRD content:
+Restart the dev server after changing `.env.local`.
+
+### 4. Create tables (schema)
+
+Run `mysql/schema.sql` **once** on the Dreamhost database.
+
+**From your computer** (if remote MySQL is allowed for your IP):
 
 ```bash
-# Start the dev server first
-pnpm dev
-
-# Then visit in your browser or curl:
-http://localhost:3000/api/seed
+mysql -h mysql.yourdomain.com -u YOUR_DB_USER -p YOUR_DATABASE_NAME < mysql/schema.sql
 ```
 
-This will create the following tables:
-- `species` - Playable species/races
-- `classes` - Character classes
-- `subclasses` - Class subclasses
-- `backgrounds` - Character backgrounds
-- `feats` - Feats and features
-- `spells` - Spell compendium
-- `equipment` - Weapons, armor, and gear
-- `custom_abilities` - User-created abilities
-- `characters` - Saved characters
-
-### 5. Run the development server
+**On the VPS via SSH** (often easiest — MySQL is local to the server):
 
 ```bash
-pnpm dev
+ssh user@your-vps.dreamhost.com
+mysql -h localhost -u YOUR_DB_USER -p YOUR_DATABASE_NAME < /path/to/repo/mysql/schema.sql
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the app.
+**phpMyAdmin:** open the database → **Import** → choose `mysql/schema.sql` → run.
+
+The seed step only inserts data; it does **not** create tables.
+
+### 5. Connect from your machine (local development)
+
+Dreamhost often blocks MySQL from the public internet. Pick one approach:
+
+**A. SSH tunnel (recommended for local dev)**
+
+In a separate terminal, keep this running while you develop:
+
+```bash
+ssh -N -L 3307:mysql.yourdomain.com:3306 user@your-vps.dreamhost.com
+```
+
+Then point `.env.local` at the tunnel:
+
+```env
+DATABASE_URL=mysql://DB_USER:DB_PASSWORD@127.0.0.1:3307/your_database_name
+```
+
+**B. Allow your IP in Dreamhost**
+
+If your plan includes remote MySQL access, add your home IP in the panel and use the panel hostname directly in `DATABASE_URL`.
+
+**C. Develop on the VPS**
+
+Clone the repo on the server, set `DATABASE_URL` with `localhost` as the host, and run `pnpm dev` there (or deploy production build below).
+
+### 6. Run the app and seed SRD content
+
+```bash
+corepack pnpm dev
+# or: ./node_modules/.bin/next dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed D&D 5.5e SRD Content**, or:
+
+```bash
+curl -X POST http://localhost:3000/api/seed
+```
+
+You should get a JSON success response. If you see a configuration or connection error, check `.env.local` and that the schema was imported.
+
+Tables populated by seed:
+
+| Table | Contents |
+|-------|----------|
+| `species` | Playable species |
+| `classes` | Character classes |
+| `subclasses` | Class subclasses |
+| `backgrounds` | Backgrounds |
+| `feats` | Feats |
+| `spells` | Spell compendium |
+| `equipment` | Weapons, armor, gear |
+| `custom_abilities` | Homebrew abilities |
+| `characters` | Saved characters (empty until you build some) |
+
+## Deploying on a Dreamhost VPS
+
+Typical flow for running the production app on the same VPS as MySQL:
+
+1. **SSH** into the VPS and install Node.js 20+ if needed.
+2. **Clone** the repo (or deploy via git pull).
+3. Set environment variables on the server (`.env.local` or systemd/PM2 env):
+
+   ```env
+   DATABASE_URL=mysql://DB_USER:DB_PASSWORD@localhost:3306/your_database_name
+   NEXT_PUBLIC_SITE_URL=https://yourdomain.com
+   NODE_ENV=production
+   PORT=3000
+   ```
+
+   Use `localhost` for the DB host when Node and MySQL run on the same machine.
+
+4. **Install and build** (allow a few GB free RAM for `next build`):
+
+   ```bash
+   pnpm install
+   NODE_OPTIONS='--max-old-space-size=4096' pnpm build
+   ```
+
+5. **Run** with a process manager, e.g. PM2:
+
+   ```bash
+   pnpm start
+   ```
+
+6. Put **nginx** or Apache on the VPS in front of the app (proxy pass to `http://127.0.0.1:3000`). Dreamhost VPS docs cover reverse-proxy setup for custom Node apps.
+
+7. Run `mysql/schema.sql` and seed once against the production database (same as local setup).
+
+## Troubleshooting
+
+| Symptom | What to check |
+|---------|----------------|
+| `Database is not configured` | `.env.local` missing or still has placeholder values; restart dev server |
+| `fetch failed` / `ECONNREFUSED` | Wrong host, tunnel not running, or remote MySQL blocked — try SSH tunnel or `localhost` on VPS |
+| `Access denied` | Wrong user/password; user not assigned to database in Dreamhost panel |
+| `Unknown table` / `doesn't exist` | Run `mysql/schema.sql` before seeding |
+| Seed returns 500 after schema exists | Check server terminal logs; verify `DATABASE_URL` reaches the same DB where you ran the schema |
 
 ## Project Structure
 
@@ -127,7 +243,7 @@ components/
 └── ui/                   # shadcn/ui components
 
 lib/
-├── supabase.ts           # Supabase client
+├── db/                   # MySQL connection, schema, API client
 ├── types.ts              # TypeScript interfaces
 └── utils.ts              # Utility functions
 ```
@@ -168,5 +284,4 @@ This project uses content from the D&D 5.5e Systems Reference Document (SRD) und
 
 - [Continue developing on v0](https://v0.app/chat/projects/prj_Z07M3vx9HphfTfMDkIp9oqtpaHYN)
 - [Next.js Documentation](https://nextjs.org/docs)
-- [Supabase Documentation](https://supabase.com/docs)
 - [Tailwind CSS](https://tailwindcss.com)

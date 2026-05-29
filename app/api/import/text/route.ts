@@ -1,4 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
+import { getDatabaseConfigError } from "@/lib/db/config"
+import {
+  deleteWhere,
+  insertRows,
+  listRows,
+  upsertByName,
+} from "@/lib/db/repository"
 import { NextRequest, NextResponse } from "next/server"
 import { generateText, Output } from "ai"
 import { z } from "zod"
@@ -131,118 +137,88 @@ For subclasses, include the parent class name in class_name field.`
       output: Output.object({ schema: ContentSchema })
     })
 
+    const configError = getDatabaseConfigError()
+    if (configError) {
+      return NextResponse.json({ error: configError }, { status: 503 })
+    }
+
     const content = result.output
-    const supabase = await createClient()
     let totalImported = 0
     const breakdown: Record<string, number> = {}
 
-    // Insert species
-    if (content.species && content.species.length > 0) {
-      const { error } = await supabase
-        .from("species")
-        .upsert(content.species.map(s => ({ ...s, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.species.length
-        breakdown.species = content.species.length
-      }
+    if (content.species?.length) {
+      await upsertByName("species", content.species.map((s) => ({ ...s, source: "Text Import" })))
+      totalImported += content.species.length
+      breakdown.species = content.species.length
     }
 
-    // Insert classes
-    if (content.classes && content.classes.length > 0) {
-      const { error } = await supabase
-        .from("classes")
-        .upsert(content.classes.map(c => ({ ...c, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.classes.length
-        breakdown.classes = content.classes.length
-      }
+    if (content.classes?.length) {
+      await upsertByName("classes", content.classes.map((c) => ({ ...c, source: "Text Import" })))
+      totalImported += content.classes.length
+      breakdown.classes = content.classes.length
     }
 
-    // Insert subclasses - need to look up class_id first
-    if (content.subclasses && content.subclasses.length > 0) {
-      // Get class IDs
-      const classNames = [...new Set(content.subclasses.map(sc => sc.class_name))]
-      const { data: classData } = await supabase
-        .from("classes")
-        .select("id, name")
-        .in("name", classNames)
-      
-      const classIdMap = new Map(classData?.map(c => [c.name, c.id]) || [])
-      
-      const subclassesWithIds = content.subclasses.map(sc => ({
-        name: sc.name,
-        description: sc.description,
-        features: sc.features,
-        source: "Text Import",
-        class_id: classIdMap.get(sc.class_name) || null,
-      })).filter(sc => sc.class_id !== null)
+    if (content.subclasses?.length) {
+      const classNames = [...new Set(content.subclasses.map((sc) => sc.class_name))]
+      const classData = await listRows("classes", {
+        filters: [{ op: "in", column: "name", values: classNames }],
+      })
+      const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
+
+      const subclassesWithIds = content.subclasses
+        .map((sc) => ({
+          name: sc.name,
+          description: sc.description,
+          features: sc.features,
+          source: "Text Import",
+          class_id: classIdMap.get(sc.class_name) || null,
+        }))
+        .filter((sc) => sc.class_id !== null)
 
       if (subclassesWithIds.length > 0) {
-        // Delete existing text import subclasses with same names, then insert
         for (const sc of subclassesWithIds) {
-          await supabase.from("subclasses").delete().eq("name", sc.name).eq("source", "Text Import")
+          await deleteWhere("subclasses", [
+            { op: "eq", column: "name", value: sc.name },
+            { op: "eq", column: "source", value: "Text Import" },
+          ])
         }
-        const { error } = await supabase.from("subclasses").insert(subclassesWithIds)
-        if (!error) {
-          totalImported += subclassesWithIds.length
-          breakdown.subclasses = subclassesWithIds.length
-        }
+        await insertRows("subclasses", subclassesWithIds)
+        totalImported += subclassesWithIds.length
+        breakdown.subclasses = subclassesWithIds.length
       }
     }
 
-    // Insert backgrounds
-    if (content.backgrounds && content.backgrounds.length > 0) {
-      const { error } = await supabase
-        .from("backgrounds")
-        .upsert(content.backgrounds.map(b => ({ ...b, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.backgrounds.length
-        breakdown.backgrounds = content.backgrounds.length
-      }
+    if (content.backgrounds?.length) {
+      await upsertByName("backgrounds", content.backgrounds.map((b) => ({ ...b, source: "Text Import" })))
+      totalImported += content.backgrounds.length
+      breakdown.backgrounds = content.backgrounds.length
     }
 
-    // Insert spells
-    if (content.spells && content.spells.length > 0) {
-      const { error } = await supabase
-        .from("spells")
-        .upsert(content.spells.map(s => ({ ...s, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.spells.length
-        breakdown.spells = content.spells.length
-      }
+    if (content.spells?.length) {
+      await upsertByName("spells", content.spells.map((s) => ({ ...s, source: "Text Import" })))
+      totalImported += content.spells.length
+      breakdown.spells = content.spells.length
     }
 
-    // Insert feats
-    if (content.feats && content.feats.length > 0) {
-      const { error } = await supabase
-        .from("feats")
-        .upsert(content.feats.map(f => ({ ...f, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.feats.length
-        breakdown.feats = content.feats.length
-      }
+    if (content.feats?.length) {
+      await upsertByName("feats", content.feats.map((f) => ({ ...f, source: "Text Import" })))
+      totalImported += content.feats.length
+      breakdown.feats = content.feats.length
     }
 
-    // Insert equipment
-    if (content.equipment && content.equipment.length > 0) {
-      const { error } = await supabase
-        .from("equipment")
-        .upsert(content.equipment.map(e => ({ ...e, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.equipment.length
-        breakdown.equipment = content.equipment.length
-      }
+    if (content.equipment?.length) {
+      await upsertByName("equipment", content.equipment.map((e) => ({ ...e, source: "Text Import" })))
+      totalImported += content.equipment.length
+      breakdown.equipment = content.equipment.length
     }
 
-    // Insert abilities
-    if (content.abilities && content.abilities.length > 0) {
-      const { error } = await supabase
-        .from("abilities")
-        .upsert(content.abilities.map(a => ({ ...a, source: "Text Import" })), { onConflict: "name" })
-      if (!error) {
-        totalImported += content.abilities.length
-        breakdown.abilities = content.abilities.length
-      }
+    if (content.abilities?.length) {
+      await upsertByName(
+        "custom_abilities",
+        content.abilities.map((a) => ({ ...a, source: "Text Import", show_in_builder: true })),
+      )
+      totalImported += content.abilities.length
+      breakdown.abilities = content.abilities.length
     }
 
     return NextResponse.json({ 
