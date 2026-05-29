@@ -309,9 +309,18 @@ export default function CharacterSheetPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-center justify-center gap-1">
                   <input
                     type="number"
+                    min={0}
+                    max={maxHp + tempHp}
                     value={currentHp}
-                    onChange={(e) => setCurrentHp(Math.max(0, Math.min(maxHp + tempHp, parseInt(e.target.value) || 0)))}
-                    className="w-14 text-center bg-background border border-border rounded px-1 py-1 text-xl font-black text-foreground"
+                    onChange={(e) => {
+                      const next = parseInt(e.target.value, 10)
+                      setCurrentHp(
+                        Number.isNaN(next)
+                          ? 0
+                          : Math.max(0, Math.min(maxHp + tempHp, next)),
+                      )
+                    }}
+                    className="w-14 text-center bg-background border border-border rounded px-1 py-1 text-xl font-black text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <span className="text-lg text-muted-foreground">/ {maxHp}</span>
                 </div>
@@ -322,9 +331,13 @@ export default function CharacterSheetPage({ params }: { params: Promise<{ id: s
                 <span className="text-xs text-cyan">Temp HP:</span>
                 <input
                   type="number"
+                  min={0}
                   value={tempHp}
-                  onChange={(e) => setTempHp(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-12 text-center bg-background border border-cyan/30 rounded px-1 py-0.5 text-sm font-bold text-cyan"
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10)
+                    setTempHp(Number.isNaN(next) ? 0 : Math.max(0, next))
+                  }}
+                  className="w-12 text-center bg-background border border-cyan/30 rounded px-1 py-0.5 text-sm font-bold text-cyan [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
               </div>
             </div>

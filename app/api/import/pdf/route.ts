@@ -1,4 +1,7 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
+import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
+import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { upsertByName } from "@/lib/db/repository"
 import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
@@ -89,8 +92,11 @@ const ContentSchema = z.object({
     name: z.string(),
     category: z.string(),
     subcategory: z.string().nullable(),
-    description: z.string().nullable()
-  })).optional()
+    description: z.string().nullable(),
+    cost: z.object({ amount: z.number(), unit: z.string() }).nullable().optional(),
+    weight: z.number().nullable().optional(),
+    properties: z.record(z.unknown()).nullable().optional(),
+  })).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -173,7 +179,12 @@ Important D&D 2024 rules:
 - Species no longer grant ability score bonuses
 
 Extract ONLY the content types you find in the text. Return empty arrays for types not present.
-Be thorough and extract all instances of each content type found.`
+Be thorough and extract all instances of each content type found.
+
+For equipment:
+- Put cost in a cost object { amount, unit } (e.g. 5 SP → { amount: 5, unit: "SP" }), NOT in the item name
+- Do not include HTML tags (<td>, etc.) or markdown headers (####) in names
+- Strip table markup from all fields`
 
     if (contentType === "specific" && specificContent) {
       systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`
@@ -185,12 +196,16 @@ Be thorough and extract all instances of each content type found.`
       ? `\n\nNote: Text was extracted from pages ${pageRange.first}–${pageRange.last} of ${totalPages} total pages.`
       : ""
 
-    // Use AI to extract structured content
+    const aiConfigError = getImportAiConfigError()
+    if (aiConfigError) {
+      return NextResponse.json({ error: aiConfigError }, { status: 503 })
+    }
+
     const result = await generateText({
-      model: "openai/gpt-4o",
+      model: getImportModel(),
       system: systemPrompt,
       prompt: `Extract D&D content from this PDF text:${pageRangeNote}\n\n${truncatedText}`,
-      output: Output.object({ schema: ContentSchema })
+      output: Output.object({ schema: ContentSchema }),
     })
 
     const configError = getDatabaseConfigError()
@@ -211,8 +226,19 @@ Be thorough and extract all instances of each content type found.`
     totalImported += await upsertSection("classes", content.classes)
     totalImported += await upsertSection("backgrounds", content.backgrounds)
     totalImported += await upsertSection("spells", content.spells)
-    totalImported += await upsertSection("feats", content.feats)
-    totalImported += await upsertSection("equipment", content.equipment)
+    totalImported += await upsertSection(
+      "feats",
+      content.feats?.map((f) => ({
+        ...f,
+        description: f.description ? formatFeatDescription(f.description) : null,
+      })),
+    )
+    totalImported += await upsertSection(
+      "equipment",
+      content.equipment
+        ? normalizeEquipmentRows(content.equipment as Record<string, unknown>[])
+        : undefined,
+    )
 
     return NextResponse.json({ 
       success: true, 

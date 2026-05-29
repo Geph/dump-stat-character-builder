@@ -31,6 +31,7 @@ export interface Species {
   description: string | null
   speed: number | { [key: string]: number } // e.g. { walking: 30, climbing: 30 }
   size: string | null
+  creature_type: string | null
   traits: Trait[]
   icon: string | null
   source: string
@@ -158,6 +159,9 @@ export interface Feat {
   level_requirement: number | null
   prerequisite: string | null  // legacy field
   prerequisite_feat_ids: string[] | null
+  prerequisite_class_ids: string[] | null
+  prerequisite_species_ids: string[] | null
+  prerequisite_background_ids: string[] | null
   benefits: unknown
   source: string
   creator_url: string | null

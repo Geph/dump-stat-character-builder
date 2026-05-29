@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
+import type { IconCategoryId } from "@/lib/icons/categories"
 
-// Icons are served from /public/icons/*.svg
-// Drop any SVG files into the public/icons directory and they will appear here.
-// File name (without .svg) is the icon identifier stored in the database.
-//
-// The picker fetches /api/icons to get the list of available icons at runtime,
-// falling back to an empty list if the route is not yet set up.
+interface IconCategoryMeta {
+  id: IconCategoryId | "other"
+  label: string
+  count: number
+}
 
 interface GameIconPickerProps {
   value: string | null
@@ -19,30 +19,77 @@ interface GameIconPickerProps {
 export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const [availableIcons, setAvailableIcons] = useState<string[]>([])
+  const [categories, setCategories] = useState<IconCategoryMeta[]>([])
+  const [activeCategory, setActiveCategory] = useState<string>("weapon")
+  const [categoryIcons, setCategoryIcons] = useState<string[]>([])
+  const [searchIcons, setSearchIcons] = useState<string[] | null>(null)
   const [loadingList, setLoadingList] = useState(false)
+  const [totalIcons, setTotalIcons] = useState(0)
 
-  // Fetch available icon names from the API route when the picker opens
+  const isSearchMode = search.trim().length > 0
+  const displayIcons = isSearchMode ? (searchIcons ?? []) : categoryIcons
+
   useEffect(() => {
-    if (!isOpen || availableIcons.length > 0) return
+    if (!isOpen) return
+
     setLoadingList(true)
     fetch("/api/icons")
       .then((r) => r.json())
-      .then((data: { icons: string[] }) => setAvailableIcons(data.icons ?? []))
-      .catch(() => setAvailableIcons([]))
+      .then((data: { categories?: IconCategoryMeta[]; total?: number }) => {
+        const cats = data.categories ?? []
+        setCategories(cats)
+        setTotalIcons(data.total ?? 0)
+        const first =
+          cats.find((c) => c.count > 0)?.id ?? cats[0]?.id ?? "weapon"
+        setActiveCategory(first)
+      })
+      .catch(() => {
+        setCategories([])
+        setTotalIcons(0)
+      })
       .finally(() => setLoadingList(false))
-  }, [isOpen, availableIcons.length])
+  }, [isOpen])
 
-  const filtered = search
-    ? availableIcons.filter((n) => n.toLowerCase().includes(search.toLowerCase()))
-    : availableIcons
+  useEffect(() => {
+    if (!isOpen || isSearchMode) return
+
+    setLoadingList(true)
+    fetch(`/api/icons?category=${encodeURIComponent(activeCategory)}`)
+      .then((r) => r.json())
+      .then((data: { icons: string[] }) => setCategoryIcons(data.icons ?? []))
+      .catch(() => setCategoryIcons([]))
+      .finally(() => setLoadingList(false))
+  }, [isOpen, activeCategory, isSearchMode])
+
+  useEffect(() => {
+    if (!isOpen || !isSearchMode) {
+      setSearchIcons(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setLoadingList(true)
+      fetch(`/api/icons?search=${encodeURIComponent(search.trim())}`)
+        .then((r) => r.json())
+        .then((data: { icons: string[] }) => setSearchIcons(data.icons ?? []))
+        .catch(() => setSearchIcons([]))
+        .finally(() => setLoadingList(false))
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [isOpen, search, isSearchMode])
+
+  const closePicker = useCallback(() => {
+    setIsOpen(false)
+    setSearch("")
+    setSearchIcons(null)
+  }, [])
 
   return (
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-foreground">{label}</label>
 
       <div className="flex items-center gap-3">
-        {/* Preview */}
         <button
           type="button"
           onClick={() => setIsOpen(true)}
@@ -72,17 +119,15 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
         </span>
       </div>
 
-      {/* Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl border-2 border-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-bold text-foreground">Choose Icon</h3>
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={closePicker}
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -95,13 +140,32 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search icons..."
+                  placeholder="Search all icons..."
                   className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
 
-            {/* Grid */}
+            {!isSearchMode && categories.length > 0 && (
+              <div className="px-4 py-2 border-b border-border flex gap-1.5 overflow-x-auto shrink-0 scrollbar-hide">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                      activeCategory === cat.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {cat.label}
+                    <span className="ml-1 opacity-70">({cat.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-4">
               {loadingList ? (
                 <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
@@ -109,29 +173,25 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
                     <div key={i} className="aspect-square rounded-lg bg-muted animate-pulse" />
                   ))}
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : displayIcons.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <p className="text-muted-foreground text-sm">
-                    {availableIcons.length === 0
-                      ? "No icons found. Drop SVG files into the public/icons/ directory."
-                      : "No icons match your search."}
+                    {totalIcons === 0
+                      ? "No icons found. Drop SVG files into public/icons/."
+                      : isSearchMode
+                        ? "No icons match your search."
+                        : "No icons in this category."}
                   </p>
-                  {availableIcons.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center max-w-xs">
-                      Files should be named like <code className="bg-muted px-1 rounded">sword.svg</code> and the name will be used as the icon identifier.
-                    </p>
-                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                  {filtered.map((iconName) => (
+                  {displayIcons.map((iconName) => (
                     <button
                       key={iconName}
                       type="button"
                       onClick={() => {
                         onChange(iconName)
-                        setIsOpen(false)
-                        setSearch("")
+                        closePicker()
                       }}
                       title={iconName.replace(/-/g, " ")}
                       className={`aspect-square rounded-lg border-2 flex items-center justify-center transition-all hover:scale-105 ${
@@ -147,9 +207,20 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
               )}
             </div>
 
-            <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
-              {availableIcons.length} icon{availableIcons.length !== 1 ? "s" : ""} available &mdash; add more SVGs to{" "}
-              <code className="bg-muted px-1 rounded">public/icons/</code>
+            <div className="p-3 border-t border-border text-xs text-muted-foreground text-center shrink-0">
+              {isSearchMode
+                ? `${displayIcons.length} match${displayIcons.length === 1 ? "" : "es"}`
+                : `${totalIcons} icons — categories from `}
+              {!isSearchMode && (
+                <a
+                  href="https://game-icons.net/tags.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
+                  game-icons.net
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -158,7 +229,6 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
   )
 }
 
-// Renders a single icon by name from /public/icons/<name>.svg
 interface GameIconProps {
   name: string
   className?: string
@@ -183,7 +253,6 @@ export function GameIcon({ name, className = "w-6 h-6", color }: GameIconProps) 
       if (!res.ok) throw new Error("not found")
       const text = await res.text()
       if (!text.includes("<svg")) throw new Error("not svg")
-      // Normalise fill so CSS color works
       const normalised = text
         .replace(/fill="(?!none)[^"]*"/g, 'fill="currentColor"')
         .replace(/stroke="(?!none)[^"]*"/g, "")

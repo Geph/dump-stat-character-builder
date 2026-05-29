@@ -449,7 +449,7 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
               onChange={(e) => setForm({ ...form, hit_die: parseInt(e.target.value) })}
               className="w-full md:w-48 px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
             >
-              {[6, 8, 10, 12].map((die) => (
+              {[4, 6, 8, 10, 12, 20].map((die) => (
                 <option key={die} value={die}>d{die}</option>
               ))}
             </select>

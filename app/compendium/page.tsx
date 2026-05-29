@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2 } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
 import { GameIcon } from "@/components/game-icon-picker"
+import { formatCompendiumSource } from "@/lib/srd/source"
+import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
 
 type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
 
@@ -39,10 +41,12 @@ export default function CompendiumPage() {
   const [selectedItem, setSelectedItem] = useState<unknown | null>(null)
   const [clearingAll, setClearingAll] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
   // Spell-specific filters
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
+  const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
@@ -91,6 +95,9 @@ export default function CompendiumPage() {
     fetchCounts()
   }, [])
 
+  // Subclasses indexed by class (for class tab cards)
+  const [subclassesForClasses, setSubclassesForClasses] = useState<Subclass[]>([])
+
   // Fetch content only for active tab
   useEffect(() => {
     const fetchActiveTabContent = async () => {
@@ -102,15 +109,35 @@ export default function CompendiumPage() {
         .from(tableName)
         .select("*")
         .order("name")
-        .limit(100)
+        .limit(activeTab === "equipment" ? 500 : 100)
       
       setContent(prev => ({ ...prev, [activeTab]: data || [] }))
+
+      if (activeTab === "classes") {
+        const { data: subclasses } = await supabase
+          .from("subclasses")
+          .select("*")
+          .order("name")
+          .limit(200)
+        setSubclassesForClasses(subclasses || [])
+      }
+
       setLoading(false)
     }
     
     fetchActiveTabContent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  const subclassesByClassId = useMemo(() => {
+    const map = new Map<string, Subclass[]>()
+    for (const sc of subclassesForClasses) {
+      const list = map.get(sc.class_id) ?? []
+      list.push(sc)
+      map.set(sc.class_id, list)
+    }
+    return map
+  }, [subclassesForClasses])
 
   // Derive unique spell filter options from loaded spell data
   const spellData = (content.spells as Spell[])
@@ -132,16 +159,77 @@ export default function CompendiumPage() {
       if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
       if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
     }
+    if (activeTab === "equipment") {
+      const eq = item as Equipment
+      if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
+    }
     return true
   })
 
+  const equipmentData = content.equipment as Equipment[]
+  const equipmentCategoryOptions = useMemo(
+    () =>
+      Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
+    [equipmentData],
+  )
+  const equipmentGroups = useMemo(() => {
+    if (activeTab !== "equipment") return []
+    return groupEquipmentByCategory(filteredContent as Equipment[])
+  }, [filteredContent, activeTab])
+
   const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
+
+  const refreshTabCounts = async () => {
+    const supabase = createClient()
+    const [
+      { count: speciesCount },
+      { count: classesCount },
+      { count: subclassesCount },
+      { count: backgroundsCount },
+      { count: spellsCount },
+      { count: featsCount },
+      { count: equipmentCount },
+      { count: abilitiesCount },
+    ] = await Promise.all([
+      supabase.from("species").select("*", { count: "exact", head: true }),
+      supabase.from("classes").select("*", { count: "exact", head: true }),
+      supabase.from("subclasses").select("*", { count: "exact", head: true }),
+      supabase.from("backgrounds").select("*", { count: "exact", head: true }),
+      supabase.from("spells").select("*", { count: "exact", head: true }),
+      supabase.from("feats").select("*", { count: "exact", head: true }),
+      supabase.from("equipment").select("*", { count: "exact", head: true }),
+      supabase.from("custom_abilities").select("*", { count: "exact", head: true }),
+    ])
+    setTabCounts({
+      species: speciesCount ?? 0,
+      classes: classesCount ?? 0,
+      subclasses: subclassesCount ?? 0,
+      backgrounds: backgroundsCount ?? 0,
+      spells: spellsCount ?? 0,
+      feats: featsCount ?? 0,
+      equipment: equipmentCount ?? 0,
+      abilities: abilitiesCount ?? 0,
+    })
+  }
+
+  const refreshActiveTabContent = async () => {
+    setLoading(true)
+    const supabase = createClient()
+    const resolvedTable = tableName(activeTab)
+    const { data } = await supabase
+      .from(resolvedTable)
+      .select("*")
+      .order("name")
+      .limit(100)
+    setContent((prev) => ({ ...prev, [activeTab]: data || [] }))
+    setLoading(false)
+  }
 
   const handleClearSection = async () => {
     setClearingAll(true)
+    setClearError(null)
     
     try {
-      // Call server API with service role to bypass RLS
       const response = await fetch("/api/compendium/clear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,21 +238,27 @@ export default function CompendiumPage() {
       
       if (!response.ok) {
         const data = await response.json()
-        console.error("[v0] Clear section error:", data.error)
-        setClearingAll(false)
-        setClearConfirmOpen(false)
+        setClearError(data.error ?? "Failed to clear section")
         return
       }
-      
-      // Update local state
-      setContent(prev => ({ ...prev, [activeTab]: [] }))
-      setTabCounts(prev => ({ ...prev, [activeTab]: 0 }))
+
+      const data = await response.json()
+      setContent((prev) => {
+        const next = { ...prev, [activeTab]: [] }
+        if (data.alsoCleared?.includes("subclasses")) {
+          next.subclasses = []
+        }
+        return next
+      })
+      await refreshTabCounts()
+      await refreshActiveTabContent()
     } catch (err) {
       console.error("[v0] Clear section error:", err)
+      setClearError("Failed to clear section")
+    } finally {
+      setClearingAll(false)
+      setClearConfirmOpen(false)
     }
-    
-    setClearingAll(false)
-    setClearConfirmOpen(false)
   }
 
   const renderContentCard = (item: unknown) => {
@@ -202,27 +296,17 @@ export default function CompendiumPage() {
           </Link>
         </div>
         {activeTab === "classes" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                d{(data as DndClass).hit_die} Hit Die
-              </span>
-              {(data as DndClass).spellcasting && (
-                <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full">
-                  Spellcaster
-                </span>
-              )}
-              {(data as DndClass).weapon_proficiencies?.some(w => 
-                w.toLowerCase().includes("martial")
-              ) && (
-                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                  Martial
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as DndClass).source || "Custom"}
-            </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>Source: {formatCompendiumSource((data as DndClass).source)}</p>
+            {(() => {
+              const subs = subclassesByClassId.get(data.id as string) ?? []
+              if (subs.length === 0) return null
+              return (
+                <p>
+                  Subclasses: {subs.map((sc) => sc.name).join(", ")}
+                </p>
+              )
+            })()}
           </div>
         )}
         {activeTab === "subclasses" && (
@@ -283,34 +367,24 @@ export default function CompendiumPage() {
           </div>
         )}
         {activeTab === "feats" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                (data as Feat).category === "Origin"
-                  ? "bg-lime/10 text-lime"
-                  : (data as Feat).category === "Epic Boon"
-                  ? "bg-magenta/10 text-magenta"
-                  : "bg-primary/10 text-primary"
-              }`}>
-                {(data as Feat).category || "General"}
+          <div className="flex gap-2 flex-wrap">
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              (data as Feat).category === "Origin"
+                ? "bg-lime/10 text-lime"
+                : (data as Feat).category === "Epic Boon"
+                ? "bg-magenta/10 text-magenta"
+                : "bg-primary/10 text-primary"
+            }`}>
+              {(data as Feat).category || "General"}
+            </span>
+            {((data as Feat).level_requirement ?? 1) > 1 && (
+              <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                Lvl {(data as Feat).level_requirement}+
               </span>
-              {((data as Feat).level_requirement ?? 1) > 1 && (
-                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                  Lvl {(data as Feat).level_requirement}+
-                </span>
-              )}
-              {(data as Feat).prerequisite_feat_ids?.length ? (
-                <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                  Has Prereqs
-                </span>
-              ) : null}
-            </div>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {(data as Feat).description}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as Feat).source || "Custom"}
-            </p>
+            )}
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {(data as Feat).source || "Custom"}
+            </span>
           </div>
         )}
         {activeTab === "equipment" && (
@@ -336,9 +410,12 @@ export default function CompendiumPage() {
             <p className="text-sm text-muted-foreground line-clamp-2">
               {(data as { description?: string }).description}
             </p>
-            {(data as { attached_to_type?: string }).attached_to_type && (
+            {(data as { attached_to_type?: string; attached_to_id?: string }).attached_to_type && (
               <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-                For: {(data as { attached_to_type: string }).attached_to_type}
+                {(data as { attached_to_type: string; attached_to_id?: string }).attached_to_type === "equipment" &&
+                (data as { attached_to_id?: string }).attached_to_id
+                  ? `Equipment: ${(data as { attached_to_id: string }).attached_to_id}`
+                  : `For: ${(data as { attached_to_type: string }).attached_to_type}`}
               </span>
             )}
           </div>
@@ -391,8 +468,13 @@ export default function CompendiumPage() {
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium. Other sections will not be affected.
+                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium database.
+                {activeTab === "classes" && " All subclasses will be cleared as well."}
+                {" "}Other sections will not be affected.
               </p>
+              {clearError && (
+                <p className="text-sm text-destructive mb-4">{clearError}</p>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setClearConfirmOpen(false)}
@@ -520,6 +602,33 @@ export default function CompendiumPage() {
           ))}
         </div>
 
+        {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Type
+            </label>
+            <select
+              value={equipmentFilterCategory}
+              onChange={(e) => setEquipmentFilterCategory(e.target.value)}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All types</option>
+              {equipmentCategoryOptions.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {equipmentFilterCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => setEquipmentFilterCategory("all")}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Clear type filter
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Content Grid */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -539,6 +648,24 @@ export default function CompendiumPage() {
             <p className="text-muted-foreground">
               {searchQuery ? "Try a different search term" : "Import content from the Import page"}
             </p>
+          </div>
+        ) : activeTab === "equipment" ? (
+          <div className="space-y-8">
+            {equipmentGroups.map((group) => (
+              <section key={group.category}>
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-lg font-black text-foreground">{group.category}</h2>
+                  <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
+                    {group.items.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <AnimatePresence>
+                    {group.items.map(renderContentCard)}
+                  </AnimatePresence>
+                </div>
+              </section>
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

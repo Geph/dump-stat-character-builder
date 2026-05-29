@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 
 interface TraitChoice {
   category: string
@@ -27,12 +28,12 @@ interface SpeciesFormData {
   description: string
   speed: number
   size: string
+  creature_type: string
   traits: Trait[]
   icon: string | null
   source: string
 }
 
-const SIZES = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 const defaultSpecies: SpeciesFormData = {
@@ -40,6 +41,7 @@ const defaultSpecies: SpeciesFormData = {
   description: "",
   speed: 30,
   size: "Medium",
+  creature_type: "Humanoid",
   traits: [{ name: "", description: "", level: 1 }],
   icon: null,
   source: "Custom",
@@ -76,6 +78,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             description: data.description || "",
             speed: data.speed || 30,
             size: data.size || "Medium",
+            creature_type: data.creature_type || "Humanoid",
             traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             icon: data.icon || null,
             source: data.source || "Custom",
@@ -327,8 +330,8 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             />
           </div>
 
-          {/* Size and Speed */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Size, creature type, and speed */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
                 Size
@@ -338,8 +341,22 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
                 onChange={(e) => setForm({ ...form, size: e.target.value })}
                 className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               >
-                {SIZES.map((size) => (
+                {SPECIES_SIZES.map((size) => (
                   <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Creature Type
+              </label>
+              <select
+                value={form.creature_type}
+                onChange={(e) => setForm({ ...form, creature_type: e.target.value })}
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+              >
+                {CREATURE_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </div>
