@@ -62,9 +62,12 @@ export default function HomePage() {
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
 
-  const [heroBg] = useState<string>(
-    () => HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
-  )
+  // Fixed initial image so SSR and hydration match; randomize after mount.
+  const [heroBg, setHeroBg] = useState(HERO_IMAGES[0])
+
+  useEffect(() => {
+    setHeroBg(HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)])
+  }, [])
 
   useEffect(() => {
     const fetchStats = async () => {
