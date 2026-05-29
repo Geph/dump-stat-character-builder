@@ -1,61 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 
-// Popular D&D-related icons from game-icons.net
-// These are organized by category for easy browsing
-const ICON_CATEGORIES = {
-  "Combat": [
-    "crossed-swords", "sword-wound", "bloody-sword", "two-handed-sword", "broadsword",
-    "axe-swing", "battle-axe", "war-hammer", "mace-head", "bow-arrow",
-    "arrow-cluster", "daggers", "saber-slash", "punch-blast", "fist",
-    "shield", "round-shield", "bordered-shield", "spear-hook", "halberd"
-  ],
-  "Magic": [
-    "magic-swirl", "spell-book", "wand", "crystal-ball", "fire-ray",
-    "ice-bolt", "lightning-helix", "magic-portal", "pentacle", "vortex",
-    "fairy-wand", "book-aura", "flame", "snowflake-1", "thunder-struck",
-    "charm", "curly-wing", "meditation", "third-eye", "enlightenment"
-  ],
-  "Creatures": [
-    "dragon-head", "spiked-dragon-head", "wyvern", "wolf-head", "bear-head",
-    "spider-face", "goblin-head", "orc-head", "troll", "minotaur",
-    "vampire-dracula", "skeleton", "ghost", "slime", "giant",
-    "fairy", "mermaid", "centaur", "gargoyle", "golem-head"
-  ],
-  "Nature": [
-    "oak", "pine-tree", "palm-tree", "shamrock", "flower-twirl",
-    "sun", "moon", "star-swirl", "cloud", "lightning-trio",
-    "water-drop", "stone-pile", "mountain", "cave-entrance", "campfire"
-  ],
-  "Skills": [
-    "rogue", "ninja-mask", "spy", "cowled", "lock-picking",
-    "eyeball", "magnifying-glass", "compass", "foot-trip", "jump-across",
-    "run", "sprint", "weight-lifting-up", "biceps", "brain",
-    "conversation", "convinced", "embrassed-energy", "healing", "health-potion"
-  ],
-  "Items": [
-    "chest", "locked-chest", "open-treasure-chest", "coin-pile", "two-coins",
-    "ring", "gem-pendant", "crown", "belt", "cape",
-    "backpack", "scroll-unfurled", "potion-ball", "cauldron", "candle-holder",
-    "key", "padlock", "rope-coil", "torch", "lantern"
-  ],
-  "Classes": [
-    "sword-brandish", "sword-spin", "battle-gear", "barbarian", "gladius",
-    "wizard-staff", "orb-wand", "wizard-face", "pointy-hat", "spell-book",
-    "holy-symbol", "angel-outfit", "hood", "archer", "hunting-horn",
-    "druid-sickle", "vine-leaf", "lyre", "harp", "musical-notes"
-  ],
-  "Species": [
-    "person", "hooded-figure", "dwarf-helmet", "dwarf-face", "elf-ear",
-    "orc-head", "goblin-head", "half-body-crawling", "horned-skull", "dragon-head",
-    "tiefling", "dragonborn", "gnome-helmet", "halfling", "aasimar"
-  ]
-}
-
-// Flatten all icons for search
-const ALL_ICONS = Object.values(ICON_CATEGORIES).flat()
+// Icons are served from /public/icons/*.svg
+// Drop any SVG files into the public/icons directory and they will appear here.
+// File name (without .svg) is the icon identifier stored in the database.
+//
+// The picker fetches /api/icons to get the list of available icons at runtime,
+// falling back to an empty list if the route is not yet set up.
 
 interface GameIconPickerProps {
   value: string | null
@@ -66,37 +19,44 @@ interface GameIconPickerProps {
 export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
-  const [activeCategory, setActiveCategory] = useState<string>("Combat")
+  const [availableIcons, setAvailableIcons] = useState<string[]>([])
+  const [loadingList, setLoadingList] = useState(false)
 
-  // Filter icons based on search
-  const filteredIcons = search 
-    ? ALL_ICONS.filter(icon => icon.toLowerCase().includes(search.toLowerCase()))
-    : ICON_CATEGORIES[activeCategory as keyof typeof ICON_CATEGORIES] || []
+  // Fetch available icon names from the API route when the picker opens
+  useEffect(() => {
+    if (!isOpen || availableIcons.length > 0) return
+    setLoadingList(true)
+    fetch("/api/icons")
+      .then((r) => r.json())
+      .then((data: { icons: string[] }) => setAvailableIcons(data.icons ?? []))
+      .catch(() => setAvailableIcons([]))
+      .finally(() => setLoadingList(false))
+  }, [isOpen, availableIcons.length])
 
-  const getIconUrl = (iconName: string) => 
-    `https://raw.githubusercontent.com/game-icons/icons/master/delapouite/originals/svg/${iconName}.svg`
-
-  const getIconUrlAlt = (iconName: string) =>
-    `https://raw.githubusercontent.com/game-icons/icons/master/lorc/originals/svg/${iconName}.svg`
+  const filtered = search
+    ? availableIcons.filter((n) => n.toLowerCase().includes(search.toLowerCase()))
+    : availableIcons
 
   return (
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-foreground">{label}</label>
-      
+
       <div className="flex items-center gap-3">
-        {/* Preview current icon */}
+        {/* Preview */}
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen(true)}
           className="w-16 h-16 rounded-xl border-2 border-border bg-card flex items-center justify-center hover:border-primary transition-colors overflow-hidden"
         >
           {value ? (
             <GameIcon name={value} className="w-10 h-10" />
           ) : (
-            <span className="text-xs text-muted-foreground text-center">Choose Icon</span>
+            <span className="text-[10px] text-muted-foreground text-center leading-tight px-1">
+              Choose
+            </span>
           )}
         </button>
-        
+
         {value && (
           <button
             type="button"
@@ -106,13 +66,15 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
             <X className="w-4 h-4" />
           </button>
         )}
-        
-        <span className="text-sm text-muted-foreground">{value || "No icon selected"}</span>
+
+        <span className="text-sm text-muted-foreground">
+          {value ? value.replace(/-/g, " ") : "No icon selected"}
+        </span>
       </div>
 
-      {/* Icon picker modal */}
+      {/* Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl border-2 border-border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="p-4 border-b border-border">
@@ -126,11 +88,10 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
+                  autoFocus
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -140,57 +101,55 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
               </div>
             </div>
 
-            {/* Categories */}
-            {!search && (
-              <div className="flex gap-1 p-2 border-b border-border overflow-x-auto">
-                {Object.keys(ICON_CATEGORIES).map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setActiveCategory(category)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                      activeCategory === category
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Icon grid */}
+            {/* Grid */}
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                {filteredIcons.map((iconName) => (
-                  <button
-                    key={iconName}
-                    type="button"
-                    onClick={() => {
-                      onChange(iconName)
-                      setIsOpen(false)
-                    }}
-                    className={`aspect-square rounded-lg border-2 flex items-center justify-center transition-all hover:scale-105 ${
-                      value === iconName
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-background hover:border-primary/50"
-                    }`}
-                    title={iconName.replace(/-/g, " ")}
-                  >
-                    <GameIcon name={iconName} className="w-8 h-8" />
-                  </button>
-                ))}
-              </div>
-              
-              {filteredIcons.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">No icons found</p>
+              {loadingList ? (
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                  {[...Array(32)].map((_, i) => (
+                    <div key={i} className="aspect-square rounded-lg bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <p className="text-muted-foreground text-sm">
+                    {availableIcons.length === 0
+                      ? "No icons found. Drop SVG files into the public/icons/ directory."
+                      : "No icons match your search."}
+                  </p>
+                  {availableIcons.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center max-w-xs">
+                      Files should be named like <code className="bg-muted px-1 rounded">sword.svg</code> and the name will be used as the icon identifier.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                  {filtered.map((iconName) => (
+                    <button
+                      key={iconName}
+                      type="button"
+                      onClick={() => {
+                        onChange(iconName)
+                        setIsOpen(false)
+                        setSearch("")
+                      }}
+                      title={iconName.replace(/-/g, " ")}
+                      className={`aspect-square rounded-lg border-2 flex items-center justify-center transition-all hover:scale-105 ${
+                        value === iconName
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:border-primary/50"
+                      }`}
+                    >
+                      <GameIcon name={iconName} className="w-8 h-8" />
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Footer */}
             <div className="p-3 border-t border-border text-xs text-muted-foreground text-center">
-              Icons from <a href="https://game-icons.net" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">game-icons.net</a> (CC BY 3.0)
+              {availableIcons.length} icon{availableIcons.length !== 1 ? "s" : ""} available &mdash; add more SVGs to{" "}
+              <code className="bg-muted px-1 rounded">public/icons/</code>
             </div>
           </div>
         </div>
@@ -199,76 +158,50 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
   )
 }
 
-// Component to render a game icon by name
+// Renders a single icon by name from /public/icons/<name>.svg
 interface GameIconProps {
   name: string
   className?: string
-  fallbackColor?: string
+  color?: string
 }
 
-// Cache for fetched SVGs to avoid redundant network requests
-const iconCache: Record<string, string | null> = {}
+const svgCache: Record<string, string | null> = {}
 
-export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "currentColor" }: GameIconProps) {
-  const [svgContent, setSvgContent] = useState<string | null>(null)
-  const [error, setError] = useState(false)
+export function GameIcon({ name, className = "w-6 h-6", color }: GameIconProps) {
+  const [svg, setSvg] = useState<string | null>(svgCache[name] ?? null)
+  const [failed, setFailed] = useState(svgCache[name] === null)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!name) return
-
-    // Return from cache immediately
-    if (iconCache[name] !== undefined) {
-      if (iconCache[name] === null) {
-        setError(true)
-      } else {
-        setSvgContent(iconCache[name])
-      }
+    if (svgCache[name] !== undefined) {
+      if (svgCache[name] === null) setFailed(true)
+      else setSvg(svgCache[name])
       return
     }
-
-    const fetchIcon = async () => {
-      // Try all known artist folders in priority order
-      const artists = [
-        "delapouite",
-        "lorc",
-        "skoll",
-        "cathelineau",
-        "darkzaitzev",
-        "heavenly-dog",
-        "willdabeast",
-        "faithtoken",
-        "zeromancer",
-        "sparker",
-      ]
-
-      for (const artist of artists) {
-        const url = `https://cdn.jsdelivr.net/gh/game-icons/icons@master/${artist}/originals/svg/${name}.svg`
-        try {
-          const response = await fetch(url)
-          if (response.ok) {
-            const text = await response.text()
-            // Verify it's actually an SVG (not a 404 HTML page)
-            if (!text.includes("<svg")) continue
-            let svg = text
-            svg = svg.replace(/fill="[^"]*"/g, 'fill="currentColor"')
-            svg = svg.replace(/stroke="[^"]*"/g, '')
-            iconCache[name] = svg
-            setSvgContent(svg)
-            setError(false)
-            return
-          }
-        } catch {
-          continue
-        }
-      }
-      iconCache[name] = null
-      setError(true)
+    try {
+      const res = await fetch(`/icons/${encodeURIComponent(name)}.svg`)
+      if (!res.ok) throw new Error("not found")
+      const text = await res.text()
+      if (!text.includes("<svg")) throw new Error("not svg")
+      // Normalise fill so CSS color works
+      const normalised = text
+        .replace(/fill="(?!none)[^"]*"/g, 'fill="currentColor"')
+        .replace(/stroke="(?!none)[^"]*"/g, "")
+      svgCache[name] = normalised
+      setSvg(normalised)
+    } catch {
+      svgCache[name] = null
+      setFailed(true)
     }
-
-    fetchIcon()
   }, [name])
 
-  if (error || !name) {
+  useEffect(() => {
+    setSvg(svgCache[name] ?? null)
+    setFailed(svgCache[name] === null)
+    if (svgCache[name] === undefined) load()
+  }, [name, load])
+
+  if (failed || !name) {
     return (
       <div className={`${className} bg-muted rounded flex items-center justify-center`}>
         <span className="text-[8px] text-muted-foreground">?</span>
@@ -276,15 +209,15 @@ export function GameIcon({ name, className = "w-6 h-6", fallbackColor = "current
     )
   }
 
-  if (!svgContent) {
+  if (!svg) {
     return <div className={`${className} bg-muted/50 rounded animate-pulse`} />
   }
 
   return (
-    <div 
+    <div
       className={`${className} [&_svg]:w-full [&_svg]:h-full [&_svg]:fill-current`}
-      style={{ color: fallbackColor }}
-      dangerouslySetInnerHTML={{ __html: svgContent }}
+      style={color ? { color } : undefined}
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
 }

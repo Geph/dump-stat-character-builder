@@ -135,15 +135,34 @@ export default function CompendiumPage() {
     return true
   })
 
-  const handleClearAll = async () => {
+  const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
+
+  const handleClearSection = async () => {
     setClearingAll(true)
-    const supabase = createClient()
-    const tables = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "custom_abilities"]
-    for (const table of tables) {
-      await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
+    
+    try {
+      // Call server API with service role to bypass RLS
+      const response = await fetch("/api/compendium/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table: tableName(activeTab) }),
+      })
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("[v0] Clear section error:", data.error)
+        setClearingAll(false)
+        setClearConfirmOpen(false)
+        return
+      }
+      
+      // Update local state
+      setContent(prev => ({ ...prev, [activeTab]: [] }))
+      setTabCounts(prev => ({ ...prev, [activeTab]: 0 }))
+    } catch (err) {
+      console.error("[v0] Clear section error:", err)
     }
-    setContent({ species: [], classes: [], subclasses: [], backgrounds: [], spells: [], feats: [], equipment: [], abilities: [] })
-    setTabCounts({ species: 0, classes: 0, subclasses: 0, backgrounds: 0, spells: 0, feats: 0, equipment: 0, abilities: 0 })
+    
     setClearingAll(false)
     setClearConfirmOpen(false)
   }
@@ -344,7 +363,7 @@ export default function CompendiumPage() {
               className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive border-2 border-destructive/30 rounded-xl font-semibold hover:bg-destructive/20 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              Clear All
+              Clear {tabs.find(t => t.id === activeTab)?.label ?? "All"}
             </button>
             <Link
               href={`/compendium/${activeTab}/new`}
@@ -365,12 +384,14 @@ export default function CompendiumPage() {
                   <Trash2 className="w-6 h-6 text-destructive" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-foreground">Clear All Content?</h2>
+                  <h2 className="text-xl font-black text-foreground">
+                    Clear {tabs.find(t => t.id === activeTab)?.label}?
+                  </h2>
                   <p className="text-sm text-muted-foreground">This cannot be undone.</p>
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                This will permanently delete <strong className="text-foreground">all</strong> classes, species, backgrounds, spells, feats, equipment, subclasses, and custom abilities from your compendium. You will need to re-seed from the D&D 5.5e SRD or re-import your content afterward.
+                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium. Other sections will not be affected.
               </p>
               <div className="flex gap-3">
                 <button
@@ -381,11 +402,11 @@ export default function CompendiumPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleClearAll}
+                  onClick={handleClearSection}
                   disabled={clearingAll}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
                 >
-                  {clearingAll ? "Clearing..." : "Yes, Clear Everything"}
+                  {clearingAll ? "Clearing..." : `Clear ${tabs.find(t => t.id === activeTab)?.label}`}
                 </button>
               </div>
             </div>
