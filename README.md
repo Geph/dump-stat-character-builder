@@ -1,6 +1,6 @@
 # Dump Stat
 
-![Dump Stat — D&D 5.5e character creator](./docs/images/hero.png)
+![Dump Stat — D&D 5.5e character creator](./public/images/readme/hero.png)
 
 A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 
@@ -244,8 +244,13 @@ components/
 
 lib/
 ├── db/                   # MySQL connection, schema, API client
+├── site-images.ts        # Paths for hero/background/readme images
 ├── types.ts              # TypeScript interfaces
 └── utils.ts              # Utility functions
+
+public/
+├── images/               # Hero, section backgrounds, README screenshot
+└── icons/                # Compendium SVG game icons
 ```
 
 ## Customization

@@ -39,7 +39,6 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "drizzle-orm": "^0.44.2",
     "mysql2": "^3.14.1",
-    "@vercel/analytics": "1.6.1",
     "ai": "^6.0.191",
     "autoprefixer": "^10.4.20",
     "cheerio": "^1.2.0",
