@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Download, Plus, X } from "lucide-react"
 import Link from "next/link"
 import type { UsesConfig, UsesAtLevel, CustomAbility } from "@/lib/types"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 interface AbilityFormData {
   name: string
@@ -17,6 +18,7 @@ interface AbilityFormData {
   uses: UsesConfig | null
   show_in_builder: boolean
   source: string
+  icon: string | null
 }
 
 const defaultAbility: AbilityFormData = {
@@ -28,6 +30,7 @@ const defaultAbility: AbilityFormData = {
   uses: null,
   show_in_builder: false,
   source: "Custom",
+  icon: null,
 }
 
 const ATTACH_OPTIONS = [
@@ -81,6 +84,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             uses: data.uses || null,
             show_in_builder: data.show_in_builder ?? false,
             source: data.source || "Custom",
+            icon: data.icon || null,
           })
         }
         setLoading(false)
@@ -270,6 +274,13 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               />
             </div>
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">

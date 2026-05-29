@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Download, Plus, X } from "lucide-react"
 import Link from "next/link"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 const ABILITIES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
 const SKILLS = [
@@ -30,6 +31,7 @@ interface BackgroundFormData {
   starting_gold: number
   starting_equipment: EquipmentItem[]
   source: string
+  icon: string | null
 }
 
 const defaultBackground: BackgroundFormData = {
@@ -42,6 +44,7 @@ const defaultBackground: BackgroundFormData = {
   starting_gold: 0,
   starting_equipment: [],
   source: "Custom",
+  icon: null,
 }
 
 export default function BackgroundEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -98,6 +101,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
             starting_gold: data.starting_gold ?? 0,
             starting_equipment: data.starting_equipment || [],
             source: data.source || "Custom",
+            icon: data.icon || null,
           })
         }
         setLoading(false)
@@ -268,6 +272,13 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
               />
             </div>
           </div>
+
+          {/* Icon */}
+          <GameIconPicker
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+            label="Icon"
+          />
 
           {/* Description */}
           <div>
