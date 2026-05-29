@@ -139,13 +139,30 @@ export default function CompendiumPage() {
 
   const handleClearSection = async () => {
     setClearingAll(true)
-    const supabase = createClient()
-    await supabase
-      .from(tableName(activeTab))
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000")
-    setContent(prev => ({ ...prev, [activeTab]: [] }))
-    setTabCounts(prev => ({ ...prev, [activeTab]: 0 }))
+    
+    try {
+      // Call server API with service role to bypass RLS
+      const response = await fetch("/api/compendium/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table: tableName(activeTab) }),
+      })
+      
+      if (!response.ok) {
+        const data = await response.json()
+        console.error("[v0] Clear section error:", data.error)
+        setClearingAll(false)
+        setClearConfirmOpen(false)
+        return
+      }
+      
+      // Update local state
+      setContent(prev => ({ ...prev, [activeTab]: [] }))
+      setTabCounts(prev => ({ ...prev, [activeTab]: 0 }))
+    } catch (err) {
+      console.error("[v0] Clear section error:", err)
+    }
+    
     setClearingAll(false)
     setClearConfirmOpen(false)
   }
