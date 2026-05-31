@@ -4,6 +4,7 @@ import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
 import * as cheerio from "cheerio"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
+import { IMPORT_CONTENT_TYPE_HINTS } from "@/lib/import/content-type-hints"
 
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
@@ -276,9 +277,69 @@ function parseFeat(html: string, url: string) {
   }
 }
 
+function parseFromContentTypeHint(
+  hint: string,
+  html: string,
+  url: string,
+): { result: Record<string, unknown>; tableName: CompendiumTable } | null {
+  switch (hint) {
+    case "species":
+      return { result: parseSpecies(html, url), tableName: "species" }
+    case "classes":
+      return { result: parseClass(html, url), tableName: "classes" }
+    case "backgrounds":
+      return { result: parseBackground(html, url), tableName: "backgrounds" }
+    case "spells":
+      return { result: parseSpell(html, url), tableName: "spells" }
+    case "feats":
+      return { result: parseFeat(html, url), tableName: "feats" }
+    default:
+      return null
+  }
+}
+
+function parseFromUrl(path: string, html: string, url: string): { result: Record<string, unknown>; tableName: CompendiumTable } | null {
+  const pathLower = path.toLowerCase()
+
+  const classNames = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"]
+  const isClassPage = classNames.some((c) => pathLower.includes(`/${c}:`))
+
+  if (pathLower.includes("/lineage:") || pathLower.includes("/species:") || pathLower.includes("/race:")) {
+    return { result: parseSpecies(html, url), tableName: "species" }
+  }
+  if (pathLower.includes("/class:") || isClassPage) {
+    return { result: parseClass(html, url), tableName: "classes" }
+  }
+  if (pathLower.includes("/background:")) {
+    return { result: parseBackground(html, url), tableName: "backgrounds" }
+  }
+  if (pathLower.includes("/spell:")) {
+    return { result: parseSpell(html, url), tableName: "spells" }
+  }
+  if (pathLower.includes("/feat:")) {
+    return { result: parseFeat(html, url), tableName: "feats" }
+  }
+
+  const $ = cheerio.load(html)
+  const pageTitle = $("#page-title").text().toLowerCase()
+  const breadcrumb = $(".breadcrumb, .page-tags").text().toLowerCase()
+
+  if (pageTitle.includes("spell") || breadcrumb.includes("spell")) {
+    return { result: parseSpell(html, url), tableName: "spells" }
+  }
+  if (pageTitle.includes("feat") || breadcrumb.includes("feat")) {
+    return { result: parseFeat(html, url), tableName: "feats" }
+  }
+  if (breadcrumb.includes("class") || pageTitle.includes("class")) {
+    return { result: parseClass(html, url), tableName: "classes" }
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json()
+    const { url, contentType } = await request.json()
     
     if (!url) {
       return NextResponse.json({ error: "No URL provided" }, { status: 400 })
@@ -302,55 +363,46 @@ export async function POST(request: NextRequest) {
 
     const html = await fetchPage(url)
     const path = parsedUrl.pathname.toLowerCase()
-    
-    let result
-    let tableName: CompendiumTable
-    
-    // More flexible path matching for dnd2024.wikidot.com
-    // Common patterns: /lineage:elf, /class:fighter, /spell:fireball, /artificer:main (class), /feat:alert
-    const pathLower = path.toLowerCase()
-    
-    // Class names on wikidot often use format like /artificer:main, /barbarian:main
-    const classNames = ["artificer", "barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"]
-    const isClassPage = classNames.some(c => pathLower.includes(`/${c}:`))
-    
-    if (pathLower.includes("/lineage:") || pathLower.includes("/species:") || pathLower.includes("/race:")) {
-      result = parseSpecies(html, url)
-      tableName = "species"
-    } else if (pathLower.includes("/class:") || isClassPage) {
-      result = parseClass(html, url)
-      tableName = "classes"
-    } else if (pathLower.includes("/background:")) {
-      result = parseBackground(html, url)
-      tableName = "backgrounds"
-    } else if (pathLower.includes("/spell:")) {
-      result = parseSpell(html, url)
-      tableName = "spells"
-    } else if (pathLower.includes("/feat:")) {
-      result = parseFeat(html, url)
-      tableName = "feats"
-    } else {
-      // Try to auto-detect from page content
-      const $ = cheerio.load(html)
-      const pageTitle = $("#page-title").text().toLowerCase()
-      const breadcrumb = $(".breadcrumb, .page-tags").text().toLowerCase()
-      
-      if (pageTitle.includes("spell") || breadcrumb.includes("spell")) {
-        result = parseSpell(html, url)
-        tableName = "spells"
-      } else if (pageTitle.includes("feat") || breadcrumb.includes("feat")) {
-        result = parseFeat(html, url)
-        tableName = "feats"
-      } else if (breadcrumb.includes("class") || pageTitle.includes("class")) {
-        result = parseClass(html, url)
-        tableName = "classes"
-      } else {
+
+    const contentTypeHint =
+      typeof contentType === "string" && contentType !== "all" ? contentType : null
+
+    if (
+      contentTypeHint &&
+      !IMPORT_CONTENT_TYPE_HINTS.some((hint) => hint.value === contentTypeHint)
+    ) {
+      return NextResponse.json({ error: "Invalid content type hint." }, { status: 400 })
+    }
+
+    let parsed: { result: Record<string, unknown>; tableName: CompendiumTable } | null = null
+
+    if (contentTypeHint) {
+      parsed = parseFromContentTypeHint(contentTypeHint, html, url)
+      if (!parsed) {
+        const label =
+          IMPORT_CONTENT_TYPE_HINTS.find((hint) => hint.value === contentTypeHint)?.label ??
+          contentTypeHint
         return NextResponse.json(
-          { error: "Could not determine content type from URL. Try URLs like /lineage:elf, /class:fighter, /spell:fireball, /feat:alert, or /background:sage" },
-          { status: 400 }
+          {
+            error: `Web import does not support the "${label}" content type hint. Use Auto-detect or try text/PDF import.`,
+          },
+          { status: 400 },
+        )
+      }
+    } else {
+      parsed = parseFromUrl(path, html, url)
+      if (!parsed) {
+        return NextResponse.json(
+          {
+            error:
+              "Could not determine content type from URL. Try URLs like /lineage:elf, /class:fighter, /spell:fireball, /feat:alert, or /background:sage, or set a content type hint.",
+          },
+          { status: 400 },
         )
       }
     }
+
+    const { result, tableName } = parsed
 
     await upsertByName(tableName, [result])
 

@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import {
+  normalizeCharacteristics,
+  type CharacteristicModifier,
+} from "@/lib/compendium/characteristic-modifiers"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 
 interface TraitChoice {
@@ -30,6 +35,7 @@ interface SpeciesFormData {
   size: string
   creature_type: string
   traits: Trait[]
+  characteristics: CharacteristicModifier[]
   icon: string | null
   source: string
 }
@@ -43,6 +49,7 @@ const defaultSpecies: SpeciesFormData = {
   size: "Medium",
   creature_type: "Humanoid",
   traits: [{ name: "", description: "", level: 1 }],
+  characteristics: [],
   icon: null,
   source: "Custom",
 }
@@ -53,11 +60,21 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
 
   useEffect(() => {
     params.then(({ id }) => setId(id))
   }, [params])
+
+  useEffect(() => {
+    const fetchSpells = async () => {
+      const supabase = createClient()
+      const { data } = await supabase.from("spells").select("id, name").order("name").limit(500)
+      setAllSpells(data || [])
+    }
+    fetchSpells()
+  }, [])
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -80,6 +97,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             size: data.size || "Medium",
             creature_type: data.creature_type || "Humanoid",
             traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
+            characteristics: normalizeCharacteristics(data.characteristics, null),
             icon: data.icon || null,
             source: data.source || "Custom",
           })
@@ -499,6 +517,12 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
           </div>
+
+          <CharacteristicModifiersEditor
+            value={form.characteristics}
+            onChange={(characteristics) => setForm({ ...form, characteristics })}
+            spellOptions={allSpells}
+          />
 
           {/* Submit */}
           <div className="flex gap-4 pt-4">

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { MainNav } from "@/components/main-nav"
 import { Upload, Globe, FileText, CheckCircle, AlertCircle, Loader2, ClipboardPaste, Info } from "lucide-react"
 
@@ -10,11 +11,13 @@ type ImportStatus = "idle" | "uploading" | "processing" | "success" | "error"
 export default function ImportPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
+  const [pdfContentTypeHint, setPdfContentTypeHint] = useState("all")
   const [pdfSpecificContent, setPdfSpecificContent] = useState("")
   const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
   const [pdfPageStart, setPdfPageStart] = useState("")
   const [pdfPageEnd, setPdfPageEnd] = useState("")
   const [webUrl, setWebUrl] = useState("")
+  const [webContentType, setWebContentType] = useState("all")
   const [textContent, setTextContent] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
@@ -53,6 +56,7 @@ export default function ImportPage() {
     const formData = new FormData()
     formData.append("pdf", pdfFile)
     formData.append("contentType", pdfContentType)
+    formData.append("contentTypeHint", pdfContentTypeHint)
     formData.append("pageScope", pdfPageScope)
     if (pdfPageScope === "range") {
       formData.append("pageStart", pdfPageStart)
@@ -85,11 +89,11 @@ export default function ImportPage() {
         setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`)
       } else {
         setPdfStatus("error")
-        setMessage(data.error || "Failed to import PDF")
+        setMessage(data.error || "Failed to import file")
       }
     } catch (err) {
       setPdfStatus("error")
-      setMessage(err instanceof Error ? err.message : "Failed to upload PDF. Please try again.")
+      setMessage(err instanceof Error ? err.message : "Failed to upload file. Please try again.")
     }
   }
 
@@ -140,7 +144,7 @@ export default function ImportPage() {
       const response = await fetch("/api/import/web", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: webUrl }),
+        body: JSON.stringify({ url: webUrl, contentType: webContentType }),
       })
 
       const data = await response.json()
@@ -277,26 +281,15 @@ export default function ImportPage() {
                 <h2 className="text-xl font-bold text-foreground mb-2">Import from Copied Text</h2>
                 <p className="text-muted-foreground mb-4">
                   Paste D&D content text (class details, spells, species, etc.) and AI will extract structured data.
+                  You can also paste a Dump Stat JSON export to import directly without AI.
                 </p>
                 
                 <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <label className="text-sm font-medium text-muted-foreground">Content type hint:</label>
-                    <select
-                      value={textContentType}
-                      onChange={(e) => setTextContentType(e.target.value)}
-                      className="px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-lime"
-                    >
-                      <option value="all">Auto-detect All</option>
-                      <option value="classes">Classes</option>
-                      <option value="subclasses">Subclasses</option>
-                      <option value="species">Species</option>
-                      <option value="backgrounds">Backgrounds</option>
-                      <option value="spells">Spells</option>
-                      <option value="feats">Feats</option>
-                      <option value="equipment">Equipment</option>
-                    </select>
-                  </div>
+                  <ImportContentTypeHintSelect
+                    value={textContentType}
+                    onChange={setTextContentType}
+                    focusRingClassName="focus:ring-lime"
+                  />
                   
                   <textarea
                     placeholder="Paste D&D content here (class features, spell descriptions, species traits, etc.)..."
@@ -337,7 +330,7 @@ export default function ImportPage() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold text-orange">Upload PDF</h2>
+                  <h2 className="text-xl font-bold text-orange">Upload PDF or JSON (Dump Stat Export)</h2>
                   <button
                     onClick={() => setShowAiInfo(!showAiInfo)}
                     className="p-1 text-orange/70 hover:text-orange transition-colors"
@@ -347,7 +340,8 @@ export default function ImportPage() {
                   </button>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  Upload a D&D sourcebook PDF and our AI will extract the content automatically.
+                  Upload a D&D sourcebook PDF and our AI will extract the content automatically,
+                  or upload a Dump Stat JSON export to import compendium items directly.
                 </p>
                 
                 {showAiInfo && (
@@ -370,6 +364,12 @@ export default function ImportPage() {
                 )}
                 
                 <div className="space-y-3">
+                  <ImportContentTypeHintSelect
+                    value={pdfContentTypeHint}
+                    onChange={setPdfContentTypeHint}
+                    focusRingClassName="focus:ring-orange"
+                  />
+
                   {/* Content filtering options */}
                   <div className="flex flex-wrap gap-4 items-center">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -461,14 +461,14 @@ export default function ImportPage() {
                     <label className="flex-1">
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.json,application/json"
                         onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
                         className="hidden"
                       />
                       <div className="flex items-center justify-center gap-2 px-4 py-3 bg-orange/10 border border-orange/20 rounded-xl cursor-pointer hover:bg-orange/15 transition-colors">
                         <FileText className="w-5 h-5 text-orange" />
                         <span className="font-medium truncate">
-                          {pdfFile ? pdfFile.name : "Choose PDF file..."}
+                          {pdfFile ? pdfFile.name : "Choose PDF or JSON file..."}
                         </span>
                       </div>
                     </label>
@@ -508,7 +508,14 @@ export default function ImportPage() {
                   Paste a URL from dnd2024.wikidot.com to import species, classes, spells, and more into your compendium.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="space-y-3">
+                  <ImportContentTypeHintSelect
+                    value={webContentType}
+                    onChange={setWebContentType}
+                    focusRingClassName="focus:ring-accent"
+                  />
+
+                  <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="url"
                     placeholder="https://dnd2024.wikidot.com/..."
@@ -524,6 +531,7 @@ export default function ImportPage() {
                     {getStatusIcon(webStatus)}
                     {webStatus === "processing" ? "Importing..." : "Import"}
                   </button>
+                </div>
                 </div>
                 
                 <p className="text-xs text-muted-foreground mt-3">

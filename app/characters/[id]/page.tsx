@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, User, Shield, Heart, Zap, Swords, BookOpen, Package, Star, Sparkles, Wand2, UserCircle, Info, ChevronDown, X } from "lucide-react"
 import Link from "next/link"
 import type { Character, DndClass, Species, Background, Spell, Equipment, CustomAbility } from "@/lib/types"
+import { resolveUsesConfig } from "@/lib/compendium/characteristic-modifiers"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -178,7 +179,7 @@ export default function CharacterSheetPage({ params }: { params: Promise<{ id: s
   const proficiencyBonus = Math.floor((character.level - 1) / 4) + 2
   const armorClass = character.armor_class || 10 + abilityMods.dexterity
   const speed = character.speed || 30
-  const initiative = abilityMods.dexterity
+  const initiative = character.initiative ?? abilityMods.dexterity
   const maxHp = character.hit_point_max || 0
   const savingThrowProficiencies = character.classes?.saving_throws || []
 
@@ -677,18 +678,21 @@ export default function CharacterSheetPage({ params }: { params: Promise<{ id: s
               <h2 className="text-xl font-bold text-foreground mb-4">Custom Abilities</h2>
               {customAbilities.length > 0 ? (
                 <div className="space-y-4">
-                  {customAbilities.map((ability) => (
+                  {customAbilities.map((ability) => {
+                    const uses = resolveUsesConfig(ability.characteristics, ability.uses)
+                    return (
                     <div key={ability.id} className="p-4 bg-muted rounded-xl">
                       <h3 className="font-bold text-foreground mb-1">{ability.name}</h3>
                       <p className="text-muted-foreground text-sm">{ability.description}</p>
-                      {ability.uses && ability.uses.type !== "unlimited" && (
+                      {uses && uses.type !== "unlimited" && (
                         <p className="text-xs text-magenta mt-2">
-                          Uses: {ability.uses.type === "fixed" ? ability.uses.fixedAmount : ability.uses.type}
-                          {ability.uses.recharge && ` (Recharges on ${ability.uses.recharge.replace("_", " ")})`}
+                          Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
+                          {uses.recharge && ` (Recharges on ${uses.recharge.replace("_", " ")})`}
                         </p>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">

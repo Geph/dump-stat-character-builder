@@ -7,6 +7,17 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Save, Trash2, Download, X } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
+  normalizeCharacteristics,
+  type CharacteristicModifier,
+} from "@/lib/compendium/characteristic-modifiers"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -20,6 +31,7 @@ interface FeatFormData {
   prerequisite_class_ids: string[]
   prerequisite_species_ids: string[]
   prerequisite_background_ids: string[]
+  characteristics: CharacteristicModifier[]
   source: string
   icon: string | null
 }
@@ -33,6 +45,7 @@ const defaultFeat: FeatFormData = {
   prerequisite_class_ids: [],
   prerequisite_species_ids: [],
   prerequisite_background_ids: [],
+  characteristics: [],
   source: "Custom",
   icon: null,
 }
@@ -47,6 +60,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
   const [allClasses, setAllClasses] = useState<{ id: string; name: string }[]>([])
   const [allSpecies, setAllSpecies] = useState<{ id: string; name: string }[]>([])
   const [allBackgrounds, setAllBackgrounds] = useState<{ id: string; name: string }[]>([])
+  const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -61,16 +75,19 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         { data: classes },
         { data: species },
         { data: backgrounds },
+        { data: spells },
       ] = await Promise.all([
         supabase.from("feats").select("id, name, category").order("name"),
         supabase.from("classes").select("id, name").order("name"),
         supabase.from("species").select("id, name").order("name"),
         supabase.from("backgrounds").select("id, name").order("name"),
+        supabase.from("spells").select("id, name").order("name").limit(500),
       ])
       setAllFeats(feats || [])
       setAllClasses(classes || [])
       setAllSpecies(species || [])
       setAllBackgrounds(backgrounds || [])
+      setAllSpells(spells || [])
     }
     fetchPrereqOptions()
   }, [])
@@ -98,6 +115,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             prerequisite_class_ids: data.prerequisite_class_ids || [],
             prerequisite_species_ids: data.prerequisite_species_ids || [],
             prerequisite_background_ids: data.prerequisite_background_ids || [],
+            characteristics: normalizeCharacteristics(data.benefits, null),
             source: data.source || "Custom",
             icon: data.icon || null,
           })
@@ -114,12 +132,14 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     setError(null)
 
     const supabase = createClient()
+    const { characteristics, ...rest } = form
+    const payload = { ...rest, benefits: characteristics }
 
     if (id === "new") {
-      const { error } = await supabase.from("feats").insert([form])
+      const { error } = await supabase.from("feats").insert([payload])
       if (error) { setError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from("feats").update(form).eq("id", id)
+      const { error } = await supabase.from("feats").update(payload).eq("id", id)
       if (error) { setError(error.message); setSaving(false); return }
     }
 
@@ -325,96 +345,102 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
-            <h3 className="font-semibold text-foreground">Prerequisites</h3>
-            <p className="text-xs text-muted-foreground">
-              Character must match all selected requirements before taking this feat.
-            </p>
+          <Accordion type="single" collapsible className="bg-card border-2 border-border rounded-xl px-4">
+            <AccordionItem value="prerequisites" className="border-none">
+              <AccordionTrigger className="font-semibold text-foreground hover:no-underline py-4">
+                Additional prerequisites
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pb-4">
+                <p className="text-xs text-muted-foreground">
+                  Character must match all selected requirements before taking this feat.
+                </p>
 
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Feats</label>
-              <select
-                value=""
-                onChange={(e) => addPrereqFeat(e.target.value)}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
-              >
-                <option value="">Add prerequisite feat...</option>
-                {availablePrereqFeats
-                  .filter((f) => !form.prerequisite_feat_ids.includes(f.id))
-                  .map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.category})</option>
-                  ))}
-              </select>
-              {form.prerequisite_feat_ids.length > 0 &&
-                renderPrereqTags(form.prerequisite_feat_ids, allFeats, removePrereqFeat)}
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Feats</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqFeat(e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite feat...</option>
+                    {availablePrereqFeats
+                      .filter((f) => !form.prerequisite_feat_ids.includes(f.id))
+                      .map((f) => (
+                        <option key={f.id} value={f.id}>{f.name} ({f.category})</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_feat_ids.length > 0 &&
+                    renderPrereqTags(form.prerequisite_feat_ids, allFeats, removePrereqFeat)}
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Classes</label>
-              <select
-                value=""
-                onChange={(e) => addPrereqId("prerequisite_class_ids", e.target.value)}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
-              >
-                <option value="">Add prerequisite class...</option>
-                {allClasses
-                  .filter((c) => !form.prerequisite_class_ids.includes(c.id))
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-              </select>
-              {form.prerequisite_class_ids.length > 0 &&
-                renderPrereqTags(
-                  form.prerequisite_class_ids,
-                  allClasses,
-                  (id) => removePrereqId("prerequisite_class_ids", id),
-                )}
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Classes</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_class_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite class...</option>
+                    {allClasses
+                      .filter((c) => !form.prerequisite_class_ids.includes(c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_class_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_class_ids,
+                      allClasses,
+                      (id) => removePrereqId("prerequisite_class_ids", id),
+                    )}
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Species</label>
-              <select
-                value=""
-                onChange={(e) => addPrereqId("prerequisite_species_ids", e.target.value)}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
-              >
-                <option value="">Add prerequisite species...</option>
-                {allSpecies
-                  .filter((s) => !form.prerequisite_species_ids.includes(s.id))
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-              </select>
-              {form.prerequisite_species_ids.length > 0 &&
-                renderPrereqTags(
-                  form.prerequisite_species_ids,
-                  allSpecies,
-                  (id) => removePrereqId("prerequisite_species_ids", id),
-                )}
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Species</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_species_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite species...</option>
+                    {allSpecies
+                      .filter((s) => !form.prerequisite_species_ids.includes(s.id))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_species_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_species_ids,
+                      allSpecies,
+                      (id) => removePrereqId("prerequisite_species_ids", id),
+                    )}
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Backgrounds</label>
-              <select
-                value=""
-                onChange={(e) => addPrereqId("prerequisite_background_ids", e.target.value)}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
-              >
-                <option value="">Add prerequisite background...</option>
-                {allBackgrounds
-                  .filter((b) => !form.prerequisite_background_ids.includes(b.id))
-                  .map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-              </select>
-              {form.prerequisite_background_ids.length > 0 &&
-                renderPrereqTags(
-                  form.prerequisite_background_ids,
-                  allBackgrounds,
-                  (id) => removePrereqId("prerequisite_background_ids", id),
-                )}
-            </div>
-          </div>
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Backgrounds</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_background_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite background...</option>
+                    {allBackgrounds
+                      .filter((b) => !form.prerequisite_background_ids.includes(b.id))
+                      .map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_background_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_background_ids,
+                      allBackgrounds,
+                      (id) => removePrereqId("prerequisite_background_ids", id),
+                    )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           {/* Description */}
           <div>
@@ -427,6 +453,12 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
               placeholder="Describe the feat's benefits..."
             />
           </div>
+
+          <CharacteristicModifiersEditor
+            value={form.characteristics}
+            onChange={(characteristics) => setForm({ ...form, characteristics })}
+            spellOptions={allSpells}
+          />
 
           <div className="flex gap-4 pt-4">
             <button

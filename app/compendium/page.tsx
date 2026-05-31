@@ -1,15 +1,22 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2 } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
 import { GameIcon } from "@/components/game-icon-picker"
 import { formatCompendiumSource } from "@/lib/srd/source"
 import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export"
 
 type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
 
@@ -57,6 +64,40 @@ export default function CompendiumPage() {
     equipment: 0,
     abilities: 0,
   })
+
+  const tabsScrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
+  const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
+
+  const updateTabsScrollState = useCallback(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setCanScrollTabsLeft(el.scrollLeft > 1)
+    setCanScrollTabsRight(el.scrollLeft < maxScroll - 1)
+  }, [])
+
+  useEffect(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    updateTabsScrollState()
+    el.addEventListener("scroll", updateTabsScrollState, { passive: true })
+    const observer = new ResizeObserver(updateTabsScrollState)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener("scroll", updateTabsScrollState)
+      observer.disconnect()
+    }
+  }, [updateTabsScrollState])
+
+  const scrollCompendiumTabs = (direction: "left" | "right") => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    el.scrollBy({
+      left: direction === "left" ? -el.clientWidth : el.clientWidth,
+      behavior: "smooth",
+    })
+  }
 
   // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
@@ -261,6 +302,40 @@ export default function CompendiumPage() {
     }
   }
 
+  const handleExportSection = async () => {
+    const supabase = createClient()
+    const resolvedTable = tableName(activeTab)
+    const { data } = await supabase.from(resolvedTable).select("*").order("name").limit(500)
+    if (!data?.length) return
+
+    const classNameById = new Map<string, string>()
+    if (activeTab === "subclasses") {
+      const { data: classesData } = await supabase.from("classes").select("id, name")
+      for (const cls of classesData ?? []) {
+        classNameById.set(cls.id as string, cls.name as string)
+      }
+    }
+
+    const items = (data as Record<string, unknown>[])
+      .map((row) => {
+        const exportRow = { ...row }
+        if (activeTab === "subclasses" && exportRow.class_id) {
+          exportRow.class_name = classNameById.get(exportRow.class_id as string)
+        }
+        return rowToExportItem(activeTab, exportRow)
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+
+    const exportPayload = buildBulkExportJson(activeTab, items)
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `dump-stat-${activeTab}-export.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = `/compendium/${activeTab}/${data.id}`
@@ -435,13 +510,33 @@ export default function CompendiumPage() {
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setClearConfirmOpen(true)}
-              className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive border-2 border-destructive/30 rounded-xl font-semibold hover:bg-destructive/20 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear {tabs.find(t => t.id === activeTab)?.label ?? "All"}
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-12 h-12 bg-card border-2 border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label="Compendium section options"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleExportSection}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Export all {tabs.find((t) => t.id === activeTab)?.label}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setClearConfirmOpen(true)}
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear {tabs.find((t) => t.id === activeTab)?.label}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link
               href={`/compendium/${activeTab}/new`}
               className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
@@ -580,26 +675,66 @@ export default function CompendiumPage() {
         )}
 
         {/* Tabs */}
-        <div id="compendium-tabs" className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
-              }`}>
-                {tabCounts[tab.id]}
-              </span>
-            </button>
-          ))}
+        <div className="relative mb-6 group/tabs">
+          {canScrollTabsLeft && (
+            <>
+              <div
+                className="pointer-events-none absolute left-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-r from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs left"
+                onClick={() => scrollCompendiumTabs("left")}
+                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          {canScrollTabsRight && (
+            <>
+              <div
+                className="pointer-events-none absolute right-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-l from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs right"
+                onClick={() => scrollCompendiumTabs("right")}
+                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          <div
+            id="compendium-tabs"
+            ref={tabsScrollRef}
+            className={`flex gap-2 overflow-x-auto pb-4 scrollbar-hide scroll-smooth ${
+              canScrollTabsLeft ? "pl-10" : ""
+            } ${canScrollTabsRight ? "pr-10" : ""}`}
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
+                }`}>
+                  {tabCounts[tab.id]}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (

@@ -40,3 +40,24 @@ export const WEAPON_PROFICIENCY_OPTIONS = [
   "Martial weapons",
   "Specific weapon",
 ] as const
+
+export const DND_SKILLS = [
+  "Acrobatics",
+  "Animal Handling",
+  "Arcana",
+  "Athletics",
+  "Deception",
+  "History",
+  "Insight",
+  "Intimidation",
+  "Investigation",
+  "Medicine",
+  "Nature",
+  "Perception",
+  "Performance",
+  "Persuasion",
+  "Religion",
+  "Sleight of Hand",
+  "Stealth",
+  "Survival",
+] as const
