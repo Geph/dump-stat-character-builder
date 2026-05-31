@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.2",
+  "version": "0.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,8 @@
     "db:setup": "node scripts/setup-local-mysql.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
     "srd:build": "node scripts/build-srd-seed.mjs",
-    "version:bump": "node scripts/bump-version.mjs"
+    "version:bump": "node scripts/bump-version.mjs",
+    "push": "node scripts/git-push.mjs Cursor"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.66",
