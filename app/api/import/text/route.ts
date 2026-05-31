@@ -1,5 +1,7 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
+import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import {
@@ -105,15 +107,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { text, contentType } = body
     
-    if (!text || text.trim().length < 20) {
+    const trimmedText = text?.trim() ?? ""
+
+    const dumpStatItems = trimmedText ? parseDumpStatExportJson(trimmedText) : null
+    if (dumpStatItems) {
+      const configError = getDatabaseConfigError()
+      if (configError) {
+        return NextResponse.json({ error: configError }, { status: 503 })
+      }
+      const result = await importDumpStatExportItems(dumpStatItems)
+      return NextResponse.json({
+        success: true,
+        count: result.count,
+        breakdown: result.breakdown,
+        source: "Dump Stat Export",
+      })
+    }
+
+    if (!trimmedText || trimmedText.length < 20) {
       return NextResponse.json({ error: "Please provide more text content to parse" }, { status: 400 })
     }
 
     // Truncate text if too long (AI context limits)
     const maxLength = 50000
-    const truncatedText = text.length > maxLength 
-      ? text.slice(0, maxLength) + "\n...[truncated]" 
-      : text
+    const truncatedText = trimmedText.length > maxLength 
+      ? trimmedText.slice(0, maxLength) + "\n...[truncated]" 
+      : trimmedText
 
     // Build prompt based on content type filter
     let systemPrompt = `You are a D&D 2024 content parser. Extract game content from the provided text.
@@ -132,9 +151,7 @@ For class features, include the level they are gained at.
 For subclasses, include the parent class name in class_name field.
 For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names.`
 
-    if (contentType && contentType !== "all") {
-      systemPrompt += `\n\nFocus primarily on extracting: ${contentType}. You may still extract other content types if clearly present.`
-    }
+    systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentType)
 
     const aiConfigError = getImportAiConfigError()
     if (aiConfigError) {

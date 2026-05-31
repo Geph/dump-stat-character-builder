@@ -33,6 +33,7 @@ export interface Species {
   size: string | null
   creature_type: string | null
   traits: Trait[]
+  characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   icon: string | null
   source: string
   creator_url: string | null
@@ -104,8 +105,10 @@ export interface CustomAbility {
   name: string
   description: string | null
   prerequisites: string | null
+  characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   attached_to_type: string | null
   attached_to_id: string | null
+  /** @deprecated Use a "uses" entry in characteristics instead */
   uses: UsesConfig | null
   show_in_builder: boolean
   source: string
@@ -162,7 +165,7 @@ export interface Feat {
   prerequisite_class_ids: string[] | null
   prerequisite_species_ids: string[] | null
   prerequisite_background_ids: string[] | null
-  benefits: unknown
+  benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   source: string
   creator_url: string | null
   created_at: string

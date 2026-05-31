@@ -1,5 +1,7 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
+import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { upsertByName } from "@/lib/db/repository"
@@ -104,13 +106,39 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get("pdf") as File
     const contentType = formData.get("contentType") as string | null
+    const contentTypeHint = formData.get("contentTypeHint") as string | null
     const specificContent = formData.get("specificContent") as string | null
     const pageScope = formData.get("pageScope") as string | null
     const pageStart = formData.get("pageStart") as string | null
     const pageEnd = formData.get("pageEnd") as string | null
     
     if (!file) {
-      return NextResponse.json({ error: "No PDF file provided" }, { status: 400 })
+      return NextResponse.json({ error: "No file provided" }, { status: 400 })
+    }
+
+    const fileName = file.name.toLowerCase()
+    const isJsonFile = fileName.endsWith(".json") || file.type === "application/json"
+
+    if (isJsonFile) {
+      const jsonText = await file.text()
+      const dumpStatItems = parseDumpStatExportJson(jsonText.trim())
+      if (!dumpStatItems) {
+        return NextResponse.json(
+          { error: "Invalid Dump Stat export JSON. Expected a dump-stat-export bundle or dnd-* item export." },
+          { status: 400 },
+        )
+      }
+      const configError = getDatabaseConfigError()
+      if (configError) {
+        return NextResponse.json({ error: configError }, { status: 503 })
+      }
+      const result = await importDumpStatExportItems(dumpStatItems)
+      return NextResponse.json({
+        success: true,
+        count: result.count,
+        breakdown: result.breakdown,
+        source: "Dump Stat Export",
+      })
     }
 
     // Convert file to buffer
@@ -188,9 +216,8 @@ For equipment:
 
     if (contentType === "specific" && specificContent) {
       systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`
-    } else if (contentType && contentType !== "all") {
-      systemPrompt += `\n\nFocus primarily on extracting: ${contentType}. You may still extract other content types if clearly present.`
     }
+    systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentTypeHint)
 
     const pageRangeNote = pageRange
       ? `\n\nNote: Text was extracted from pages ${pageRange.first}–${pageRange.last} of ${totalPages} total pages.`

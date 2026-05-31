@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
 import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
 import type { UsesConfig, FeatureChoice } from "@/lib/types"
+import { DND_SKILLS } from "@/lib/compendium/constants"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -15,12 +16,7 @@ const WEAPON_TYPES = ["Simple weapons", "Martial weapons", "Specific weapon"]
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
 const DIE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
-const SKILLS = [
-  "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception",
-  "History", "Insight", "Intimidation", "Investigation", "Medicine",
-  "Nature", "Perception", "Performance", "Persuasion", "Religion",
-  "Sleight of Hand", "Stealth", "Survival"
-]
+const SKILLS = [...DND_SKILLS]
 
 // Starting equipment choice structure
 interface EquipmentOption {
