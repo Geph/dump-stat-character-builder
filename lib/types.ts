@@ -40,6 +40,23 @@ export interface Species {
   created_at: string
 }
 
+export interface StartingEquipmentOption {
+  label: string
+  items: { name: string; quantity: number }[]
+}
+
+export interface StartingEquipmentGroup {
+  description: string
+  options: StartingEquipmentOption[]
+}
+
+export interface SpellProgressionEntry {
+  level: number
+  cantrips: number
+  prepared: number
+  max_spell_level: number
+}
+
 export interface DndClass {
   id: string
   name: string
@@ -51,15 +68,19 @@ export interface DndClass {
   weapon_proficiencies: string[] | null
   skill_choices: { count: number; options: string[] } | null
   starting_equipment: unknown
+  starting_equipment_groups: StartingEquipmentGroup[] | null
+  starting_gold: number | null
   features: Feature[]
   spellcasting: {
     ability: string
+    type?: "prepared" | "pact"
     cantrips?: number
     spells_known?: number
     prepared?: boolean
     spellbook?: boolean
     pact_magic?: boolean
     starts_at?: number
+    progression?: SpellProgressionEntry[]
   } | null
   icon: string | null
   source: string
@@ -78,6 +99,7 @@ export interface Subclass {
     cantrips?: number
     spells_known?: number
   } | null
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -111,6 +133,7 @@ export interface CustomAbility {
   /** @deprecated Use a "uses" entry in characteristics instead */
   uses: UsesConfig | null
   show_in_builder: boolean
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -129,6 +152,7 @@ export interface Background {
   starting_equipment: { name: string; quantity: number }[] | null
   equipment: unknown  // legacy field
   feature: { name: string; description: string } | null
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -149,6 +173,7 @@ export interface Spell {
   description: string | null
   higher_levels: string | null
   classes: string[] | null
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -166,6 +191,7 @@ export interface Feat {
   prerequisite_species_ids: string[] | null
   prerequisite_background_ids: string[] | null
   benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -190,6 +216,7 @@ export interface Equipment {
   mastery?: string | null // e.g. "Cleave", "Graze"
   // Attached abilities (for finesse, two-handed, etc.)
   attached_ability_ids?: string[]
+  icon: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -219,6 +246,8 @@ export interface Character {
   backstory: string | null
   appearance: Record<string, string> | null
   portrait_url: string | null
+  banner_url: string | null
+  asi_allocations: Record<string, Partial<Record<string, number>>> | null
   proficiency_bonus: number
   hit_points: number | null
   hit_point_max: number | null
@@ -226,6 +255,7 @@ export interface Character {
   initiative: number | null
   speed: number | null
   skill_proficiencies: string[] | null
+  skill_expertise: string[] | null
   tool_proficiencies: string[] | null
   languages: string[] | null
   equipment_ids: string[]
@@ -256,6 +286,8 @@ export interface CharacterDraft {
   backstory: string
   appearance?: Record<string, string>
   portrait_url: string | null
+  banner_url?: string | null
+  asi_allocations?: Record<string, Partial<Record<string, number>>> | null
   skill_proficiencies: string[]
   tool_proficiencies?: string[]
   languages: string[]

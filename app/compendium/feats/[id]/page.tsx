@@ -4,9 +4,12 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Download, X } from "lucide-react"
-import Link from "next/link"
+import { X } from "lucide-react"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import {
   Accordion,
@@ -18,6 +21,7 @@ import {
   normalizeCharacteristics,
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -33,6 +37,7 @@ interface FeatFormData {
   prerequisite_background_ids: string[]
   characteristics: CharacteristicModifier[]
   source: string
+  creator_url: string
   icon: string | null
 }
 
@@ -47,6 +52,7 @@ const defaultFeat: FeatFormData = {
   prerequisite_background_ids: [],
   characteristics: [],
   source: "Custom",
+  creator_url: "",
   icon: null,
 }
 
@@ -117,6 +123,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             prerequisite_background_ids: data.prerequisite_background_ids || [],
             characteristics: normalizeCharacteristics(data.benefits, null),
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
             icon: data.icon || null,
           })
         }
@@ -132,8 +139,12 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     setError(null)
 
     const supabase = createClient()
-    const { characteristics, ...rest } = form
-    const payload = { ...rest, benefits: characteristics }
+    const { characteristics, creator_url, ...rest } = form
+    const payload = {
+      ...rest,
+      benefits: characteristics,
+      creator_url: normalizeCreatorUrl(creator_url),
+    }
 
     if (id === "new") {
       const { error } = await supabase.from("feats").insert([payload])
@@ -236,48 +247,24 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
+      <CompendiumEditorToolbar
+        tab="feats"
+        title={id === "new" ? "New Feat" : "Edit Feat"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Feat"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/compendium?tab=feats"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Feat" : "Edit Feat"}
-            </h1>
-          </div>
-
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           {/* Name + Source */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -302,6 +289,11 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
               />
             </div>
           </div>
+
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
 
           {/* Icon */}
           <GameIconPicker
@@ -460,22 +452,6 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             spellOptions={allSpells}
           />
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Feat"}
-            </button>
-            <Link
-              href="/compendium?tab=feats"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
         </form>
       </main>
     </div>

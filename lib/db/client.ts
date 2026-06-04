@@ -8,6 +8,16 @@ import { resolveTable } from "./tables"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbResult<T = any> = { data: T | null; error: { message: string } | null; count?: number | null }
 
+function apiError(json: { error?: unknown }, fallback: string): { message: string } {
+  const raw = json?.error
+  if (typeof raw === "string" && raw.trim()) return { message: raw }
+  if (raw && typeof raw === "object" && "message" in raw) {
+    const nested = (raw as { message?: unknown }).message
+    if (typeof nested === "string" && nested.trim()) return { message: nested }
+  }
+  return { message: fallback }
+}
+
 type Filter = { op: "eq" | "in"; column: string; value?: unknown; values?: unknown[] }
 
 class QueryBuilder implements PromiseLike<DbResult> {
@@ -62,6 +72,10 @@ class QueryBuilder implements PromiseLike<DbResult> {
     return this
   }
 
+  maybeSingle() {
+    return this.single()
+  }
+
   insert(rows: unknown[]) {
     this.mode = "insert"
     this.payload = rows
@@ -113,7 +127,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
           body: JSON.stringify({ rows: this.payload }),
         })
         const json = await res.json()
-        if (!res.ok) return { data: null, error: { message: json.error ?? "Insert failed" } }
+        if (!res.ok) return { data: null, error: apiError(json, "Insert failed") }
         return { data: json.data ?? null, error: null }
       }
 
@@ -128,7 +142,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
           }),
         })
         const json = await res.json()
-        if (!res.ok) return { data: null, error: { message: json.error ?? "Upsert failed" } }
+        if (!res.ok) return { data: null, error: apiError(json, "Upsert failed") }
         return { data: json.data ?? null, error: null }
       }
 
@@ -141,7 +155,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
           body: JSON.stringify(this.payload),
         })
         const json = await res.json()
-        if (!res.ok) return { data: null, error: { message: json.error ?? "Update failed" } }
+        if (!res.ok) return { data: null, error: apiError(json, "Update failed") }
         return { data: json.data ?? null, error: null }
       }
 
@@ -150,7 +164,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
         if (id) {
           const res = await fetch(`/api/data/${apiTable}/${id}`, { method: "DELETE" })
           const json = await res.json()
-          if (!res.ok) return { data: null, error: { message: json.error ?? "Delete failed" } }
+          if (!res.ok) return { data: null, error: apiError(json, "Delete failed") }
           return { data: null, error: null }
         }
         const res = await fetch(`/api/data/${apiTable}`, {
@@ -159,7 +173,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
           body: JSON.stringify({ filters: this.filters }),
         })
         const json = await res.json()
-        if (!res.ok) return { data: null, error: { message: json.error ?? "Delete failed" } }
+        if (!res.ok) return { data: null, error: apiError(json, "Delete failed") }
         return { data: null, error: null }
       }
 
@@ -179,7 +193,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
       const res = await fetch(`/api/data/${apiTable}?${params}`)
       const json = await res.json()
       if (!res.ok) {
-        return { data: null, error: { message: json.error ?? "Query failed" }, count: null }
+        return { data: null, error: apiError(json, "Query failed"), count: null }
       }
       if (this.countOnly) {
         return { data: null, error: null, count: json.count ?? 0 }
@@ -201,7 +215,20 @@ class QueryBuilder implements PromiseLike<DbResult> {
         body: JSON.stringify(this.payload),
       })
       const json = await res.json()
-      if (!res.ok) return { data: null, error: { message: json.error ?? "Insert failed" } }
+      if (!res.ok) return { data: null, error: apiError(json, "Insert failed") }
+      return { data: json.data ?? null, error: null }
+    }
+
+    if (this.mode === "update") {
+      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+      if (!id) return { data: null, error: { message: "Update requires .eq('id', ...)" } }
+      const res = await fetch(`/api/characters/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(this.payload),
+      })
+      const json = await res.json()
+      if (!res.ok) return { data: null, error: apiError(json, "Update failed") }
       return { data: json.data ?? null, error: null }
     }
 
@@ -209,21 +236,23 @@ class QueryBuilder implements PromiseLike<DbResult> {
       const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
       const res = await fetch(`/api/characters/${id}`, { method: "DELETE" })
       const json = await res.json()
-      if (!res.ok) return { data: null, error: { message: json.error ?? "Delete failed" } }
+      if (!res.ok) return { data: null, error: apiError(json, "Delete failed") }
       return { data: null, error: null }
     }
 
-    if (this.singleRow || this.embedRelations) {
-      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
-      const res = await fetch(`/api/characters/${id}`)
+    const characterId = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as
+      | string
+      | undefined
+    if (this.singleRow || (this.embedRelations && characterId)) {
+      const res = await fetch(`/api/characters/${characterId}`)
       const json = await res.json()
-      if (!res.ok) return { data: null, error: { message: json.error ?? "Not found" } }
+      if (!res.ok) return { data: null, error: apiError(json, "Not found") }
       return { data: json.data ?? null, error: null }
     }
 
     const res = await fetch("/api/characters")
     const json = await res.json()
-    if (!res.ok) return { data: null, error: { message: json.error ?? "Query failed" } }
+    if (!res.ok) return { data: null, error: apiError(json, "Query failed") }
     return { data: json.data ?? [], error: null }
   }
 }

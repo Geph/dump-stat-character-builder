@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
-import { Plus, User, Trash2, Search } from "lucide-react"
+import { createClient } from "@/lib/db/client"
+import { Plus, User, Trash2, Search, Pencil } from "lucide-react"
 import Link from "next/link"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
 
@@ -24,23 +24,24 @@ export default function CharactersPage() {
   const [filterSpecies, setFilterSpecies] = useState("all")
   const [filterLevel, setFilterLevel] = useState("all")
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest")
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchCharacters = async () => {
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from("characters")
-        .select(`
-          *,
-          classes (*),
-          species (*),
-          backgrounds (*)
-        `)
-        .order("created_at", { ascending: false })
+      setLoadError(null)
+      const db = createClient()
 
-      if (!error && data) {
-        setCharacters(data)
+      const { data, error } = await db.from("characters").select("*")
+
+      if (error) {
+        const message = error.message || "Could not load characters from the database."
+        setLoadError(message)
+        console.error("Failed to load characters:", message)
+      } else if (data) {
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        setCharacters(sorted)
       }
       setLoading(false)
     }
@@ -106,8 +107,8 @@ export default function CharactersPage() {
   const deleteCharacter = async (id: string) => {
     if (!confirm("Are you sure you want to delete this character?")) return
     
-    const supabase = createClient()
-    const { error } = await supabase.from("characters").delete().eq("id", id)
+    const db = createClient()
+    const { error } = await db.from("characters").delete().eq("id", id)
     
     if (!error) {
       setCharacters(characters.filter(c => c.id !== id))
@@ -145,6 +146,21 @@ export default function CharactersPage() {
             New Character
           </Link>
         </div>
+
+        {loadError && (
+          <div
+            role="alert"
+            className="mb-6 rounded-xl border-2 border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+          >
+            <p className="font-semibold">Could not load characters</p>
+            <p className="mt-1 text-muted-foreground">{loadError}</p>
+            {loadError.includes("schema is out of date") && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Run <code className="font-mono">npm run db:migrate</code> in the project root, then refresh.
+              </p>
+            )}
+          </div>
+        )}
 
         {!loading && characters.length > 0 && (
           <div className="mb-6 space-y-3">
@@ -300,11 +316,20 @@ export default function CharactersPage() {
                 
                 {/* Character Info - Below the image */}
                 <div className="p-4">
-                  <Link href={`/characters/${character.id}`}>
-                    <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">
-                      {character.name}
-                    </h3>
-                  </Link>
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/characters/${character.id}`} className="min-w-0 flex-1">
+                      <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">
+                        {character.name}
+                      </h3>
+                    </Link>
+                    <Link
+                      href={`/builder?edit=${character.id}`}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+                      title="Edit character"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Link>
+                  </div>
                   <div className="mt-1 space-y-0.5">
                     <p className="text-sm text-primary font-medium">
                       {character.classes?.name || "Adventurer"}

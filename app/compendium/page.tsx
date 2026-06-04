@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
@@ -16,9 +17,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export"
+import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export-format"
+import {
+  type CompendiumContentType,
+  getCompendiumItemIcon,
+  isCompendiumContentType,
+} from "@/lib/compendium/content-types"
 
-type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
+type ContentType = CompendiumContentType
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "classes", label: "Classes", icon: <Shield className="w-4 h-4" /> },
@@ -32,6 +38,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
 ]
 
 export default function CompendiumPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [searchQuery, setSearchQuery] = useState("")
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
@@ -53,6 +60,7 @@ export default function CompendiumPage() {
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
+  const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
@@ -64,6 +72,13 @@ export default function CompendiumPage() {
     equipment: 0,
     abilities: 0,
   })
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab && isCompendiumContentType(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   const tabsScrollRef = useRef<HTMLDivElement>(null)
   const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
@@ -199,6 +214,11 @@ export default function CompendiumPage() {
       if (spellFilterClass !== "all" && !(spell.classes ?? []).includes(spellFilterClass)) return false
       if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
       if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
+    }
+    if (activeTab === "feats") {
+      const feat = item as Feat
+      const category = feat.category || "General"
+      if (featFilterCategory !== "all" && category !== featFilterCategory) return false
     }
     if (activeTab === "equipment") {
       const eq = item as Equipment
@@ -339,8 +359,8 @@ export default function CompendiumPage() {
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = `/compendium/${activeTab}/${data.id}`
-    const iconName = data.icon as string | null | undefined
-    
+    const iconName = getCompendiumItemIcon(activeTab, data)
+
     return (
       <motion.div
         key={data.id as string}
@@ -350,11 +370,9 @@ export default function CompendiumPage() {
       >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            {iconName && (
-              <div className="w-10 h-10 shrink-0 text-primary">
-                <GameIcon name={iconName} className="w-10 h-10" fallbackColor="currentColor" />
-              </div>
-            )}
+            <div className="w-10 h-10 shrink-0 text-primary">
+              <GameIcon name={iconName} className="w-10 h-10" />
+            </div>
             <h3 
               className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight"
               onClick={() => setSelectedItem(item)}
@@ -387,29 +405,22 @@ export default function CompendiumPage() {
         {activeTab === "subclasses" && (
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
-              {(data as Subclass).description?.slice(0, 80)}...
+              {(data as Subclass).features?.length
+                ? (data as Subclass).features!.map((f) => f.name).join(", ")
+                : "No features listed"}
             </p>
-            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-              {((data as Subclass).features || []).length} features
-            </span>
           </div>
         )}
         {activeTab === "species" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
-                {(data as Species).size || "Medium"}
-              </span>
-              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {typeof (data as Species).speed === "object"
-                  ? Object.entries((data as Species).speed as Record<string, number>).map(([k, v]) => `${v}ft ${k}`).join(" / ")
-                  : `${(data as Species).speed || 30} ft`
-                }
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as Species).source || "Custom"}
-            </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>Source: {formatCompendiumSource((data as Species).source)}</p>
+            {((data as Species).traits ?? [])
+              .filter((t) => t.isChoice && t.choices?.options?.length)
+              .map((t) => (
+                <p key={t.name}>
+                  {t.choices!.options.map((o) => o.name).join(", ")}
+                </p>
+              ))}
           </div>
         )}
         {activeTab === "backgrounds" && (
@@ -439,6 +450,14 @@ export default function CompendiumPage() {
                 Concentration
               </span>
             )}
+            {((data as Spell).classes ?? []).map((cls) => (
+              <span
+                key={cls}
+                className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
+              >
+                {cls}
+              </span>
+            ))}
           </div>
         )}
         {activeTab === "feats" && (
@@ -467,6 +486,11 @@ export default function CompendiumPage() {
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {(data as Equipment).category}
             </span>
+            {(data as Equipment).subcategory && (
+              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
+                {(data as Equipment).subcategory!.replace(/\s+Weapons$/i, "")}
+              </span>
+            )}
             {(data as Equipment).cost && (
               <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
                 {((data as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
@@ -674,6 +698,36 @@ export default function CompendiumPage() {
           </div>
         )}
 
+        {/* Feat type filter */}
+        {activeTab === "feats" && (
+          <div id="feat-filters" className="flex flex-wrap gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                Type
+              </label>
+              <select
+                value={featFilterCategory}
+                onChange={(e) => setFeatFilterCategory(e.target.value)}
+                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="all">All Types</option>
+                <option value="Origin">Origin</option>
+                <option value="General">General</option>
+                <option value="Epic Boon">Epic Boon</option>
+                <option value="Fighting Style">Fighting Style</option>
+              </select>
+            </div>
+            {featFilterCategory !== "all" && (
+              <button
+                onClick={() => setFeatFilterCategory("all")}
+                className="ml-auto px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="relative mb-6 group/tabs">
           {canScrollTabsLeft && (
@@ -766,7 +820,7 @@ export default function CompendiumPage() {
 
         {/* Content Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-card rounded-2xl p-5 border-2 border-border animate-pulse">
                 <div className="h-6 bg-muted rounded w-3/4 mb-3" />
@@ -794,7 +848,7 @@ export default function CompendiumPage() {
                     {group.items.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <AnimatePresence>
                     {group.items.map(renderContentCard)}
                   </AnimatePresence>
@@ -803,7 +857,7 @@ export default function CompendiumPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <AnimatePresence>
               {filteredContent.map(renderContentCard)}
             </AnimatePresence>
@@ -832,6 +886,19 @@ export default function CompendiumPage() {
               <p className="text-muted-foreground whitespace-pre-wrap">
                 {(selectedItem as { description?: string }).description || "No description available."}
               </p>
+              {(selectedItem as { creator_url?: string | null }).creator_url && (
+                <p className="mt-4 text-sm">
+                  <span className="text-muted-foreground">Source link: </span>
+                  <a
+                    href={(selectedItem as { creator_url: string }).creator_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {(selectedItem as { creator_url: string }).creator_url}
+                  </a>
+                </p>
+              )}
               <button
                 onClick={() => setSelectedItem(null)}
                 className="mt-6 w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"

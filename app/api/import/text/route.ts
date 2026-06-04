@@ -1,6 +1,11 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import {
+  CHOICE_EXTRACTION_HINT,
+  ClassFeatureSchema,
+  SpeciesTraitSchema,
+} from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
@@ -21,10 +26,7 @@ const ContentSchema = z.object({
     description: z.string().nullable(),
     speed: z.number().nullable(),
     size: z.string().nullable(),
-    traits: z.array(z.object({
-      name: z.string(),
-      description: z.string()
-    }))
+    traits: z.array(SpeciesTraitSchema)
   })).optional(),
   classes: z.array(z.object({
     name: z.string(),
@@ -44,21 +46,13 @@ const ContentSchema = z.object({
       spells_known: z.number().optional(),
       prepared: z.boolean().optional()
     }).nullable(),
-    features: z.array(z.object({
-      level: z.number(),
-      name: z.string(),
-      description: z.string()
-    }))
+    features: z.array(ClassFeatureSchema)
   })).optional(),
   subclasses: z.array(z.object({
     name: z.string(),
     class_name: z.string(),
     description: z.string().nullable(),
-    features: z.array(z.object({
-      level: z.number(),
-      name: z.string(),
-      description: z.string()
-    }))
+    features: z.array(ClassFeatureSchema)
   })).optional(),
   backgrounds: z.array(z.object({
     name: z.string(),
@@ -149,7 +143,9 @@ Extract ONLY the content types you find in the text. Return empty arrays for typ
 Be thorough and extract all instances of each content type found.
 For class features, include the level they are gained at.
 For subclasses, include the parent class name in class_name field.
-For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names.`
+For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names.
+
+${CHOICE_EXTRACTION_HINT}`
 
     systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentType)
 

@@ -10,6 +10,8 @@ type MultiSelectChoicesProps = {
   selected: string[]
   onChange: (selected: string[]) => void
   accentClass?: string
+  /** Options that cannot be selected (e.g. already chosen elsewhere). */
+  unavailableOptions?: string[]
 }
 
 export function MultiSelectChoices({
@@ -20,13 +22,16 @@ export function MultiSelectChoices({
   selected,
   onChange,
   accentClass = "border-primary bg-primary/10",
+  unavailableOptions = [],
 }: MultiSelectChoicesProps) {
+  const unavailable = new Set(unavailableOptions)
+
   const toggle = (name: string) => {
     if (selected.includes(name)) {
       onChange(selected.filter((entry) => entry !== name))
       return
     }
-    if (selected.length >= maxCount) return
+    if (unavailable.has(name) || selected.length >= maxCount) return
     onChange([...selected, name])
   }
 
@@ -42,7 +47,8 @@ export function MultiSelectChoices({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {options.map((option) => {
           const isSelected = selected.includes(option.name)
-          const isDisabled = !isSelected && selected.length >= maxCount
+          const isTakenElsewhere = !isSelected && unavailable.has(option.name)
+          const isDisabled = isTakenElsewhere || (!isSelected && selected.length >= maxCount)
           return (
             <button
               key={option.name}
@@ -58,6 +64,9 @@ export function MultiSelectChoices({
               }`}
             >
               <p className="font-semibold text-sm text-foreground">{option.name}</p>
+              {isTakenElsewhere && (
+                <p className="text-xs text-muted-foreground mt-0.5">Already chosen</p>
+              )}
               {option.description && (
                 <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{option.description}</p>
               )}

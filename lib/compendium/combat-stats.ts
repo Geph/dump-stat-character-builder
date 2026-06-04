@@ -145,3 +145,26 @@ export function calculateWeaponAttack(
 
   return { attackBonus, damageDisplay }
 }
+
+export function getWeaponMastery(weapon: Equipment): string | null {
+  const mastery = getPropertyRecord(weapon).mastery
+  return typeof mastery === "string" && mastery.trim() ? mastery : null
+}
+
+export function getWeaponRangeText(weapon: Equipment): string | null {
+  if (weapon.range?.trim()) return weapon.range
+  for (const tag of propertiesToStringArray(weapon.properties)) {
+    const thrown = tag.match(/thrown\s*\(range\s*([\d/]+)\)/i)
+    if (thrown) return `${thrown[1]} ft (thrown)`
+    const range = tag.match(/range\s*([\d/]+)/i)
+    if (range) return `${range[1]} ft`
+  }
+  const sub = weapon.subcategory?.toLowerCase() ?? ""
+  if (sub.includes("melee")) return "Melee reach"
+  if (sub.includes("ranged")) return "Ranged"
+  return null
+}
+
+export function getWeaponPropertyTags(weapon: Equipment): string[] {
+  return propertiesToStringArray(weapon.properties)
+}
