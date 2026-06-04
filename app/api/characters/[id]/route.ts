@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
-import { getCharacterWithRelations } from "@/lib/db/characters"
+import { getCharacterWithRelations, updateCharacter } from "@/lib/db/characters"
 import { deleteRowById } from "@/lib/db/repository"
 
 export async function GET(
@@ -17,6 +17,28 @@ export async function GET(
     return NextResponse.json({ data })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Query failed"
+    return NextResponse.json(
+      { error: formatDatabaseError("Characters", message) },
+      { status: 500 },
+    )
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const configError = getDatabaseConfigError()
+    if (configError) return NextResponse.json({ error: configError }, { status: 503 })
+
+    const { id } = await params
+    const body = await request.json()
+    const row = (body?.rows?.[0] ?? body) as Record<string, unknown>
+    const data = await updateCharacter(id, row)
+    return NextResponse.json({ data })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Update failed"
     return NextResponse.json(
       { error: formatDatabaseError("Characters", message) },
       { status: 500 },

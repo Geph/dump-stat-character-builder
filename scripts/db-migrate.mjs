@@ -9,17 +9,18 @@
  */
 
 import mysql from "mysql2/promise"
+import { isDuplicateColumnError, isMigrationApplied } from "../lib/db/migrate-utils.mjs"
 import { SCHEMA_MIGRATIONS } from "../lib/db/schema-migrations.mjs"
 
 const host = process.env.MYSQL_HOST?.trim() || "localhost"
 const port = Number(process.env.MYSQL_PORT?.trim() || "3306")
 const database = process.env.MYSQL_DATABASE?.trim() || "dump_stat"
-const rootPassword = process.env.MYSQL_ROOT_PASSWORD ?? ""
+const rootPassword = process.env.MYSQL_ROOT_PASSWORD ?? "tEa%loss2"
 
 if (!rootPassword) {
   console.error(
     "Set MYSQL_ROOT_PASSWORD, then run again.\n" +
-      "  PowerShell: $env:MYSQL_ROOT_PASSWORD = 'your-password'; pnpm db:migrate",
+      "  PowerShell: $env:MYSQL_ROOT_PASSWORD = 'tEa%loss2'; pnpm db:migrate",
   )
   process.exit(1)
 }
@@ -28,17 +29,22 @@ async function runPendingMigrations(conn) {
   const applied = []
   for (const migration of SCHEMA_MIGRATIONS) {
     const [rows] = await conn.query(migration.check)
-    const row = rows[0] ?? {}
-    const done = migration.alreadyApplied
-      ? migration.alreadyApplied(row)
-      : Number(row.n ?? 0) > 0
-    if (done) {
+    const rowsArray = rows ?? []
+    if (isMigrationApplied(rowsArray, migration)) {
       console.log(`skip ${migration.name} (already applied)`)
       continue
     }
-    await conn.query(migration.apply)
-    console.log(`applied ${migration.name}`)
-    applied.push(migration.name)
+    try {
+      await conn.query(migration.apply)
+      console.log(`applied ${migration.name}`)
+      applied.push(migration.name)
+    } catch (err) {
+      if (isDuplicateColumnError(err)) {
+        console.log(`skip ${migration.name} (column already exists)`)
+        continue
+      }
+      throw err
+    }
   }
   return applied
 }

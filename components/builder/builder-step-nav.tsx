@@ -9,6 +9,7 @@ type BuilderStepNavProps = {
   onBack: () => void
   onContinue: () => void
   onSave: () => void
+  saveLabel?: string
   className?: string
 }
 
@@ -19,6 +20,7 @@ export function BuilderStepNav({
   onBack,
   onContinue,
   onSave,
+  saveLabel = "Create Character",
   className = "",
 }: BuilderStepNavProps) {
   return (
@@ -50,7 +52,7 @@ export function BuilderStepNav({
           disabled={saving || !canProceed}
           className="flex items-center gap-2 px-5 py-2 bg-success text-white rounded-xl font-bold text-sm hover:bg-success/90 disabled:opacity-50 transition-colors"
         >
-          {saving ? "Saving..." : "Create Character"}
+          {saving ? "Saving..." : saveLabel}
           <Check className="w-4 h-4" />
         </button>
       )}

@@ -1,6 +1,11 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import {
+  CHOICE_EXTRACTION_HINT,
+  ClassFeatureSchema,
+  SpeciesTraitSchema,
+} from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
@@ -50,21 +55,14 @@ const ContentSchema = z.object({
     description: z.string().nullable(),
     speed: z.number().nullable(),
     size: z.string().nullable(),
-    traits: z.array(z.object({
-      name: z.string(),
-      description: z.string()
-    }))
+    traits: z.array(SpeciesTraitSchema)
   })).optional(),
   classes: z.array(z.object({
     name: z.string(),
     description: z.string().nullable(),
     hit_die: z.number(),
     primary_ability: z.array(z.string()).nullable(),
-    features: z.array(z.object({
-      level: z.number(),
-      name: z.string(),
-      description: z.string()
-    }))
+    features: z.array(ClassFeatureSchema)
   })).optional(),
   backgrounds: z.array(z.object({
     name: z.string(),
@@ -212,7 +210,9 @@ Be thorough and extract all instances of each content type found.
 For equipment:
 - Put cost in a cost object { amount, unit } (e.g. 5 SP → { amount: 5, unit: "SP" }), NOT in the item name
 - Do not include HTML tags (<td>, etc.) or markdown headers (####) in names
-- Strip table markup from all fields`
+- Strip table markup from all fields
+
+${CHOICE_EXTRACTION_HINT}`
 
     if (contentType === "specific" && specificContent) {
       systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`

@@ -1,4 +1,57 @@
+import { DND_SKILLS } from "@/lib/compendium/constants"
 import type { DndClass, Species, Subclass } from "@/lib/types"
+
+const DND_SKILL_SET = new Set<string>(DND_SKILLS)
+
+export function isDndSkill(name: string): boolean {
+  return DND_SKILL_SET.has(name)
+}
+
+export type SkillPickSource = {
+  id: string
+  skills: string[]
+}
+
+export function getTakenSkills(
+  sources: SkillPickSource[],
+  excludeSourceId?: string,
+): Set<string> {
+  const taken = new Set<string>()
+  for (const source of sources) {
+    if (source.id === excludeSourceId) continue
+    for (const skill of source.skills) {
+      if (isDndSkill(skill)) taken.add(skill)
+    }
+  }
+  return taken
+}
+
+export function buildSkillPickSources(params: {
+  backgroundSkills?: string[] | null
+  classSkillPicks: Record<string, string[]>
+  featureChoicePicks: Record<string, string[]>
+  speciesTraitPicks: Record<string, string[]>
+}): SkillPickSource[] {
+  const sources: SkillPickSource[] = []
+
+  if (params.backgroundSkills?.length) {
+    sources.push({ id: "background", skills: params.backgroundSkills })
+  }
+
+  for (const [classId, picks] of Object.entries(params.classSkillPicks)) {
+    sources.push({ id: `class:${classId}`, skills: picks })
+  }
+
+  for (const [key, picks] of Object.entries(params.featureChoicePicks)) {
+    sources.push({ id: `feature:${key}`, skills: picks })
+  }
+
+  for (const [key, picks] of Object.entries(params.speciesTraitPicks)) {
+    sources.push({ id: `species:${key}`, skills: picks })
+  }
+
+  return sources
+}
 
 export const SUBCLASS_LEVEL = 3
 

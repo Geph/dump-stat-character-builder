@@ -4,10 +4,14 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
-import Link from "next/link"
+import { Plus, X } from "lucide-react"
 import type { Spell } from "@/lib/types"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -34,6 +38,7 @@ interface SpellFormData {
   higher_levels: string
   classes: string[]
   source: string
+  creator_url: string
   icon: string | null
 }
 
@@ -52,6 +57,7 @@ const defaultSpell: SpellFormData = {
   higher_levels: "",
   classes: [],
   source: "Custom",
+  creator_url: "",
   icon: null,
 }
 
@@ -96,6 +102,7 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
             higher_levels: data.higher_levels || "",
             classes: data.classes || [],
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
             icon: data.icon || null,
           })
         }
@@ -111,16 +118,17 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
     setError(null)
 
     const supabase = createClient()
+    const payload = { ...form, creator_url: normalizeCreatorUrl(form.creator_url) }
     
     if (id === "new") {
-      const { error } = await supabase.from("spells").insert([form])
+      const { error } = await supabase.from("spells").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("spells").update(form).eq("id", id)
+      const { error } = await supabase.from("spells").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -160,13 +168,19 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
     }))
   }
 
+  const spellHasClass = (cls: string) =>
+    form.classes.some((c) => c.toLowerCase() === cls.toLowerCase())
+
   const toggleClass = (cls: string) => {
-    setForm(prev => ({
-      ...prev,
-      classes: prev.classes.includes(cls)
-        ? prev.classes.filter(c => c !== cls)
-        : [...prev.classes, cls]
-    }))
+    setForm((prev) => {
+      const has = prev.classes.some((c) => c.toLowerCase() === cls.toLowerCase())
+      return {
+        ...prev,
+        classes: has
+          ? prev.classes.filter((c) => c.toLowerCase() !== cls.toLowerCase())
+          : [...prev.classes, cls],
+      }
+    })
   }
 
   if (loading) {
@@ -190,49 +204,24 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
-      
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/compendium?tab=spells"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Spell" : "Edit Spell"}
-            </h1>
-          </div>
-          
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
+      <CompendiumEditorToolbar
+        tab="spells"
+        title={id === "new" ? "New Spell" : "Edit Spell"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Spell"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -262,6 +251,11 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
 
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
+
           {/* Icon */}
           <GameIconPicker
             value={form.icon}
@@ -279,8 +273,8 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
                 <label key={cls} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={form.classes.includes(cls.toLowerCase())}
-                    onChange={() => toggleClass(cls.toLowerCase())}
+                    checked={spellHasClass(cls)}
+                    onChange={() => toggleClass(cls)}
                     className="w-4 h-4 rounded border-border accent-primary"
                   />
                   <span className="text-foreground">{cls}</span>
@@ -446,22 +440,6 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* Submit */}
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Spell"}
-            </button>
-            <Link
-              href="/compendium?tab=spells"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
         </form>
       </main>
     </div>

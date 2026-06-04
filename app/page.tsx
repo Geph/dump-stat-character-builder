@@ -188,10 +188,10 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section id="features-section" className="py-20 px-4 border-t border-border bg-card-lighter relative">
+        <section id="features-section" className="py-20 px-6 md:px-10 lg:px-12 border-t border-border bg-card-lighter relative">
           {/* Inset purple border */}
-          <div className="absolute inset-4 border-2 border-primary/30 rounded-xl pointer-events-none" />
-          <div className="max-w-6xl mx-auto relative z-10">
+          <div className="absolute inset-6 md:inset-8 lg:inset-10 border-2 border-primary/30 rounded-xl pointer-events-none" />
+          <div className="max-w-6xl mx-auto relative z-10 px-4 md:px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
