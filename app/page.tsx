@@ -4,30 +4,35 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import Link from "next/link"
-import { Sparkles, BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
+import { BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  FEATURE_CARD_IMAGES,
+  HERO_ROTATING_IMAGES,
+  LIBRARY_STATS_BACKGROUND,
+} from "@/lib/site-images"
 
 const features = [
   {
-    icon: Sparkles,
+    href: "/builder",
+    image: FEATURE_CARD_IMAGES.characterCreation,
+    imageAlt: "Easy Character Creation",
     title: "Easy Character Creation",
     description: "Build your hero step-by-step with a simple 6-step wizard following D&D 2024 rules.",
-    accent: "bg-primary",
-    glow: "glow-primary",
   },
   {
-    icon: BookOpen,
+    href: "/compendium",
+    image: FEATURE_CARD_IMAGES.compendium,
+    imageAlt: "Build Your Compendium",
     title: "Build Your Compendium",
     description: "Browse species, classes, backgrounds, spells, feats, and equipment from the D&D 5.5e SRD and beyond.",
-    accent: "bg-lime",
-    glow: "glow-lime",
   },
   {
-    icon: Upload,
+    href: "/import",
+    image: FEATURE_CARD_IMAGES.importContent,
+    imageAlt: "Import External Content",
     title: "Import External Content",
     description: "Upload PDFs or import from web sources to expand your content library.",
-    accent: "bg-orange",
-    glow: "glow-orange",
   },
 ]
 
@@ -47,24 +52,17 @@ type LibraryStats = {
   equipment: number
 }
 
-const HERO_IMAGES = [
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%282%29.png-lTMAKAxAk9aiCH20M7OEgf7cCAjfz4.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%281%29.png-jkIOsnsjzDsuQGxDZ9aEuKojaqHbbX.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%285%29.png-RP5MWN94zgr6Ju284Ct4ZtHSBL6gmr.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%283%29.png-PtWc4DkQOWfQklKa5PYDBmOxjSuCud.jpeg",
-  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rotating%20%284%29.png-CuA5DQzxgCl6Paw1PmtYUgDG65Xu6a.jpeg",
-]
-
-const LIBRARY_STATS_BG = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/library-stats-section.png-xI6gFjkk9x6YETqOPgj8680eSlMkL2.jpeg"
-
 export default function HomePage() {
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
 
-  const [heroBg] = useState<string>(
-    () => HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)]
-  )
+  // Fixed initial image so SSR and hydration match; randomize after mount.
+  const [heroBg, setHeroBg] = useState(HERO_ROTATING_IMAGES[0])
+
+  useEffect(() => {
+    setHeroBg(HERO_ROTATING_IMAGES[Math.floor(Math.random() * HERO_ROTATING_IMAGES.length)])
+  }, [])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -190,10 +188,10 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section id="features-section" className="py-20 px-4 border-t border-border bg-card-lighter relative">
+        <section id="features-section" className="py-20 px-6 md:px-10 lg:px-12 border-t border-border bg-card-lighter relative">
           {/* Inset purple border */}
-          <div className="absolute inset-4 border-2 border-primary/30 rounded-xl pointer-events-none" />
-          <div className="max-w-6xl mx-auto relative z-10">
+          <div className="absolute inset-6 md:inset-8 lg:inset-10 border-2 border-primary/30 rounded-xl pointer-events-none" />
+          <div className="max-w-6xl mx-auto relative z-10 px-4 md:px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -210,30 +208,38 @@ export default function HomePage() {
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {features.map((feature, index) => {
-                const Icon = feature.icon
-                return (
-                  <motion.div
-                    key={feature.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-card rounded-xl p-6 border border-border hover:border-primary/40 transition-all hover:-translate-y-1"
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Link
+                    href={feature.href}
+                    className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card-lighter"
                   >
-                    <div className={`w-12 h-12 ${feature.accent} ${feature.glow} rounded-xl flex items-center justify-center mb-4`}>
-                      <Icon className="w-6 h-6 text-primary-foreground" />
+                    <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={feature.image}
+                        alt={feature.imageAlt}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
                     </div>
-                    <h3
-                      className="text-lg font-bold text-foreground mb-2"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">{feature.description}</p>
-                  </motion.div>
-                )
-              })}
+                    <div className="flex flex-col items-center p-6">
+                      <h3
+                        className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors"
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {feature.title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm">{feature.description}</p>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
@@ -243,7 +249,7 @@ export default function HomePage() {
           id="library-stats-section"
           className="py-20 px-4 border-t border-border relative overflow-hidden"
           style={{
-            backgroundImage: `url(${LIBRARY_STATS_BG})`,
+            backgroundImage: `url(${LIBRARY_STATS_BACKGROUND})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",

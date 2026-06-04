@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
+import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { MainNav } from "@/components/main-nav"
 import { Upload, Globe, FileText, CheckCircle, AlertCircle, Loader2, ClipboardPaste, Info } from "lucide-react"
 
@@ -10,8 +11,13 @@ type ImportStatus = "idle" | "uploading" | "processing" | "success" | "error"
 export default function ImportPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
+  const [pdfContentTypeHint, setPdfContentTypeHint] = useState("all")
   const [pdfSpecificContent, setPdfSpecificContent] = useState("")
+  const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
+  const [pdfPageStart, setPdfPageStart] = useState("")
+  const [pdfPageEnd, setPdfPageEnd] = useState("")
   const [webUrl, setWebUrl] = useState("")
+  const [webContentType, setWebContentType] = useState("all")
   const [textContent, setTextContent] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
@@ -27,9 +33,35 @@ export default function ImportPage() {
     setPdfStatus("uploading")
     setMessage("")
 
+    if (pdfPageScope === "range") {
+      const start = parseInt(pdfPageStart, 10)
+      const end = parseInt(pdfPageEnd, 10)
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        setPdfStatus("error")
+        setMessage("Enter a valid start and end page number.")
+        return
+      }
+      if (start < 1 || end < 1) {
+        setPdfStatus("error")
+        setMessage("Page numbers must be 1 or greater.")
+        return
+      }
+      if (start > end) {
+        setPdfStatus("error")
+        setMessage("Start page must be less than or equal to end page.")
+        return
+      }
+    }
+
     const formData = new FormData()
     formData.append("pdf", pdfFile)
     formData.append("contentType", pdfContentType)
+    formData.append("contentTypeHint", pdfContentTypeHint)
+    formData.append("pageScope", pdfPageScope)
+    if (pdfPageScope === "range") {
+      formData.append("pageStart", pdfPageStart)
+      formData.append("pageEnd", pdfPageEnd)
+    }
     if (pdfContentType === "specific" && pdfSpecificContent) {
       formData.append("specificContent", pdfSpecificContent)
     }
@@ -51,14 +83,17 @@ export default function ImportPage() {
               .map(([type, count]) => `${count} ${type}`)
               .join(", ")
           : ""
-        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}`)
+        const pagesText = data.pagesParsed?.from
+          ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
+          : ""
+        setMessage(`Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`)
       } else {
         setPdfStatus("error")
-        setMessage(data.error || "Failed to import PDF")
+        setMessage(data.error || "Failed to import file")
       }
     } catch (err) {
       setPdfStatus("error")
-      setMessage(err instanceof Error ? err.message : "Failed to upload PDF. Please try again.")
+      setMessage(err instanceof Error ? err.message : "Failed to upload file. Please try again.")
     }
   }
 
@@ -109,7 +144,7 @@ export default function ImportPage() {
       const response = await fetch("/api/import/web", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: webUrl }),
+        body: JSON.stringify({ url: webUrl, contentType: webContentType }),
       })
 
       const data = await response.json()
@@ -140,7 +175,15 @@ export default function ImportPage() {
 
       if (response.ok) {
         setSeedStatus("success")
-        setMessage(`Successfully seeded ${data.total} items from D&D 5.5e SRD`)
+        setMessage(
+          `Successfully seeded ${data.total} SRD items` +
+            (data.breakdown
+              ? ` (${Object.entries(data.breakdown)
+                  .filter(([, n]) => (n as number) > 0)
+                  .map(([k, n]) => `${n} ${k}`)
+                  .join(", ")})`
+              : ""),
+        )
       } else {
         setSeedStatus("error")
         setMessage(data.error || "Failed to seed database")
@@ -207,8 +250,9 @@ export default function ImportPage() {
                   Quick Start: Seed D&D 5.5e SRD Content
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Instantly populate your database with the D&D 5.5e SRD content including 
-                  classes, species, backgrounds, spells, and equipment.
+                  Populate your database with the full official SRD 5.2.1: 12 classes, 12 subclasses,
+                  9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries
+                  (parsed from the SRD, not a hand-picked sample).
                 </p>
                 <button
                   onClick={handleSeedSRD}
@@ -237,26 +281,15 @@ export default function ImportPage() {
                 <h2 className="text-xl font-bold text-foreground mb-2">Import from Copied Text</h2>
                 <p className="text-muted-foreground mb-4">
                   Paste D&D content text (class details, spells, species, etc.) and AI will extract structured data.
+                  You can also paste a Dump Stat JSON export to import directly without AI.
                 </p>
                 
                 <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <label className="text-sm font-medium text-muted-foreground">Content type hint:</label>
-                    <select
-                      value={textContentType}
-                      onChange={(e) => setTextContentType(e.target.value)}
-                      className="px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-lime"
-                    >
-                      <option value="all">Auto-detect All</option>
-                      <option value="classes">Classes</option>
-                      <option value="subclasses">Subclasses</option>
-                      <option value="species">Species</option>
-                      <option value="backgrounds">Backgrounds</option>
-                      <option value="spells">Spells</option>
-                      <option value="feats">Feats</option>
-                      <option value="equipment">Equipment</option>
-                    </select>
-                  </div>
+                  <ImportContentTypeHintSelect
+                    value={textContentType}
+                    onChange={setTextContentType}
+                    focusRingClassName="focus:ring-lime"
+                  />
                   
                   <textarea
                     placeholder="Paste D&D content here (class features, spell descriptions, species traits, etc.)..."
@@ -289,43 +322,54 @@ export default function ImportPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-card rounded-2xl p-6 border-2 border-border"
+            className="bg-gradient-to-br from-orange/10 to-orange/5 rounded-2xl p-6 border-2 border-orange/25"
           >
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 bg-secondary/20 rounded-xl flex items-center justify-center shrink-0">
-                <Upload className="w-7 h-7 text-secondary" />
+              <div className="w-14 h-14 bg-orange/20 rounded-xl flex items-center justify-center shrink-0">
+                <Upload className="w-7 h-7 text-orange" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-bold text-foreground">Upload PDF</h2>
+                  <h2 className="text-xl font-bold text-orange">Upload PDF or JSON (Dump Stat Export)</h2>
                   <button
                     onClick={() => setShowAiInfo(!showAiInfo)}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1 text-orange/70 hover:text-orange transition-colors"
                     title="How does AI processing work?"
                   >
                     <Info className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  Upload a D&D sourcebook PDF and our AI will extract the content automatically.
+                  Upload a D&D sourcebook PDF and our AI will extract the content automatically,
+                  or upload a Dump Stat JSON export to import compendium items directly.
                 </p>
                 
                 {showAiInfo && (
-                  <div className="mb-4 p-4 bg-muted/50 rounded-xl border border-border">
-                    <h3 className="font-bold text-foreground mb-2">How AI Processing Works</h3>
+                  <div className="mb-4 p-4 bg-orange/10 rounded-xl border border-orange/20">
+                    <h3 className="font-bold text-orange mb-2">How AI Processing Works</h3>
                     <p className="text-sm text-muted-foreground mb-2">
-                      PDF and text imports use <strong>OpenAI GPT-4o</strong> via the Vercel AI Gateway to parse and structure D&D content.
+                      PDF and text imports use <strong>OpenAI</strong> (default model:{" "}
+                      <code className="text-xs">gpt-4o</code>) to parse and structure D&D content.
+                      Set <code className="text-xs">OPENAI_API_KEY</code> in your server environment.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>No separate API key required - uses Vercel AI Gateway</li>
+                      <li>Requires your own OpenAI API key on the server (not in the browser)</li>
+                      <li>Optional: override model with IMPORT_AI_MODEL (e.g. gpt-4o-mini)</li>
                       <li>Extracts classes, species, spells, feats, equipment, and more</li>
                       <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
                       <li>Large PDFs are truncated to 50,000 characters for processing</li>
+                      <li>Optionally import only a specific page range (e.g. pages 12–24)</li>
                     </ul>
                   </div>
                 )}
                 
                 <div className="space-y-3">
+                  <ImportContentTypeHintSelect
+                    value={pdfContentTypeHint}
+                    onChange={setPdfContentTypeHint}
+                    focusRingClassName="focus:ring-orange"
+                  />
+
                   {/* Content filtering options */}
                   <div className="flex flex-wrap gap-4 items-center">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -334,7 +378,7 @@ export default function ImportPage() {
                         name="pdfContentType"
                         checked={pdfContentType === "all"}
                         onChange={() => setPdfContentType("all")}
-                        className="w-4 h-4 accent-secondary"
+                        className="w-4 h-4 accent-orange"
                       />
                       <span className="text-sm text-foreground">Extract all content</span>
                     </label>
@@ -344,7 +388,7 @@ export default function ImportPage() {
                         name="pdfContentType"
                         checked={pdfContentType === "specific"}
                         onChange={() => setPdfContentType("specific")}
-                        className="w-4 h-4 accent-secondary"
+                        className="w-4 h-4 accent-orange"
                       />
                       <span className="text-sm text-foreground">Specific content only</span>
                     </label>
@@ -356,29 +400,87 @@ export default function ImportPage() {
                       placeholder="e.g., Fighter class features, Fireball spell, Elf species..."
                       value={pdfSpecificContent}
                       onChange={(e) => setPdfSpecificContent(e.target.value)}
-                      className="w-full px-4 py-2 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary text-sm"
+                      className="w-full px-4 py-2 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-orange text-sm"
                     />
                   )}
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-orange/80">Pages to import</p>
+                    <div className="flex flex-wrap gap-4 items-center">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfPageScope"
+                          checked={pdfPageScope === "all"}
+                          onChange={() => setPdfPageScope("all")}
+                          className="w-4 h-4 accent-orange"
+                        />
+                        <span className="text-sm text-foreground">All pages</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfPageScope"
+                          checked={pdfPageScope === "range"}
+                          onChange={() => setPdfPageScope("range")}
+                          className="w-4 h-4 accent-orange"
+                        />
+                        <span className="text-sm text-foreground">Page range</span>
+                      </label>
+                    </div>
+                    {pdfPageScope === "range" && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          From
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="1"
+                            value={pdfPageStart}
+                            onChange={(e) => setPdfPageStart(e.target.value)}
+                            className="w-24 px-3 py-2 bg-muted rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-orange"
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-foreground">
+                          To
+                          <input
+                            type="number"
+                            min={1}
+                            placeholder="10"
+                            value={pdfPageEnd}
+                            onChange={(e) => setPdfPageEnd(e.target.value)}
+                            className="w-24 px-3 py-2 bg-muted rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-orange"
+                          />
+                        </label>
+                        <span className="text-xs text-muted-foreground">1-based page numbers</span>
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3">
                     <label className="flex-1">
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.json,application/json"
                         onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
                         className="hidden"
                       />
-                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-muted rounded-xl cursor-pointer hover:bg-muted/80 transition-colors">
-                        <FileText className="w-5 h-5" />
+                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-orange/10 border border-orange/20 rounded-xl cursor-pointer hover:bg-orange/15 transition-colors">
+                        <FileText className="w-5 h-5 text-orange" />
                         <span className="font-medium truncate">
-                          {pdfFile ? pdfFile.name : "Choose PDF file..."}
+                          {pdfFile ? pdfFile.name : "Choose PDF or JSON file..."}
                         </span>
                       </div>
                     </label>
                     <button
                       onClick={handlePdfUpload}
-                      disabled={!pdfFile || pdfStatus === "processing" || pdfStatus === "uploading"}
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/90 transition-colors disabled:opacity-50"
+                      disabled={
+                        !pdfFile ||
+                        pdfStatus === "processing" ||
+                        pdfStatus === "uploading" ||
+                        (pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim()))
+                      }
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange text-orange-foreground rounded-xl font-bold hover:bg-orange/90 transition-all glow-orange disabled:opacity-50"
                     >
                       {getStatusIcon(pdfStatus)}
                       {pdfStatus === "processing" ? "Processing..." : "Import"}
@@ -403,10 +505,17 @@ export default function ImportPage() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-foreground mb-2">Import from Web</h2>
                 <p className="text-muted-foreground mb-4">
-                  Import content from dnd2024.wikidot.com or other supported sources.
+                  Paste a URL from dnd2024.wikidot.com to import species, classes, spells, and more into your compendium.
                 </p>
                 
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="space-y-3">
+                  <ImportContentTypeHintSelect
+                    value={webContentType}
+                    onChange={setWebContentType}
+                    focusRingClassName="focus:ring-accent"
+                  />
+
+                  <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="url"
                     placeholder="https://dnd2024.wikidot.com/..."
@@ -423,20 +532,11 @@ export default function ImportPage() {
                     {webStatus === "processing" ? "Importing..." : "Import"}
                   </button>
                 </div>
-                
-                <div className="mt-4 p-3 bg-muted rounded-xl">
-                  <p className="text-sm font-medium text-foreground mb-2">Supported sources:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>- dnd2024.wikidot.com/lineage:* (Species)</li>
-                    <li>- dnd2024.wikidot.com/artificer:main, /barbarian:main, etc. (Classes)</li>
-                    <li>- dnd2024.wikidot.com/background:* (Backgrounds)</li>
-                    <li>- dnd2024.wikidot.com/spell:* (Spells)</li>
-                    <li>- dnd2024.wikidot.com/feat:* (Feats)</li>
-                  </ul>
-                  <p className="text-xs text-muted-foreground mt-2 italic">
-                    Imported content will appear in the Compendium after import completes.
-                  </p>
                 </div>
+                
+                <p className="text-xs text-muted-foreground mt-3">
+                  Imported content will appear in the Compendium after import completes.
+                </p>
               </div>
             </div>
           </motion.div>

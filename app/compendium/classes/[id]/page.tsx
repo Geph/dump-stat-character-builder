@@ -4,10 +4,15 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Plus, X, Download } from "lucide-react"
-import Link from "next/link"
+import { Plus, X } from "lucide-react"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
 import type { UsesConfig, FeatureChoice } from "@/lib/types"
+import { DND_SKILLS } from "@/lib/compendium/constants"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -15,12 +20,7 @@ const WEAPON_TYPES = ["Simple weapons", "Martial weapons", "Specific weapon"]
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
 const DIE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
-const SKILLS = [
-  "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception",
-  "History", "Insight", "Intimidation", "Investigation", "Medicine",
-  "Nature", "Perception", "Performance", "Persuasion", "Religion",
-  "Sleight of Hand", "Stealth", "Survival"
-]
+const SKILLS = [...DND_SKILLS]
 
 // Starting equipment choice structure
 interface EquipmentOption {
@@ -60,6 +60,7 @@ interface ClassFormData {
   starting_equipment_groups: StartingEquipmentGroup[]
   icon: string | null
   source: string
+  creator_url: string
 }
 
 const defaultClass: ClassFormData = {
@@ -77,6 +78,7 @@ const defaultClass: ClassFormData = {
   starting_equipment_groups: [],
   icon: null,
   source: "Custom",
+  creator_url: "",
 }
 
 export default function ClassEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -121,6 +123,7 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
             starting_equipment_groups: data.starting_equipment_groups || [],
             icon: data.icon || null,
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
           })
           setHasSpellcasting(!!data.spellcasting)
         }
@@ -140,6 +143,7 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
       ...form,
       features: form.features.filter(f => f.name.trim()),
       spellcasting: hasSpellcasting ? form.spellcasting : null,
+      creator_url: normalizeCreatorUrl(form.creator_url),
     }
     
     if (id === "new") {
@@ -346,49 +350,24 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
-      
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/compendium?tab=classes"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Class" : "Edit Class"}
-            </h1>
-          </div>
-          
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
+      <CompendiumEditorToolbar
+        tab="classes"
+        title={id === "new" ? "New Class" : "Edit Class"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Class"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -417,6 +396,11 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
               />
             </div>
           </div>
+
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
 
           {/* Icon Picker */}
           <GameIconPicker
@@ -449,7 +433,7 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
               onChange={(e) => setForm({ ...form, hit_die: parseInt(e.target.value) })}
               className="w-full md:w-48 px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
             >
-              {[6, 8, 10, 12].map((die) => (
+              {[4, 6, 8, 10, 12, 20].map((die) => (
                 <option key={die} value={die}>d{die}</option>
               ))}
             </select>
@@ -1046,23 +1030,6 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
             )}
           </div>
 
-          {/* Submit */}
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Class"}
-            </button>
-            <Link
-              href="/compendium?tab=classes"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
         </form>
       </main>
     </div>

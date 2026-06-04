@@ -4,20 +4,34 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Download, Plus, X } from "lucide-react"
-import Link from "next/link"
-import type { UsesConfig, UsesAtLevel, CustomAbility } from "@/lib/types"
+import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
+import {
+  extractUsesConfig,
+  normalizeCharacteristics,
+  type CharacteristicModifier,
+} from "@/lib/compendium/characteristic-modifiers"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { attachTypeToTable } from "@/lib/db/attach-target-table"
+import {
+  EQUIPMENT_ATTACH_CATEGORIES,
+  isEquipmentCategoryAttach,
+} from "@/lib/compendium/attach-targets"
 
 interface AbilityFormData {
   name: string
   description: string
   prerequisites: string
+  characteristics: CharacteristicModifier[]
   attached_to_type: string
   attached_to_id: string
-  uses: UsesConfig | null
   show_in_builder: boolean
   source: string
+  creator_url: string
   icon: string | null
 }
 
@@ -25,11 +39,12 @@ const defaultAbility: AbilityFormData = {
   name: "",
   description: "",
   prerequisites: "",
+  characteristics: [],
   attached_to_type: "",
   attached_to_id: "",
-  uses: null,
   show_in_builder: false,
   source: "Custom",
+  creator_url: "",
   icon: null,
 }
 
@@ -41,11 +56,8 @@ const ATTACH_OPTIONS = [
   { value: "feat", label: "Feat" },
   { value: "equipment", label: "Equipment" },
   { value: "spell", label: "Spell" },
+  { value: "ability", label: "Custom Ability" },
 ]
-
-const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
-const DIE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
-const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 export default function AbilityEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string | null>(null)
@@ -55,6 +67,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState<string | null>(null)
   const [attachTargets, setAttachTargets] = useState<{ id: string; name: string }[]>([])
   const [otherAbilities, setOtherAbilities] = useState<{ id: string; name: string }[]>([])
+  const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -79,11 +92,12 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             name: data.name || "",
             description: data.description || "",
             prerequisites: data.prerequisites || "",
+            characteristics: normalizeCharacteristics(data.characteristics, data.uses),
             attached_to_type: data.attached_to_type || "",
             attached_to_id: data.attached_to_id || "",
-            uses: data.uses || null,
             show_in_builder: data.show_in_builder ?? false,
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
             icon: data.icon || null,
           })
         }
@@ -93,7 +107,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     }
   }, [id])
 
-  // Fetch attach targets when type changes
+  // Fetch attach targets when type changes (equipment uses categories, not item IDs)
   useEffect(() => {
     const fetchTargets = async () => {
       if (!form.attached_to_type) {
@@ -101,35 +115,45 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
         return
       }
 
+      if (isEquipmentCategoryAttach(form.attached_to_type)) {
+        setAttachTargets(
+          EQUIPMENT_ATTACH_CATEGORIES.map((category) => ({
+            id: category,
+            name: category,
+          })),
+        )
+        return
+      }
+
+      const table = attachTypeToTable(form.attached_to_type)
+      if (!table) {
+        setAttachTargets([])
+        return
+      }
+
       const supabase = createClient()
-      const tableName = form.attached_to_type === "class" ? "classes" 
-        : form.attached_to_type === "species" ? "species"
-        : form.attached_to_type === "spell" ? "spells"
-        : `${form.attached_to_type}s`
-      
       const { data } = await supabase
-        .from(tableName)
+        .from(table)
         .select("id, name")
         .order("name")
-        .limit(50)
-      
-      setAttachTargets(data || [])
+        .limit(200)
+
+      const rows = (data || []).filter((row) => row.id !== id)
+      setAttachTargets(rows)
     }
     fetchTargets()
-  }, [form.attached_to_type])
+  }, [form.attached_to_type, id])
 
-  // Fetch other abilities for the custom_ability uses type
   useEffect(() => {
     const fetchOtherAbilities = async () => {
       const supabase = createClient()
-      const { data } = await supabase
-        .from("custom_abilities")
-        .select("id, name")
-        .order("name")
-        .limit(100)
-      
-      // Exclude the current ability from the list
-      setOtherAbilities((data || []).filter(a => a.id !== id))
+      const [{ data: abilities }, { data: spells }] = await Promise.all([
+        supabase.from("custom_abilities").select("id, name").order("name").limit(100),
+        supabase.from("spells").select("id, name").order("name").limit(500),
+      ])
+
+      setOtherAbilities((abilities || []).filter((a) => a.id !== id))
+      setAllSpells(spells || [])
     }
     fetchOtherAbilities()
   }, [id])
@@ -143,6 +167,8 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     const payload = {
       ...form,
       attached_to_id: form.attached_to_id || null,
+      uses: extractUsesConfig(form.characteristics),
+      creator_url: normalizeCreatorUrl(form.creator_url),
     }
     
     if (id === "new") {
@@ -205,48 +231,24 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
-      
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/compendium?tab=abilities"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Custom Ability" : "Edit Custom Ability"}
-            </h1>
-          </div>
-          
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
+      <CompendiumEditorToolbar
+        tab="abilities"
+        title={id === "new" ? "New Custom Ability" : "Edit Custom Ability"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Ability"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -275,6 +277,11 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
+
           {/* Icon */}
           <GameIconPicker
             value={form.icon}
@@ -293,266 +300,6 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               placeholder="e.g., Level 5, Strength 13 or higher"
             />
-          </div>
-
-          {/* Uses Configuration */}
-          <div className="bg-card-lighter border-2 border-primary/30 rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Uses Configuration</h3>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.uses !== null}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setForm({ ...form, uses: { type: "unlimited" } })
-                    } else {
-                      setForm({ ...form, uses: null })
-                    }
-                  }}
-                  className="w-4 h-4 rounded border-border accent-primary"
-                />
-                <span className="text-sm text-muted-foreground">Has limited uses</span>
-              </label>
-            </div>
-
-            {form.uses && (
-              <div className="space-y-4 pt-2 border-t border-border">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-foreground mb-2">
-                      Uses Type
-                    </label>
-                    <select
-                      value={form.uses.type}
-                      onChange={(e) => setForm({ 
-                        ...form, 
-                        uses: { 
-                          ...form.uses!, 
-                          type: e.target.value as UsesConfig["type"],
-                          // Reset type-specific fields
-                          fixedAmount: undefined,
-                          abilityModifier: undefined,
-                          customAbilityId: undefined,
-                          atLevelTable: undefined,
-                        } 
-                      })}
-                      className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                    >
-                      <option value="unlimited">Unlimited (At Will)</option>
-                      <option value="fixed">Fixed Number</option>
-                      <option value="proficiency">Proficiency Modifier</option>
-                      <option value="ability_modifier">Ability Modifier</option>
-                      <option value="custom_ability">Same as Another Ability</option>
-                      <option value="at_level">Based on Level</option>
-                    </select>
-                  </div>
-
-                  {/* Fixed amount input */}
-                  {form.uses.type === "fixed" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Number of Uses
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={form.uses.fixedAmount ?? 1}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, fixedAmount: parseInt(e.target.value) || 1 } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  )}
-
-                  {/* Ability modifier selector */}
-                  {form.uses.type === "ability_modifier" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Ability Score
-                      </label>
-                      <select
-                        value={form.uses.abilityModifier || ""}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, abilityModifier: e.target.value as typeof ABILITY_MODIFIERS[number] } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      >
-                        <option value="">Select ability...</option>
-                        {ABILITY_MODIFIERS.map((mod) => (
-                          <option key={mod} value={mod}>{mod} Modifier</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Uses = selected ability modifier (min 1)
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Custom ability selector */}
-                  {form.uses.type === "custom_ability" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Copy Uses From
-                      </label>
-                      <select
-                        value={form.uses.customAbilityId || ""}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, customAbilityId: e.target.value } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      >
-                        <option value="">Select ability...</option>
-                        {otherAbilities.map((ability) => (
-                          <option key={ability.id} value={ability.id}>{ability.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Uses same number of uses as the selected ability
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* At-level table */}
-                {form.uses.type === "at_level" && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-semibold text-foreground">
-                        Uses by Level
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const table = form.uses?.atLevelTable || []
-                          const nextLevel = table.length > 0 ? Math.max(...table.map(t => t.level)) + 1 : 1
-                          setForm({
-                            ...form,
-                            uses: {
-                              ...form.uses!,
-                              atLevelTable: [...table, { level: Math.min(nextLevel, 20), count: 1 }]
-                            }
-                          })
-                        }}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Row
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {(form.uses.atLevelTable || []).map((row, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground w-16">At level</span>
-                          <select
-                            value={row.level}
-                            onChange={(e) => {
-                              const table = [...(form.uses?.atLevelTable || [])]
-                              table[idx] = { ...row, level: parseInt(e.target.value) }
-                              setForm({ ...form, uses: { ...form.uses!, atLevelTable: table } })
-                            }}
-                            className="w-20 px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
-                          >
-                            {LEVELS.map((lvl) => (
-                              <option key={lvl} value={lvl}>{lvl}</option>
-                            ))}
-                          </select>
-                          <span className="text-sm text-muted-foreground">uses:</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={99}
-                            value={row.count}
-                            onChange={(e) => {
-                              const table = [...(form.uses?.atLevelTable || [])]
-                              table[idx] = { ...row, count: parseInt(e.target.value) || 1 }
-                              setForm({ ...form, uses: { ...form.uses!, atLevelTable: table } })
-                            }}
-                            className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const table = (form.uses?.atLevelTable || []).filter((_, i) => i !== idx)
-                              setForm({ ...form, uses: { ...form.uses!, atLevelTable: table } })
-                            }}
-                            className="p-1 text-muted-foreground hover:text-destructive"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                      {(form.uses.atLevelTable?.length ?? 0) === 0 && (
-                        <p className="text-sm text-muted-foreground italic">Click "Add Row" to define uses at each level</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recharge and Die fields - shown for all limited uses types except unlimited */}
-                {form.uses.type !== "unlimited" && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border">
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Recharges On
-                      </label>
-                      <select
-                        value={form.uses.recharge || ""}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, recharge: e.target.value as UsesConfig["recharge"] || null } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      >
-                        <option value="">No recharge</option>
-                        <option value="short_rest">Short Rest</option>
-                        <option value="long_rest">Long Rest</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Die Count
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={20}
-                        value={form.uses.dieCount ?? ""}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, dieCount: e.target.value ? parseInt(e.target.value) : undefined } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                        placeholder="e.g. 2"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-foreground mb-2">
-                        Die Type
-                      </label>
-                      <select
-                        value={form.uses.dieType || ""}
-                        onChange={(e) => setForm({ 
-                          ...form, 
-                          uses: { ...form.uses!, dieType: e.target.value as UsesConfig["dieType"] || null } 
-                        })}
-                        className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      >
-                        <option value="">None</option>
-                        {DIE_TYPES.map((die) => (
-                          <option key={die} value={die}>{die}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -575,20 +322,31 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             {form.attached_to_type && (
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
-                  Attach to {form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}
+                  {isEquipmentCategoryAttach(form.attached_to_type)
+                    ? "Equipment category"
+                    : `Attach to ${form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}`}
                 </label>
                 <select
                   value={form.attached_to_id}
                   onChange={(e) => setForm({ ...form, attached_to_id: e.target.value })}
                   className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
                 >
-                  <option value="">Select a {form.attached_to_type}...</option>
+                  <option value="">
+                    {isEquipmentCategoryAttach(form.attached_to_type)
+                      ? "Select category..."
+                      : `Select a ${form.attached_to_type}...`}
+                  </option>
                   {attachTargets.map((target) => (
                     <option key={target.id} value={target.id}>
                       {target.name}
                     </option>
                   ))}
                 </select>
+                {isEquipmentCategoryAttach(form.attached_to_type) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Applies to all items in that category (e.g. every Weapon), not a single item.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -605,6 +363,13 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
               placeholder="Describe what this ability does..."
             />
           </div>
+
+          <CharacteristicModifiersEditor
+            value={form.characteristics}
+            onChange={(characteristics) => setForm({ ...form, characteristics })}
+            otherAbilities={otherAbilities}
+            spellOptions={allSpells}
+          />
 
           {/* Show in Builder Checkbox */}
           <div className="bg-card border-2 border-border rounded-xl p-4">
@@ -624,22 +389,6 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
             </label>
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Ability"}
-            </button>
-            <Link
-              href="/compendium?tab=abilities"
-              className="px-6 py-4 bg-lemon text-lemon-foreground rounded-xl font-bold hover:brightness-110 transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
         </form>
       </main>
     </div>

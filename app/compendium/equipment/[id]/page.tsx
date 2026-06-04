@@ -4,9 +4,16 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Download } from "lucide-react"
-import Link from "next/link"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
+import {
+  propertiesToStringArray,
+  stringifyPropertiesForDb,
+} from "@/lib/compendium/equipment-properties"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const CATEGORIES = [
   "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
@@ -44,6 +51,7 @@ interface EquipmentFormData {
   weight: number | null
   description: string
   source: string
+  creator_url: string
   // Armor fields
   armor_class: number | null
   stealth_disadvantage: boolean
@@ -64,6 +72,7 @@ const defaultEquipment: EquipmentFormData = {
   weight: null,
   description: "",
   source: "Custom",
+  creator_url: "",
   armor_class: null,
   stealth_disadvantage: false,
   damage: "",
@@ -80,6 +89,8 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customAbilities, setCustomAbilities] = useState<{ id: string; name: string }[]>([])
+  const [rawProperties, setRawProperties] = useState<unknown>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -100,6 +111,25 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
         if (error) {
           setError("Equipment not found")
         } else if (data) {
+          const props = data.properties
+          const propTags = propertiesToStringArray(props)
+          let damage = data.damage || ""
+          let damageType = data.damage_type || ""
+          let mastery = data.mastery || ""
+          if (props && typeof props === "object" && !Array.isArray(props)) {
+            const record = props as Record<string, unknown>
+            if (typeof record.damage === "string" && !damage) {
+              const dm = record.damage.match(/^([\dd+\s]+)\s+(\w+)/i)
+              if (dm) {
+                damage = dm[1].trim()
+                damageType = dm[2]
+              }
+            }
+            if (typeof record.mastery === "string" && !mastery) {
+              mastery = record.mastery
+            }
+          }
+          setRawProperties(props)
           setForm({
             name: data.name || "",
             category: data.category || "Adventuring Gear",
@@ -108,13 +138,14 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             weight: data.weight || null,
             description: data.description || "",
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
             armor_class: data.armor_class || null,
             stealth_disadvantage: data.stealth_disadvantage || false,
-            damage: data.damage || "",
-            damage_type: data.damage_type || "",
+            damage,
+            damage_type: damageType,
             range: data.range || "",
-            mastery: data.mastery || "",
-            properties: Array.isArray(data.properties) ? data.properties : [],
+            mastery,
+            properties: propTags,
             icon: data.icon || null,
           })
         }
@@ -124,22 +155,56 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     }
   }, [id])
 
+  useEffect(() => {
+    if (!form.category) {
+      setCustomAbilities([])
+      return
+    }
+    const loadAbilities = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("custom_abilities")
+        .select("id, name")
+        .eq("attached_to_type", "equipment")
+        .eq("attached_to_id", form.category)
+        .order("name")
+      setCustomAbilities(data || [])
+    }
+    loadAbilities()
+  }, [form.category])
+
+  const toggleCategoryAbility = (abilityName: string, checked: boolean) => {
+    if (checked) {
+      setForm({ ...form, properties: [...form.properties, abilityName] })
+    } else {
+      setForm({
+        ...form,
+        properties: form.properties.filter((p) => p !== abilityName),
+      })
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
 
     const supabase = createClient()
+    const payload = {
+      ...form,
+      properties: stringifyPropertiesForDb(form.properties, rawProperties),
+      creator_url: normalizeCreatorUrl(form.creator_url),
+    }
     
     if (id === "new") {
-      const { error } = await supabase.from("equipment").insert([form])
+      const { error } = await supabase.from("equipment").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("equipment").update(form).eq("id", id)
+      const { error } = await supabase.from("equipment").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -191,48 +256,24 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
-      
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/compendium?tab=equipment"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Equipment" : "Edit Equipment"}
-            </h1>
-          </div>
-          
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
+      <CompendiumEditorToolbar
+        tab="equipment"
+        title={id === "new" ? "New Equipment" : "Edit Equipment"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Equipment"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -260,6 +301,11 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
               />
             </div>
           </div>
+
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
 
           {/* Icon */}
           <GameIconPicker
@@ -494,22 +540,33 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Equipment"}
-            </button>
-            <Link
-              href="/compendium?tab=equipment"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
+          {customAbilities.length > 0 && (
+            <div className="bg-card-lighter border-2 border-accent/30 rounded-xl p-4 space-y-3">
+              <h3 className="font-semibold text-foreground">
+                {form.category} abilities
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Custom abilities attached to the {form.category} category in the compendium.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {customAbilities.map((ability) => (
+                  <label
+                    key={ability.id}
+                    className="flex items-center gap-1.5 cursor-pointer text-sm bg-secondary/10 px-2 py-1 rounded-lg border border-secondary/40"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.properties.includes(ability.name)}
+                      onChange={(e) => toggleCategoryAbility(ability.name, e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-secondary"
+                    />
+                    <span className="text-foreground">{ability.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
         </form>
       </main>
     </div>
