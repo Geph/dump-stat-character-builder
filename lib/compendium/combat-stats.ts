@@ -1,0 +1,170 @@
+import type { Equipment } from "@/lib/types"
+import { propertiesToStringArray } from "@/lib/compendium/equipment-properties"
+
+export type AbilityMods = {
+  strength: number
+  dexterity: number
+  constitution: number
+  intelligence: number
+  wisdom: number
+  charisma: number
+}
+
+function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
+  if (equipment.properties && typeof equipment.properties === "object" && !Array.isArray(equipment.properties)) {
+    return equipment.properties as Record<string, unknown>
+  }
+  return {}
+}
+
+export function isShieldItem(equipment: Equipment): boolean {
+  return equipment.name.toLowerCase().includes("shield")
+}
+
+export function isArmorItem(equipment: Equipment): boolean {
+  return equipment.category === "Armor" && !isShieldItem(equipment)
+}
+
+export function isWeaponItem(equipment: Equipment): boolean {
+  return equipment.category === "Weapon"
+}
+
+export function getArmorAcText(equipment: Equipment): string | null {
+  if (equipment.armor_class != null) return String(equipment.armor_class)
+  const ac = getPropertyRecord(equipment).ac
+  return typeof ac === "string" ? ac : null
+}
+
+export function getWeaponDamageText(equipment: Equipment): string | null {
+  if (equipment.damage) return equipment.damage
+  const damage = getPropertyRecord(equipment).damage
+  return typeof damage === "string" ? damage : null
+}
+
+export function hasWeaponProperty(equipment: Equipment, property: string): boolean {
+  const needle = property.toLowerCase()
+  return propertiesToStringArray(equipment.properties).some((tag) => tag.toLowerCase().includes(needle))
+}
+
+export function parseArmorAc(acText: string, dexMod: number): number {
+  const text = acText.trim()
+
+  if (/^\+\d+$/.test(text)) {
+    return 10 + dexMod
+  }
+
+  if (/^\d+$/.test(text)) {
+    return parseInt(text, 10)
+  }
+
+  const basePlusDex = text.match(/^(\d+)\s*\+\s*dex/i)
+  if (basePlusDex) {
+    const base = parseInt(basePlusDex[1], 10)
+    const maxDexMatch = text.match(/max\s*(\d+)/i)
+    const dexContribution = maxDexMatch
+      ? Math.min(dexMod, parseInt(maxDexMatch[1], 10))
+      : dexMod
+    return base + dexContribution
+  }
+
+  const leadingNumber = text.match(/^(\d+)/)
+  if (leadingNumber) {
+    return parseInt(leadingNumber[1], 10) + dexMod
+  }
+
+  return 10 + dexMod
+}
+
+export function getShieldBonus(shield: Equipment | null): number {
+  if (!shield) return 0
+  const acText = getArmorAcText(shield)
+  if (acText?.startsWith("+")) {
+    return parseInt(acText.replace("+", ""), 10) || 2
+  }
+  return 2
+}
+
+export function calculateArmorClass(
+  dexMod: number,
+  armor: Equipment | null,
+  shield: Equipment | null,
+): number {
+  let ac: number
+  if (armor) {
+    const acText = getArmorAcText(armor)
+    ac = acText ? parseArmorAc(acText, dexMod) : 10 + dexMod
+  } else {
+    ac = 10 + dexMod
+  }
+  return ac + getShieldBonus(shield)
+}
+
+export function getWeaponAbilityMod(weapon: Equipment, abilityMods: AbilityMods): number {
+  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
+  if (isRanged) return abilityMods.dexterity
+  if (hasWeaponProperty(weapon, "finesse")) {
+    return Math.max(abilityMods.strength, abilityMods.dexterity)
+  }
+  return abilityMods.strength
+}
+
+export function isWeaponProficient(
+  weapon: Equipment,
+  proficiencies: string[] | null | undefined,
+): boolean {
+  if (!proficiencies?.length) return false
+  const sub = weapon.subcategory?.toLowerCase() ?? ""
+  const normalized = proficiencies.map((p) => p.toLowerCase())
+  if (sub.includes("simple")) {
+    return normalized.some((p) => p.includes("simple"))
+  }
+  if (sub.includes("martial")) {
+    return normalized.some((p) => p.includes("martial"))
+  }
+  return false
+}
+
+export function calculateWeaponAttack(
+  weapon: Equipment,
+  abilityMods: AbilityMods,
+  proficiencyBonus: number,
+  isProficient: boolean,
+): { attackBonus: number; damageDisplay: string } | null {
+  const damageText = getWeaponDamageText(weapon)
+  if (!damageText) return null
+
+  const match = damageText.trim().match(/^([\d+d\s]+)\s*(.*)$/i)
+  const dice = match?.[1]?.trim() ?? damageText
+  const damageType = match?.[2]?.trim() || weapon.damage_type || ""
+
+  const abilityMod = getWeaponAbilityMod(weapon, abilityMods)
+  const attackBonus = abilityMod + (isProficient ? proficiencyBonus : 0)
+  const modSuffix =
+    abilityMod === 0 ? "" : abilityMod > 0 ? ` + ${abilityMod}` : ` - ${Math.abs(abilityMod)}`
+  const damageDisplay = `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()
+
+  return { attackBonus, damageDisplay }
+}
+
+export function getWeaponMastery(weapon: Equipment): string | null {
+  const mastery = getPropertyRecord(weapon).mastery
+  return typeof mastery === "string" && mastery.trim() ? mastery : null
+}
+
+export function getWeaponRangeText(weapon: Equipment): string | null {
+  if (weapon.range?.trim()) return weapon.range
+  for (const tag of propertiesToStringArray(weapon.properties)) {
+    const thrown = tag.match(/thrown\s*\(range\s*([\d/]+)\)/i)
+    if (thrown) return `${thrown[1]} ft (thrown)`
+    const range = tag.match(/range\s*([\d/]+)/i)
+    if (range) return `${range[1]} ft`
+  }
+  const sub = weapon.subcategory?.toLowerCase() ?? ""
+  if (sub.includes("melee")) return "Melee reach"
+  if (sub.includes("ranged")) return "Ranged"
+  return null
+}
+
+export function getWeaponPropertyTags(weapon: Equipment): string[] {
+  return propertiesToStringArray(weapon.properties)
+}

@@ -1,15 +1,30 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2 } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
 import { GameIcon } from "@/components/game-icon-picker"
+import { formatCompendiumSource } from "@/lib/srd/source"
+import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export-format"
+import {
+  type CompendiumContentType,
+  getCompendiumItemIcon,
+  isCompendiumContentType,
+} from "@/lib/compendium/content-types"
 
-type ContentType = "species" | "classes" | "subclasses" | "backgrounds" | "spells" | "feats" | "equipment" | "abilities"
+type ContentType = CompendiumContentType
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "classes", label: "Classes", icon: <Shield className="w-4 h-4" /> },
@@ -23,6 +38,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
 ]
 
 export default function CompendiumPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [searchQuery, setSearchQuery] = useState("")
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
@@ -39,10 +55,13 @@ export default function CompendiumPage() {
   const [selectedItem, setSelectedItem] = useState<unknown | null>(null)
   const [clearingAll, setClearingAll] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
   // Spell-specific filters
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
+  const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
+  const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
@@ -53,6 +72,47 @@ export default function CompendiumPage() {
     equipment: 0,
     abilities: 0,
   })
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab && isCompendiumContentType(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  const tabsScrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
+  const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
+
+  const updateTabsScrollState = useCallback(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setCanScrollTabsLeft(el.scrollLeft > 1)
+    setCanScrollTabsRight(el.scrollLeft < maxScroll - 1)
+  }, [])
+
+  useEffect(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    updateTabsScrollState()
+    el.addEventListener("scroll", updateTabsScrollState, { passive: true })
+    const observer = new ResizeObserver(updateTabsScrollState)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener("scroll", updateTabsScrollState)
+      observer.disconnect()
+    }
+  }, [updateTabsScrollState])
+
+  const scrollCompendiumTabs = (direction: "left" | "right") => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    el.scrollBy({
+      left: direction === "left" ? -el.clientWidth : el.clientWidth,
+      behavior: "smooth",
+    })
+  }
 
   // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
@@ -91,6 +151,9 @@ export default function CompendiumPage() {
     fetchCounts()
   }, [])
 
+  // Subclasses indexed by class (for class tab cards)
+  const [subclassesForClasses, setSubclassesForClasses] = useState<Subclass[]>([])
+
   // Fetch content only for active tab
   useEffect(() => {
     const fetchActiveTabContent = async () => {
@@ -102,15 +165,35 @@ export default function CompendiumPage() {
         .from(tableName)
         .select("*")
         .order("name")
-        .limit(100)
+        .limit(activeTab === "equipment" ? 500 : 100)
       
       setContent(prev => ({ ...prev, [activeTab]: data || [] }))
+
+      if (activeTab === "classes") {
+        const { data: subclasses } = await supabase
+          .from("subclasses")
+          .select("*")
+          .order("name")
+          .limit(200)
+        setSubclassesForClasses(subclasses || [])
+      }
+
       setLoading(false)
     }
     
     fetchActiveTabContent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
+
+  const subclassesByClassId = useMemo(() => {
+    const map = new Map<string, Subclass[]>()
+    for (const sc of subclassesForClasses) {
+      const list = map.get(sc.class_id) ?? []
+      list.push(sc)
+      map.set(sc.class_id, list)
+    }
+    return map
+  }, [subclassesForClasses])
 
   // Derive unique spell filter options from loaded spell data
   const spellData = (content.spells as Spell[])
@@ -132,16 +215,82 @@ export default function CompendiumPage() {
       if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
       if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
     }
+    if (activeTab === "feats") {
+      const feat = item as Feat
+      const category = feat.category || "General"
+      if (featFilterCategory !== "all" && category !== featFilterCategory) return false
+    }
+    if (activeTab === "equipment") {
+      const eq = item as Equipment
+      if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
+    }
     return true
   })
 
+  const equipmentData = content.equipment as Equipment[]
+  const equipmentCategoryOptions = useMemo(
+    () =>
+      Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
+    [equipmentData],
+  )
+  const equipmentGroups = useMemo(() => {
+    if (activeTab !== "equipment") return []
+    return groupEquipmentByCategory(filteredContent as Equipment[])
+  }, [filteredContent, activeTab])
+
   const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
+
+  const refreshTabCounts = async () => {
+    const supabase = createClient()
+    const [
+      { count: speciesCount },
+      { count: classesCount },
+      { count: subclassesCount },
+      { count: backgroundsCount },
+      { count: spellsCount },
+      { count: featsCount },
+      { count: equipmentCount },
+      { count: abilitiesCount },
+    ] = await Promise.all([
+      supabase.from("species").select("*", { count: "exact", head: true }),
+      supabase.from("classes").select("*", { count: "exact", head: true }),
+      supabase.from("subclasses").select("*", { count: "exact", head: true }),
+      supabase.from("backgrounds").select("*", { count: "exact", head: true }),
+      supabase.from("spells").select("*", { count: "exact", head: true }),
+      supabase.from("feats").select("*", { count: "exact", head: true }),
+      supabase.from("equipment").select("*", { count: "exact", head: true }),
+      supabase.from("custom_abilities").select("*", { count: "exact", head: true }),
+    ])
+    setTabCounts({
+      species: speciesCount ?? 0,
+      classes: classesCount ?? 0,
+      subclasses: subclassesCount ?? 0,
+      backgrounds: backgroundsCount ?? 0,
+      spells: spellsCount ?? 0,
+      feats: featsCount ?? 0,
+      equipment: equipmentCount ?? 0,
+      abilities: abilitiesCount ?? 0,
+    })
+  }
+
+  const refreshActiveTabContent = async () => {
+    setLoading(true)
+    const supabase = createClient()
+    const resolvedTable = tableName(activeTab)
+    const { data } = await supabase
+      .from(resolvedTable)
+      .select("*")
+      .order("name")
+      .limit(100)
+    setContent((prev) => ({ ...prev, [activeTab]: data || [] }))
+    setLoading(false)
+  }
 
   const handleClearSection = async () => {
     setClearingAll(true)
+    setClearError(null)
     
     try {
-      // Call server API with service role to bypass RLS
       const response = await fetch("/api/compendium/clear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,28 +299,68 @@ export default function CompendiumPage() {
       
       if (!response.ok) {
         const data = await response.json()
-        console.error("[v0] Clear section error:", data.error)
-        setClearingAll(false)
-        setClearConfirmOpen(false)
+        setClearError(data.error ?? "Failed to clear section")
         return
       }
-      
-      // Update local state
-      setContent(prev => ({ ...prev, [activeTab]: [] }))
-      setTabCounts(prev => ({ ...prev, [activeTab]: 0 }))
+
+      const data = await response.json()
+      setContent((prev) => {
+        const next = { ...prev, [activeTab]: [] }
+        if (data.alsoCleared?.includes("subclasses")) {
+          next.subclasses = []
+        }
+        return next
+      })
+      await refreshTabCounts()
+      await refreshActiveTabContent()
     } catch (err) {
       console.error("[v0] Clear section error:", err)
+      setClearError("Failed to clear section")
+    } finally {
+      setClearingAll(false)
+      setClearConfirmOpen(false)
     }
-    
-    setClearingAll(false)
-    setClearConfirmOpen(false)
+  }
+
+  const handleExportSection = async () => {
+    const supabase = createClient()
+    const resolvedTable = tableName(activeTab)
+    const { data } = await supabase.from(resolvedTable).select("*").order("name").limit(500)
+    if (!data?.length) return
+
+    const classNameById = new Map<string, string>()
+    if (activeTab === "subclasses") {
+      const { data: classesData } = await supabase.from("classes").select("id, name")
+      for (const cls of classesData ?? []) {
+        classNameById.set(cls.id as string, cls.name as string)
+      }
+    }
+
+    const items = (data as Record<string, unknown>[])
+      .map((row) => {
+        const exportRow = { ...row }
+        if (activeTab === "subclasses" && exportRow.class_id) {
+          exportRow.class_name = classNameById.get(exportRow.class_id as string)
+        }
+        return rowToExportItem(activeTab, exportRow)
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+
+    const exportPayload = buildBulkExportJson(activeTab, items)
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `dump-stat-${activeTab}-export.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = `/compendium/${activeTab}/${data.id}`
-    const iconName = data.icon as string | null | undefined
-    
+    const iconName = getCompendiumItemIcon(activeTab, data)
+
     return (
       <motion.div
         key={data.id as string}
@@ -181,11 +370,9 @@ export default function CompendiumPage() {
       >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            {iconName && (
-              <div className="w-10 h-10 shrink-0 text-primary">
-                <GameIcon name={iconName} className="w-10 h-10" fallbackColor="currentColor" />
-              </div>
-            )}
+            <div className="w-10 h-10 shrink-0 text-primary">
+              <GameIcon name={iconName} className="w-10 h-10" />
+            </div>
             <h3 
               className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight"
               onClick={() => setSelectedItem(item)}
@@ -202,55 +389,38 @@ export default function CompendiumPage() {
           </Link>
         </div>
         {activeTab === "classes" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                d{(data as DndClass).hit_die} Hit Die
-              </span>
-              {(data as DndClass).spellcasting && (
-                <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full">
-                  Spellcaster
-                </span>
-              )}
-              {(data as DndClass).weapon_proficiencies?.some(w => 
-                w.toLowerCase().includes("martial")
-              ) && (
-                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                  Martial
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as DndClass).source || "Custom"}
-            </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>Source: {formatCompendiumSource((data as DndClass).source)}</p>
+            {(() => {
+              const subs = subclassesByClassId.get(data.id as string) ?? []
+              if (subs.length === 0) return null
+              return (
+                <p>
+                  Subclasses: {subs.map((sc) => sc.name).join(", ")}
+                </p>
+              )
+            })()}
           </div>
         )}
         {activeTab === "subclasses" && (
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
-              {(data as Subclass).description?.slice(0, 80)}...
+              {(data as Subclass).features?.length
+                ? (data as Subclass).features!.map((f) => f.name).join(", ")
+                : "No features listed"}
             </p>
-            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-              {((data as Subclass).features || []).length} features
-            </span>
           </div>
         )}
         {activeTab === "species" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
-                {(data as Species).size || "Medium"}
-              </span>
-              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {typeof (data as Species).speed === "object"
-                  ? Object.entries((data as Species).speed as Record<string, number>).map(([k, v]) => `${v}ft ${k}`).join(" / ")
-                  : `${(data as Species).speed || 30} ft`
-                }
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as Species).source || "Custom"}
-            </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>Source: {formatCompendiumSource((data as Species).source)}</p>
+            {((data as Species).traits ?? [])
+              .filter((t) => t.isChoice && t.choices?.options?.length)
+              .map((t) => (
+                <p key={t.name}>
+                  {t.choices!.options.map((o) => o.name).join(", ")}
+                </p>
+              ))}
           </div>
         )}
         {activeTab === "backgrounds" && (
@@ -280,37 +450,35 @@ export default function CompendiumPage() {
                 Concentration
               </span>
             )}
+            {((data as Spell).classes ?? []).map((cls) => (
+              <span
+                key={cls}
+                className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
+              >
+                {cls}
+              </span>
+            ))}
           </div>
         )}
         {activeTab === "feats" && (
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                (data as Feat).category === "Origin"
-                  ? "bg-lime/10 text-lime"
-                  : (data as Feat).category === "Epic Boon"
-                  ? "bg-magenta/10 text-magenta"
-                  : "bg-primary/10 text-primary"
-              }`}>
-                {(data as Feat).category || "General"}
+          <div className="flex gap-2 flex-wrap">
+            <span className={`text-xs px-2 py-1 rounded-full ${
+              (data as Feat).category === "Origin"
+                ? "bg-lime/10 text-lime"
+                : (data as Feat).category === "Epic Boon"
+                ? "bg-magenta/10 text-magenta"
+                : "bg-primary/10 text-primary"
+            }`}>
+              {(data as Feat).category || "General"}
+            </span>
+            {((data as Feat).level_requirement ?? 1) > 1 && (
+              <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                Lvl {(data as Feat).level_requirement}+
               </span>
-              {((data as Feat).level_requirement ?? 1) > 1 && (
-                <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                  Lvl {(data as Feat).level_requirement}+
-                </span>
-              )}
-              {(data as Feat).prerequisite_feat_ids?.length ? (
-                <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                  Has Prereqs
-                </span>
-              ) : null}
-            </div>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {(data as Feat).description}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Source: {(data as Feat).source || "Custom"}
-            </p>
+            )}
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {(data as Feat).source || "Custom"}
+            </span>
           </div>
         )}
         {activeTab === "equipment" && (
@@ -318,6 +486,11 @@ export default function CompendiumPage() {
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {(data as Equipment).category}
             </span>
+            {(data as Equipment).subcategory && (
+              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
+                {(data as Equipment).subcategory!.replace(/\s+Weapons$/i, "")}
+              </span>
+            )}
             {(data as Equipment).cost && (
               <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
                 {((data as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
@@ -336,9 +509,12 @@ export default function CompendiumPage() {
             <p className="text-sm text-muted-foreground line-clamp-2">
               {(data as { description?: string }).description}
             </p>
-            {(data as { attached_to_type?: string }).attached_to_type && (
+            {(data as { attached_to_type?: string; attached_to_id?: string }).attached_to_type && (
               <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-                For: {(data as { attached_to_type: string }).attached_to_type}
+                {(data as { attached_to_type: string; attached_to_id?: string }).attached_to_type === "equipment" &&
+                (data as { attached_to_id?: string }).attached_to_id
+                  ? `Equipment: ${(data as { attached_to_id: string }).attached_to_id}`
+                  : `For: ${(data as { attached_to_type: string }).attached_to_type}`}
               </span>
             )}
           </div>
@@ -358,13 +534,33 @@ export default function CompendiumPage() {
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setClearConfirmOpen(true)}
-              className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive border-2 border-destructive/30 rounded-xl font-semibold hover:bg-destructive/20 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear {tabs.find(t => t.id === activeTab)?.label ?? "All"}
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-12 h-12 bg-card border-2 border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label="Compendium section options"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleExportSection}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  Export all {tabs.find((t) => t.id === activeTab)?.label}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setClearConfirmOpen(true)}
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear {tabs.find((t) => t.id === activeTab)?.label}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link
               href={`/compendium/${activeTab}/new`}
               className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
@@ -391,8 +587,13 @@ export default function CompendiumPage() {
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium. Other sections will not be affected.
+                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium database.
+                {activeTab === "classes" && " All subclasses will be cleared as well."}
+                {" "}Other sections will not be affected.
               </p>
+              {clearError && (
+                <p className="text-sm text-destructive mb-4">{clearError}</p>
+              )}
               <div className="flex gap-3">
                 <button
                   onClick={() => setClearConfirmOpen(false)}
@@ -497,32 +698,129 @@ export default function CompendiumPage() {
           </div>
         )}
 
+        {/* Feat type filter */}
+        {activeTab === "feats" && (
+          <div id="feat-filters" className="flex flex-wrap gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                Type
+              </label>
+              <select
+                value={featFilterCategory}
+                onChange={(e) => setFeatFilterCategory(e.target.value)}
+                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="all">All Types</option>
+                <option value="Origin">Origin</option>
+                <option value="General">General</option>
+                <option value="Epic Boon">Epic Boon</option>
+                <option value="Fighting Style">Fighting Style</option>
+              </select>
+            </div>
+            {featFilterCategory !== "all" && (
+              <button
+                onClick={() => setFeatFilterCategory("all")}
+                className="ml-auto px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
-        <div id="compendium-tabs" className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
-              }`}>
-                {tabCounts[tab.id]}
-              </span>
-            </button>
-          ))}
+        <div className="relative mb-6 group/tabs">
+          {canScrollTabsLeft && (
+            <>
+              <div
+                className="pointer-events-none absolute left-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-r from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs left"
+                onClick={() => scrollCompendiumTabs("left")}
+                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          {canScrollTabsRight && (
+            <>
+              <div
+                className="pointer-events-none absolute right-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-l from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs right"
+                onClick={() => scrollCompendiumTabs("right")}
+                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          <div
+            id="compendium-tabs"
+            ref={tabsScrollRef}
+            className={`flex gap-2 overflow-x-auto pb-4 scrollbar-hide scroll-smooth ${
+              canScrollTabsLeft ? "pl-10" : ""
+            } ${canScrollTabsRight ? "pr-10" : ""}`}
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
+                }`}>
+                  {tabCounts[tab.id]}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
+
+        {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Type
+            </label>
+            <select
+              value={equipmentFilterCategory}
+              onChange={(e) => setEquipmentFilterCategory(e.target.value)}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All types</option>
+              {equipmentCategoryOptions.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {equipmentFilterCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => setEquipmentFilterCategory("all")}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Clear type filter
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Content Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-card rounded-2xl p-5 border-2 border-border animate-pulse">
                 <div className="h-6 bg-muted rounded w-3/4 mb-3" />
@@ -540,8 +838,26 @@ export default function CompendiumPage() {
               {searchQuery ? "Try a different search term" : "Import content from the Import page"}
             </p>
           </div>
+        ) : activeTab === "equipment" ? (
+          <div className="space-y-8">
+            {equipmentGroups.map((group) => (
+              <section key={group.category}>
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-lg font-black text-foreground">{group.category}</h2>
+                  <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
+                    {group.items.length}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <AnimatePresence>
+                    {group.items.map(renderContentCard)}
+                  </AnimatePresence>
+                </div>
+              </section>
+            ))}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <AnimatePresence>
               {filteredContent.map(renderContentCard)}
             </AnimatePresence>
@@ -570,6 +886,19 @@ export default function CompendiumPage() {
               <p className="text-muted-foreground whitespace-pre-wrap">
                 {(selectedItem as { description?: string }).description || "No description available."}
               </p>
+              {(selectedItem as { creator_url?: string | null }).creator_url && (
+                <p className="mt-4 text-sm">
+                  <span className="text-muted-foreground">Source link: </span>
+                  <a
+                    href={(selectedItem as { creator_url: string }).creator_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {(selectedItem as { creator_url: string }).creator_url}
+                  </a>
+                </p>
+              )}
               <button
                 onClick={() => setSelectedItem(null)}
                 className="mt-6 w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"

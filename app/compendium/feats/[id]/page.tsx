@@ -4,9 +4,24 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/supabase/client"
-import { ArrowLeft, Save, Trash2, Download, X } from "lucide-react"
-import Link from "next/link"
+import { X } from "lucide-react"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import {
+  CompendiumEditorToolbar,
+  COMPENDIUM_EDITOR_FORM_ID,
+} from "@/components/compendium/editor-toolbar"
+import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
+  normalizeCharacteristics,
+  type CharacteristicModifier,
+} from "@/lib/compendium/characteristic-modifiers"
+import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -17,7 +32,12 @@ interface FeatFormData {
   category: string
   level_requirement: number
   prerequisite_feat_ids: string[]
+  prerequisite_class_ids: string[]
+  prerequisite_species_ids: string[]
+  prerequisite_background_ids: string[]
+  characteristics: CharacteristicModifier[]
   source: string
+  creator_url: string
   icon: string | null
 }
 
@@ -27,7 +47,12 @@ const defaultFeat: FeatFormData = {
   category: "General",
   level_requirement: 1,
   prerequisite_feat_ids: [],
+  prerequisite_class_ids: [],
+  prerequisite_species_ids: [],
+  prerequisite_background_ids: [],
+  characteristics: [],
   source: "Custom",
+  creator_url: "",
   icon: null,
 }
 
@@ -38,23 +63,39 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [allFeats, setAllFeats] = useState<{ id: string; name: string; category: string }[]>([])
+  const [allClasses, setAllClasses] = useState<{ id: string; name: string }[]>([])
+  const [allSpecies, setAllSpecies] = useState<{ id: string; name: string }[]>([])
+  const [allBackgrounds, setAllBackgrounds] = useState<{ id: string; name: string }[]>([])
+  const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
 
   useEffect(() => {
     params.then(({ id }) => setId(id))
   }, [params])
 
-  // Fetch all feats for the prerequisite dropdown
   useEffect(() => {
-    const fetchFeats = async () => {
+    const fetchPrereqOptions = async () => {
       const supabase = createClient()
-      const { data } = await supabase
-        .from("feats")
-        .select("id, name, category")
-        .order("name")
-      setAllFeats(data || [])
+      const [
+        { data: feats },
+        { data: classes },
+        { data: species },
+        { data: backgrounds },
+        { data: spells },
+      ] = await Promise.all([
+        supabase.from("feats").select("id, name, category").order("name"),
+        supabase.from("classes").select("id, name").order("name"),
+        supabase.from("species").select("id, name").order("name"),
+        supabase.from("backgrounds").select("id, name").order("name"),
+        supabase.from("spells").select("id, name").order("name").limit(500),
+      ])
+      setAllFeats(feats || [])
+      setAllClasses(classes || [])
+      setAllSpecies(species || [])
+      setAllBackgrounds(backgrounds || [])
+      setAllSpells(spells || [])
     }
-    fetchFeats()
+    fetchPrereqOptions()
   }, [])
 
   useEffect(() => {
@@ -77,7 +118,12 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             category: data.category || "General",
             level_requirement: data.level_requirement ?? 1,
             prerequisite_feat_ids: data.prerequisite_feat_ids || [],
+            prerequisite_class_ids: data.prerequisite_class_ids || [],
+            prerequisite_species_ids: data.prerequisite_species_ids || [],
+            prerequisite_background_ids: data.prerequisite_background_ids || [],
+            characteristics: normalizeCharacteristics(data.benefits, null),
             source: data.source || "Custom",
+            creator_url: data.creator_url || "",
             icon: data.icon || null,
           })
         }
@@ -93,12 +139,18 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     setError(null)
 
     const supabase = createClient()
+    const { characteristics, creator_url, ...rest } = form
+    const payload = {
+      ...rest,
+      benefits: characteristics,
+      creator_url: normalizeCreatorUrl(creator_url),
+    }
 
     if (id === "new") {
-      const { error } = await supabase.from("feats").insert([form])
+      const { error } = await supabase.from("feats").insert([payload])
       if (error) { setError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from("feats").update(form).eq("id", id)
+      const { error } = await supabase.from("feats").update(payload).eq("id", id)
       if (error) { setError(error.message); setSaving(false); return }
     }
 
@@ -133,7 +185,49 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     setForm(prev => ({ ...prev, prerequisite_feat_ids: prev.prerequisite_feat_ids.filter(id => id !== featId) }))
   }
 
-  // Feats available as prerequisites: exclude the current feat
+  const addPrereqId = (
+    field: "prerequisite_class_ids" | "prerequisite_species_ids" | "prerequisite_background_ids",
+    value: string,
+  ) => {
+    if (!value || form[field].includes(value)) return
+    setForm((prev) => ({ ...prev, [field]: [...prev[field], value] }))
+  }
+
+  const removePrereqId = (
+    field: "prerequisite_class_ids" | "prerequisite_species_ids" | "prerequisite_background_ids",
+    value: string,
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: prev[field].filter((id) => id !== value) }))
+  }
+
+  const renderPrereqTags = (
+    ids: string[],
+    lookup: { id: string; name: string }[],
+    onRemove: (id: string) => void,
+  ) => (
+    <div className="flex flex-wrap gap-2">
+      {ids.map((entryId) => {
+        const entry = lookup.find((x) => x.id === entryId)
+        if (!entry) return null
+        return (
+          <span
+            key={entryId}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium"
+          >
+            {entry.name}
+            <button
+              type="button"
+              onClick={() => onRemove(entryId)}
+              className="text-primary/60 hover:text-destructive transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        )
+      })}
+    </div>
+  )
+
   const availablePrereqFeats = allFeats.filter(f => f.id !== id)
 
   if (loading) {
@@ -153,48 +247,24 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
+      <CompendiumEditorToolbar
+        tab="feats"
+        title={id === "new" ? "New Feat" : "Edit Feat"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Feat"
+        onExport={handleExport}
+        onDelete={id !== "new" ? handleDelete : undefined}
+      />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/compendium?tab=feats"
-              className="p-3 bg-lemon text-lemon-foreground hover:brightness-110 rounded-xl transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h1 className="text-3xl font-black text-foreground">
-              {id === "new" ? "New Feat" : "Edit Feat"}
-            </h1>
-          </div>
-
-          {id !== "new" && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-primary hover:bg-primary/10 rounded-xl transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           {/* Name + Source */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -219,6 +289,11 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
               />
             </div>
           </div>
+
+          <SourceLinkField
+            value={form.creator_url}
+            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          />
 
           {/* Icon */}
           <GameIconPicker
@@ -262,49 +337,102 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* Prerequisite Feats */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Prerequisite Feats
-            </label>
-            <p className="text-xs text-muted-foreground mb-3">
-              The character must already have these feats before taking this one.
-            </p>
-            <select
-              value=""
-              onChange={(e) => addPrereqFeat(e.target.value)}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-3"
-            >
-              <option value="">Add a prerequisite feat...</option>
-              {availablePrereqFeats
-                .filter(f => !form.prerequisite_feat_ids.includes(f.id))
-                .map(f => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.category})</option>
-                ))}
-            </select>
-            {form.prerequisite_feat_ids.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {form.prerequisite_feat_ids.map(featId => {
-                  const feat = allFeats.find(f => f.id === featId)
-                  return feat ? (
-                    <span
-                      key={featId}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-medium"
-                    >
-                      {feat.name}
-                      <button
-                        type="button"
-                        onClick={() => removePrereqFeat(featId)}
-                        className="text-primary/60 hover:text-destructive transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ) : null
-                })}
-              </div>
-            )}
-          </div>
+          <Accordion type="single" collapsible className="bg-card border-2 border-border rounded-xl px-4">
+            <AccordionItem value="prerequisites" className="border-none">
+              <AccordionTrigger className="font-semibold text-foreground hover:no-underline py-4">
+                Additional prerequisites
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pb-4">
+                <p className="text-xs text-muted-foreground">
+                  Character must match all selected requirements before taking this feat.
+                </p>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Feats</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqFeat(e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite feat...</option>
+                    {availablePrereqFeats
+                      .filter((f) => !form.prerequisite_feat_ids.includes(f.id))
+                      .map((f) => (
+                        <option key={f.id} value={f.id}>{f.name} ({f.category})</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_feat_ids.length > 0 &&
+                    renderPrereqTags(form.prerequisite_feat_ids, allFeats, removePrereqFeat)}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Classes</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_class_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite class...</option>
+                    {allClasses
+                      .filter((c) => !form.prerequisite_class_ids.includes(c.id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_class_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_class_ids,
+                      allClasses,
+                      (id) => removePrereqId("prerequisite_class_ids", id),
+                    )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Species</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_species_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite species...</option>
+                    {allSpecies
+                      .filter((s) => !form.prerequisite_species_ids.includes(s.id))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_species_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_species_ids,
+                      allSpecies,
+                      (id) => removePrereqId("prerequisite_species_ids", id),
+                    )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Backgrounds</label>
+                  <select
+                    value=""
+                    onChange={(e) => addPrereqId("prerequisite_background_ids", e.target.value)}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+                  >
+                    <option value="">Add prerequisite background...</option>
+                    {allBackgrounds
+                      .filter((b) => !form.prerequisite_background_ids.includes(b.id))
+                      .map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                  </select>
+                  {form.prerequisite_background_ids.length > 0 &&
+                    renderPrereqTags(
+                      form.prerequisite_background_ids,
+                      allBackgrounds,
+                      (id) => removePrereqId("prerequisite_background_ids", id),
+                    )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           {/* Description */}
           <div>
@@ -318,22 +446,12 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             />
           </div>
 
-          <div className="flex gap-4 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {saving ? "Saving..." : "Save Feat"}
-            </button>
-            <Link
-              href="/compendium?tab=feats"
-              className="px-6 py-4 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:bg-muted transition-colors"
-            >
-              Cancel
-            </Link>
-          </div>
+          <CharacteristicModifiersEditor
+            value={form.characteristics}
+            onChange={(characteristics) => setForm({ ...form, characteristics })}
+            spellOptions={allSpells}
+          />
+
         </form>
       </main>
     </div>
