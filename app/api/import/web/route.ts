@@ -1,10 +1,17 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
-import { upsertByName } from "@/lib/db/repository"
+import { listRows, upsertByName } from "@/lib/db/repository"
 import type { CompendiumTable } from "@/lib/db/tables"
 import { NextRequest, NextResponse } from "next/server"
 import * as cheerio from "cheerio"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { IMPORT_CONTENT_TYPE_HINTS } from "@/lib/import/content-type-hints"
+import {
+  parseBackgroundAbilityFromImportText,
+  parseBackgroundFeatureFromText,
+  parseBackgroundGrantedSpellNames,
+  finalizeBackgroundImportRow,
+} from "@/lib/import/background-parse"
+import { parseBackgroundAbilityScoresLine } from "@/lib/compendium/background-utils"
 
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
@@ -169,37 +176,32 @@ function parseBackground(html: string, url: string) {
   const description = mainContent.find("p").first().text().trim()
   const fullText = mainContent.text()
   
-  // Extract skill proficiencies
   const skillsMatch = fullText.match(/Skill\s*Proficiencies?[:\s]*([^.]+)/i)
-  const skills = skillsMatch 
-    ? skillsMatch[1].split(/[,&]/).map(s => s.trim()).filter(Boolean)
+  const skills = skillsMatch
+    ? skillsMatch[1].replace(/^Choose \d+:\s*/i, "").split(/\s+and\s+|[,&]/).map((s) => s.trim()).filter(Boolean)
     : []
-  
-  // Extract feat
+
   const featMatch = fullText.match(/Feat[:\s]*([^.]+)/i)
-  
-  // Extract ability bonuses (D&D 2024 format)
-  const abilityMatch = fullText.match(/Ability\s*Scores?[:\s]*([^.]+)/i)
-  const ability_bonuses: Record<string, number> = {}
-  if (abilityMatch) {
-    const bonusText = abilityMatch[1].toLowerCase()
-    const abilities = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
-    abilities.forEach(ab => {
-      if (bonusText.includes(ab)) {
-        const match = bonusText.match(new RegExp(`${ab}[\\s:]*\\+?(\\d)`, "i"))
-        if (match) ability_bonuses[ab] = parseInt(match[1])
-      }
-    })
-  }
+
+  const abilityLine = fullText.match(/Ability\s*Scores?[:\s]*([^\n.]+)/i)?.[1]
+  const ability_bonuses =
+    parseBackgroundAbilityScoresLine(abilityLine) ?? parseBackgroundAbilityFromImportText(fullText)
+
+  const feature = parseBackgroundFeatureFromText(fullText)
+  const { grants_spells, spells_by_level } = parseBackgroundGrantedSpellNames(fullText)
 
   return {
     name,
-    description,
+    description: description || null,
     skill_proficiencies: skills,
-    feat_granted: featMatch ? featMatch[1].trim() : null,
-    ability_bonuses: Object.keys(ability_bonuses).length > 0 ? ability_bonuses : null,
+    feat_granted: featMatch ? featMatch[1].replace(/\s*\(see.*$/i, "").trim() : null,
+    ability_bonuses,
+    feature,
+    grants_spells,
+    granted_spells: null,
+    _granted_spell_names: grants_spells ? spells_by_level : undefined,
     source: new URL(url).hostname,
-    creator_url: url
+    creator_url: url,
   }
 }
 
@@ -404,7 +406,13 @@ export async function POST(request: NextRequest) {
 
     const { result, tableName } = parsed
 
-    await upsertByName(tableName, [result])
+    let row = result
+    if (tableName === "backgrounds") {
+      const spells = (await listRows("spells")) as { id: string; name: string }[]
+      row = finalizeBackgroundImportRow(row, spells)
+    }
+
+    await upsertByName(tableName, [row])
 
     return NextResponse.json({
       success: true,

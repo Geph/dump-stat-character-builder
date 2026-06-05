@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/db/client"
 import {
   ArrowLeft,
   User,
@@ -17,6 +17,7 @@ import {
   Pencil,
   FileText,
   Plus,
+  Search,
 } from "lucide-react"
 import Link from "next/link"
 import type {
@@ -33,6 +34,17 @@ import type {
 import { resolveUsesConfig, ABILITY_SCORE_KEYS } from "@/lib/compendium/characteristic-modifiers"
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
 import { DamageRollButton } from "@/components/character-sheet/damage-roll-button"
+import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
+import { SpellSlotTracker, useSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
+import { SpellDetailOverlay } from "@/components/character-sheet/spell-detail-overlay"
+import { EquipmentDetailOverlay } from "@/components/character-sheet/equipment-detail-overlay"
+import { filterEquipmentList } from "@/lib/compendium/equipment-display"
+import {
+  getSpellSlotTable,
+  isConcentrationCondition,
+  getActiveConcentration,
+  formatSpellListGroupLabel,
+} from "@/lib/compendium/spell-slots"
 import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import {
@@ -44,6 +56,10 @@ import {
   isWeaponItem,
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
+import {
+  getEffectiveArmorProficiencies,
+  getEffectiveWeaponProficiencies,
+} from "@/lib/compendium/background-proficiencies"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -134,14 +150,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [tempHp, setTempHp] = useState(0)
   const [activeConditions, setActiveConditions] = useState<string[]>([])
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
-  const [hoveredCondition, setHoveredCondition] = useState<string | null>(null)
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
+  const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
+  const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("")
+  const [usedSpellSlots, setUsedSpellSlots] = useState<number[]>([])
+  const conditionButtonRef = useRef<HTMLButtonElement>(null)
+  const [conditionMenuPos, setConditionMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  )
 
   useEffect(() => {
     const fetchCharacter = async () => {
-      const supabase = createClient()
+      const db = createClient()
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("characters")
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .eq("id", id)
@@ -152,16 +175,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
 
         if (data.spell_ids?.length) {
-          const { data: spellData } = await supabase.from("spells").select("*").in("id", data.spell_ids)
+          const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
           if (spellData) setSpells(spellData)
         }
 
         if (data.equipment_ids?.length) {
-          const { data: equipmentData } = await supabase.from("equipment").select("*").in("id", data.equipment_ids)
+          const { data: equipmentData } = await db.from("equipment").select("*").in("id", data.equipment_ids)
           if (equipmentData) setEquipment(equipmentData)
         }
 
-        const { data: abilitiesData } = await supabase
+        const { data: abilitiesData } = await db
           .from("custom_abilities")
           .select("*")
           .eq("show_in_builder", true)
@@ -169,13 +192,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
         const featIds = (data.feat_ids ?? []).filter(Boolean)
         if (featIds.length) {
-          const { data: featData } = await supabase.from("feats").select("*").in("id", featIds)
-          if (featData) setCharacterFeats(featData)
+          const uniqueFeatIds = [...new Set(featIds)]
+          const { data: featData } = await db.from("feats").select("*").in("id", uniqueFeatIds)
+          if (featData) {
+            const rows = featData as Feat[]
+            const byId = new Map(rows.map((feat) => [feat.id, feat]))
+            setCharacterFeats(
+              featIds.map((id) => byId.get(id)).filter((feat): feat is Feat => Boolean(feat)),
+            )
+          }
         }
 
         const bg = data.backgrounds as Background | undefined
         if (bg?.feat_granted) {
-          const { data: originData } = await supabase
+          const { data: originData } = await db
             .from("feats")
             .select("*")
             .eq("name", bg.feat_granted)
@@ -194,6 +224,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character?.asi_allocations],
   )
 
+  const spellSlotTable = useMemo(() => {
+    if (!character?.classes?.spellcasting) return null
+    return getSpellSlotTable(
+      character.classes.name,
+      character.level,
+      character.classes.spellcasting,
+    )
+  }, [character?.classes, character?.level])
+
+  useEffect(() => {
+    if (spellSlotTable) {
+      setUsedSpellSlots(spellSlotTable.slotsByLevel.map(() => 0))
+    }
+  }, [spellSlotTable])
+
   const effectiveScores = useMemo(() => {
     if (!character) return null
     return ABILITY_SCORE_KEYS.reduce(
@@ -210,6 +255,32 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       prev.includes(conditionName) ? prev.filter((c) => c !== conditionName) : [...prev, conditionName],
     )
   }
+
+  const applyConcentration = useCallback((conditionName: string) => {
+    setActiveConditions((prev) => [
+      ...prev.filter((c) => !isConcentrationCondition(c)),
+      conditionName,
+    ])
+  }, [])
+
+  const openConditionMenu = () => {
+    if (conditionButtonRef.current) {
+      const rect = conditionButtonRef.current.getBoundingClientRect()
+      setConditionMenuPos({ top: rect.bottom + 4, left: rect.left })
+    }
+    setConditionDropdownOpen((open) => !open)
+  }
+
+  useEffect(() => {
+    if (!conditionDropdownOpen) return
+    const close = () => setConditionDropdownOpen(false)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [conditionDropdownOpen])
 
   if (loading) {
     return (
@@ -269,8 +340,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     .join(" · ")
 
   const skillsInOrder = getSkillsInAbilityOrder()
-  const weaponProficiencies = character.classes?.weapon_proficiencies ?? []
+  const weaponProficiencies = getEffectiveWeaponProficiencies(
+    character.classes?.weapon_proficiencies,
+    character.weapon_proficiencies,
+  )
+  const armorProficiencies = getEffectiveArmorProficiencies(
+    character.classes?.armor_proficiencies,
+    character.armor_proficiencies,
+  )
   const weapons = equipment.filter(isWeaponItem)
+  const nonWeaponEquipment = equipment.filter((item) => !isWeaponItem(item))
+  const filteredEquipment = filterEquipmentList(nonWeaponEquipment, equipmentSearchQuery)
   const spellcastingAbilityKey = (
     character.classes?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
   )?.toLowerCase() as keyof typeof abilityMods | undefined
@@ -286,6 +366,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     : null
 
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
+
+  const spellsGroupedByLevel = (() => {
+    const groups = new Map<number, Spell[]>()
+    for (const spell of spells) {
+      const list = groups.get(spell.level) ?? []
+      list.push(spell)
+      groups.set(spell.level, list)
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([level, levelSpells]) => ({
+        level,
+        label: formatSpellListGroupLabel(level),
+        spells: levelSpells.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+  })()
 
   return (
     <div className="min-h-screen bg-background">
@@ -312,14 +408,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl mb-3 overflow-hidden min-h-[140px]"
+          className="relative rounded-2xl mb-3 min-h-[140px]"
         >
           {character.banner_url && (
-            <img
-              src={character.banner_url}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover"
-            />
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+              <img
+                src={character.banner_url}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
           )}
           <div
             className={`relative p-4 ${
@@ -365,16 +463,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )}
                 </div>
 
-                <div className="relative mt-2">
+                <div className="relative mt-2 z-10">
                   <button
-                    onClick={() => setConditionDropdownOpen(!conditionDropdownOpen)}
+                    ref={conditionButtonRef}
+                    type="button"
+                    onClick={openConditionMenu}
                     className="flex items-center gap-1.5 px-2 py-1 bg-card/80 border border-border rounded-md text-xs hover:border-primary transition-colors"
                   >
                     Conditions
                     <ChevronDown className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
-                  {conditionDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                  {conditionDropdownOpen && conditionMenuPos && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-[99]"
+                        aria-hidden
+                        onClick={() => setConditionDropdownOpen(false)}
+                      />
+                      <div
+                        className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-48 overflow-y-auto"
+                        style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
+                      >
                       {CONDITIONS.map((condition) => (
                         <label
                           key={condition.name}
@@ -389,14 +498,23 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           {condition.name}
                         </label>
                       ))}
-                    </div>
+                      </div>
+                    </>
                   )}
                   {activeConditions.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {activeConditions.map((condName) => (
                         <span
                           key={condName}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full text-[10px] font-medium"
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                            isConcentrationCondition(condName)
+                              ? "bg-purple-500/20 text-purple-800 dark:text-purple-300"
+                              : "bg-destructive/20 text-destructive"
+                          }`}
+                          title={
+                            CONDITIONS.find((c) => c.name === condName)?.description ??
+                            (isConcentrationCondition(condName) ? "Concentrating on a spell" : undefined)
+                          }
                         >
                           {condName}
                           <button type="button" onClick={() => toggleCondition(condName)}>
@@ -449,10 +567,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         <div className="flex gap-1.5 mb-3 overflow-x-auto">
           {[
             { id: "abilities" as const, label: "Abilities & Skills", icon: <UserCircle className="w-3.5 h-3.5" /> },
-            { id: "details" as const, label: "Character Details", icon: <FileText className="w-3.5 h-3.5" /> },
             { id: "combat" as const, label: "Combat", icon: <Swords className="w-3.5 h-3.5" /> },
             { id: "features" as const, label: "Features", icon: <Sparkles className="w-3.5 h-3.5" /> },
             { id: "custom" as const, label: "Custom", icon: <Wand2 className="w-3.5 h-3.5" /> },
+            { id: "details" as const, label: "Character Details", icon: <FileText className="w-3.5 h-3.5" /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -478,13 +596,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "abilities" && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-foreground">Abilities and Skills</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {ABILITY_SCORE_KEYS.map((key) => {
                       const score = effectiveScores[key]
                       const bonus = asiBonuses[key]
+                      const mod = abilityMods[key]
                       return (
                         <div key={key} className="text-center">
                           <div
@@ -497,15 +616,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           {bonus ? (
                             <p className="text-[9px] text-lime">+{bonus} ASI</p>
                           ) : null}
+                          <div className="mt-1 flex justify-center">
+                            <D20RollButton
+                              modifier={mod}
+                              title={`${ABILITY_LABELS[key]} ability check`}
+                            />
+                          </div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0">
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-2">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Skills</h3>
-                  <div className="space-y-1 max-h-[280px] overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:min-h-[300px]">
                     {skillsInOrder.map((skill) => {
                       const isProficient = character.skill_proficiencies?.includes(skill.name) ?? false
                       const hasExpertise = character.skill_expertise?.includes(skill.name) ?? false
@@ -519,7 +644,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
                           }`}
                         >
-                          <span className="truncate">
+                          <span className="truncate min-w-0">
                             {skill.name} ({ABILITY_ABBREVIATIONS[skill.ability]})
                           </span>
                           <span className="flex items-center gap-1 shrink-0">
@@ -528,7 +653,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                 Expertise
                               </span>
                             )}
-                            <span className="font-bold tabular-nums">{formatMod(mod)}</span>
+                            <span className="font-bold tabular-nums w-7 text-right">{formatMod(mod)}</span>
+                            <D20RollButton modifier={mod} title={`Roll ${skill.name}`} />
                           </span>
                         </div>
                       )
@@ -539,21 +665,77 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               <div className="bg-card rounded-xl p-3 border border-border">
                 <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Proficiencies</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {(character.tool_proficiencies ?? []).map((tool) => (
-                    <span key={tool} className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-full text-xs">
-                      {tool}
-                    </span>
-                  ))}
-                  {(character.languages ?? []).map((lang) => (
-                    <span key={lang} className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-xs">
-                      {lang}
-                    </span>
-                  ))}
-                  {!character.tool_proficiencies?.length && !character.languages?.length && (
-                    <span className="text-xs text-muted-foreground">None listed</span>
-                  )}
-                </div>
+                {!weaponProficiencies.length &&
+                !armorProficiencies.length &&
+                !(character.tool_proficiencies ?? []).length &&
+                !(character.languages ?? []).length ? (
+                  <span className="text-xs text-muted-foreground">None listed</span>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    {weaponProficiencies.length > 0 && (
+                      <div className="flex-1 min-w-[140px] rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Weapons</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {weaponProficiencies.map((item) => (
+                            <span
+                              key={`weapon-${item}`}
+                              className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {armorProficiencies.length > 0 && (
+                      <div className="flex-1 min-w-[140px] rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Armor</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {armorProficiencies.map((item) => (
+                            <span
+                              key={`armor-${item}`}
+                              className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(character.tool_proficiencies ?? []).length > 0 && (
+                      <div className="flex-1 min-w-[140px] rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">
+                          Tools & Vehicles
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(character.tool_proficiencies ?? []).map((tool) => (
+                            <span
+                              key={tool}
+                              className="px-2 py-0.5 bg-secondary/10 text-secondary rounded-full text-xs"
+                            >
+                              {tool}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(character.languages ?? []).length > 0 && (
+                      <div className="flex-1 min-w-[140px] rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Languages</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(character.languages ?? []).map((lang) => (
+                            <span
+                              key={lang}
+                              className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full text-xs"
+                            >
+                              {lang}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -608,26 +790,40 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <div className="bg-card rounded-xl p-3 border border-border">
                   <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
                   <div className="space-y-1">
-                    {[
-                      { label: "Armor Class", value: String(armorClass) },
-                      { label: "Speed", value: `${speed} ft` },
-                      { label: "Initiative", value: formatMod(initiative) },
-                      { label: "Proficiency Bonus", value: formatMod(proficiencyBonus) },
-                      ...(hasSpellcasting && spellSaveDc != null
-                        ? [
-                            { label: "Spell Save DC", value: String(spellSaveDc) },
-                            { label: "Spell Attack", value: formatMod(spellAttackMod!) },
-                          ]
-                        : []),
-                    ].map((row) => (
-                      <div
-                        key={row.label}
-                        className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium"
-                      >
-                        <span>{row.label}</span>
-                        <span className="font-bold tabular-nums">{row.value}</span>
+                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Armor Class</span>
+                      <span className="font-bold tabular-nums">{armorClass}</span>
+                    </div>
+                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Speed</span>
+                      <span className="font-bold tabular-nums">{speed} ft</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Initiative</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold tabular-nums">{formatMod(initiative)}</span>
+                        <D20RollButton modifier={initiative} title="Roll initiative" />
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Proficiency Bonus</span>
+                      <span className="font-bold tabular-nums">{formatMod(proficiencyBonus)}</span>
+                    </div>
+                    {hasSpellcasting && spellSaveDc != null && (
+                      <>
+                        <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                          <span>Spell Save DC</span>
+                          <span className="font-bold tabular-nums">{spellSaveDc}</span>
+                        </div>
+                        <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                          <span>Spell Attack</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold tabular-nums">{formatMod(spellAttackMod!)}</span>
+                            <D20RollButton modifier={spellAttackMod!} title="Roll spell attack" />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -643,12 +839,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         return (
                           <div
                             key={ability}
-                            className={`flex justify-between items-center px-2 py-1.5 rounded text-xs ${
+                            className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${
                               isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
                             }`}
                           >
                             <span>{ability}</span>
-                            <span className="font-bold">{formatMod(mod)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold tabular-nums">{formatMod(mod)}</span>
+                              <D20RollButton modifier={mod} title={`Roll ${ability} save`} />
+                            </div>
                           </div>
                         )
                       },
@@ -683,10 +882,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           <p className="font-bold text-xs text-foreground mb-1.5">{weapon.name}</p>
                           {attack && (
                             <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-xs font-black text-primary">
-                                {formatMod(attack.attackBonus)} to hit
-                              </span>
-                              {damageRollExpr ? <DamageRollButton expression={damageRollExpr} /> : null}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-muted-foreground uppercase">To Hit</span>
+                                <D20RollButton
+                                  modifier={attack.attackBonus}
+                                  title={`${weapon.name} attack roll`}
+                                />
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-muted-foreground uppercase">Dmg</span>
+                                {damageRollExpr ? (
+                                  <DamageRollButton expression={damageRollExpr} />
+                                ) : null}
+                              </div>
                             </div>
                           )}
                           <dl className="space-y-0.5 text-[11px]">
@@ -731,41 +939,97 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold mb-2">Equipment</h2>
-                  <div className="space-y-1 max-h-36 overflow-y-auto">
-                    {equipment.filter((item) => !isWeaponItem(item)).length ? (
-                      equipment
-                        .filter((item) => !isWeaponItem(item))
-                        .map((item) => (
-                          <div key={item.id} className="flex justify-between text-xs px-2 py-1 bg-muted rounded">
-                            <span>{item.name}</span>
-                            <span className="text-muted-foreground">{item.category}</span>
+              {hasSpellcasting && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div
+                    className={`bg-card rounded-xl p-3 border border-border min-w-0 ${spellSlotTable ? "" : "md:col-span-2"}`}
+                  >
+                    <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
+                    {spellsGroupedByLevel.length ? (
+                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                        {spellsGroupedByLevel.map((group) => (
+                          <div key={group.level}>
+                            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5">
+                              {group.label}
+                            </h3>
+                            <div className="space-y-1">
+                              {group.spells.map((spell) => (
+                                <button
+                                  key={spell.id}
+                                  type="button"
+                                  onClick={() => setSelectedSpell(spell)}
+                                  className="flex w-full justify-between items-center text-xs px-2 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left"
+                                >
+                                  <span className="font-medium truncate">{spell.name}</span>
+                                  {spell.concentration && (
+                                    <span className="text-[9px] text-purple-600 dark:text-purple-400 shrink-0 ml-2">
+                                      C
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        ))
+                        ))}
+                      </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">No other equipment</p>
+                      <p className="text-xs text-muted-foreground">No spells prepared</p>
                     )}
                   </div>
-                </div>
-                {hasSpellcasting && (
-                  <div className="bg-card rounded-xl p-3 border border-border">
-                    <h2 className="text-sm font-bold mb-2">Spells</h2>
-                    <div className="space-y-1 max-h-36 overflow-y-auto">
-                      {spells.length ? (
-                        spells.map((spell) => (
-                          <div key={spell.id} className="flex justify-between text-xs px-2 py-1 bg-muted rounded">
-                            <span>{spell.name}</span>
-                            <span className="text-primary">{spell.level === 0 ? "Cantrip" : `Lvl ${spell.level}`}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground">No spells prepared</p>
-                      )}
+
+                  {spellSlotTable ? (
+                    <div className="bg-card rounded-xl p-3 border border-border min-w-0">
+                      <h2 className="text-sm font-bold text-foreground mb-2">Spell Slots</h2>
+                      <SpellSlotTracker
+                        table={spellSlotTable}
+                        usedByLevel={usedSpellSlots}
+                        onUsedChange={setUsedSpellSlots}
+                      />
                     </div>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="bg-card rounded-xl p-3 border border-border">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <h2 className="text-sm font-bold">Equipment</h2>
+                  {nonWeaponEquipment.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {filteredEquipment.length} of {nonWeaponEquipment.length}
+                    </span>
+                  )}
+                </div>
+                {nonWeaponEquipment.length > 0 && (
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={equipmentSearchQuery}
+                      onChange={(e) => setEquipmentSearchQuery(e.target.value)}
+                      placeholder="Search equipment..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
                   </div>
                 )}
+                <div className="flex flex-wrap gap-2">
+                  {filteredEquipment.length ? (
+                    filteredEquipment.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedEquipment(item)}
+                        className="flex justify-between gap-3 text-xs px-2.5 py-1.5 bg-muted rounded-lg min-w-[140px] flex-1 max-w-xs text-left hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors"
+                      >
+                        <span className="font-medium truncate">{item.name}</span>
+                        <span className="text-muted-foreground shrink-0">{item.category}</span>
+                      </button>
+                    ))
+                  ) : nonWeaponEquipment.length ? (
+                    <p className="text-xs text-muted-foreground">No equipment matches your search</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No other equipment</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -850,8 +1114,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <section className="bg-card rounded-xl p-3 border border-border">
                   <h2 className="text-sm font-bold mb-2">General Feats & Epic Boons</h2>
                   <div className="space-y-2">
-                    {characterFeats.map((feat) => (
-                      <div key={feat.id} className="p-2 bg-muted rounded-lg text-xs">
+                    {characterFeats.map((feat, index) => (
+                      <div key={`${feat.id}-${index}`} className="p-2 bg-muted rounded-lg text-xs">
                         <p className="font-bold">
                           {feat.name}
                           <span className="ml-2 text-[10px] font-normal text-muted-foreground">
@@ -905,6 +1169,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       </main>
 
       <AnimatePresence>
+        {selectedEquipment && (
+          <EquipmentDetailOverlay
+            item={selectedEquipment}
+            onClose={() => setSelectedEquipment(null)}
+          />
+        )}
+        {selectedSpell && (
+          <SpellDetailOverlay
+            spell={selectedSpell}
+            spellAttackMod={spellAttackMod}
+            activeConcentration={getActiveConcentration(activeConditions)}
+            onClose={() => setSelectedSpell(null)}
+            onCast={(result) => {
+              if (result.concentrationApplied) {
+                applyConcentration(result.concentrationApplied)
+              }
+              if (result.slotUsed && spellSlotTable) {
+                const next = useSpellSlot(
+                  usedSpellSlots,
+                  spellSlotTable.slotsByLevel,
+                  selectedSpell.level,
+                )
+                if (next) setUsedSpellSlots(next)
+              }
+            }}
+            canUseSlot={
+              selectedSpell.level === 0 ||
+              (spellSlotTable != null &&
+                (usedSpellSlots[selectedSpell.level - 1] ?? 0) <
+                  (spellSlotTable.slotsByLevel[selectedSpell.level - 1] ?? 0))
+            }
+          />
+        )}
         {portraitZoomOpen && character.portrait_url && (
           <motion.div
             initial={{ opacity: 0 }}

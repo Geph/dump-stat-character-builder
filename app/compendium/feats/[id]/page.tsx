@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
-import { X } from "lucide-react"
-import { GameIconPicker } from "@/components/game-icon-picker"
+import { createClient } from "@/lib/db/client"
+import { Info, X } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -21,7 +22,7 @@ import {
   normalizeCharacteristics,
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
-import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -39,6 +40,7 @@ interface FeatFormData {
   source: string
   creator_url: string
   icon: string | null
+  repeatable: boolean
 }
 
 const defaultFeat: FeatFormData = {
@@ -54,6 +56,7 @@ const defaultFeat: FeatFormData = {
   source: "Custom",
   creator_url: "",
   icon: null,
+  repeatable: false,
 }
 
 export default function FeatEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,7 +78,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     const fetchPrereqOptions = async () => {
-      const supabase = createClient()
+      const db = createClient()
       const [
         { data: feats },
         { data: classes },
@@ -83,11 +86,11 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         { data: backgrounds },
         { data: spells },
       ] = await Promise.all([
-        supabase.from("feats").select("id, name, category").order("name"),
-        supabase.from("classes").select("id, name").order("name"),
-        supabase.from("species").select("id, name").order("name"),
-        supabase.from("backgrounds").select("id, name").order("name"),
-        supabase.from("spells").select("id, name").order("name").limit(500),
+        db.from("feats").select("id, name, category").order("name"),
+        db.from("classes").select("id, name").order("name"),
+        db.from("species").select("id, name").order("name"),
+        db.from("backgrounds").select("id, name").order("name"),
+        db.from("spells").select("id, name").order("name").limit(500),
       ])
       setAllFeats(feats || [])
       setAllClasses(classes || [])
@@ -102,8 +105,8 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     if (id && id !== "new") {
       const fetchFeat = async () => {
         setLoading(true)
-        const supabase = createClient()
-        const { data, error } = await supabase
+        const db = createClient()
+        const { data, error } = await db
           .from("feats")
           .select("*")
           .eq("id", id)
@@ -125,6 +128,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
+            repeatable: Boolean(data.repeatable),
           })
         }
         setLoading(false)
@@ -138,7 +142,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     setSaving(true)
     setError(null)
 
-    const supabase = createClient()
+    const db = createClient()
     const { characteristics, creator_url, ...rest } = form
     const payload = {
       ...rest,
@@ -147,10 +151,10 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
     }
 
     if (id === "new") {
-      const { error } = await supabase.from("feats").insert([payload])
+      const { error } = await db.from("feats").insert([payload])
       if (error) { setError(error.message); setSaving(false); return }
     } else {
-      const { error } = await supabase.from("feats").update(payload).eq("id", id)
+      const { error } = await db.from("feats").update(payload).eq("id", id)
       if (error) { setError(error.message); setSaving(false); return }
     }
 
@@ -171,8 +175,8 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this feat?")) return
-    const supabase = createClient()
-    await supabase.from("feats").delete().eq("id", id)
+    const db = createClient()
+    await db.from("feats").delete().eq("id", id)
     router.push("/compendium?tab=feats")
   }
 
@@ -265,45 +269,21 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
-          {/* Name + Source */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Feat Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Alert"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Source</label>
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Player's Handbook"
-              />
-            </div>
-          </div>
-
-          <SourceLinkField
-            value={form.creator_url}
-            onChange={(creator_url) => setForm({ ...form, creator_url })}
+          <CompendiumEditorHeaderRow
+            nameLabel="Feat Name"
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            namePlaceholder="Alert"
+            source={form.source}
+            onSourceChange={(source) => setForm({ ...form, source })}
+            creatorUrl={form.creator_url}
+            onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
+            icon={form.icon}
+            onIconChange={(icon) => setForm({ ...form, icon })}
           />
 
-          {/* Icon */}
-          <GameIconPicker
-            value={form.icon}
-            onChange={(icon) => setForm({ ...form, icon })}
-            label="Icon"
-          />
-
-          {/* Category + Level Requirement */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Category, level requirement, repeatable */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Category</label>
               <select
@@ -334,6 +314,34 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
                   <option key={lvl} value={lvl}>Level {lvl}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-sm font-semibold text-foreground">Can be chosen more than once</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="About repeatable feats"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    When enabled, players may select this feat in multiple milestone slots on the same
+                    character.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <label className="flex items-center cursor-pointer w-full px-4 py-3 bg-card border-2 border-border rounded-xl min-h-[50px]">
+                <input
+                  type="checkbox"
+                  checked={form.repeatable}
+                  onChange={(e) => setForm({ ...form, repeatable: e.target.checked })}
+                  className="w-5 h-5 rounded border-border accent-primary"
+                />
+              </label>
             </div>
           </div>
 

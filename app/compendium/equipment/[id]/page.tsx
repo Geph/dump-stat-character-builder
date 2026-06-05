@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
-import { GameIconPicker } from "@/components/game-icon-picker"
+import { createClient } from "@/lib/db/client"
+import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -13,7 +13,7 @@ import {
   propertiesToStringArray,
   stringifyPropertiesForDb,
 } from "@/lib/compendium/equipment-properties"
-import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const CATEGORIES = [
   "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
@@ -101,8 +101,8 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     if (id && id !== "new") {
       const fetchEquipment = async () => {
         setLoading(true)
-        const supabase = createClient()
-        const { data, error } = await supabase
+        const db = createClient()
+        const { data, error } = await db
           .from("equipment")
           .select("*")
           .eq("id", id)
@@ -161,8 +161,8 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
       return
     }
     const loadAbilities = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
+      const db = createClient()
+      const { data } = await db
         .from("custom_abilities")
         .select("id, name")
         .eq("attached_to_type", "equipment")
@@ -189,7 +189,7 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     setSaving(true)
     setError(null)
 
-    const supabase = createClient()
+    const db = createClient()
     const payload = {
       ...form,
       properties: stringifyPropertiesForDb(form.properties, rawProperties),
@@ -197,14 +197,14 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
     }
     
     if (id === "new") {
-      const { error } = await supabase.from("equipment").insert([payload])
+      const { error } = await db.from("equipment").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("equipment").update(payload).eq("id", id)
+      const { error } = await db.from("equipment").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -230,8 +230,8 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this equipment?")) return
     
-    const supabase = createClient()
-    await supabase.from("equipment").delete().eq("id", id)
+    const db = createClient()
+    await db.from("equipment").delete().eq("id", id)
     router.push("/compendium?tab=equipment")
   }
 
@@ -274,44 +274,17 @@ export default function EquipmentEditorPage({ params }: { params: Promise<{ id: 
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Item Name
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Longsword"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Source
-              </label>
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Player's Handbook"
-              />
-            </div>
-          </div>
-
-          <SourceLinkField
-            value={form.creator_url}
-            onChange={(creator_url) => setForm({ ...form, creator_url })}
-          />
-
-          {/* Icon */}
-          <GameIconPicker
-            value={form.icon}
-            onChange={(icon) => setForm({ ...form, icon })}
-            label="Icon"
+          <CompendiumEditorHeaderRow
+            nameLabel="Item Name"
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            namePlaceholder="Longsword"
+            source={form.source}
+            onSourceChange={(source) => setForm({ ...form, source })}
+            creatorUrl={form.creator_url}
+            onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
+            icon={form.icon}
+            onIconChange={(icon) => setForm({ ...form, icon })}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

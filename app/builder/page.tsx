@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/db/client"
 import { useRouter } from "next/navigation"
 import { 
   ChevronLeft, 
@@ -30,14 +30,31 @@ import {
 import {
   aggregateCharacteristics,
   applyAcCharacteristics,
+  applyHpCharacteristics,
   computeInitiative,
   normalizeCharacteristics,
   resolveUsesConfig,
+  sumAttackRollModifiers,
+  sumDamageRollModifiers,
   ABILITY_SCORE_KEYS,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
+  findBackgroundGrantedFeat,
+  formatBackgroundAbilityBonuses,
+  formatBackgroundEquipment,
+  formatBackgroundGrantedSpells,
+  getBackgroundProficiencySections,
+} from "@/lib/compendium/background-display"
+import {
+  applyBackgroundProficienciesToDraft,
+  getEffectiveArmorProficiencies,
+  getEffectiveWeaponProficiencies,
+  mergeProficiencyLists,
+} from "@/lib/compendium/background-proficiencies"
+import {
   calculateArmorClass,
   calculateWeaponAttack,
+  getWeaponPropertyTags,
   isArmorItem,
   isShieldItem,
   isWeaponItem,
@@ -85,7 +102,14 @@ import {
 import {
   aggregateAsiBonuses,
   allSelectedAsiAllocationsValid,
+  COMBINED_MILESTONE_ASI_KEY,
+  countMilestoneAsiFeats,
+  getAsiPointsUsed,
+  getCombinedMilestoneAsiAllocation,
   isAsiFeat,
+  milestoneAsiPointTotal,
+  trimAsiAllocation,
+  withCombinedMilestoneAsiAllocation,
 } from "@/lib/builder/asi-allocation"
 import { MAX_PORTRAIT_FILE_BYTES, normalizePortraitUrl, normalizeBannerUrl } from "@/lib/portrait"
 import type {
@@ -112,6 +136,10 @@ const STEPS = [
 
 const ABILITY_NAMES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
 
+const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const
+
+type AbilityMethod = "pointbuy" | "standard" | "roll" | "custom"
+
 const EMPTY_CHARACTER: CharacterDraft = {
   name: "",
   level: 1,
@@ -126,6 +154,9 @@ const EMPTY_CHARACTER: CharacterDraft = {
   wisdom: 8,
   charisma: 8,
   skill_proficiencies: [],
+  tool_proficiencies: [],
+  weapon_proficiencies: [],
+  armor_proficiencies: [],
   languages: ["Common"],
   spell_ids: [],
   equipment_ids: [],
@@ -153,6 +184,7 @@ export default function BuilderPage() {
   const [spells, setSpells] = useState<Spell[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [feats, setFeats] = useState<Feat[]>([])
+  const [featsLoadError, setFeatsLoadError] = useState<string | null>(null)
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -160,7 +192,7 @@ export default function BuilderPage() {
   const [character, setCharacter] = useState<CharacterDraft>(EMPTY_CHARACTER)
 
   // Ability score generation method
-  const [abilityMethod, setAbilityMethod] = useState<"pointbuy" | "standard" | "roll">("pointbuy")
+  const [abilityMethod, setAbilityMethod] = useState<AbilityMethod>("pointbuy")
   const [pointsRemaining, setPointsRemaining] = useState(27)
   
   // Search state for each step
@@ -307,8 +339,8 @@ export default function BuilderPage() {
     if (loading || !editIdParam || editHydratedRef.current) return
 
     const hydrateFromCharacter = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
+      const db = createClient()
+      const { data, error } = await db
         .from("characters")
         .select("*")
         .eq("id", editIdParam)
@@ -395,24 +427,30 @@ export default function BuilderPage() {
 
   useEffect(() => {
     const fetchContent = async () => {
-      const supabase = createClient()
+      const db = createClient()
       
       const [classesRes, subclassesRes, speciesRes, backgroundsRes, featsRes, spellsRes, equipmentRes, abilitiesRes] = await Promise.all([
-        supabase.from("classes").select("*").order("name"),
-        supabase.from("subclasses").select("*").order("name"),
-        supabase.from("species").select("*").order("name"),
-        supabase.from("backgrounds").select("*").order("name"),
-        supabase.from("feats").select("*").order("name"),
-        supabase.from("spells").select("*").order("level").order("name"),
-        supabase.from("equipment").select("*").order("category").order("name"),
-        supabase.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
+        db.from("classes").select("*").order("name"),
+        db.from("subclasses").select("*").order("name"),
+        db.from("species").select("*").order("name"),
+        db.from("backgrounds").select("*").order("name"),
+        db.from("feats").select("*").order("name"),
+        db.from("spells").select("*").order("level").order("name"),
+        db.from("equipment").select("*").order("category").order("name"),
+        db.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
       ])
 
       setClasses(classesRes.data || [])
       setSubclasses(subclassesRes.data || [])
       setSpecies(speciesRes.data || [])
       setBackgrounds(backgroundsRes.data || [])
-      setFeats(featsRes.data || [])
+      if (featsRes.error) {
+        setFeatsLoadError(featsRes.error.message)
+        setFeats([])
+      } else {
+        setFeatsLoadError(null)
+        setFeats(featsRes.data || [])
+      }
       setSpells(spellsRes.data || [])
       setEquipment(equipmentRes.data || [])
       setCustomAbilities(abilitiesRes.data || [])
@@ -447,6 +485,28 @@ export default function BuilderPage() {
 
     setCharacter({ ...character, [ability]: newScore })
   }
+
+  const setCustomAbilityScore = (ability: (typeof ABILITY_NAMES)[number], raw: string) => {
+    if (raw === "") return
+    const parsed = parseInt(raw, 10)
+    if (!Number.isFinite(parsed)) return
+    setCharacter({ ...character, [ability]: Math.min(30, Math.max(1, parsed)) })
+  }
+
+  const assignStandardArrayValue = (
+    ability: (typeof ABILITY_NAMES)[number],
+    value: number,
+  ) => {
+    setCharacter((prev) => ({ ...prev, [ability]: value }))
+  }
+
+  const isStandardValueUsedElsewhere = (
+    ability: (typeof ABILITY_NAMES)[number],
+    value: number,
+  ) =>
+    ABILITY_NAMES.some(
+      (name) => name !== ability && character[name] === value,
+    )
 
   const applyStandardArray = () => {
     setCharacter({
@@ -522,6 +582,13 @@ export default function BuilderPage() {
   const requiredFeatSlots = requiredFeatSlotCount(totalLevel)
   const selectedFeatIds = (character.feat_ids ?? []).slice(0, requiredFeatSlots)
   const selectedFeatCount = selectedFeatIds.filter(Boolean).length
+  const milestoneAsiFeatCount = countMilestoneAsiFeats(selectedFeatIds, feats)
+  const milestoneAsiTotalPoints = milestoneAsiPointTotal(milestoneAsiFeatCount)
+  const milestoneAsiAllocation = getCombinedMilestoneAsiAllocation(
+    asiAllocationsByFeatId,
+    selectedFeatIds,
+    feats,
+  )
 
   // If level drops, trim feat slots
   useEffect(() => {
@@ -565,7 +632,31 @@ export default function BuilderPage() {
     selectedFeatIds,
     selectedFeatCount,
   ])
-  
+
+  useEffect(() => {
+    if (milestoneAsiTotalPoints <= 0) {
+      setAsiAllocationsByFeatId((prev) => {
+        if (!prev[COMBINED_MILESTONE_ASI_KEY]) return prev
+        const next = { ...prev }
+        delete next[COMBINED_MILESTONE_ASI_KEY]
+        return next
+      })
+      return
+    }
+    const allocation = getCombinedMilestoneAsiAllocation(
+      asiAllocationsByFeatId,
+      selectedFeatIds,
+      feats,
+    )
+    if (getAsiPointsUsed(allocation) <= milestoneAsiTotalPoints) return
+    setAsiAllocationsByFeatId((prev) =>
+      withCombinedMilestoneAsiAllocation(
+        prev,
+        trimAsiAllocation(allocation, milestoneAsiTotalPoints),
+      ),
+    )
+  }, [asiAllocationsByFeatId, selectedFeatIds, feats, milestoneAsiTotalPoints])
+
   // Get proficiency bonus based on total level
   const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
   
@@ -621,8 +712,10 @@ export default function BuilderPage() {
 
   const builderCharacteristicMods = [
     ...normalizeCharacteristics(selectedSpecies?.characteristics, null),
-    ...feats
-      .filter((feat) => selectedFeatIds.filter(Boolean).includes(feat.id))
+    ...selectedFeatIds
+      .filter(Boolean)
+      .map((featId) => feats.find((feat) => feat.id === featId))
+      .filter((feat): feat is Feat => Boolean(feat))
       .flatMap((feat) => normalizeCharacteristics(feat.benefits, null)),
     ...customAbilities.flatMap((ability) =>
       normalizeCharacteristics(ability.characteristics, ability.uses),
@@ -659,6 +752,21 @@ export default function BuilderPage() {
   }
 
   const effectiveSkillProficiencies = mergedSkillProficiencies
+  const effectiveSkillExpertise = [...aggregatedCharacteristics.skillExpertise]
+  const effectiveToolProficiencies = mergeProficiencyLists(
+    character.tool_proficiencies,
+    aggregatedCharacteristics.toolProficiencies,
+  )
+  const effectiveWeaponProficiencies = getEffectiveWeaponProficiencies(
+    primaryClass?.weapon_proficiencies,
+    character.weapon_proficiencies,
+    aggregatedCharacteristics.weaponProficiencies,
+  )
+  const effectiveArmorProficiencies = getEffectiveArmorProficiencies(
+    primaryClass?.armor_proficiencies,
+    character.armor_proficiencies,
+    aggregatedCharacteristics.armorProficiencies,
+  )
   const savingThrowProficiencies = [
     ...new Set([
       ...(primaryClass?.saving_throws || []),
@@ -692,7 +800,15 @@ export default function BuilderPage() {
     const total = Number.isFinite(hp) ? hp : 8 + conMod
     return Math.max(total, 1)
   }
-  const maxHp = calculateMaxHp()
+  const totalCharacterLevel =
+    characterClasses.length > 0
+      ? characterClasses.reduce((sum, cls) => sum + cls.level, 0)
+      : character.level
+  const maxHp = applyHpCharacteristics(
+    calculateMaxHp(),
+    aggregatedCharacteristics,
+    totalCharacterLevel,
+  )
   
   const armorOptions = equipment.filter(isArmorItem)
   const shieldOptions = equipment.filter(isShieldItem)
@@ -707,17 +823,39 @@ export default function BuilderPage() {
     abilityMods,
     proficiencyBonus,
   )
-  const equippedWeaponAttack =
+  const baseEquippedWeaponAttack =
     equippedWeapon && primaryClass
       ? calculateWeaponAttack(
           equippedWeapon,
           abilityMods,
           proficiencyBonus,
-          isWeaponProficient(equippedWeapon, primaryClass.weapon_proficiencies),
+          isWeaponProficient(equippedWeapon, effectiveWeaponProficiencies),
         )
       : equippedWeapon
         ? calculateWeaponAttack(equippedWeapon, abilityMods, proficiencyBonus, false)
         : null
+  const equippedWeaponAttack =
+    baseEquippedWeaponAttack && equippedWeapon
+      ? (() => {
+          const weaponProps = getWeaponPropertyTags(equippedWeapon)
+          const attackBonus =
+            baseEquippedWeaponAttack.attackBonus +
+            sumAttackRollModifiers(aggregatedCharacteristics, {
+              subcategory: equippedWeapon.subcategory ?? "",
+              properties: weaponProps,
+            })
+          const damageBonus = sumDamageRollModifiers(aggregatedCharacteristics, {
+            subcategory: equippedWeapon.subcategory ?? "",
+            properties: weaponProps,
+            damageType: equippedWeapon.damage_type ?? "",
+          })
+          const damageDisplay =
+            damageBonus > 0
+              ? `${baseEquippedWeaponAttack.damageDisplay} + ${damageBonus}`
+              : baseEquippedWeaponAttack.damageDisplay
+          return { attackBonus, damageDisplay }
+        })()
+      : baseEquippedWeaponAttack
   
   // Speed from species + characteristic modifiers
   const baseWalkSpeed =
@@ -735,8 +873,13 @@ export default function BuilderPage() {
   }
   
   // Passive Perception (10 + wis mod + proficiency if proficient)
-  const passivePerception = 10 + abilityMods.wisdom + 
-    (effectiveSkillProficiencies.includes("Perception") ? proficiencyBonus : 0)
+  const passivePerception =
+    10 +
+    abilityMods.wisdom +
+    (effectiveSkillProficiencies.includes("Perception")
+      ? proficiencyBonus *
+        (effectiveSkillExpertise.includes("Perception") ? 2 : 1)
+      : 0)
   
   // Initiative (DEX mod + characteristic modifiers)
   const initiative = computeInitiative(
@@ -772,7 +915,7 @@ export default function BuilderPage() {
   const saveCharacter = async () => {
     setSaving(true)
     try {
-      const supabase = createClient()
+      const db = createClient()
       const cls = classes.find((c) => c.id === character.class_id)
       const calculatedLevel =
         classLevels.length > 0
@@ -838,6 +981,8 @@ export default function BuilderPage() {
           character.skill_proficiencies,
         ),
         tool_proficiencies: character.tool_proficiencies ?? [],
+        weapon_proficiencies: character.weapon_proficiencies ?? [],
+        armor_proficiencies: character.armor_proficiencies ?? [],
         languages: character.languages ?? ["Common"],
         equipment_ids: character.equipment_ids ?? [],
         spell_ids: mergeSpellPicks(spellPicksByClassId),
@@ -856,8 +1001,8 @@ export default function BuilderPage() {
       }
 
       const { data, error } = editingCharacterId
-        ? await supabase.from("characters").update(characterData).eq("id", editingCharacterId).select().single()
-        : await supabase.from("characters").insert([characterData]).select().single()
+        ? await db.from("characters").update(characterData).eq("id", editingCharacterId).select().single()
+        : await db.from("characters").insert([characterData]).select().single()
 
       if (error || !data?.id) {
         console.error("Error saving character:", error)
@@ -909,8 +1054,7 @@ export default function BuilderPage() {
             subclassByClassId,
             featureChoicePicks,
           ) &&
-          selectedFeatCount === requiredFeatSlots &&
-          allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats)
+          selectedFeatCount === requiredFeatSlots
         )
       case 2:
         return validateOriginStepChoices(
@@ -919,7 +1063,8 @@ export default function BuilderPage() {
           selectedSpecies,
           speciesTraitPicks,
         )
-      case 3: return true
+      case 3:
+        return allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats)
       case 4: return true
       case 5: return character.name.trim().length > 0
       case 6: return character.name.trim().length > 0
@@ -1372,6 +1517,19 @@ export default function BuilderPage() {
                       </span>
                     </div>
 
+                    {featsLoadError && (
+                      <p className="text-xs text-destructive mb-3">
+                        Could not load feats from the database ({featsLoadError}). Run{" "}
+                        <code className="font-mono">npm run db:migrate</code> and refresh the page.
+                      </p>
+                    )}
+                    {!featsLoadError && feats.length === 0 && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        No feats in your compendium yet. Seed SRD content from Settings or add General
+                        feats in the Compendium.
+                      </p>
+                    )}
+
                     {FEAT_MILESTONES.filter((lvl) => lvl <= totalLevel).map((lvl, slotIndex) => {
                       const pickedId = selectedFeatIds[slotIndex] ?? null
                       const picked = feats.find((f) => f.id === pickedId) ?? null
@@ -1405,21 +1563,7 @@ export default function BuilderPage() {
                                     const previousId = next[slotIndex]
                                     if (isSelected) {
                                       next[slotIndex] = ""
-                                      if (previousId) {
-                                        setAsiAllocationsByFeatId((prev) => {
-                                          const copy = { ...prev }
-                                          delete copy[previousId]
-                                          return copy
-                                        })
-                                      }
                                     } else {
-                                      if (previousId) {
-                                        setAsiAllocationsByFeatId((prev) => {
-                                          const copy = { ...prev }
-                                          delete copy[previousId]
-                                          return copy
-                                        })
-                                      }
                                       next[slotIndex] = feat.id
                                     }
                                     setCharacter((prev) => ({
@@ -1434,14 +1578,17 @@ export default function BuilderPage() {
                                   }`}
                                 >
                                   <p className="font-semibold text-sm text-foreground">{feat.name}</p>
-                                  {feat.level_requirement && feat.level_requirement > 1 && (
-                                    <p className="text-xs text-muted-foreground">Lvl {feat.level_requirement}+</p>
-                                  )}
+                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                    {feat.level_requirement && feat.level_requirement > 1 && (
+                                      <span>Lvl {feat.level_requirement}+</span>
+                                    )}
+                                    {feat.repeatable && <span className="text-primary">Repeatable</span>}
+                                  </div>
                                 </button>
                               )
                             })}
                           </div>
-                          {eligible.length === 0 && (
+                          {eligible.length === 0 && !featsLoadError && feats.length > 0 && (
                             <p className="text-xs text-muted-foreground">No eligible feats for this slot.</p>
                           )}
                           {picked && (
@@ -1450,15 +1597,9 @@ export default function BuilderPage() {
                             </p>
                           )}
                           {picked && isAsiFeat(picked) && (
-                            <AsiAllocator
-                              allocation={asiAllocationsByFeatId[picked.id] ?? {}}
-                              onChange={(allocation) =>
-                                setAsiAllocationsByFeatId((prev) => ({
-                                  ...prev,
-                                  [picked.id]: allocation,
-                                }))
-                              }
-                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              Allocate ability increases on the Abilities step.
+                            </p>
                           )}
                         </div>
                       )
@@ -1596,7 +1737,30 @@ export default function BuilderPage() {
                           e.preventDefault()
                           ;(e.currentTarget as HTMLDivElement).click()
                         }}
-                        onClick={() => setCharacter({ ...character, background_id: character.background_id === bg.id ? null : bg.id })}
+                        onClick={() => {
+                          const nextId =
+                            character.background_id === bg.id ? null : bg.id
+                          const nextBg = nextId
+                            ? backgrounds.find((b) => b.id === nextId)
+                            : null
+                          setCharacter((prev) => {
+                            let next: CharacterDraft = {
+                              ...prev,
+                              background_id: nextId,
+                            }
+                            if (nextBg) {
+                              next = applyBackgroundProficienciesToDraft(next, nextBg)
+                            } else {
+                              next = {
+                                ...next,
+                                tool_proficiencies: [],
+                                weapon_proficiencies: [],
+                                armor_proficiencies: [],
+                              }
+                            }
+                            return next
+                          })
+                        }}
                         className={`p-2 rounded-lg border-2 text-left transition-all cursor-pointer ${
                           character.background_id === bg.id
                             ? "border-accent bg-accent/10"
@@ -1631,16 +1795,20 @@ export default function BuilderPage() {
                 <p className="text-muted-foreground mb-6">Set your character&apos;s core abilities.</p>
 
                 {/* Method Selection */}
-                <div className="flex gap-2 mb-6">
-                  {[
-                    { id: "pointbuy", label: "Point Buy" },
-                    { id: "standard", label: "Standard Array" },
-                    { id: "roll", label: "Roll" },
-                  ].map((method) => (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {(
+                    [
+                      { id: "pointbuy", label: "Point Buy" },
+                      { id: "standard", label: "Standard Array" },
+                      { id: "roll", label: "Roll", dice: true },
+                      { id: "custom", label: "Custom" },
+                    ] as const
+                  ).map((method) => (
                     <button
                       key={method.id}
+                      type="button"
                       onClick={() => {
-                        setAbilityMethod(method.id as typeof abilityMethod)
+                        setAbilityMethod(method.id)
                         if (method.id === "standard") applyStandardArray()
                         if (method.id === "roll") rollAbilities()
                         if (method.id === "pointbuy") {
@@ -1656,16 +1824,32 @@ export default function BuilderPage() {
                           })
                         }
                       }}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold transition-colors ${
                         abilityMethod === method.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
+                      {"dice" in method && method.dice && (
+                        <Dices className="w-4 h-4 shrink-0" />
+                      )}
                       {method.label}
                     </button>
                   ))}
                 </div>
+
+                {abilityMethod === "roll" && (
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={rollAbilities}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/15 text-secondary rounded-xl font-semibold hover:bg-secondary/25 transition-colors"
+                    >
+                      <Dices className="w-4 h-4" />
+                      Roll again
+                    </button>
+                  </div>
+                )}
 
                 {abilityMethod === "pointbuy" && (
                   <div className="mb-4 p-3 bg-primary/10 rounded-xl text-center">
@@ -1673,30 +1857,93 @@ export default function BuilderPage() {
                   </div>
                 )}
 
+                {milestoneAsiFeatCount > 0 && (
+                  <div className="mb-6">
+                    <AsiAllocator
+                      allocation={milestoneAsiAllocation}
+                      totalPoints={milestoneAsiTotalPoints}
+                      pickCount={milestoneAsiFeatCount}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) =>
+                          withCombinedMilestoneAsiAllocation(prev, allocation),
+                        )
+                      }
+                    />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {ABILITY_NAMES.map((ability) => (
                     <div key={ability} className="bg-card rounded-xl p-4 border-2 border-border text-center">
                       <h3 className="font-bold text-foreground capitalize mb-2">{ability}</h3>
-                      <div className="flex items-center justify-center gap-3">
-                        <button
-                          onClick={() => updateAbilityScore(ability, -1)}
-                          disabled={character[ability] <= 8}
-                          className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
-                        >
-                          -
-                        </button>
-                        <span className="text-3xl font-black text-foreground w-12">
-                          {character[ability]}
-                        </span>
-                        <button
-                          onClick={() => updateAbilityScore(ability, 1)}
-                          disabled={abilityMethod === "pointbuy" && character[ability] >= 15}
-                          className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <p className="text-lg font-bold text-primary mt-1">
+
+                      {abilityMethod === "custom" ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={30}
+                            value={character[ability]}
+                            onChange={(e) => setCustomAbilityScore(ability, e.target.value)}
+                            className="w-20 text-center text-3xl font-black text-foreground px-2 py-1 bg-background border-2 border-border rounded-lg focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-3">
+                          {(abilityMethod === "pointbuy") && (
+                            <button
+                              type="button"
+                              onClick={() => updateAbilityScore(ability, -1)}
+                              disabled={character[ability] <= 8}
+                              className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
+                            >
+                              -
+                            </button>
+                          )}
+                          <span className="text-3xl font-black text-foreground w-12">
+                            {character[ability]}
+                          </span>
+                          {abilityMethod === "pointbuy" && (
+                            <button
+                              type="button"
+                              onClick={() => updateAbilityScore(ability, 1)}
+                              disabled={abilityMethod === "pointbuy" && character[ability] >= 15}
+                              className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {abilityMethod === "standard" && (
+                        <div className="flex flex-wrap justify-center gap-1.5 mt-3">
+                          {STANDARD_ARRAY.map((value) => {
+                            const selectedHere = character[ability] === value
+                            const usedElsewhere = isStandardValueUsedElsewhere(ability, value)
+                            const disabled = usedElsewhere && !selectedHere
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => assignStandardArrayValue(ability, value)}
+                                className={`min-w-[2.25rem] px-2 py-1 rounded-lg text-sm font-bold transition-colors ${
+                                  selectedHere
+                                    ? "bg-primary text-primary-foreground"
+                                    : disabled
+                                      ? "bg-muted/40 text-muted-foreground/40 cursor-not-allowed"
+                                      : "bg-muted text-foreground hover:bg-primary/15 hover:text-primary"
+                                }`}
+                              >
+                                {value}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      <p className="text-lg font-bold text-primary mt-2">
                         {getAbilityModifier(character[ability])}
                       </p>
                     </div>
@@ -2220,7 +2467,7 @@ export default function BuilderPage() {
             id="builder-preview"
             className={`lg:col-span-2 ${mobilePanel === "steps" ? "hidden lg:block" : ""}`}
           >
-            <div className="bg-card rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 min-h-[720px]">
+            <div className="builder-preview-panel bg-card rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 min-h-[720px]">
               {/* Header with name, classes and hit die */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-black text-foreground truncate" style={{ fontFamily: "var(--font-display)" }}>
@@ -2306,7 +2553,10 @@ export default function BuilderPage() {
                         <div className="grid grid-cols-1 gap-0.5 text-xs">
                           {SKILLS_DATA.map((skill) => {
                             const isProficient = effectiveSkillProficiencies.includes(skill.name)
-                            const mod = abilityMods[skill.ability] + (isProficient ? proficiencyBonus : 0)
+                            const hasExpertise = effectiveSkillExpertise.includes(skill.name)
+                            const mod =
+                              abilityMods[skill.ability] +
+                              (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
                             const abilityAbbr = skill.ability.slice(0, 3).toUpperCase()
                             return (
                               <div key={skill.name} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
@@ -2401,6 +2651,39 @@ export default function BuilderPage() {
                       </div>
                     </div>
                   </div>
+
+                  {(effectiveWeaponProficiencies.length > 0 ||
+                    effectiveArmorProficiencies.length > 0 ||
+                    effectiveToolProficiencies.length > 0 ||
+                    (character.languages?.length ?? 0) > 0) && (
+                    <div className="p-2 bg-muted/30 rounded-lg space-y-1.5">
+                      <p className="text-sm text-muted-foreground uppercase font-bold">Proficiencies</p>
+                      {effectiveWeaponProficiencies.length > 0 && (
+                        <p className="text-[10px] text-foreground">
+                          <span className="text-muted-foreground">Weapons: </span>
+                          {effectiveWeaponProficiencies.join(", ")}
+                        </p>
+                      )}
+                      {effectiveArmorProficiencies.length > 0 && (
+                        <p className="text-[10px] text-foreground">
+                          <span className="text-muted-foreground">Armor: </span>
+                          {effectiveArmorProficiencies.join(", ")}
+                        </p>
+                      )}
+                      {effectiveToolProficiencies.length > 0 && (
+                        <p className="text-[10px] text-foreground">
+                          <span className="text-muted-foreground">Tools: </span>
+                          {effectiveToolProficiencies.join(", ")}
+                        </p>
+                      )}
+                      {(character.languages?.length ?? 0) > 0 && (
+                        <p className="text-[10px] text-foreground">
+                          <span className="text-muted-foreground">Languages: </span>
+                          {(character.languages ?? []).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -2528,15 +2811,29 @@ export default function BuilderPage() {
                   <div className="p-2 bg-muted/30 rounded-lg">
                     <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Weapon Proficiencies</p>
                     <p className="text-[10px] text-foreground italic">
-                      {primaryClass?.weapon_proficiencies?.join(", ") || "None"}
+                      {effectiveWeaponProficiencies.join(", ") || "None"}
                     </p>
                   </div>
                   <div className="p-2 bg-muted/30 rounded-lg">
                     <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Armor Proficiencies</p>
                     <p className="text-[10px] text-foreground italic">
-                      {primaryClass?.armor_proficiencies?.join(", ") || "None"}
+                      {effectiveArmorProficiencies.join(", ") || "None"}
                     </p>
                   </div>
+                  {(effectiveToolProficiencies.length > 0 ||
+                    (character.languages?.length ?? 0) > 0) && (
+                    <div className="p-2 bg-muted/30 rounded-lg">
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">
+                        Tools & Languages
+                      </p>
+                      <p className="text-[10px] text-foreground italic">
+                        {[
+                          ...effectiveToolProficiencies,
+                          ...(character.languages ?? []),
+                        ].join(", ") || "None"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -2774,29 +3071,93 @@ export default function BuilderPage() {
                 </div>
               )}
               
-              {detailsModal.type === "background" && (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {(detailsModal.item as Background).description}
-                  </p>
-                  {(detailsModal.item as Background).skill_proficiencies && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Skills</p>
-                      <p className="text-sm text-foreground">
-                        {(detailsModal.item as Background).skill_proficiencies?.join(", ")}
-                      </p>
-                    </div>
-                  )}
-                  {(detailsModal.item as Background).feat_granted && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Starting Feat</p>
-                      <p className="text-sm text-foreground">
-                        {(detailsModal.item as Background).feat_granted}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              {detailsModal.type === "background" && (() => {
+                const bg = detailsModal.item as Background
+                const abilityText = formatBackgroundAbilityBonuses(bg.ability_bonuses)
+                const equipmentText = formatBackgroundEquipment(bg)
+                const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
+                const grantedSpellLines = formatBackgroundGrantedSpells(bg, spells)
+
+                return (
+                  <div className="space-y-3">
+                    {bg.description?.trim() && (
+                      <p className="text-sm text-muted-foreground">{bg.description}</p>
+                    )}
+
+                    {abilityText && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Ability Scores</p>
+                        <p className="text-sm text-foreground">{abilityText}</p>
+                      </div>
+                    )}
+
+                    {bg.skill_proficiencies && bg.skill_proficiencies.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Skills</p>
+                        <p className="text-sm text-foreground">{bg.skill_proficiencies.join(", ")}</p>
+                      </div>
+                    )}
+
+                    {getBackgroundProficiencySections(bg).map((section) => (
+                      <div key={section.label}>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">{section.label}</p>
+                        <p className="text-sm text-foreground">{section.items.join(", ")}</p>
+                      </div>
+                    ))}
+
+                    {bg.feat_granted && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Origin Feat</p>
+                        <p className="text-sm font-semibold text-foreground">{bg.feat_granted}</p>
+                        {grantedFeat?.description && (
+                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                            {grantedFeat.description}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {(bg.feature?.name || bg.feature?.description) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Background Feature</p>
+                        {bg.feature?.name && (
+                          <p className="text-sm font-semibold text-foreground">{bg.feature.name}</p>
+                        )}
+                        {bg.feature?.description && (
+                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                            {bg.feature.description}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {grantedSpellLines.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Granted Spells</p>
+                        <ul className="text-sm text-foreground space-y-1">
+                          {grantedSpellLines.map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {equipmentText && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Starting Equipment</p>
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{equipmentText}</p>
+                      </div>
+                    )}
+
+                    {bg.starting_gold != null && bg.starting_gold > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase mb-1">Starting Gold</p>
+                        <p className="text-sm text-foreground">{bg.starting_gold} gp</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               
               {detailsModal.type === "spell" && (
                 <div className="space-y-3">

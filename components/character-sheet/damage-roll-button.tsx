@@ -18,14 +18,12 @@ export function DamageRollButton({ expression }: { expression: string }) {
     <button
       type="button"
       onClick={handleRoll}
-      className="flex items-center justify-center gap-1 h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs font-bold tabular-nums hover:bg-muted shrink-0"
+      className="inline-flex items-center justify-center gap-1 h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs font-bold tabular-nums hover:bg-muted shrink-0"
       title={expression ? `Roll damage (${expression})` : "Roll damage"}
+      aria-label={expression ? `Roll damage (${expression})` : "Roll damage"}
     >
-      {total != null ? (
-        <span>{total}</span>
-      ) : (
-        <Dices className="w-3 h-3 text-muted-foreground" />
-      )}
+      <Dices className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden />
+      {total != null ? <span className="font-black text-primary">{total}</span> : null}
     </button>
   )
 }

@@ -2,9 +2,10 @@ interface SourceLinkFieldProps {
   value: string
   onChange: (value: string) => void
   className?: string
+  compact?: boolean
 }
 
-export function SourceLinkField({ value, onChange, className }: SourceLinkFieldProps) {
+export function SourceLinkField({ value, onChange, className, compact }: SourceLinkFieldProps) {
   return (
     <div className={className}>
       <label className="block text-sm font-semibold text-foreground mb-2">Source Link</label>
@@ -15,7 +16,9 @@ export function SourceLinkField({ value, onChange, className }: SourceLinkFieldP
         placeholder="https://example.com/source"
         className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
       />
-      <p className="text-xs text-muted-foreground mt-1">Optional link to the original source material.</p>
+      {!compact && (
+        <p className="text-xs text-muted-foreground mt-1">Optional link to the original source material.</p>
+      )}
     </div>
   )
 }

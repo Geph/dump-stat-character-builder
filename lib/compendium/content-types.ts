@@ -29,9 +29,9 @@ export const COMPENDIUM_DEFAULT_ICONS: Record<CompendiumContentType, string> = {
   subclasses: "templar-shield",
   species: "character",
   backgrounds: "bookshelf",
-  spells: "round-potion",
-  feats: "achievement",
-  equipment: "briefcase",
+  spells: "bookmarklet",
+  feats: "mighty-force",
+  equipment: "battle-gear",
   abilities: "magic-trident",
 }
 
