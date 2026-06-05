@@ -333,7 +333,7 @@ No database server required. Data lives in the visitor's browser.
 
 Environment variables for static builds are documented in [.env.example](.env.example).
 
-**GitHub Pages:** See [deploy/github-pages.md](deploy/github-pages.md). After enabling Pages (Source: GitHub Actions), the app is served at `https://geph.github.io/v0-dump-stat-character-builder/`.
+**GitHub Pages:** See [deploy/github-pages.md](deploy/github-pages.md). After enabling Pages (Source: GitHub Actions), the app is served at `https://geph.github.io/dump-stat-character-builder/`.
 
 ---
 
