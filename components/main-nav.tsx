@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { Users, BookOpen, Upload, Sparkles, Home } from "lucide-react"
+import { GlobalSettingsMenu } from "@/components/settings/global-settings-menu"
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
@@ -45,7 +46,7 @@ export function MainNav() {
             </span>
           </Link>
 
-          {/* Navigation */}
+          <div className="flex items-center gap-2 shrink-0">
           <nav className="flex items-center gap-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href ||
@@ -75,6 +76,9 @@ export function MainNav() {
               )
             })}
           </nav>
+
+          <GlobalSettingsMenu />
+          </div>
         </div>
       </div>
     </header>

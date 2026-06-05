@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import type { IconCategoryId } from "@/lib/icons/categories"
+import { compendiumIconButtonClass } from "@/lib/compendium/editor-field-styles"
 
 interface IconCategoryMeta {
   id: IconCategoryId | "other"
@@ -14,9 +15,16 @@ interface GameIconPickerProps {
   value: string | null
   onChange: (icon: string | null) => void
   label?: string
+  /** Compact picker for compendium name rows (no label, smaller button). */
+  inline?: boolean
 }
 
-export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPickerProps) {
+export function GameIconPicker({
+  value,
+  onChange,
+  label = "Icon",
+  inline = false,
+}: GameIconPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [categories, setCategories] = useState<IconCategoryMeta[]>([])
@@ -85,20 +93,28 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
     setSearchIcons(null)
   }, [])
 
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-foreground">{label}</label>
+  const buttonClass = inline
+    ? compendiumIconButtonClass
+    : `${compendiumIconButtonClass}`
+  const iconSize = inline ? "w-7 h-7" : "w-8 h-8"
 
-      <div className="flex items-center gap-3">
+  return (
+    <div className={inline ? "shrink-0" : "space-y-2"}>
+      {!inline && (
+        <label className="block text-sm font-semibold text-foreground">{label}</label>
+      )}
+
+      <div className={`flex items-center ${inline ? "gap-1" : "gap-3"}`}>
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="w-16 h-16 rounded-xl border-2 border-border bg-card flex items-center justify-center hover:border-primary transition-colors overflow-hidden"
+          title={inline ? "Choose icon" : undefined}
+          className={`${buttonClass} bg-card flex items-center justify-center hover:border-primary transition-colors overflow-hidden`}
         >
           {value ? (
-            <GameIcon name={value} className="w-10 h-10" />
+            <GameIcon name={value} className={iconSize} />
           ) : (
-            <span className="text-[10px] text-muted-foreground text-center leading-tight px-1">
+            <span className="text-[9px] text-muted-foreground text-center leading-tight px-0.5">
               Choose
             </span>
           )}
@@ -108,15 +124,12 @@ export function GameIconPicker({ value, onChange, label = "Icon" }: GameIconPick
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+            title="Remove icon"
           >
             <X className="w-4 h-4" />
           </button>
         )}
-
-        <span className="text-sm text-muted-foreground">
-          {value ? value.replace(/-/g, " ") : "No icon selected"}
-        </span>
       </div>
 
       {isOpen && (

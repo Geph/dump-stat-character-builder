@@ -3,15 +3,18 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
-import { Plus, X } from "lucide-react"
+import { createClient } from "@/lib/db/client"
+import { X } from "lucide-react"
 import type { Spell } from "@/lib/types"
-import { GameIconPicker } from "@/components/game-icon-picker"
+import { isSrdSource } from "@/lib/srd/source"
+import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { DropdownOrOtherField } from "@/components/compendium/dropdown-or-other-field"
+import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -21,6 +24,31 @@ const SPELL_SCHOOLS = [
 const SPELL_CLASSES = [
   "Bard", "Cleric", "Druid", "Paladin", "Ranger", 
   "Sorcerer", "Warlock", "Wizard"
+]
+
+const CASTING_TIME_OPTIONS = [
+  { value: "1 action", label: "Action" },
+  { value: "1 bonus action", label: "Bonus action" },
+  { value: "1 reaction", label: "Reaction" },
+  { value: "1 minute", label: "1 minute" },
+]
+
+const DURATION_OPTIONS = [
+  { value: "Instantaneous", label: "Instantaneous" },
+  { value: "1 minute", label: "1 minute" },
+  { value: "10 minutes", label: "10 minutes" },
+  { value: "1 hour", label: "1 hour" },
+  { value: "Until dispelled", label: "Until dispelled" },
+]
+
+const RANGE_OPTIONS = [
+  { value: "Self", label: "Self" },
+  { value: "Touch", label: "Touch" },
+  { value: "15 feet", label: "15 feet" },
+  { value: "30 feet", label: "30 feet" },
+  { value: "60 feet", label: "60 feet" },
+  { value: "90 feet", label: "90 feet" },
+  { value: "120 feet", label: "120 feet" },
 ]
 
 interface SpellFormData {
@@ -58,7 +86,7 @@ const defaultSpell: SpellFormData = {
   classes: [],
   source: "Custom",
   creator_url: "",
-  icon: null,
+  icon: "bookmarklet",
 }
 
 export default function SpellEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -67,18 +95,40 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customClasses, setCustomClasses] = useState<{ id: string; name: string }[]>([])
+  const [otherClassListOpen, setOtherClassListOpen] = useState(false)
   const router = useRouter()
+
+  const isStandardSpellClass = (name: string) =>
+    SPELL_CLASSES.some((c) => c.toLowerCase() === name.toLowerCase())
+
+  const nonStandardClassesOnSpell = form.classes.filter((c) => !isStandardSpellClass(c))
+  const otherClassListChecked =
+    otherClassListOpen || nonStandardClassesOnSpell.length > 0
 
   useEffect(() => {
     params.then(({ id }) => setId(id))
   }, [params])
 
   useEffect(() => {
+    const fetchCustomClasses = async () => {
+      const db = createClient()
+      const { data } = await db.from("classes").select("id, name, source").order("name")
+      setCustomClasses(
+        (data ?? [])
+          .filter((row) => !isSrdSource(row.source as string))
+          .map((row) => ({ id: row.id as string, name: row.name as string })),
+      )
+    }
+    fetchCustomClasses()
+  }, [])
+
+  useEffect(() => {
     if (id && id !== "new") {
       const fetchSpell = async () => {
         setLoading(true)
-        const supabase = createClient()
-        const { data, error } = await supabase
+        const db = createClient()
+        const { data, error } = await db
           .from("spells")
           .select("*")
           .eq("id", id)
@@ -117,18 +167,18 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
     setSaving(true)
     setError(null)
 
-    const supabase = createClient()
+    const db = createClient()
     const payload = { ...form, creator_url: normalizeCreatorUrl(form.creator_url) }
     
     if (id === "new") {
-      const { error } = await supabase.from("spells").insert([payload])
+      const { error } = await db.from("spells").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("spells").update(payload).eq("id", id)
+      const { error } = await db.from("spells").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -154,8 +204,8 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this spell?")) return
     
-    const supabase = createClient()
-    await supabase.from("spells").delete().eq("id", id)
+    const db = createClient()
+    await db.from("spells").delete().eq("id", id)
     router.push("/compendium?tab=spells")
   }
 
@@ -181,6 +231,18 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
           : [...prev.classes, cls],
       }
     })
+  }
+
+  const clearNonStandardClasses = () => {
+    setForm((prev) => ({
+      ...prev,
+      classes: prev.classes.filter((c) => isStandardSpellClass(c)),
+    }))
+  }
+
+  const addCustomClassFromDropdown = (className: string) => {
+    if (!className || spellHasClass(className)) return
+    toggleClass(className)
   }
 
   if (loading) {
@@ -222,53 +284,25 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Name
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Fireball"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Source
-              </label>
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Player's Handbook"
-              />
-            </div>
-          </div>
-
-          <SourceLinkField
-            value={form.creator_url}
-            onChange={(creator_url) => setForm({ ...form, creator_url })}
-          />
-
-          {/* Icon */}
-          <GameIconPicker
-            value={form.icon}
-            onChange={(icon) => setForm({ ...form, icon })}
-            label="Icon"
+          <CompendiumEditorHeaderRow
+            nameLabel="Spell Name"
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            namePlaceholder="Fireball"
+            source={form.source}
+            onSourceChange={(source) => setForm({ ...form, source })}
+            creatorUrl={form.creator_url}
+            onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
+            icon={form.icon}
+            onIconChange={(icon) => setForm({ ...form, icon })}
           />
 
           {/* Classes */}
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">
-              Add This Spell to Which Class Spell Lists?
+              On Class Spell List
             </label>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               {SPELL_CLASSES.map((cls) => (
                 <label key={cls} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -280,11 +314,70 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
                   <span className="text-foreground">{cls}</span>
                 </label>
               ))}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={otherClassListChecked}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setOtherClassListOpen(true)
+                    } else {
+                      setOtherClassListOpen(false)
+                      clearNonStandardClasses()
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+                <span className="text-foreground">Other</span>
+              </label>
             </div>
+            {otherClassListChecked && (
+              <div className="mt-3 space-y-2">
+                {customClasses.length > 0 ? (
+                  <select
+                    value=""
+                    onChange={(e) => addCustomClassFromDropdown(e.target.value)}
+                    className={compendiumFieldClass}
+                  >
+                    <option value="">Select custom class...</option>
+                    {customClasses
+                      .filter((cls) => !spellHasClass(cls.name))
+                      .map((cls) => (
+                        <option key={cls.id} value={cls.name}>
+                          {cls.name}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No custom classes in the compendium yet. Create a class with a non-SRD source to list it here.
+                  </p>
+                )}
+                {nonStandardClassesOnSpell.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {nonStandardClassesOnSpell.map((className) => (
+                      <span
+                        key={className}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
+                      >
+                        {className}
+                        <button
+                          type="button"
+                          onClick={() => toggleClass(className)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Level and School */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Level, school, ritual, concentration */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
                 Level
@@ -292,7 +385,7 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
               <select
                 value={form.level}
                 onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                className={compendiumFieldClass}
               >
                 <option value={0}>Cantrip</option>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => (
@@ -309,75 +402,56 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
               <select
                 value={form.school}
                 onChange={(e) => setForm({ ...form, school: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                className={compendiumFieldClass}
               >
                 {SPELL_SCHOOLS.map((school) => (
                   <option key={school} value={school}>{school}</option>
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Ritual / Concentration */}
-          <div className="flex gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer min-h-[50px] pb-1">
               <input
                 type="checkbox"
                 checked={form.ritual}
                 onChange={(e) => setForm({ ...form, ritual: e.target.checked })}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
-              <span className="text-foreground">Ritual?</span>
+              <span className="text-foreground font-semibold text-sm">Ritual</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer min-h-[50px] pb-1">
               <input
                 type="checkbox"
                 checked={form.concentration}
                 onChange={(e) => setForm({ ...form, concentration: e.target.checked })}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
-              <span className="text-foreground">Concentration?</span>
+              <span className="text-foreground font-semibold text-sm">Concentration</span>
             </label>
           </div>
 
           {/* Casting Time, Range, Duration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Casting Time
-              </label>
-              <input
-                type="text"
-                value={form.casting_time}
-                onChange={(e) => setForm({ ...form, casting_time: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="1 action"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Range
-              </label>
-              <input
-                type="text"
-                value={form.range}
-                onChange={(e) => setForm({ ...form, range: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="120 feet"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Duration
-              </label>
-              <input
-                type="text"
-                value={form.duration}
-                onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Instantaneous"
-              />
-            </div>
+            <DropdownOrOtherField
+              label="Casting Time"
+              value={form.casting_time}
+              onChange={(casting_time) => setForm({ ...form, casting_time })}
+              options={CASTING_TIME_OPTIONS}
+              otherPlaceholder="e.g. 10 minutes"
+            />
+            <DropdownOrOtherField
+              label="Range"
+              value={form.range}
+              onChange={(range) => setForm({ ...form, range })}
+              options={RANGE_OPTIONS}
+              otherPlaceholder="e.g. 300 feet"
+            />
+            <DropdownOrOtherField
+              label="Duration"
+              value={form.duration}
+              onChange={(duration) => setForm({ ...form, duration })}
+              options={DURATION_OPTIONS}
+              otherPlaceholder="e.g. 8 hours"
+            />
           </div>
 
           {/* Components */}

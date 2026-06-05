@@ -43,6 +43,8 @@ export function characterToDraft(character: Character): CharacterDraft {
     asi_allocations: character.asi_allocations ?? undefined,
     skill_proficiencies: character.skill_proficiencies ?? [],
     tool_proficiencies: character.tool_proficiencies ?? [],
+    weapon_proficiencies: character.weapon_proficiencies ?? [],
+    armor_proficiencies: character.armor_proficiencies ?? [],
     languages: character.languages ?? ["Common"],
     equipment_ids: character.equipment_ids ?? [],
     spell_ids: character.spell_ids ?? [],

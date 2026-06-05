@@ -1,5 +1,7 @@
 // D&D 2024 Types
 
+import type { BackgroundProficiencies } from "@/lib/compendium/background-proficiencies"
+
 // Feature with choice support
 export interface FeatureChoice {
   category: string // e.g., "Fighting Style", "Skill Proficiency"
@@ -147,11 +149,15 @@ export interface Background {
   ability_bonuses: Record<string, number> | null
   skill_proficiencies: string[] | null
   tool_proficiencies: string[] | null
+  /** Tools, vehicles, weapons, armor, and languages granted by this background. */
+  proficiencies: BackgroundProficiencies | null
   feat_granted: string | null
   starting_gold: number | null
   starting_equipment: { name: string; quantity: number }[] | null
   equipment: unknown  // legacy field
   feature: { name: string; description: string } | null
+  grants_spells?: boolean
+  granted_spells?: Record<string, string[]> | null
   icon: string | null
   source: string
   creator_url: string | null
@@ -191,6 +197,8 @@ export interface Feat {
   prerequisite_species_ids: string[] | null
   prerequisite_background_ids: string[] | null
   benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
+  /** When true, the feat may be chosen in more than one milestone slot. */
+  repeatable?: boolean
   icon: string | null
   source: string
   creator_url: string | null
@@ -257,6 +265,8 @@ export interface Character {
   skill_proficiencies: string[] | null
   skill_expertise: string[] | null
   tool_proficiencies: string[] | null
+  weapon_proficiencies: string[] | null
+  armor_proficiencies: string[] | null
   languages: string[] | null
   equipment_ids: string[]
   spell_ids: string[]
@@ -290,6 +300,8 @@ export interface CharacterDraft {
   asi_allocations?: Record<string, Partial<Record<string, number>>> | null
   skill_proficiencies: string[]
   tool_proficiencies?: string[]
+  weapon_proficiencies?: string[]
+  armor_proficiencies?: string[]
   languages: string[]
   equipment_ids: string[]
   spell_ids: string[]

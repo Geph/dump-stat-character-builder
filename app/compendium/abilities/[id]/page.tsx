@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/db/client"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import {
   CompendiumEditorToolbar,
@@ -14,8 +14,8 @@ import {
   normalizeCharacteristics,
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
-import { GameIconPicker } from "@/components/game-icon-picker"
-import { SourceLinkField, normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { attachTypeToTable } from "@/lib/db/attach-target-table"
 import {
   EQUIPMENT_ATTACH_CATEGORIES,
@@ -78,8 +78,8 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     if (id && id !== "new") {
       const fetchAbility = async () => {
         setLoading(true)
-        const supabase = createClient()
-        const { data, error } = await supabase
+        const db = createClient()
+        const { data, error } = await db
           .from("custom_abilities")
           .select("*")
           .eq("id", id)
@@ -131,8 +131,8 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
         return
       }
 
-      const supabase = createClient()
-      const { data } = await supabase
+      const db = createClient()
+      const { data } = await db
         .from(table)
         .select("id, name")
         .order("name")
@@ -146,10 +146,10 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     const fetchOtherAbilities = async () => {
-      const supabase = createClient()
+      const db = createClient()
       const [{ data: abilities }, { data: spells }] = await Promise.all([
-        supabase.from("custom_abilities").select("id, name").order("name").limit(100),
-        supabase.from("spells").select("id, name").order("name").limit(500),
+        db.from("custom_abilities").select("id, name").order("name").limit(100),
+        db.from("spells").select("id, name").order("name").limit(500),
       ])
 
       setOtherAbilities((abilities || []).filter((a) => a.id !== id))
@@ -163,7 +163,7 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     setSaving(true)
     setError(null)
 
-    const supabase = createClient()
+    const db = createClient()
     const payload = {
       ...form,
       attached_to_id: form.attached_to_id || null,
@@ -172,14 +172,14 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
     }
     
     if (id === "new") {
-      const { error } = await supabase.from("custom_abilities").insert([payload])
+      const { error } = await db.from("custom_abilities").insert([payload])
       if (error) {
         setError(error.message)
         setSaving(false)
         return
       }
     } else {
-      const { error } = await supabase.from("custom_abilities").update(payload).eq("id", id)
+      const { error } = await db.from("custom_abilities").update(payload).eq("id", id)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -205,8 +205,8 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this custom ability?")) return
     
-    const supabase = createClient()
-    await supabase.from("custom_abilities").delete().eq("id", id)
+    const db = createClient()
+    await db.from("custom_abilities").delete().eq("id", id)
     router.push("/compendium?tab=abilities")
   }
 
@@ -249,44 +249,17 @@ export default function AbilityEditorPage({ params }: { params: Promise<{ id: st
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Ability Name
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="e.g., Extra Attack"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Source
-              </label>
-              <input
-                type="text"
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="Custom, Homebrew, etc."
-              />
-            </div>
-          </div>
-
-          <SourceLinkField
-            value={form.creator_url}
-            onChange={(creator_url) => setForm({ ...form, creator_url })}
-          />
-
-          {/* Icon */}
-          <GameIconPicker
-            value={form.icon}
-            onChange={(icon) => setForm({ ...form, icon })}
-            label="Icon"
+          <CompendiumEditorHeaderRow
+            nameLabel="Ability Name"
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            namePlaceholder="e.g., Extra Attack"
+            source={form.source}
+            onSourceChange={(source) => setForm({ ...form, source })}
+            creatorUrl={form.creator_url}
+            onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
+            icon={form.icon}
+            onIconChange={(icon) => setForm({ ...form, icon })}
           />
 
           <div>

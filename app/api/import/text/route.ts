@@ -58,8 +58,12 @@ const ContentSchema = z.object({
     name: z.string(),
     description: z.string().nullable(),
     skill_proficiencies: z.array(z.string()).nullable(),
+    tool_proficiencies: z.array(z.string()).nullable().optional(),
     feat_granted: z.string().nullable(),
-    ability_bonuses: z.record(z.string(), z.number()).nullable()
+    ability_bonuses: z.record(z.string(), z.number()).nullable(),
+    feature: z.object({ name: z.string(), description: z.string() }).nullable().optional(),
+    grants_spells: z.boolean().optional(),
+    granted_spells: z.record(z.string(), z.array(z.string())).nullable().optional(),
   })).optional(),
   spells: z.array(z.object({
     name: z.string(),
