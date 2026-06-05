@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
@@ -23,6 +23,9 @@ import {
   getCompendiumItemIcon,
   isCompendiumContentType,
 } from "@/lib/compendium/content-types"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
+import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 
 type ContentType = CompendiumContentType
 
@@ -48,7 +51,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   abilities: "New Custom Ability",
 }
 
-export default function CompendiumPage() {
+function CompendiumPageContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [searchQuery, setSearchQuery] = useState("")
@@ -302,26 +305,41 @@ export default function CompendiumPage() {
     setClearError(null)
     
     try {
-      const response = await fetch("/api/compendium/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ table: tableName(activeTab) }),
-      })
-      
-      if (!response.ok) {
-        const data = await response.json()
-        setClearError(data.error ?? "Failed to clear section")
-        return
-      }
+      if (canClearCompendiumViaApi()) {
+        const response = await fetch("/api/compendium/clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ table: tableName(activeTab) }),
+        })
 
-      const data = await response.json()
-      setContent((prev) => {
-        const next = { ...prev, [activeTab]: [] }
-        if (data.alsoCleared?.includes("subclasses")) {
-          next.subclasses = []
+        if (!response.ok) {
+          const data = await response.json()
+          setClearError(data.error ?? "Failed to clear section")
+          return
         }
-        return next
-      })
+
+        const data = await response.json()
+        setContent((prev) => {
+          const next = { ...prev, [activeTab]: [] }
+          if (data.alsoCleared?.includes("subclasses")) {
+            next.subclasses = []
+          }
+          return next
+        })
+      } else {
+        const resolved = tableName(activeTab)
+        await clearIndexedDbStore(resolved as Parameters<typeof clearIndexedDbStore>[0])
+        if (activeTab === "classes") {
+          await clearIndexedDbStore("subclasses")
+        }
+        setContent((prev) => {
+          const next = { ...prev, [activeTab]: [] }
+          if (activeTab === "classes") {
+            next.subclasses = []
+          }
+          return next
+        })
+      }
       await refreshTabCounts()
       await refreshActiveTabContent()
     } catch (err) {
@@ -369,7 +387,7 @@ export default function CompendiumPage() {
 
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
-    const editPath = `/compendium/${activeTab}/${data.id}`
+    const editPath = compendiumEditHref(activeTab, data.id as string)
     const iconName = getCompendiumItemIcon(activeTab, data)
 
     return (
@@ -573,7 +591,7 @@ export default function CompendiumPage() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Link
-              href={`/compendium/${activeTab}/new`}
+              href={compendiumEditHref(activeTab, "new")}
               className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
             >
               <Plus className="w-5 h-5 shrink-0" />
@@ -922,5 +940,19 @@ export default function CompendiumPage() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function CompendiumPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <p className="text-muted-foreground">Loading compendium…</p>
+        </div>
+      }
+    >
+      <CompendiumPageContent />
+    </Suspense>
   )
 }

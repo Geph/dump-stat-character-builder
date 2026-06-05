@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono } from 'next/font/google'
 import { AppThemeProvider } from '@/components/providers/app-theme-provider'
+import { StaticDataProvider } from '@/components/providers/static-data-provider'
 import './globals.css'
 
 // Solbera fonts are loaded via @font-face in globals.css
@@ -40,7 +41,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background" data-theme="parchment" suppressHydrationWarning>
       <body className={`${geistMono.variable} font-sans antialiased`}>
-        <AppThemeProvider>{children}</AppThemeProvider>
+        <AppThemeProvider>
+          <StaticDataProvider>{children}</StaticDataProvider>
+        </AppThemeProvider>
       </body>
     </html>
   )

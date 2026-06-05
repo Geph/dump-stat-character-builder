@@ -20,6 +20,7 @@ import {
   Search,
 } from "lucide-react"
 import Link from "next/link"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import type {
   Character,
   DndClass,
@@ -1137,7 +1138,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h2 className="text-sm font-bold text-foreground">Custom Abilities</h2>
                 <Link
-                  href="/compendium/abilities/new"
+                  href={compendiumEditHref("abilities", "new")}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />

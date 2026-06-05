@@ -5,6 +5,16 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { MainNav } from "@/components/main-nav"
 import {
+  canUseServerImport,
+  getStorageLabel,
+  isStaticDeploy,
+} from "@/lib/config/deploy-mode"
+import { seedLocalSrd } from "@/lib/data/local-seed"
+import {
+  importDumpStatExportItemsLocal,
+  parseDumpStatExportJson,
+} from "@/lib/data/local-import"
+import {
   Upload,
   Globe,
   FileText,
@@ -16,19 +26,23 @@ import {
 } from "lucide-react"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "success" | "error"
-type ImportTab = "clipboard" | "pdf" | "web"
+type ImportTab = "clipboard" | "pdf" | "web" | "pack"
 
-const SRD_SEED_DESCRIPTION =
-  "Populate your database with the full official SRD 5.2.1: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
-
-const IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
+const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
   { id: "clipboard", label: "Clipboard", icon: ClipboardPaste },
   { id: "pdf", label: "PDF / JSON", icon: Upload },
   { id: "web", label: "From Web", icon: Globe },
 ]
 
+const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Upload }[] = [
+  { id: "pack", label: "JSON pack", icon: Upload },
+]
+
+const IMPORT_TABS = canUseServerImport() ? SERVER_IMPORT_TABS : STATIC_IMPORT_TABS
+
 export default function ImportPage() {
-  const [activeTab, setActiveTab] = useState<ImportTab>("clipboard")
+  const staticMode = isStaticDeploy()
+  const [activeTab, setActiveTab] = useState<ImportTab>(staticMode ? "pack" : "clipboard")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
   const [pdfContentTypeHint, setPdfContentTypeHint] = useState("all")
@@ -44,6 +58,8 @@ export default function ImportPage() {
   const [webStatus, setWebStatus] = useState<ImportStatus>("idle")
   const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
+  const [packStatus, setPackStatus] = useState<ImportStatus>("idle")
+  const [packFile, setPackFile] = useState<File | null>(null)
   const [message, setMessage] = useState("")
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
@@ -192,6 +208,21 @@ export default function ImportPage() {
     setMessage("")
 
     try {
+      if (staticMode) {
+        const data = await seedLocalSrd()
+        setSeedStatus("success")
+        setMessage(
+          `Loaded ${data.total} SRD items into ${getStorageLabel()}` +
+            (data.breakdown
+              ? ` (${Object.entries(data.breakdown)
+                  .filter(([, n]) => (n as number) > 0)
+                  .map(([k, n]) => `${n} ${k}`)
+                  .join(", ")})`
+              : ""),
+        )
+        return
+      }
+
       const response = await fetch("/api/seed", {
         method: "POST",
       })
@@ -219,6 +250,34 @@ export default function ImportPage() {
     }
   }
 
+  const handleJsonPackImport = async () => {
+    if (!packFile) return
+    setPackStatus("processing")
+    setMessage("")
+
+    try {
+      const raw = await packFile.text()
+      const items = parseDumpStatExportJson(raw)
+      if (!items?.length) {
+        setPackStatus("error")
+        setMessage("Invalid Dump Stat JSON export file.")
+        return
+      }
+      const data = await importDumpStatExportItemsLocal(items)
+      setPackStatus("success")
+      const breakdownText = Object.entries(data.breakdown)
+        .filter(([, count]) => count > 0)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(", ")
+      setMessage(
+        `Imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""} into ${getStorageLabel()}`,
+      )
+    } catch (err) {
+      setPackStatus("error")
+      setMessage(err instanceof Error ? err.message : "Failed to import JSON pack.")
+    }
+  }
+
   const getStatusIcon = (status: ImportStatus) => {
     switch (status) {
       case "processing":
@@ -237,7 +296,12 @@ export default function ImportPage() {
     pdfStatus === "success" ||
     webStatus === "success" ||
     seedStatus === "success" ||
-    textStatus === "success"
+    textStatus === "success" ||
+    packStatus === "success"
+
+  const SRD_SEED_DESCRIPTION = staticMode
+    ? "Load or reset the bundled SRD 5.2.1 into browser storage (IndexedDB). First visit auto-seeds; use this button to reload after clearing data."
+    : "Populate your database with the full official SRD 5.2.1: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
 
   return (
     <div id="import-root" className="min-h-screen bg-background">
@@ -255,9 +319,15 @@ export default function ImportPage() {
             >
               {getStatusIcon(seedStatus)}
               <span className="hidden sm:inline">
-                {seedStatus === "processing" ? "Seeding..." : "Seed D&D 5.5e SRD Content"}
+                {seedStatus === "processing"
+                  ? "Seeding..."
+                  : staticMode
+                    ? "Load bundled SRD"
+                    : "Seed D&D 5.5e SRD Content"}
               </span>
-              <span className="sm:hidden">{seedStatus === "processing" ? "Seeding..." : "Seed SRD"}</span>
+              <span className="sm:hidden">
+                {seedStatus === "processing" ? "Seeding..." : staticMode ? "Load SRD" : "Seed SRD"}
+              </span>
             </button>
             <button
               type="button"
@@ -293,8 +363,15 @@ export default function ImportPage() {
         <div id="import-header" className="mb-8 sm:pr-56">
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className="text-muted-foreground text-lg">
-            Add new content from PDFs, copied text, or online sources
+            {staticMode
+              ? "Import Dump Stat JSON packs or reload the bundled SRD (data stays in your browser)."
+              : "Add new content from PDFs, copied text, or online sources"}
           </p>
+          {staticMode && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Storage: {getStorageLabel()}. PDF, web, and AI import require a hosted deployment with MySQL.
+            </p>
+          )}
         </div>
 
         {message && (
@@ -347,7 +424,48 @@ export default function ImportPage() {
 
           <div className="p-6">
             <AnimatePresence mode="wait">
-              {activeTab === "clipboard" && (
+              {activeTab === "pack" && (
+                <motion.div
+                  key="pack"
+                  role="tabpanel"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <p className="text-muted-foreground mb-4">
+                    Upload a Dump Stat JSON export (single item or bulk section export from the compendium).
+                    Use compendium export buttons to share content packs between devices.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={(e) => setPackFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center gap-2 px-4 py-3 bg-primary/10 border border-primary/20 rounded-xl cursor-pointer hover:bg-primary/15 transition-colors">
+                        <Upload className="w-5 h-5 text-primary" />
+                        <span className="font-medium truncate">
+                          {packFile ? packFile.name : "Choose JSON pack..."}
+                        </span>
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleJsonPackImport}
+                      disabled={!packFile || packStatus === "processing"}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      {getStatusIcon(packStatus)}
+                      {packStatus === "processing" ? "Importing..." : "Import pack"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {canUseServerImport() && activeTab === "clipboard" && (
                 <motion.div
                   key="clipboard"
                   role="tabpanel"
@@ -393,7 +511,7 @@ export default function ImportPage() {
                 </motion.div>
               )}
 
-              {activeTab === "pdf" && (
+              {canUseServerImport() && activeTab === "pdf" && (
                 <motion.div
                   key="pdf"
                   role="tabpanel"
@@ -563,7 +681,7 @@ export default function ImportPage() {
                 </motion.div>
               )}
 
-              {activeTab === "web" && (
+              {canUseServerImport() && activeTab === "web" && (
                 <motion.div
                   key="web"
                   role="tabpanel"

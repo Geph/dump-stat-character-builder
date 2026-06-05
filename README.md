@@ -300,6 +300,43 @@ DreamHost-specific: MySQL is created under **Goodies → MySQL Databases**; remo
 
 ---
 
+## Deployment profiles
+
+Dump Stat supports two **build-time** profiles. Choose one when building for production; there is no runtime toggle in the deployed app.
+
+| Profile | Command | Storage | Deploy target |
+|---------|---------|---------|---------------|
+| **Hosted** (default) | `pnpm build:hosted` | MySQL via `/api/*` | VPS / Node (`pnpm start`) |
+| **Static** | `pnpm build:static` | IndexedDB in browser | GitHub Pages (`out/`) |
+
+### Hosted (MySQL + Node)
+
+This is the default local development and VPS workflow documented above:
+
+1. Configure `DATABASE_URL` in `.env.local`
+2. `pnpm build:hosted` (or `pnpm build`)
+3. Run with `pnpm start` or PM2/nginx as in [deploy/](deploy/)
+
+Set `NEXT_PUBLIC_DEPLOY_MODE=hosted` or leave it unset.
+
+### Static (GitHub Pages)
+
+No database server required. Data lives in the visitor's browser.
+
+1. Set `NEXT_PUBLIC_BASE_PATH` to your repo name for project sites (e.g. `/dump-stat-character-builder`)
+2. `pnpm build:static` — writes static files to `out/`
+3. Deploy `out/` to GitHub Pages (see [deploy/github-pages.md](deploy/github-pages.md))
+
+**Static mode includes:** builder, characters, compendium, bundled SRD on first visit, JSON pack import/export.
+
+**Static mode excludes:** PDF/text/web AI import, server seed API. Use JSON exports from a hosted instance to share custom content.
+
+Environment variables for static builds are documented in [.env.example](.env.example).
+
+**GitHub Pages:** See [deploy/github-pages.md](deploy/github-pages.md). After enabling Pages (Source: GitHub Actions), the app is served at `https://geph.github.io/v0-dump-stat-character-builder/`.
+
+---
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -342,7 +379,7 @@ mysql/
 
 public/
 ├── images/               # Hero, feature cards, backgrounds
-└── icons/                # Compendium SVG game icons
+└── icons/                # Compendium SVG game icons (+ manifest.json from pnpm icons:manifest)
 ```
 
 ## Customization
@@ -351,10 +388,10 @@ Use the Compendium section to create custom species, classes, backgrounds, feats
 
 Theming lives in `app/globals.css` (Arcane default plus Parchment, Stone, Moss, and Clay). Use the gear icon in the header to switch styles; choice is stored in `localStorage`.
 
-### Data layer (MySQL only)
+### Data layer
 
-- Browser code uses `createClient()` from `@/lib/db/client` → `/api/characters` and `/api/data/*`
-- Server routes use `lib/db/*` (Drizzle + `mysql2`)
+- Browser code uses `createClient()` from `@/lib/db/client` → hosted: `/api/characters` and `/api/data/*`; static: IndexedDB via `lib/data/`
+- Server routes use `lib/db/*` (Drizzle + `mysql2`) — hosted builds only
 - There is **no** Supabase dependency. Run `pnpm check:mysql` to verify the repo has no stray Supabase references.
 
 ## License

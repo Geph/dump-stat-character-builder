@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from "react"
 import { Search, X } from "lucide-react"
 import type { IconCategoryId } from "@/lib/icons/categories"
+import {
+  fetchIconCategories,
+  fetchIconsByCategory,
+  searchIcons,
+} from "@/lib/icons/manifest-client"
+import { getBasePath } from "@/lib/config/deploy-mode"
 import { compendiumIconButtonClass } from "@/lib/compendium/editor-field-styles"
 
 interface IconCategoryMeta {
@@ -41,12 +47,10 @@ export function GameIconPicker({
     if (!isOpen) return
 
     setLoadingList(true)
-    fetch("/api/icons")
-      .then((r) => r.json())
-      .then((data: { categories?: IconCategoryMeta[]; total?: number }) => {
-        const cats = data.categories ?? []
+    fetchIconCategories()
+      .then(({ categories: cats, total }) => {
         setCategories(cats)
-        setTotalIcons(data.total ?? 0)
+        setTotalIcons(total)
         const first =
           cats.find((c) => c.count > 0)?.id ?? cats[0]?.id ?? "weapon"
         setActiveCategory(first)
@@ -62,9 +66,8 @@ export function GameIconPicker({
     if (!isOpen || isSearchMode) return
 
     setLoadingList(true)
-    fetch(`/api/icons?category=${encodeURIComponent(activeCategory)}`)
-      .then((r) => r.json())
-      .then((data: { icons: string[] }) => setCategoryIcons(data.icons ?? []))
+    fetchIconsByCategory(activeCategory)
+      .then((icons) => setCategoryIcons(icons))
       .catch(() => setCategoryIcons([]))
       .finally(() => setLoadingList(false))
   }, [isOpen, activeCategory, isSearchMode])
@@ -77,9 +80,8 @@ export function GameIconPicker({
 
     const timer = setTimeout(() => {
       setLoadingList(true)
-      fetch(`/api/icons?search=${encodeURIComponent(search.trim())}`)
-        .then((r) => r.json())
-        .then((data: { icons: string[] }) => setSearchIcons(data.icons ?? []))
+      searchIcons(search.trim())
+        .then((icons) => setSearchIcons(icons))
         .catch(() => setSearchIcons([]))
         .finally(() => setLoadingList(false))
     }, 250)
@@ -262,7 +264,8 @@ export function GameIcon({ name, className = "w-6 h-6", color }: GameIconProps) 
       return
     }
     try {
-      const res = await fetch(`/icons/${encodeURIComponent(name)}.svg`)
+      const base = getBasePath()
+      const res = await fetch(`${base}/icons/${encodeURIComponent(name)}.svg`)
       if (!res.ok) throw new Error("not found")
       const text = await res.text()
       if (!text.includes("<svg")) throw new Error("not svg")

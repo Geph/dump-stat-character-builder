@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-hosted.mjs",
+    "build:hosted": "node scripts/build-hosted.mjs",
+    "build:static": "node scripts/build-static.mjs",
     "start": "next start",
     "lint": "eslint .",
+    "icons:manifest": "node scripts/build-icon-manifest.mjs",
     "db:setup": "node scripts/setup-local-mysql.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
     "srd:build": "node scripts/build-srd-seed.mjs",
