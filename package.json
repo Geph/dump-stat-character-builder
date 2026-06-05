@@ -11,7 +11,8 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "srd:build": "node scripts/build-srd-seed.mjs",
     "version:bump": "node scripts/bump-version.mjs",
-    "push": "node scripts/git-push.mjs Cursor"
+    "push": "node scripts/git-push.mjs Cursor",
+    "check:mysql": "node scripts/check-no-supabase.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.66",
@@ -76,6 +77,8 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.7",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",

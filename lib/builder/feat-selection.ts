@@ -41,7 +41,7 @@ export function isFeatEligibleForSlot(
   )
 
   if (category === "Origin") return false
-  if (taken.has(feat.id)) return false
+  if (!feat.repeatable && taken.has(feat.id)) return false
 
   if (milestoneLevel === 19) {
     if (category !== "Epic Boon") return false

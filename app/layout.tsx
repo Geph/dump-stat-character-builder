@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono } from 'next/font/google'
+import { AppThemeProvider } from '@/components/providers/app-theme-provider'
 import './globals.css'
 
 // Solbera fonts are loaded via @font-face in globals.css
@@ -8,7 +9,6 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 export const metadata: Metadata = {
   title: 'Dump Stat - D&D 5.5e Character Builder',
   description: 'A vibe-coded D&D 5.5e character creator with support for custom classes and content',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1a1025',
+  themeColor: '#f0e8d8',
 }
 
 export default function RootLayout({
@@ -38,9 +38,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
+    <html lang="en" className="bg-background" data-theme="parchment" suppressHydrationWarning>
       <body className={`${geistMono.variable} font-sans antialiased`}>
-        {children}
+        <AppThemeProvider>{children}</AppThemeProvider>
       </body>
     </html>
   )

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
+import { getPool } from "@/lib/db/index"
+import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
 import {
   clearTable,
   countRows,
@@ -55,6 +57,8 @@ export async function GET(
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
+    await runPendingMigrationsOnPool(getPool())
+
     const { table: raw } = await params
     const table = resolveTable(raw)
     if (!table || table === "characters") {
@@ -100,6 +104,8 @@ export async function POST(
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
+    await runPendingMigrationsOnPool(getPool())
+
     const { table: raw } = await params
     const table = resolveTable(raw)
     if (!table || table === "characters") {
@@ -132,6 +138,8 @@ export async function DELETE(
   try {
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
+
+    await runPendingMigrationsOnPool(getPool())
 
     const { table: raw } = await params
     const table = resolveTable(raw)

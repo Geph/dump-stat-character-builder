@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import Link from "next/link"
 import { BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/db/client"
 import {
   FEATURE_CARD_IMAGES,
   HERO_ROTATING_IMAGES,
@@ -66,7 +66,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const supabase = createClient()
+      const db = createClient()
       const [
         { count: classes },
         { count: species },
@@ -76,13 +76,13 @@ export default function HomePage() {
         { count: subclasses },
         { count: equipment },
       ] = await Promise.all([
-        supabase.from("classes").select("*", { count: "exact", head: true }),
-        supabase.from("species").select("*", { count: "exact", head: true }),
-        supabase.from("backgrounds").select("*", { count: "exact", head: true }),
-        supabase.from("spells").select("*", { count: "exact", head: true }),
-        supabase.from("feats").select("*", { count: "exact", head: true }),
-        supabase.from("subclasses").select("*", { count: "exact", head: true }),
-        supabase.from("equipment").select("*", { count: "exact", head: true }),
+        db.from("classes").select("*", { count: "exact", head: true }),
+        db.from("species").select("*", { count: "exact", head: true }),
+        db.from("backgrounds").select("*", { count: "exact", head: true }),
+        db.from("spells").select("*", { count: "exact", head: true }),
+        db.from("feats").select("*", { count: "exact", head: true }),
+        db.from("subclasses").select("*", { count: "exact", head: true }),
+        db.from("equipment").select("*", { count: "exact", head: true }),
       ])
       setStats({
         classes: classes ?? 0,
@@ -141,8 +141,10 @@ export default function HomePage() {
                 Dump Stat
               </h1>
 
-              <p className="text-lg mb-10 max-w-2xl mx-auto text-pretty">
-                A vibe-coded D&D 5.5e character creator with support for custom classes and content
+              <p className="mb-10 max-w-2xl mx-auto">
+                <span className="text-lg font-bold text-pretty inline rounded-lg px-[2px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone]">
+                  A vibe-coded D&D 5.5e character creator with support for custom classes and content
+                </span>
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

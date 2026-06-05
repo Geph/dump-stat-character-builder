@@ -8,7 +8,7 @@ export type BuilderDraftSnapshot = {
   currentStep: number
   maxStepReached: number
   character: CharacterDraft
-  abilityMethod: "pointbuy" | "standard" | "roll"
+  abilityMethod: "pointbuy" | "standard" | "roll" | "custom"
   pointsRemaining: number
   classSearch: string
   speciesSearch: string

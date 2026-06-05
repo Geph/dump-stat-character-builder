@@ -18,6 +18,7 @@ function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
 }
 
 export function isShieldItem(equipment: Equipment): boolean {
+  if (equipment.subcategory === "Shield") return true
   return equipment.name.toLowerCase().includes("shield")
 }
 
@@ -114,12 +115,20 @@ export function isWeaponProficient(
 ): boolean {
   if (!proficiencies?.length) return false
   const sub = weapon.subcategory?.toLowerCase() ?? ""
+  const name = weapon.name.toLowerCase()
   const normalized = proficiencies.map((p) => p.toLowerCase())
+
+  if (normalized.some((p) => p.includes("all martial"))) {
+    if (sub.includes("martial")) return true
+  }
   if (sub.includes("simple")) {
-    return normalized.some((p) => p.includes("simple"))
+    if (normalized.some((p) => p.includes("simple"))) return true
   }
   if (sub.includes("martial")) {
-    return normalized.some((p) => p.includes("martial"))
+    if (normalized.some((p) => p.includes("martial"))) return true
+  }
+  if (normalized.some((p) => p === name || name.includes(p) || p.includes(name))) {
+    return true
   }
   return false
 }

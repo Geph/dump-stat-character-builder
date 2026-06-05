@@ -2,8 +2,8 @@
 
 import { ABILITY_SCORE_KEYS } from "@/lib/compendium/characteristic-modifiers"
 import {
-  ASI_POINTS_TOTAL,
   adjustAsiPoint,
+  getAsiAllocatorHelpText,
   getAsiPointsUsed,
   type AsiAllocation,
 } from "@/lib/builder/asi-allocation"
@@ -11,6 +11,8 @@ import {
 type Props = {
   allocation: AsiAllocation
   onChange: (allocation: AsiAllocation) => void
+  totalPoints: number
+  pickCount?: number
 }
 
 const ABILITY_LABELS: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
@@ -22,16 +24,21 @@ const ABILITY_LABELS: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
   charisma: "Charisma",
 }
 
-export function AsiAllocator({ allocation, onChange }: Props) {
+export function AsiAllocator({ allocation, onChange, totalPoints, pickCount = 1 }: Props) {
   const pointsUsed = getAsiPointsUsed(allocation)
-  const pointsRemaining = ASI_POINTS_TOTAL - pointsUsed
+  const pointsRemaining = totalPoints - pointsUsed
+  const helpText = getAsiAllocatorHelpText(totalPoints, pickCount)
 
   return (
     <div className="mt-2 p-3 rounded-lg border border-border bg-card/80">
       <p className="text-xs font-bold text-foreground mb-1">Ability Score Improvement</p>
+      {pickCount > 1 && (
+        <p className="text-[11px] text-muted-foreground mb-1">
+          From {pickCount} selected feats ({totalPoints} points total)
+        </p>
+      )}
       <p className="text-[11px] text-muted-foreground mb-2">
-        +2 to one ability, or +1 to two abilities ({pointsRemaining} point
-        {pointsRemaining === 1 ? "" : "s"} remaining)
+        {helpText} ({pointsRemaining} point{pointsRemaining === 1 ? "" : "s"} remaining)
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {ABILITY_SCORE_KEYS.map((ability) => {
@@ -45,7 +52,7 @@ export function AsiAllocator({ allocation, onChange }: Props) {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={() => onChange(adjustAsiPoint(allocation, ability, -1))}
+                  onClick={() => onChange(adjustAsiPoint(allocation, ability, -1, totalPoints))}
                   disabled={value <= 0}
                   className="w-6 h-6 rounded bg-muted text-foreground text-sm font-bold disabled:opacity-30"
                 >
@@ -54,8 +61,8 @@ export function AsiAllocator({ allocation, onChange }: Props) {
                 <span className="w-5 text-center text-sm font-bold text-primary">+{value}</span>
                 <button
                   type="button"
-                  onClick={() => onChange(adjustAsiPoint(allocation, ability, 1))}
-                  disabled={pointsRemaining <= 0 || value >= 2}
+                  onClick={() => onChange(adjustAsiPoint(allocation, ability, 1, totalPoints))}
+                  disabled={pointsRemaining <= 0 || value >= totalPoints}
                   className="w-6 h-6 rounded bg-muted text-foreground text-sm font-bold disabled:opacity-30"
                 >
                   +

@@ -1,6 +1,6 @@
 /**
- * Browser-side data client (Supabase-compatible subset).
- * Talks to /api/data/* and /api/characters — never connects to MySQL directly.
+ * Browser-side data client for Dump Stat.
+ * Talks to /api/data/* and /api/characters; the server uses MySQL (DreamHost VPS or local).
  */
 
 import { resolveTable } from "./tables"

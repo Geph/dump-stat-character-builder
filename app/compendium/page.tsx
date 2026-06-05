@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/db/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
 import { GameIcon } from "@/components/game-icon-picker"
@@ -36,6 +36,17 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "equipment", label: "Equipment", icon: <Package className="w-4 h-4" /> },
   { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-4 h-4" /> },
 ]
+
+const newItemButtonLabels: Record<ContentType, string> = {
+  classes: "New Class",
+  subclasses: "New Subclass",
+  species: "New Species",
+  backgrounds: "New Background",
+  spells: "New Spell",
+  feats: "New Feat",
+  equipment: "New Item",
+  abilities: "New Custom Ability",
+}
 
 export default function CompendiumPage() {
   const searchParams = useSearchParams()
@@ -117,7 +128,7 @@ export default function CompendiumPage() {
   // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
     const fetchCounts = async () => {
-      const supabase = createClient()
+      const db = createClient()
       const [
         { count: speciesCount },
         { count: classesCount },
@@ -128,14 +139,14 @@ export default function CompendiumPage() {
         { count: equipmentCount },
         { count: abilitiesCount },
       ] = await Promise.all([
-        supabase.from("species").select("*", { count: "exact", head: true }),
-        supabase.from("classes").select("*", { count: "exact", head: true }),
-        supabase.from("subclasses").select("*", { count: "exact", head: true }),
-        supabase.from("backgrounds").select("*", { count: "exact", head: true }),
-        supabase.from("spells").select("*", { count: "exact", head: true }),
-        supabase.from("feats").select("*", { count: "exact", head: true }),
-        supabase.from("equipment").select("*", { count: "exact", head: true }),
-        supabase.from("custom_abilities").select("*", { count: "exact", head: true }),
+        db.from("species").select("*", { count: "exact", head: true }),
+        db.from("classes").select("*", { count: "exact", head: true }),
+        db.from("subclasses").select("*", { count: "exact", head: true }),
+        db.from("backgrounds").select("*", { count: "exact", head: true }),
+        db.from("spells").select("*", { count: "exact", head: true }),
+        db.from("feats").select("*", { count: "exact", head: true }),
+        db.from("equipment").select("*", { count: "exact", head: true }),
+        db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
       setTabCounts({
         species: speciesCount ?? 0,
@@ -158,10 +169,10 @@ export default function CompendiumPage() {
   useEffect(() => {
     const fetchActiveTabContent = async () => {
       setLoading(true)
-      const supabase = createClient()
+      const db = createClient()
       
       const tableName = activeTab === "abilities" ? "custom_abilities" : activeTab
-      const { data } = await supabase
+      const { data } = await db
         .from(tableName)
         .select("*")
         .order("name")
@@ -170,7 +181,7 @@ export default function CompendiumPage() {
       setContent(prev => ({ ...prev, [activeTab]: data || [] }))
 
       if (activeTab === "classes") {
-        const { data: subclasses } = await supabase
+        const { data: subclasses } = await db
           .from("subclasses")
           .select("*")
           .order("name")
@@ -241,7 +252,7 @@ export default function CompendiumPage() {
   const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
 
   const refreshTabCounts = async () => {
-    const supabase = createClient()
+    const db = createClient()
     const [
       { count: speciesCount },
       { count: classesCount },
@@ -252,14 +263,14 @@ export default function CompendiumPage() {
       { count: equipmentCount },
       { count: abilitiesCount },
     ] = await Promise.all([
-      supabase.from("species").select("*", { count: "exact", head: true }),
-      supabase.from("classes").select("*", { count: "exact", head: true }),
-      supabase.from("subclasses").select("*", { count: "exact", head: true }),
-      supabase.from("backgrounds").select("*", { count: "exact", head: true }),
-      supabase.from("spells").select("*", { count: "exact", head: true }),
-      supabase.from("feats").select("*", { count: "exact", head: true }),
-      supabase.from("equipment").select("*", { count: "exact", head: true }),
-      supabase.from("custom_abilities").select("*", { count: "exact", head: true }),
+      db.from("species").select("*", { count: "exact", head: true }),
+      db.from("classes").select("*", { count: "exact", head: true }),
+      db.from("subclasses").select("*", { count: "exact", head: true }),
+      db.from("backgrounds").select("*", { count: "exact", head: true }),
+      db.from("spells").select("*", { count: "exact", head: true }),
+      db.from("feats").select("*", { count: "exact", head: true }),
+      db.from("equipment").select("*", { count: "exact", head: true }),
+      db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
     setTabCounts({
       species: speciesCount ?? 0,
@@ -275,9 +286,9 @@ export default function CompendiumPage() {
 
   const refreshActiveTabContent = async () => {
     setLoading(true)
-    const supabase = createClient()
+    const db = createClient()
     const resolvedTable = tableName(activeTab)
-    const { data } = await supabase
+    const { data } = await db
       .from(resolvedTable)
       .select("*")
       .order("name")
@@ -323,14 +334,14 @@ export default function CompendiumPage() {
   }
 
   const handleExportSection = async () => {
-    const supabase = createClient()
+    const db = createClient()
     const resolvedTable = tableName(activeTab)
-    const { data } = await supabase.from(resolvedTable).select("*").order("name").limit(500)
+    const { data } = await db.from(resolvedTable).select("*").order("name").limit(500)
     if (!data?.length) return
 
     const classNameById = new Map<string, string>()
     if (activeTab === "subclasses") {
-      const { data: classesData } = await supabase.from("classes").select("id, name")
+      const { data: classesData } = await db.from("classes").select("id, name")
       for (const cls of classesData ?? []) {
         classNameById.set(cls.id as string, cls.name as string)
       }
@@ -528,12 +539,12 @@ export default function CompendiumPage() {
       <MainNav />
       
       <main id="compendium-main" className="max-w-7xl mx-auto px-4 py-8">
-        <div id="compendium-header" className="flex items-start justify-between mb-8 gap-4">
-          <div>
+        <div id="compendium-header" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
+          <div className="min-w-0">
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
             <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -563,10 +574,10 @@ export default function CompendiumPage() {
             </DropdownMenu>
             <Link
               href={`/compendium/${activeTab}/new`}
-              className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+              className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
             >
-              <Plus className="w-5 h-5" />
-              New {activeTab === "abilities" ? "Custom Ability" : activeTab === "species" ? "Species" : activeTab.slice(0, -2).charAt(0).toUpperCase() + activeTab.slice(0, -2).slice(1)}
+              <Plus className="w-5 h-5 shrink-0" />
+              {newItemButtonLabels[activeTab]}
             </Link>
           </div>
         </div>
@@ -614,16 +625,110 @@ export default function CompendiumPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div id="compendium-search" className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search content..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-          />
+        {/* Tabs — content type selection */}
+        <div className="relative mb-4 group/tabs">
+          {canScrollTabsLeft && (
+            <>
+              <div
+                className="pointer-events-none absolute left-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-r from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs left"
+                onClick={() => scrollCompendiumTabs("left")}
+                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          {canScrollTabsRight && (
+            <>
+              <div
+                className="pointer-events-none absolute right-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-l from-background to-transparent"
+                aria-hidden
+              />
+              <button
+                type="button"
+                aria-label="Scroll tabs right"
+                onClick={() => scrollCompendiumTabs("right")}
+                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+          <div
+            id="compendium-tabs"
+            ref={tabsScrollRef}
+            className={`flex gap-2 overflow-x-auto pb-4 scrollbar-hide scroll-smooth ${
+              canScrollTabsLeft ? "pl-10" : ""
+            } ${canScrollTabsRight ? "pr-10" : ""}`}
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
+                }`}>
+                  {tabCounts[tab.id]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Search (+ tab filters inline on sm+) */}
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div id="compendium-search" className="relative flex-1 min-w-0">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search content..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+
+          {activeTab === "feats" && (
+            <div id="feat-filters" className="flex flex-wrap items-center gap-2 sm:shrink-0">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Type
+                </label>
+                <select
+                  value={featFilterCategory}
+                  onChange={(e) => setFeatFilterCategory(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                >
+                  <option value="all">All Types</option>
+                  <option value="Origin">Origin</option>
+                  <option value="General">General</option>
+                  <option value="Epic Boon">Epic Boon</option>
+                  <option value="Fighting Style">Fighting Style</option>
+                </select>
+              </div>
+              {featFilterCategory !== "all" && (
+                <button
+                  onClick={() => setFeatFilterCategory("all")}
+                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Spell Filters — only shown on spells tab */}
@@ -697,99 +802,6 @@ export default function CompendiumPage() {
             )}
           </div>
         )}
-
-        {/* Feat type filter */}
-        {activeTab === "feats" && (
-          <div id="feat-filters" className="flex flex-wrap gap-3 mb-6">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                Type
-              </label>
-              <select
-                value={featFilterCategory}
-                onChange={(e) => setFeatFilterCategory(e.target.value)}
-                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-              >
-                <option value="all">All Types</option>
-                <option value="Origin">Origin</option>
-                <option value="General">General</option>
-                <option value="Epic Boon">Epic Boon</option>
-                <option value="Fighting Style">Fighting Style</option>
-              </select>
-            </div>
-            {featFilterCategory !== "all" && (
-              <button
-                onClick={() => setFeatFilterCategory("all")}
-                className="ml-auto px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
-              >
-                Clear filter
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="relative mb-6 group/tabs">
-          {canScrollTabsLeft && (
-            <>
-              <div
-                className="pointer-events-none absolute left-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-r from-background to-transparent"
-                aria-hidden
-              />
-              <button
-                type="button"
-                aria-label="Scroll tabs left"
-                onClick={() => scrollCompendiumTabs("left")}
-                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-            </>
-          )}
-          {canScrollTabsRight && (
-            <>
-              <div
-                className="pointer-events-none absolute right-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-l from-background to-transparent"
-                aria-hidden
-              />
-              <button
-                type="button"
-                aria-label="Scroll tabs right"
-                onClick={() => scrollCompendiumTabs("right")}
-                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </>
-          )}
-          <div
-            id="compendium-tabs"
-            ref={tabsScrollRef}
-            className={`flex gap-2 overflow-x-auto pb-4 scrollbar-hide scroll-smooth ${
-              canScrollTabsLeft ? "pl-10" : ""
-            } ${canScrollTabsRight ? "pr-10" : ""}`}
-          >
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
-                }`}>
-                  {tabCounts[tab.id]}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-4">
