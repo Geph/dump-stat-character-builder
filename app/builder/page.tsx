@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
+import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { useRouter } from "next/navigation"
 import { 
   ChevronLeft, 
@@ -1012,7 +1013,7 @@ export default function BuilderPage() {
       }
 
       clearBuilderDraft()
-      router.push(`/characters/${data.id}`)
+      router.push(characterSheetHref(data.id))
     } catch (err) {
       console.error("Error saving character:", err)
       alert(err instanceof Error ? err.message : "Failed to save character. Please try again.")

@@ -1,4 +1,4 @@
-import CharacterSheetClient from "./character-sheet-client"
+import CharacterSheetClient from "@/components/characters/character-sheet-client"
 
 export default async function CharacterSheetPage({
   params,

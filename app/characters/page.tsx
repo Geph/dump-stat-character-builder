@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, User, Trash2, Search, Pencil } from "lucide-react"
 import Link from "next/link"
+import { characterSheetHref } from "@/lib/compendium/edit-href"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
 import {
   AlertDialog,
@@ -297,7 +298,7 @@ export default function CharactersPage() {
                 className="bg-card rounded-2xl border-2 border-border hover:border-primary/50 transition-colors group overflow-hidden"
               >
                 {/* Large Portrait as main focus */}
-                <Link href={`/characters/${character.id}`} className="block relative aspect-square">
+                <Link href={characterSheetHref(character.id)} className="block relative aspect-square">
                   {character.portrait_url ? (
                     <img
                       src={character.portrait_url}
@@ -330,7 +331,7 @@ export default function CharactersPage() {
                 {/* Character Info - Below the image */}
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/characters/${character.id}`} className="min-w-0 flex-1">
+                    <Link href={characterSheetHref(character.id)} className="min-w-0 flex-1">
                       <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">
                         {character.name}
                       </h3>
