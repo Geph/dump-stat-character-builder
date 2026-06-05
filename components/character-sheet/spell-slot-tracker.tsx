@@ -126,7 +126,7 @@ export function SpellSlotTracker({ table, usedByLevel, onUsedChange }: SpellSlot
 }
 
 /** Mark one slot used at the given spell level (1-based). Returns false if none available. */
-export function useSpellSlot(
+export function consumeSpellSlot(
   usedByLevel: number[],
   slotsByLevel: number[],
   spellLevel: number,

@@ -35,7 +35,7 @@ import { resolveUsesConfig, ABILITY_SCORE_KEYS } from "@/lib/compendium/characte
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
 import { DamageRollButton } from "@/components/character-sheet/damage-roll-button"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
-import { SpellSlotTracker, useSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
+import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
 import { SpellDetailOverlay } from "@/components/character-sheet/spell-detail-overlay"
 import { EquipmentDetailOverlay } from "@/components/character-sheet/equipment-detail-overlay"
 import { filterEquipmentList } from "@/lib/compendium/equipment-display"
@@ -1187,7 +1187,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 applyConcentration(result.concentrationApplied)
               }
               if (result.slotUsed && spellSlotTable) {
-                const next = useSpellSlot(
+                const next = consumeSpellSlot(
                   usedSpellSlots,
                   spellSlotTable.slotsByLevel,
                   selectedSpell.level,

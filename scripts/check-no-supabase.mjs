@@ -5,8 +5,9 @@
  */
 import { readFileSync, readdirSync, statSync } from "fs"
 import { join } from "path"
+import { fileURLToPath } from "url"
 
-const ROOT = new URL("..", import.meta.url).pathname
+const ROOT = fileURLToPath(new URL("..", import.meta.url))
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "public/icons"])
 const FORBIDDEN = [
   /@supabase\//,
