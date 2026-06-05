@@ -18,6 +18,7 @@ function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
 }
 
 export function isShieldItem(equipment: Equipment): boolean {
+  if (equipment.subcategory === "Shield") return true
   return equipment.name.toLowerCase().includes("shield")
 }
 

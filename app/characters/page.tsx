@@ -7,6 +7,16 @@ import { createClient } from "@/lib/db/client"
 import { Plus, User, Trash2, Search, Pencil } from "lucide-react"
 import Link from "next/link"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -25,6 +35,7 @@ export default function CharactersPage() {
   const [filterLevel, setFilterLevel] = useState("all")
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest")
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [characterToDelete, setCharacterToDelete] = useState<CharacterWithRelations | null>(null)
 
   useEffect(() => {
     const fetchCharacters = async () => {
@@ -104,15 +115,17 @@ export default function CharactersPage() {
     setCreatedSort("newest")
   }
 
-  const deleteCharacter = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this character?")) return
-    
+  const confirmDeleteCharacter = async () => {
+    if (!characterToDelete) return
+
+    const id = characterToDelete.id
     const db = createClient()
     const { error } = await db.from("characters").delete().eq("id", id)
-    
+
     if (!error) {
-      setCharacters(characters.filter(c => c.id !== id))
+      setCharacters((prev) => prev.filter((c) => c.id !== id))
     }
+    setCharacterToDelete(null)
   }
 
   const formatCreated = (iso: string) =>
@@ -305,7 +318,7 @@ export default function CharactersPage() {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      deleteCharacter(character.id)
+                      setCharacterToDelete(character)
                     }}
                     className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-sm rounded-lg text-white/70 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
                     title="Delete character"
@@ -352,6 +365,37 @@ export default function CharactersPage() {
           </div>
         )}
       </main>
+
+      <AlertDialog
+        open={characterToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setCharacterToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete character?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {characterToDelete ? (
+                <>
+                  Are you sure you want to permanently delete{" "}
+                  <span className="font-semibold text-foreground">{characterToDelete.name}</span>? This
+                  cannot be undone.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteCharacter}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

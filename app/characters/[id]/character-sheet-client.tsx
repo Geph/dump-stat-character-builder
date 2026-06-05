@@ -44,6 +44,7 @@ import {
   isConcentrationCondition,
   getActiveConcentration,
   formatSpellListGroupLabel,
+  resolveSpellcastingAbilityKey,
 } from "@/lib/compendium/spell-slots"
 import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
@@ -60,6 +61,8 @@ import {
   getEffectiveArmorProficiencies,
   getEffectiveWeaponProficiencies,
 } from "@/lib/compendium/background-proficiencies"
+import { SRD_CONDITIONS, getConditionDescription } from "@/lib/srd/condition-descriptions"
+import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -67,24 +70,6 @@ interface CharacterWithRelations extends Character {
   backgrounds?: Background
   subclasses?: Subclass
 }
-
-const CONDITIONS = [
-  { name: "Blinded", description: "A blinded creature can't see and automatically fails any ability check that requires sight." },
-  { name: "Charmed", description: "A charmed creature can't attack the charmer or target the charmer with harmful abilities." },
-  { name: "Deafened", description: "A deafened creature can't hear and automatically fails any ability check that requires hearing." },
-  { name: "Exhaustion", description: "Exhaustion is measured in six levels with increasingly severe penalties." },
-  { name: "Frightened", description: "A frightened creature has disadvantage on ability checks and attack rolls while the source of fear is in sight." },
-  { name: "Grappled", description: "A grappled creature's speed becomes 0 and it can't benefit from speed bonuses." },
-  { name: "Incapacitated", description: "An incapacitated creature can't take actions or reactions." },
-  { name: "Invisible", description: "An invisible creature is impossible to see without magic or a special sense." },
-  { name: "Paralyzed", description: "A paralyzed creature is incapacitated and automatically fails Strength and Dexterity saves." },
-  { name: "Petrified", description: "A petrified creature is transformed into a solid inanimate substance." },
-  { name: "Poisoned", description: "A poisoned creature has disadvantage on attack rolls and ability checks." },
-  { name: "Prone", description: "A prone creature's only movement option is to crawl." },
-  { name: "Restrained", description: "A restrained creature's speed becomes 0." },
-  { name: "Stunned", description: "A stunned creature is incapacitated and automatically fails Strength and Dexterity saves." },
-  { name: "Unconscious", description: "An unconscious creature is incapacitated and falls prone." },
-]
 
 const ABILITY_COLORS: Record<string, string> = {
   strength: "bg-red-500",
@@ -351,21 +336,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const weapons = equipment.filter(isWeaponItem)
   const nonWeaponEquipment = equipment.filter((item) => !isWeaponItem(item))
   const filteredEquipment = filterEquipmentList(nonWeaponEquipment, equipmentSearchQuery)
-  const spellcastingAbilityKey = (
+  const spellcastingAbilityLabel =
     character.classes?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
-  )?.toLowerCase() as keyof typeof abilityMods | undefined
-  const hasSpellcasting = Boolean(
-    character.classes?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability,
-  )
-  const spellcastingAbility = spellcastingAbilityKey
-  const spellSaveDc = hasSpellcasting
-    ? 8 + proficiencyBonus + abilityMods[spellcastingAbility!]
-    : null
-  const spellAttackMod = hasSpellcasting
-    ? proficiencyBonus + abilityMods[spellcastingAbility!]
-    : null
+  const spellcastingAbilityKey = resolveSpellcastingAbilityKey(spellcastingAbilityLabel)
+  const hasSpellcasting = Boolean(spellcastingAbilityLabel && spellcastingAbilityKey)
+  const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
+  const spellSaveDc = hasSpellcasting ? 8 + proficiencyBonus + spellAbilityMod : null
+  const spellAttackMod = hasSpellcasting ? proficiencyBonus + spellAbilityMod : null
 
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
+
+  const isPerceptionProficient = character.skill_proficiencies?.includes("Perception") ?? false
+  const hasPerceptionExpertise = character.skill_expertise?.includes("Perception") ?? false
+  const passivePerception =
+    10 +
+    abilityMods.wisdom +
+    (isPerceptionProficient
+      ? proficiencyBonus * (hasPerceptionExpertise ? 2 : 1)
+      : 0)
 
   const spellsGroupedByLevel = (() => {
     const groups = new Map<number, Spell[]>()
@@ -484,7 +472,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-48 overflow-y-auto"
                         style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
                       >
-                      {CONDITIONS.map((condition) => (
+                      {SRD_CONDITIONS.map((condition) => (
                         <label
                           key={condition.name}
                           className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted cursor-pointer text-xs"
@@ -493,9 +481,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             type="checkbox"
                             checked={activeConditions.includes(condition.name)}
                             onChange={() => toggleCondition(condition.name)}
-                            className="w-3.5 h-3.5 rounded accent-destructive"
+                            className="w-3.5 h-3.5 rounded accent-destructive shrink-0"
                           />
-                          {condition.name}
+                          <span className="flex-1 min-w-0">{condition.name}</span>
+                          <ConditionInfoTip description={condition.description} />
                         </label>
                       ))}
                       </div>
@@ -503,25 +492,31 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )}
                   {activeConditions.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      {activeConditions.map((condName) => (
-                        <span
-                          key={condName}
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                            isConcentrationCondition(condName)
-                              ? "bg-purple-500/20 text-purple-800 dark:text-purple-300"
-                              : "bg-destructive/20 text-destructive"
-                          }`}
-                          title={
-                            CONDITIONS.find((c) => c.name === condName)?.description ??
-                            (isConcentrationCondition(condName) ? "Concentrating on a spell" : undefined)
-                          }
-                        >
-                          {condName}
-                          <button type="button" onClick={() => toggleCondition(condName)}>
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </span>
-                      ))}
+                      {activeConditions.map((condName) => {
+                        const condDescription =
+                          getConditionDescription(condName) ??
+                          (isConcentrationCondition(condName)
+                            ? "You are concentrating on a spell. Concentration ends if you take damage and fail a Constitution save, cast another concentration spell, or become incapacitated."
+                            : undefined)
+                        return (
+                          <span
+                            key={condName}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                              isConcentrationCondition(condName)
+                                ? "bg-purple-500/20 text-purple-800 dark:text-purple-300"
+                                : "bg-destructive/20 text-destructive"
+                            }`}
+                          >
+                            {condName}
+                            {condDescription ? (
+                              <ConditionInfoTip description={condDescription} />
+                            ) : null}
+                            <button type="button" onClick={() => toggleCondition(condName)}>
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -597,37 +592,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-foreground">Abilities and Skills</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {ABILITY_SCORE_KEYS.map((key) => {
-                      const score = effectiveScores[key]
-                      const bonus = asiBonuses[key]
-                      const mod = abilityMods[key]
-                      return (
-                        <div key={key} className="text-center">
-                          <div
-                            className={`w-10 h-10 ${ABILITY_COLORS[key]} rounded-lg flex items-center justify-center mx-auto`}
-                          >
-                            <span className="text-sm font-black text-white">{score}</span>
-                          </div>
-                          <p className="text-[10px] font-medium text-foreground mt-0.5">{ABILITY_LABELS[key]}</p>
-                          <p className="text-xs font-bold text-primary">{getAbilityModifier(score)}</p>
-                          {bonus ? (
-                            <p className="text-[9px] text-lime">+{bonus} ASI</p>
-                          ) : null}
-                          <div className="mt-1 flex justify-center">
-                            <D20RollButton
-                              modifier={mod}
-                              title={`${ABILITY_LABELS[key]} ability check`}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
                 <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-2">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Skills</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:min-h-[300px]">
@@ -659,6 +623,47 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </div>
                       )
                     })}
+                  </div>
+                </div>
+
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {ABILITY_SCORE_KEYS.map((key) => {
+                      const score = effectiveScores[key]
+                      const bonus = asiBonuses[key]
+                      const mod = abilityMods[key]
+                      return (
+                        <div key={key} className="text-center">
+                          <div
+                            className={`w-10 h-10 ${ABILITY_COLORS[key]} rounded-lg flex items-center justify-center mx-auto`}
+                          >
+                            <span className="text-sm font-black text-white">{score}</span>
+                          </div>
+                          <p className="text-[10px] font-medium text-foreground mt-0.5">{ABILITY_LABELS[key]}</p>
+                          <p className="text-xs font-bold text-primary">{getAbilityModifier(score)}</p>
+                          {bonus ? (
+                            <p className="text-[9px] text-lime">+{bonus} ASI</p>
+                          ) : null}
+                          <div className="mt-1 flex justify-center">
+                            <D20RollButton
+                              modifier={mod}
+                              title={`${ABILITY_LABELS[key]} ability check`}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Proficiency Bonus</span>
+                      <span className="font-bold tabular-nums">{formatMod(proficiencyBonus)}</span>
+                    </div>
+                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                      <span>Passive Perception</span>
+                      <span className="font-bold tabular-nums">{passivePerception}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -805,11 +810,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         <D20RollButton modifier={initiative} title="Roll initiative" />
                       </div>
                     </div>
-                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                      <span>Proficiency Bonus</span>
-                      <span className="font-bold tabular-nums">{formatMod(proficiencyBonus)}</span>
-                    </div>
-                    {hasSpellcasting && spellSaveDc != null && (
+                    {hasSpellcasting && spellSaveDc != null && Number.isFinite(spellSaveDc) && (
                       <>
                         <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
                           <span>Spell Save DC</span>
@@ -859,7 +860,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <div className="bg-card rounded-xl p-3 border border-border">
                 <h2 className="text-sm font-bold text-foreground mb-2">Weapons</h2>
                 {weapons.length ? (
-                  <div className="columns-1 sm:columns-2 lg:columns-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     {weapons.map((weapon) => {
                       const proficient = isWeaponProficient(weapon, weaponProficiencies)
                       const attack = calculateWeaponAttack(
@@ -877,7 +878,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       return (
                         <div
                           key={weapon.id}
-                          className="break-inside-avoid mb-3 p-2.5 bg-muted/50 rounded-lg border border-border/60"
+                          className="p-2.5 bg-muted/50 rounded-lg border border-border/60 min-w-0"
                         >
                           <p className="font-bold text-xs text-foreground mb-1.5">{weapon.name}</p>
                           {attack && (
