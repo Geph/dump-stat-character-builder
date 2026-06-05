@@ -6,15 +6,21 @@ import { UsesConfigEditor } from "@/components/uses-config-editor"
 import {
   ABILITY_SCORE_KEYS,
   ABILITY_MODIFIER_KEYS,
+  ATTACK_ROLL_TARGETS,
   CHARACTERISTIC_MODIFIER_TYPE_OPTIONS,
+  DAMAGE_ROLL_TARGETS,
   DAMAGE_TYPES,
   SKILL_NAMES,
   SAVING_THROW_NAMES,
   SPEED_TYPES,
+  UNARMED_STRIKE_DICE,
   VISION_TYPES,
   createCharacteristicModifier,
+  getSkillEntries,
   type CharacteristicModifier,
   type CharacteristicModifierType,
+  type RollModifierEntry,
+  type SkillEntry,
 } from "@/lib/compendium/characteristic-modifiers"
 
 type CharacteristicModifiersEditorProps = {
@@ -114,6 +120,149 @@ function TagInput({
   )
 }
 
+function RollModifiersEditor({
+  entries,
+  targets,
+  onChange,
+}: {
+  entries: RollModifierEntry[]
+  targets: readonly { value: string; label: string }[]
+  onChange: (entries: RollModifierEntry[]) => void
+}) {
+  const updateEntry = (idx: number, next: RollModifierEntry) => {
+    const copy = [...entries]
+    copy[idx] = next
+    onChange(copy)
+  }
+
+  return (
+    <div className="space-y-2">
+      {entries.map((entry, idx) => (
+        <div
+          key={idx}
+          className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border"
+        >
+          <input
+            type="number"
+            value={entry.bonus}
+            onChange={(e) =>
+              updateEntry(idx, { ...entry, bonus: parseInt(e.target.value, 10) || 0 })
+            }
+            className="w-20 px-2 py-1.5 bg-card border border-border rounded-lg text-sm text-center"
+            placeholder="+N"
+          />
+          <select
+            value={entry.target}
+            onChange={(e) => updateEntry(idx, { ...entry, target: e.target.value })}
+            className="flex-1 min-w-[160px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+          >
+            {targets.map((target) => (
+              <option key={target.value} value={target.value}>
+                {target.label}
+              </option>
+            ))}
+          </select>
+          {entry.target === "custom" && (
+            <input
+              type="text"
+              value={entry.customTarget ?? ""}
+              onChange={(e) => updateEntry(idx, { ...entry, customTarget: e.target.value })}
+              className="flex-1 min-w-[120px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+              placeholder="Custom target"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => onChange(entries.filter((_, i) => i !== idx))}
+            className="p-1 text-muted-foreground hover:text-destructive"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...entries, { bonus: 1, target: targets[0]?.value ?? "all" }])}
+        className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg"
+      >
+        <Plus className="w-3 h-3" />
+        Add modifier entry
+      </button>
+    </div>
+  )
+}
+
+function SkillsEditor({
+  entries,
+  onChange,
+}: {
+  entries: SkillEntry[]
+  onChange: (entries: SkillEntry[]) => void
+}) {
+  const usedSkills = new Set(entries.map((entry) => entry.skill))
+
+  const addSkill = (skill: string) => {
+    if (!skill || usedSkills.has(skill)) return
+    onChange([...entries, { skill, expertise: false }])
+  }
+
+  const updateEntry = (idx: number, next: SkillEntry) => {
+    const copy = [...entries]
+    copy[idx] = next
+    onChange(copy)
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, idx) => (
+        <div
+          key={`${entry.skill}-${idx}`}
+          className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border"
+        >
+          <span className="text-sm font-medium flex-1 min-w-[120px]">{entry.skill}</span>
+          <label className="inline-flex items-center gap-1.5 text-sm">
+            <input
+              type="radio"
+              name={`skill-level-${idx}`}
+              checked={!entry.expertise}
+              onChange={() => updateEntry(idx, { ...entry, expertise: false })}
+            />
+            Proficiency
+          </label>
+          <label className="inline-flex items-center gap-1.5 text-sm">
+            <input
+              type="radio"
+              name={`skill-level-${idx}`}
+              checked={entry.expertise}
+              onChange={() => updateEntry(idx, { ...entry, expertise: true })}
+            />
+            Expertise
+          </label>
+          <button
+            type="button"
+            onClick={() => onChange(entries.filter((_, i) => i !== idx))}
+            className="p-1 text-muted-foreground hover:text-destructive"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+      <select
+        value=""
+        onChange={(e) => addSkill(e.target.value)}
+        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+      >
+        <option value="">Add skill...</option>
+        {SKILL_NAMES.filter((skill) => !usedSkills.has(skill)).map((skill) => (
+          <option key={skill} value={skill}>
+            {skill}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function ModifierFields({
   mod,
   onChange,
@@ -154,11 +303,9 @@ function ModifierFields({
 
     case "skills":
       return (
-        <TagInput
-          values={mod.values}
-          onChange={(values) => onChange({ ...mod, values })}
-          suggestions={SKILL_NAMES}
-          placeholder="Add skill..."
+        <SkillsEditor
+          entries={getSkillEntries(mod)}
+          onChange={(entries) => onChange({ ...mod, entries })}
         />
       )
 
@@ -265,6 +412,32 @@ function ModifierFields({
         </div>
       )
 
+    case "hit_points":
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={mod.mode}
+            onChange={(e) =>
+              onChange({ ...mod, mode: e.target.value as typeof mod.mode })
+            }
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="flat">Flat bonus to max HP</option>
+            <option value="per_level">Per character level (e.g. Tough)</option>
+          </select>
+          <input
+            type="number"
+            value={mod.value}
+            onChange={(e) => onChange({ ...mod, value: parseInt(e.target.value, 10) || 0 })}
+            className="w-24 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            placeholder="HP"
+          />
+          <span className="text-xs text-muted-foreground">
+            {mod.mode === "per_level" ? "HP per level" : "Total HP bonus"}
+          </span>
+        </div>
+      )
+
     case "initiative":
       return (
         <div className="space-y-3">
@@ -319,7 +492,9 @@ function ModifierFields({
                 className="w-24 px-3 py-2 bg-background border border-border rounded-lg text-sm"
                 placeholder="Bonus"
               />
-              <span className="text-xs text-muted-foreground">Uses selected ability mod + bonus instead of DEX</span>
+              <span className="text-xs text-muted-foreground">
+                Uses selected ability mod + bonus instead of DEX
+              </span>
             </div>
           )}
         </div>
@@ -411,6 +586,44 @@ function ModifierFields({
         </div>
       )
 
+    case "attack_roll_modifiers":
+      return (
+        <RollModifiersEditor
+          entries={mod.entries}
+          targets={ATTACK_ROLL_TARGETS}
+          onChange={(entries) => onChange({ ...mod, entries })}
+        />
+      )
+
+    case "damage_roll_modifiers":
+      return (
+        <RollModifiersEditor
+          entries={mod.entries}
+          targets={DAMAGE_ROLL_TARGETS}
+          onChange={(entries) => onChange({ ...mod, entries })}
+        />
+      )
+
+    case "unarmed_strike_damage":
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-muted-foreground">Damage die</label>
+          <select
+            value={mod.die}
+            onChange={(e) =>
+              onChange({ ...mod, die: e.target.value as typeof mod.die })
+            }
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            {UNARMED_STRIKE_DICE.map((die) => (
+              <option key={die} value={die}>
+                {die === "1" ? "1 (flat damage)" : die}
+              </option>
+            ))}
+          </select>
+        </div>
+      )
+
     case "damage_resistance":
     case "damage_immunity":
       return (
@@ -422,11 +635,44 @@ function ModifierFields({
         />
       )
 
+    case "damage_reduction":
+      return (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Reduce damage by</label>
+            <input
+              type="number"
+              min={1}
+              value={mod.amount}
+              onChange={(e) => onChange({ ...mod, amount: parseInt(e.target.value, 10) || 0 })}
+              className="w-24 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Damage types (leave empty for all types)
+            </p>
+            <TagInput
+              values={mod.damageTypes ?? []}
+              onChange={(damageTypes) => onChange({ ...mod, damageTypes })}
+              suggestions={DAMAGE_TYPES}
+              placeholder="Add damage type..."
+            />
+          </div>
+        </div>
+      )
+
     case "spells":
       return (
         <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Modifies the spell slot table (extra slots per spell level).
+          </p>
           {mod.grants.map((grant, idx) => (
-            <div key={idx} className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border">
+            <div
+              key={idx}
+              className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border"
+            >
               <select
                 value={grant.level}
                 onChange={(e) => {
@@ -454,28 +700,7 @@ function ModifierFields({
                 }}
                 className="w-20 px-2 py-1.5 bg-card border border-border rounded-lg text-sm text-center"
               />
-              <span className="text-sm text-muted-foreground">spell(s)</span>
-              {spellOptions.length > 0 && (
-                <select
-                  value={grant.spellIds?.[0] ?? ""}
-                  onChange={(e) => {
-                    const grants = [...mod.grants]
-                    grants[idx] = {
-                      ...grant,
-                      spellIds: e.target.value ? [e.target.value] : undefined,
-                    }
-                    onChange({ ...mod, grants })
-                  }}
-                  className="flex-1 min-w-[140px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
-                >
-                  <option value="">Any spell (count only)</option>
-                  {spellOptions.map((spell) => (
-                    <option key={spell.id} value={spell.id}>
-                      {spell.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <span className="text-sm text-muted-foreground">slot(s)</span>
               <button
                 type="button"
                 onClick={() => onChange({ ...mod, grants: mod.grants.filter((_, i) => i !== idx) })}
@@ -491,8 +716,112 @@ function ModifierFields({
             className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg"
           >
             <Plus className="w-3 h-3" />
-            Add spell grant
+            Add spell slot grant
           </button>
+        </div>
+      )
+
+    case "spells_known":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Specific spells granted by this feat (e.g. Magic Initiate).
+          </p>
+          <div>
+            <label className="block text-sm font-semibold mb-1">Spellcasting ability</label>
+            <select
+              value={mod.castingAbility ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  castingAbility: e.target.value
+                    ? (e.target.value as typeof mod.castingAbility)
+                    : undefined,
+                })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="">Use class default</option>
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {mod.spells.map((entry, idx) => (
+            <div
+              key={idx}
+              className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border"
+            >
+              <select
+                value={entry.spellId}
+                onChange={(e) => {
+                  const spells = [...mod.spells]
+                  spells[idx] = { ...entry, spellId: e.target.value }
+                  onChange({ ...mod, spells })
+                }}
+                className="flex-1 min-w-[160px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+              >
+                <option value="">Select spell...</option>
+                {spellOptions.map((spell) => (
+                  <option key={spell.id} value={spell.id}>
+                    {spell.name}
+                  </option>
+                ))}
+              </select>
+              <label className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={entry.prepared !== false}
+                  onChange={(e) => {
+                    const spells = [...mod.spells]
+                    spells[idx] = { ...entry, prepared: e.target.checked }
+                    onChange({ ...mod, spells })
+                  }}
+                />
+                Prepared
+              </label>
+              <button
+                type="button"
+                onClick={() => onChange({ ...mod, spells: mod.spells.filter((_, i) => i !== idx) })}
+                className="p-1 text-muted-foreground hover:text-destructive"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => onChange({ ...mod, spells: [...mod.spells, { spellId: "", prepared: true }] })}
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg"
+          >
+            <Plus className="w-3 h-3" />
+            Add spell
+          </button>
+        </div>
+      )
+
+    case "spellcasting_ability":
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-muted-foreground">Use ability modifier</label>
+          <select
+            value={mod.ability}
+            onChange={(e) =>
+              onChange({ ...mod, ability: e.target.value as typeof mod.ability })
+            }
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            {ABILITY_SCORE_KEYS.map((ability) => (
+              <option key={ability} value={ability}>
+                {ability.charAt(0).toUpperCase() + ability.slice(1)}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-muted-foreground">
+            Overrides spellcasting ability for feat-granted spells
+          </span>
         </div>
       )
 
@@ -523,7 +852,8 @@ export function CharacteristicModifiersEditor({
         <div>
           <h3 className="font-semibold text-foreground">Characteristic Modifiers</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Mechanical effects — ability scores, proficiencies, AC, initiative, vision, speed, resistances, spells, and uses.
+            Mechanical effects from feats and features — ability scores, proficiencies, combat stats,
+            spell grants, and limited-use resources.
           </p>
         </div>
         <select

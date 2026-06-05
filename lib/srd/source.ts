@@ -9,3 +9,8 @@ export function formatCompendiumSource(source: string | null | undefined): strin
   if (source === "SRD") return SRD_SOURCE
   return source
 }
+
+export function isSrdSource(source: string | null | undefined): boolean {
+  if (!source) return false
+  return (LEGACY_SRD_SOURCES as readonly string[]).includes(source)
+}

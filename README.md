@@ -7,21 +7,33 @@ A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 ## Features
 
 ### Character Builder
-- **Step-by-step character creation** - Guided workflow through species, class, ability scores, background, and equipment selection
-- **Multi-class support** - Build characters with multiple classes and track levels independently
-- **Real-time preview** - See your character sheet update live as you make choices
-- **Point buy & standard array** - Multiple methods for determining ability scores
-- **Automatic calculations** - HP, AC, saving throws, skills, and modifiers calculated automatically
+- **Step-by-step character creation** — Guided workflow through species, class, ability scores, background, gear, spells, and details
+- **Multi-class support** — Build characters with multiple classes and track levels independently
+- **Real-time preview** — Live character sheet with Summary, Combat, Features, and Custom tabs
+- **Point buy & standard array** — Multiple methods for determining ability scores
+- **Repeatable feats** — Feats marked repeatable can fill more than one milestone slot; duplicate ASI feats combine into a shared bonus pool on the Abilities step
+- **Background proficiencies** — Tools, vehicles, weapons, armor, and languages from backgrounds flow into preview and saved characters
+- **Automatic calculations** — HP, AC, weapon attacks, saving throws, skills, and modifiers calculated automatically
 
 ### Compendium
-- **SRD Content** - Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
-- **Custom Content Creation** - Create and manage your own species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities
-- **Filtering & Search** - Find content quickly with search and category filters
+- **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
+- **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities
+- **Unified editor header** — Icon picker (inline with name field), name, source, and source link on one row across all compendium editors
+- **Background proficiencies editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, and languages
+- **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level
+- **Spell editor** — Casting time, range, and duration presets with “Other” custom values; ritual and concentration on the same row as level and school
+- **Section export & clear** — Export or wipe an entire compendium tab from the gear menu
+- **Filtering & search** — Find content quickly with search and category filters
 
 ### Character Management
-- **Save & Load Characters** - Persist characters to the database
-- **Export Options** - Download character data as JSON
-- **Character Sheet View** - Full character sheet with all details
+- **Save & load characters** — Persist characters to MySQL; resume editing from the builder
+- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, banner/portrait, and in-sheet HP tracking
+- **Export options** — Download character and compendium data as JSON
+
+### Import
+- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from official markdown)
+- **Web import** — Paste a URL to pull homebrew-style HTML into the compendium
+- **PDF & text import** — OpenAI-powered extraction (optional `OPENAI_API_KEY`) for pasted text or uploaded PDFs
 
 ## Tech Stack
 
@@ -112,7 +124,13 @@ mysql -h localhost -u YOUR_DB_USER -p dump_stat < mysql/schema.sql
 
 Or import the file through phpMyAdmin, Adminer, or your host’s database UI.
 
-The seed step only inserts data; it does **not** create tables.
+The seed step only inserts data; it does **not** create tables. After pulling schema updates, run:
+
+```bash
+pnpm db:migrate
+```
+
+This applies incremental migrations (new columns such as background `proficiencies`, character weapon/armor proficiencies, feat `repeatable`, etc.).
 
 ### 5. Remote MySQL from your laptop
 
@@ -166,7 +184,9 @@ Restart the dev server after adding the key. Without it, import still works for 
 
 ---
 
-## Production deployment (VPS or similar)
+## Production deployment (DreamHost VPS or similar)
+
+**This app is designed for self-hosted Node + MySQL**, not Vercel serverless. If the repo was linked to Vercel from v0, disconnect that integration in the Vercel dashboard (or remove the Git deploy hook) and deploy on your VPS instead.
 
 These steps apply to any Linux VPS or dedicated box where you run Node and MySQL yourself (DreamHost VPS, Linode, DigitalOcean, Hetzner, AWS EC2, a home server, etc.). Adjust paths and panel names for your host.
 
@@ -223,11 +243,17 @@ NODE_OPTIONS='--max-old-space-size=4096' pnpm build
 pnpm start
 ```
 
-Or with PM2:
+Or with PM2 (config included in `deploy/`):
 
 ```bash
-pm2 start pnpm --name dump-stat -- start
+pm2 start deploy/ecosystem.config.cjs
 pm2 save
+```
+
+Optional standalone build (copies minimal `node_modules` into `.next/standalone`):
+
+```bash
+NEXT_OUTPUT=standalone pnpm build
 ```
 
 ### 4. Reverse proxy (nginx example)
@@ -267,6 +293,7 @@ curl -X POST https://yourdomain.com/api/seed
 | **VPS** (DreamHost, DO, Linode, …) | Node + MySQL on same box, nginx in front — steps above |
 | **Managed MySQL** (RDS, Aiven, …) | Point `DATABASE_URL` at the provider hostname; run Node on a VPS or PaaS |
 | **PaaS** (Railway, Render, Fly.io) | Deploy Next.js build; attach managed MySQL; set env vars in the dashboard |
+| **Vercel** | **Not recommended** — no persistent MySQL on the same project; use DreamHost VPS + nginx instead |
 | **Shared PHP/cPanel** | Often **no** long-running Node — use a VPS or PaaS instead unless your plan supports Node apps |
 
 DreamHost-specific: MySQL is created under **Goodies → MySQL Databases**; remote access may require an SSH tunnel or IP allowlist as described in local dev step 5.
@@ -298,10 +325,17 @@ app/
 └── api/                  # REST routes (seed, import, data, characters)
 
 lib/
-├── db/                   # MySQL connection, schema, repository
+├── db/                   # MySQL connection, Drizzle schema, migrations
+├── builder/              # Draft storage, ASI allocation, feat selection, equipment utils
+├── compendium/           # Background proficiencies, display helpers, editor field styles
 ├── srd/                  # SRD seed data and parsers
-├── import/               # Import normalization helpers
+├── import/               # Import normalization and dump-stat export format
 └── site-images.ts        # Marketing image paths
+
+components/
+├── compendium/           # Editor header row, proficiencies editor, dropdown-or-other fields
+├── builder/              # Step nav, multi-select choices, ASI allocator
+└── game-icon-picker.tsx  # SVG game-icons.net picker for compendium entries
 
 mysql/
 └── schema.sql            # Database DDL
@@ -315,7 +349,13 @@ public/
 
 Use the Compendium section to create custom species, classes, backgrounds, feats, spells, equipment, and abilities. Custom entries are marked with source **Custom**.
 
-Theming lives in `app/globals.css` via CSS custom properties.
+Theming lives in `app/globals.css` (Arcane default plus Parchment, Stone, Moss, and Clay). Use the gear icon in the header to switch styles; choice is stored in `localStorage`.
+
+### Data layer (MySQL only)
+
+- Browser code uses `createClient()` from `@/lib/db/client` → `/api/characters` and `/api/data/*`
+- Server routes use `lib/db/*` (Drizzle + `mysql2`)
+- There is **no** Supabase dependency. Run `pnpm check:mysql` to verify the repo has no stray Supabase references.
 
 ## License
 
@@ -323,6 +363,5 @@ This project uses content from the D&D 5.5e Systems Reference Document (SRD) und
 
 ## Links
 
-- [Continue developing on v0](https://v0.app/chat/projects/prj_Z07M3vx9HphfTfMDkIp9oqtpaHYN)
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Tailwind CSS](https://tailwindcss.com)
