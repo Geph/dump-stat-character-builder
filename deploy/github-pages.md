@@ -1,18 +1,20 @@
 # GitHub Pages (static deployment)
 
-Live site (after enabling Pages): **https://geph.github.io/v0-dump-stat-character-builder/**
+Live site (after enabling Pages): **https://geph.github.io/dump-stat-character-builder/**
 
 Static mode runs entirely in the browser with **IndexedDB** storage. No MySQL, Node server, or API routes are required at runtime.
 
 ## One-time GitHub setup
 
 1. Push this repo to `main` (the deploy workflow is in `.github/workflows/deploy-pages.yml`).
-2. Open **GitHub → Repository → Settings → Pages**.
+2. Open **[Settings → Pages](https://github.com/Geph/dump-stat-character-builder/settings/pages)**.
 3. Under **Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”).
-4. Push to `main` or run the **Deploy GitHub Pages** workflow manually (**Actions** tab → **Deploy GitHub Pages** → **Run workflow**).
+4. Re-run the deploy workflow: **[Actions → Deploy GitHub Pages → Run workflow](https://github.com/Geph/dump-stat-character-builder/actions/workflows/deploy-pages.yml)** (or push any commit to `main`).
 5. When the workflow finishes, the site URL appears on the **Pages** settings page and in the workflow summary.
 
-The workflow sets `NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }}` (i.e. `/v0-dump-stat-character-builder` for this repo).
+If the **deploy** job fails with a Pages permission or “not enabled” error, step 3 was skipped — enable **GitHub Actions** as the Pages source first, then re-run.
+
+The workflow sets `NEXT_PUBLIC_BASE_PATH=/${{ github.event.repository.name }}` (i.e. `/dump-stat-character-builder` for this repo).
 
 ## Build locally
 
