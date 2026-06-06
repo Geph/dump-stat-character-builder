@@ -142,7 +142,7 @@ export default function HomePage() {
               </h1>
 
               <p className="mb-10 max-w-2xl mx-auto">
-                <span className="text-lg font-bold text-pretty inline rounded-lg px-[2px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone]">
+                <span className="text-lg font-bold text-pretty inline rounded-lg px-[5px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone]">
                   A vibe-coded D&D 5.5e character creator with support for custom classes and content
                 </span>
               </p>

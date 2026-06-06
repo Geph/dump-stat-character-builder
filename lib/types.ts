@@ -7,6 +7,38 @@ export interface FeatureChoice {
   category: string // e.g., "Fighting Style", "Skill Proficiency"
   options: { name: string; description: string }[]
   count: number // how many to choose
+  /** When "feats", builder offers compendium feats instead of static options. */
+  kind?: "options" | "feats"
+  /** Feat categories to filter (General, Epic Boon, etc.) when kind is "feats". */
+  featCategories?: string[]
+}
+
+export interface FeatureEffect {
+  id: string
+  kind: string
+  /** resistance | immunity | flat reduction */
+  mitigation?: "resistance" | "immunity" | "reduction" | null
+  damageTypes?: string[]
+  reductionAmount?: number | null
+  /** e.g. rage bonus: +2 at level 1, +3 at 9 */
+  bonusByLevel?: { level: number; bonus: string }[]
+  bonusDice?: string | null
+  checkCategory?: "ability" | "skill" | "attack" | "save" | "other" | null
+  checkAbility?: string | null
+  checkSkills?: string[]
+  bonusAmount?: number | null
+  grantAdvantage?: boolean
+  grantDisadvantage?: boolean
+  classResourceKey?: string | null
+}
+
+export interface FeatureActivation {
+  action?: boolean
+  bonusAction?: boolean
+  reaction?: boolean
+  /** @deprecated Use effects[] */
+  effect?: string | null
+  effects?: FeatureEffect[]
 }
 
 export interface Feature {
@@ -16,6 +48,31 @@ export interface Feature {
   isChoice?: boolean
   choices?: FeatureChoice
   limitedUses?: UsesConfig | null
+  activation?: FeatureActivation | null
+  /** @deprecated Use limitedUses.type === "class_resource" */
+  resourceId?: string | null
+}
+
+export interface ClassResource {
+  id: string
+  name: string
+  description?: string
+  uses: UsesConfig
+}
+
+/** Row in the `class_resources` compendium table. */
+export interface ClassResourceRow {
+  id: string
+  class_id: string
+  resource_key: string
+  name: string
+  description: string | null
+  uses: UsesConfig
+  icon: string | null
+  source: string
+  creator_url: string | null
+  enabled?: boolean
+  created_at: string
 }
 
 // Trait with choice support for species
@@ -39,6 +96,7 @@ export interface Species {
   icon: string | null
   source: string
   creator_url: string | null
+  enabled?: boolean
   created_at: string
 }
 
@@ -73,6 +131,7 @@ export interface DndClass {
   starting_equipment_groups: StartingEquipmentGroup[] | null
   starting_gold: number | null
   features: Feature[]
+  class_resources?: ClassResource[] | null
   spellcasting: {
     ability: string
     type?: "prepared" | "pact"
@@ -114,14 +173,23 @@ export interface UsesAtLevel {
 }
 
 export interface UsesConfig {
-  type: 'fixed' | 'proficiency' | 'ability_modifier' | 'custom_ability' | 'at_level' | 'unlimited'
+  type:
+    | "fixed"
+    | "proficiency"
+    | "ability_modifier"
+    | "custom_ability"
+    | "at_level"
+    | "class_resource"
+    | "unlimited"
   fixedAmount?: number
-  abilityModifier?: 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
+  abilityModifier?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
   customAbilityId?: string
+  /** When type is class_resource — resource_key from class_resources table */
+  classResourceKey?: string
   atLevelTable?: UsesAtLevel[]
-  recharge?: 'short_rest' | 'long_rest' | null
+  recharge?: "short_rest" | "long_rest" | null
   dieCount?: number
-  dieType?: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | null
+  dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
 }
 
 export interface CustomAbility {

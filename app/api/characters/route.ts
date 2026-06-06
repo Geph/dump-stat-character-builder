@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
+import { getPool } from "@/lib/db/index"
+import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
 import { insertCharacter, listCharactersWithRelations } from "@/lib/db/characters"
 
 export async function GET() {
   try {
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
+
+    await runPendingMigrationsOnPool(getPool())
 
     const data = await listCharactersWithRelations()
     return NextResponse.json({ data })
@@ -23,9 +27,14 @@ export async function POST(request: NextRequest) {
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
+    await runPendingMigrationsOnPool(getPool())
+
     const body = await request.json()
     const row = Array.isArray(body) ? body[0] : body.rows?.[0] ?? body
     const data = await insertCharacter(row as Record<string, unknown>)
+    if (!data?.id) {
+      return NextResponse.json({ error: "Character was not saved." }, { status: 500 })
+    }
     return NextResponse.json({ data })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Insert failed"

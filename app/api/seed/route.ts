@@ -8,6 +8,8 @@ import {
   listRows,
   upsertByName,
 } from "@/lib/db/repository"
+import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
+import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES } from "@/lib/srd/source"
 
@@ -23,7 +25,7 @@ export async function POST() {
     const { classes, subclasses, species, backgrounds, spells, feats, equipment } =
       getSrdSeedData()
 
-    await upsertByName("classes", classes)
+    await upsertByName("classes", enrichSrdClassList(classes))
     const classData = await listRows("classes")
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
 
@@ -41,6 +43,11 @@ export async function POST() {
       await deleteWhere("subclasses", [{ op: "eq", column: "source", value: source }])
     }
     await insertRows("subclasses", subclassesWithIds)
+
+    for (const source of [...LEGACY_SRD_SOURCES, "SRD"]) {
+      await deleteWhere("class_resources", [{ op: "eq", column: "source", value: source }])
+    }
+    await insertRows("class_resources", buildSrdClassResourceRows(classIdMap))
 
     await upsertByName("species", species)
     await upsertByName("backgrounds", backgrounds)

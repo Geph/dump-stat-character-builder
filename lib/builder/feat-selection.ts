@@ -35,19 +35,30 @@ export function isFeatEligibleForSlot(
   milestoneLevel: number,
   context: FeatSlotContext,
 ): boolean {
+  return isFeatEligibleForCategories(
+    feat,
+    milestoneLevel === 19 ? ["Epic Boon"] : ["General"],
+    milestoneLevel,
+    context,
+  )
+}
+
+export function isFeatEligibleForCategories(
+  feat: Feat,
+  categories: string[],
+  milestoneLevel: number,
+  context: FeatSlotContext,
+): boolean {
+  const normalizedCategories = new Set(categories.map(normalizeFeatCategory))
   const category = normalizeFeatCategory(feat.category)
+  if (!normalizedCategories.has(category)) return false
+
   const taken = new Set(
     context.selectedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
   if (category === "Origin") return false
   if (!feat.repeatable && taken.has(feat.id)) return false
-
-  if (milestoneLevel === 19) {
-    if (category !== "Epic Boon") return false
-  } else {
-    if (category !== "General") return false
-  }
 
   const minLevel = feat.level_requirement ?? (category === "Epic Boon" ? 19 : 4)
   if (minLevel > context.totalLevel || minLevel > milestoneLevel) return false

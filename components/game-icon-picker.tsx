@@ -36,12 +36,12 @@ export function GameIconPicker({
   const [categories, setCategories] = useState<IconCategoryMeta[]>([])
   const [activeCategory, setActiveCategory] = useState<string>("weapon")
   const [categoryIcons, setCategoryIcons] = useState<string[]>([])
-  const [searchIcons, setSearchIcons] = useState<string[] | null>(null)
+  const [searchResults, setSearchResults] = useState<string[] | null>(null)
   const [loadingList, setLoadingList] = useState(false)
   const [totalIcons, setTotalIcons] = useState(0)
 
   const isSearchMode = search.trim().length > 0
-  const displayIcons = isSearchMode ? (searchIcons ?? []) : categoryIcons
+  const displayIcons = isSearchMode ? (searchResults ?? []) : categoryIcons
 
   useEffect(() => {
     if (!isOpen) return
@@ -74,15 +74,15 @@ export function GameIconPicker({
 
   useEffect(() => {
     if (!isOpen || !isSearchMode) {
-      setSearchIcons(null)
+      setSearchResults(null)
       return
     }
 
     const timer = setTimeout(() => {
       setLoadingList(true)
       searchIcons(search.trim())
-        .then((icons) => setSearchIcons(icons))
-        .catch(() => setSearchIcons([]))
+        .then((icons) => setSearchResults(icons))
+        .catch(() => setSearchResults([]))
         .finally(() => setLoadingList(false))
     }, 250)
 
@@ -92,7 +92,7 @@ export function GameIconPicker({
   const closePicker = useCallback(() => {
     setIsOpen(false)
     setSearch("")
-    setSearchIcons(null)
+    setSearchResults(null)
   }, [])
 
   const buttonClass = inline

@@ -3,8 +3,16 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
+import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
+import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import {
+  filterEnabled,
+  filterEnabledIds,
+  pickEnabledId,
+} from "@/lib/compendium/compendium-enabled"
 import { useRouter } from "next/navigation"
 import { 
   ChevronLeft, 
@@ -95,11 +103,9 @@ import {
   getSpellLimits,
   mergeSpellPicks,
 } from "@/lib/builder/spell-limits"
+import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import {
-  FEAT_MILESTONES,
-  isFeatEligibleForSlot,
-  isFeatValidSelection,
-  requiredFeatSlotCount,
+  isFeatEligibleForCategories,
 } from "@/lib/builder/feat-selection"
 import {
   aggregateAsiBonuses,
@@ -113,7 +119,14 @@ import {
   trimAsiAllocation,
   withCombinedMilestoneAsiAllocation,
 } from "@/lib/builder/asi-allocation"
-import { MAX_PORTRAIT_FILE_BYTES, normalizePortraitUrl, normalizeBannerUrl } from "@/lib/portrait"
+import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
+import {
+  MAX_PORTRAIT_FILE_BYTES,
+  MAX_PORTRAIT_FILE_MB,
+  formatImageUploadHint,
+  normalizePortraitUrl,
+  normalizeBannerUrl,
+} from "@/lib/portrait"
 import type {
   DndClass,
   Species,
@@ -139,6 +152,33 @@ const STEPS = [
 const ABILITY_NAMES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
 
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const
+
+/** Class picker: 4 columns, up to 4 rows per page before pagination */
+const CLASS_GRID_ROWS = 4
+const CLASS_GRID_COLS = 4
+const CLASS_GRID_PAGE_SIZE = CLASS_GRID_ROWS * CLASS_GRID_COLS
+
+const ABILITY_GAME_ICONS: Record<(typeof ABILITY_NAMES)[number], string> = {
+  strength: "muscle-up",
+  dexterity: "dodge",
+  constitution: "heart-plus",
+  intelligence: "brain",
+  wisdom: "third-eye",
+  charisma: "charm",
+}
+
+const PREVIEW_STAT_ICONS = {
+  speed: "running-shoe",
+  initiative: "lightning-arc",
+  proficiency: "medal",
+  passivePerception: "all-seeing-eye",
+} as const
+
+const PREVIEW_SECTION_ICONS = {
+  skills: "skills",
+  saves: "shield-reflect",
+  proficiencies: "bookshelf",
+} as const
 
 type AbilityMethod = "pointbuy" | "standard" | "roll" | "custom"
 
@@ -199,6 +239,7 @@ export default function BuilderPage() {
   
   // Search state for each step
   const [classSearch, setClassSearch] = useState("")
+  const [classGridPage, setClassGridPage] = useState(0)
   const [speciesSearch, setSpeciesSearch] = useState("")
   const [backgroundSearch, setBackgroundSearch] = useState("")
   const [spellSearch, setSpellSearch] = useState("")
@@ -326,6 +367,10 @@ export default function BuilderPage() {
   }, [])
 
   useEffect(() => {
+    setClassGridPage(0)
+  }, [classSearch])
+
+  useEffect(() => {
     if (editIdParam) {
       setDraftReady(true)
       return
@@ -442,20 +487,24 @@ export default function BuilderPage() {
         db.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
       ])
 
-      setClasses(classesRes.data || [])
-      setSubclasses(subclassesRes.data || [])
-      setSpecies(speciesRes.data || [])
-      setBackgrounds(backgroundsRes.data || [])
+      setClasses(filterEnabled(enrichClassesList(classesRes.data || []) as DndClass[]))
+      setSubclasses(filterEnabled(subclassesRes.data || []))
+      setSpecies(filterEnabled(enrichSpeciesList(speciesRes.data || []) as Species[]))
+      setBackgrounds(filterEnabled(backgroundsRes.data || []))
       if (featsRes.error) {
         setFeatsLoadError(featsRes.error.message)
         setFeats([])
       } else {
         setFeatsLoadError(null)
-        setFeats(featsRes.data || [])
+        setFeats(filterEnabled(featsRes.data || []))
       }
-      setSpells(spellsRes.data || [])
-      setEquipment(equipmentRes.data || [])
-      setCustomAbilities(abilitiesRes.data || [])
+      setSpells(filterEnabled(spellsRes.data || []))
+      setEquipment(filterEnabled(equipmentRes.data || []))
+      setCustomAbilities(
+        filterEnabled(abilitiesRes.data || []).filter(
+          (ability) => ability.show_in_builder !== false,
+        ),
+      )
       setLoading(false)
     }
 
@@ -545,7 +594,7 @@ export default function BuilderPage() {
     if (!file) return
 
     if (file.size > MAX_PORTRAIT_FILE_BYTES) {
-      alert("Image must be less than 10MB")
+      alert(`Image must be ${MAX_PORTRAIT_FILE_MB} MB or smaller.`)
       return
     }
 
@@ -561,7 +610,7 @@ export default function BuilderPage() {
     if (!file) return
 
     if (file.size > MAX_PORTRAIT_FILE_BYTES) {
-      alert("Image must be less than 10MB")
+      alert(`Image must be ${MAX_PORTRAIT_FILE_MB} MB or smaller.`)
       return
     }
 
@@ -570,6 +619,15 @@ export default function BuilderPage() {
       setCharacter({ ...character, banner_url: reader.result as string })
     }
     reader.readAsDataURL(file)
+  }
+
+  const applyRandomCharacterDetails = () => {
+    const generated = generateRandomCharacterDetails()
+    setCharacter((prev) => ({
+      ...prev,
+      ...generated,
+      name: prev.name.trim() ? prev.name : generated.name,
+    }))
   }
 
   const selectedClass = classes.find(c => c.id === character.class_id)
@@ -581,8 +639,9 @@ export default function BuilderPage() {
     ? classLevels.reduce((sum, cl) => sum + cl.level, 0)
     : character.level
 
-  const requiredFeatSlots = requiredFeatSlotCount(totalLevel)
-  const selectedFeatIds = (character.feat_ids ?? []).slice(0, requiredFeatSlots)
+  const featPickSlots = getFeatPickSlots(classLevels, classes, totalLevel)
+  const requiredFeatSlots = featPickSlots.length
+  const selectedFeatIds = featPickSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? "")
   const selectedFeatCount = selectedFeatIds.filter(Boolean).length
   const milestoneAsiFeatCount = countMilestoneAsiFeats(selectedFeatIds, feats)
   const milestoneAsiTotalPoints = milestoneAsiPointTotal(milestoneAsiFeatCount)
@@ -592,18 +651,27 @@ export default function BuilderPage() {
     feats,
   )
 
-  // If level drops, trim feat slots
+  // If level drops, clear feat picks that no longer apply.
   useEffect(() => {
-    if ((character.feat_ids ?? []).length > requiredFeatSlots) {
-      setCharacter((prev) => ({ ...prev, feat_ids: (prev.feat_ids ?? []).slice(0, requiredFeatSlots) }))
-    }
-  }, [requiredFeatSlots])
+    const validKeys = new Set(featPickSlots.map((slot) => slot.key))
+    setFeatureChoicePicks((prev) => {
+      const next: Record<string, string[]> = {}
+      let changed = false
+      for (const [key, picks] of Object.entries(prev)) {
+        if (validKeys.has(key) || !key.includes(":")) {
+          next[key] = picks
+        } else {
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [featPickSlots.map((slot) => slot.key).join("|")])
 
-  // Once Origin is chosen, enforce feat prerequisites (including Epic Boon at 19).
+  // Once Origin is chosen, enforce feat prerequisites for class feature feat picks.
   useEffect(() => {
     if (selectedFeatCount === 0) return
     const classIds = classLevels.map((cl) => cl.classId)
-    const milestones = FEAT_MILESTONES.filter((lvl) => lvl <= totalLevel)
     const context = {
       totalLevel,
       classIds,
@@ -612,17 +680,26 @@ export default function BuilderPage() {
       backgroundId: character.background_id,
     }
 
-    const realigned = milestones.map((milestone, index) => {
-      const id = selectedFeatIds[index]
-      if (!id) return ""
-      const feat = feats.find((f) => f.id === id)
-      if (!feat || !isFeatValidSelection(feat, milestone, context)) return ""
-      return id
-    })
+    let changed = false
+    const nextPicks = { ...featureChoicePicks }
+    for (const slot of featPickSlots) {
+      const pickedId = nextPicks[slot.key]?.[0]
+      if (!pickedId) continue
+      const feat = feats.find((f) => f.id === pickedId)
+      if (
+        !feat ||
+        !isFeatEligibleForCategories(feat, slot.featCategories, slot.milestoneLevel, {
+          ...context,
+          currentSlotFeatId: pickedId,
+        })
+      ) {
+        nextPicks[slot.key] = []
+        changed = true
+      }
+    }
 
-    const previous = milestones.map((_, index) => selectedFeatIds[index] ?? "")
-    if (realigned.join("|") !== previous.join("|")) {
-      setCharacter((prev) => ({ ...prev, feat_ids: realigned }))
+    if (changed) {
+      setFeatureChoicePicks(nextPicks)
       alert("One or more selected feats no longer meet prerequisites. Please reselect.")
     }
   }, [
@@ -633,6 +710,8 @@ export default function BuilderPage() {
     feats,
     selectedFeatIds,
     selectedFeatCount,
+    featPickSlots,
+    featureChoicePicks,
   ])
 
   useEffect(() => {
@@ -955,13 +1034,34 @@ export default function BuilderPage() {
       const savedArmorClass = calculateArmorClass(dexMod, savedEquippedArmor, savedEquippedShield)
 
       const bg = backgrounds.find((b) => b.id === character.background_id)
+      const validClassId = pickEnabledId(character.class_id, classes)
+      const validSpeciesId = pickEnabledId(character.species_id, species)
+      const validBackgroundId = pickEnabledId(character.background_id, backgrounds)
+      const staleRefs: string[] = []
+      if (character.class_id && !validClassId) staleRefs.push("class")
+      if (character.species_id && !validSpeciesId) staleRefs.push("species")
+      if (character.background_id && !validBackgroundId) staleRefs.push("background")
+
+      if (staleRefs.length > 0) {
+        alert(
+          `Your draft still points at old compendium IDs (${staleRefs.join(", ")}). ` +
+            "That usually happens after reseeding the database. Re-select your class, species, and background, then save again.",
+        )
+        return
+      }
+
+      const validSubclassId =
+        validClassId && subclassByClassId[validClassId]
+          ? pickEnabledId(subclassByClassId[validClassId], subclasses)
+          : null
+
       const characterData: Record<string, unknown> = {
         name: character.name.trim() || "Unnamed",
         level: calculatedLevel,
-        class_id: character.class_id,
-        subclass_id: character.class_id ? subclassByClassId[character.class_id] ?? null : null,
-        species_id: character.species_id,
-        background_id: character.background_id,
+        class_id: validClassId,
+        subclass_id: validSubclassId,
+        species_id: validSpeciesId,
+        background_id: validBackgroundId,
         strength: character.strength,
         dexterity: character.dexterity,
         constitution: character.constitution,
@@ -986,9 +1086,9 @@ export default function BuilderPage() {
         weapon_proficiencies: character.weapon_proficiencies ?? [],
         armor_proficiencies: character.armor_proficiencies ?? [],
         languages: character.languages ?? ["Common"],
-        equipment_ids: character.equipment_ids ?? [],
-        spell_ids: mergeSpellPicks(spellPicksByClassId),
-        feat_ids: selectedFeatIds.filter(Boolean),
+        equipment_ids: filterEnabledIds(character.equipment_ids, equipment),
+        spell_ids: filterEnabledIds(mergeSpellPicks(spellPicksByClassId), spells),
+        feat_ids: filterEnabledIds(selectedFeatIds.filter(Boolean), feats),
         asi_allocations: asiAllocationsByFeatId,
         hit_point_max: hitPointMax,
         hit_points: currentHp ?? hitPointMax,
@@ -1006,9 +1106,14 @@ export default function BuilderPage() {
         ? await db.from("characters").update(characterData).eq("id", editingCharacterId).select().single()
         : await db.from("characters").insert([characterData]).select().single()
 
-      if (error || !data?.id) {
-        console.error("Error saving character:", error)
-        alert(error?.message ?? "Failed to save character. Please try again.")
+      if (error?.message || !data?.id) {
+        const message =
+          error?.message ??
+          (editingCharacterId
+            ? "Character record not found. If you cleared the database, open the builder fresh and create a new character."
+            : "Save completed without a character id. Refresh the page and try again.")
+        console.error("Error saving character:", message, { error, data })
+        alert(message)
         return
       }
 
@@ -1324,81 +1429,127 @@ export default function BuilderPage() {
                 </div>
                 
                 <p className="text-xs text-muted-foreground mb-2">Click a class to add it, or increase its level if already selected.</p>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto pl-[10px] pt-[10px] pr-[10px] pb-[10px]">
-                  {classes
-                    .filter(cls => cls.name.toLowerCase().includes(classSearch.toLowerCase()))
-                    .map((cls) => {
-                      const existingLevel = classLevels.find(cl => cl.classId === cls.id)
-                      const isSelected = !!existingLevel || character.class_id === cls.id
-                      return (
-                        <motion.div
-                          key={cls.id}
-                          role="button"
-                          tabIndex={0}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return
-                            e.preventDefault()
-                            ;(e.currentTarget as HTMLDivElement).click()
-                          }}
-                          onClick={() => {
-                            if (existingLevel) {
-                              // Increase level of existing class
-                              if (totalLevel < 20) {
-                                setClassLevels(classLevels.map(cl => 
-                                  cl.classId === cls.id ? { ...cl, level: cl.level + 1 } : cl
-                                ))
-                              }
-                            } else {
-                              // Add new class at level 1
-                              if (classLevels.length === 0) {
-                                setCharacter({ ...character, class_id: cls.id })
-                              }
-                              if (totalLevel < 20) {
-                                setClassLevels([...classLevels, { classId: cls.id, level: 1 }])
-                                if (!character.class_id) {
-                                  setCharacter({ ...character, class_id: cls.id })
+
+                {(() => {
+                  const filteredClasses = classes.filter((cls) =>
+                    cls.name.toLowerCase().includes(classSearch.toLowerCase()),
+                  )
+                  const classGridPageCount = Math.max(
+                    1,
+                    Math.ceil(filteredClasses.length / CLASS_GRID_PAGE_SIZE),
+                  )
+                  const safeClassGridPage = Math.min(classGridPage, classGridPageCount - 1)
+                  const visibleClasses = filteredClasses.slice(
+                    safeClassGridPage * CLASS_GRID_PAGE_SIZE,
+                    safeClassGridPage * CLASS_GRID_PAGE_SIZE + CLASS_GRID_PAGE_SIZE,
+                  )
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-4 auto-rows-min items-start content-start gap-2 px-[10px] pt-[10px] pb-[10px]">
+                        {visibleClasses.map((cls) => {
+                          const existingLevel = classLevels.find((cl) => cl.classId === cls.id)
+                          const isSelected = !!existingLevel || character.class_id === cls.id
+                          return (
+                            <motion.div
+                              key={cls.id}
+                              role="button"
+                              tabIndex={0}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onKeyDown={(e) => {
+                                if (e.key !== "Enter" && e.key !== " ") return
+                                e.preventDefault()
+                                ;(e.currentTarget as HTMLDivElement).click()
+                              }}
+                              onClick={() => {
+                                if (existingLevel) {
+                                  if (totalLevel < 20) {
+                                    setClassLevels(
+                                      classLevels.map((cl) =>
+                                        cl.classId === cls.id ? { ...cl, level: cl.level + 1 } : cl,
+                                      ),
+                                    )
+                                  }
+                                } else {
+                                  if (classLevels.length === 0) {
+                                    setCharacter({ ...character, class_id: cls.id })
+                                  }
+                                  if (totalLevel < 20) {
+                                    setClassLevels([...classLevels, { classId: cls.id, level: 1 }])
+                                    if (!character.class_id) {
+                                      setCharacter({ ...character, class_id: cls.id })
+                                    }
+                                  }
                                 }
-                              }
+                              }}
+                              className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                                totalLevel >= 20 && !existingLevel
+                                  ? "opacity-50 pointer-events-none"
+                                  : ""
+                              } ${
+                                isSelected
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border bg-card hover:border-primary/50"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <h3 className="font-bold text-sm text-foreground truncate">{cls.name}</h3>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {existingLevel && (
+                                    <span className="text-xs px-1.5 py-0.5 bg-primary text-primary-foreground rounded">
+                                      Lv{existingLevel.level}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setDetailsModal({ type: "class", item: cls })
+                                    }}
+                                    className="p-1 text-muted-foreground hover:text-primary"
+                                  >
+                                    <Info className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {cls.source || "Custom"}
+                              </p>
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+                      {classGridPageCount > 1 && (
+                        <div className="flex items-center justify-center gap-3 mt-2">
+                          <button
+                            type="button"
+                            aria-label="Previous classes"
+                            disabled={safeClassGridPage === 0}
+                            onClick={() => setClassGridPage((p) => Math.max(0, p - 1))}
+                            className="p-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {safeClassGridPage + 1} / {classGridPageCount}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Next classes"
+                            disabled={safeClassGridPage >= classGridPageCount - 1}
+                            onClick={() =>
+                              setClassGridPage((p) => Math.min(classGridPageCount - 1, p + 1))
                             }
-                          }}
-                          className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                            totalLevel >= 20 && !existingLevel ? "opacity-50 pointer-events-none" : ""
-                          } ${
-                            isSelected
-                              ? "border-primary bg-primary/10"
-                              : "border-border bg-card hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-bold text-sm text-foreground">{cls.name}</h3>
-                            <div className="flex items-center gap-1">
-                              {existingLevel && (
-                                <span className="text-xs px-1.5 py-0.5 bg-primary text-primary-foreground rounded">
-                                  Lv{existingLevel.level}
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setDetailsModal({ type: "class", item: cls })
-                                }}
-                                className="p-1 text-muted-foreground hover:text-primary"
-                              >
-                                <Info className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {cls.source || "Custom"}
-                          </p>
-                        </motion.div>
-                      )
-                    })}
-                </div>
+                            className="p-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
 
                 {classLevels.length > 0 && (
                   <div className="mt-6 space-y-2 border-t border-border pt-6">
@@ -1412,7 +1563,11 @@ export default function BuilderPage() {
                       const classSubclasses = getSubclassesForClass(subclasses, entry.classId)
                       const eligibleFeatures = (cls.features ?? []).filter(
                         (feature) =>
-                          feature.level <= entry.level && feature.isChoice && feature.choices,
+                          feature.level <= entry.level &&
+                          feature.isChoice &&
+                          feature.choices &&
+                          feature.choices.kind !== "feats" &&
+                          (feature.choices.options?.length ?? 0) > 0,
                       )
 
                       return (
@@ -1503,14 +1658,14 @@ export default function BuilderPage() {
                   </div>
                 )}
 
-                {/* Level-based Feats (SRD: 4/8/12/16 general, 19 epic boon) */}
+                {/* Feats granted by class features */}
                 {classLevels.length > 0 && requiredFeatSlots > 0 && (
                   <div className="mt-6 p-4 bg-muted/40 rounded-xl border border-border">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
                         <h3 className="text-lg font-bold text-foreground">Feats</h3>
                         <p className="text-xs text-muted-foreground">
-                          At levels 4, 8, 12, and 16 choose a General feat; at level 19 choose an Epic Boon.
+                          Choose feats from your class features (ASI, Epic Boon, fighting styles, etc.).
                           Ability-score bonuses apply on later steps.
                         </p>
                       </div>
@@ -1527,13 +1682,13 @@ export default function BuilderPage() {
                     )}
                     {!featsLoadError && feats.length === 0 && (
                       <p className="text-xs text-muted-foreground mb-3">
-                        No feats in your compendium yet. Seed SRD content from Settings or add General
-                        feats in the Compendium.
+                        No feats in your compendium yet. Seed SRD content from Settings or add feats
+                        in the Compendium.
                       </p>
                     )}
 
-                    {FEAT_MILESTONES.filter((lvl) => lvl <= totalLevel).map((lvl, slotIndex) => {
-                      const pickedId = selectedFeatIds[slotIndex] ?? null
+                    {featPickSlots.map((slot) => {
+                      const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
                       const picked = feats.find((f) => f.id === pickedId) ?? null
                       const featContext = {
                         totalLevel,
@@ -1544,13 +1699,21 @@ export default function BuilderPage() {
                         currentSlotFeatId: pickedId,
                       }
                       const eligible = feats
-                        .filter((feat) => isFeatEligibleForSlot(feat, lvl, featContext))
+                        .filter((feat) =>
+                          isFeatEligibleForCategories(
+                            feat,
+                            slot.featCategories,
+                            slot.milestoneLevel,
+                            featContext,
+                          ),
+                        )
                         .sort((a, b) => a.name.localeCompare(b.name))
 
                       return (
-                        <div key={lvl} className="mt-3">
+                        <div key={slot.key} className="mt-3">
                           <p className="text-xs font-bold text-primary uppercase mb-2">
-                            {lvl === 19 ? "Epic Boon (Level 19)" : `General Feat (Level ${lvl})`}
+                            {slot.className ? `${slot.className}: ` : ""}
+                            {slot.label}
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {eligible.map((feat) => {
@@ -1560,17 +1723,9 @@ export default function BuilderPage() {
                                   key={feat.id}
                                   type="button"
                                   onClick={() => {
-                                    const next = [...selectedFeatIds]
-                                    while (next.length <= slotIndex) next.push("")
-                                    const previousId = next[slotIndex]
-                                    if (isSelected) {
-                                      next[slotIndex] = ""
-                                    } else {
-                                      next[slotIndex] = feat.id
-                                    }
-                                    setCharacter((prev) => ({
+                                    setFeatureChoicePicks((prev) => ({
                                       ...prev,
-                                      feat_ids: next.slice(0, requiredFeatSlots),
+                                      [slot.key]: isSelected ? [] : [feat.id],
                                     }))
                                   }}
                                   className={`p-3 rounded-lg border-2 text-left transition-all ${
@@ -1637,7 +1792,7 @@ export default function BuilderPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[200px] overflow-y-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[200px] overflow-y-auto px-[10px] py-2">
                     {species
                       .filter(sp => sp.name.toLowerCase().includes(speciesSearch.toLowerCase()))
                       .map((sp) => (
@@ -1681,11 +1836,14 @@ export default function BuilderPage() {
                     ))}
                   </div>
 
-                  {selectedSpecies && (selectedSpecies.traits ?? []).some((t) => t.isChoice && t.choices) && (
+                  {selectedSpecies &&
+                    (selectedSpecies.traits ?? []).some(
+                      (t) => t.isChoice && (t.choices?.options?.length ?? 0) > 0,
+                    ) && (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
                       <h3 className="text-lg font-bold text-foreground">Species Options</h3>
                       {(selectedSpecies.traits ?? []).map((trait, index) => {
-                        if (!trait.isChoice || !trait.choices) return null
+                        if (!trait.isChoice || !(trait.choices?.options?.length ?? 0)) return null
                         return (
                           <MultiSelectChoices
                             key={`${selectedSpecies.id}-${index}`}
@@ -1724,7 +1882,7 @@ export default function BuilderPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto px-[10px] py-2">
                     {backgrounds
                       .filter(bg => bg.name.toLowerCase().includes(backgroundSearch.toLowerCase()))
                       .map((bg) => (
@@ -2263,8 +2421,20 @@ export default function BuilderPage() {
             {/* Step 5: Character Details */}
             {currentStep === 5 && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-black text-foreground mb-2">Character Details</h2>
-                <p className="text-muted-foreground mb-6">Give your character a name and personality.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black text-foreground mb-2">Character Details</h2>
+                    <p className="text-muted-foreground">Give your character a name and personality.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applyRandomCharacterDetails}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-border bg-card text-sm font-semibold text-foreground hover:border-primary hover:text-primary transition-colors"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    Randomly generate
+                  </button>
+                </div>
 
                 {/* Portrait & banner uploads */}
                 <div className="flex flex-col lg:flex-row gap-6 mb-6">
@@ -2285,9 +2455,12 @@ export default function BuilderPage() {
                           </button>
                         </div>
                       ) : (
-                        <label className="w-32 h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
+                        <label className="w-32 h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors px-2 text-center">
                           <Upload className="w-8 h-8 text-muted-foreground mb-1" />
-                          <span className="text-xs text-muted-foreground">Portrait</span>
+                          <span className="text-xs font-medium text-foreground">Portrait</span>
+                          <span className="text-[10px] leading-tight text-muted-foreground mt-1">
+                            {formatImageUploadHint("portrait")}
+                          </span>
                           <input
                             type="file"
                             accept="image/*"
@@ -2314,9 +2487,12 @@ export default function BuilderPage() {
                           </button>
                         </div>
                       ) : (
-                        <label className="w-full h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors">
+                        <label className="w-full h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors px-4 text-center">
                           <Upload className="w-8 h-8 text-muted-foreground mb-1" />
-                          <span className="text-xs text-muted-foreground">Landscape banner (optional)</span>
+                          <span className="text-xs font-medium text-foreground">Landscape banner (optional)</span>
+                          <span className="text-[10px] leading-tight text-muted-foreground mt-1">
+                            {formatImageUploadHint("banner")}
+                          </span>
                           <input
                             type="file"
                             accept="image/*"
@@ -2537,6 +2713,10 @@ export default function BuilderPage() {
                       const mod = abilityMods[ability]
                       return (
                         <div key={ability} className="text-center">
+                          <GameIcon
+                            name={ABILITY_GAME_ICONS[ability]}
+                            className="w-4 h-4 mx-auto text-primary mb-0.5"
+                          />
                           <p className="text-[8px] text-muted-foreground uppercase font-bold">{ability.slice(0, 3)}</p>
                           <p className="text-sm font-black text-foreground">{score}</p>
                           <p className="text-[10px] text-primary font-bold">{mod >= 0 ? `+${mod}` : mod}</p>
@@ -2551,7 +2731,10 @@ export default function BuilderPage() {
                     <div className="space-y-2">
                       {/* Skills */}
                       <div className="p-3 bg-muted/30 rounded-lg">
-                        <p className="text-sm text-muted-foreground uppercase mb-1 font-bold">Skills</p>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <GameIcon name={PREVIEW_SECTION_ICONS.skills} className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <p className="text-sm text-muted-foreground uppercase font-bold">Skills</p>
+                        </div>
                         <div className="grid grid-cols-1 gap-0.5 text-xs">
                           {SKILLS_DATA.map((skill) => {
                             const isProficient = effectiveSkillProficiencies.includes(skill.name)
@@ -2614,10 +2797,12 @@ export default function BuilderPage() {
                       {/* Second row: Speed and Initiative */}
                       <div className="grid grid-cols-2 gap-1">
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <GameIcon name={PREVIEW_STAT_ICONS.speed} className="w-3 h-3 mx-auto text-accent mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">Speed</p>
                           <p className="text-base font-black text-accent">{speed} ft</p>
                         </div>
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <GameIcon name={PREVIEW_STAT_ICONS.initiative} className="w-3 h-3 mx-auto text-lime mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">Initiative</p>
                           <p className="text-base font-black text-lime">{initiative >= 0 ? `+${initiative}` : initiative}</p>
                         </div>
@@ -2626,18 +2811,26 @@ export default function BuilderPage() {
                       {/* Third row: Proficiency and Passive Perception */}
                       <div className="grid grid-cols-2 gap-1">
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+                          <GameIcon name={PREVIEW_STAT_ICONS.proficiency} className="w-3 h-3 mx-auto text-lime mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">Proficiency</p>
                           <p className="text-base font-black text-lime">+{proficiencyBonus}</p>
                         </div>
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
-                          <p className="text-[7px] text-muted-foreground uppercase">Passive</p>
+                          <GameIcon
+                            name={PREVIEW_STAT_ICONS.passivePerception}
+                            className="w-3 h-3 mx-auto text-foreground mb-0.5"
+                          />
+                          <p className="text-[7px] text-muted-foreground uppercase">Pass. Perc.</p>
                           <p className="text-base font-black text-foreground">{passivePerception}</p>
                         </div>
                       </div>
 
                       {/* Saving Throws */}
                       <div className="p-2 bg-muted/30 rounded-lg">
-                        <p className="text-sm text-muted-foreground uppercase mb-1 font-bold">Saves</p>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <GameIcon name={PREVIEW_SECTION_ICONS.saves} className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <p className="text-sm text-muted-foreground uppercase font-bold">Saves</p>
+                        </div>
                         <div className="grid grid-cols-2 gap-x-2 text-[9px]">
                           {ABILITY_NAMES.map((ability) => {
                             const isProficient = savingThrowProficiencies.includes(ability.charAt(0).toUpperCase() + ability.slice(1))
@@ -2659,7 +2852,13 @@ export default function BuilderPage() {
                     effectiveToolProficiencies.length > 0 ||
                     (character.languages?.length ?? 0) > 0) && (
                     <div className="p-2 bg-muted/30 rounded-lg space-y-1.5">
-                      <p className="text-sm text-muted-foreground uppercase font-bold">Proficiencies</p>
+                      <div className="flex items-center gap-1.5">
+                        <GameIcon
+                          name={PREVIEW_SECTION_ICONS.proficiencies}
+                          className="w-4 h-4 text-muted-foreground shrink-0"
+                        />
+                        <p className="text-sm text-muted-foreground uppercase font-bold">Proficiencies</p>
+                      </div>
                       {effectiveWeaponProficiencies.length > 0 && (
                         <p className="text-[10px] text-foreground">
                           <span className="text-muted-foreground">Weapons: </span>

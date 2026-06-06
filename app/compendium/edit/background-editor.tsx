@@ -13,6 +13,7 @@ import {
   formatGrantedSpellLevelKey,
 } from "@/lib/compendium/background-utils"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -335,11 +336,9 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
 
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">Description</label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={5}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none min-h-[140px]"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="You spent years learning the lore of the multiverse..."
             />
           </div>
@@ -415,11 +414,9 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             </div>
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Feature Description</label>
-              <textarea
+              <RichTextEditor
                 value={form.feature_description}
-                onChange={(e) => setForm({ ...form, feature_description: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+                onChange={(feature_description) => setForm({ ...form, feature_description })}
                 placeholder="Describe what this feature grants..."
               />
             </div>

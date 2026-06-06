@@ -15,6 +15,13 @@ const id = () => char("id", { length: 36 }).primaryKey().notNull()
 const timestamps = {
   created_at: timestamp("created_at").defaultNow().notNull(),
 }
+const compendiumMeta = {
+  icon: varchar("icon", { length: 255 }),
+  source: varchar("source", { length: 64 }).notNull().default("Custom"),
+  creator_url: varchar("creator_url", { length: 512 }),
+  enabled: boolean("enabled").notNull().default(true),
+  ...timestamps,
+}
 
 export const classes = mysqlTable("classes", {
   id: id(),
@@ -30,11 +37,9 @@ export const classes = mysqlTable("classes", {
   starting_equipment_groups: json("starting_equipment_groups"),
   starting_gold: int("starting_gold").default(0),
   features: json("features").$type<unknown[]>().default([]),
+  class_resources: json("class_resources").$type<unknown[]>().default([]),
   spellcasting: json("spellcasting"),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const subclasses = mysqlTable("subclasses", {
@@ -44,10 +49,7 @@ export const subclasses = mysqlTable("subclasses", {
   description: text("description"),
   features: json("features").$type<unknown[]>().default([]),
   spellcasting: json("spellcasting"),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const species = mysqlTable("species", {
@@ -59,10 +61,7 @@ export const species = mysqlTable("species", {
   creature_type: varchar("creature_type", { length: 64 }).default("Humanoid"),
   traits: json("traits").$type<unknown[]>().default([]),
   characteristics: json("characteristics").$type<unknown[]>().default([]),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const backgrounds = mysqlTable("backgrounds", {
@@ -80,10 +79,7 @@ export const backgrounds = mysqlTable("backgrounds", {
   feature: json("feature"),
   grants_spells: boolean("grants_spells").notNull().default(false),
   granted_spells: json("granted_spells").$type<Record<string, string[]>>(),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const spells = mysqlTable("spells", {
@@ -101,10 +97,7 @@ export const spells = mysqlTable("spells", {
   description: text("description"),
   higher_levels: text("higher_levels"),
   classes: json("classes").$type<string[]>(),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const feats = mysqlTable("feats", {
@@ -120,10 +113,7 @@ export const feats = mysqlTable("feats", {
   prerequisite_background_ids: json("prerequisite_background_ids").$type<string[]>(),
   benefits: json("benefits"),
   repeatable: boolean("repeatable").notNull().default(false),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
 })
 
 export const equipment = mysqlTable("equipment", {
@@ -135,10 +125,17 @@ export const equipment = mysqlTable("equipment", {
   weight: decimal("weight", { precision: 10, scale: 2 }),
   properties: json("properties"),
   description: text("description"),
-  icon: varchar("icon", { length: 255 }),
-  source: varchar("source", { length: 64 }).notNull().default("Custom"),
-  creator_url: varchar("creator_url", { length: 512 }),
-  ...timestamps,
+  ...compendiumMeta,
+})
+
+export const classResources = mysqlTable("class_resources", {
+  id: id(),
+  class_id: char("class_id", { length: 36 }).notNull(),
+  resource_key: varchar("resource_key", { length: 64 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  uses: json("uses").$type<import("@/lib/types").UsesConfig>().notNull(),
+  ...compendiumMeta,
 })
 
 export const customAbilities = mysqlTable("custom_abilities", {
@@ -154,6 +151,7 @@ export const customAbilities = mysqlTable("custom_abilities", {
   icon: varchar("icon", { length: 255 }),
   source: varchar("source", { length: 64 }).notNull().default("Custom"),
   creator_url: varchar("creator_url", { length: 512 }),
+  enabled: boolean("enabled").notNull().default(true),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 })
@@ -211,6 +209,7 @@ export const tableMap = {
   spells,
   feats,
   equipment,
+  class_resources: classResources,
   custom_abilities: customAbilities,
   characters,
 } as const
