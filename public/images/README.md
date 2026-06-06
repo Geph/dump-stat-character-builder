@@ -9,9 +9,12 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 | `hero/rotating-01.jpeg` … `rotating-05.jpeg` | Home page hero — random background on each visit |
 | `hero/rotating-06.jpeg` | Optional sixth hero (add file + entry in `lib/site-images.ts`) |
 | `backgrounds/library-stats.jpeg` | Home page “library stats” section background |
-| `features/character-creation.svg` | Home feature card — Easy Character Creation (links to `/builder`) |
-| `features/compendium.svg` | Home feature card — Build Your Compendium (links to `/compendium`) |
-| `features/import-content.svg` | Home feature card — Import External Content (links to `/import`) |
+| `features/character-creation.png` | Home feature card — Easy Character Creation (links to `/builder`) |
+| `features/compendium.png` | Home feature card — Build Your Compendium (links to `/compendium`) |
+| `features/import-content.png` | Home feature card — Import External Content (links to `/import`) |
+| `features/character-sheet.png` | Home feature card — Interactive Character Sheet (links to `/characters`) |
+| `features/appearance.png` | Home feature card — Customized Appearance (links to `/characters`) |
+| `features/export-database.png` | Home feature card — Export and Database (links to `/import`) |
 | `readme/hero.png` | GitHub README preview screenshot |
 
 ## Adding or changing images

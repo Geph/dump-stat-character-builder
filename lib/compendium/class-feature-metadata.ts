@@ -29,6 +29,8 @@ export type EffectInputField =
   | "bonusAmount"
   | "advantageFlags"
   | "classResourceKey"
+  | "classResourceChange"
+  | "healAmount"
 
 export type ActionEffectOption = {
   value: string
@@ -51,7 +53,7 @@ export const ACTION_EFFECT_GROUPS: { id: ActionEffectGroup; label: string }[] = 
 
 export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
   { value: "heal_from_pool", label: "Heal HP from a pool", group: "healing_temp_hp", hint: "Lay on Hands" },
-  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind" },
+  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind", fields: ["healAmount"] },
   { value: "grant_temp_hp", label: "Grant temporary HP", group: "healing_temp_hp" },
   {
     value: "extra_damage_on_hit",
@@ -108,8 +110,8 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     value: "class_resource",
     label: "Class resource",
     group: "resource_casting",
-    hint: "Spends or modifies a class resource pool",
-    fields: ["classResourceKey"],
+    hint: "Reduce, restore, or reset a class resource pool",
+    fields: ["classResourceKey", "classResourceChange"],
   },
   { value: "self_buff_caster", label: "Self-buff caster state", group: "resource_casting" },
 ]

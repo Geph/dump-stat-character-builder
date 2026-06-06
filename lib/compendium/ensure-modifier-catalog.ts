@@ -4,21 +4,9 @@ import {
   mergeDefaultCatalogEntries,
   normalizeModifierCatalog,
 } from "@/lib/compendium/modifier-catalog"
+import { createClient } from "@/lib/db/client"
 
-type CatalogDb = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>
-        single: () => Promise<{ data: Record<string, unknown> | null }>
-      }
-    }
-    insert: (rows: Record<string, unknown>[]) => Promise<unknown>
-    update: (patch: Record<string, unknown>) => {
-      eq: (column: string, value: string) => Promise<unknown>
-    }
-  }
-}
+type CatalogDb = ReturnType<typeof createClient>
 
 export async function ensureModifierCatalog(db: CatalogDb): Promise<void> {
   const { data: existing } = await db
@@ -27,22 +15,23 @@ export async function ensureModifierCatalog(db: CatalogDb): Promise<void> {
     .eq("id", COMMON_MODIFIERS_CATALOG_ID)
     .maybeSingle()
 
-  if (!existing) {
+  const existingRow = existing as Record<string, unknown> | null
+
+  if (!existingRow) {
     await db.from("custom_abilities").insert([buildCommonModifiersCatalogRow()])
     return
   }
 
-  const catalog = normalizeModifierCatalog(existing.modifier_catalog)
+  const catalog = normalizeModifierCatalog(existingRow.modifier_catalog)
   const merged = mergeDefaultCatalogEntries(catalog)
 
-  if (merged.length !== catalog.length || !existing.is_system) {
+  if (merged.length !== catalog.length || !existingRow.is_system) {
     await db
       .from("custom_abilities")
       .update({
         is_system: true,
         show_in_builder: false,
         modifier_catalog: merged,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", COMMON_MODIFIERS_CATALOG_ID)
   }
@@ -56,5 +45,6 @@ export async function loadModifierCatalog(db: CatalogDb) {
     .eq("id", COMMON_MODIFIERS_CATALOG_ID)
     .single()
 
-  return normalizeModifierCatalog(data?.modifier_catalog)
+  const row = data as Record<string, unknown> | null
+  return normalizeModifierCatalog(row?.modifier_catalog)
 }

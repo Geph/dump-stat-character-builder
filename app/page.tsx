@@ -11,6 +11,10 @@ import {
   HERO_ROTATING_IMAGES,
   LIBRARY_STATS_BACKGROUND,
 } from "@/lib/site-images"
+import {
+  getCustomHeroBackground,
+  HERO_BG_CHANGE_EVENT,
+} from "@/lib/site-settings/hero-background"
 
 const features = [
   {
@@ -18,21 +22,48 @@ const features = [
     image: FEATURE_CARD_IMAGES.characterCreation,
     imageAlt: "Easy Character Creation",
     title: "Easy Character Creation",
-    description: "Build your hero step-by-step with a simple 6-step wizard following D&D 2024 rules.",
+    description:
+      "Build characters step-by-step with a live sheet preview—species lineages, backgrounds, multiclass levels, spells, and equipment following D&D 2024 rules.",
   },
   {
     href: "/compendium",
     image: FEATURE_CARD_IMAGES.compendium,
     imageAlt: "Build Your Compendium",
     title: "Build Your Compendium",
-    description: "Browse species, classes, backgrounds, spells, feats, and equipment from the D&D 5.5e SRD and beyond.",
+    description:
+      "Browse and edit classes, subclasses, species, spells, feats, equipment, and class resources. Toggle SRD entries on or off and add your own homebrew.",
   },
   {
     href: "/import",
     image: FEATURE_CARD_IMAGES.importContent,
     imageAlt: "Import External Content",
     title: "Import External Content",
-    description: "Upload PDFs or import from web sources to expand your content library.",
+    description:
+      "Paste text, upload PDFs, or drop in Dump Stat JSON—AI extracts structured compendium data from homebrew documents and web sources.",
+  },
+  {
+    href: "/characters",
+    image: FEATURE_CARD_IMAGES.characterSheet,
+    imageAlt: "Interactive Character Sheet",
+    title: "Interactive Character Sheet",
+    description:
+      "Play at the table with clickable d20 rolls, editable HP and temp HP, spell slot tracking, conditions, and weapon attack and damage rollers.",
+  },
+  {
+    href: "/characters",
+    image: FEATURE_CARD_IMAGES.appearance,
+    imageAlt: "Customized Appearance",
+    title: "Customized Appearance",
+    description:
+      "Pick from five color themes in the settings menu and upload a custom home page hero background—your sheet and UI update instantly.",
+  },
+  {
+    href: "/import",
+    image: FEATURE_CARD_IMAGES.exportDatabase,
+    imageAlt: "Export and Database",
+    title: "Export and Database",
+    description:
+      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export everything as JSON, import Dump Stat packs, and manage tables from the compendium.",
   },
 ]
 
@@ -57,12 +88,24 @@ export default function HomePage() {
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
 
-  // Fixed initial image so SSR and hydration match; randomize after mount.
+  // Fixed initial image so SSR and hydration match; randomize after mount unless custom.
   const [heroBg, setHeroBg] = useState(HERO_ROTATING_IMAGES[0])
+  const [customHeroBg, setCustomHeroBg] = useState<string | null>(null)
 
   useEffect(() => {
-    setHeroBg(HERO_ROTATING_IMAGES[Math.floor(Math.random() * HERO_ROTATING_IMAGES.length)])
+    const syncHero = () => {
+      const custom = getCustomHeroBackground()
+      setCustomHeroBg(custom)
+      if (!custom) {
+        setHeroBg(HERO_ROTATING_IMAGES[Math.floor(Math.random() * HERO_ROTATING_IMAGES.length)])
+      }
+    }
+    syncHero()
+    window.addEventListener(HERO_BG_CHANGE_EVENT, syncHero)
+    return () => window.removeEventListener(HERO_BG_CHANGE_EVENT, syncHero)
   }, [])
+
+  const heroBackgroundUrl = customHeroBg ?? heroBg
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -117,7 +160,7 @@ export default function HomePage() {
           id="hero-section"
           className="relative overflow-hidden pt-[170px] pb-20 px-4"
           style={{
-            backgroundImage: `url(${heroBg})`,
+            backgroundImage: `url(${heroBackgroundUrl})`,
             backgroundSize: "cover",
             backgroundPosition: "center top",
             backgroundRepeat: "no-repeat",
@@ -209,7 +252,7 @@ export default function HomePage() {
               <p className="text-muted-foreground">Build the components to bring your characters to life with custom classes and abilities</p>
             </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((feature, index) => (
                 <motion.div
                   key={feature.title}
@@ -227,7 +270,7 @@ export default function HomePage() {
                       <img
                         src={feature.image}
                         alt={feature.imageAlt}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
                       />
                     </div>
                     <div className="flex flex-col items-center p-6">

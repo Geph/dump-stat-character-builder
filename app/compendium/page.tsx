@@ -14,6 +14,7 @@ import {
   COMPENDIUM_TOGGLE_LABELS,
   contentTypeToTable,
   findCompendiumDependents,
+  isProtectedSystemCompendiumRow,
   setCompendiumItemsEnabled,
   type CompendiumToggleTarget,
 } from "@/lib/compendium/compendium-toggle"
@@ -401,11 +402,15 @@ function CompendiumPageContent() {
           return next
         })
       } else {
+        const db = createClient()
         const resolved = tableName(activeTab)
         await clearIndexedDbStore(resolved as Parameters<typeof clearIndexedDbStore>[0])
         if (activeTab === "classes") {
           await clearIndexedDbStore("subclasses")
           await clearIndexedDbStore("class_resources")
+        }
+        if (activeTab === "abilities") {
+          await ensureModifierCatalog(db)
         }
         setContent((prev) => {
           const next = { ...prev, [activeTab]: [] }
@@ -491,6 +496,10 @@ function CompendiumPageContent() {
   }
 
   const handleItemEnabledChange = async (item: Record<string, unknown>, nextEnabled: boolean) => {
+    if (!nextEnabled && isProtectedSystemCompendiumRow(item)) {
+      return
+    }
+
     const target: CompendiumToggleTarget = {
       table: contentTypeToTable(activeTab),
       contentType: activeTab,
@@ -519,12 +528,13 @@ function CompendiumPageContent() {
     const editPath = compendiumEditHref(activeTab, data.id as string)
     const iconName = getCompendiumItemIcon(activeTab, data)
     const enabled = isCompendiumItemEnabled(data)
+    const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(data as { id?: string; is_system?: boolean })
 
     return (
       <motion.div
         key={data.id as string}
         layoutId={data.id as string}
-        className={`bg-card rounded-2xl p-5 border-2 transition-colors ${
+        className={`relative bg-card rounded-2xl p-5 pb-11 border-2 transition-colors ${
           enabled ? "border-border hover:border-primary" : "border-border/60 opacity-60 hover:opacity-80"
         }`}
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
@@ -557,26 +567,13 @@ function CompendiumPageContent() {
               )}
             </h3>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div
-              className="flex items-center gap-2"
-              onClick={(e) => e.stopPropagation()}
-              title={enabled ? "Enabled in builder" : "Disabled in builder"}
-            >
-              <Switch
-                checked={enabled}
-                onCheckedChange={(checked) => void handleItemEnabledChange(data, checked)}
-                aria-label={`${enabled ? "Disable" : "Enable"} ${data.name as string}`}
-              />
-            </div>
-            <Link
-              href={editPath}
-              className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-              title="Edit"
-            >
-              <Edit className="w-4 h-4" />
-            </Link>
-          </div>
+          <Link
+            href={editPath}
+            className="flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/10 transition-colors"
+            title="Edit"
+          >
+            <Edit className="w-4 h-4" />
+          </Link>
         </div>
         {activeTab === "classes" && (
           <div className="space-y-1 text-xs text-muted-foreground">
@@ -704,20 +701,16 @@ function CompendiumPageContent() {
         )}
         {activeTab === "abilities" && (
           <div className="space-y-2">
-            {isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
-              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full inline-flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                System catalog
-              </span>
-            )}
             {(data as { prerequisites?: string }).prerequisites && (
               <p className="text-xs text-orange">
                 Prereq: {(data as { prerequisites: string }).prerequisites}
               </p>
             )}
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {(data as { description?: string }).description}
-            </p>
+            {!isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {(data as { description?: string }).description}
+              </p>
+            )}
             {(data as { attached_to_type?: string; attached_to_id?: string }).attached_to_type && (
               <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
                 {(data as { attached_to_type: string; attached_to_id?: string }).attached_to_type === "equipment" &&
@@ -728,6 +721,24 @@ function CompendiumPageContent() {
             )}
           </div>
         )}
+        <div
+          className="absolute bottom-4 right-4 flex items-center"
+          onClick={(e) => e.stopPropagation()}
+          title={
+            isSystemCatalog
+              ? "System catalog is always enabled"
+              : enabled
+                ? "Enabled in builder"
+                : "Disabled in builder"
+          }
+        >
+          <Switch
+            checked={enabled}
+            disabled={isSystemCatalog}
+            onCheckedChange={(checked) => void handleItemEnabledChange(data, checked)}
+            aria-label={`${enabled ? "Disable" : "Enable"} ${data.name as string}`}
+          />
+        </div>
       </motion.div>
     )
   }
@@ -809,6 +820,9 @@ function CompendiumPageContent() {
                 )}
                 {activeTab === "classes" && tabCounts.class_resources > 0 && (
                   <> All {tabCounts.class_resources} class resources will be cleared as well.</>
+                )}
+                {activeTab === "abilities" && (
+                  <> The system <strong className="text-foreground">Common Modifier Effects</strong> catalog will be recreated automatically with default entries.</>
                 )}{" "}
                 Other sections will not be affected.
               </p>
@@ -1193,9 +1207,11 @@ function CompendiumPageContent() {
               <h2 className="text-2xl font-black text-foreground mb-4">
                 {(selectedItem as { name: string }).name}
               </h2>
-              <RichTextContent
-                html={(selectedItem as { description?: string }).description}
-              />
+              {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
+                <RichTextContent
+                  html={(selectedItem as { description?: string }).description}
+                />
+              )}
               {(selectedItem as { creator_url?: string | null }).creator_url && (
                 <p className="mt-4 text-sm">
                   <span className="text-muted-foreground">Source link: </span>

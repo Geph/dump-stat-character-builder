@@ -8,8 +8,9 @@ export interface FeatureChoice {
   options: { name: string; description: string; modifierRefs?: string[] }[]
   count: number // how many to choose
   /** When "feats", builder offers compendium feats instead of static options. */
+  /** @deprecated Feat picks use grant_feat modifiers from the common modifiers catalog. */
   kind?: "options" | "feats"
-  /** Feat categories to filter (General, Epic Boon, etc.) when kind is "feats". */
+  /** @deprecated Use grant_feat catalog entries instead. */
   featCategories?: string[]
 }
 
@@ -30,6 +31,19 @@ export interface FeatureEffect {
   grantAdvantage?: boolean
   grantDisadvantage?: boolean
   classResourceKey?: string | null
+  /** How a class_resource effect modifies the pool. */
+  classResourceChange?: "reduce" | "increase" | "reset" | null
+  /** Uses reduced or restored; ignored when classResourceChange is reset. */
+  classResourceAmount?: number | null
+  /** heal_self / similar: how HP restored is calculated */
+  healMode?: "fixed" | "dice" | "character_level" | "proficiency" | "ability_modifier" | null
+  healFixed?: number | null
+  healDiceCount?: number | null
+  healDieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
+  healFlatBonus?: number | null
+  /** HP = character level × multiplier when healMode is character_level */
+  healLevelMultiplier?: number | null
+  healAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
 }
 
 export interface FeatureActivation {
@@ -177,6 +191,14 @@ export interface UsesAtLevel {
   count: number
 }
 
+export type RestType = "short_rest" | "long_rest"
+
+export interface RechargeRule {
+  rest: RestType
+  /** Uses restored on this rest; omit for full pool. */
+  amount?: number | null
+}
+
 export interface UsesConfig {
   type:
     | "fixed"
@@ -192,7 +214,11 @@ export interface UsesConfig {
   /** When type is class_resource — resource_key from class_resources table */
   classResourceKey?: string
   atLevelTable?: UsesAtLevel[]
-  recharge?: "short_rest" | "long_rest" | null
+  /** How at_level rows are interpreted (default tier). */
+  atLevelMode?: "tier" | "multiply_level"
+  /** @deprecated — use recharges */
+  recharge?: RestType | null
+  recharges?: RechargeRule[]
   dieCount?: number
   dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
 }
@@ -204,6 +230,7 @@ export interface CustomAbility {
   prerequisites: string | null
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   modifier_catalog?: import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[] | null
+  modifierRefs?: string[] | null
   is_system?: boolean
   attached_to_type: string | null
   attached_to_id: string | null

@@ -1,46 +1,48 @@
 "use client"
 
-import { Info } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useMemo } from "react"
+import { MainNav } from "@/components/main-nav"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
-import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { ModifierCatalogAdminEditor } from "@/components/compendium/modifier-catalog-admin-editor"
+import {
+  CatalogEditorFloatingNav,
+} from "@/components/compendium/catalog-editor-floating-nav"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
   COMMON_MODIFIERS_CATALOG_NAME,
   MODIFIER_CATALOG_INFO,
+  CATALOG_EDITOR_SECTION_CLASS,
+  catalogEditorNavSections,
+  catalogEditorSectionId,
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
-import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
 type CommonModifiersCatalogEditorProps = {
-  description: string
   catalog: ModifierCatalogEntry[]
   spellOptions: { id: string; name: string }[]
   otherAbilities: { id: string; name: string }[]
   saving: boolean
   error: string | null
-  onDescriptionChange: (description: string) => void
   onCatalogChange: (catalog: ModifierCatalogEntry[]) => void
   onSubmit: (e: React.FormEvent) => void
 }
 
 export function CommonModifiersCatalogEditor({
-  description,
   catalog,
   spellOptions,
   otherAbilities,
   saving,
   error,
-  onDescriptionChange,
   onCatalogChange,
   onSubmit,
 }: CommonModifiersCatalogEditorProps) {
+  const navSections = useMemo(() => catalogEditorNavSections(catalog), [catalog])
+
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
@@ -51,7 +53,8 @@ export function CommonModifiersCatalogEditor({
         saving={saving}
         saveLabel="Save Catalog"
       />
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <CatalogEditorFloatingNav sections={navSections} />
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-24 xl:pb-8">
         <CompendiumEditorHeaderRow
           nameLabel="Catalog name"
           name={COMMON_MODIFIERS_CATALOG_NAME}
@@ -65,23 +68,6 @@ export function CommonModifiersCatalogEditor({
           onIconChange={() => {}}
         />
 
-        <div className="mb-6 flex gap-3 rounded-xl border-2 border-primary/30 bg-primary/5 p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <Info className="h-5 w-5" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-sm">
-              {MODIFIER_CATALOG_INFO}
-            </TooltipContent>
-          </Tooltip>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Shared modifier catalog</p>
-            <p className="text-sm text-muted-foreground mt-1">{MODIFIER_CATALOG_INFO}</p>
-          </div>
-        </div>
-
         {error && (
           <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive">
             {error}
@@ -89,14 +75,15 @@ export function CommonModifiersCatalogEditor({
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={onSubmit} className="space-y-6">
-          <div>
+          <section
+            id={catalogEditorSectionId("Overview")}
+            className={CATALOG_EDITOR_SECTION_CLASS}
+          >
             <label className="block text-sm font-semibold text-foreground mb-2">Overview</label>
-            <RichTextEditor
-              value={description}
-              onChange={onDescriptionChange}
-              placeholder="Catalog overview shown in compendium…"
-            />
-          </div>
+            <p className="rounded-xl border-2 border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground leading-relaxed">
+              {MODIFIER_CATALOG_INFO}
+            </p>
+          </section>
 
           <ModifierCatalogAdminEditor
             value={catalog}
@@ -118,15 +105,11 @@ export function parseCatalogFromRow(data: Record<string, unknown>): ModifierCata
   return normalizeModifierCatalog(data.modifier_catalog)
 }
 
-export function buildCatalogSavePayload(
-  description: string,
-  catalog: ModifierCatalogEntry[],
-): Record<string, unknown> {
+export function buildCatalogSavePayload(catalog: ModifierCatalogEntry[]): Record<string, unknown> {
   return {
-    description,
+    description: `<p>${MODIFIER_CATALOG_INFO}</p>`,
     modifier_catalog: catalog,
     creator_url: null,
-    updated_at: new Date().toISOString(),
   }
 }
 

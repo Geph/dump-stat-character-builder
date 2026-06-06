@@ -5,10 +5,12 @@ import {
 import {
   CHARACTERISTIC_MODIFIER_TYPE_OPTIONS,
   createCharacteristicModifier,
+  normalizeCharacteristics,
   type CharacteristicModifier,
   type CharacteristicModifierType,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatureActivation } from "@/lib/types"
+import { buildGrantFeatCatalogEntries } from "@/lib/compendium/grant-feat-catalog"
 
 /** Fixed id for the system-owned common modifiers custom ability. */
 export const COMMON_MODIFIERS_CATALOG_ID = "00000000-0000-4000-8000-000000000001"
@@ -29,6 +31,7 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Spells & casting",
   "Active abilities",
   "Resources & uses",
+  "Feats & choices",
 ] as const
 
 export type ModifierCatalogGroup = (typeof MODIFIER_CATALOG_GROUPS)[number]
@@ -66,6 +69,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   spells_known: "Spells & casting",
   spellcasting_ability: "Spells & casting",
   uses: "Resources & uses",
+  grant_feat: "Feats & choices",
 }
 
 const ACTION_EFFECT_GROUP: Record<string, ModifierCatalogGroup> = {
@@ -94,9 +98,12 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
     const mod = createCharacteristicModifier(option.value)
     entries.push({
       id: catalogId("char", option.value),
-      name: option.label,
+      name: option.value === "grant_feat" ? "Gain a Feat (custom categories)" : option.label,
       group: CHARACTERISTIC_GROUP[option.value],
-      summary: `Passive: ${option.label}`,
+      summary:
+        option.value === "grant_feat"
+          ? "Passive: choose a feat — edit categories in this entry"
+          : `Passive: ${option.label}`,
       characteristics: [mod],
     })
   }
@@ -115,6 +122,8 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
     })
   }
 
+  entries.push(...buildGrantFeatCatalogEntries())
+
   return entries
 }
 
@@ -126,7 +135,7 @@ export function normalizeModifierCatalog(raw: unknown): ModifierCatalogEntry[] {
     })
     .map((entry) => ({
       ...entry,
-      characteristics: Array.isArray(entry.characteristics) ? entry.characteristics : [],
+      characteristics: normalizeCharacteristics(entry.characteristics, null),
       activation: entry.activation ?? null,
     }))
 }
@@ -142,6 +151,42 @@ export function mergeDefaultCatalogEntries(existing: ModifierCatalogEntry[]): Mo
     if (groupCmp !== 0) return groupCmp
     return a.name.localeCompare(b.name)
   })
+}
+
+export function catalogEditorSectionId(section: string): string {
+  if (section === "Overview") return "catalog-overview"
+  return `catalog-${section.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`
+}
+
+/** Scroll margin so sticky headers do not cover section titles. */
+export const CATALOG_EDITOR_SECTION_CLASS = "scroll-mt-32"
+
+export function groupModifierCatalogEntries(catalog: ModifierCatalogEntry[]): {
+  group: string
+  entries: ModifierCatalogEntry[]
+}[] {
+  const grouped = MODIFIER_CATALOG_GROUPS.map((group) => ({
+    group,
+    entries: catalog.filter((entry) => entry.group === group),
+  })).filter((section) => section.entries.length > 0)
+
+  const otherEntries = catalog.filter(
+    (entry) => !MODIFIER_CATALOG_GROUPS.includes(entry.group as ModifierCatalogGroup),
+  )
+
+  if (otherEntries.length > 0) {
+    grouped.push({ group: "Other", entries: otherEntries })
+  }
+
+  return grouped
+}
+
+export function catalogEditorNavSections(catalog: ModifierCatalogEntry[]): { id: string; label: string }[] {
+  const sections = [{ id: catalogEditorSectionId("Overview"), label: "Overview" }]
+  for (const { group } of groupModifierCatalogEntries(catalog)) {
+    sections.push({ id: catalogEditorSectionId(group), label: group })
+  }
+  return sections
 }
 
 export function catalogEntryById(
@@ -191,7 +236,6 @@ export function isCommonModifiersCatalogAbility(row: { id?: string; is_system?: 
 }
 
 export function buildCommonModifiersCatalogRow(): Record<string, unknown> {
-  const now = new Date().toISOString()
   return {
     id: COMMON_MODIFIERS_CATALOG_ID,
     name: COMMON_MODIFIERS_CATALOG_NAME,
@@ -208,7 +252,5 @@ export function buildCommonModifiersCatalogRow(): Record<string, unknown> {
     source: "System",
     creator_url: null,
     enabled: true,
-    created_at: now,
-    updated_at: now,
   }
 }

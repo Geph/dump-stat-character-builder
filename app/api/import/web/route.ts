@@ -6,6 +6,12 @@ import * as cheerio from "cheerio"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { IMPORT_CONTENT_TYPE_HINTS } from "@/lib/import/content-type-hints"
 import {
+  extractFollowingBlocks,
+  extractMainContentHtml,
+  extractPlainSummary,
+  getMainContentRoot,
+} from "@/lib/import/extract-html-content"
+import {
   parseBackgroundAbilityFromImportText,
   parseBackgroundFeatureFromText,
   parseBackgroundGrantedSpellNames,
@@ -31,22 +37,19 @@ function parseSpecies(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim() || $("h1").first().text().trim()
   
-  // Extract description from main content
-  const mainContent = $("#page-content, .page-content, article").first()
-  const description = mainContent.find("p").first().text().trim()
+  const mainContent = getMainContentRoot($)
+  const description = extractMainContentHtml($)
+  const fullText = mainContent.text()
   
   // Extract traits
   const traits: { name: string; description: string }[] = []
   mainContent.find("h3, h4, strong").each((_, el) => {
     const traitName = $(el).text().trim()
-    const traitDesc = $(el).next("p").text().trim()
+    const traitDesc = extractFollowingBlocks($, el) || $(el).next("p").text().trim()
     if (traitName && traitDesc && !traitName.includes("Ability") && !traitName.includes("Size")) {
       traits.push({ name: traitName, description: traitDesc })
     }
   })
-
-  // Try to extract size and speed
-  const fullText = mainContent.text()
   const sizeMatch = fullText.match(/Size[:\s]*(Small|Medium|Large)/i)
   const speedMatch = fullText.match(/Speed[:\s]*(\d+)/i)
 
@@ -70,8 +73,8 @@ function parseClass(html: string, url: string) {
   if (!name) name = $("h1").first().text().trim()
   name = name.replace(/^Class:\s*/i, "")
   
-  const mainContent = $("#page-content, .page-content, article").first()
-  const description = mainContent.find("p").first().text().trim()
+  const mainContent = getMainContentRoot($)
+  const description = extractMainContentHtml($)
   const fullText = mainContent.text()
   
   // Try to extract hit die
@@ -81,7 +84,7 @@ function parseClass(html: string, url: string) {
   const features: { level: number; name: string; description: string }[] = []
   mainContent.find("h3, h4, h2").each((_, el) => {
     const featureName = $(el).text().trim()
-    const featureDesc = $(el).nextAll("p").first().text().trim()
+    const featureDesc = extractFollowingBlocks($, el)
     // Try to extract level from feature name
     const levelMatch = featureName.match(/(\d+)(?:st|nd|rd|th)?[- ]*level/i)
     if (featureName && featureDesc && !featureName.match(/^(Table|Level|Features)/i)) {
@@ -172,8 +175,8 @@ function parseBackground(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Background:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = $("#page-content, .page-content, article").first()
-  const description = mainContent.find("p").first().text().trim()
+  const mainContent = getMainContentRoot($)
+  const description = extractMainContentHtml($) || null
   const fullText = mainContent.text()
   
   const skillsMatch = fullText.match(/Skill\s*Proficiencies?[:\s]*([^.]+)/i)
@@ -209,7 +212,7 @@ function parseSpell(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Spell:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = $("#page-content, .page-content, article").first()
+  const mainContent = getMainContentRoot($)
   const fullText = mainContent.text()
   
   // Extract spell level
@@ -226,8 +229,11 @@ function parseSpell(html: string, url: string) {
   const durationMatch = fullText.match(/Duration[:\s]*([^\n]+)/i)
   const componentsMatch = fullText.match(/Components?[:\s]*([VSM,\s]+)/i)
   
-  // Get description (usually after the stat block)
-  const description = mainContent.find("p").slice(1).first().text().trim() || mainContent.find("p").first().text().trim()
+  const firstPara = mainContent.find("p").first().get(0)
+  const description =
+    (firstPara ? extractFollowingBlocks($, firstPara) : "") ||
+    extractMainContentHtml($) ||
+    extractPlainSummary(extractMainContentHtml($))
   
   // Extract classes
   const classesMatch = fullText.match(/Classes?[:\s]*([^\n]+)/i)
@@ -255,17 +261,10 @@ function parseFeat(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Feat:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = $("#page-content, .page-content, article").first()
+  const mainContent = getMainContentRoot($)
   const fullText = mainContent.text()
   
-  const description = formatFeatDescription(
-    mainContent
-      .find("p")
-      .map((_, el) => $(el).text().trim())
-      .get()
-      .filter(Boolean)
-      .join("\n\n"),
-  )
+  const description = formatFeatDescription(extractMainContentHtml($))
   
   // Extract prerequisite
   const prereqMatch = fullText.match(/Prerequisite[s]?[:\s]*([^\n.]+)/i)

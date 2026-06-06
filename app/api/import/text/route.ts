@@ -1,6 +1,11 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
+import {
+  applyClassSpellListsToImport,
+  CLASS_SPELL_LIST_IMPORT_HINT,
+} from "@/lib/import/class-spell-lists"
 import {
   CHOICE_EXTRACTION_HINT,
   ClassFeatureSchema,
@@ -46,7 +51,8 @@ const ContentSchema = z.object({
       spells_known: z.number().optional(),
       prepared: z.boolean().optional()
     }).nullable(),
-    features: z.array(ClassFeatureSchema)
+    features: z.array(ClassFeatureSchema),
+    spell_list: z.array(z.string()).nullable().optional(),
   })).optional(),
   subclasses: z.array(z.object({
     name: z.string(),
@@ -147,9 +153,13 @@ Extract ONLY the content types you find in the text. Return empty arrays for typ
 Be thorough and extract all instances of each content type found.
 For class features, include the level they are gained at.
 For subclasses, include the parent class name in class_name field.
-For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names.
+For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names only.
 
-${CHOICE_EXTRACTION_HINT}`
+${RICH_TEXT_TABLE_HINT}
+
+${CHOICE_EXTRACTION_HINT}
+
+${CLASS_SPELL_LIST_IMPORT_HINT}`
 
     systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentType)
 
@@ -170,7 +180,7 @@ ${CHOICE_EXTRACTION_HINT}`
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
-    const content = result.output
+    const content = applyClassSpellListsToImport(result.output)
     let totalImported = 0
     const breakdown: Record<string, number> = {}
 

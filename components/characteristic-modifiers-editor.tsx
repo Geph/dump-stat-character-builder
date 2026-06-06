@@ -21,7 +21,10 @@ import {
   type CharacteristicModifierType,
   type RollModifierEntry,
   type SkillEntry,
+  type WeaponProficienciesCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
+import { SRD_WEAPON_NAMES } from "@/lib/compendium/weapon-proficiency-options"
 
 type CharacteristicModifiersEditorProps = {
   value: CharacteristicModifier[]
@@ -116,6 +119,81 @@ function TagInput({
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function WeaponProficienciesEditor({
+  mod,
+  onChange,
+}: {
+  mod: WeaponProficienciesCharacteristic
+  onChange: (next: WeaponProficienciesCharacteristic) => void
+}) {
+  const usedWeapons = new Set(mod.values)
+
+  const addWeapon = (name: string) => {
+    if (!name || usedWeapons.has(name)) return
+    onChange({ ...mod, values: [...mod.values, name] })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-4">
+        <label className="inline-flex items-center gap-1.5 text-sm cursor-pointer">
+          <input
+            type="radio"
+            name={`weapon-prof-mode-${mod.id}`}
+            checked={mod.mode === "martial_weapons"}
+            onChange={() => onChange({ ...mod, mode: "martial_weapons", values: [] })}
+          />
+          All martial weapons
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-sm cursor-pointer">
+          <input
+            type="radio"
+            name={`weapon-prof-mode-${mod.id}`}
+            checked={mod.mode === "specific"}
+            onChange={() => onChange({ ...mod, mode: "specific" })}
+          />
+          Specific weapons
+        </label>
+      </div>
+      {mod.mode === "specific" && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {mod.values.map((weapon) => (
+              <span
+                key={weapon}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-lg text-sm"
+              >
+                {weapon}
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({ ...mod, values: mod.values.filter((entry) => entry !== weapon) })
+                  }
+                  className="hover:text-destructive"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <select
+            value=""
+            onChange={(e) => addWeapon(e.target.value)}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">Add weapon...</option>
+            {SRD_WEAPON_NAMES.filter((weapon) => !usedWeapons.has(weapon)).map((weapon) => (
+              <option key={weapon} value={weapon}>
+                {weapon}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   )
 }
@@ -321,13 +399,20 @@ function ModifierFields({
 
     case "languages":
     case "armor_proficiencies":
-    case "weapon_proficiencies":
     case "tool_proficiencies":
       return (
         <TagInput
           values={mod.values}
           onChange={(values) => onChange({ ...mod, values })}
           placeholder={`Add ${mod.type.replace(/_/g, " ")}...`}
+        />
+      )
+
+    case "weapon_proficiencies":
+      return (
+        <WeaponProficienciesEditor
+          mod={mod}
+          onChange={(next) => onChange(next)}
         />
       )
 
@@ -832,6 +917,56 @@ function ModifierFields({
           onChange={(uses) => onChange({ ...mod, uses })}
           otherAbilities={otherAbilities}
         />
+      )
+
+    case "grant_feat":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Feat categories</label>
+            <div className="flex flex-wrap gap-2">
+              {FEAT_PICK_CATEGORIES.map((category) => {
+                const selected = mod.featCategories?.includes(category) ?? false
+                return (
+                  <label
+                    key={category}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-card text-xs cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(e) => {
+                        const current = mod.featCategories ?? []
+                        const next = e.target.checked
+                          ? [...current, category]
+                          : current.filter((entry) => entry !== category)
+                        onChange({
+                          ...mod,
+                          featCategories: next.length ? next : ["General"],
+                        })
+                      }}
+                      className="accent-primary"
+                    />
+                    {category}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Number of feats</label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={mod.count ?? 1}
+              onChange={(e) =>
+                onChange({ ...mod, count: Math.max(1, parseInt(e.target.value, 10) || 1) })
+              }
+              className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
       )
   }
 }

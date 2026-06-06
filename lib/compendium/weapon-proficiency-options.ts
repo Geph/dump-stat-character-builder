@@ -1,0 +1,46 @@
+/** Matches class-level proficiency strings and `isWeaponProficient` checks. */
+export const MARTIAL_WEAPONS_LABEL = "Martial weapons" as const
+
+export type WeaponProficiencyMode = "martial_weapons" | "specific"
+
+/** All SRD weapon names for specific-weapon picker suggestions. */
+export const SRD_WEAPON_NAMES = [
+  "Battleaxe",
+  "Blowgun",
+  "Club",
+  "Dagger",
+  "Dart",
+  "Flail",
+  "Glaive",
+  "Greataxe",
+  "Greatclub",
+  "Greatsword",
+  "Halberd",
+  "Hand Crossbow",
+  "Handaxe",
+  "Heavy Crossbow",
+  "Javelin",
+  "Lance",
+  "Light Crossbow",
+  "Light Hammer",
+  "Longbow",
+  "Longsword",
+  "Mace",
+  "Maul",
+  "Morningstar",
+  "Musket",
+  "Pike",
+  "Pistol",
+  "Quarterstaff",
+  "Rapier",
+  "Scimitar",
+  "Shortbow",
+  "Shortsword",
+  "Sickle",
+  "Sling",
+  "Spear",
+  "Trident",
+  "War Pick",
+  "Warhammer",
+  "Whip",
+] as const

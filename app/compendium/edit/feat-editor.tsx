@@ -24,6 +24,7 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 
@@ -126,7 +127,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
             prerequisite_species_ids: data.prerequisite_species_ids || [],
             prerequisite_background_ids: data.prerequisite_background_ids || [],
             characteristics: normalizeCharacteristics(data.benefits, null),
-            modifier_refs: Array.isArray(data.modifier_refs) ? data.modifier_refs : [],
+            modifier_refs: readModifierRefs(data as Record<string, unknown>),
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,

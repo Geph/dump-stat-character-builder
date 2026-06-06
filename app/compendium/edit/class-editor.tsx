@@ -255,36 +255,11 @@ export default function ClassEditorPage({ id }: { id: string }) {
       isChoice: checked,
       choices: checked
         ? (newFeatures[index].choices || {
-            kind: "options",
             category: "Feature Option",
             options: [{ name: "", description: "" }],
             count: 1,
           })
         : undefined,
-    }
-    setForm({ ...form, features: newFeatures })
-  }
-
-  const setFeatureChoiceKind = (index: number, kind: "options" | "feats") => {
-    const newFeatures = [...form.features]
-    const existing = newFeatures[index].choices || {
-      category: "",
-      options: [],
-      count: 1,
-    }
-    newFeatures[index] = {
-      ...newFeatures[index],
-      choices: {
-        ...existing,
-        kind,
-        options: kind === "feats" ? [] : existing.options?.length ? existing.options : [{ name: "", description: "" }],
-        featCategories:
-          kind === "feats"
-            ? existing.featCategories?.length
-              ? existing.featCategories
-              : ["General"]
-            : existing.featCategories,
-      },
     }
     setForm({ ...form, features: newFeatures })
   }
@@ -738,7 +713,6 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     onUpdate={updateFeature}
                     onToggleChoice={toggleFeatureChoice}
                     onUpdateChoiceField={updateFeatureChoiceField}
-                    onSetChoiceKind={setFeatureChoiceKind}
                     onAddChoiceOption={addChoiceOption}
                     onUpdateChoiceOption={updateChoiceOption}
                     onRemoveChoiceOption={removeChoiceOption}

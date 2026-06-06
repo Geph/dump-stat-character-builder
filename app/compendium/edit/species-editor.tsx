@@ -20,7 +20,7 @@ import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
-import type { Trait } from "@/lib/types"
+import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 
 interface TraitChoice {
   category: string
@@ -106,7 +106,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             creature_type: data.creature_type || "Humanoid",
             traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             characteristics: normalizeCharacteristics(data.characteristics, null),
-            modifier_refs: Array.isArray(data.modifier_refs) ? data.modifier_refs : [],
+            modifier_refs: readModifierRefs(data as Record<string, unknown>),
             icon: data.icon || null,
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
