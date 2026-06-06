@@ -20,6 +20,7 @@ import { compendiumListHref } from "@/lib/compendium/content-types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -90,6 +91,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
   const router = useRouter()
+  const { catalog: modifierCatalog } = useModifierCatalog()
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -304,7 +306,12 @@ export default function ClassEditorPage({ id }: { id: string }) {
     setForm({ ...form, features: newFeatures })
   }
 
-  const updateChoiceOption = (featIndex: number, optIndex: number, field: "name" | "description", value: string) => {
+  const updateChoiceOption = (
+    featIndex: number,
+    optIndex: number,
+    field: "name" | "description" | "modifierRefs",
+    value: string | string[],
+  ) => {
     const newFeatures = [...form.features]
     const existing = newFeatures[featIndex].choices!
     const newOptions = existing.options.map((o, i) => i === optIndex ? { ...o, [field]: value } : o)
@@ -727,6 +734,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     feature={feature}
                     index={index}
                     classResources={classResources}
+                    modifierCatalog={modifierCatalog}
                     onUpdate={updateFeature}
                     onToggleChoice={toggleFeatureChoice}
                     onUpdateChoiceField={updateFeatureChoiceField}

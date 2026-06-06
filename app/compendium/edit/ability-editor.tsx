@@ -17,6 +17,15 @@ import {
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import {
+  CommonModifiersCatalogEditor,
+  buildCatalogSavePayload,
+  isCommonModifiersCatalogEditor,
+  parseCatalogFromRow,
+  COMMON_MODIFIERS_CATALOG_ID,
+} from "@/app/compendium/edit/common-modifiers-catalog-editor"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { attachTypeToTable } from "@/lib/db/attach-target-table"
 import {
   EQUIPMENT_ATTACH_CATEGORIES,
@@ -62,6 +71,9 @@ const ATTACH_OPTIONS = [
 
 export default function AbilityEditorPage({ id }: { id: string }) {
   const [form, setForm] = useState<AbilityFormData>(defaultAbility)
+  const [catalog, setCatalog] = useState<ModifierCatalogEntry[]>([])
+  const [catalogDescription, setCatalogDescription] = useState("")
+  const isCatalogEditor = isCommonModifiersCatalogEditor(id)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,6 +87,9 @@ export default function AbilityEditorPage({ id }: { id: string }) {
       const fetchAbility = async () => {
         setLoading(true)
         const db = createClient()
+        if (isCommonModifiersCatalogEditor(id)) {
+          await ensureModifierCatalog(db)
+        }
         const { data, error } = await db
           .from("custom_abilities")
           .select("*")
@@ -84,24 +99,29 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Custom Ability not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            prerequisites: data.prerequisites || "",
-            characteristics: normalizeCharacteristics(data.characteristics, data.uses),
-            attached_to_type: data.attached_to_type || "",
-            attached_to_id: data.attached_to_id || "",
-            show_in_builder: data.show_in_builder ?? false,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-          })
+          if (isCommonModifiersCatalogEditor(id)) {
+            setCatalogDescription(data.description || "")
+            setCatalog(parseCatalogFromRow(data as Record<string, unknown>))
+          } else {
+            setForm({
+              name: data.name || "",
+              description: data.description || "",
+              prerequisites: data.prerequisites || "",
+              characteristics: normalizeCharacteristics(data.characteristics, data.uses),
+              attached_to_type: data.attached_to_type || "",
+              attached_to_id: data.attached_to_id || "",
+              show_in_builder: data.show_in_builder ?? false,
+              source: data.source || "Custom",
+              creator_url: data.creator_url || "",
+              icon: data.icon || null,
+            })
+          }
         }
         setLoading(false)
       }
       fetchAbility()
     }
-  }, [id])
+  }, [id, isCatalogEditor])
 
   // Fetch attach targets when type changes (equipment uses categories, not item IDs)
   useEffect(() => {
@@ -160,6 +180,26 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     setError(null)
 
     const db = createClient()
+
+    if (isCatalogEditor) {
+      const payload = buildCatalogSavePayload(
+        catalogDescription,
+        catalog,
+      )
+      const { error } = await db
+        .from("custom_abilities")
+        .update(payload)
+        .eq("id", COMMON_MODIFIERS_CATALOG_ID)
+      if (error) {
+        setError(error.message)
+        setSaving(false)
+        return
+      }
+      setSaving(false)
+      router.push("/compendium?tab=abilities")
+      return
+    }
+
     const payload = {
       ...form,
       attached_to_id: form.attached_to_id || null,
@@ -199,6 +239,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
   }
 
   const handleDelete = async () => {
+    if (isCatalogEditor) return
     if (!confirm("Are you sure you want to delete this custom ability?")) return
     
     const db = createClient()
@@ -221,6 +262,22 @@ export default function AbilityEditorPage({ id }: { id: string }) {
           </div>
         </main>
       </div>
+    )
+  }
+
+  if (isCatalogEditor) {
+    return (
+      <CommonModifiersCatalogEditor
+        description={catalogDescription}
+        catalog={catalog}
+        spellOptions={allSpells}
+        otherAbilities={otherAbilities}
+        saving={saving}
+        error={error}
+        onDescriptionChange={setCatalogDescription}
+        onCatalogChange={setCatalog}
+        onSubmit={handleSubmit}
+      />
     )
   }
 

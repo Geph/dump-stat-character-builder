@@ -24,6 +24,8 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -38,6 +40,7 @@ interface FeatFormData {
   prerequisite_species_ids: string[]
   prerequisite_background_ids: string[]
   characteristics: CharacteristicModifier[]
+  modifier_refs: string[]
   source: string
   creator_url: string
   icon: string | null
@@ -54,6 +57,7 @@ const defaultFeat: FeatFormData = {
   prerequisite_species_ids: [],
   prerequisite_background_ids: [],
   characteristics: [],
+  modifier_refs: [],
   source: "Custom",
   creator_url: "",
   icon: null,
@@ -61,6 +65,7 @@ const defaultFeat: FeatFormData = {
 }
 
 export default function FeatEditorPage({ id }: { id: string }) {
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const [form, setForm] = useState<FeatFormData>(defaultFeat)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -121,6 +126,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
             prerequisite_species_ids: data.prerequisite_species_ids || [],
             prerequisite_background_ids: data.prerequisite_background_ids || [],
             characteristics: normalizeCharacteristics(data.benefits, null),
+            modifier_refs: Array.isArray(data.modifier_refs) ? data.modifier_refs : [],
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
@@ -448,11 +454,26 @@ export default function FeatEditorPage({ id }: { id: string }) {
             />
           </div>
 
-          <CharacteristicModifiersEditor
-            value={form.characteristics}
-            onChange={(characteristics) => setForm({ ...form, characteristics })}
-            spellOptions={allSpells}
+          <ModifierCatalogPicker
+            value={form.modifier_refs}
+            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+            catalog={modifierCatalog}
+            label="Modifier effects (from shared catalog)"
           />
+
+          <details className="rounded-xl border border-border p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              Legacy inline modifiers (optional)
+            </summary>
+            <p className="text-xs text-muted-foreground mt-2 mb-3">
+              Prefer the shared catalog above. Inline modifiers remain supported for older content.
+            </p>
+            <CharacteristicModifiersEditor
+              value={form.characteristics}
+              onChange={(characteristics) => setForm({ ...form, characteristics })}
+              spellOptions={allSpells}
+            />
+          </details>
 
         </form>
       </main>

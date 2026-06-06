@@ -18,6 +18,10 @@ A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 ### Compendium
 - **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
 - **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities
+- **Common Modifier Effects** — A permanent, editable system catalog under Custom Abilities that merges class-feature activation templates with characteristic modifiers; class/subclass features, feats, species traits, and choice options pick from this searchable list instead of defining effects inline
+- **Rich text descriptions** — Compendium description fields support bold, italic, lists, and clear formatting
+- **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses
+- **Enable / disable content** — Toggle compendium entries off for the builder, with prompts to disable dependents (subclasses, attached abilities, etc.)
 - **Unified editor header** — Icon picker (inline with name field), name, source, and source link on one row across all compendium editors
 - **Background proficiencies editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, and languages
 - **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level

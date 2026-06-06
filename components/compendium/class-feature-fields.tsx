@@ -1,15 +1,17 @@
 "use client"
 
 import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { ClassResource, Feature, FeatureChoice, UsesConfig } from "@/lib/types"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
-import { FeatureEffectList } from "@/components/compendium/feature-effect-list"
+import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 
 type ClassFeatureFieldsProps = {
   feature: Feature
   index: number
   classResources: ClassResource[]
+  modifierCatalog: ModifierCatalogEntry[]
   onUpdate: (index: number, patch: Partial<Feature>) => void
   onToggleChoice: (index: number, checked: boolean) => void
   onUpdateChoiceField: (index: number, field: keyof FeatureChoice, value: unknown) => void
@@ -18,8 +20,8 @@ type ClassFeatureFieldsProps = {
   onUpdateChoiceOption: (
     index: number,
     optionIndex: number,
-    field: "name" | "description",
-    value: string,
+    field: "name" | "description" | "modifierRefs",
+    value: string | string[],
   ) => void
   onRemoveChoiceOption: (index: number, optionIndex: number) => void
   onToggleLimitedUses: (index: number, checked: boolean) => void
@@ -29,7 +31,7 @@ type ClassFeatureFieldsProps = {
 export function ClassFeatureFields({
   feature,
   index,
-  classResources,
+  modifierCatalog,
   onUpdate,
   onToggleChoice,
   onUpdateChoiceField,
@@ -42,7 +44,6 @@ export function ClassFeatureFields({
 }: ClassFeatureFieldsProps) {
   const choiceKind = feature.choices?.kind ?? "options"
   const activation = feature.activation ?? {}
-  const hasActivation = !!(activation.action || activation.bonusAction || activation.reaction)
 
   return (
     <>
@@ -52,8 +53,20 @@ export function ClassFeatureFields({
         placeholder="Feature description..."
       />
 
+      <ModifierCatalogPicker
+        value={feature.modifierRefs ?? []}
+        onChange={(modifierRefs) => onUpdate(index, { modifierRefs })}
+        catalog={modifierCatalog}
+        label="Modifier effects"
+        emptyMessage="No common modifiers linked — add effects from the shared catalog."
+      />
+
       <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Activation</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Activation timing</p>
+        <p className="text-xs text-muted-foreground">
+          When this feature is used in play, which action economy does it consume? Detailed effects come from linked
+          modifiers above.
+        </p>
         <div className="flex flex-wrap gap-4 text-sm">
           {(
             [
@@ -80,14 +93,6 @@ export function ClassFeatureFields({
             </label>
           ))}
         </div>
-
-        {hasActivation && (
-          <FeatureEffectList
-            activation={activation}
-            classResources={classResources}
-            onChange={(next) => onUpdate(index, { activation: next })}
-          />
-        )}
       </div>
 
       <div className="pt-2 border-t border-border space-y-3">
@@ -170,7 +175,7 @@ export function ClassFeatureFields({
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">Options</span>
                   <button
@@ -182,7 +187,7 @@ export function ClassFeatureFields({
                   </button>
                 </div>
                 {feature.choices.options.map((opt, oi) => (
-                  <div key={oi} className="space-y-2">
+                  <div key={oi} className="space-y-2 rounded-lg border border-border p-3 bg-card/50">
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -204,6 +209,13 @@ export function ClassFeatureFields({
                       onChange={(description) => onUpdateChoiceOption(index, oi, "description", description)}
                       placeholder="Description (optional)"
                       minHeightClass="min-h-[4rem]"
+                    />
+                    <ModifierCatalogPicker
+                      value={opt.modifierRefs ?? []}
+                      onChange={(modifierRefs) => onUpdateChoiceOption(index, oi, "modifierRefs", modifierRefs)}
+                      catalog={modifierCatalog}
+                      label="Option modifiers"
+                      emptyMessage="No modifiers for this choice option."
                     />
                   </div>
                 ))}

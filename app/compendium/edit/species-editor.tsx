@@ -18,6 +18,9 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import type { Trait } from "@/lib/types"
 
 interface TraitChoice {
   category: string
@@ -41,6 +44,7 @@ interface SpeciesFormData {
   creature_type: string
   traits: Trait[]
   characteristics: CharacteristicModifier[]
+  modifier_refs: string[]
   icon: string | null
   source: string
   creator_url: string
@@ -56,12 +60,14 @@ const defaultSpecies: SpeciesFormData = {
   creature_type: "Humanoid",
   traits: [{ name: "", description: "", level: 1 }],
   characteristics: [],
+  modifier_refs: [],
   icon: null,
   source: "Custom",
   creator_url: "",
 }
 
 export default function SpeciesEditorPage({ id }: { id: string }) {
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const [form, setForm] = useState<SpeciesFormData>(defaultSpecies)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -100,6 +106,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             creature_type: data.creature_type || "Humanoid",
             traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             characteristics: normalizeCharacteristics(data.characteristics, null),
+            modifier_refs: Array.isArray(data.modifier_refs) ? data.modifier_refs : [],
             icon: data.icon || null,
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
@@ -225,7 +232,12 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
     })
   }
 
-  const updateTraitOption = (traitIndex: number, optionIndex: number, field: "name" | "description", value: string) => {
+  const updateTraitOption = (
+    traitIndex: number,
+    optionIndex: number,
+    field: "name" | "description" | "modifierRefs",
+    value: string | string[],
+  ) => {
     const trait = form.traits[traitIndex]
     if (!trait.choices) return
     updateTrait(traitIndex, {
@@ -407,12 +419,20 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                   </div>
 
                   {!trait.isChoice ? (
-                    <RichTextEditor
-                      value={trait.description}
-                      onChange={(description) => updateTrait(index, { description })}
-                      placeholder="Trait description..."
-                      minHeightClass="min-h-[3rem]"
-                    />
+                    <>
+                      <RichTextEditor
+                        value={trait.description}
+                        onChange={(description) => updateTrait(index, { description })}
+                        placeholder="Trait description..."
+                        minHeightClass="min-h-[3rem]"
+                      />
+                      <ModifierCatalogPicker
+                        value={trait.modifierRefs ?? []}
+                        onChange={(modifierRefs) => updateTrait(index, { modifierRefs })}
+                        catalog={modifierCatalog}
+                        label="Trait modifiers"
+                      />
+                    </>
                   ) : (
                     <div className="space-y-3 pt-2 border-t border-border mt-2">
                       <div className="flex items-center gap-4">
@@ -454,6 +474,14 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                               placeholder="Option description..."
                               minHeightClass="min-h-[3rem]"
                             />
+                            <ModifierCatalogPicker
+                              value={option.modifierRefs ?? []}
+                              onChange={(modifierRefs) =>
+                                updateTraitOption(index, optIndex, "modifierRefs", modifierRefs)
+                              }
+                              catalog={modifierCatalog}
+                              label="Option modifiers"
+                            />
                           </div>
                           <button
                             type="button"
@@ -471,11 +499,23 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             </div>
           </div>
 
-          <CharacteristicModifiersEditor
-            value={form.characteristics}
-            onChange={(characteristics) => setForm({ ...form, characteristics })}
-            spellOptions={allSpells}
+          <ModifierCatalogPicker
+            value={form.modifier_refs}
+            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+            catalog={modifierCatalog}
+            label="Species-wide modifier effects"
           />
+
+          <details className="rounded-xl border border-border p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              Legacy inline species modifiers (optional)
+            </summary>
+            <CharacteristicModifiersEditor
+              value={form.characteristics}
+              onChange={(characteristics) => setForm({ ...form, characteristics })}
+              spellOptions={allSpells}
+            />
+          </details>
 
           {/* Submit */}
         </form>

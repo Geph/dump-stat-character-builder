@@ -61,6 +61,7 @@ export const species = mysqlTable("species", {
   creature_type: varchar("creature_type", { length: 64 }).default("Humanoid"),
   traits: json("traits").$type<unknown[]>().default([]),
   characteristics: json("characteristics").$type<unknown[]>().default([]),
+  modifier_refs: json("modifier_refs").$type<string[]>().default([]),
   ...compendiumMeta,
 })
 
@@ -112,6 +113,7 @@ export const feats = mysqlTable("feats", {
   prerequisite_species_ids: json("prerequisite_species_ids").$type<string[]>(),
   prerequisite_background_ids: json("prerequisite_background_ids").$type<string[]>(),
   benefits: json("benefits"),
+  modifier_refs: json("modifier_refs").$type<string[]>().default([]),
   repeatable: boolean("repeatable").notNull().default(false),
   ...compendiumMeta,
 })
@@ -148,6 +150,8 @@ export const customAbilities = mysqlTable("custom_abilities", {
   attached_to_id: varchar("attached_to_id", { length: 128 }),
   uses: json("uses"),
   show_in_builder: boolean("show_in_builder").notNull().default(true),
+  is_system: boolean("is_system").notNull().default(false),
+  modifier_catalog: json("modifier_catalog").$type<import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[]>().default([]),
   icon: varchar("icon", { length: 255 }),
   source: varchar("source", { length: 64 }).notNull().default("Custom"),
   creator_url: varchar("creator_url", { length: 512 }),

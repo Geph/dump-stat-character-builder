@@ -5,7 +5,7 @@ import type { BackgroundProficiencies } from "@/lib/compendium/background-profic
 // Feature with choice support
 export interface FeatureChoice {
   category: string // e.g., "Fighting Style", "Skill Proficiency"
-  options: { name: string; description: string }[]
+  options: { name: string; description: string; modifierRefs?: string[] }[]
   count: number // how many to choose
   /** When "feats", builder offers compendium feats instead of static options. */
   kind?: "options" | "feats"
@@ -51,6 +51,8 @@ export interface Feature {
   activation?: FeatureActivation | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
+  /** References into the Common Modifier Effects catalog. */
+  modifierRefs?: string[]
 }
 
 export interface ClassResource {
@@ -82,6 +84,7 @@ export interface Trait {
   level?: number // level at which trait becomes available, defaults to 1
   isChoice?: boolean
   choices?: FeatureChoice
+  modifierRefs?: string[]
 }
 
 export interface Species {
@@ -93,6 +96,8 @@ export interface Species {
   creature_type: string | null
   traits: Trait[]
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
+  /** References into the Common Modifier Effects catalog (merged with characteristics in builder). */
+  modifierRefs?: string[] | null
   icon: string | null
   source: string
   creator_url: string | null
@@ -198,6 +203,8 @@ export interface CustomAbility {
   description: string | null
   prerequisites: string | null
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
+  modifier_catalog?: import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[] | null
+  is_system?: boolean
   attached_to_type: string | null
   attached_to_id: string | null
   /** @deprecated Use a "uses" entry in characteristics instead */
@@ -265,6 +272,8 @@ export interface Feat {
   prerequisite_species_ids: string[] | null
   prerequisite_background_ids: string[] | null
   benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
+  /** References into the Common Modifier Effects catalog (merged with benefits in builder). */
+  modifierRefs?: string[] | null
   /** When true, the feat may be chosen in more than one milestone slot. */
   repeatable?: boolean
   icon: string | null

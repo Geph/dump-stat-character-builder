@@ -1,5 +1,7 @@
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { createClient } from "@/lib/db/client"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES } from "@/lib/srd/source"
 import {
@@ -99,12 +101,16 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   await upsertByName("feats", feats)
   await upsertByName("equipment", equipment)
 
+  await ensureModifierCatalog(createClient())
+
   const { total, breakdown } = getSrdSeedTotals()
   writeStoredSrdVersion(manifest.version)
   return { total, breakdown, srdVersion: manifest.version }
 }
 
 export async function ensureLocalSrdSeed(): Promise<LocalSeedResult | null> {
+  await ensureModifierCatalog(createClient())
+
   const empty = await isIndexedDbEmpty()
   if (empty) {
     return seedLocalSrd()
