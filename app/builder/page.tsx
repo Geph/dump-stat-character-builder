@@ -104,6 +104,9 @@ import {
   mergeSpellPicks,
 } from "@/lib/builder/spell-limits"
 import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
+import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
   isFeatEligibleForCategories,
 } from "@/lib/builder/feat-selection"
@@ -228,6 +231,7 @@ export default function BuilderPage() {
   const [feats, setFeats] = useState<Feat[]>([])
   const [featsLoadError, setFeatsLoadError] = useState<string | null>(null)
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
+  const [modifierCatalog, setModifierCatalog] = useState<ModifierCatalogEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   // Character draft
@@ -486,6 +490,9 @@ export default function BuilderPage() {
         db.from("equipment").select("*").order("category").order("name"),
         db.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
       ])
+
+      const catalog = await loadModifierCatalog(db)
+      setModifierCatalog(catalog)
 
       setClasses(filterEnabled(enrichClassesList(classesRes.data || []) as DndClass[]))
       setSubclasses(filterEnabled(subclassesRes.data || []))
@@ -792,12 +799,13 @@ export default function BuilderPage() {
   }
 
   const builderCharacteristicMods = [
-    ...normalizeCharacteristics(selectedSpecies?.characteristics, null),
-    ...selectedFeatIds
-      .filter(Boolean)
-      .map((featId) => feats.find((feat) => feat.id === featId))
-      .filter((feat): feat is Feat => Boolean(feat))
-      .flatMap((feat) => normalizeCharacteristics(feat.benefits, null)),
+    ...collectBuilderModifierRefIds({
+      catalog: modifierCatalog,
+      species: selectedSpecies,
+      speciesTraitPicks,
+      feats,
+      selectedFeatIds,
+    }),
     ...customAbilities.flatMap((ability) =>
       normalizeCharacteristics(ability.characteristics, ability.uses),
     ),

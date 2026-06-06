@@ -6,6 +6,8 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
 import type { DndClass, Feature, FeatureChoice } from "@/lib/types"
+import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
@@ -41,6 +43,7 @@ const defaultSubclass: SubclassFormData = {
 }
 
 export default function SubclassEditorPage({ id }: { id: string }) {
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const [form, setForm] = useState<SubclassFormData>(defaultSubclass)
   const [classes, setClasses] = useState<DndClass[]>([])
   const [loading, setLoading] = useState(false)
@@ -179,14 +182,15 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     }))
   }
 
-  const toggleFeatureChoice = (index: number) => {
+  const toggleFeatureChoice = (index: number, checked?: boolean) => {
     const feature = form.features[index]
-    if (feature.isChoice) {
+    const nextChecked = checked ?? !feature.isChoice
+    if (!nextChecked) {
       updateFeature(index, { isChoice: false, choices: undefined })
     } else {
-      updateFeature(index, { 
-        isChoice: true, 
-        choices: { category: feature.name || "Option", options: [], count: 1 }
+      updateFeature(index, {
+        isChoice: true,
+        choices: { category: feature.name || "Option", options: [], count: 1, kind: "options" },
       })
     }
   }
@@ -213,16 +217,39 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     })
   }
 
-  const updateFeatureOption = (featureIndex: number, optionIndex: number, field: "name" | "description", value: string) => {
+  const updateFeatureOption = (
+    featureIndex: number,
+    optionIndex: number,
+    field: "name" | "description" | "modifierRefs",
+    value: string | string[],
+  ) => {
     const feature = form.features[featureIndex]
     if (!feature.choices) return
     updateFeature(featureIndex, {
       choices: {
         ...feature.choices,
-        options: feature.choices.options.map((opt, i) => 
-          i === optionIndex ? { ...opt, [field]: value } : opt
-        )
-      }
+        options: feature.choices.options.map((opt, i) =>
+          i === optionIndex ? { ...opt, [field]: value } : opt,
+        ),
+      },
+    })
+  }
+
+  const updateFeatureChoiceField = (index: number, field: keyof FeatureChoice, value: unknown) => {
+    const feature = form.features[index]
+    if (!feature.choices) return
+    updateFeature(index, { choices: { ...feature.choices, [field]: value } })
+  }
+
+  const setFeatureChoiceKind = (index: number, kind: "options" | "feats") => {
+    const feature = form.features[index]
+    if (!feature.choices) return
+    updateFeature(index, {
+      choices: {
+        ...feature.choices,
+        kind,
+        featCategories: kind === "feats" ? feature.choices.featCategories ?? ["General"] : undefined,
+      },
     })
   }
 
@@ -411,80 +438,29 @@ export default function SubclassEditorPage({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  {!feature.isChoice ? (
-                    <RichTextEditor
-                      value={feature.description}
-                      onChange={(description) => updateFeature(index, { description })}
-                      placeholder="Feature description..."
-                      minHeightClass="min-h-[4rem]"
-                    />
-                  ) : (
-                    <div className="space-y-3 pt-2 border-t border-border mt-2">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Category:</span>
-                          <input
-                            type="text"
-                            value={feature.choices?.category || ""}
-                            onChange={(e) => updateFeature(index, {
-                              choices: { ...feature.choices!, category: e.target.value }
-                            })}
-                            placeholder="e.g. Fighting Style"
-                            className="w-36 px-2 py-1 bg-background border-2 border-border rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Choose</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={5}
-                            value={feature.choices?.count || 1}
-                            onChange={(e) => updateFeature(index, {
-                              choices: { ...feature.choices!, count: parseInt(e.target.value) || 1 }
-                            })}
-                            className="w-14 px-2 py-1 bg-background border-2 border-border rounded-lg text-center text-sm"
-                          />
-                          <span className="text-sm text-muted-foreground">from:</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => addFeatureOption(index)}
-                          className="ml-auto flex items-center gap-1 px-2 py-1 text-xs bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add Option
-                        </button>
-                      </div>
-                      
-                      {feature.choices?.options.map((option, optIndex) => (
-                        <div key={optIndex} className="flex items-start gap-2 pl-4 border-l-2 border-secondary/30">
-                          <div className="flex-1 space-y-2">
-                            <input
-                              type="text"
-                              value={option.name}
-                              onChange={(e) => updateFeatureOption(index, optIndex, "name", e.target.value)}
-                              placeholder="Option name"
-                              className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
-                            />
-                            <RichTextEditor
-                              value={option.description}
-                              onChange={(description) => updateFeatureOption(index, optIndex, "description", description)}
-                              placeholder="Option description..."
-                              minHeightClass="min-h-[3rem]"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFeatureOption(index, optIndex)}
-                            className="p-1 text-muted-foreground hover:text-destructive"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <ClassFeatureFields
+                    feature={feature}
+                    index={index}
+                    classResources={[]}
+                    modifierCatalog={modifierCatalog}
+                    onUpdate={updateFeature}
+                    onToggleChoice={toggleFeatureChoice}
+                    onUpdateChoiceField={updateFeatureChoiceField}
+                    onSetChoiceKind={setFeatureChoiceKind}
+                    onAddChoiceOption={addFeatureOption}
+                    onUpdateChoiceOption={updateFeatureOption}
+                    onRemoveChoiceOption={removeFeatureOption}
+                    onToggleLimitedUses={(featIndex, checked) => {
+                      if (checked) {
+                        updateFeature(featIndex, { limitedUses: { type: "unlimited" } })
+                      } else {
+                        updateFeature(featIndex, { limitedUses: null })
+                      }
+                    }}
+                    onUpdateLimitedUses={(featIndex, uses) =>
+                      updateFeature(featIndex, { limitedUses: uses })
+                    }
+                  />
                 </div>
               ))}
             </div>

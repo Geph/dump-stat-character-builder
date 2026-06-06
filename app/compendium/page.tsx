@@ -38,6 +38,14 @@ import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import {
+  COMMON_MODIFIERS_CATALOG_ID,
+  isCommonModifiersCatalogAbility,
+  MODIFIER_CATALOG_INFO,
+} from "@/lib/compendium/modifier-catalog"
+import { Info } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ContentType = CompendiumContentType
 
@@ -202,13 +210,23 @@ function CompendiumPageContent() {
       const db = createClient()
       
       const tableName = activeTab === "abilities" ? "custom_abilities" : activeTab
+      if (activeTab === "abilities") {
+        await ensureModifierCatalog(db)
+      }
       const { data } = await db
         .from(tableName)
         .select("*")
         .order("name")
         .limit(activeTab === "equipment" ? 500 : 100)
       
-      const rows = data || []
+      let rows = data || []
+      if (activeTab === "abilities") {
+        rows = [...rows].sort((a, b) => {
+          if (a.id === COMMON_MODIFIERS_CATALOG_ID) return -1
+          if (b.id === COMMON_MODIFIERS_CATALOG_ID) return 1
+          return String(a.name).localeCompare(String(b.name))
+        })
+      }
       setContent((prev) => ({
         ...prev,
         [activeTab]:
@@ -517,10 +535,26 @@ function CompendiumPageContent() {
               <GameIcon name={iconName} className="w-10 h-10" />
             </div>
             <h3 
-              className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight"
+              className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight flex items-center gap-1.5"
               onClick={() => setSelectedItem(item)}
             >
               {data.name as string}
+              {activeTab === "abilities" && isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex text-primary"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="About common modifiers catalog"
+                    >
+                      <Info className="w-4 h-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-sm">
+                    {MODIFIER_CATALOG_INFO}
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -670,6 +704,12 @@ function CompendiumPageContent() {
         )}
         {activeTab === "abilities" && (
           <div className="space-y-2">
+            {isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full inline-flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                System catalog
+              </span>
+            )}
             {(data as { prerequisites?: string }).prerequisites && (
               <p className="text-xs text-orange">
                 Prereq: {(data as { prerequisites: string }).prerequisites}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { getPool } from "@/lib/db/index"
 import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
+import { createClient } from "@/lib/db/client"
 import {
   deleteWhere,
   insertRows,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/db/repository"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES } from "@/lib/srd/source"
 
@@ -54,6 +56,8 @@ export async function POST() {
     await upsertByName("spells", spells)
     await upsertByName("feats", feats)
     await upsertByName("equipment", equipment)
+
+    await ensureModifierCatalog(createClient())
 
     const { total, breakdown } = getSrdSeedTotals()
 
