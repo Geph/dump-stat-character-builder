@@ -145,6 +145,7 @@ export const customAbilities = mysqlTable("custom_abilities", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   characteristics: json("characteristics").$type<unknown[]>().default([]),
+  modifier_refs: json("modifier_refs").$type<string[]>().default([]),
   prerequisites: text("prerequisites"),
   attached_to_type: varchar("attached_to_type", { length: 64 }),
   attached_to_id: varchar("attached_to_id", { length: 128 }),

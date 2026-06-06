@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
-import type { DndClass, Feature, FeatureChoice } from "@/lib/types"
+import type { DndClass, Feature, FeatureChoice, ClassResource } from "@/lib/types"
+import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
@@ -50,6 +51,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSpellcasting, setHasSpellcasting] = useState(false)
+  const [classResources, setClassResources] = useState<ClassResource[]>([])
   const router = useRouter()
 
   // Fetch classes for dropdown
@@ -93,6 +95,23 @@ export default function SubclassEditorPage({ id }: { id: string }) {
       fetchSubclass()
     }
   }, [id])
+
+  useEffect(() => {
+    const loadClassResources = async () => {
+      if (!form.class_id) {
+        setClassResources([])
+        return
+      }
+      const db = createClient()
+      const { data } = await db
+        .from("class_resources")
+        .select("class_id, resource_key, name, description, uses")
+        .eq("class_id", form.class_id)
+        .order("name")
+      setClassResources(resourcesForClass(form.class_id, data ?? []))
+    }
+    void loadClassResources()
+  }, [form.class_id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -190,7 +209,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     } else {
       updateFeature(index, {
         isChoice: true,
-        choices: { category: feature.name || "Option", options: [], count: 1, kind: "options" },
+        choices: { category: feature.name || "Option", options: [{ name: "", description: "" }], count: 1 },
       })
     }
   }
@@ -239,18 +258,6 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     const feature = form.features[index]
     if (!feature.choices) return
     updateFeature(index, { choices: { ...feature.choices, [field]: value } })
-  }
-
-  const setFeatureChoiceKind = (index: number, kind: "options" | "feats") => {
-    const feature = form.features[index]
-    if (!feature.choices) return
-    updateFeature(index, {
-      choices: {
-        ...feature.choices,
-        kind,
-        featCategories: kind === "feats" ? feature.choices.featCategories ?? ["General"] : undefined,
-      },
-    })
   }
 
   if (loading) {
@@ -441,12 +448,11 @@ export default function SubclassEditorPage({ id }: { id: string }) {
                   <ClassFeatureFields
                     feature={feature}
                     index={index}
-                    classResources={[]}
+                    classResources={classResources}
                     modifierCatalog={modifierCatalog}
                     onUpdate={updateFeature}
                     onToggleChoice={toggleFeatureChoice}
                     onUpdateChoiceField={updateFeatureChoiceField}
-                    onSetChoiceKind={setFeatureChoiceKind}
                     onAddChoiceOption={addFeatureOption}
                     onUpdateChoiceOption={updateFeatureOption}
                     onRemoveChoiceOption={removeFeatureOption}

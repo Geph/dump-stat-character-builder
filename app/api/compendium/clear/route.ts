@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { clearTable } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
+import { createClient } from "@/lib/db/client"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 
 const VALID_TABLES = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "class_resources", "custom_abilities"]
 
@@ -29,11 +31,16 @@ export async function POST(request: NextRequest) {
       await clearTable("subclasses")
       await clearTable("class_resources")
     }
+
+    if (table === "custom_abilities" || resolved === "custom_abilities") {
+      await ensureModifierCatalog(createClient())
+    }
     
     return NextResponse.json({
       success: true,
       table,
       alsoCleared: table === "classes" ? ["subclasses", "class_resources"] : [],
+      restoredSystemCatalog: table === "abilities" || resolved === "custom_abilities",
     })
   } catch (err) {
     console.error("[v0] Clear section error:", err)

@@ -1,3 +1,4 @@
+import { isCommonModifiersCatalogAbility, COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
@@ -27,6 +28,15 @@ export function contentTypeToTable(contentType: CompendiumContentType): Compendi
 
 export function tableToContentType(table: CompendiumTable): CompendiumContentType {
   return table === "custom_abilities" ? "abilities" : (table as CompendiumContentType)
+}
+
+/** System-owned rows that cannot be disabled or cleared with the rest of the section. */
+export function isProtectedSystemCompendiumItem(table: CompendiumTable, id: string): boolean {
+  return table === "custom_abilities" && id === COMMON_MODIFIERS_CATALOG_ID
+}
+
+export function isProtectedSystemCompendiumRow(row: { id?: string; is_system?: boolean | null }): boolean {
+  return isCommonModifiersCatalogAbility(row)
 }
 
 function idsInclude(value: unknown, id: string): boolean {
@@ -184,7 +194,11 @@ export async function setCompendiumItemsEnabled(
   targets: CompendiumToggleTarget[],
   enabled: boolean,
 ): Promise<void> {
-  for (const target of targets) {
+  const filtered = enabled
+    ? targets
+    : targets.filter((target) => !isProtectedSystemCompendiumItem(target.table, target.id))
+
+  for (const target of filtered) {
     const { error } = await db.from(target.table).update({ enabled }).eq("id", target.id)
     if (error) throw new Error(error.message ?? "Failed to update item")
   }

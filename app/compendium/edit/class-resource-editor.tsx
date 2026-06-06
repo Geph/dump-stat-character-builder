@@ -12,6 +12,7 @@ import {
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { normalizeUsesConfig } from "@/lib/compendium/normalize-uses-config"
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
 import type { UsesConfig } from "@/lib/types"
 import { compendiumListHref } from "@/lib/compendium/content-types"
@@ -32,7 +33,7 @@ const defaultForm: ClassResourceFormData = {
   resource_key: "",
   name: "",
   description: "",
-  uses: { type: "fixed", fixedAmount: 1, recharge: "long_rest" },
+  uses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
   source: "Custom",
   creator_url: "",
   icon: null,
@@ -82,7 +83,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             resource_key: data.resource_key || "",
             name: data.name || "",
             description: data.description || "",
-            uses: (data.uses as UsesConfig) || defaultForm.uses,
+            uses: normalizeUsesConfig((data.uses as UsesConfig) || defaultForm.uses),
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
@@ -105,7 +106,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
       resource_key: first.id,
       name: first.name,
       description: first.description ?? "",
-      uses: first.uses,
+      uses: normalizeUsesConfig(first.uses),
       source: "SRD",
     }))
   }

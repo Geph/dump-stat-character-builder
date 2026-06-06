@@ -7,6 +7,7 @@ import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
+import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import {
   filterEnabled,
@@ -60,6 +61,7 @@ import {
   getEffectiveWeaponProficiencies,
   mergeProficiencyLists,
 } from "@/lib/compendium/background-proficiencies"
+import { formatUsesRecharges, getRechargeRules } from "@/lib/compendium/normalize-uses-config"
 import {
   calculateArmorClass,
   calculateWeaponAttack,
@@ -503,14 +505,14 @@ export default function BuilderPage() {
         setFeats([])
       } else {
         setFeatsLoadError(null)
-        setFeats(filterEnabled(featsRes.data || []))
+        setFeats(filterEnabled(enrichRowsWithModifierRefs(featsRes.data || [])) as Feat[])
       }
       setSpells(filterEnabled(spellsRes.data || []))
       setEquipment(filterEnabled(equipmentRes.data || []))
       setCustomAbilities(
-        filterEnabled(abilitiesRes.data || []).filter(
+        filterEnabled(enrichRowsWithModifierRefs(abilitiesRes.data || [])).filter(
           (ability) => ability.show_in_builder !== false,
-        ),
+        ) as CustomAbility[],
       )
       setLoading(false)
     }
@@ -646,7 +648,14 @@ export default function BuilderPage() {
     ? classLevels.reduce((sum, cl) => sum + cl.level, 0)
     : character.level
 
-  const featPickSlots = getFeatPickSlots(classLevels, classes, totalLevel)
+  const featPickSlots = getFeatPickSlots(
+    classLevels,
+    classes,
+    modifierCatalog,
+    totalLevel,
+    subclasses,
+    subclassByClassId,
+  )
   const requiredFeatSlots = featPickSlots.length
   const selectedFeatIds = featPickSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? "")
   const selectedFeatCount = selectedFeatIds.filter(Boolean).length
@@ -805,10 +814,13 @@ export default function BuilderPage() {
       speciesTraitPicks,
       feats,
       selectedFeatIds,
+      classLevels,
+      classes,
+      subclasses,
+      subclassByClassId,
+      featureChoicePicks,
+      customAbilities,
     }),
-    ...customAbilities.flatMap((ability) =>
-      normalizeCharacteristics(ability.characteristics, ability.uses),
-    ),
   ]
   const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
   const asiBonuses = aggregateAsiBonuses(asiAllocationsByFeatId)
@@ -1574,7 +1586,6 @@ export default function BuilderPage() {
                           feature.level <= entry.level &&
                           feature.isChoice &&
                           feature.choices &&
-                          feature.choices.kind !== "feats" &&
                           (feature.choices.options?.length ?? 0) > 0,
                       )
 
@@ -1673,7 +1684,7 @@ export default function BuilderPage() {
                       <div>
                         <h3 className="text-lg font-bold text-foreground">Feats</h3>
                         <p className="text-xs text-muted-foreground">
-                          Choose feats from your class features (ASI, Epic Boon, fighting styles, etc.).
+                          Choose feats granted by linked common modifiers (Gain a General Feat, Epic Boon, etc.).
                           Ability-score bonuses apply on later steps.
                         </p>
                       </div>
@@ -3165,7 +3176,8 @@ export default function BuilderPage() {
                             {uses && uses.type !== "unlimited" && (
                               <p className="text-[8px] text-magenta mt-0.5">
                                 Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
-                                {uses.recharge && ` (${uses.recharge.replace("_", " ")})`}
+                                {getRechargeRules(uses).length > 0 &&
+                                  ` (${formatUsesRecharges(uses)})`}
                               </p>
                             )}
                           </div>

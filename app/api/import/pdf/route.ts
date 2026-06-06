@@ -1,6 +1,11 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError, getImportModel } from "@/lib/import/ai"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
+import {
+  applyClassSpellListsToImport,
+  CLASS_SPELL_LIST_IMPORT_HINT,
+} from "@/lib/import/class-spell-lists"
 import {
   CHOICE_EXTRACTION_HINT,
   ClassFeatureSchema,
@@ -62,7 +67,8 @@ const ContentSchema = z.object({
     description: z.string().nullable(),
     hit_die: z.number(),
     primary_ability: z.array(z.string()).nullable(),
-    features: z.array(ClassFeatureSchema)
+    features: z.array(ClassFeatureSchema),
+    spell_list: z.array(z.string()).nullable().optional(),
   })).optional(),
   backgrounds: z.array(z.object({
     name: z.string(),
@@ -213,10 +219,13 @@ Be thorough and extract all instances of each content type found.
 
 For equipment:
 - Put cost in a cost object { amount, unit } (e.g. 5 SP → { amount: 5, unit: "SP" }), NOT in the item name
-- Do not include HTML tags (<td>, etc.) or markdown headers (####) in names
-- Strip table markup from all fields
+- Do not include HTML tags or markdown headers (####) in equipment names — strip markup from name fields only
 
-${CHOICE_EXTRACTION_HINT}`
+${RICH_TEXT_TABLE_HINT}
+
+${CHOICE_EXTRACTION_HINT}
+
+${CLASS_SPELL_LIST_IMPORT_HINT}`
 
     if (contentType === "specific" && specificContent) {
       systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`
@@ -244,7 +253,7 @@ ${CHOICE_EXTRACTION_HINT}`
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
-    const content = result.output
+    const content = applyClassSpellListsToImport(result.output)
     let totalImported = 0
 
     const upsertSection = async (table: CompendiumTable, rows: Record<string, unknown>[] | undefined) => {

@@ -1,4 +1,5 @@
 import type { Feature, FeatureActivation, FeatureEffect } from "@/lib/types"
+import { migrateFeatureFeatChoiceToModifierRefs } from "@/lib/compendium/grant-feat-catalog"
 
 function newEffectId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID()
@@ -56,5 +57,5 @@ export function normalizeFeatureRow(feature: Feature): Feature {
     }
   }
 
-  return next
+  return migrateFeatureFeatChoiceToModifierRefs(next)
 }

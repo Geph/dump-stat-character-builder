@@ -1,8 +1,17 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
-import { Bold, Italic, List, ListOrdered, RemoveFormatting } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Bold, Italic, List, ListOrdered, RemoveFormatting, Table2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  addTableColumn,
+  addTableRow,
+  deleteTable,
+  getSelectedTable,
+  insertTableAtSelection,
+  isHtml,
+  toEditorHtml,
+} from "@/lib/compendium/rich-text-html"
 
 type RichTextEditorProps = {
   value: string
@@ -12,22 +21,8 @@ type RichTextEditorProps = {
   minHeightClass?: string
 }
 
-function isHtml(value: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(value)
-}
-
-function toEditorHtml(value: string): string {
-  if (!value?.trim()) return ""
-  if (isHtml(value)) return value
-  const escaped = value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-  return escaped
-    .split(/\n{2,}/)
-    .map((block) => `<p>${block.replace(/\n/g, "<br>")}</p>`)
-    .join("")
-}
+const EDITOR_CONTENT_CLASS =
+  "px-4 py-3 text-sm text-foreground focus:outline-none resize-y overflow-auto empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:font-semibold [&_th]:bg-muted/40 [&_th]:align-top"
 
 export function RichTextEditor({
   value,
@@ -38,6 +33,7 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const lastValueRef = useRef(value)
+  const [activeTable, setActiveTable] = useState<HTMLTableElement | null>(null)
 
   useEffect(() => {
     const el = editorRef.current
@@ -62,10 +58,36 @@ export function RichTextEditor({
     onChange(normalized)
   }, [onChange])
 
+  const refreshTableState = useCallback(() => {
+    setActiveTable(getSelectedTable(editorRef.current))
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", refreshTableState)
+    return () => document.removeEventListener("selectionchange", refreshTableState)
+  }, [refreshTableState])
+
   const runCommand = (command: string, arg?: string) => {
     editorRef.current?.focus()
     document.execCommand(command, false, arg)
     sync()
+    refreshTableState()
+  }
+
+  const insertTable = () => {
+    const el = editorRef.current
+    if (!el) return
+    insertTableAtSelection(el, 3, 2)
+    sync()
+    refreshTableState()
+  }
+
+  const mutateTable = (fn: (table: HTMLTableElement) => void) => {
+    const table = getSelectedTable(editorRef.current) ?? activeTable
+    if (!table) return
+    fn(table)
+    sync()
+    refreshTableState()
   }
 
   return (
@@ -83,6 +105,23 @@ export function RichTextEditor({
         <ToolbarButton title="Numbered list" onClick={() => runCommand("insertOrderedList")}>
           <ListOrdered className="h-4 w-4" />
         </ToolbarButton>
+        <ToolbarButton title="Insert table (3×2)" onClick={insertTable}>
+          <Table2 className="h-4 w-4" />
+        </ToolbarButton>
+        {activeTable && (
+          <>
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+            <ToolbarButton title="Add row" onClick={() => mutateTable(addTableRow)}>
+              <span className="text-[10px] font-bold leading-none">+R</span>
+            </ToolbarButton>
+            <ToolbarButton title="Add column" onClick={() => mutateTable(addTableColumn)}>
+              <span className="text-[10px] font-bold leading-none">+C</span>
+            </ToolbarButton>
+            <ToolbarButton title="Delete table" onClick={() => mutateTable(deleteTable)}>
+              <Trash2 className="h-4 w-4" />
+            </ToolbarButton>
+          </>
+        )}
         <ToolbarButton title="Clear formatting" onClick={() => runCommand("removeFormat")}>
           <RemoveFormatting className="h-4 w-4" />
         </ToolbarButton>
@@ -93,13 +132,10 @@ export function RichTextEditor({
         suppressContentEditableWarning
         onInput={sync}
         onBlur={sync}
+        onKeyUp={refreshTableState}
+        onMouseUp={refreshTableState}
         data-placeholder={placeholder}
-        className={cn(
-          "px-4 py-3 text-sm text-foreground focus:outline-none resize-y overflow-auto",
-          "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground",
-          "[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0",
-          minHeightClass,
-        )}
+        className={cn(EDITOR_CONTENT_CLASS, minHeightClass)}
       />
     </div>
   )
@@ -146,6 +182,9 @@ export function RichTextContent({
       <div
         className={cn(
           "text-sm text-muted-foreground prose-like [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2",
+          "[&_table]:w-full [&_table]:border-collapse [&_table]:my-3",
+          "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top",
+          "[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:font-semibold [&_th]:bg-muted/40 [&_th]:align-top",
           className,
         )}
         dangerouslySetInnerHTML={{ __html: html }}
@@ -155,3 +194,5 @@ export function RichTextContent({
 
   return <p className={cn("text-sm text-muted-foreground whitespace-pre-wrap", className)}>{html}</p>
 }
+
+export { isHtml, toEditorHtml }

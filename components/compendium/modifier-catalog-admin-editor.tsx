@@ -1,9 +1,13 @@
 "use client"
 
 import { Plus, Trash2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
-  MODIFIER_CATALOG_GROUPS,
   createCatalogEntryId,
+  catalogEditorSectionId,
+  CATALOG_EDITOR_SECTION_CLASS,
+  groupModifierCatalogEntries,
+  MODIFIER_CATALOG_GROUPS,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
@@ -49,14 +53,7 @@ export function ModifierCatalogAdminEditor({
     ])
   }
 
-  const grouped = MODIFIER_CATALOG_GROUPS.map((group) => ({
-    group,
-    entries: value.filter((entry) => entry.group === group),
-  })).filter((section) => section.entries.length > 0)
-
-  const otherEntries = value.filter(
-    (entry) => !MODIFIER_CATALOG_GROUPS.includes(entry.group as (typeof MODIFIER_CATALOG_GROUPS)[number]),
-  )
+  const sections = groupModifierCatalogEntries(value)
 
   return (
     <div className="space-y-4">
@@ -74,24 +71,26 @@ export function ModifierCatalogAdminEditor({
         </button>
       </div>
 
-      {[...grouped, ...(otherEntries.length ? [{ group: "Other", entries: otherEntries }] : [])].map(
-        ({ group, entries }) => (
-          <div key={group} className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</h3>
-            {entries.map((entry) => (
-              <CatalogEntryEditor
-                key={entry.id}
-                entry={entry}
-                classResources={classResources}
-                spellOptions={spellOptions}
-                otherAbilities={otherAbilities}
-                onChange={(patch) => updateEntry(entry.id, patch)}
-                onRemove={() => removeEntry(entry.id)}
-              />
-            ))}
-          </div>
-        ),
-      )}
+      {sections.map(({ group, entries }) => (
+        <section
+          key={group}
+          id={catalogEditorSectionId(group)}
+          className={cn("space-y-3", CATALOG_EDITOR_SECTION_CLASS)}
+        >
+          <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{group}</h3>
+          {entries.map((entry) => (
+            <CatalogEntryEditor
+              key={entry.id}
+              entry={entry}
+              classResources={classResources}
+              spellOptions={spellOptions}
+              otherAbilities={otherAbilities}
+              onChange={(patch) => updateEntry(entry.id, patch)}
+              onRemove={() => removeEntry(entry.id)}
+            />
+          ))}
+        </section>
+      ))}
     </div>
   )
 }

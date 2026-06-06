@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import { HeroBackgroundSettings } from "@/components/settings/hero-background-settings"
 
 const EXPORT_SECTIONS = [
   { tab: "classes", table: "classes" },
@@ -188,6 +189,7 @@ export function GlobalSettingsMenu() {
               Import &amp; data management
             </Link>
           </DropdownMenuItem>
+          <HeroBackgroundSettings onStatus={setStatus} disabled={busy} />
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Appearance</DropdownMenuLabel>
           <DropdownMenuSeparator />

@@ -1,4 +1,8 @@
 import type { UsesConfig } from "@/lib/types"
+import {
+  MARTIAL_WEAPONS_LABEL,
+  type WeaponProficiencyMode,
+} from "@/lib/compendium/weapon-proficiency-options"
 
 export const ABILITY_SCORE_KEYS = [
   "strength",
@@ -126,6 +130,7 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "spells_known", label: "Spells Known / Prepared" },
   { value: "spellcasting_ability", label: "Spellcasting Ability Modifier" },
   { value: "uses", label: "Uses (Limited Ability / Resource)" },
+  { value: "grant_feat", label: "Gain a Feat" },
 ] as const
 
 export type CharacteristicModifierType =
@@ -134,7 +139,6 @@ export type CharacteristicModifierType =
 export type ListCharacteristicType =
   | "languages"
   | "armor_proficiencies"
-  | "weapon_proficiencies"
   | "tool_proficiencies"
   | "saving_throws"
 
@@ -162,6 +166,13 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
 
 export interface ListCharacteristic extends CharacteristicModifierBase {
   type: ListCharacteristicType
+  values: string[]
+}
+
+export interface WeaponProficienciesCharacteristic extends CharacteristicModifierBase {
+  type: "weapon_proficiencies"
+  mode: WeaponProficiencyMode
+  /** Specific weapon names when mode is "specific". */
   values: string[]
 }
 
@@ -285,10 +296,19 @@ export interface UsesCharacteristic extends CharacteristicModifierBase {
   uses: UsesConfig
 }
 
+export interface GrantFeatCharacteristic extends CharacteristicModifierBase {
+  type: "grant_feat"
+  /** Feat categories the character may choose from (General, Epic Boon, etc.). */
+  featCategories: string[]
+  /** How many feat choices this modifier grants (default 1). */
+  count: number
+}
+
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
   | ListCharacteristic
+  | WeaponProficienciesCharacteristic
   | AcCharacteristic
   | HitPointsCharacteristic
   | InitiativeCharacteristic
@@ -303,6 +323,7 @@ export type CharacteristicModifier =
   | SpellsKnownCharacteristic
   | SpellcastingAbilityCharacteristic
   | UsesCharacteristic
+  | GrantFeatCharacteristic
 
 export function createModifierId(): string {
   return `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -319,10 +340,11 @@ export function createCharacteristicModifier(
       return { id, type, entries: [] }
     case "languages":
     case "armor_proficiencies":
-    case "weapon_proficiencies":
     case "tool_proficiencies":
     case "saving_throws":
       return { id, type, values: [] }
+    case "weapon_proficiencies":
+      return { id, type, mode: "specific", values: [] }
     case "ac":
       return { id, type, mode: "flat_bonus", flatBonus: 1 }
     case "hit_points":
@@ -352,6 +374,8 @@ export function createCharacteristicModifier(
       return { id, type, ability: "intelligence" }
     case "uses":
       return { id, type, uses: { type: "unlimited" } }
+    case "grant_feat":
+      return { id, type, featCategories: ["General"], count: 1 }
   }
 }
 
@@ -363,6 +387,48 @@ function isCharacteristicModifier(value: unknown): value is CharacteristicModifi
     "id" in value &&
     typeof (value as CharacteristicModifier).type === "string"
   )
+}
+
+function migrateWeaponProficiencies(value: CharacteristicModifier): WeaponProficienciesCharacteristic {
+  const raw = value as WeaponProficienciesCharacteristic & { values?: string[] }
+  if (raw.mode === "martial_weapons" || raw.mode === "specific") {
+    return {
+      id: raw.id,
+      label: raw.label,
+      type: "weapon_proficiencies",
+      mode: raw.mode,
+      values: raw.values ?? [],
+    }
+  }
+
+  const legacyValues = raw.values ?? []
+  const hasMartialCategory = legacyValues.some((entry) =>
+    entry.toLowerCase().includes("martial"),
+  )
+  const specificValues = legacyValues.filter(
+    (entry) =>
+      !entry.toLowerCase().includes("martial") &&
+      !entry.toLowerCase().includes("simple") &&
+      entry.trim().length > 0,
+  )
+
+  if (hasMartialCategory && specificValues.length === 0) {
+    return {
+      id: raw.id,
+      label: raw.label,
+      type: "weapon_proficiencies",
+      mode: "martial_weapons",
+      values: [],
+    }
+  }
+
+  return {
+    id: raw.id,
+    label: raw.label,
+    type: "weapon_proficiencies",
+    mode: "specific",
+    values: specificValues.length ? specificValues : legacyValues,
+  }
 }
 
 function migrateCharacteristicModifier(value: unknown): CharacteristicModifier | null {
@@ -379,6 +445,10 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       }
     }
     return { ...legacy, entries: legacy.entries ?? [] }
+  }
+
+  if (value.type === "weapon_proficiencies") {
+    return migrateWeaponProficiencies(value)
   }
 
   return value
@@ -419,6 +489,11 @@ export function getSkillEntries(mod: SkillsCharacteristic): SkillEntry[] {
     return mod.values.map((skill) => ({ skill, expertise: false }))
   }
   return []
+}
+
+export function getWeaponProficiencyValues(mod: WeaponProficienciesCharacteristic): string[] {
+  if (mod.mode === "martial_weapons") return [MARTIAL_WEAPONS_LABEL]
+  return mod.values
 }
 
 export type AggregatedRollModifier = { bonus: number; target: string; customTarget?: string }
@@ -537,18 +612,18 @@ export function aggregateCharacteristics(
         break
       case "languages":
       case "armor_proficiencies":
-      case "weapon_proficiencies":
       case "tool_proficiencies":
         pushUnique(
           mod.type === "languages"
             ? result.languages
             : mod.type === "armor_proficiencies"
               ? result.armorProficiencies
-              : mod.type === "weapon_proficiencies"
-                ? result.weaponProficiencies
-                : result.toolProficiencies,
+              : result.toolProficiencies,
           mod.values,
         )
+        break
+      case "weapon_proficiencies":
+        pushUnique(result.weaponProficiencies, getWeaponProficiencyValues(mod))
         break
       case "saving_throws":
         pushUnique(result.savingThrows, mod.values)

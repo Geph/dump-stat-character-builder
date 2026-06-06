@@ -17,6 +17,9 @@ import {
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import {
   CommonModifiersCatalogEditor,
   buildCatalogSavePayload,
@@ -37,6 +40,7 @@ interface AbilityFormData {
   description: string
   prerequisites: string
   characteristics: CharacteristicModifier[]
+  modifier_refs: string[]
   attached_to_type: string
   attached_to_id: string
   show_in_builder: boolean
@@ -50,6 +54,7 @@ const defaultAbility: AbilityFormData = {
   description: "",
   prerequisites: "",
   characteristics: [],
+  modifier_refs: [],
   attached_to_type: "",
   attached_to_id: "",
   show_in_builder: false,
@@ -72,7 +77,6 @@ const ATTACH_OPTIONS = [
 export default function AbilityEditorPage({ id }: { id: string }) {
   const [form, setForm] = useState<AbilityFormData>(defaultAbility)
   const [catalog, setCatalog] = useState<ModifierCatalogEntry[]>([])
-  const [catalogDescription, setCatalogDescription] = useState("")
   const isCatalogEditor = isCommonModifiersCatalogEditor(id)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -81,6 +85,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
   const [otherAbilities, setOtherAbilities] = useState<{ id: string; name: string }[]>([])
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
+  const { catalog: modifierCatalog } = useModifierCatalog()
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -100,7 +105,6 @@ export default function AbilityEditorPage({ id }: { id: string }) {
           setError("Custom Ability not found")
         } else if (data) {
           if (isCommonModifiersCatalogEditor(id)) {
-            setCatalogDescription(data.description || "")
             setCatalog(parseCatalogFromRow(data as Record<string, unknown>))
           } else {
             setForm({
@@ -108,6 +112,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               description: data.description || "",
               prerequisites: data.prerequisites || "",
               characteristics: normalizeCharacteristics(data.characteristics, data.uses),
+              modifier_refs: readModifierRefs(data as Record<string, unknown>),
               attached_to_type: data.attached_to_type || "",
               attached_to_id: data.attached_to_id || "",
               show_in_builder: data.show_in_builder ?? false,
@@ -182,10 +187,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     const db = createClient()
 
     if (isCatalogEditor) {
-      const payload = buildCatalogSavePayload(
-        catalogDescription,
-        catalog,
-      )
+      const payload = buildCatalogSavePayload(catalog)
       const { error } = await db
         .from("custom_abilities")
         .update(payload)
@@ -268,13 +270,11 @@ export default function AbilityEditorPage({ id }: { id: string }) {
   if (isCatalogEditor) {
     return (
       <CommonModifiersCatalogEditor
-        description={catalogDescription}
         catalog={catalog}
         spellOptions={allSpells}
         otherAbilities={otherAbilities}
         saving={saving}
         error={error}
-        onDescriptionChange={setCatalogDescription}
         onCatalogChange={setCatalog}
         onSubmit={handleSubmit}
       />
@@ -388,12 +388,27 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             />
           </div>
 
-          <CharacteristicModifiersEditor
-            value={form.characteristics}
-            onChange={(characteristics) => setForm({ ...form, characteristics })}
-            otherAbilities={otherAbilities}
-            spellOptions={allSpells}
+          <ModifierCatalogPicker
+            value={form.modifier_refs}
+            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+            catalog={modifierCatalog}
+            label="Modifier effects (from shared catalog)"
           />
+
+          <details className="rounded-xl border border-border p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              Legacy inline modifiers (optional)
+            </summary>
+            <p className="text-xs text-muted-foreground mt-2 mb-3">
+              Prefer the shared catalog above. Inline modifiers remain supported for older content.
+            </p>
+            <CharacteristicModifiersEditor
+              value={form.characteristics}
+              onChange={(characteristics) => setForm({ ...form, characteristics })}
+              otherAbilities={otherAbilities}
+              spellOptions={allSpells}
+            />
+          </details>
 
           {/* Show in Builder Checkbox */}
           <div className="bg-card border-2 border-border rounded-xl p-4">

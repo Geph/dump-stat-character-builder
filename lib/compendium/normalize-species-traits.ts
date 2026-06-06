@@ -1,6 +1,7 @@
 import type { FeatureChoice, Trait } from "@/lib/types"
 import bundledSpecies from "@/lib/srd/seed-data/species.json"
 import { isSrdSource } from "@/lib/srd/source"
+import { withModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 
 function normalizeChoice(raw: unknown, fallbackCategory: string): FeatureChoice | undefined {
   if (!raw || typeof raw !== "object") return undefined
@@ -12,6 +13,11 @@ function normalizeChoice(raw: unknown, fallbackCategory: string): FeatureChoice 
         .map((option) => ({
           name: String(option.name ?? "").trim(),
           description: String(option.description ?? "").trim(),
+          modifierRefs: Array.isArray(option.modifierRefs)
+            ? option.modifierRefs.filter((id): id is string => typeof id === "string")
+            : Array.isArray(option.modifier_refs)
+              ? option.modifier_refs.filter((id): id is string => typeof id === "string")
+              : undefined,
         }))
         .filter((option) => option.name)
     : []
@@ -56,6 +62,11 @@ export function normalizeSpeciesTraits(raw: unknown): Trait[] {
         level: typeof trait.level === "number" ? trait.level : undefined,
         isChoice: isChoice && !!choices,
         choices: isChoice && choices ? choices : undefined,
+        modifierRefs: Array.isArray(trait.modifierRefs)
+          ? trait.modifierRefs.filter((id): id is string => typeof id === "string")
+          : Array.isArray(trait.modifier_refs)
+            ? trait.modifier_refs.filter((id): id is string => typeof id === "string")
+            : undefined,
       }
     })
     .filter((trait) => trait.name)
@@ -75,24 +86,26 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
 ): T[] {
   return rows.map((row) => {
     const traits = normalizeSpeciesTraits(row.traits)
+    let next = { ...withModifierRefs(row), traits } as T & { modifierRefs: string[]; traits: Trait[] }
+
     if (speciesHasChoiceTraits(traits)) {
-      return { ...row, traits }
+      return next as T
     }
 
     if (!isSrdSource(row.source)) {
-      return { ...row, traits }
+      return next as T
     }
 
     const seed = bundledSpeciesByName.get(row.name)
     if (!seed) {
-      return { ...row, traits }
+      return next as T
     }
 
     const seedTraits = normalizeSpeciesTraits(seed.traits)
     if (speciesHasChoiceTraits(seedTraits)) {
-      return { ...row, traits: seedTraits }
+      return { ...next, traits: seedTraits } as T
     }
 
-    return { ...row, traits }
+    return next as T
   })
 }

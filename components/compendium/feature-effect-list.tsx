@@ -9,6 +9,7 @@ import {
   effectFieldsForKind,
 } from "@/lib/compendium/class-feature-metadata"
 import { DAMAGE_TYPES } from "@/lib/compendium/damage-types"
+import { ABILITY_MODIFIER_KEYS } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeFeatureEffects } from "@/lib/compendium/normalize-feature-activation"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import type { ClassResource, FeatureActivation, FeatureEffect } from "@/lib/types"
@@ -45,7 +46,7 @@ export function FeatureEffectList({ activation, classResources, onChange }: Feat
   }
 
   const changeKind = (id: string, kind: string) => {
-    updateEffect(id, {
+    const defaults: Partial<FeatureEffect> = {
       kind,
       mitigation: null,
       damageTypes: [],
@@ -59,7 +60,21 @@ export function FeatureEffectList({ activation, classResources, onChange }: Feat
       grantAdvantage: undefined,
       grantDisadvantage: undefined,
       classResourceKey: null,
-    })
+      classResourceChange: null,
+      classResourceAmount: null,
+      healMode: null,
+      healFixed: null,
+      healDiceCount: null,
+      healDieType: null,
+      healFlatBonus: null,
+      healLevelMultiplier: null,
+      healAbility: null,
+    }
+    if (kind === "class_resource") {
+      defaults.classResourceChange = "reduce"
+      defaults.classResourceAmount = 1
+    }
+    updateEffect(id, defaults)
   }
 
   return (
@@ -340,6 +355,10 @@ function EffectRow({
         </div>
       )}
 
+      {fields.includes("healAmount") && (
+        <HealAmountEditor effect={effect} onChange={onChange} />
+      )}
+
       {fields.includes("classResourceKey") && classResources.length > 0 && (
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Class resource</label>
@@ -356,6 +375,207 @@ function EffectRow({
             ))}
           </select>
         </div>
+      )}
+
+      {fields.includes("classResourceChange") && (
+        <ClassResourceChangeEditor effect={effect} onChange={onChange} />
+      )}
+    </div>
+  )
+}
+
+function ClassResourceChangeEditor({
+  effect,
+  onChange,
+}: {
+  effect: FeatureEffect
+  onChange: (patch: Partial<FeatureEffect>) => void
+}) {
+  const mode = effect.classResourceChange ?? "reduce"
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-card/50 p-3">
+      <label className="block text-xs font-semibold text-foreground">Resource change</label>
+      <select
+        value={mode}
+        onChange={(e) => {
+          const next = e.target.value as FeatureEffect["classResourceChange"]
+          onChange({
+            classResourceChange: next,
+            classResourceAmount: next === "reset" ? null : effect.classResourceAmount ?? 1,
+          })
+        }}
+        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+      >
+        <option value="reduce">Reduce by amount</option>
+        <option value="increase">Increase by amount</option>
+        <option value="reset">Reset to full pool</option>
+      </select>
+
+      {mode !== "reset" && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">
+            {mode === "reduce" ? "Uses spent" : "Uses restored"}
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={effect.classResourceAmount ?? 1}
+            onChange={(e) =>
+              onChange({
+                classResourceAmount: e.target.value ? parseInt(e.target.value, 10) : 1,
+              })
+            }
+            className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HealAmountEditor({
+  effect,
+  onChange,
+}: {
+  effect: FeatureEffect
+  onChange: (patch: Partial<FeatureEffect>) => void
+}) {
+  const mode = effect.healMode ?? "fixed"
+  const dieTypes = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-card/50 p-3">
+      <label className="block text-xs font-semibold text-foreground">Healing amount</label>
+      <select
+        value={mode}
+        onChange={(e) =>
+          onChange({
+            healMode: e.target.value as FeatureEffect["healMode"],
+            healFixed: null,
+            healDiceCount: null,
+            healDieType: null,
+            healFlatBonus: null,
+            healLevelMultiplier: null,
+            healAbility: null,
+          })
+        }
+        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+      >
+        <option value="fixed">Fixed HP</option>
+        <option value="dice">Dice + optional flat bonus</option>
+        <option value="character_level">Character level × multiplier</option>
+        <option value="proficiency">Proficiency bonus</option>
+        <option value="ability_modifier">Ability modifier</option>
+      </select>
+
+      {mode === "fixed" && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Hit points</label>
+          <input
+            type="number"
+            min={1}
+            value={effect.healFixed ?? ""}
+            onChange={(e) =>
+              onChange({ healFixed: e.target.value ? parseInt(e.target.value, 10) : null })
+            }
+            placeholder="e.g. 10"
+            className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      )}
+
+      {mode === "dice" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Dice count</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={effect.healDiceCount ?? ""}
+              onChange={(e) =>
+                onChange({ healDiceCount: e.target.value ? parseInt(e.target.value, 10) : null })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Die</label>
+            <select
+              value={effect.healDieType ?? ""}
+              onChange={(e) =>
+                onChange({ healDieType: (e.target.value || null) as FeatureEffect["healDieType"] })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="">Select...</option>
+              {dieTypes.map((die) => (
+                <option key={die} value={die}>
+                  {die}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Flat bonus</label>
+            <input
+              type="number"
+              value={effect.healFlatBonus ?? ""}
+              onChange={(e) =>
+                onChange({
+                  healFlatBonus: e.target.value === "" ? null : parseInt(e.target.value, 10),
+                })
+              }
+              placeholder="0"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      {mode === "character_level" && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Multiplier (HP = level × n)</label>
+          <input
+            type="number"
+            min={1}
+            value={effect.healLevelMultiplier ?? 1}
+            onChange={(e) =>
+              onChange({
+                healLevelMultiplier: e.target.value ? parseInt(e.target.value, 10) : 1,
+              })
+            }
+            className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      )}
+
+      {mode === "ability_modifier" && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Ability</label>
+          <select
+            value={effect.healAbility ?? ""}
+            onChange={(e) =>
+              onChange({
+                healAbility: (e.target.value || null) as FeatureEffect["healAbility"],
+              })
+            }
+            className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">Select ability...</option>
+            {ABILITY_MODIFIER_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {key} modifier
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {mode === "proficiency" && (
+        <p className="text-xs text-muted-foreground">Healing equals the character&apos;s proficiency bonus.</p>
       )}
     </div>
   )

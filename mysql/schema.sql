@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS custom_abilities (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   characteristics JSON,
+  modifier_refs JSON,
   modifier_catalog JSON,
   prerequisites TEXT,
   attached_to_type VARCHAR(64),

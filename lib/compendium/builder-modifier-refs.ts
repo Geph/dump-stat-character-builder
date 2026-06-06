@@ -1,6 +1,8 @@
+import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Species, Feat, Trait } from "@/lib/types"
+import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+import type { CustomAbility, DndClass, Feature, Feat, Species, Subclass } from "@/lib/types"
 
 export function characteristicsFromModifierRefs(
   catalog: ModifierCatalogEntry[],
@@ -13,6 +15,61 @@ export function characteristicsFromModifierRefs(
     ...normalizeCharacteristics(resolved.characteristics, null),
     ...normalizeCharacteristics(legacy ?? null, uses ?? null),
   ]
+}
+
+function collectFromFeature(
+  feature: Feature,
+  classId: string,
+  featureChoicePicks: Record<string, string[]>,
+  ids: string[],
+): void {
+  if (feature.modifierRefs?.length) ids.push(...feature.modifierRefs)
+
+  if (
+    feature.isChoice &&
+    feature.choices?.options?.length
+  ) {
+    const key = featureChoiceKey(classId, feature.name)
+    const picked = featureChoicePicks[key] ?? []
+    for (const optionName of picked) {
+      const option = feature.choices.options.find((entry) => entry.name === optionName)
+      if (option?.modifierRefs?.length) ids.push(...option.modifierRefs)
+    }
+  }
+}
+
+export function classAndSubclassFeatureModifierRefIds(params: {
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  subclasses: Subclass[]
+  subclassByClassId: Record<string, string>
+  featureChoicePicks: Record<string, string[]>
+}): string[] {
+  const { classLevels, classes, subclasses, subclassByClassId, featureChoicePicks } = params
+  const ids: string[] = []
+
+  for (const entry of classLevels) {
+    const cls = classes.find((c) => c.id === entry.classId)
+    if (!cls) continue
+
+    for (const feature of cls.features ?? []) {
+      if (feature.level > entry.level) continue
+      collectFromFeature(feature, entry.classId, featureChoicePicks, ids)
+    }
+
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = subclasses.find((s) => s.id === subclassId)
+      if (subclass) {
+        for (const feature of subclass.features ?? []) {
+          if (feature.level > entry.level) continue
+          collectFromFeature(feature, entry.classId, featureChoicePicks, ids)
+        }
+      }
+    }
+  }
+
+  return ids
 }
 
 export function speciesTraitModifierRefIds(
@@ -41,24 +98,58 @@ export function collectBuilderModifierRefIds(params: {
   speciesTraitPicks: Record<string, string[]>
   feats: Feat[]
   selectedFeatIds: string[]
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  subclasses: Subclass[]
+  subclassByClassId: Record<string, string>
+  featureChoicePicks: Record<string, string[]>
+  customAbilities?: CustomAbility[]
 }): CharacteristicModifier[] {
-  const { catalog, species, speciesTraitPicks, feats, selectedFeatIds } = params
+  const {
+    catalog,
+    species,
+    speciesTraitPicks,
+    feats,
+    selectedFeatIds,
+    classLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    featureChoicePicks,
+    customAbilities = [],
+  } = params
 
   const speciesRefs = [
     ...(species?.modifierRefs ?? []),
     ...speciesTraitModifierRefIds(species, speciesTraitPicks),
   ]
 
-  const featRefs = selectedFeatIds
+  const classFeatureRefs = classAndSubclassFeatureModifierRefIds({
+    classLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    featureChoicePicks,
+  })
+
+  const featMods = selectedFeatIds
     .filter(Boolean)
     .flatMap((featId) => {
       const feat = feats.find((entry) => entry.id === featId)
       if (!feat) return []
-      return characteristicsFromModifierRefs(catalog, feat.modifier_refs, feat.benefits)
+      const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
+      return characteristicsFromModifierRefs(catalog, refs, feat.benefits)
     })
+
+  const customAbilityMods = customAbilities.flatMap((ability) => {
+    const refs = ability.modifierRefs ?? readModifierRefs(ability as unknown as Record<string, unknown>)
+    return characteristicsFromModifierRefs(catalog, refs, ability.characteristics, ability.uses)
+  })
 
   return [
     ...characteristicsFromModifierRefs(catalog, speciesRefs, species?.characteristics),
-    ...featRefs,
+    ...characteristicsFromModifierRefs(catalog, classFeatureRefs, null),
+    ...featMods,
+    ...customAbilityMods,
   ]
 }
