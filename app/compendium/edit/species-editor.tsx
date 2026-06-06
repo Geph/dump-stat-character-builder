@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -295,11 +296,9 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             <label className="block text-sm font-semibold text-foreground mb-2">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="Elves are a magical people of otherworldly grace..."
             />
           </div>
@@ -408,12 +407,11 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                   </div>
 
                   {!trait.isChoice ? (
-                    <textarea
+                    <RichTextEditor
                       value={trait.description}
-                      onChange={(e) => updateTrait(index, { description: e.target.value })}
+                      onChange={(description) => updateTrait(index, { description })}
                       placeholder="Trait description..."
-                      rows={2}
-                      className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
+                      minHeightClass="min-h-[3rem]"
                     />
                   ) : (
                     <div className="space-y-3 pt-2 border-t border-border mt-2">
@@ -450,12 +448,11 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                               placeholder="Option name"
                               className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
                             />
-                            <textarea
+                            <RichTextEditor
                               value={option.description}
-                              onChange={(e) => updateTraitOption(index, optIndex, "description", e.target.value)}
+                              onChange={(description) => updateTraitOption(index, optIndex, "description", description)}
                               placeholder="Option description..."
-                              rows={2}
-                              className="w-full px-3 py-1.5 bg-background border border-border rounded-lg text-sm resize-none"
+                              minHeightClass="min-h-[3rem]"
                             />
                           </div>
                           <button

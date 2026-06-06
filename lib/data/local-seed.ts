@@ -1,3 +1,5 @@
+import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
+import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES } from "@/lib/srd/source"
 import {
@@ -14,13 +16,53 @@ export type LocalSeedResult = {
   srdVersion: string
 }
 
+const SRD_VERSION_STORAGE_KEY = "dump-stat-srd-version"
+
 export { isIndexedDbEmpty, getIndexedDbRowCounts } from "./indexed-db-store"
+
+function readStoredSrdVersion(): string | null {
+  if (typeof localStorage === "undefined") return null
+  return localStorage.getItem(SRD_VERSION_STORAGE_KEY)
+}
+
+function writeStoredSrdVersion(version: string): void {
+  if (typeof localStorage === "undefined") return
+  localStorage.setItem(SRD_VERSION_STORAGE_KEY, version)
+}
+
+async function seedClassResources(classIdMap: Map<string, string>): Promise<void> {
+  const existing = await getAllFromStore("class_resources")
+  const srdSources = new Set([...LEGACY_SRD_SOURCES, "SRD"])
+  for (const row of existing) {
+    if (srdSources.has(row.source as string)) {
+      await deleteIndexedDbRow("class_resources", row.id as string)
+    }
+  }
+
+  const rows = buildSrdClassResourceRows(classIdMap).map((row) => ({
+    ...row,
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+  }))
+  await putRows("class_resources", rows)
+}
+
+async function ensureBundledSrdFresh(): Promise<void> {
+  const { manifest, species, classes } = getSrdSeedData()
+  if (readStoredSrdVersion() === manifest.version) return
+  await upsertByName("species", species)
+  await upsertByName("classes", enrichSrdClassList(classes as Record<string, unknown>[]))
+  const classRows = await getAllFromStore("classes")
+  const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
+  await seedClassResources(classIdMap)
+  writeStoredSrdVersion(manifest.version)
+}
 
 export async function seedLocalSrd(): Promise<LocalSeedResult> {
   const { classes, subclasses, species, backgrounds, spells, feats, equipment, manifest } =
     getSrdSeedData()
 
-  await upsertByName("classes", classes as Record<string, unknown>[])
+  await upsertByName("classes", enrichSrdClassList(classes as Record<string, unknown>[]))
   const classRows = await getAllFromStore("classes")
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
 
@@ -49,6 +91,8 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
     updated_at: new Date().toISOString(),
   })))
 
+  await seedClassResources(classIdMap)
+
   await upsertByName("species", species)
   await upsertByName("backgrounds", backgrounds)
   await upsertByName("spells", spells)
@@ -56,11 +100,16 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   await upsertByName("equipment", equipment)
 
   const { total, breakdown } = getSrdSeedTotals()
+  writeStoredSrdVersion(manifest.version)
   return { total, breakdown, srdVersion: manifest.version }
 }
 
 export async function ensureLocalSrdSeed(): Promise<LocalSeedResult | null> {
   const empty = await isIndexedDbEmpty()
-  if (!empty) return null
-  return seedLocalSrd()
+  if (empty) {
+    return seedLocalSrd()
+  }
+
+  await ensureBundledSrdFresh()
+  return null
 }

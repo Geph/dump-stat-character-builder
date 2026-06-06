@@ -7,6 +7,7 @@ import { createClient } from "@/lib/db/client"
 import { Info, X } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -440,11 +441,9 @@ export default function FeatEditorPage({ id }: { id: string }) {
           {/* Description */}
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">Description</label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={8}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe the feat's benefits..."
             />
           </div>

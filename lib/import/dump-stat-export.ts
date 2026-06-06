@@ -21,6 +21,7 @@ const EXPORT_TYPE_TO_TABLE: Record<ExportItemType, CompendiumTable> = {
   "dnd-spell": "spells",
   "dnd-feat": "feats",
   "dnd-equipment": "equipment",
+  "dnd-class-resource": "class_resources",
   "dnd-ability": "custom_abilities",
 }
 
@@ -100,8 +101,12 @@ export async function importDumpStatExportItems(
 
   const classes = items.filter((item) => item.type === "dnd-class")
   const subclasses = items.filter((item) => item.type === "dnd-subclass")
+  const classResources = items.filter((item) => item.type === "dnd-class-resource")
   const others = items.filter(
-    (item) => item.type !== "dnd-class" && item.type !== "dnd-subclass",
+    (item) =>
+      item.type !== "dnd-class" &&
+      item.type !== "dnd-subclass" &&
+      item.type !== "dnd-class-resource",
   )
 
   for (const item of classes) {
@@ -126,6 +131,23 @@ export async function importDumpStatExportItems(
     ])
     await insertRows("subclasses", [row])
     breakdown.subclasses = (breakdown.subclasses ?? 0) + 1
+    totalImported += 1
+  }
+
+  for (const item of classResources) {
+    const classId = await resolveClassId(item.data)
+    if (!classId) continue
+    const row = rowForTable(item.type, item.data, source)
+    if (!row || typeof row.resource_key !== "string" || !row.resource_key.trim()) continue
+    row.class_id = classId
+    delete row.class_name
+    delete row.className
+    await deleteWhere("class_resources", [
+      { op: "eq", column: "class_id", value: classId },
+      { op: "eq", column: "resource_key", value: row.resource_key as string },
+    ])
+    await insertRows("class_resources", [row])
+    breakdown.class_resources = (breakdown.class_resources ?? 0) + 1
     totalImported += 1
   }
 

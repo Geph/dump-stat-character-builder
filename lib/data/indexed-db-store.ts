@@ -3,7 +3,7 @@ import { normalizeBannerUrl, normalizePortraitUrl } from "@/lib/portrait"
 import type { DbResult, Filter, OrderBy, QueryBuilder } from "./types"
 
 const DB_NAME = "dump-stat"
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 const ALL_STORES = [...COMPENDIUM_TABLES, "characters"] as const
 type StoreName = CompendiumTable | "characters"
@@ -22,6 +22,13 @@ function normalizeCharacterSpeed(value: unknown): number {
     if (typeof walking === "number" && Number.isFinite(walking)) return walking
   }
   return 30
+}
+
+function firstInsertRow(payload: unknown): Record<string, unknown> {
+  if (Array.isArray(payload)) {
+    return (payload[0] ?? {}) as Record<string, unknown>
+  }
+  return (payload ?? {}) as Record<string, unknown>
 }
 
 function applyFilters(rows: Record<string, unknown>[], filters: Filter[]): Record<string, unknown>[] {
@@ -358,7 +365,7 @@ class IndexedDbQueryBuilder implements QueryBuilder {
     const cache = new Map<StoreName, Record<string, unknown>[]>()
 
     if (this.mode === "insert") {
-      const payload = this.payload as Record<string, unknown>
+      const payload = firstInsertRow(this.payload)
       const id = newId()
       const now = new Date().toISOString()
       const row: Record<string, unknown> = {

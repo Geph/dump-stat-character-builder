@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
@@ -10,9 +11,15 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import type { UsesConfig, FeatureChoice } from "@/lib/types"
+import type { FeatureChoice, Feature, ClassResource, ClassResourceRow } from "@/lib/types"
+import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import { compendiumListHref } from "@/lib/compendium/content-types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -33,14 +40,7 @@ interface StartingEquipmentGroup {
   options: EquipmentOption[]
 }
 
-interface ClassFeature {
-  level: number
-  name: string
-  description: string
-  isChoice?: boolean
-  choices?: FeatureChoice
-  limitedUses?: UsesConfig | null
-}
+interface ClassFeature extends Feature {}
 
 interface ClassFormData {
   name: string
@@ -87,6 +87,8 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSpellcasting, setHasSpellcasting] = useState(false)
+  const [classResources, setClassResources] = useState<ClassResource[]>([])
+  const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -94,15 +96,20 @@ export default function ClassEditorPage({ id }: { id: string }) {
       const fetchClass = async () => {
         setLoading(true)
         const db = createClient()
-        const { data, error } = await db
-          .from("classes")
-          .select("*")
-          .eq("id", id)
-          .single()
+        const [{ data, error }, { data: resourceRows }] = await Promise.all([
+          db.from("classes").select("*").eq("id", id).single(),
+          db.from("class_resources").select("*").eq("class_id", id),
+        ])
         
         if (error) {
           setError("Class not found")
         } else if (data) {
+          const spellcasting = data.spellcasting
+            ? {
+                ability: data.spellcasting.ability || "Intelligence",
+                starts_at: data.spellcasting.starts_at ?? 1,
+              }
+            : null
           setForm({
             name: data.name || "",
             description: data.description || "",
@@ -112,8 +119,10 @@ export default function ClassEditorPage({ id }: { id: string }) {
             armor_proficiencies: data.armor_proficiencies || [],
             weapon_proficiencies: data.weapon_proficiencies || [],
             skill_choices: data.skill_choices || { count: 2, options: [] },
-            features: data.features || [{ level: 1, name: "", description: "" }],
-            spellcasting: data.spellcasting || null,
+            features: (data.features || [{ level: 1, name: "", description: "" }]).map((feature) =>
+              normalizeFeatureRow(feature),
+            ),
+            spellcasting,
             starting_gold: data.starting_gold ?? 0,
             starting_equipment_groups: data.starting_equipment_groups || [],
             icon: data.icon || null,
@@ -121,6 +130,8 @@ export default function ClassEditorPage({ id }: { id: string }) {
             creator_url: data.creator_url || "",
           })
           setHasSpellcasting(!!data.spellcasting)
+          setClassResources(resourcesForClass(id, (resourceRows || []) as ClassResourceRow[]))
+          setClassResourceRows((resourceRows || []) as ClassResourceRow[])
         }
         setLoading(false)
       }
@@ -202,11 +213,15 @@ export default function ClassEditorPage({ id }: { id: string }) {
     }))
   }
 
-  const updateFeature = (index: number, field: keyof ClassFeature, value: string | number) => {
+  const updateFeature = (index: number, patch: Partial<ClassFeature>) => {
     setForm(prev => ({
       ...prev,
-      features: prev.features.map((f, i) => i === index ? { ...f, [field]: value } : f)
+      features: prev.features.map((f, i) => i === index ? { ...f, ...patch } : f)
     }))
+  }
+
+  const updateFeatureField = (index: number, field: keyof ClassFeature, value: string | number) => {
+    updateFeature(index, { [field]: value } as Partial<ClassFeature>)
   }
 
   const toggleArrayField = (field: "primary_ability" | "saving_throws" | "armor_proficiencies" | "weapon_proficiencies", value: string) => {
@@ -237,8 +252,37 @@ export default function ClassEditorPage({ id }: { id: string }) {
       ...newFeatures[index],
       isChoice: checked,
       choices: checked
-        ? (newFeatures[index].choices || { category: "Feature Option", options: [{ name: "", description: "" }], count: 1 })
+        ? (newFeatures[index].choices || {
+            kind: "options",
+            category: "Feature Option",
+            options: [{ name: "", description: "" }],
+            count: 1,
+          })
         : undefined,
+    }
+    setForm({ ...form, features: newFeatures })
+  }
+
+  const setFeatureChoiceKind = (index: number, kind: "options" | "feats") => {
+    const newFeatures = [...form.features]
+    const existing = newFeatures[index].choices || {
+      category: "",
+      options: [],
+      count: 1,
+    }
+    newFeatures[index] = {
+      ...newFeatures[index],
+      choices: {
+        ...existing,
+        kind,
+        options: kind === "feats" ? [] : existing.options?.length ? existing.options : [{ name: "", description: "" }],
+        featCategories:
+          kind === "feats"
+            ? existing.featCategories?.length
+              ? existing.featCategories
+              : ["General"]
+            : existing.featCategories,
+      },
     }
     setForm({ ...form, features: newFeatures })
   }
@@ -381,11 +425,9 @@ export default function ClassEditorPage({ id }: { id: string }) {
             <label className="block text-sm font-semibold text-foreground mb-2">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="A warrior who fights with great strength..."
             />
           </div>
@@ -570,7 +612,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     type="number"
                     min={1}
                     max={20}
-                    value={form.spellcasting.starts_at}
+                    value={form.spellcasting.starts_at ?? 1}
                     onChange={(e) => setForm(prev => ({
                       ...prev,
                       spellcasting: { ...prev.spellcasting!, starts_at: parseInt(e.target.value) || 1 }
@@ -579,6 +621,57 @@ export default function ClassEditorPage({ id }: { id: string }) {
                   />
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Class Resources — managed in compendium tab */}
+          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <label className="text-sm font-semibold text-foreground">Class Resources</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Level-scaling pools (Rage, Focus Points, etc.) live in the Class Resources compendium section.
+                </p>
+              </div>
+              {id !== "new" && (
+                <Link
+                  href={`${compendiumEditHref("class_resources", "new")}?class_id=${id}`}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Resource
+                </Link>
+              )}
+            </div>
+            {id === "new" ? (
+              <p className="text-sm text-muted-foreground">Save this class first, then add resources.</p>
+            ) : classResources.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No resources yet.{" "}
+                <Link href={compendiumListHref("class_resources")} className="text-primary hover:underline">
+                  Browse Class Resources
+                </Link>
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {classResourceRows.map((resource) => (
+                  <li
+                    key={resource.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <span>
+                      <span className="font-semibold text-foreground">{resource.name}</span>
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">{resource.resource_key}</span>
+                    </span>
+                    <Link
+                      href={compendiumEditHref("class_resources", resource.id)}
+                      className="text-xs text-primary hover:underline shrink-0"
+                    >
+                      Edit
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
@@ -606,7 +699,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                       <input
                         type="text"
                         value={feature.name}
-                        onChange={(e) => updateFeature(index, "name", e.target.value)}
+                        onChange={(e) => updateFeatureField(index, "name", e.target.value)}
                         placeholder="Feature name"
                         className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
                       />
@@ -614,7 +707,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     <div className="w-32">
                       <select
                         value={feature.level}
-                        onChange={(e) => updateFeature(index, "level", parseInt(e.target.value))}
+                        onChange={(e) => updateFeatureField(index, "level", parseInt(e.target.value, 10))}
                         className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-foreground text-center focus:outline-none focus:border-primary"
                       >
                         {LEVELS.map((lvl) => (
@@ -630,254 +723,28 @@ export default function ClassEditorPage({ id }: { id: string }) {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <textarea
-                    value={feature.description}
-                    onChange={(e) => updateFeature(index, "description", e.target.value)}
-                    placeholder="Feature description..."
-                    rows={2}
-                    className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
+                  <ClassFeatureFields
+                    feature={feature}
+                    index={index}
+                    classResources={classResources}
+                    onUpdate={updateFeature}
+                    onToggleChoice={toggleFeatureChoice}
+                    onUpdateChoiceField={updateFeatureChoiceField}
+                    onSetChoiceKind={setFeatureChoiceKind}
+                    onAddChoiceOption={addChoiceOption}
+                    onUpdateChoiceOption={updateChoiceOption}
+                    onRemoveChoiceOption={removeChoiceOption}
+                    onToggleLimitedUses={(featIndex, checked) => {
+                      if (checked) {
+                        updateFeature(featIndex, { limitedUses: { type: "unlimited" } })
+                      } else {
+                        updateFeature(featIndex, { limitedUses: null })
+                      }
+                    }}
+                    onUpdateLimitedUses={(featIndex, uses) =>
+                      updateFeature(featIndex, { limitedUses: uses })
+                    }
                   />
-                  
-                  {/* Is Choice Toggle */}
-                  <div className="pt-2 border-t border-border space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="checkbox"
-                        checked={!!feature.isChoice}
-                        onChange={(e) => toggleFeatureChoice(index, e.target.checked)}
-                        className="w-4 h-4 rounded border-border accent-primary"
-                      />
-                      <span className="text-muted-foreground">This feature offers a choice between options</span>
-                    </label>
-
-                    {feature.isChoice && feature.choices && (
-                      <div className="bg-background border-2 border-primary/20 rounded-xl p-3 space-y-3 ml-6">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-foreground mb-1">Category</label>
-                            <input
-                              type="text"
-                              value={feature.choices.category}
-                              onChange={(e) => updateFeatureChoiceField(index, "category", e.target.value)}
-                              placeholder="e.g. Fighting Style"
-                              className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-foreground mb-1">Number to Choose</label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={feature.choices.count}
-                              onChange={(e) => updateFeatureChoiceField(index, "count", parseInt(e.target.value) || 1)}
-                              className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-center focus:outline-none focus:border-primary"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-foreground">Options</span>
-                            <button
-                              type="button"
-                              onClick={() => addChoiceOption(index)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Add Option
-                            </button>
-                          </div>
-                          {feature.choices.options.map((opt, oi) => (
-                            <div key={oi} className="flex gap-2">
-                              <input
-                                type="text"
-                                value={opt.name}
-                                onChange={(e) => updateChoiceOption(index, oi, "name", e.target.value)}
-                                placeholder="Option name"
-                                className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                              />
-                              <input
-                                type="text"
-                                value={opt.description}
-                                onChange={(e) => updateChoiceOption(index, oi, "description", e.target.value)}
-                                placeholder="Description (optional)"
-                                className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                              />
-                              <button type="button" onClick={() => removeChoiceOption(index, oi)}
-                                className="p-1.5 text-muted-foreground hover:text-destructive">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Limited Uses Checkbox */}
-                  <label className="flex items-center gap-2 cursor-pointer text-sm pt-2 border-t border-border">
-                    <input
-                      type="checkbox"
-                      checked={feature.limitedUses !== null && feature.limitedUses !== undefined}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const newFeatures = [...form.features]
-                          newFeatures[index] = { ...newFeatures[index], limitedUses: { type: "unlimited" } }
-                          setForm({ ...form, features: newFeatures })
-                        } else {
-                          const newFeatures = [...form.features]
-                          newFeatures[index] = { ...newFeatures[index], limitedUses: null }
-                          setForm({ ...form, features: newFeatures })
-                        }
-                      }}
-                      className="w-4 h-4 rounded border-border accent-primary"
-                    />
-                    <span className="text-muted-foreground">Has limited uses</span>
-                  </label>
-
-                  {/* Limited Uses Configuration */}
-                  {feature.limitedUses && (
-                    <div className="bg-card-lighter border-2 border-primary/30 rounded-lg p-3 space-y-3 ml-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1">
-                            Uses Type
-                          </label>
-                          <select
-                            value={feature.limitedUses.type}
-                            onChange={(e) => {
-                              const newFeatures = [...form.features]
-                              newFeatures[index] = {
-                                ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, type: e.target.value as UsesConfig["type"] }
-                              }
-                              setForm({ ...form, features: newFeatures })
-                            }}
-                            className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm focus:outline-none focus:border-primary"
-                          >
-                            <option value="unlimited">Unlimited (At Will)</option>
-                            <option value="fixed">Fixed Number</option>
-                            <option value="proficiency">Proficiency Modifier</option>
-                            <option value="ability_modifier">Ability Modifier</option>
-                            <option value="at_level">Based on Level</option>
-                          </select>
-                        </div>
-
-                        {feature.limitedUses.type === "fixed" && (
-                          <div>
-                            <label className="block text-xs font-semibold text-foreground mb-1">
-                              Number of Uses
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={99}
-                              value={feature.limitedUses.fixedAmount ?? 1}
-                              onChange={(e) => {
-                                const newFeatures = [...form.features]
-                                newFeatures[index] = {
-                                  ...newFeatures[index],
-                                  limitedUses: { ...feature.limitedUses!, fixedAmount: parseInt(e.target.value) || 1 }
-                                }
-                                setForm({ ...form, features: newFeatures })
-                              }}
-                              className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm"
-                            />
-                          </div>
-                        )}
-
-                        {feature.limitedUses.type === "ability_modifier" && (
-                          <div>
-                            <label className="block text-xs font-semibold text-foreground mb-1">
-                              Ability Score
-                            </label>
-                            <select
-                              value={feature.limitedUses.abilityModifier || ""}
-                              onChange={(e) => {
-                                const newFeatures = [...form.features]
-                                newFeatures[index] = {
-                                  ...newFeatures[index],
-                                  limitedUses: { ...feature.limitedUses!, abilityModifier: e.target.value as any }
-                                }
-                                setForm({ ...form, features: newFeatures })
-                              }}
-                              className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-sm"
-                            >
-                              <option value="">Select...</option>
-                              {ABILITY_MODIFIERS.map((mod) => (
-                                <option key={mod} value={mod}>{mod}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                        <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1">
-                            Recharges On
-                          </label>
-                          <select
-                            value={feature.limitedUses.recharge || ""}
-                            onChange={(e) => {
-                              const newFeatures = [...form.features]
-                              newFeatures[index] = {
-                                ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, recharge: e.target.value as any }
-                              }
-                              setForm({ ...form, features: newFeatures })
-                            }}
-                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs"
-                          >
-                            <option value="">No recharge</option>
-                            <option value="short_rest">Short Rest</option>
-                            <option value="long_rest">Long Rest</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1">
-                            Die Count
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={feature.limitedUses.dieCount ?? ""}
-                            onChange={(e) => {
-                              const newFeatures = [...form.features]
-                              newFeatures[index] = {
-                                ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, dieCount: e.target.value ? parseInt(e.target.value) : undefined }
-                              }
-                              setForm({ ...form, features: newFeatures })
-                            }}
-                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-center"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1">
-                            Die Type
-                          </label>
-                          <select
-                            value={feature.limitedUses.dieType || ""}
-                            onChange={(e) => {
-                              const newFeatures = [...form.features]
-                              newFeatures[index] = {
-                                ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, dieType: e.target.value as any }
-                              }
-                              setForm({ ...form, features: newFeatures })
-                            }}
-                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs"
-                          >
-                            <option value="">None</option>
-                            {DIE_TYPES.map((die) => (
-                              <option key={die} value={die}>{die}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

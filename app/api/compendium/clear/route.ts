@@ -3,7 +3,7 @@ import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { clearTable } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
 
-const VALID_TABLES = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "custom_abilities"]
+const VALID_TABLES = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "class_resources", "custom_abilities"]
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,12 +27,13 @@ export async function POST(request: NextRequest) {
 
     if (table === "classes") {
       await clearTable("subclasses")
+      await clearTable("class_resources")
     }
     
     return NextResponse.json({
       success: true,
       table,
-      alsoCleared: table === "classes" ? ["subclasses"] : [],
+      alsoCleared: table === "classes" ? ["subclasses", "class_resources"] : [],
     })
   } catch (err) {
     console.error("[v0] Clear section error:", err)

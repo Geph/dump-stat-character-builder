@@ -6,8 +6,18 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass } from "@/lib/types"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow } from "@/lib/types"
+import { formatUsesSummary } from "@/lib/compendium/class-resource-rows"
+import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
+import {
+  COMPENDIUM_TOGGLE_LABELS,
+  contentTypeToTable,
+  findCompendiumDependents,
+  setCompendiumItemsEnabled,
+  type CompendiumToggleTarget,
+} from "@/lib/compendium/compendium-toggle"
+import { Switch } from "@/components/ui/switch"
 import { GameIcon } from "@/components/game-icon-picker"
 import { formatCompendiumSource } from "@/lib/srd/source"
 import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
@@ -24,20 +34,23 @@ import {
   isCompendiumContentType,
 } from "@/lib/compendium/content-types"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 
 type ContentType = CompendiumContentType
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
-  { id: "classes", label: "Classes", icon: <Shield className="w-4 h-4" /> },
-  { id: "subclasses", label: "Subclasses", icon: <Shield className="w-4 h-4" /> },
-  { id: "species", label: "Species", icon: <Users className="w-4 h-4" /> },
-  { id: "backgrounds", label: "Backgrounds", icon: <BookOpen className="w-4 h-4" /> },
-  { id: "spells", label: "Spells", icon: <Wand2 className="w-4 h-4" /> },
-  { id: "feats", label: "Feats", icon: <Sparkles className="w-4 h-4" /> },
-  { id: "equipment", label: "Equipment", icon: <Package className="w-4 h-4" /> },
-  { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-4 h-4" /> },
+  { id: "classes", label: "Classes", icon: <Shield className="w-3.5 h-3.5" /> },
+  { id: "subclasses", label: "Subclasses", icon: <Shield className="w-3.5 h-3.5" /> },
+  { id: "species", label: "Species", icon: <Users className="w-3.5 h-3.5" /> },
+  { id: "backgrounds", label: "Backgrounds", icon: <BookOpen className="w-3.5 h-3.5" /> },
+  { id: "spells", label: "Spells", icon: <Wand2 className="w-3.5 h-3.5" /> },
+  { id: "feats", label: "Feats", icon: <Sparkles className="w-3.5 h-3.5" /> },
+  { id: "equipment", label: "Equipment", icon: <Package className="w-3.5 h-3.5" /> },
+  { id: "class_resources", label: "Class Resources", icon: <Gauge className="w-3.5 h-3.5" /> },
+  { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-3.5 h-3.5" /> },
 ]
 
 const newItemButtonLabels: Record<ContentType, string> = {
@@ -48,6 +61,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   spells: "New Spell",
   feats: "New Feat",
   equipment: "New Item",
+  class_resources: "New Class Resource",
   abilities: "New Custom Ability",
 }
 
@@ -63,6 +77,7 @@ function CompendiumPageContent() {
     spells: [],
     feats: [],
     equipment: [],
+    class_resources: [],
     abilities: [],
   })
   const [loading, setLoading] = useState(true)
@@ -70,12 +85,20 @@ function CompendiumPageContent() {
   const [clearingAll, setClearingAll] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearError, setClearError] = useState<string | null>(null)
+  const [toggleConfirm, setToggleConfirm] = useState<{
+    item: CompendiumToggleTarget
+    dependents: CompendiumToggleTarget[]
+  } | null>(null)
+  const [toggleSaving, setToggleSaving] = useState(false)
+  const [toggleError, setToggleError] = useState<string | null>(null)
   // Spell-specific filters
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
+  const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
+  const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
     classes: 0,
@@ -84,6 +107,7 @@ function CompendiumPageContent() {
     spells: 0,
     feats: 0,
     equipment: 0,
+    class_resources: 0,
     abilities: 0,
   })
 
@@ -140,6 +164,7 @@ function CompendiumPageContent() {
         { count: spellsCount },
         { count: featsCount },
         { count: equipmentCount },
+        { count: classResourcesCount },
         { count: abilitiesCount },
       ] = await Promise.all([
         db.from("species").select("*", { count: "exact", head: true }),
@@ -149,6 +174,7 @@ function CompendiumPageContent() {
         db.from("spells").select("*", { count: "exact", head: true }),
         db.from("feats").select("*", { count: "exact", head: true }),
         db.from("equipment").select("*", { count: "exact", head: true }),
+        db.from("class_resources").select("*", { count: "exact", head: true }),
         db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
       setTabCounts({
@@ -159,6 +185,7 @@ function CompendiumPageContent() {
         spells: spellsCount ?? 0,
         feats: featsCount ?? 0,
         equipment: equipmentCount ?? 0,
+        class_resources: classResourcesCount ?? 0,
         abilities: abilitiesCount ?? 0,
       })
     }
@@ -181,7 +208,12 @@ function CompendiumPageContent() {
         .order("name")
         .limit(activeTab === "equipment" ? 500 : 100)
       
-      setContent(prev => ({ ...prev, [activeTab]: data || [] }))
+      const rows = data || []
+      setContent((prev) => ({
+        ...prev,
+        [activeTab]:
+          activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+      }))
 
       if (activeTab === "classes") {
         const { data: subclasses } = await db
@@ -190,6 +222,11 @@ function CompendiumPageContent() {
           .order("name")
           .limit(200)
         setSubclassesForClasses(subclasses || [])
+      }
+
+      if (activeTab === "class_resources") {
+        const { data: classes } = await db.from("classes").select("id, name").order("name")
+        setClassNamesById(Object.fromEntries((classes || []).map((cls) => [cls.id as string, cls.name as string])))
       }
 
       setLoading(false)
@@ -222,7 +259,16 @@ function CompendiumPageContent() {
   ).sort((a, b) => a - b)
 
   const filteredContent = (content[activeTab] as { name: string }[]).filter((item) => {
-    if (!item.name?.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    const query = searchQuery.toLowerCase()
+    if (activeTab === "class_resources") {
+      const resource = item as ClassResourceRow
+      const className = classNamesById[resource.class_id] ?? ""
+      const haystack = `${resource.name} ${resource.resource_key} ${className}`.toLowerCase()
+      if (!haystack.includes(query)) return false
+      if (classResourceFilterClassId !== "all" && resource.class_id !== classResourceFilterClassId) return false
+      return true
+    }
+    if (!item.name?.toLowerCase().includes(query)) return false
     if (activeTab === "spells") {
       const spell = item as Spell
       if (spellFilterClass !== "all" && !(spell.classes ?? []).includes(spellFilterClass)) return false
@@ -264,6 +310,7 @@ function CompendiumPageContent() {
       { count: spellsCount },
       { count: featsCount },
       { count: equipmentCount },
+      { count: classResourcesCount },
       { count: abilitiesCount },
     ] = await Promise.all([
       db.from("species").select("*", { count: "exact", head: true }),
@@ -273,6 +320,7 @@ function CompendiumPageContent() {
       db.from("spells").select("*", { count: "exact", head: true }),
       db.from("feats").select("*", { count: "exact", head: true }),
       db.from("equipment").select("*", { count: "exact", head: true }),
+      db.from("class_resources").select("*", { count: "exact", head: true }),
       db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
     setTabCounts({
@@ -283,6 +331,7 @@ function CompendiumPageContent() {
       spells: spellsCount ?? 0,
       feats: featsCount ?? 0,
       equipment: equipmentCount ?? 0,
+      class_resources: classResourcesCount ?? 0,
       abilities: abilitiesCount ?? 0,
     })
   }
@@ -296,7 +345,11 @@ function CompendiumPageContent() {
       .select("*")
       .order("name")
       .limit(100)
-    setContent((prev) => ({ ...prev, [activeTab]: data || [] }))
+    const rows = data || []
+    setContent((prev) => ({
+      ...prev,
+      [activeTab]: activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+    }))
     setLoading(false)
   }
 
@@ -324,6 +377,9 @@ function CompendiumPageContent() {
           if (data.alsoCleared?.includes("subclasses")) {
             next.subclasses = []
           }
+          if (data.alsoCleared?.includes("class_resources")) {
+            next.class_resources = []
+          }
           return next
         })
       } else {
@@ -331,11 +387,13 @@ function CompendiumPageContent() {
         await clearIndexedDbStore(resolved as Parameters<typeof clearIndexedDbStore>[0])
         if (activeTab === "classes") {
           await clearIndexedDbStore("subclasses")
+          await clearIndexedDbStore("class_resources")
         }
         setContent((prev) => {
           const next = { ...prev, [activeTab]: [] }
           if (activeTab === "classes") {
             next.subclasses = []
+            next.class_resources = []
           }
           return next
         })
@@ -358,7 +416,7 @@ function CompendiumPageContent() {
     if (!data?.length) return
 
     const classNameById = new Map<string, string>()
-    if (activeTab === "subclasses") {
+    if (activeTab === "subclasses" || activeTab === "class_resources") {
       const { data: classesData } = await db.from("classes").select("id, name")
       for (const cls of classesData ?? []) {
         classNameById.set(cls.id as string, cls.name as string)
@@ -368,7 +426,7 @@ function CompendiumPageContent() {
     const items = (data as Record<string, unknown>[])
       .map((row) => {
         const exportRow = { ...row }
-        if (activeTab === "subclasses" && exportRow.class_id) {
+        if ((activeTab === "subclasses" || activeTab === "class_resources") && exportRow.class_id) {
           exportRow.class_name = classNameById.get(exportRow.class_id as string)
         }
         return rowToExportItem(activeTab, exportRow)
@@ -385,17 +443,73 @@ function CompendiumPageContent() {
     URL.revokeObjectURL(url)
   }
 
+  const patchContentEnabled = (targets: CompendiumToggleTarget[], enabled: boolean) => {
+    setContent((prev) => {
+      const next = { ...prev }
+      for (const target of targets) {
+        const tab = target.contentType
+        next[tab] = (next[tab] as Record<string, unknown>[]).map((row) =>
+          row.id === target.id ? { ...row, enabled } : row,
+        )
+      }
+      return next
+    })
+  }
+
+  const applyItemEnabled = async (targets: CompendiumToggleTarget[], enabled: boolean) => {
+    setToggleSaving(true)
+    setToggleError(null)
+    try {
+      const db = createClient()
+      await setCompendiumItemsEnabled(db, targets, enabled)
+      patchContentEnabled(targets, enabled)
+      setToggleConfirm(null)
+    } catch (err) {
+      console.error("[v0] Toggle compendium item error:", err)
+      setToggleError(err instanceof Error ? err.message : "Failed to update item")
+    } finally {
+      setToggleSaving(false)
+    }
+  }
+
+  const handleItemEnabledChange = async (item: Record<string, unknown>, nextEnabled: boolean) => {
+    const target: CompendiumToggleTarget = {
+      table: contentTypeToTable(activeTab),
+      contentType: activeTab,
+      id: item.id as string,
+      name: item.name as string,
+    }
+
+    if (nextEnabled) {
+      await applyItemEnabled([target], true)
+      return
+    }
+
+    const db = createClient()
+    const dependents = await findCompendiumDependents(db, activeTab, target.id)
+    if (dependents.length === 0) {
+      await applyItemEnabled([target], false)
+      return
+    }
+
+    setToggleError(null)
+    setToggleConfirm({ item: target, dependents })
+  }
+
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = compendiumEditHref(activeTab, data.id as string)
     const iconName = getCompendiumItemIcon(activeTab, data)
+    const enabled = isCompendiumItemEnabled(data)
 
     return (
       <motion.div
         key={data.id as string}
         layoutId={data.id as string}
-        className="bg-card rounded-2xl p-5 border-2 border-border hover:border-primary transition-colors"
-        whileHover={{ scale: 1.02 }}
+        className={`bg-card rounded-2xl p-5 border-2 transition-colors ${
+          enabled ? "border-border hover:border-primary" : "border-border/60 opacity-60 hover:opacity-80"
+        }`}
+        whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
@@ -409,13 +523,26 @@ function CompendiumPageContent() {
               {data.name as string}
             </h3>
           </div>
-          <Link
-            href={editPath}
-            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors shrink-0"
-            title="Edit"
-          >
-            <Edit className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <div
+              className="flex items-center gap-2"
+              onClick={(e) => e.stopPropagation()}
+              title={enabled ? "Enabled in builder" : "Disabled in builder"}
+            >
+              <Switch
+                checked={enabled}
+                onCheckedChange={(checked) => void handleItemEnabledChange(data, checked)}
+                aria-label={`${enabled ? "Disable" : "Enable"} ${data.name as string}`}
+              />
+            </div>
+            <Link
+              href={editPath}
+              className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+              title="Edit"
+            >
+              <Edit className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
         {activeTab === "classes" && (
           <div className="space-y-1 text-xs text-muted-foreground">
@@ -528,6 +655,19 @@ function CompendiumPageContent() {
             )}
           </div>
         )}
+        {activeTab === "class_resources" && (
+          <div className="flex gap-2 flex-wrap">
+            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+              {classNamesById[(data as ClassResourceRow).class_id] ?? "Unknown class"}
+            </span>
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full font-mono">
+              {(data as ClassResourceRow).resource_key}
+            </span>
+            <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
+              {formatUsesSummary((data as ClassResourceRow).uses)}
+            </span>
+          </div>
+        )}
         {activeTab === "abilities" && (
           <div className="space-y-2">
             {(data as { prerequisites?: string }).prerequisites && (
@@ -582,7 +722,10 @@ function CompendiumPageContent() {
                   Export all {tabs.find((t) => t.id === activeTab)?.label}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setClearConfirmOpen(true)}
+                  onClick={() => {
+                    setClearError(null)
+                    setClearConfirmOpen(true)
+                  }}
                   className="gap-2 cursor-pointer text-destructive focus:text-destructive"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -616,9 +759,18 @@ function CompendiumPageContent() {
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                This will permanently delete <strong className="text-foreground">all {tabs.find(t => t.id === activeTab)?.label.toLowerCase()}</strong> from your compendium database.
-                {activeTab === "classes" && " All subclasses will be cleared as well."}
-                {" "}Other sections will not be affected.
+                This will permanently delete{" "}
+                <strong className="text-foreground">
+                  all {tabCounts[activeTab]} {tabs.find((t) => t.id === activeTab)?.label.toLowerCase()}
+                </strong>{" "}
+                from your compendium database.
+                {activeTab === "classes" && tabCounts.subclasses > 0 && (
+                  <> All {tabCounts.subclasses} subclasses will be cleared as well.</>
+                )}
+                {activeTab === "classes" && tabCounts.class_resources > 0 && (
+                  <> All {tabCounts.class_resources} class resources will be cleared as well.</>
+                )}{" "}
+                Other sections will not be affected.
               </p>
               {clearError && (
                 <p className="text-sm text-destructive mb-4">{clearError}</p>
@@ -643,52 +795,108 @@ function CompendiumPageContent() {
           </div>
         )}
 
+        {toggleConfirm && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl border-2 border-border p-6 max-w-lg w-full shadow-xl">
+              <h2 className="text-xl font-black text-foreground mb-2">
+                Disable {toggleConfirm.item.name}?
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Other compendium entries rely on this {COMPENDIUM_TOGGLE_LABELS[toggleConfirm.item.contentType].toLowerCase()}.
+                You can disable only this item, or disable it together with the related entries below.
+              </p>
+              <ul className="max-h-48 overflow-y-auto space-y-2 mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                {toggleConfirm.dependents.map((dependent) => (
+                  <li key={`${dependent.table}:${dependent.id}`} className="text-sm text-foreground">
+                    <span className="font-semibold">{dependent.name}</span>
+                    <span className="text-muted-foreground"> · {COMPENDIUM_TOGGLE_LABELS[dependent.contentType]}</span>
+                  </li>
+                ))}
+              </ul>
+              {toggleError && <p className="text-sm text-destructive mb-4">{toggleError}</p>}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToggleConfirm(null)
+                    setToggleError(null)
+                  }}
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-semibold hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void applyItemEnabled([toggleConfirm.item], false)}
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50"
+                >
+                  {toggleSaving ? "Saving..." : "Only this item"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void applyItemEnabled([toggleConfirm.item, ...toggleConfirm.dependents], false)
+                  }
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {toggleSaving
+                    ? "Saving..."
+                    : `Disable all (${toggleConfirm.dependents.length + 1})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs — content type selection */}
         <div className="relative mb-4 group/tabs">
           {canScrollTabsLeft && (
             <>
               <div
-                className="pointer-events-none absolute left-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-r from-background to-transparent"
+                className="pointer-events-none absolute left-0 top-0 bottom-3 z-[1] w-10 bg-gradient-to-r from-background to-transparent"
                 aria-hidden
               />
               <button
                 type="button"
                 aria-label="Scroll tabs left"
                 onClick={() => scrollCompendiumTabs("left")}
-                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.375rem)] flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
             </>
           )}
           {canScrollTabsRight && (
             <>
               <div
-                className="pointer-events-none absolute right-0 top-0 bottom-4 z-[1] w-12 bg-gradient-to-l from-background to-transparent"
+                className="pointer-events-none absolute right-0 top-0 bottom-3 z-[1] w-10 bg-gradient-to-l from-background to-transparent"
                 aria-hidden
               />
               <button
                 type="button"
                 aria-label="Scroll tabs right"
                 onClick={() => scrollCompendiumTabs("right")}
-                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.5rem)] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
+                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.375rem)] flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
               </button>
             </>
           )}
           <div
             id="compendium-tabs"
             ref={tabsScrollRef}
-            className={`flex gap-2 overflow-x-auto pb-4 scrollbar-hide scroll-smooth ${
-              canScrollTabsLeft ? "pl-10" : ""
-            } ${canScrollTabsRight ? "pr-10" : ""}`}
+            className={`flex gap-1.5 overflow-x-auto pb-3 scrollbar-hide scroll-smooth ${
+              canScrollTabsLeft ? "pl-9" : ""
+            } ${canScrollTabsRight ? "pr-9" : ""}`}
           >
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl font-semibold whitespace-nowrap transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                   activeTab === tab.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-muted-foreground hover:bg-muted"
@@ -696,7 +904,7 @@ function CompendiumPageContent() {
               >
                 {tab.icon}
                 {tab.label}
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                   activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
                 }`}>
                   {tabCounts[tab.id]}
@@ -709,13 +917,13 @@ function CompendiumPageContent() {
         {/* Search (+ tab filters inline on sm+) */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div id="compendium-search" className="relative flex-1 min-w-0">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search content..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-card border-2 border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
             />
           </div>
 
@@ -740,6 +948,38 @@ function CompendiumPageContent() {
               {featFilterCategory !== "all" && (
                 <button
                   onClick={() => setFeatFilterCategory("all")}
+                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          )}
+
+          {activeTab === "class_resources" && (
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Class
+                </label>
+                <select
+                  value={classResourceFilterClassId}
+                  onChange={(e) => setClassResourceFilterClassId(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                >
+                  <option value="all">All Classes</option>
+                  {Object.entries(classNamesById)
+                    .sort(([, a], [, b]) => a.localeCompare(b))
+                    .map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {classResourceFilterClassId !== "all" && (
+                <button
+                  onClick={() => setClassResourceFilterClassId("all")}
                   className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                 >
                   Clear filter
@@ -913,9 +1153,9 @@ function CompendiumPageContent() {
               <h2 className="text-2xl font-black text-foreground mb-4">
                 {(selectedItem as { name: string }).name}
               </h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">
-                {(selectedItem as { description?: string }).description || "No description available."}
-              </p>
+              <RichTextContent
+                html={(selectedItem as { description?: string }).description}
+              />
               {(selectedItem as { creator_url?: string | null }).creator_url && (
                 <p className="mt-4 text-sm">
                   <span className="text-muted-foreground">Source link: </span>

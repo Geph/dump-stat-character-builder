@@ -25,8 +25,11 @@ export function getSrdSeedData() {
   }
 }
 
+import { countBundledClassResources } from "@/lib/compendium/seed-class-resources"
+
 export function getSrdSeedTotals() {
   const data = getSrdSeedData()
+  const classResourceCount = countBundledClassResources()
   const total =
     data.classes.length +
     data.subclasses.length +
@@ -34,7 +37,8 @@ export function getSrdSeedTotals() {
     data.backgrounds.length +
     data.spells.length +
     data.feats.length +
-    data.equipment.length
+    data.equipment.length +
+    classResourceCount
 
   return {
     total,
@@ -46,6 +50,7 @@ export function getSrdSeedTotals() {
       spells: data.spells.length,
       feats: data.feats.length,
       equipment: data.equipment.length,
+      class_resources: classResourceCount,
     },
   }
 }

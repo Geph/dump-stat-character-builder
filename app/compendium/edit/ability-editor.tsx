@@ -15,6 +15,7 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { attachTypeToTable } from "@/lib/db/attach-target-table"
 import {
@@ -323,11 +324,9 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             <label className="block text-sm font-semibold text-foreground mb-2">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={8}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe what this ability does..."
             />
           </div>

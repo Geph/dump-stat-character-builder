@@ -8,6 +8,7 @@ import { X } from "lucide-react"
 import type { Spell } from "@/lib/types"
 import { isSrdSource } from "@/lib/srd/source"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { DropdownOrOtherField } from "@/components/compendium/dropdown-or-other-field"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import {
@@ -485,11 +486,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
             <label className="block text-sm font-semibold text-foreground mb-2">
               Description
             </label>
-            <textarea
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={6}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe what the spell does..."
             />
           </div>
@@ -499,12 +498,11 @@ export default function SpellEditorPage({ id }: { id: string }) {
             <label className="block text-sm font-semibold text-foreground mb-2">
               At Higher Levels
             </label>
-            <textarea
+            <RichTextEditor
               value={form.higher_levels}
-              onChange={(e) => setForm({ ...form, higher_levels: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary resize-none"
+              onChange={(higher_levels) => setForm({ ...form, higher_levels })}
               placeholder="Effects when cast at higher levels..."
+              minHeightClass="min-h-[4rem]"
             />
           </div>
 

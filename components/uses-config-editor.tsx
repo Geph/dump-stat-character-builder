@@ -43,6 +43,7 @@ export function UsesConfigEditor({
             <option value="ability_modifier">Ability Modifier</option>
             <option value="custom_ability">Same as Another Ability</option>
             <option value="at_level">Based on Level</option>
+            <option value="class_resource">Class resource</option>
           </select>
         </div>
 
@@ -174,7 +175,7 @@ export function UsesConfigEditor({
         </div>
       )}
 
-      {value.type !== "unlimited" && (
+      {value.type !== "unlimited" && value.type !== "class_resource" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border">
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">Recharges On</label>
