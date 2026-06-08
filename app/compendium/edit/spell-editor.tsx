@@ -69,6 +69,7 @@ interface SpellFormData {
   source: string
   creator_url: string
   icon: string | null
+  accent_color: string | null
 }
 
 const defaultSpell: SpellFormData = {
@@ -88,6 +89,7 @@ const defaultSpell: SpellFormData = {
   source: "Custom",
   creator_url: "",
   icon: "bookmarklet",
+  accent_color: null,
 }
 
 export default function SpellEditorPage({ id }: { id: string }) {
@@ -150,6 +152,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
           })
         }
         setLoading(false)
@@ -291,6 +294,8 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
           {/* Classes */}

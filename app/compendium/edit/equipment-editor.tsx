@@ -63,6 +63,7 @@ interface EquipmentFormData {
   mastery: string
   properties: string[]
   icon: string | null
+  accent_color: string | null
 }
 
 const defaultEquipment: EquipmentFormData = {
@@ -82,6 +83,7 @@ const defaultEquipment: EquipmentFormData = {
   mastery: "",
   properties: [],
   icon: null,
+  accent_color: null,
 }
 
 export default function EquipmentEditorPage({ id }: { id: string }) {
@@ -143,6 +145,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             mastery,
             properties: propTags,
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
           })
         }
         setLoading(false)
@@ -281,6 +284,8 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

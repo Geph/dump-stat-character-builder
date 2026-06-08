@@ -85,6 +85,7 @@ export interface ClassResourceRow {
   description: string | null
   uses: UsesConfig
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   enabled?: boolean
@@ -113,6 +114,7 @@ export interface Species {
   /** References into the Common Modifier Effects catalog (merged with characteristics in builder). */
   modifierRefs?: string[] | null
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   enabled?: boolean
@@ -163,6 +165,7 @@ export interface DndClass {
     progression?: SpellProgressionEntry[]
   } | null
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -180,6 +183,7 @@ export interface Subclass {
     spells_known?: number
   } | null
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -238,6 +242,7 @@ export interface CustomAbility {
   uses: UsesConfig | null
   show_in_builder: boolean
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -261,6 +266,7 @@ export interface Background {
   grants_spells?: boolean
   granted_spells?: Record<string, string[]> | null
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -282,6 +288,7 @@ export interface Spell {
   higher_levels: string | null
   classes: string[] | null
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -304,6 +311,7 @@ export interface Feat {
   /** When true, the feat may be chosen in more than one milestone slot. */
   repeatable?: boolean
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -329,6 +337,7 @@ export interface Equipment {
   // Attached abilities (for finesse, two-handed, etc.)
   attached_ability_ids?: string[]
   icon: string | null
+  accent_color?: string | null
   source: string
   creator_url: string | null
   created_at: string

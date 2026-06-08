@@ -30,10 +30,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export-format"
 import {
-  type CompendiumContentType,
   getCompendiumItemIcon,
   isCompendiumContentType,
 } from "@/lib/compendium/content-types"
+import {
+  compendiumAccentColorStyles,
+  getCompendiumItemAccentColor,
+} from "@/lib/compendium/theme-colors"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
@@ -527,6 +530,7 @@ function CompendiumPageContent() {
     const data = item as Record<string, unknown>
     const editPath = compendiumEditHref(activeTab, data.id as string)
     const iconName = getCompendiumItemIcon(activeTab, data)
+    const accentStyles = compendiumAccentColorStyles(getCompendiumItemAccentColor(data))
     const enabled = isCompendiumItemEnabled(data)
     const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(data as { id?: string; is_system?: boolean })
 
@@ -535,17 +539,17 @@ function CompendiumPageContent() {
         key={data.id as string}
         layoutId={data.id as string}
         className={`relative bg-card rounded-2xl p-5 pb-11 border-2 transition-colors ${
-          enabled ? "border-border hover:border-primary" : "border-border/60 opacity-60 hover:opacity-80"
+          enabled ? `border-border ${accentStyles.hoverBorder}` : "border-border/60 opacity-60 hover:opacity-80"
         }`}
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 shrink-0 text-primary">
+            <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
               <GameIcon name={iconName} className="w-10 h-10" />
             </div>
             <h3 
-              className="font-bold text-lg text-foreground cursor-pointer hover:text-primary leading-tight flex items-center gap-1.5"
+              className={`font-bold text-lg text-foreground cursor-pointer ${accentStyles.titleHover} leading-tight flex items-center gap-1.5`}
               onClick={() => setSelectedItem(item)}
             >
               {data.name as string}
@@ -569,7 +573,7 @@ function CompendiumPageContent() {
           </div>
           <Link
             href={editPath}
-            className="flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/10 transition-colors"
+            className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground transition-colors ${accentStyles.editHover}`}
             title="Edit"
           >
             <Edit className="w-4 h-4" />
