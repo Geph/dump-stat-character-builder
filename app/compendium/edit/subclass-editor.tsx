@@ -30,6 +30,7 @@ interface SubclassFormData {
   source: string
   creator_url: string
   icon: string | null
+  accent_color: string | null
 }
 
 const defaultSubclass: SubclassFormData = {
@@ -41,6 +42,7 @@ const defaultSubclass: SubclassFormData = {
   source: "Custom",
   creator_url: "",
   icon: null,
+  accent_color: null,
 }
 
 export default function SubclassEditorPage({ id }: { id: string }) {
@@ -87,6 +89,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
           })
           setHasSpellcasting(!!data.spellcasting)
         }
@@ -310,6 +313,8 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             afterName={
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">

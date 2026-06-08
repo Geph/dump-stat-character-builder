@@ -47,6 +47,7 @@ interface AbilityFormData {
   source: string
   creator_url: string
   icon: string | null
+  accent_color: string | null
 }
 
 const defaultAbility: AbilityFormData = {
@@ -61,6 +62,7 @@ const defaultAbility: AbilityFormData = {
   source: "Custom",
   creator_url: "",
   icon: null,
+  accent_color: null,
 }
 
 const ATTACH_OPTIONS = [
@@ -119,6 +121,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               source: data.source || "Custom",
               creator_url: data.creator_url || "",
               icon: data.icon || null,
+              accent_color: data.accent_color || null,
             })
           }
         }
@@ -313,6 +316,8 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
           <div>

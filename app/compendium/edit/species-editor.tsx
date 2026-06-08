@@ -46,6 +46,7 @@ interface SpeciesFormData {
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
   icon: string | null
+  accent_color: string | null
   source: string
   creator_url: string
 }
@@ -62,6 +63,7 @@ const defaultSpecies: SpeciesFormData = {
   characteristics: [],
   modifier_refs: [],
   icon: null,
+  accent_color: null,
   source: "Custom",
   creator_url: "",
 }
@@ -108,6 +110,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             characteristics: normalizeCharacteristics(data.characteristics, null),
             modifier_refs: readModifierRefs(data as Record<string, unknown>),
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
           })
@@ -301,6 +304,8 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
           {/* Description */}

@@ -50,6 +50,7 @@ interface BackgroundFormData {
   source: string
   creator_url: string
   icon: string | null
+  accent_color: string | null
   feature_name: string
   feature_description: string
   grants_spells: boolean
@@ -68,6 +69,7 @@ const defaultBackground: BackgroundFormData = {
   source: "Custom",
   creator_url: "",
   icon: null,
+  accent_color: null,
   feature_name: "",
   feature_description: "",
   grants_spells: false,
@@ -155,6 +157,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
             feature_name: data.feature?.name || "",
             feature_description: data.feature?.description || "",
             grants_spells: Boolean(data.grants_spells),
@@ -332,6 +335,8 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
           <div>

@@ -26,6 +26,7 @@ interface ClassResourceFormData {
   source: string
   creator_url: string
   icon: string | null
+  accent_color: string | null
 }
 
 const defaultForm: ClassResourceFormData = {
@@ -37,6 +38,7 @@ const defaultForm: ClassResourceFormData = {
   source: "Custom",
   creator_url: "",
   icon: null,
+  accent_color: null,
 }
 
 export default function ClassResourceEditorPage({ id }: { id: string }) {
@@ -87,6 +89,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
             icon: data.icon || null,
+            accent_color: data.accent_color || null,
           })
         }
         setLoading(false)
@@ -202,6 +205,8 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm((prev) => ({ ...prev, creator_url }))}
             icon={form.icon}
             onIconChange={(icon) => setForm((prev) => ({ ...prev, icon }))}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm((prev) => ({ ...prev, accent_color }))}
           />
 
           <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">

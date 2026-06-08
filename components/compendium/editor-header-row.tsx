@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { CompendiumThemeColorPicker } from "@/components/compendium/theme-color-picker"
 import { SourceLinkField } from "@/components/compendium/source-link-field"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 const fieldClass = compendiumFieldClass
 
@@ -19,6 +21,8 @@ type CompendiumEditorHeaderRowProps = {
   onCreatorUrlChange: (value: string) => void
   icon: string | null
   onIconChange: (icon: string | null) => void
+  accentColor?: CompendiumThemeColorId | null
+  onAccentColorChange?: (color: CompendiumThemeColorId | null) => void
   /** Optional field between name and source (e.g. parent class). */
   afterName?: ReactNode
 }
@@ -35,6 +39,8 @@ export function CompendiumEditorHeaderRow({
   onCreatorUrlChange,
   icon,
   onIconChange,
+  accentColor = null,
+  onAccentColorChange,
   afterName,
 }: CompendiumEditorHeaderRowProps) {
   const gridCols = afterName
@@ -43,11 +49,16 @@ export function CompendiumEditorHeaderRow({
 
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start">
-      <div className="shrink-0 flex flex-col">
-        <span className="hidden sm:block text-sm font-semibold text-foreground mb-2 invisible select-none" aria-hidden>
-          Icon
-        </span>
-        <GameIconPicker value={icon} onChange={onIconChange} inline />
+      <div className="shrink-0 flex flex-col gap-3">
+        <div className="flex flex-col">
+          <span className="hidden sm:block text-sm font-semibold text-foreground mb-2 invisible select-none" aria-hidden>
+            Icon
+          </span>
+          <GameIconPicker value={icon} onChange={onIconChange} inline />
+        </div>
+        {onAccentColorChange ? (
+          <CompendiumThemeColorPicker value={accentColor} onChange={onAccentColorChange} compact />
+        ) : null}
       </div>
       <div className={`flex-1 w-full min-w-0 grid ${gridCols} gap-4`}>
         <div>

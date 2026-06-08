@@ -17,6 +17,7 @@ const timestamps = {
 }
 const compendiumMeta = {
   icon: varchar("icon", { length: 255 }),
+  accent_color: varchar("accent_color", { length: 32 }),
   source: varchar("source", { length: 64 }).notNull().default("Custom"),
   creator_url: varchar("creator_url", { length: 512 }),
   enabled: boolean("enabled").notNull().default(true),
@@ -154,6 +155,7 @@ export const customAbilities = mysqlTable("custom_abilities", {
   is_system: boolean("is_system").notNull().default(false),
   modifier_catalog: json("modifier_catalog").$type<import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[]>().default([]),
   icon: varchar("icon", { length: 255 }),
+  accent_color: varchar("accent_color", { length: 32 }),
   source: varchar("source", { length: 64 }).notNull().default("Custom"),
   creator_url: varchar("creator_url", { length: 512 }),
   enabled: boolean("enabled").notNull().default(true),
