@@ -52,7 +52,13 @@ export const ACTION_EFFECT_GROUPS: { id: ActionEffectGroup; label: string }[] = 
 ]
 
 export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
-  { value: "heal_from_pool", label: "Heal HP from a pool", group: "healing_temp_hp", hint: "Lay on Hands" },
+  {
+    value: "heal_from_pool",
+    label: "Heal HP from a pool",
+    group: "healing_temp_hp",
+    hint: "Lay on Hands",
+    fields: ["classResourceKey", "classResourceChange"],
+  },
   { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind", fields: ["healAmount"] },
   { value: "grant_temp_hp", label: "Grant temporary HP", group: "healing_temp_hp" },
   {

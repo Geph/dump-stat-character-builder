@@ -28,6 +28,9 @@ export type BuilderDraftSnapshot = {
   startingEquipmentOptionIndex: number | null
   spellPicksByClassId: Record<string, string[]>
   asiAllocationsByFeatId: Record<string, Partial<Record<string, number>>>
+  standardArrayAssignments: Partial<
+    Record<"strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma", number>
+  >
   editingCharacterId: string | null
   currentHp: number | null
   tempHp: number

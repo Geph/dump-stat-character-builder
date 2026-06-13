@@ -14,6 +14,7 @@ import {
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
+import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import {
   deleteWhere,
   insertRows,
@@ -144,6 +145,7 @@ export async function POST(request: NextRequest) {
 Important D&D 2024 rules:
 - "Species" is the new term (not "Race")
 - Backgrounds grant ability score bonuses (+2 to one, +1 to another, or +1/+1/+1)
+- For backgrounds, set ability_bonuses to an object listing eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed bonuses with +1/+2 values
 - Backgrounds grant a 1st-level feat
 - Species no longer grant ability score bonuses
 - Class features are tied to specific levels
@@ -227,7 +229,12 @@ ${CLASS_SPELL_LIST_IMPORT_HINT}`
     }
 
     if (content.backgrounds?.length) {
-      await upsertByName("backgrounds", content.backgrounds.map((b) => ({ ...b, source: "Text Import" })))
+      await upsertByName(
+        "backgrounds",
+        normalizeBackgroundRows(
+          content.backgrounds.map((b) => ({ ...b, source: "Text Import" })),
+        ),
+      )
       totalImported += content.backgrounds.length
       breakdown.backgrounds = content.backgrounds.length
     }

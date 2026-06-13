@@ -1,11 +1,17 @@
 // D&D 2024 Types
 
 import type { BackgroundProficiencies } from "@/lib/compendium/background-proficiencies"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 // Feature with choice support
 export interface FeatureChoice {
   category: string // e.g., "Fighting Style", "Skill Proficiency"
-  options: { name: string; description: string; modifierRefs?: string[] }[]
+  options: {
+    name: string
+    description: string
+    modifierRefs?: string[]
+    linkedModifiers?: LinkedModifierInstance[]
+  }[]
   count: number // how many to choose
   /** When "feats", builder offers compendium feats instead of static options. */
   /** @deprecated Feat picks use grant_feat modifiers from the common modifiers catalog. */
@@ -67,6 +73,8 @@ export interface Feature {
   resourceId?: string | null
   /** References into the Common Modifier Effects catalog. */
   modifierRefs?: string[]
+  /** Per-instance catalog links with inline configuration. */
+  linkedModifiers?: LinkedModifierInstance[]
 }
 
 export interface ClassResource {
@@ -100,6 +108,7 @@ export interface Trait {
   isChoice?: boolean
   choices?: FeatureChoice
   modifierRefs?: string[]
+  linkedModifiers?: LinkedModifierInstance[]
 }
 
 export interface Species {
@@ -113,6 +122,7 @@ export interface Species {
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   /** References into the Common Modifier Effects catalog (merged with characteristics in builder). */
   modifierRefs?: string[] | null
+  linkedModifiers?: LinkedModifierInstance[] | null
   icon: string | null
   accent_color?: string | null
   source: string
@@ -262,7 +272,12 @@ export interface Background {
   starting_gold: number | null
   starting_equipment: { name: string; quantity: number }[] | null
   equipment: unknown  // legacy field
-  feature: { name: string; description: string } | null
+  feature: {
+    name: string
+    description: string
+    modifierRefs?: string[]
+    linkedModifiers?: LinkedModifierInstance[]
+  } | null
   grants_spells?: boolean
   granted_spells?: Record<string, string[]> | null
   icon: string | null
@@ -308,6 +323,7 @@ export interface Feat {
   benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   /** References into the Common Modifier Effects catalog (merged with benefits in builder). */
   modifierRefs?: string[] | null
+  linkedModifiers?: LinkedModifierInstance[] | null
   /** When true, the feat may be chosen in more than one milestone slot. */
   repeatable?: boolean
   icon: string | null

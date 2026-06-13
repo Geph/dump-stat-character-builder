@@ -1,4 +1,9 @@
 import { createModifierId, type GrantFeatCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import {
+  effectiveLinkedModifiers,
+  resolveLinkedModifierInstance,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { catalogEntryById } from "@/lib/compendium/modifier-catalog"
 import type { Feature } from "@/lib/types"
@@ -93,11 +98,40 @@ export function grantFeatsFromModifierRefs(
   return grants
 }
 
+export function grantFeatsFromLinkedModifiers(
+  catalog: ModifierCatalogEntry[],
+  instances: LinkedModifierInstance[] | null | undefined,
+  legacyRefs?: string[] | null,
+): ResolvedGrantFeat[] {
+  const linked = effectiveLinkedModifiers(instances, legacyRefs, catalog)
+  if (!linked.length) return []
+  const grants: ResolvedGrantFeat[] = []
+
+  for (const instance of linked) {
+    const entry = catalogEntryById(catalog, instance.catalogRefId)
+    const { characteristics } = resolveLinkedModifierInstance(instance, catalog)
+    for (const mod of characteristics) {
+      if (mod.type !== "grant_feat") continue
+      grants.push({
+        catalogEntryId: instance.catalogRefId,
+        label: entry?.name ?? instance.catalogRefId,
+        featCategories: mod.featCategories?.length ? mod.featCategories : ["General"],
+        count: mod.count ?? 1,
+      })
+    }
+  }
+
+  return grants
+}
+
 /** Legacy feat-choice features and grant_feat modifier refs. */
 export function grantFeatsFromFeature(
   feature: Feature,
   catalog: ModifierCatalogEntry[],
 ): ResolvedGrantFeat[] {
+  const fromLinked = grantFeatsFromLinkedModifiers(catalog, feature.linkedModifiers, feature.modifierRefs)
+  if (fromLinked.length) return fromLinked
+
   const fromRefs = grantFeatsFromModifierRefs(catalog, feature.modifierRefs)
   if (fromRefs.length) return fromRefs
 

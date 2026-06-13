@@ -147,9 +147,15 @@ export interface CharacteristicModifierBase {
   label?: string
 }
 
+export type AbilityScoresMode = "fixed" | "asi_pool"
+
 export interface AbilityScoresCharacteristic extends CharacteristicModifierBase {
   type: "ability_scores"
+  /** fixed = set amounts on specific abilities; asi_pool = player allocates points (SRD ASI rules). */
+  mode: AbilityScoresMode
   bonuses: Partial<Record<AbilityScoreKey, number>>
+  /** Points to spend when mode is asi_pool (default 2 per SRD ASI). */
+  points?: number
 }
 
 export interface SkillEntry {
@@ -335,7 +341,7 @@ export function createCharacteristicModifier(
   const id = createModifierId()
   switch (type) {
     case "ability_scores":
-      return { id, type, bonuses: {} }
+      return { id, type, mode: "fixed", bonuses: {} }
     case "skills":
       return { id, type, entries: [] }
     case "languages":
@@ -449,6 +455,19 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
 
   if (value.type === "weapon_proficiencies") {
     return migrateWeaponProficiencies(value)
+  }
+
+  if (value.type === "ability_scores") {
+    const raw = value as AbilityScoresCharacteristic
+    const mode = raw.mode === "asi_pool" ? "asi_pool" : "fixed"
+    return {
+      id: raw.id,
+      label: raw.label,
+      type: "ability_scores",
+      mode,
+      bonuses: raw.bonuses ?? {},
+      points: mode === "asi_pool" ? (raw.points ?? 2) : undefined,
+    }
   }
 
   return value
@@ -599,6 +618,7 @@ export function aggregateCharacteristics(
   for (const mod of mods) {
     switch (mod.type) {
       case "ability_scores":
+        if (mod.mode === "asi_pool") break
         for (const [key, bonus] of Object.entries(mod.bonuses)) {
           const ability = key as AbilityScoreKey
           result.abilityBonuses[ability] = (result.abilityBonuses[ability] ?? 0) + (bonus ?? 0)

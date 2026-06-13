@@ -18,6 +18,7 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
+import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
 import {
@@ -25,6 +26,14 @@ import {
   normalizeBackgroundProficiencies,
   type BackgroundProficiencies,
 } from "@/lib/compendium/background-proficiencies"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import {
+  normalizeLinkedModifiers,
+  readLinkedModifiers,
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 
 const SKILLS = [
   "Acrobatics", "Animal Handling", "Arcana", "Athletics", "Deception",
@@ -53,6 +62,8 @@ interface BackgroundFormData {
   accent_color: string | null
   feature_name: string
   feature_description: string
+  feature_linked_modifiers: LinkedModifierInstance[]
+  feature_modifier_refs: string[]
   grants_spells: boolean
   granted_spells: Record<string, string[]>
 }
@@ -72,11 +83,14 @@ const defaultBackground: BackgroundFormData = {
   accent_color: null,
   feature_name: "",
   feature_description: "",
+  feature_linked_modifiers: [],
+  feature_modifier_refs: [],
   grants_spells: false,
   granted_spells: {},
 }
 
 export default function BackgroundEditorPage({ id }: { id: string }) {
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const [form, setForm] = useState<BackgroundFormData>(defaultBackground)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -142,26 +156,41 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Background not found")
         } else if (data) {
+          const row = data as Record<string, unknown> & { name: string }
+          const enriched = enrichBackgroundList([row])[0]
           setForm({
-            name: data.name || "",
-            description: data.description || "",
-            ability_bonuses: normalizeBackgroundAbilityBonuses(data.ability_bonuses),
-            skill_proficiencies: data.skill_proficiencies || [],
-            proficiencies: normalizeBackgroundProficiencies(
-              data.proficiencies,
-              data.tool_proficiencies,
+            name: String(row.name || ""),
+            description: String(row.description || ""),
+            ability_bonuses: normalizeBackgroundAbilityBonuses(
+              enriched.ability_bonuses as Record<string, number> | null | undefined,
             ),
-            feat_granted: data.feat_granted || "",
-            starting_gold: data.starting_gold ?? 0,
-            starting_equipment: data.starting_equipment || [],
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            feature_name: data.feature?.name || "",
-            feature_description: data.feature?.description || "",
-            grants_spells: Boolean(data.grants_spells),
-            granted_spells: normalizeGrantedSpells(data.granted_spells),
+            skill_proficiencies: (row.skill_proficiencies as string[]) || [],
+            proficiencies: normalizeBackgroundProficiencies(
+              row.proficiencies,
+              row.tool_proficiencies as string[] | null | undefined,
+            ),
+            feat_granted: String(row.feat_granted || ""),
+            starting_gold: (row.starting_gold as number | null | undefined) ?? 0,
+            starting_equipment: (row.starting_equipment as BackgroundFormData["starting_equipment"]) || [],
+            source: String(row.source || "Custom"),
+            creator_url: String(row.creator_url || ""),
+            icon: (row.icon as string | null) ?? null,
+            accent_color: (row.accent_color as string | null) ?? null,
+            feature_name: (row.feature as { name?: string } | null)?.name || "",
+            feature_description: (row.feature as { description?: string } | null)?.description || "",
+            feature_linked_modifiers: readLinkedModifiers(
+              (row.feature ?? {}) as Record<string, unknown>,
+              modifierCatalog,
+            ),
+            feature_modifier_refs: Array.isArray((row.feature as { modifierRefs?: string[] } | null)?.modifierRefs)
+              ? (row.feature as { modifierRefs: string[] }).modifierRefs
+              : Array.isArray((row.feature as { modifier_refs?: string[] } | null)?.modifier_refs)
+                ? (row.feature as { modifier_refs: string[] }).modifier_refs
+                : [],
+            grants_spells: Boolean(row.grants_spells),
+            granted_spells: normalizeGrantedSpells(
+              row.granted_spells as Record<string, string[]> | null | undefined,
+            ),
           })
         }
         setLoading(false)
@@ -175,7 +204,16 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
     setSaving(true)
     setError(null)
     const db = createClient()
-    const { feature_name, feature_description, grants_spells, granted_spells, proficiencies, ...rest } = form
+    const {
+      feature_name,
+      feature_description,
+      feature_linked_modifiers,
+      feature_modifier_refs,
+      grants_spells,
+      granted_spells,
+      proficiencies,
+      ...rest
+    } = form
     const normalizedProficiencies = normalizeBackgroundProficiencies(proficiencies)
     const payload = {
       ...rest,
@@ -186,11 +224,13 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
       ],
       creator_url: normalizeCreatorUrl(form.creator_url),
       feature:
-        feature_name.trim() || feature_description.trim()
-          ? {
+        feature_name.trim() || feature_description.trim() || feature_linked_modifiers.length
+          ? syncModifierRefs({
               name: feature_name.trim() || "Background Feature",
               description: feature_description.trim(),
-            }
+              linkedModifiers: feature_linked_modifiers,
+              modifierRefs: feature_modifier_refs,
+            })
           : null,
       grants_spells,
       granted_spells: grants_spells ? granted_spells : null,
@@ -358,7 +398,10 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               chooses +2 and +1 from listed scores).
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {BACKGROUND_ABILITY_KEYS.map((ability) => (
+              {(Object.keys(form.ability_bonuses).length
+                ? BACKGROUND_ABILITY_KEYS.filter((ability) => ability in form.ability_bonuses)
+                : BACKGROUND_ABILITY_KEYS
+              ).map((ability) => (
                 <div key={ability} className="flex items-center gap-3">
                   <span className="text-foreground capitalize w-24 text-sm">{ability}</span>
                   <select
@@ -425,6 +468,23 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                 placeholder="Describe what this feature grants..."
               />
             </div>
+            <LinkedModifiersEditor
+              value={normalizeLinkedModifiers(
+                form.feature_linked_modifiers,
+                modifierCatalog,
+                form.feature_modifier_refs,
+              )}
+              onChange={(feature_linked_modifiers) =>
+                setForm((prev) => ({
+                  ...prev,
+                  feature_linked_modifiers,
+                  feature_modifier_refs: feature_linked_modifiers.map((instance) => instance.catalogRefId),
+                }))
+              }
+              catalog={modifierCatalog}
+              label="Feature modifier effects"
+              emptyMessage="No mechanical effects linked to this background feature."
+            />
           </div>
 
           {/* Granted spells */}

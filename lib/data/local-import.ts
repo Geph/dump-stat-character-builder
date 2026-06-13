@@ -1,4 +1,5 @@
 import { extractUsesConfig, normalizeCharacteristics } from "@/lib/compendium/characteristic-modifiers"
+import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
@@ -79,6 +80,10 @@ function rowForTable(
 
   if (exportType === "dnd-species") {
     row.characteristics = normalizeCharacteristics(cleaned.characteristics, null)
+  }
+
+  if (exportType === "dnd-background") {
+    return normalizeBackgroundRow(row)
   }
 
   return row

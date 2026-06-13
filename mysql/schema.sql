@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS feats (
   prerequisite_background_ids JSON,
   benefits JSON,
   modifier_refs JSON,
+  linked_modifiers JSON,
   repeatable TINYINT(1) NOT NULL DEFAULT 0,
   icon VARCHAR(255),
   accent_color VARCHAR(32),

@@ -1,43 +1,121 @@
 import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import {
+  effectiveLinkedModifiers,
+  resolveLinkedModifiers,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-import type { CustomAbility, DndClass, Feature, Feat, Species, Subclass } from "@/lib/types"
+import type {
+  Background,
+  CustomAbility,
+  DndClass,
+  Feature,
+  Feat,
+  Species,
+  Subclass,
+  UsesConfig,
+} from "@/lib/types"
 
-export function characteristicsFromModifierRefs(
+export function characteristicsFromLinkedModifiers(
   catalog: ModifierCatalogEntry[],
-  refIds: string[] | null | undefined,
+  linked: LinkedModifierInstance[] | null | undefined,
+  legacyRefs: string[] | null | undefined,
   legacy: CharacteristicModifier[] | null | undefined,
-  uses?: unknown,
+  uses?: UsesConfig | null,
 ): CharacteristicModifier[] {
-  const resolved = resolveModifierRefIds(refIds, catalog)
+  const instances = effectiveLinkedModifiers(linked, legacyRefs, catalog)
+  const resolved = instances.length
+    ? resolveLinkedModifiers(instances, catalog)
+    : resolveModifierRefIds(legacyRefs, catalog)
   return [
     ...normalizeCharacteristics(resolved.characteristics, null),
     ...normalizeCharacteristics(legacy ?? null, uses ?? null),
   ]
 }
 
-function collectFromFeature(
+/** @deprecated Use characteristicsFromLinkedModifiers */
+export function characteristicsFromModifierRefs(
+  catalog: ModifierCatalogEntry[],
+  refIds: string[] | null | undefined,
+  legacy: CharacteristicModifier[] | null | undefined,
+  uses?: UsesConfig | null,
+): CharacteristicModifier[] {
+  return characteristicsFromLinkedModifiers(catalog, null, refIds, legacy, uses)
+}
+
+function collectLinkedFromFeature(
   feature: Feature,
   classId: string,
   featureChoicePicks: Record<string, string[]>,
-  ids: string[],
+  catalog: ModifierCatalogEntry[],
+  instances: LinkedModifierInstance[],
 ): void {
-  if (feature.modifierRefs?.length) ids.push(...feature.modifierRefs)
+  instances.push(...effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog))
 
-  if (
-    feature.isChoice &&
-    feature.choices?.options?.length
-  ) {
+  if (feature.isChoice && feature.choices?.options?.length) {
     const key = featureChoiceKey(classId, feature.name)
     const picked = featureChoicePicks[key] ?? []
     for (const optionName of picked) {
       const option = feature.choices.options.find((entry) => entry.name === optionName)
-      if (option?.modifierRefs?.length) ids.push(...option.modifierRefs)
+      if (!option) continue
+      instances.push(...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog))
     }
   }
 }
 
+function collectLinkedFromFeatures(
+  features: Feature[],
+  classId: string,
+  maxLevel: number,
+  featureChoicePicks: Record<string, string[]>,
+  catalog: ModifierCatalogEntry[],
+  instances: LinkedModifierInstance[],
+): void {
+  for (const feature of features) {
+    if (feature.level > maxLevel) continue
+    collectLinkedFromFeature(feature, classId, featureChoicePicks, catalog, instances)
+  }
+}
+
+export function classAndSubclassLinkedModifiers(params: {
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  subclasses: Subclass[]
+  subclassByClassId: Record<string, string>
+  featureChoicePicks: Record<string, string[]>
+  catalog: ModifierCatalogEntry[]
+}): LinkedModifierInstance[] {
+  const { classLevels, classes, subclasses, subclassByClassId, featureChoicePicks, catalog } = params
+  const instances: LinkedModifierInstance[] = []
+
+  for (const entry of classLevels) {
+    const cls = classes.find((c) => c.id === entry.classId)
+    if (!cls) continue
+
+    collectLinkedFromFeatures(cls.features ?? [], entry.classId, entry.level, featureChoicePicks, catalog, instances)
+
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = subclasses.find((s) => s.id === subclassId)
+      if (subclass) {
+        collectLinkedFromFeatures(
+          subclass.features ?? [],
+          entry.classId,
+          entry.level,
+          featureChoicePicks,
+          catalog,
+          instances,
+        )
+      }
+    }
+  }
+
+  return instances
+}
+
+/** @deprecated Use classAndSubclassLinkedModifiers */
 export function classAndSubclassFeatureModifierRefIds(params: {
   classLevels: { classId: string; level: number }[]
   classes: DndClass[]
@@ -45,57 +123,45 @@ export function classAndSubclassFeatureModifierRefIds(params: {
   subclassByClassId: Record<string, string>
   featureChoicePicks: Record<string, string[]>
 }): string[] {
-  const { classLevels, classes, subclasses, subclassByClassId, featureChoicePicks } = params
-  const ids: string[] = []
-
-  for (const entry of classLevels) {
-    const cls = classes.find((c) => c.id === entry.classId)
-    if (!cls) continue
-
-    for (const feature of cls.features ?? []) {
-      if (feature.level > entry.level) continue
-      collectFromFeature(feature, entry.classId, featureChoicePicks, ids)
-    }
-
-    const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
-      const subclass = subclasses.find((s) => s.id === subclassId)
-      if (subclass) {
-        for (const feature of subclass.features ?? []) {
-          if (feature.level > entry.level) continue
-          collectFromFeature(feature, entry.classId, featureChoicePicks, ids)
-        }
-      }
-    }
-  }
-
-  return ids
+  const instances = classAndSubclassLinkedModifiers({ ...params, catalog: [] })
+  return instances.map((instance) => instance.catalogRefId)
 }
 
-export function speciesTraitModifierRefIds(
+export function speciesTraitLinkedModifiers(
   species: Species | undefined,
   speciesTraitPicks: Record<string, string[]>,
-): string[] {
+  catalog: ModifierCatalogEntry[],
+): LinkedModifierInstance[] {
   if (!species?.traits?.length) return []
 
-  const ids: string[] = []
+  const instances: LinkedModifierInstance[] = []
   species.traits.forEach((trait, index) => {
-    if (trait.modifierRefs?.length) ids.push(...trait.modifierRefs)
+    instances.push(...effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog))
     if (trait.isChoice && trait.choices?.options?.length) {
       const picked = speciesTraitPicks[String(index)] ?? []
       for (const optionName of picked) {
         const option = trait.choices.options.find((entry) => entry.name === optionName)
-        if (option?.modifierRefs?.length) ids.push(...option.modifierRefs)
+        if (!option) continue
+        instances.push(...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog))
       }
     }
   })
-  return ids
+  return instances
+}
+
+/** @deprecated Use speciesTraitLinkedModifiers */
+export function speciesTraitModifierRefIds(
+  species: Species | undefined,
+  speciesTraitPicks: Record<string, string[]>,
+): string[] {
+  return speciesTraitLinkedModifiers(species, speciesTraitPicks, []).map((instance) => instance.catalogRefId)
 }
 
 export function collectBuilderModifierRefIds(params: {
   catalog: ModifierCatalogEntry[]
   species?: Species
   speciesTraitPicks: Record<string, string[]>
+  background?: Background | null
   feats: Feat[]
   selectedFeatIds: string[]
   classLevels: { classId: string; level: number }[]
@@ -109,6 +175,7 @@ export function collectBuilderModifierRefIds(params: {
     catalog,
     species,
     speciesTraitPicks,
+    background,
     feats,
     selectedFeatIds,
     classLevels,
@@ -119,18 +186,36 @@ export function collectBuilderModifierRefIds(params: {
     customAbilities = [],
   } = params
 
-  const speciesRefs = [
-    ...(species?.modifierRefs ?? []),
-    ...speciesTraitModifierRefIds(species, speciesTraitPicks),
+  const speciesInstances = [
+    ...effectiveLinkedModifiers(species?.linkedModifiers, species?.modifierRefs, catalog),
+    ...speciesTraitLinkedModifiers(species, speciesTraitPicks, catalog),
   ]
+  const speciesResolved = speciesInstances.length
+    ? resolveLinkedModifiers(speciesInstances, catalog).characteristics
+    : []
 
-  const classFeatureRefs = classAndSubclassFeatureModifierRefIds({
+  const classInstances = classAndSubclassLinkedModifiers({
     classLevels,
     classes,
     subclasses,
     subclassByClassId,
     featureChoicePicks,
+    catalog,
   })
+  const classResolved = classInstances.length
+    ? resolveLinkedModifiers(classInstances, catalog).characteristics
+    : []
+
+  const backgroundInstances = background?.feature
+    ? effectiveLinkedModifiers(
+        background.feature.linkedModifiers,
+        background.feature.modifierRefs,
+        catalog,
+      )
+    : []
+  const backgroundResolved = backgroundInstances.length
+    ? resolveLinkedModifiers(backgroundInstances, catalog).characteristics
+    : []
 
   const featMods = selectedFeatIds
     .filter(Boolean)
@@ -138,18 +223,32 @@ export function collectBuilderModifierRefIds(params: {
       const feat = feats.find((entry) => entry.id === featId)
       if (!feat) return []
       const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
-      return characteristicsFromModifierRefs(catalog, refs, feat.benefits)
+      return characteristicsFromLinkedModifiers(catalog, feat.linkedModifiers, refs, feat.benefits)
     })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
     const refs = ability.modifierRefs ?? readModifierRefs(ability as unknown as Record<string, unknown>)
-    return characteristicsFromModifierRefs(catalog, refs, ability.characteristics, ability.uses)
+    return characteristicsFromLinkedModifiers(
+      catalog,
+      readLinkedModifiersFromAbility(ability),
+      refs,
+      ability.characteristics,
+      ability.uses,
+    )
   })
 
   return [
-    ...characteristicsFromModifierRefs(catalog, speciesRefs, species?.characteristics),
-    ...characteristicsFromModifierRefs(catalog, classFeatureRefs, null),
+    ...normalizeCharacteristics(speciesResolved, null),
+    ...normalizeCharacteristics(species?.characteristics ?? null, null),
+    ...normalizeCharacteristics(classResolved, null),
+    ...normalizeCharacteristics(backgroundResolved, null),
     ...featMods,
     ...customAbilityMods,
   ]
+}
+
+function readLinkedModifiersFromAbility(ability: CustomAbility): LinkedModifierInstance[] | null {
+  const raw = ability as unknown as Record<string, unknown>
+  if (!Array.isArray(raw.linkedModifiers) && !Array.isArray(raw.linked_modifiers)) return null
+  return (raw.linkedModifiers ?? raw.linked_modifiers) as LinkedModifierInstance[]
 }

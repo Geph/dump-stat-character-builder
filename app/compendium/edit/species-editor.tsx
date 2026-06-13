@@ -18,23 +18,16 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
-import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import {
+  normalizeLinkedModifiers,
+  readLinkedModifiers,
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-
-interface TraitChoice {
-  category: string
-  options: { name: string; description: string }[]
-  count: number
-}
-
-interface Trait {
-  name: string
-  description: string
-  level?: number // level at which trait becomes available, defaults to 1
-  isChoice?: boolean
-  choices?: TraitChoice
-}
+import type { Trait } from "@/lib/types"
 
 interface SpeciesFormData {
   name: string
@@ -45,6 +38,7 @@ interface SpeciesFormData {
   traits: Trait[]
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
+  linked_modifiers: LinkedModifierInstance[]
   icon: string | null
   accent_color: string | null
   source: string
@@ -62,6 +56,7 @@ const defaultSpecies: SpeciesFormData = {
   traits: [{ name: "", description: "", level: 1 }],
   characteristics: [],
   modifier_refs: [],
+  linked_modifiers: [],
   icon: null,
   accent_color: null,
   source: "Custom",
@@ -109,6 +104,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             characteristics: normalizeCharacteristics(data.characteristics, null),
             modifier_refs: readModifierRefs(data as Record<string, unknown>),
+            linked_modifiers: readLinkedModifiers(data as Record<string, unknown>, modifierCatalog),
             icon: data.icon || null,
             accent_color: data.accent_color || null,
             source: data.source || "Custom",
@@ -238,18 +234,25 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
   const updateTraitOption = (
     traitIndex: number,
     optionIndex: number,
-    field: "name" | "description" | "modifierRefs",
-    value: string | string[],
+    field: "name" | "description" | "modifierRefs" | "linkedModifiers",
+    value: string | string[] | LinkedModifierInstance[],
   ) => {
     const trait = form.traits[traitIndex]
     if (!trait.choices) return
     updateTrait(traitIndex, {
       choices: {
         ...trait.choices,
-        options: trait.choices.options.map((opt, i) => 
-          i === optionIndex ? { ...opt, [field]: value } : opt
-        )
-      }
+        options: trait.choices.options.map((opt, i) => {
+          if (i !== optionIndex) return opt
+          if (field === "linkedModifiers") {
+            return syncModifierRefs({ ...opt, linkedModifiers: value as LinkedModifierInstance[] })
+          }
+          if (field === "modifierRefs") {
+            return { ...opt, modifierRefs: value as string[] }
+          }
+          return { ...opt, [field]: value as string }
+        }),
+      },
     })
   }
 
@@ -431,11 +434,14 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                         placeholder="Trait description..."
                         minHeightClass="min-h-[3rem]"
                       />
-                      <ModifierCatalogPicker
-                        value={trait.modifierRefs ?? []}
-                        onChange={(modifierRefs) => updateTrait(index, { modifierRefs })}
+                      <LinkedModifiersEditor
+                        value={normalizeLinkedModifiers(trait.linkedModifiers, modifierCatalog, trait.modifierRefs)}
+                        onChange={(linkedModifiers) =>
+                          updateTrait(index, syncModifierRefs({ linkedModifiers }))
+                        }
                         catalog={modifierCatalog}
                         label="Trait modifiers"
+                        spellOptions={allSpells}
                       />
                     </>
                   ) : (
@@ -479,13 +485,18 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                               placeholder="Option description..."
                               minHeightClass="min-h-[3rem]"
                             />
-                            <ModifierCatalogPicker
-                              value={option.modifierRefs ?? []}
-                              onChange={(modifierRefs) =>
-                                updateTraitOption(index, optIndex, "modifierRefs", modifierRefs)
+                            <LinkedModifiersEditor
+                              value={normalizeLinkedModifiers(
+                                option.linkedModifiers,
+                                modifierCatalog,
+                                option.modifierRefs,
+                              )}
+                              onChange={(linkedModifiers) =>
+                                updateTraitOption(index, optIndex, "linkedModifiers", linkedModifiers)
                               }
                               catalog={modifierCatalog}
                               label="Option modifiers"
+                              spellOptions={allSpells}
                             />
                           </div>
                           <button
@@ -504,11 +515,18 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             </div>
           </div>
 
-          <ModifierCatalogPicker
-            value={form.modifier_refs}
-            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+          <LinkedModifiersEditor
+            value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
+            onChange={(linked_modifiers) =>
+              setForm((prev) => ({
+                ...prev,
+                ...syncModifierRefs({ linkedModifiers: linked_modifiers }),
+                linked_modifiers,
+              }))
+            }
             catalog={modifierCatalog}
             label="Species-wide modifier effects"
+            spellOptions={allSpells}
           />
 
           <details className="rounded-xl border border-border p-4">

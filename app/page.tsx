@@ -23,7 +23,7 @@ const features = [
     imageAlt: "Easy Character Creation",
     title: "Easy Character Creation",
     description:
-      "Build characters step-by-step with a live sheet preview—species lineages, backgrounds, multiclass levels, spells, and equipment following D&D 2024 rules.",
+      "Build characters step-by-step with a live sheet preview—species, backgrounds, multiclass levels, spells, and equipment following D&D 2024 rules.",
   },
   {
     href: "/compendium",
@@ -63,7 +63,7 @@ const features = [
     imageAlt: "Export and Database",
     title: "Export and Database",
     description:
-      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export everything as JSON, import Dump Stat packs, and manage tables from the compendium.",
+      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export as JSON for restoration later.",
   },
 ]
 

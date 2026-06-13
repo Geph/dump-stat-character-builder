@@ -59,7 +59,8 @@ export function ModifierCatalogAdminEditor({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Each entry defines passive characteristics and/or active effects referenced elsewhere in the compendium.
+          Each entry is a template of possible choices. Class features, traits, feats, and backgrounds link these
+          entries and configure the specifics inline.
         </p>
         <button
           type="button"
@@ -172,7 +173,7 @@ function CatalogEntryEditor({
       </div>
 
       <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Passive characteristics</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Passive characteristics (template choices)</p>
         <CharacteristicModifiersEditor
           value={entry.characteristics ?? []}
           onChange={(characteristics) => onChange({ characteristics })}
@@ -182,7 +183,7 @@ function CatalogEntryEditor({
       </div>
 
       <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Active activation</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Active activation (template choices)</p>
         <div className="flex flex-wrap gap-4 text-sm">
           {(
             [

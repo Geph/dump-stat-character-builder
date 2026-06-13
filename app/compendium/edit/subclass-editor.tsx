@@ -16,6 +16,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 
@@ -242,17 +243,21 @@ export default function SubclassEditorPage({ id }: { id: string }) {
   const updateFeatureOption = (
     featureIndex: number,
     optionIndex: number,
-    field: "name" | "description" | "modifierRefs",
-    value: string | string[],
+    field: "name" | "description" | "modifierRefs" | "linkedModifiers",
+    value: string | string[] | LinkedModifierInstance[],
   ) => {
     const feature = form.features[featureIndex]
     if (!feature.choices) return
     updateFeature(featureIndex, {
       choices: {
         ...feature.choices,
-        options: feature.choices.options.map((opt, i) =>
-          i === optionIndex ? { ...opt, [field]: value } : opt,
-        ),
+        options: feature.choices.options.map((opt, i) => {
+          if (i !== optionIndex) return opt
+          if (field === "linkedModifiers" && Array.isArray(value)) {
+            return syncModifierRefs({ ...opt, linkedModifiers: value })
+          }
+          return { ...opt, [field]: value }
+        }),
       },
     })
   }

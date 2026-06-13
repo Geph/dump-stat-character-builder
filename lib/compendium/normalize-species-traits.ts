@@ -1,7 +1,24 @@
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { FeatureChoice, Trait } from "@/lib/types"
 import bundledSpecies from "@/lib/srd/seed-data/species.json"
 import { isSrdSource } from "@/lib/srd/source"
 import { withModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+
+function normalizeStoredLinkedModifiers(raw: unknown): LinkedModifierInstance[] | undefined {
+  if (!Array.isArray(raw) || !raw.length) return undefined
+  const instances = raw
+    .filter(
+      (item): item is LinkedModifierInstance =>
+        Boolean(item && typeof item === "object" && typeof (item as LinkedModifierInstance).catalogRefId === "string"),
+    )
+    .map((item) => ({
+      instanceId: typeof item.instanceId === "string" ? item.instanceId : `modinst_${Math.random().toString(36).slice(2, 8)}`,
+      catalogRefId: item.catalogRefId,
+      characteristics: item.characteristics,
+      activation: item.activation,
+    }))
+  return instances.length ? instances : undefined
+}
 
 function normalizeChoice(raw: unknown, fallbackCategory: string): FeatureChoice | undefined {
   if (!raw || typeof raw !== "object") return undefined
@@ -18,6 +35,7 @@ function normalizeChoice(raw: unknown, fallbackCategory: string): FeatureChoice 
             : Array.isArray(option.modifier_refs)
               ? option.modifier_refs.filter((id): id is string => typeof id === "string")
               : undefined,
+          linkedModifiers: normalizeStoredLinkedModifiers(option.linkedModifiers ?? option.linked_modifiers),
         }))
         .filter((option) => option.name)
     : []
@@ -67,6 +85,7 @@ export function normalizeSpeciesTraits(raw: unknown): Trait[] {
           : Array.isArray(trait.modifier_refs)
             ? trait.modifier_refs.filter((id): id is string => typeof id === "string")
             : undefined,
+        linkedModifiers: normalizeStoredLinkedModifiers(trait.linkedModifiers ?? trait.linked_modifiers),
       }
     })
     .filter((trait) => trait.name)

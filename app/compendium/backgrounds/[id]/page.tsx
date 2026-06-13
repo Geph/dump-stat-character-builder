@@ -359,7 +359,10 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
               chooses +2 and +1 from listed scores).
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {BACKGROUND_ABILITY_KEYS.map((ability) => (
+              {(Object.keys(form.ability_bonuses).length
+                ? BACKGROUND_ABILITY_KEYS.filter((ability) => ability in form.ability_bonuses)
+                : BACKGROUND_ABILITY_KEYS
+              ).map((ability) => (
                 <div key={ability} className="flex items-center gap-3">
                   <span className="text-foreground capitalize w-24 text-sm">{ability}</span>
                   <select

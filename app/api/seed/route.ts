@@ -10,6 +10,9 @@ import {
   upsertByName,
 } from "@/lib/db/repository"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
+import { enrichSrdSubclassList } from "@/lib/compendium/enrich-srd-subclasses"
+import { enrichSrdFeatList } from "@/lib/compendium/enrich-srd-feats"
+import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
@@ -31,15 +34,18 @@ export async function POST() {
     const classData = await listRows("classes")
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
 
-    const subclassesWithIds = subclasses
-      .map((sc) => ({
-        name: sc.name,
-        description: sc.description,
-        features: sc.features,
-        source: sc.source,
-        class_id: classIdMap.get(sc.class_name) ?? null,
-      }))
-      .filter((sc) => sc.class_id !== null)
+    const subclassesWithIds = enrichSrdSubclassList(
+      subclasses
+        .map((sc) => ({
+          name: sc.name,
+          description: sc.description,
+          features: sc.features,
+          source: sc.source,
+          class_id: classIdMap.get(sc.class_name) ?? null,
+        }))
+        .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+      new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+    )
 
     for (const source of LEGACY_SRD_SOURCES) {
       await deleteWhere("subclasses", [{ op: "eq", column: "source", value: source }])
@@ -52,9 +58,9 @@ export async function POST() {
     await insertRows("class_resources", buildSrdClassResourceRows(classIdMap))
 
     await upsertByName("species", species)
-    await upsertByName("backgrounds", backgrounds)
+    await upsertByName("backgrounds", normalizeBackgroundRows(backgrounds))
     await upsertByName("spells", spells)
-    await upsertByName("feats", feats)
+    await upsertByName("feats", enrichSrdFeatList(feats))
     await upsertByName("equipment", equipment)
 
     await ensureModifierCatalog(createClient())

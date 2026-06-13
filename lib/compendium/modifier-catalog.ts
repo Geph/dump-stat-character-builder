@@ -18,7 +18,7 @@ export const COMMON_MODIFIERS_CATALOG_ID = "00000000-0000-4000-8000-000000000001
 export const COMMON_MODIFIERS_CATALOG_NAME = "Common Modifier Effects"
 
 export const MODIFIER_CATALOG_INFO =
-  "This system entry defines reusable mechanical effects shared across class features, subclasses, feats, species traits, and custom abilities. Edit entries here; other compendium editors pick from this list via searchable dropdowns instead of defining effects inline."
+  "This system entry defines reusable mechanical effect templates shared across class features, subclasses, feats, species traits, and backgrounds. Set the possible choices for each effect here; compendium editors link these entries and configure specifics inline (e.g. damage types, check categories)."
 
 export const MODIFIER_CATALOG_GROUPS = [
   "Ability scores & checks",
@@ -103,7 +103,9 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       summary:
         option.value === "grant_feat"
           ? "Passive: choose a feat — edit categories in this entry"
-          : `Passive: ${option.label}`,
+          : option.value === "ability_scores"
+            ? "Passive: fixed ability bonuses or ASI-style player choice"
+            : `Passive: ${option.label}`,
       characteristics: [mod],
     })
   }

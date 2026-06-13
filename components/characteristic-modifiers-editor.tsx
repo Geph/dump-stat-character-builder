@@ -31,6 +31,8 @@ type CharacteristicModifiersEditorProps = {
   onChange: (value: CharacteristicModifier[]) => void
   otherAbilities?: { id: string; name: string }[]
   spellOptions?: { id: string; name: string }[]
+  /** Hide add control and header — used when configuring a catalog-linked instance inline. */
+  configureOnly?: boolean
 }
 
 function updateModifier(
@@ -355,27 +357,90 @@ function ModifierFields({
   switch (mod.type) {
     case "ability_scores":
       return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {ABILITY_SCORE_KEYS.map((ability) => (
-            <label key={ability} className="text-sm">
-              <span className="block text-muted-foreground capitalize mb-1">{ability}</span>
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
-                type="number"
-                value={mod.bonuses[ability] ?? ""}
-                onChange={(e) =>
+                type="radio"
+                name={`ability-scores-mode-${mod.id}`}
+                checked={mod.mode !== "asi_pool"}
+                onChange={() =>
                   onChange({
                     ...mod,
-                    bonuses: {
-                      ...mod.bonuses,
-                      [ability]: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                    },
+                    mode: "fixed",
+                    points: undefined,
                   })
                 }
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg"
-                placeholder="+0"
+                className="accent-primary"
               />
+              <span className="text-foreground">Fixed amounts</span>
             </label>
-          ))}
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name={`ability-scores-mode-${mod.id}`}
+                checked={mod.mode === "asi_pool"}
+                onChange={() =>
+                  onChange({
+                    ...mod,
+                    mode: "asi_pool",
+                    points: mod.points ?? 2,
+                    bonuses: {},
+                  })
+                }
+                className="accent-primary"
+              />
+              <span className="text-foreground">Player choice (ASI-style)</span>
+            </label>
+          </div>
+
+          {mod.mode === "asi_pool" ? (
+            <div className="space-y-2">
+              <label className="block text-sm">
+                <span className="block text-muted-foreground mb-1">Points to allocate</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={mod.points ?? 2}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      points: Math.max(1, parseInt(e.target.value, 10) || 2),
+                    })
+                  }
+                  className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg"
+                />
+              </label>
+              <p className="text-xs text-muted-foreground">
+                In the builder, the player spends these points like an Ability Score Improvement:
+                +2 to one ability, or +1 to two abilities (for 2 points).
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <label key={ability} className="text-sm">
+                  <span className="block text-muted-foreground capitalize mb-1">{ability}</span>
+                  <input
+                    type="number"
+                    value={mod.bonuses[ability] ?? ""}
+                    onChange={(e) =>
+                      onChange({
+                        ...mod,
+                        bonuses: {
+                          ...mod.bonuses,
+                          [ability]: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                        },
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg"
+                    placeholder="+0"
+                  />
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       )
 
@@ -976,41 +1041,52 @@ export function CharacteristicModifiersEditor({
   onChange,
   otherAbilities = [],
   spellOptions = [],
+  configureOnly = false,
 }: CharacteristicModifiersEditorProps) {
   const addModifier = (type: CharacteristicModifierType) => {
     onChange([...value, createCharacteristicModifier(type)])
   }
 
   return (
-    <div className="bg-card-lighter border-2 border-primary/30 rounded-xl p-4 space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="font-semibold text-foreground">Characteristic Modifiers</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Mechanical effects from feats and features — ability scores, proficiencies, combat stats,
-            spell grants, and limited-use resources.
-          </p>
+    <div
+      className={
+        configureOnly
+          ? "space-y-3"
+          : "bg-card-lighter border-2 border-primary/30 rounded-xl p-4 space-y-4"
+      }
+    >
+      {!configureOnly && (
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-foreground">Characteristic Modifiers</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Mechanical effects from feats and features — ability scores, proficiencies, combat stats,
+              spell grants, and limited-use resources.
+            </p>
+          </div>
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) addModifier(e.target.value as CharacteristicModifierType)
+            }}
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm font-medium"
+          >
+            <option value="">Add modifier...</option>
+            {CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <select
-          value=""
-          onChange={(e) => {
-            if (e.target.value) addModifier(e.target.value as CharacteristicModifierType)
-          }}
-          className="px-3 py-2 bg-background border border-border rounded-lg text-sm font-medium"
-        >
-          <option value="">Add modifier...</option>
-          {CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      )}
 
       {value.length === 0 ? (
-        <p className="text-sm text-muted-foreground italic py-4 text-center border border-dashed border-border rounded-lg">
-          No characteristic modifiers yet. Add one to define mechanical benefits.
-        </p>
+        configureOnly ? null : (
+          <p className="text-sm text-muted-foreground italic py-4 text-center border border-dashed border-border rounded-lg">
+            No characteristic modifiers yet. Add one to define mechanical benefits.
+          </p>
+        )
       ) : (
         <div className="space-y-3">
           {value.map((mod) => {
@@ -1018,26 +1094,35 @@ export function CharacteristicModifiersEditor({
               CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.find((option) => option.value === mod.type)?.label ??
               mod.type
             return (
-              <div key={mod.id} className="p-4 bg-background border border-border rounded-xl space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-primary">{typeLabel}</span>
-                    <input
-                      type="text"
-                      value={mod.label ?? ""}
-                      onChange={(e) => onChange(updateModifier(value, mod.id, { ...mod, label: e.target.value }))}
-                      placeholder="Optional label"
-                      className="px-2 py-1 bg-card border border-border rounded text-xs"
-                    />
+              <div
+                key={mod.id}
+                className={
+                  configureOnly
+                    ? "space-y-3"
+                    : "p-4 bg-background border border-border rounded-xl space-y-3"
+                }
+              >
+                {!configureOnly && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-primary">{typeLabel}</span>
+                      <input
+                        type="text"
+                        value={mod.label ?? ""}
+                        onChange={(e) => onChange(updateModifier(value, mod.id, { ...mod, label: e.target.value }))}
+                        placeholder="Optional label"
+                        className="px-2 py-1 bg-card border border-border rounded text-xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onChange(value.filter((entry) => entry.id !== mod.id))}
+                      className="p-1 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onChange(value.filter((entry) => entry.id !== mod.id))}
-                    className="p-1 text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                )}
                 <ModifierFields
                   mod={mod}
                   onChange={(next) => onChange(updateModifier(value, mod.id, next))}

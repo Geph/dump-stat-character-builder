@@ -1,4 +1,7 @@
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
+import { enrichSrdSubclassList } from "@/lib/compendium/enrich-srd-subclasses"
+import { enrichSrdFeatList } from "@/lib/compendium/enrich-srd-feats"
+import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { createClient } from "@/lib/db/client"
@@ -50,13 +53,46 @@ async function seedClassResources(classIdMap: Map<string, string>): Promise<void
 }
 
 async function ensureBundledSrdFresh(): Promise<void> {
-  const { manifest, species, classes } = getSrdSeedData()
+  const { manifest, species, classes, backgrounds, feats, subclasses } = getSrdSeedData()
   if (readStoredSrdVersion() === manifest.version) return
   await upsertByName("species", species)
   await upsertByName("classes", enrichSrdClassList(classes as Record<string, unknown>[]))
+  await upsertByName("backgrounds", normalizeBackgroundRows(backgrounds))
+  await upsertByName("feats", enrichSrdFeatList(feats as Record<string, unknown>[]))
   const classRows = await getAllFromStore("classes")
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
   await seedClassResources(classIdMap)
+
+  const subclassesWithIds = enrichSrdSubclassList(
+    subclasses
+      .map((sc) => ({
+        name: sc.name,
+        description: sc.description,
+        features: sc.features,
+        source: sc.source,
+        class_id: classIdMap.get(sc.class_name) ?? null,
+      }))
+      .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+    new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+  )
+  for (const source of LEGACY_SRD_SOURCES) {
+    const existing = await getAllFromStore("subclasses")
+    for (const row of existing) {
+      if (row.source === source) {
+        await deleteIndexedDbRow("subclasses", row.id as string)
+      }
+    }
+  }
+  await putRows(
+    "subclasses",
+    subclassesWithIds.map((row) => ({
+      ...row,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })),
+  )
+
   writeStoredSrdVersion(manifest.version)
 }
 
@@ -68,16 +104,18 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   const classRows = await getAllFromStore("classes")
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
 
-  const subclassesWithIds = subclasses
-    .map((sc) => ({
-      name: sc.name,
-      description: sc.description,
-      features: sc.features,
-      source: sc.source,
-      class_id: classIdMap.get(sc.class_name) ?? null,
-    }))
-    .filter((sc) => sc.class_id !== null) as Record<string, unknown>[]
-
+  const subclassesWithIds = enrichSrdSubclassList(
+    subclasses
+      .map((sc) => ({
+        name: sc.name,
+        description: sc.description,
+        features: sc.features,
+        source: sc.source,
+        class_id: classIdMap.get(sc.class_name) ?? null,
+      }))
+      .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+    new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+  )
   for (const source of LEGACY_SRD_SOURCES) {
     const existing = await getAllFromStore("subclasses")
     for (const row of existing) {
@@ -96,9 +134,9 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   await seedClassResources(classIdMap)
 
   await upsertByName("species", species)
-  await upsertByName("backgrounds", backgrounds)
+  await upsertByName("backgrounds", normalizeBackgroundRows(backgrounds))
   await upsertByName("spells", spells)
-  await upsertByName("feats", feats)
+  await upsertByName("feats", enrichSrdFeatList(feats as Record<string, unknown>[]))
   await upsertByName("equipment", equipment)
 
   await ensureModifierCatalog(createClient())

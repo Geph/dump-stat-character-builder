@@ -18,6 +18,7 @@ import {
   finalizeBackgroundImportRow,
 } from "@/lib/import/background-parse"
 import { parseBackgroundAbilityScoresLine } from "@/lib/compendium/background-utils"
+import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
@@ -408,7 +409,7 @@ export async function POST(request: NextRequest) {
     let row = result
     if (tableName === "backgrounds") {
       const spells = (await listRows("spells")) as { id: string; name: string }[]
-      row = finalizeBackgroundImportRow(row, spells)
+      row = normalizeBackgroundRow(finalizeBackgroundImportRow(row, spells) as Record<string, unknown>)
     }
 
     await upsertByName(tableName, [row])
