@@ -21,6 +21,7 @@ import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -287,12 +288,18 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const updateChoiceOption = (
     featIndex: number,
     optIndex: number,
-    field: "name" | "description" | "modifierRefs",
-    value: string | string[],
+    field: "name" | "description" | "modifierRefs" | "linkedModifiers",
+    value: string | string[] | LinkedModifierInstance[],
   ) => {
     const newFeatures = [...form.features]
     const existing = newFeatures[featIndex].choices!
-    const newOptions = existing.options.map((o, i) => i === optIndex ? { ...o, [field]: value } : o)
+    const newOptions = existing.options.map((o, i) => {
+      if (i !== optIndex) return o
+      if (field === "linkedModifiers" && Array.isArray(value)) {
+        return syncModifierRefs({ ...o, linkedModifiers: value })
+      }
+      return { ...o, [field]: value }
+    })
     newFeatures[featIndex] = { ...newFeatures[featIndex], choices: { ...existing, options: newOptions } }
     setForm({ ...form, features: newFeatures })
   }

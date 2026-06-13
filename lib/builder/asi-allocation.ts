@@ -1,6 +1,6 @@
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { Feat } from "@/lib/types"
-
+import { BACKGROUND_ASI_KEY } from "@/lib/builder/background-asi"
 export const ASI_POINTS_PER_PICK = 2
 
 /** Combined allocation for all milestone Ability Score Improvement feats. */
@@ -163,15 +163,23 @@ export function trimAsiAllocation(allocation: AsiAllocation, totalPoints: number
 }
 
 export function aggregateAsiBonuses(allocations: AsiAllocationsByFeatId): AsiAllocation {
-  const combined = allocations[COMBINED_MILESTONE_ASI_KEY]
-  if (combined && getAsiPointsUsed(combined) > 0) {
-    return { ...combined }
-  }
-
   const totals: AsiAllocation = {}
-  for (const allocation of Object.values(allocations)) {
+  const combined = allocations[COMBINED_MILESTONE_ASI_KEY]
+  const useCombined = Boolean(combined && getAsiPointsUsed(combined) > 0)
+
+  for (const [key, allocation] of Object.entries(allocations)) {
+    if (key === BACKGROUND_ASI_KEY) continue
+    if (key.startsWith(FEAT_SLOT_ASI_PREFIX)) {
+      if (!useCombined) mergeAllocationsInto(totals, allocation)
+      continue
+    }
+    if (key === COMBINED_MILESTONE_ASI_KEY) {
+      if (useCombined) mergeAllocationsInto(totals, allocation)
+      continue
+    }
     mergeAllocationsInto(totals, allocation)
   }
+
   return totals
 }
 

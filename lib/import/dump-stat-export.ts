@@ -1,4 +1,5 @@
 import { extractUsesConfig, normalizeCharacteristics } from "@/lib/compendium/characteristic-modifiers"
+import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import type { CompendiumTable } from "@/lib/db/tables"
 import {
   deleteWhere,
@@ -82,6 +83,10 @@ function rowForTable(
 
   if (exportType === "dnd-species") {
     row.characteristics = normalizeCharacteristics(cleaned.characteristics, null)
+  }
+
+  if (exportType === "dnd-background") {
+    return normalizeBackgroundRow(row)
   }
 
   return row

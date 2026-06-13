@@ -1,3 +1,4 @@
+import { enrichClassFeatureWithResource } from "@/lib/compendium/class-resource-features"
 import { SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
 import {
   GRANT_FEAT_CATALOG_IDS,
@@ -24,8 +25,9 @@ function applyGrantRef(feature: Feature, refId: string): Feature {
   }
 }
 
-function enrichFeature(feature: Feature): Feature {
+function enrichFeature(className: string, feature: Feature): Feature {
   let next = migrateFeatureFeatChoiceToModifierRefs(feature)
+  next = enrichClassFeatureWithResource(className, next)
 
   if (/ability score improvement/i.test(next.name ?? "")) {
     next = applyGrantRef(next, GRANT_FEAT_CATALOG_IDS.general)
@@ -80,9 +82,9 @@ function ensureMilestoneGrantFeatFeatures(features: Feature[]): Feature[] {
   return result.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
 }
 
-function enrichFeatures(features: unknown): Feature[] {
+function enrichFeatures(className: string, features: unknown): Feature[] {
   if (!Array.isArray(features)) return []
-  const mapped = features.map((raw) => enrichFeature(raw as Feature))
+  const mapped = features.map((raw) => enrichFeature(className, raw as Feature))
   return ensureMilestoneGrantFeatFeatures(mapped)
 }
 
@@ -96,7 +98,7 @@ function normalizeSpellcasting(raw: unknown): Record<string, unknown> | null {
 /** Apply SRD defaults: feat-granting modifier refs, icons, spellcasting starts_at. */
 export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, unknown> {
   const name = String(row.name ?? "")
-  const features = enrichFeatures(row.features)
+  const features = enrichFeatures(name, row.features)
   const icon =
     typeof row.icon === "string" && row.icon.trim()
       ? row.icon.trim()

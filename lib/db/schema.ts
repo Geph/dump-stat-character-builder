@@ -115,6 +115,7 @@ export const feats = mysqlTable("feats", {
   prerequisite_background_ids: json("prerequisite_background_ids").$type<string[]>(),
   benefits: json("benefits"),
   modifier_refs: json("modifier_refs").$type<string[]>().default([]),
+  linked_modifiers: json("linked_modifiers").$type<unknown[]>().default([]),
   repeatable: boolean("repeatable").notNull().default(false),
   ...compendiumMeta,
 })

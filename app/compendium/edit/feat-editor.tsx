@@ -25,8 +25,15 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import {
+  normalizeLinkedModifiers,
+  readLinkedModifiers,
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -42,6 +49,7 @@ interface FeatFormData {
   prerequisite_background_ids: string[]
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
+  linked_modifiers: LinkedModifierInstance[]
   source: string
   creator_url: string
   icon: string | null
@@ -60,6 +68,7 @@ const defaultFeat: FeatFormData = {
   prerequisite_background_ids: [],
   characteristics: [],
   modifier_refs: [],
+  linked_modifiers: [],
   source: "Custom",
   creator_url: "",
   icon: null,
@@ -119,29 +128,31 @@ export default function FeatEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Feat not found")
         } else if (data) {
+          const [enriched] = enrichFeatsList([data as Record<string, unknown>])
           setForm({
-            name: data.name || "",
-            description: data.description || "",
-            category: data.category || "General",
-            level_requirement: data.level_requirement ?? 1,
-            prerequisite_feat_ids: data.prerequisite_feat_ids || [],
-            prerequisite_class_ids: data.prerequisite_class_ids || [],
-            prerequisite_species_ids: data.prerequisite_species_ids || [],
-            prerequisite_background_ids: data.prerequisite_background_ids || [],
-            characteristics: normalizeCharacteristics(data.benefits, null),
-            modifier_refs: readModifierRefs(data as Record<string, unknown>),
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            repeatable: Boolean(data.repeatable),
+            name: enriched.name || "",
+            description: enriched.description || "",
+            category: enriched.category || "General",
+            level_requirement: enriched.level_requirement ?? 1,
+            prerequisite_feat_ids: enriched.prerequisite_feat_ids || [],
+            prerequisite_class_ids: enriched.prerequisite_class_ids || [],
+            prerequisite_species_ids: enriched.prerequisite_species_ids || [],
+            prerequisite_background_ids: enriched.prerequisite_background_ids || [],
+            characteristics: normalizeCharacteristics(enriched.benefits, null),
+            modifier_refs: readModifierRefs(enriched),
+            linked_modifiers: readLinkedModifiers(enriched, modifierCatalog),
+            source: enriched.source || "Custom",
+            creator_url: enriched.creator_url || "",
+            icon: enriched.icon || null,
+            accent_color: enriched.accent_color || null,
+            repeatable: Boolean(enriched.repeatable),
           })
         }
         setLoading(false)
       }
       fetchFeat()
     }
-  }, [id])
+  }, [id, modifierCatalog])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -460,11 +471,18 @@ export default function FeatEditorPage({ id }: { id: string }) {
             />
           </div>
 
-          <ModifierCatalogPicker
-            value={form.modifier_refs}
-            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+          <LinkedModifiersEditor
+            value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
+            onChange={(linked_modifiers) =>
+              setForm((prev) => ({
+                ...prev,
+                ...syncModifierRefs({ linkedModifiers: linked_modifiers }),
+                linked_modifiers,
+              }))
+            }
             catalog={modifierCatalog}
             label="Modifier effects (from shared catalog)"
+            spellOptions={allSpells}
           />
 
           <details className="rounded-xl border border-border p-4">

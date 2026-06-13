@@ -99,6 +99,7 @@ export function characterToBuilderState(
     startingEquipmentOptionIndex: null,
     spellPicksByClassId,
     asiAllocationsByFeatId: (character.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {},
+    standardArrayAssignments: {},
     currentHp: character.hit_points ?? character.hit_point_max ?? null,
     tempHp: 0,
     editingCharacterId: character.id,

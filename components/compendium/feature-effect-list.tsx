@@ -359,21 +359,35 @@ function EffectRow({
         <HealAmountEditor effect={effect} onChange={onChange} />
       )}
 
-      {fields.includes("classResourceKey") && classResources.length > 0 && (
+      {fields.includes("classResourceKey") && (
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Class resource</label>
-          <select
-            value={effect.classResourceKey ?? ""}
-            onChange={(e) => onChange({ classResourceKey: e.target.value || null })}
-            className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm"
-          >
-            <option value="">Select resource...</option>
-            {classResources.map((resource) => (
-              <option key={resource.id} value={resource.id}>
-                {resource.name}
-              </option>
-            ))}
-          </select>
+          {classResources.length > 0 ? (
+            <select
+              value={effect.classResourceKey ?? ""}
+              onChange={(e) => onChange({ classResourceKey: e.target.value || null })}
+              className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm"
+            >
+              <option value="">Select resource...</option>
+              {classResources.map((resource) => (
+                <option key={resource.id} value={resource.id}>
+                  {resource.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={effect.classResourceKey ?? ""}
+              onChange={(e) =>
+                onChange({
+                  classResourceKey: e.target.value.trim().replace(/\s+/g, "_").toLowerCase() || null,
+                })
+              }
+              placeholder="rage"
+              className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm font-mono"
+            />
+          )}
         </div>
       )}
 

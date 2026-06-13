@@ -7,6 +7,7 @@ import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
+import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import {
@@ -107,6 +108,18 @@ import {
 } from "@/lib/builder/spell-limits"
 import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import {
+  allAbilityScorePoolAllocationsValid,
+  collectAbilityScorePoolGrants,
+} from "@/lib/builder/ability-score-pools"
+import {
+  aggregateBackgroundAbilityBonuses,
+  BACKGROUND_ASI_KEY,
+  BACKGROUND_ASI_TOTAL_POINTS,
+  getBackgroundAbilityGrant,
+  getBackgroundAsiHelpText,
+  isValidBackgroundAsiAllocation,
+} from "@/lib/builder/background-asi"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
@@ -157,6 +170,30 @@ const STEPS = [
 const ABILITY_NAMES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
 
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const
+
+type AbilityName = (typeof ABILITY_NAMES)[number]
+
+type StandardArrayAssignments = Partial<Record<AbilityName, number>>
+
+const STANDARD_ARRAY_UNASSIGNED_SCORE = 10
+
+function standardAssignmentsFromCharacter(
+  scores: Pick<CharacterDraft, AbilityName>,
+): StandardArrayAssignments {
+  const assignments: StandardArrayAssignments = {}
+  const usedValues = new Set<number>()
+  for (const name of ABILITY_NAMES) {
+    const value = scores[name]
+    if (!(STANDARD_ARRAY as readonly number[]).includes(value) || usedValues.has(value)) continue
+    assignments[name] = value
+    usedValues.add(value)
+  }
+  return assignments
+}
+
+function isStandardArrayComplete(assignments: StandardArrayAssignments): boolean {
+  return ABILITY_NAMES.every((name) => assignments[name] != null)
+}
 
 /** Class picker: 4 columns, up to 4 rows per page before pagination */
 const CLASS_GRID_ROWS = 4
@@ -241,6 +278,7 @@ export default function BuilderPage() {
 
   // Ability score generation method
   const [abilityMethod, setAbilityMethod] = useState<AbilityMethod>("pointbuy")
+  const [standardArrayAssignments, setStandardArrayAssignments] = useState<StandardArrayAssignments>({})
   const [pointsRemaining, setPointsRemaining] = useState(27)
   
   // Search state for each step
@@ -308,6 +346,12 @@ export default function BuilderPage() {
     setSpeciesTraitPicks(snapshot.speciesTraitPicks)
     setSpellPicksByClassId(snapshot.spellPicksByClassId ?? {})
     setAsiAllocationsByFeatId(snapshot.asiAllocationsByFeatId ?? {})
+    setStandardArrayAssignments(
+      snapshot.standardArrayAssignments ??
+        (snapshot.abilityMethod === "standard"
+          ? standardAssignmentsFromCharacter(snapshot.character)
+          : {}),
+    )
     setCurrentHp(snapshot.currentHp)
     setTempHp(snapshot.tempHp)
     setEditingCharacterId(snapshot.editingCharacterId ?? null)
@@ -347,6 +391,7 @@ export default function BuilderPage() {
     setSpeciesTraitPicks({})
     setSpellPicksByClassId({})
     setAsiAllocationsByFeatId({})
+    setStandardArrayAssignments({})
     setAbilityMethod("pointbuy")
     setPointsRemaining(27)
     setClassSearch("")
@@ -444,6 +489,7 @@ export default function BuilderPage() {
       speciesTraitPicks,
       spellPicksByClassId,
       asiAllocationsByFeatId,
+      standardArrayAssignments,
       editingCharacterId,
       currentHp,
       tempHp,
@@ -473,6 +519,7 @@ export default function BuilderPage() {
     speciesTraitPicks,
     spellPicksByClassId,
     asiAllocationsByFeatId,
+    standardArrayAssignments,
     editingCharacterId,
     currentHp,
     tempHp,
@@ -499,7 +546,7 @@ export default function BuilderPage() {
       setClasses(filterEnabled(enrichClassesList(classesRes.data || []) as DndClass[]))
       setSubclasses(filterEnabled(subclassesRes.data || []))
       setSpecies(filterEnabled(enrichSpeciesList(speciesRes.data || []) as Species[]))
-      setBackgrounds(filterEnabled(backgroundsRes.data || []))
+      setBackgrounds(enrichBackgroundList(filterEnabled(backgroundsRes.data || [])) as Background[])
       if (featsRes.error) {
         setFeatsLoadError(featsRes.error.message)
         setFeats([])
@@ -553,31 +600,40 @@ export default function BuilderPage() {
     setCharacter({ ...character, [ability]: Math.min(30, Math.max(1, parsed)) })
   }
 
-  const assignStandardArrayValue = (
-    ability: (typeof ABILITY_NAMES)[number],
-    value: number,
-  ) => {
-    setCharacter((prev) => ({ ...prev, [ability]: value }))
+  const assignStandardArrayValue = (ability: AbilityName, value: number) => {
+    setStandardArrayAssignments((prev) => {
+      const current = prev[ability]
+      const next = { ...prev }
+      if (current === value) {
+        delete next[ability]
+        setCharacter((characterPrev) => ({
+          ...characterPrev,
+          [ability]: STANDARD_ARRAY_UNASSIGNED_SCORE,
+        }))
+      } else {
+        next[ability] = value
+        setCharacter((characterPrev) => ({ ...characterPrev, [ability]: value }))
+      }
+      return next
+    })
   }
 
-  const isStandardValueUsedElsewhere = (
-    ability: (typeof ABILITY_NAMES)[number],
-    value: number,
-  ) =>
+  const isStandardValueUsedElsewhere = (ability: AbilityName, value: number) =>
     ABILITY_NAMES.some(
-      (name) => name !== ability && character[name] === value,
+      (name) => name !== ability && standardArrayAssignments[name] === value,
     )
 
   const applyStandardArray = () => {
-    setCharacter({
-      ...character,
-      strength: 15,
-      dexterity: 14,
-      constitution: 13,
-      intelligence: 12,
-      wisdom: 10,
-      charisma: 8,
-    })
+    setStandardArrayAssignments({})
+    setCharacter((prev) => ({
+      ...prev,
+      strength: STANDARD_ARRAY_UNASSIGNED_SCORE,
+      dexterity: STANDARD_ARRAY_UNASSIGNED_SCORE,
+      constitution: STANDARD_ARRAY_UNASSIGNED_SCORE,
+      intelligence: STANDARD_ARRAY_UNASSIGNED_SCORE,
+      wisdom: STANDARD_ARRAY_UNASSIGNED_SCORE,
+      charisma: STANDARD_ARRAY_UNASSIGNED_SCORE,
+    }))
   }
 
   const rollAbilities = () => {
@@ -642,6 +698,11 @@ export default function BuilderPage() {
   const selectedClass = classes.find(c => c.id === character.class_id)
   const selectedSpecies = species.find(s => s.id === character.species_id)
   const selectedBackground = backgrounds.find(b => b.id === character.background_id)
+  const backgroundAbilityGrant = getBackgroundAbilityGrant(selectedBackground)
+  const backgroundAbilityBonuses = aggregateBackgroundAbilityBonuses(
+    selectedBackground,
+    asiAllocationsByFeatId,
+  )
   
   // Calculate total level from all class levels
   const totalLevel = classLevels.length > 0 
@@ -666,6 +727,18 @@ export default function BuilderPage() {
     selectedFeatIds,
     feats,
   )
+  const abilityScorePoolGrants = collectAbilityScorePoolGrants({
+    catalog: modifierCatalog,
+    species: selectedSpecies,
+    speciesTraitPicks,
+    feats,
+    selectedFeatIds,
+    classLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    featureChoicePicks,
+  })
 
   // If level drops, clear feat picks that no longer apply.
   useEffect(() => {
@@ -684,6 +757,8 @@ export default function BuilderPage() {
     })
   }, [featPickSlots.map((slot) => slot.key).join("|")])
 
+  const featPickSlotKeys = featPickSlots.map((slot) => slot.key).join("|")
+
   // Once Origin is chosen, enforce feat prerequisites for class feature feat picks.
   useEffect(() => {
     if (selectedFeatCount === 0) return
@@ -696,28 +771,32 @@ export default function BuilderPage() {
       backgroundId: character.background_id,
     }
 
-    let changed = false
-    const nextPicks = { ...featureChoicePicks }
-    for (const slot of featPickSlots) {
-      const pickedId = nextPicks[slot.key]?.[0]
-      if (!pickedId) continue
-      const feat = feats.find((f) => f.id === pickedId)
-      if (
-        !feat ||
-        !isFeatEligibleForCategories(feat, slot.featCategories, slot.milestoneLevel, {
-          ...context,
-          currentSlotFeatId: pickedId,
-        })
-      ) {
-        nextPicks[slot.key] = []
-        changed = true
+    setFeatureChoicePicks((prev) => {
+      const nextPicks = { ...prev }
+      let changed = false
+      for (const slot of featPickSlots) {
+        const pickedId = nextPicks[slot.key]?.[0]
+        if (!pickedId) continue
+        const feat = feats.find((f) => f.id === pickedId)
+        if (
+          !feat ||
+          !isFeatEligibleForCategories(feat, slot.featCategories, slot.milestoneLevel, {
+            ...context,
+            currentSlotFeatId: pickedId,
+          })
+        ) {
+          nextPicks[slot.key] = []
+          changed = true
+        }
       }
-    }
-
-    if (changed) {
-      setFeatureChoicePicks(nextPicks)
-      alert("One or more selected feats no longer meet prerequisites. Please reselect.")
-    }
+      if (changed) {
+        window.setTimeout(() => {
+          alert("One or more selected feats no longer meet prerequisites. Please reselect.")
+        }, 0)
+        return nextPicks
+      }
+      return prev
+    })
   }, [
     character.species_id,
     character.background_id,
@@ -726,8 +805,7 @@ export default function BuilderPage() {
     feats,
     selectedFeatIds,
     selectedFeatCount,
-    featPickSlots,
-    featureChoicePicks,
+    featPickSlotKeys,
   ])
 
   useEffect(() => {
@@ -753,6 +831,24 @@ export default function BuilderPage() {
       ),
     )
   }, [asiAllocationsByFeatId, selectedFeatIds, feats, milestoneAsiTotalPoints])
+
+  useEffect(() => {
+    if (!abilityScorePoolGrants.length) return
+    setAsiAllocationsByFeatId((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const grant of abilityScorePoolGrants) {
+        const current = next[grant.allocationKey]
+        if (!current) continue
+        const trimmed = trimAsiAllocation(current, grant.points)
+        if (JSON.stringify(trimmed) !== JSON.stringify(current)) {
+          next[grant.allocationKey] = trimmed
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [abilityScorePoolGrants.map((grant) => `${grant.allocationKey}:${grant.points}`).join("|")])
 
   // Get proficiency bonus based on total level
   const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
@@ -812,6 +908,7 @@ export default function BuilderPage() {
       catalog: modifierCatalog,
       species: selectedSpecies,
       speciesTraitPicks,
+      background: selectedBackground,
       feats,
       selectedFeatIds,
       classLevels,
@@ -836,7 +933,8 @@ export default function BuilderPage() {
       scores[key] =
         character[key] +
         (aggregatedCharacteristics.abilityBonuses[key] ?? 0) +
-        (asiBonuses[key] ?? 0)
+        (asiBonuses[key] ?? 0) +
+        (backgroundAbilityBonuses[key] ?? 0)
       return scores
     },
     {} as Record<(typeof ABILITY_SCORE_KEYS)[number], number>,
@@ -1191,7 +1289,16 @@ export default function BuilderPage() {
           speciesTraitPicks,
         )
       case 3:
-        return allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats)
+        return (
+          allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats) &&
+          allAbilityScorePoolAllocationsValid(abilityScorePoolGrants, asiAllocationsByFeatId) &&
+          (!backgroundAbilityGrant.needsChoice ||
+            isValidBackgroundAsiAllocation(
+              asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {},
+              backgroundAbilityGrant.eligible,
+            )) &&
+          (abilityMethod !== "standard" || isStandardArrayComplete(standardArrayAssignments))
+        )
       case 4: return true
       case 5: return character.name.trim().length > 0
       case 6: return character.name.trim().length > 0
@@ -2051,6 +2158,52 @@ export default function BuilderPage() {
                   </div>
                 )}
 
+                {abilityScorePoolGrants.map((grant) => (
+                  <div key={grant.allocationKey} className="mb-6">
+                    <AsiAllocator
+                      title={grant.label}
+                      allocation={asiAllocationsByFeatId[grant.allocationKey] ?? {}}
+                      totalPoints={grant.points}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) => ({
+                          ...prev,
+                          [grant.allocationKey]: allocation,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+
+                {backgroundAbilityGrant.needsChoice && (
+                  <div className="mb-6">
+                    <AsiAllocator
+                      title={`${selectedBackground?.name ?? "Background"} Ability Scores`}
+                      allocation={asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {}}
+                      totalPoints={BACKGROUND_ASI_TOTAL_POINTS}
+                      allowedAbilities={backgroundAbilityGrant.eligible}
+                      maxPerAbility={2}
+                      helpText={getBackgroundAsiHelpText()}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) => ({
+                          ...prev,
+                          [BACKGROUND_ASI_KEY]: allocation,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {Object.keys(backgroundAbilityGrant.fixed).length > 0 && (
+                  <div className="mb-6 p-3 rounded-lg border border-border bg-card/80">
+                    <p className="text-xs font-bold text-foreground mb-1">
+                      {selectedBackground?.name ?? "Background"} Ability Scores
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {formatBackgroundAbilityBonuses(selectedBackground?.ability_bonuses)}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {ABILITY_NAMES.map((ability) => (
                     <div key={ability} className="bg-card rounded-xl p-4 border-2 border-border text-center">
@@ -2067,9 +2220,13 @@ export default function BuilderPage() {
                             className="w-20 text-center text-3xl font-black text-foreground px-2 py-1 bg-background border-2 border-border rounded-lg focus:outline-none focus:border-primary"
                           />
                         </div>
+                      ) : abilityMethod === "standard" ? (
+                        <span className="text-3xl font-black text-foreground w-12 inline-block">
+                          {standardArrayAssignments[ability] ?? "—"}
+                        </span>
                       ) : (
                         <div className="flex items-center justify-center gap-3">
-                          {(abilityMethod === "pointbuy") && (
+                          {abilityMethod === "pointbuy" && (
                             <button
                               type="button"
                               onClick={() => updateAbilityScore(ability, -1)}
@@ -2086,7 +2243,7 @@ export default function BuilderPage() {
                             <button
                               type="button"
                               onClick={() => updateAbilityScore(ability, 1)}
-                              disabled={abilityMethod === "pointbuy" && character[ability] >= 15}
+                              disabled={character[ability] >= 15}
                               className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
                             >
                               +
@@ -2098,7 +2255,7 @@ export default function BuilderPage() {
                       {abilityMethod === "standard" && (
                         <div className="flex flex-wrap justify-center gap-1.5 mt-3">
                           {STANDARD_ARRAY.map((value) => {
-                            const selectedHere = character[ability] === value
+                            const selectedHere = standardArrayAssignments[ability] === value
                             const usedElsewhere = isStandardValueUsedElsewhere(ability, value)
                             const disabled = usedElsewhere && !selectedHere
                             return (
@@ -2106,6 +2263,7 @@ export default function BuilderPage() {
                                 key={value}
                                 type="button"
                                 disabled={disabled}
+                                aria-pressed={selectedHere}
                                 onClick={() => assignStandardArrayValue(ability, value)}
                                 className={`min-w-[2.25rem] px-2 py-1 rounded-lg text-sm font-bold transition-colors ${
                                   selectedHere
@@ -2123,7 +2281,13 @@ export default function BuilderPage() {
                       )}
 
                       <p className="text-lg font-bold text-primary mt-2">
-                        {getAbilityModifier(character[ability])}
+                        {abilityMethod === "standard" && standardArrayAssignments[ability] == null
+                          ? "—"
+                          : getAbilityModifier(
+                              abilityMethod === "standard"
+                                ? (standardArrayAssignments[ability] ?? STANDARD_ARRAY_UNASSIGNED_SCORE)
+                                : character[ability],
+                            )}
                       </p>
                     </div>
                   ))}
