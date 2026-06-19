@@ -136,7 +136,7 @@ pnpm db:migrate
 
 This applies incremental migrations (new columns such as background `proficiencies`, character weapon/armor proficiencies, feat `repeatable`, etc.).
 
-### 5. Remote MySQL from your laptop
+### 5. Remote MySQL
 
 If MySQL runs on a remote server and blocks public connections (common on shared/VPS hosts), use one of:
 
@@ -188,7 +188,7 @@ Restart the dev server after adding the key. Without it, import still works for 
 
 ---
 
-## Production deployment (DreamHost VPS or similar)
+## Production deployment
 
 **This app is designed for self-hosted Node + MySQL**, not Vercel serverless. If the repo was linked to Vercel from v0, disconnect that integration in the Vercel dashboard (or remove the Git deploy hook) and deploy on your VPS instead.
 
