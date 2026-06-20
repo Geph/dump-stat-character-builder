@@ -15,6 +15,7 @@ import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeUsesConfig } from "@/lib/compendium/normalize-uses-config"
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
 import type { UsesConfig } from "@/lib/types"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { compendiumListHref } from "@/lib/compendium/content-types"
 
 interface ClassResourceFormData {
@@ -27,6 +28,7 @@ interface ClassResourceFormData {
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
 }
 
 const defaultForm: ClassResourceFormData = {
@@ -39,6 +41,7 @@ const defaultForm: ClassResourceFormData = {
   creator_url: "",
   icon: null,
   accent_color: null,
+  card_image_url: null,
 }
 
 export default function ClassResourceEditorPage({ id }: { id: string }) {
@@ -48,6 +51,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("class_resources", id)
   const searchParams = useSearchParams()
   const presetClassId = searchParams.get("class_id") ?? ""
 
@@ -90,6 +94,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             creator_url: data.creator_url || "",
             icon: data.icon || null,
             accent_color: data.accent_color || null,
+            card_image_url: data.card_image_url || null,
           })
         }
         setLoading(false)
@@ -190,10 +195,17 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
         isNew={id === "new"}
         saving={saving}
         saveLabel="Save Resource"
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
+        {(error || copyError) && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
+            {error || copyError}
+          </div>
+        )}
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
           <CompendiumEditorHeaderRow
             nameLabel="Resource Name"
@@ -207,6 +219,8 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm((prev) => ({ ...prev, icon }))}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm((prev) => ({ ...prev, accent_color }))}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm((prev) => ({ ...prev, card_image_url }))}
           />
 
           <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
@@ -274,8 +288,6 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
               onChange={(uses) => setForm((prev) => ({ ...prev, uses }))}
             />
           </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
       </main>
     </div>

@@ -16,7 +16,8 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
-import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { DurationEditor } from "@/components/compendium/duration-editor"
+import type { FeatureDurationKey } from "@/lib/types"
 
 interface TraitChoice {
   category: string
@@ -30,6 +31,7 @@ interface Trait {
   level?: number // level at which trait becomes available, defaults to 1
   isChoice?: boolean
   choices?: TraitChoice
+  duration?: FeatureDurationKey | null
 }
 
 interface SpeciesFormData {
@@ -76,7 +78,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     const fetchSpells = async () => {
       const db = createClient()
-      const { data } = await db.from("spells").select("id, name").order("name").limit(500)
+      const { data } = await db.from("spells").select("id, name, level").order("level").order("name").limit(500)
       setAllSpells(data || [])
     }
     fetchSpells()
@@ -413,13 +415,19 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
                   </div>
 
                   {!trait.isChoice ? (
-                    <textarea
-                      value={trait.description}
-                      onChange={(e) => updateTrait(index, { description: e.target.value })}
-                      placeholder="Trait description..."
-                      rows={2}
-                      className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
-                    />
+                    <>
+                      <textarea
+                        value={trait.description}
+                        onChange={(e) => updateTrait(index, { description: e.target.value })}
+                        placeholder="Trait description..."
+                        rows={2}
+                        className="w-full px-4 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary resize-none"
+                      />
+                      <DurationEditor
+                        value={trait.duration}
+                        onChange={(duration) => updateTrait(index, { duration })}
+                      />
+                    </>
                   ) : (
                     <div className="space-y-3 pt-2 border-t border-border mt-2">
                       <div className="flex items-center gap-4">

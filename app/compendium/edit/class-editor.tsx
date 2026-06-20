@@ -14,12 +14,15 @@ import {
 import type { FeatureChoice, Feature, ClassResource, ClassResourceRow } from "@/lib/types"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { CardBlurbField } from "@/components/compendium/card-blurb-field"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { compendiumListHref } from "@/lib/compendium/content-types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
+import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
@@ -47,6 +50,7 @@ interface ClassFeature extends Feature {}
 interface ClassFormData {
   name: string
   description: string
+  card_blurb: string
   hit_die: number
   primary_ability: string[]
   saving_throws: string[]
@@ -62,6 +66,7 @@ interface ClassFormData {
   starting_equipment_groups: StartingEquipmentGroup[]
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
   source: string
   creator_url: string
 }
@@ -69,6 +74,7 @@ interface ClassFormData {
 const defaultClass: ClassFormData = {
   name: "",
   description: "",
+  card_blurb: "",
   hit_die: 8,
   primary_ability: [],
   saving_throws: [],
@@ -81,6 +87,7 @@ const defaultClass: ClassFormData = {
   starting_equipment_groups: [],
   icon: null,
   accent_color: null,
+  card_image_url: null,
   source: "Custom",
   creator_url: "",
 }
@@ -94,6 +101,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("classes", id)
   const { catalog: modifierCatalog } = useModifierCatalog()
 
   useEffect(() => {
@@ -109,29 +117,32 @@ export default function ClassEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Class not found")
         } else if (data) {
-          const spellcasting = data.spellcasting
+          const [enriched] = enrichClassesList([data as Record<string, unknown>])
+          const spellcasting = enriched.spellcasting
             ? {
-                ability: data.spellcasting.ability || "Intelligence",
-                starts_at: data.spellcasting.starts_at ?? 1,
+                ability: enriched.spellcasting.ability || "Intelligence",
+                starts_at: enriched.spellcasting.starts_at ?? 1,
               }
             : null
           setForm({
-            name: data.name || "",
-            description: data.description || "",
-            hit_die: data.hit_die || 8,
-            primary_ability: data.primary_ability || [],
-            saving_throws: data.saving_throws || [],
-            armor_proficiencies: data.armor_proficiencies || [],
-            weapon_proficiencies: data.weapon_proficiencies || [],
-            skill_choices: data.skill_choices || { count: 2, options: [] },
-            features: (data.features || [{ level: 1, name: "", description: "" }]).map((feature) =>
+            name: enriched.name || "",
+            description: enriched.description || "",
+            card_blurb: enriched.card_blurb || "",
+            hit_die: enriched.hit_die || 8,
+            primary_ability: enriched.primary_ability || [],
+            saving_throws: enriched.saving_throws || [],
+            armor_proficiencies: enriched.armor_proficiencies || [],
+            weapon_proficiencies: enriched.weapon_proficiencies || [],
+            skill_choices: enriched.skill_choices || { count: 2, options: [] },
+            features: (enriched.features || [{ level: 1, name: "", description: "" }]).map((feature) =>
               normalizeFeatureRow(feature),
             ),
             spellcasting,
-            starting_gold: data.starting_gold ?? 0,
-            starting_equipment_groups: data.starting_equipment_groups || [],
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
+            starting_gold: enriched.starting_gold ?? 0,
+            starting_equipment_groups: enriched.starting_equipment_groups || [],
+            icon: enriched.icon || null,
+            accent_color: enriched.accent_color || null,
+            card_image_url: data.card_image_url || null,
             source: data.source || "Custom",
             creator_url: data.creator_url || "",
           })
@@ -153,6 +164,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
     const db = createClient()
     const payload = {
       ...form,
+      card_blurb: form.card_blurb.trim() || null,
       features: form.features.filter(f => f.name.trim()),
       spellcasting: hasSpellcasting ? form.spellcasting : null,
       creator_url: normalizeCreatorUrl(form.creator_url),
@@ -388,13 +400,15 @@ export default function ClassEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Class"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -412,6 +426,8 @@ export default function ClassEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           {/* Description */}
@@ -425,6 +441,12 @@ export default function ClassEditorPage({ id }: { id: string }) {
               placeholder="A warrior who fights with great strength..."
             />
           </div>
+
+          <CardBlurbField
+            value={form.card_blurb}
+            onChange={(card_blurb) => setForm({ ...form, card_blurb })}
+            placeholder="A master of weapons and armor who adapts to any martial role…"
+          />
 
           {/* Hit Die */}
           <div>
@@ -722,6 +744,10 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     index={index}
                     classResources={classResources}
                     modifierCatalog={modifierCatalog}
+                    siblingFeatures={form.features.map((feat) => ({
+                      name: feat.name,
+                      level: feat.level,
+                    }))}
                     onUpdate={updateFeature}
                     onToggleChoice={toggleFeatureChoice}
                     onUpdateChoiceField={updateFeatureChoiceField}

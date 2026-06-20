@@ -16,6 +16,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -70,6 +71,7 @@ interface SpellFormData {
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
 }
 
 const defaultSpell: SpellFormData = {
@@ -90,6 +92,7 @@ const defaultSpell: SpellFormData = {
   creator_url: "",
   icon: "bookmarklet",
   accent_color: null,
+  card_image_url: null,
 }
 
 export default function SpellEditorPage({ id }: { id: string }) {
@@ -100,6 +103,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
   const [customClasses, setCustomClasses] = useState<{ id: string; name: string }[]>([])
   const [otherClassListOpen, setOtherClassListOpen] = useState(false)
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("spells", id)
 
   const isStandardSpellClass = (name: string) =>
     SPELL_CLASSES.some((c) => c.toLowerCase() === name.toLowerCase())
@@ -153,6 +157,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             creator_url: data.creator_url || "",
             icon: data.icon || null,
             accent_color: data.accent_color || null,
+            card_image_url: data.card_image_url || null,
           })
         }
         setLoading(false)
@@ -272,13 +277,15 @@ export default function SpellEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Spell"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -296,6 +303,8 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           {/* Classes */}

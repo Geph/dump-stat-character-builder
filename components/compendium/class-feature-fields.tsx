@@ -8,6 +8,8 @@ import {
 
   syncModifierRefs,
 
+  syncFeatureActivationTiming,
+
   type LinkedModifierInstance,
 
 } from "@/lib/compendium/linked-modifiers"
@@ -19,6 +21,10 @@ import type { ClassResource, Feature, FeatureChoice, UsesConfig } from "@/lib/ty
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+
+import { ActivationEditor, type SiblingClassFeatureOption } from "@/components/compendium/activation-timing-editor"
+
+import { DurationEditor } from "@/components/compendium/duration-editor"
 
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 
@@ -60,6 +66,9 @@ type ClassFeatureFieldsProps = {
 
   onUpdateLimitedUses: (index: number, uses: UsesConfig) => void
 
+  /** Other features on the same class/subclass for inherited activation. */
+  siblingFeatures?: SiblingClassFeatureOption[]
+
 }
 
 
@@ -89,6 +98,8 @@ export function ClassFeatureFields({
   onToggleLimitedUses,
 
   onUpdateLimitedUses,
+
+  siblingFeatures = [],
 
 }: ClassFeatureFieldsProps) {
 
@@ -126,7 +137,21 @@ export function ClassFeatureFields({
 
         value={linkedModifiers}
 
-        onChange={(next) => onUpdate(index, syncModifierRefs({ linkedModifiers: next }))}
+        onChange={(next) =>
+
+          onUpdate(
+
+            index,
+
+            syncModifierRefs({
+
+              linkedModifiers: syncFeatureActivationTiming(activation, next),
+
+            }),
+
+          )
+
+        }
 
         catalog={modifierCatalog}
 
@@ -140,71 +165,39 @@ export function ClassFeatureFields({
 
 
 
-      <div className="pt-2 border-t border-border space-y-3">
+      <ActivationEditor
 
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Activation timing</p>
+        activation={activation}
 
-        <p className="text-xs text-muted-foreground">
+        siblingFeatures={siblingFeatures.filter((feat) => feat.name !== feature.name)}
 
-          When this feature is used in play, which action economy does it consume? Detailed effects come from linked
+        onChange={(nextActivation) =>
 
-          modifiers above.
+          onUpdate(index, {
 
-        </p>
+            activation: nextActivation,
 
-        <div className="flex flex-wrap gap-4 text-sm">
+            ...syncModifierRefs({
 
-          {(
+              linkedModifiers: syncFeatureActivationTiming(nextActivation, linkedModifiers),
 
-            [
+            }),
 
-              ["action", "Action"],
+          })
 
-              ["bonusAction", "Bonus Action"],
+        }
 
-              ["reaction", "Reaction"],
+      />
 
-            ] as const
 
-          ).map(([key, label]) => (
 
-            <label key={key} className="flex items-center gap-2 cursor-pointer">
+      <DurationEditor
 
-              <input
+        value={feature.duration}
 
-                type="checkbox"
+        onChange={(duration) => onUpdate(index, { duration })}
 
-                checked={!!activation[key]}
-
-                onChange={(e) =>
-
-                  onUpdate(index, {
-
-                    activation: {
-
-                      ...activation,
-
-                      [key]: e.target.checked,
-
-                    },
-
-                  })
-
-                }
-
-                className="w-4 h-4 rounded border-border accent-primary"
-
-              />
-
-              <span className="text-muted-foreground">{label}</span>
-
-            </label>
-
-          ))}
-
-        </div>
-
-      </div>
+      />
 
 
 

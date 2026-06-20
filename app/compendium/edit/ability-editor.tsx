@@ -19,13 +19,14 @@ import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import {
-  CommonModifiersCatalogEditor,
+  CatalogEditor,
   buildCatalogSavePayload,
-  isCommonModifiersCatalogEditor,
+  getCatalogEditorMeta,
+  isSystemCatalogEditorRoute,
   parseCatalogFromRow,
-  COMMON_MODIFIERS_CATALOG_ID,
 } from "@/app/compendium/edit/common-modifiers-catalog-editor"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -48,6 +49,7 @@ interface AbilityFormData {
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
 }
 
 const defaultAbility: AbilityFormData = {
@@ -63,6 +65,7 @@ const defaultAbility: AbilityFormData = {
   creator_url: "",
   icon: null,
   accent_color: null,
+  card_image_url: null,
 }
 
 const ATTACH_OPTIONS = [
@@ -79,7 +82,8 @@ const ATTACH_OPTIONS = [
 export default function AbilityEditorPage({ id }: { id: string }) {
   const [form, setForm] = useState<AbilityFormData>(defaultAbility)
   const [catalog, setCatalog] = useState<ModifierCatalogEntry[]>([])
-  const isCatalogEditor = isCommonModifiersCatalogEditor(id)
+  const catalogMeta = getCatalogEditorMeta(id)
+  const isCatalogEditor = catalogMeta !== null
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,6 +91,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
   const [otherAbilities, setOtherAbilities] = useState<{ id: string; name: string }[]>([])
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("abilities", id)
   const { catalog: modifierCatalog } = useModifierCatalog()
 
   useEffect(() => {
@@ -94,7 +99,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
       const fetchAbility = async () => {
         setLoading(true)
         const db = createClient()
-        if (isCommonModifiersCatalogEditor(id)) {
+        if (isSystemCatalogEditorRoute(id)) {
           await ensureModifierCatalog(db)
         }
         const { data, error } = await db
@@ -106,7 +111,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Custom Ability not found")
         } else if (data) {
-          if (isCommonModifiersCatalogEditor(id)) {
+          if (isSystemCatalogEditorRoute(id)) {
             setCatalog(parseCatalogFromRow(data as Record<string, unknown>))
           } else {
             setForm({
@@ -122,6 +127,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               creator_url: data.creator_url || "",
               icon: data.icon || null,
               accent_color: data.accent_color || null,
+            card_image_url: data.card_image_url || null,
             })
           }
         }
@@ -173,7 +179,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
       const db = createClient()
       const [{ data: abilities }, { data: spells }] = await Promise.all([
         db.from("custom_abilities").select("id, name").order("name").limit(100),
-        db.from("spells").select("id, name").order("name").limit(500),
+        db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
 
       setOtherAbilities((abilities || []).filter((a) => a.id !== id))
@@ -189,12 +195,12 @@ export default function AbilityEditorPage({ id }: { id: string }) {
 
     const db = createClient()
 
-    if (isCatalogEditor) {
-      const payload = buildCatalogSavePayload(catalog)
+    if (isCatalogEditor && catalogMeta) {
+      const payload = buildCatalogSavePayload(catalog, catalogMeta.info)
       const { error } = await db
         .from("custom_abilities")
         .update(payload)
-        .eq("id", COMMON_MODIFIERS_CATALOG_ID)
+        .eq("id", catalogMeta.catalogId)
       if (error) {
         setError(error.message)
         setSaving(false)
@@ -270,9 +276,12 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     )
   }
 
-  if (isCatalogEditor) {
+  if (isCatalogEditor && catalogMeta) {
     return (
-      <CommonModifiersCatalogEditor
+      <CatalogEditor
+        catalogId={catalogMeta.catalogId}
+        catalogName={catalogMeta.name}
+        catalogInfo={catalogMeta.info}
         catalog={catalog}
         spellOptions={allSpells}
         otherAbilities={otherAbilities}
@@ -294,13 +303,15 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Ability"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -318,6 +329,8 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           <div>

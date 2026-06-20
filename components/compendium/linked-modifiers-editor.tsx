@@ -46,13 +46,7 @@ function hasConfigurableActivation(
 ): boolean {
   const activation = instance.activation !== undefined ? instance.activation : entry?.activation
   if (!activation) return false
-  return Boolean(
-    activation.action ||
-      activation.bonusAction ||
-      activation.reaction ||
-      activation.effects?.length ||
-      activation.effect,
-  )
+  return Boolean(activation.effects?.length || activation.effect)
 }
 
 export function LinkedModifiersEditor({
@@ -158,6 +152,8 @@ export function LinkedModifiersEditor({
                       onChange={(characteristics) => updateInstance(instance.instanceId, { characteristics })}
                       otherAbilities={otherAbilities}
                       spellOptions={spellOptions}
+                      modifierCatalog={catalog}
+                      classResources={classResources}
                       configureOnly
                     />
                   </div>
@@ -168,30 +164,6 @@ export function LinkedModifiersEditor({
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Active effect details
                     </p>
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      {(
-                        [
-                          ["action", "Action"],
-                          ["bonusAction", "Bonus Action"],
-                          ["reaction", "Reaction"],
-                        ] as const
-                      ).map(([key, timingLabel]) => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={!!activation[key]}
-                            onChange={(e) => {
-                              updateActivation(instance.instanceId, {
-                                ...activation,
-                                [key]: e.target.checked,
-                              })
-                            }}
-                            className="accent-primary"
-                          />
-                          <span className="text-muted-foreground">{timingLabel}</span>
-                        </label>
-                      ))}
-                    </div>
                     <FeatureEffectList
                       activation={activation}
                       classResources={classResources}

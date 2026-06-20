@@ -2,6 +2,47 @@
 
 import type { BackgroundProficiencies } from "@/lib/compendium/background-proficiencies"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import type { BuffAllyMode, RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
+import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
+
+export type FeatureDurationKey =
+  | "1_round"
+  | "until_ended"
+  | "until_end_next_turn"
+  | "until_next_day"
+  | "1_minute"
+  | "10_minutes"
+
+export type RollTarget = "ally" | "enemy"
+
+export type MoveDistanceMode = "speed" | "fixed" | "multiplier"
+
+export type MovementType = "walk" | "fly" | "swim" | "climb" | "burrow" | "jump"
+
+export type CastSpellCastingTime = "action" | "bonus_action" | "reaction" | "minute" | "hour"
+
+export type AttackProfile = "melee" | "ranged" | "emanation" | "force_save"
+
+export type CreatureModifyMode =
+  | "roll"
+  | "disadvantage"
+  | "speed"
+  | "forced_movement"
+  | "restrict"
+
+export type CreatureSpeedChange = "halve" | "reduce" | "set" | "zero"
+
+export type FeatureActivationRequirement =
+  | { kind: "drop_to_zero_hp" }
+  | { kind: "while_raging" }
+  | { kind: "while_condition"; condition: string }
+  | { kind: "make_saving_throw"; ability?: string | null }
+  | { kind: "fail_saving_throw"; ability?: string | null }
+  | { kind: "on_hit" }
+  | { kind: "on_attack" }
+  | { kind: "on_cast_spell" }
+  | { kind: "on_crit" }
+  | { kind: "custom"; text: string }
 
 // Feature with choice support
 export interface FeatureChoice {
@@ -26,15 +67,43 @@ export interface FeatureEffect {
   /** resistance | immunity | flat reduction */
   mitigation?: "resistance" | "immunity" | "reduction" | null
   damageTypes?: string[]
+  /** Conditions (Charmed, Frightened, etc.) when mitigation is resistance/immunity. */
+  conditionTypes?: string[]
   reductionAmount?: number | null
   /** e.g. rage bonus: +2 at level 1, +3 at 9 */
-  bonusByLevel?: { level: number; bonus: string }[]
+  bonusByLevel?: BonusByLevelEntry[]
   bonusDice?: string | null
-  checkCategory?: "ability" | "skill" | "attack" | "save" | "other" | null
+  checkCategory?: "ability" | "skill" | "attack" | "spell_attack" | "save" | "spell_save_dc" | "initiative" | "other" | null
   checkAbility?: string | null
   checkSkills?: string[]
+  /** Conditions avoided or ended (typically with saving throws or ability checks). */
+  checkConditionTypes?: string[]
+  /** check_roll_modifier: bonus, advantage, or disadvantage */
+  checkRollMode?: "bonus" | "advantage" | "disadvantage" | null
+  /** Reroll when the d20 shows a natural 1 (e.g. Halfling Luck on D20 Tests). */
+  checkRerollOnNaturalOne?: boolean
+  /** Treat rolls below checkRollFloorBelow as checkRollFloorSetTo. */
+  checkRollFloorEnabled?: boolean
+  checkRollFloorBelow?: number | null
+  checkRollFloorSetTo?: number | null
+  /** @deprecated Use bonusConfig */
   bonusAmount?: number | null
+  bonusConfig?: RollBonusConfig | null
+  /** modify_creature: ally or enemy */
+  rollTarget?: RollTarget | null
+  /** modify_creature: roll debuff/buff, speed, push, restrict actions, etc. */
+  creatureModifyMode?: CreatureModifyMode | null
+  creatureSpeedChange?: CreatureSpeedChange | null
+  creatureSpeedAmount?: number | null
+  creatureMoveDistance?: number | null
+  /** e.g. no_opportunity_attacks, no_reactions */
+  creatureRestrictions?: string[]
+  /** @deprecated Use rollTarget + buffMode on modify_creature_roll */
+  buffMode?: BuffAllyMode | null
+  buffBonus?: RollBonusConfig | null
+  /** @deprecated Implicit when kind is check_advantage */
   grantAdvantage?: boolean
+  /** @deprecated Implicit when kind is check_disadvantage */
   grantDisadvantage?: boolean
   classResourceKey?: string | null
   /** How a class_resource effect modifies the pool. */
@@ -50,12 +119,107 @@ export interface FeatureEffect {
   /** HP = character level × multiplier when healMode is character_level */
   healLevelMultiplier?: number | null
   healAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  /** extra_attack: attacks when taking the Attack action */
+  extraAttackCount?: number | null
+  /** movement_option */
+  movementDash?: boolean
+  movementDisengage?: boolean
+  movementHide?: boolean
+  movementMoveThroughLargerSpaces?: boolean
+  movementHideBehindLargerCreatures?: boolean
+  moveDistanceMode?: MoveDistanceMode | null
+  moveDistanceFixed?: number | null
+  moveDistanceMultiplier?: number | null
+  /** movement_option: movement does not provoke opportunity attacks. */
+  moveWithoutOpportunityAttacks?: boolean
+  /** weapon_attack / attack or effect */
+  attackProfile?: AttackProfile | null
+  /** @deprecated Use attackProfile */
+  attackStyle?: "melee" | "ranged" | null
+  attackDiceCount?: number | null
+  attackDieType?: "d4" | "d6" | "d8" | "d10" | "d12" | null
+  attackAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  attackDamageBonus?: number | null
+  /** force_save profile: DC = base + modifier */
+  saveDCBase?: number | null
+  saveDCConfig?: RollBonusConfig | null
+  saveAbility?: string | null
+  /** damage/conditions applied on failed save or hit */
+  effectDamageTypes?: string[]
+  effectConditionTypes?: string[]
+  /** damage_reduction: Dex-save-style mitigation (Evasion). */
+  defensiveSaveScope?: boolean
+  /** When defensiveSaveScope: damage on successful save (none = 0, half = half). */
+  defensiveSaveSuccess?: "none" | "half" | null
+  /** modify_creature: attack rolls against this character can't have Advantage. */
+  attackRollsCantHaveAdvantage?: boolean
+  /** grant_temp_hp: when temp HP is granted. */
+  tempHpTrigger?: "passive" | "on_kill" | "on_action" | "bonus_action" | null
+  /** class_resource: refresh pool when rolling Initiative (etc.). */
+  resourceRefreshOnInitiative?: boolean
+  /** class_resource reset: cap restored uses (e.g. until you have 2). */
+  resourceRefreshCap?: number | null
+  /** class_resource reset: refresh when finishing a rest. */
+  resourceRefreshOnRest?: "short_rest" | "long_rest" | "short_or_long_rest" | null
+  /** class_resource reset: cap formula instead of fixed cap (e.g. half level). */
+  resourceRefreshFormula?: "half_level" | "full" | null
+  /** class_resource: regain all when using another named class feature. */
+  regainAllOnLinkedFeatureUse?: boolean
+  linkedFeatureName?: string | null
+  /** activate_custom_ability: compendium custom ability id to trigger. */
+  customAbilityId?: string | null
+  /** self_buff_caster: label for the temporary caster state. */
+  casterBuffLabel?: string | null
+  /** movement_option: movement types this bonus applies to (empty = all). */
+  movementTypes?: MovementType[]
+  /** cast_spell: spell level (0 = cantrip). */
+  castSpellLevel?: number | null
+  /** cast_spell: class spell lists the spell may be chosen from. */
+  castSpellListClasses?: string[]
+  /** cast_spell: required casting time for the granted cast. */
+  castSpellCastingTime?: CastSpellCastingTime | null
+  /** cast_spell: optional school filter. */
+  castSpellSchool?: string | null
+  /** cast_spell: fixed spell name when not a player choice. */
+  castSpellName?: string | null
+  /** cast_spell: cast without expending a spell slot. */
+  castSpellWithoutSlot?: boolean
+  /** cast_spell: may cast as ritual if the spell allows. */
+  castSpellRitual?: boolean
+  /** heal_from_pool / heal_self: also remove conditions from target. */
+  removeConditions?: string[]
+  /** Blessed Healer: heal self when healing others with a spell slot. */
+  selfHealFlatOnHealOthers?: number | null
+  selfHealPerSpellLevelOnHealOthers?: number | null
+  /** Supreme Healing: maximize healing dice. */
+  maximizeHealingDice?: boolean
+  /** extra_damage_on_hit / rider_damage: selectable riders (Cunning Strike, Brutal Strike). */
+  bonusRiderOptions?: { id: string; name: string; costDice?: string | null; description?: string | null }[]
+  maxBonusRidersPerUse?: number | null
 }
 
 export interface FeatureActivation {
   action?: boolean
   bonusAction?: boolean
   reaction?: boolean
+  /** When you roll initiative (not an action economy cost). */
+  onInitiative?: boolean
+  /** Passive or reaction-style trigger when the character drops to 0 HP. */
+  onDropToZeroHp?: boolean
+  /** Use the same activation timing as another class feature on this class/subclass. */
+  usesExistingClassFeature?: boolean
+  /** Name of the sibling class feature whose activation this feature shares. */
+  existingClassFeatureName?: string | null
+  /** Limit to once per turn (Stunning Strike, etc.). */
+  oncePerTurn?: boolean
+  /** React when you fail a saving throw. */
+  onFailedSave?: boolean
+  /** React when you succeed on a saving throw. */
+  onSuccessfulSave?: boolean
+  /** Spend this class resource pool to activate. */
+  spendClassResourceKey?: string | null
+  spendClassResourceAmount?: number | null
+  requirements?: FeatureActivationRequirement[]
   /** @deprecated Use effects[] */
   effect?: string | null
   effects?: FeatureEffect[]
@@ -68,6 +232,7 @@ export interface Feature {
   isChoice?: boolean
   choices?: FeatureChoice
   limitedUses?: UsesConfig | null
+  duration?: FeatureDurationKey | null
   activation?: FeatureActivation | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
@@ -94,6 +259,7 @@ export interface ClassResourceRow {
   uses: UsesConfig
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   enabled?: boolean
@@ -109,6 +275,7 @@ export interface Trait {
   choices?: FeatureChoice
   modifierRefs?: string[]
   linkedModifiers?: LinkedModifierInstance[]
+  duration?: FeatureDurationKey | null
 }
 
 export interface Species {
@@ -125,6 +292,7 @@ export interface Species {
   linkedModifiers?: LinkedModifierInstance[] | null
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   enabled?: boolean
@@ -152,6 +320,7 @@ export interface DndClass {
   id: string
   name: string
   description: string | null
+  card_blurb: string | null
   hit_die: number
   primary_ability: string[] | null
   saving_throws: string[] | null
@@ -176,6 +345,7 @@ export interface DndClass {
   } | null
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -194,6 +364,7 @@ export interface Subclass {
   } | null
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -222,11 +393,16 @@ export interface UsesConfig {
     | "at_level"
     | "class_resource"
     | "unlimited"
+    | "special"
   fixedAmount?: number
   abilityModifier?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
   customAbilityId?: string
+  /** When type is special — freeform uses description (e.g. Greater Divine Intervention). */
+  specialDescription?: string
   /** When type is class_resource — resource_key from class_resources table */
   classResourceKey?: string
+  /** When type is class_resource — uses spent per activation (default: 1) */
+  classResourceAmount?: number
   atLevelTable?: UsesAtLevel[]
   /** How at_level rows are interpreted (default tier). */
   atLevelMode?: "tier" | "multiply_level"
@@ -253,6 +429,7 @@ export interface CustomAbility {
   show_in_builder: boolean
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -271,6 +448,7 @@ export interface Background {
   feat_granted: string | null
   starting_gold: number | null
   starting_equipment: { name: string; quantity: number }[] | null
+  starting_equipment_groups: StartingEquipmentGroup[] | null
   equipment: unknown  // legacy field
   feature: {
     name: string
@@ -282,6 +460,7 @@ export interface Background {
   granted_spells?: Record<string, string[]> | null
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -304,6 +483,7 @@ export interface Spell {
   classes: string[] | null
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -324,10 +504,15 @@ export interface Feat {
   /** References into the Common Modifier Effects catalog (merged with benefits in builder). */
   modifierRefs?: string[] | null
   linkedModifiers?: LinkedModifierInstance[] | null
+  /** When true, player picks from choices.options instead of top-level linked modifiers. */
+  isChoice?: boolean
+  choices?: FeatureChoice
+  duration?: FeatureDurationKey | null
   /** When true, the feat may be chosen in more than one milestone slot. */
   repeatable?: boolean
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -354,6 +539,7 @@ export interface Equipment {
   attached_ability_ids?: string[]
   icon: string | null
   accent_color?: string | null
+  card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
@@ -398,8 +584,13 @@ export interface Character {
   armor_proficiencies: string[] | null
   languages: string[] | null
   equipment_ids: string[]
+  equipped_armor_id?: string | null
+  equipped_shield_id?: string | null
+  equipped_weapon_id?: string | null
   spell_ids: string[]
   feat_ids: string[]
+  feat_choice_picks?: Record<string, string[]> | null
+  modifier_player_picks?: Record<string, string[]> | null
   created_at: string
   updated_at: string
 }

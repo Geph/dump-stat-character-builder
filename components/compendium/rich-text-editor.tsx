@@ -3,15 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Bold, Italic, List, ListOrdered, RemoveFormatting, Table2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import {
-  addTableColumn,
-  addTableRow,
-  deleteTable,
-  getSelectedTable,
-  insertTableAtSelection,
-  isHtml,
-  toEditorHtml,
-} from "@/lib/compendium/rich-text-html"
+import { isHtml, toEditorHtml, getSelectedTable, insertTableAtSelection, addTableRow, addTableColumn, deleteTable } from "@/lib/compendium/rich-text-html"
+import { markdownToHtml } from "@/lib/compendium/markdown-to-html"
 
 type RichTextEditorProps = {
   value: string
@@ -177,22 +170,20 @@ export function RichTextContent({
     return <p className={cn("text-sm text-muted-foreground", className)}>{fallback}</p>
   }
 
-  if (isHtml(html)) {
-    return (
-      <div
-        className={cn(
-          "text-sm text-muted-foreground prose-like [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2",
-          "[&_table]:w-full [&_table]:border-collapse [&_table]:my-3",
-          "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top",
-          "[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:font-semibold [&_th]:bg-muted/40 [&_th]:align-top",
-          className,
-        )}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    )
-  }
+  const rendered = isHtml(html) ? html : markdownToHtml(html)
 
-  return <p className={cn("text-sm text-muted-foreground whitespace-pre-wrap", className)}>{html}</p>
+  return (
+    <div
+      className={cn(
+        "text-sm text-muted-foreground prose-like [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_em]:italic [&_strong]:font-semibold",
+        "[&_table]:w-full [&_table]:border-collapse [&_table]:my-3",
+        "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top",
+        "[&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:font-semibold [&_th]:bg-muted/40 [&_th]:align-top",
+        className,
+      )}
+      dangerouslySetInnerHTML={{ __html: rendered }}
+    />
+  )
 }
 
 export { isHtml, toEditorHtml }

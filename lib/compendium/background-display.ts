@@ -1,4 +1,5 @@
 import type { Background } from "@/lib/types"
+import { getBackgroundStartingEquipmentGroups } from "@/lib/compendium/background-equipment"
 import {
   formatBackgroundProficiencies,
   normalizeBackgroundProficiencies,
@@ -38,6 +39,19 @@ export function formatBackgroundAbilityBonuses(
 }
 
 export function formatBackgroundEquipment(background: Background): string | null {
+  const groups = getBackgroundStartingEquipmentGroups(background)
+  if (groups.length > 0) {
+    return groups
+      .flatMap((group) =>
+        group.options.map((opt) => {
+          const items = opt.items
+            .map((item) => `${item.quantity > 1 ? `${item.quantity}× ` : ""}${item.name}`)
+            .join(", ")
+          return `${opt.label}: ${items}`
+        }),
+      )
+      .join("\n")
+  }
   if (background.starting_equipment?.length) {
     return background.starting_equipment
       .map((item) => `${item.quantity > 1 ? `${item.quantity}× ` : ""}${item.name}`)

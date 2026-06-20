@@ -359,7 +359,7 @@ export default function HomePage() {
           <p>Dump Stat — D&D 5.5e Character Builder</p>
           <p className="pt-0">Uses content from the 
             <a
-            href="_https://www.dndbeyond.com/srd"
+            href="https://www.dndbeyond.com/srd"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:underline"

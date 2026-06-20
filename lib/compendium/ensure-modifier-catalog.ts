@@ -4,6 +4,7 @@ import {
   mergeDefaultCatalogEntries,
   normalizeModifierCatalog,
 } from "@/lib/compendium/modifier-catalog"
+import { ensureSystemOptionCatalogs } from "@/lib/compendium/system-option-catalogs"
 import { createClient } from "@/lib/db/client"
 
 type CatalogDb = ReturnType<typeof createClient>
@@ -35,6 +36,8 @@ export async function ensureModifierCatalog(db: CatalogDb): Promise<void> {
       })
       .eq("id", COMMON_MODIFIERS_CATALOG_ID)
   }
+
+  await ensureSystemOptionCatalogs(db)
 }
 
 export async function loadModifierCatalog(db: CatalogDb) {

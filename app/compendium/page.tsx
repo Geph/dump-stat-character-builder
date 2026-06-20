@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Copy, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow } from "@/lib/types"
-import { formatUsesSummary } from "@/lib/compendium/class-resource-rows"
+import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
+import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import {
   COMPENDIUM_TOGGLE_LABELS,
@@ -38,20 +39,40 @@ import {
   getCompendiumItemAccentColor,
 } from "@/lib/compendium/theme-colors"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import {
+  canDuplicateCompendiumItem,
+  duplicateCompendiumItem,
+} from "@/lib/compendium/duplicate-compendium-item"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
+import { getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
   isCommonModifiersCatalogAbility,
   MODIFIER_CATALOG_INFO,
 } from "@/lib/compendium/modifier-catalog"
+import {
+  getSystemCatalogMeta,
+  SYSTEM_OPTION_CATALOG_IDS,
+} from "@/lib/compendium/system-option-catalogs"
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ContentType = CompendiumContentType
+
+const SYSTEM_CATALOG_SORT_ORDER = [
+  COMMON_MODIFIERS_CATALOG_ID,
+  ...SYSTEM_OPTION_CATALOG_IDS,
+] as const
+
+function systemCatalogSortIndex(id: string): number {
+  const index = SYSTEM_CATALOG_SORT_ORDER.indexOf(id as (typeof SYSTEM_CATALOG_SORT_ORDER)[number])
+  return index === -1 ? 999 : index
+}
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "classes", label: "Classes", icon: <Shield className="w-3.5 h-3.5" /> },
@@ -79,6 +100,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
 
 function CompendiumPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [searchQuery, setSearchQuery] = useState("")
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
@@ -103,6 +125,8 @@ function CompendiumPageContent() {
   } | null>(null)
   const [toggleSaving, setToggleSaving] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
+  const [copyingId, setCopyingId] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
   // Spell-specific filters
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
@@ -226,8 +250,9 @@ function CompendiumPageContent() {
       let rows = data || []
       if (activeTab === "abilities") {
         rows = [...rows].sort((a, b) => {
-          if (a.id === COMMON_MODIFIERS_CATALOG_ID) return -1
-          if (b.id === COMMON_MODIFIERS_CATALOG_ID) return 1
+          const aRank = systemCatalogSortIndex(a.id)
+          const bRank = systemCatalogSortIndex(b.id)
+          if (aRank !== bRank) return aRank - bRank
           return String(a.name).localeCompare(String(b.name))
         })
       }
@@ -319,6 +344,11 @@ function CompendiumPageContent() {
     if (activeTab !== "equipment") return []
     return groupEquipmentByCategory(filteredContent as Equipment[])
   }, [filteredContent, activeTab])
+
+  const classResourceGroups = useMemo(() => {
+    if (activeTab !== "class_resources") return []
+    return groupClassResourcesByKey(filteredContent as ClassResourceRow[], classNamesById)
+  }, [filteredContent, activeTab, classNamesById])
 
   const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
 
@@ -526,6 +556,20 @@ function CompendiumPageContent() {
     setToggleConfirm({ item: target, dependents })
   }
 
+  const handleCopyItem = async (item: Record<string, unknown>) => {
+    const id = String(item.id ?? "")
+    if (!canDuplicateCompendiumItem(activeTab, id, item as { is_system?: boolean | null })) return
+    setCopyingId(id)
+    setCopyError(null)
+    const result = await duplicateCompendiumItem(createClient(), activeTab, id)
+    setCopyingId(null)
+    if ("error" in result) {
+      setCopyError(result.error)
+      return
+    }
+    router.push(compendiumEditHref(activeTab, result.id))
+  }
+
   const renderContentCard = (item: unknown) => {
     const data = item as Record<string, unknown>
     const editPath = compendiumEditHref(activeTab, data.id as string)
@@ -533,16 +577,27 @@ function CompendiumPageContent() {
     const accentStyles = compendiumAccentColorStyles(getCompendiumItemAccentColor(data))
     const enabled = isCompendiumItemEnabled(data)
     const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(data as { id?: string; is_system?: boolean })
+    const canCopy = canDuplicateCompendiumItem(activeTab, data.id as string, data as { is_system?: boolean | null })
+
+    const cardImage = getCompendiumCardImageUrl(data as Record<string, unknown>)
 
     return (
       <motion.div
         key={data.id as string}
         layoutId={data.id as string}
-        className={`relative bg-card rounded-2xl p-5 pb-11 border-2 transition-colors ${
-          enabled ? `border-border ${accentStyles.hoverBorder}` : "border-border/60 opacity-60 hover:opacity-80"
+        className={`relative overflow-hidden bg-card rounded-2xl border-2 transition-colors ${
+          enabled ? `border-primary/40 ${accentStyles.hoverBorder}` : "border-border/60 opacity-60 hover:opacity-80"
         }`}
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
+        {cardImage ? (
+          <div className="relative h-32 w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={cardImage} alt="" className="h-full w-full object-cover object-top" />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+          </div>
+        ) : null}
+        <div className={`p-5 pb-11 ${cardImage ? "pt-3" : ""}`}>
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
@@ -552,44 +607,66 @@ function CompendiumPageContent() {
               className={`font-bold text-lg text-foreground cursor-pointer ${accentStyles.titleHover} leading-tight flex items-center gap-1.5`}
               onClick={() => setSelectedItem(item)}
             >
-              {data.name as string}
+              {activeTab === "class_resources"
+                ? (classNamesById[(data as ClassResourceRow).class_id] ?? "Unknown class")
+                : (data.name as string)}
               {activeTab === "abilities" && isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
                       className="inline-flex text-primary"
                       onClick={(e) => e.stopPropagation()}
-                      aria-label="About common modifiers catalog"
+                      aria-label="About system catalog"
                     >
                       <Info className="w-4 h-4" />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm">
-                    {MODIFIER_CATALOG_INFO}
+                    {getSystemCatalogMeta(data.id as string)?.info ?? MODIFIER_CATALOG_INFO}
                   </TooltipContent>
                 </Tooltip>
               )}
             </h3>
           </div>
-          <Link
-            href={editPath}
-            className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground transition-colors ${accentStyles.editHover}`}
-            title="Edit"
-          >
-            <Edit className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-1 shrink-0">
+            {canCopy && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void handleCopyItem(data)
+                }}
+                disabled={copyingId === (data.id as string)}
+                className={`flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground hover:bg-muted disabled:opacity-50 ${accentStyles.editHover}`}
+                title="Make a copy"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            )}
+            <Link
+              href={editPath}
+              className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground transition-colors ${accentStyles.editHover}`}
+              title="Edit"
+            >
+              <Edit className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
         {activeTab === "classes" && (
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p>Source: {formatCompendiumSource((data as DndClass).source)}</p>
+          <div className="flex gap-2 flex-wrap">
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {formatCompendiumSource((data as DndClass).source) || "Custom"}
+            </span>
             {(() => {
               const subs = subclassesByClassId.get(data.id as string) ?? []
-              if (subs.length === 0) return null
-              return (
-                <p>
-                  Subclasses: {subs.map((sc) => sc.name).join(", ")}
-                </p>
-              )
+              return subs.map((sc) => (
+                <span
+                  key={sc.id}
+                  className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
+                >
+                  {sc.name}
+                </span>
+              ))
             })()}
           </div>
         )}
@@ -603,15 +680,10 @@ function CompendiumPageContent() {
           </div>
         )}
         {activeTab === "species" && (
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p>Source: {formatCompendiumSource((data as Species).source)}</p>
-            {((data as Species).traits ?? [])
-              .filter((t) => t.isChoice && t.choices?.options?.length)
-              .map((t) => (
-                <p key={t.name}>
-                  {t.choices!.options.map((o) => o.name).join(", ")}
-                </p>
-              ))}
+          <div className="flex gap-2 flex-wrap">
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {formatCompendiumSource((data as Species).source) || "Custom"}
+            </span>
           </div>
         )}
         {activeTab === "backgrounds" && (
@@ -626,6 +698,9 @@ function CompendiumPageContent() {
                 {(data as Background).feat_granted}
               </span>
             )}
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {formatCompendiumSource((data as Background).source) || "Custom"}
+            </span>
           </div>
         )}
         {activeTab === "spells" && (
@@ -693,7 +768,7 @@ function CompendiumPageContent() {
         {activeTab === "class_resources" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-              {classNamesById[(data as ClassResourceRow).class_id] ?? "Unknown class"}
+              {(data as ClassResourceRow).name}
             </span>
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full font-mono">
               {(data as ClassResourceRow).resource_key}
@@ -725,6 +800,7 @@ function CompendiumPageContent() {
             )}
           </div>
         )}
+        </div>
         <div
           className="absolute bottom-4 right-4 flex items-center"
           onClick={(e) => e.stopPropagation()}
@@ -985,6 +1061,10 @@ function CompendiumPageContent() {
             />
           </div>
 
+        {copyError && (
+          <p className="mb-4 text-sm text-destructive">{copyError}</p>
+        )}
+
           {activeTab === "feats" && (
             <div id="feat-filters" className="flex flex-wrap items-center gap-2 sm:shrink-0">
               <div className="flex items-center gap-2">
@@ -1184,6 +1264,15 @@ function CompendiumPageContent() {
               </section>
             ))}
           </div>
+        ) : activeTab === "class_resources" ? (
+          <ClassResourcesOverview
+            groups={classResourceGroups}
+            classNamesById={classNamesById}
+            onSelect={(row) => setSelectedItem(row)}
+            onToggleEnabled={(row, enabled) => void handleItemEnabledChange(row, enabled)}
+            onCopy={(row) => void handleCopyItem(row as Record<string, unknown>)}
+            copyingId={copyingId}
+          />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <AnimatePresence>
@@ -1193,52 +1282,69 @@ function CompendiumPageContent() {
         )}
       </main>
 
-      {/* Detail Modal */}
-      <AnimatePresence>
-        {selectedItem && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-            onClick={() => setSelectedItem(null)}
-          >
-            <motion.div
-              layoutId={(selectedItem as { id: string }).id}
-              className="bg-card rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl font-black text-foreground mb-4">
-                {(selectedItem as { name: string }).name}
-              </h2>
-              {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
-                <RichTextContent
-                  html={(selectedItem as { description?: string }).description}
-                />
-              )}
-              {(selectedItem as { creator_url?: string | null }).creator_url && (
-                <p className="mt-4 text-sm">
-                  <span className="text-muted-foreground">Source link: </span>
-                  <a
-                    href={(selectedItem as { creator_url: string }).creator_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline break-all"
-                  >
-                    {(selectedItem as { creator_url: string }).creator_url}
-                  </a>
-                </p>
-              )}
+      {selectedItem && (
+        <CompendiumDetailOverlay
+          open
+          onClose={() => setSelectedItem(null)}
+          item={
+            activeTab === "class_resources"
+              ? {
+                  ...(selectedItem as ClassResourceRow),
+                  name: `${classNamesById[(selectedItem as ClassResourceRow).class_id] ?? "Unknown"} · ${(selectedItem as ClassResourceRow).name}`,
+                }
+              : (selectedItem as { name: string; source?: string; icon?: string | null; card_image_url?: string | null })
+          }
+          subtitle={formatCompendiumSource((selectedItem as { source?: string }).source)}
+          tags={
+            activeTab === "class_resources"
+              ? [
+                  {
+                    label: formatUsesSummary((selectedItem as ClassResourceRow).uses),
+                    emphasis: true,
+                  },
+                  {
+                    label: (selectedItem as ClassResourceRow).resource_key,
+                  },
+                ]
+              : undefined
+          }
+          accentColor={getCompendiumItemAccentColor(selectedItem as Record<string, unknown>)}
+          headerActions={
+            canDuplicateCompendiumItem(
+              activeTab,
+              (selectedItem as { id: string }).id,
+              selectedItem as { is_system?: boolean | null },
+            ) ? (
               <button
-                onClick={() => setSelectedItem(null)}
-                className="mt-6 w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
+                type="button"
+                onClick={() => void handleCopyItem(selectedItem as Record<string, unknown>)}
+                disabled={copyingId === (selectedItem as { id: string }).id}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-white/20 text-white/90 hover:bg-white/10 disabled:opacity-50"
               >
-                Close
+                <Copy className="h-3.5 w-3.5" />
+                Make a copy
               </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            ) : undefined
+          }
+        >
+          {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
+            <RichTextContent html={(selectedItem as { description?: string }).description} />
+          )}
+          {(selectedItem as { creator_url?: string | null }).creator_url && (
+            <p className="mt-4 text-sm">
+              <span className="text-white/50">Source link: </span>
+              <a
+                href={(selectedItem as { creator_url: string }).creator_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline break-all"
+              >
+                {(selectedItem as { creator_url: string }).creator_url}
+              </a>
+            </p>
+          )}
+        </CompendiumDetailOverlay>
+      )}
     </div>
   )
 }

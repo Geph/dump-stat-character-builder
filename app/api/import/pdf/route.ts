@@ -66,6 +66,7 @@ const ContentSchema = z.object({
   classes: z.array(z.object({
     name: z.string(),
     description: z.string().nullable(),
+    card_blurb: z.string().max(120).nullable().optional(),
     hit_die: z.number(),
     primary_ability: z.array(z.string()).nullable(),
     features: z.array(ClassFeatureSchema),

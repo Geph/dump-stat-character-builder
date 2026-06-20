@@ -19,7 +19,9 @@ A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 - **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
 - **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities
 - **Common Modifier Effects** — A permanent, editable system catalog under Custom Abilities that merges class-feature activation templates with characteristic modifiers; class/subclass features, feats, species traits, and choice options pick from this searchable list instead of defining effects inline
-- **Rich text descriptions** — Compendium description fields support bold, italic, lists, and clear formatting
+- **SRD modifier enrichment** — Bundled SRD classes, subclasses, feats, and species traits ship with linked common-modifier presets (class resources, cast spell, movement types, Metamagic/Eldritch Invocations catalogs, unarmed die scaling, and more); run `pnpm dlx tsx scripts/audit-srd-class-features.ts` to list gaps
+- **Card background graphics** — Every compendium entry can have a hero image for selection cards and full-screen detail overlays (upload or URL in the editor header area)
+- **Cinematic selection UI** — Builder class/species/background pickers and compendium detail views use full-bleed artwork with gold-framed cards inspired by D&D Beyond
 - **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses
 - **Enable / disable content** — Toggle compendium entries off for the builder, with prompts to disable dependents (subclasses, attached abilities, etc.)
 - **Unified editor header** — Icon picker (inline with name field), name, source, and source link on one row across all compendium editors
@@ -345,12 +347,26 @@ Environment variables for static builds are documented in [.env.example](.env.ex
 
 | Symptom | What to check |
 |---------|----------------|
+| Dev server hangs / pages never load | Stale `next dev` on port 3000 after sleep or reboot — kill the Node process, delete `.next`, run `pnpm dev` again (see below) |
 | `Database is not configured` | `.env.local` missing or placeholder values; restart dev server |
 | `fetch failed` / `ECONNREFUSED` | Wrong host/port, tunnel not running, or firewall blocking MySQL |
 | `Access denied` | Wrong user/password; user not granted access to the database |
 | `Unknown table` / `doesn't exist` | Run `mysql/schema.sql` or `pnpm db:setup` before seeding |
 | Seed returns 500 | Server logs; confirm `DATABASE_URL` points at the DB where schema was applied |
 | `next build` OOM | Set `NODE_OPTIONS='--max-old-space-size=4096'` |
+
+### Dev server stuck after reboot
+
+If `http://localhost:3000` spins forever, a zombie Next.js process is often still holding the port:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+Remove-Item -Recurse -Force .next
+pnpm dev
+```
+
+Run `pnpm db:migrate` after pulling if you see unknown column errors for `card_image_url`.
 
 ---
 
@@ -374,7 +390,7 @@ lib/
 └── site-images.ts        # Marketing image paths
 
 components/
-├── compendium/           # Editor header row, proficiencies editor, dropdown-or-other fields
+├── compendium/           # Editor header row, card image field, selection cards, detail overlays
 ├── builder/              # Step nav, multi-select choices, ASI allocator
 └── game-icon-picker.tsx  # SVG game-icons.net picker for compendium entries
 
@@ -398,9 +414,57 @@ Theming lives in `app/globals.css` (Arcane default plus Parchment, Stone, Moss, 
 - Server routes use `lib/db/*` (Drizzle + `mysql2`) — hosted builds only
 - There is **no** Supabase dependency. Run `pnpm check:mysql` to verify the repo has no stray Supabase references.
 
-## License
+---
 
-This project uses content from the D&D 5.5e Systems Reference Document (SRD) under the Creative Commons license.
+## Updating the release version
+
+**Maintainers only** — do not bump version in contributor PRs.
+
+After merging to `main`, run:
+
+```bash
+pnpm version:bump
+```
+
+This increments `VERSION` and syncs `package.json` `version` (e.g. `0.3` → `0.4`). Commit the result as part of the release push. Contributors must not run this script or hand-edit those files.
+
+---
+
+## Known issues / Roadmap
+
+Track bugs and feature ideas in [GitHub Issues](https://github.com/Geph/v0-dump-stat-character-builder/issues). There is no published roadmap yet — open an issue to discuss priorities.
+
+<!-- Roadmap items (uncomment when ready):
+- ...
+-->
+
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branch naming, and PR expectations, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
+
+---
+
+## License & credits
+
+### Application code
+
+The Dump Stat application source code in this repository is licensed under the [MIT License](LICENSE) (Copyright © Geph).
+
+The MIT license applies to **application code only**. It does **not** cover third-party game content or assets bundled with or displayed by the app.
+
+### D&D 5.5e SRD
+
+This project uses material from the **D&D 5.5e Systems Reference Document (SRD)** under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/). See [lib/srd/README.md](lib/srd/README.md) for attribution and how to rebuild seed data (`pnpm srd:build`).
+
+### Icons (game-icons.net)
+
+Compendium icons are from [game-icons.net](https://game-icons.net/) (thousands of SVGs under `public/icons/`, manifest from `pnpm icons:manifest`). The site’s icons are licensed under [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/). Attribution appears in the app footer, the landing page, and the compendium icon picker (link to game-icons.net). The site logo uses [Spiked Dragon Head](https://game-icons.net/1x1/delapouite/spiked-dragon-head.html) by Delapouite (CC BY 3.0).
+
+### Fonts
+
+Solbera’s D&D Fonts by Solbera / Ryrok, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — see [Solbera D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/).
 
 ## Links
 

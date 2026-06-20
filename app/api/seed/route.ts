@@ -12,11 +12,12 @@ import {
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import { enrichSrdSubclassList } from "@/lib/compendium/enrich-srd-subclasses"
 import { enrichSrdFeatList } from "@/lib/compendium/enrich-srd-feats"
+import { enrichSrdSpeciesList } from "@/lib/compendium/enrich-srd-species"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
-import { LEGACY_SRD_SOURCES } from "@/lib/srd/source"
+import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 
 export async function POST() {
   try {
@@ -30,20 +31,22 @@ export async function POST() {
     const { classes, subclasses, species, backgrounds, spells, feats, equipment } =
       getSrdSeedData()
 
-    await upsertByName("classes", enrichSrdClassList(classes))
+    await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
     const classData = await listRows("classes")
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
 
     const subclassesWithIds = enrichSrdSubclassList(
-      subclasses
-        .map((sc) => ({
-          name: sc.name,
-          description: sc.description,
-          features: sc.features,
-          source: sc.source,
-          class_id: classIdMap.get(sc.class_name) ?? null,
-        }))
-        .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+      withSrdCreatorUrlList(
+        subclasses
+          .map((sc) => ({
+            name: sc.name,
+            description: sc.description,
+            features: sc.features,
+            source: sc.source,
+            class_id: classIdMap.get(sc.class_name) ?? null,
+          }))
+          .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+      ),
       new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
     )
 
@@ -57,11 +60,11 @@ export async function POST() {
     }
     await insertRows("class_resources", buildSrdClassResourceRows(classIdMap))
 
-    await upsertByName("species", species)
-    await upsertByName("backgrounds", normalizeBackgroundRows(backgrounds))
-    await upsertByName("spells", spells)
-    await upsertByName("feats", enrichSrdFeatList(feats))
-    await upsertByName("equipment", equipment)
+    await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
+    await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
+    await upsertByName("spells", withSrdCreatorUrlList(spells))
+    await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
+    await upsertByName("equipment", withSrdCreatorUrlList(equipment))
 
     await ensureModifierCatalog(createClient())
 

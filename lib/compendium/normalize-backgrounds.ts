@@ -1,5 +1,6 @@
 import { parseBackgroundAbilityFromImportText } from "@/lib/import/background-parse"
 import bundledBackgrounds from "@/lib/srd/seed-data/backgrounds.json"
+import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import { isSrdSource } from "@/lib/srd/source"
 import {
   normalizeBackgroundAbilityBonuses,
@@ -7,9 +8,13 @@ import {
 } from "@/lib/compendium/background-utils"
 
 const bundledBackgroundByName = new Map(
-  (bundledBackgrounds as unknown as { name: string; ability_bonuses?: Record<string, number> }[]).map(
-    (background) => [background.name, background],
-  ),
+  (bundledBackgrounds as unknown as {
+    name: string
+    ability_bonuses?: Record<string, number>
+    feat_granted?: string | null
+    starting_equipment_groups?: unknown
+    starting_gold?: number
+  }[]).map((background) => [background.name, background]),
 )
 
 function parseStoredAbilityBonuses(raw: unknown): Record<string, number> {
@@ -53,29 +58,50 @@ export function normalizeBackgroundRow(row: Record<string, unknown>): Record<str
   }
 }
 
-/** Fill missing SRD background ability scores from bundled seed data. */
+/** Fill missing SRD background fields from bundled seed data. */
 export function enrichBackgroundList<
-  T extends { name: string; ability_bonuses?: unknown; source?: string | null },
+  T extends {
+    name: string
+    ability_bonuses?: unknown
+    feat_granted?: string | null
+    source?: string | null
+  },
 >(rows: T[]): T[] {
   return rows.map((row) => {
     const normalized = normalizeBackgroundRow(row as Record<string, unknown>) as T
     const bonuses = parseStoredAbilityBonuses(normalized.ability_bonuses)
-    if (Object.keys(bonuses).length) {
-      return { ...normalized, ability_bonuses: bonuses }
-    }
-
-    if (!isSrdSource(row.source)) return normalized
-
     const seed = bundledBackgroundByName.get(row.name)
-    if (!seed?.ability_bonuses) return normalized
 
-    return {
-      ...normalized,
-      ability_bonuses: normalizeBackgroundAbilityBonuses(seed.ability_bonuses),
+    const enriched = { ...normalized } as T & {
+      starting_equipment_groups?: unknown
+      starting_gold?: number
+      feat_granted?: string | null
     }
+
+    if (Object.keys(bonuses).length) {
+      enriched.ability_bonuses = bonuses as T["ability_bonuses"]
+    } else if (seed?.ability_bonuses) {
+      enriched.ability_bonuses = normalizeBackgroundAbilityBonuses(seed.ability_bonuses) as T["ability_bonuses"]
+    }
+
+    if (isSrdSource(row.source) && seed) {
+      if (!String(enriched.feat_granted ?? "").trim() && seed.feat_granted) {
+        enriched.feat_granted = seed.feat_granted
+      }
+    }
+
+    const rowRecord = row as Record<string, unknown>
+    if (!rowRecord.starting_equipment_groups && seed?.starting_equipment_groups) {
+      enriched.starting_equipment_groups = seed.starting_equipment_groups
+    }
+    if ((rowRecord.starting_gold == null || rowRecord.starting_gold === 0) && seed?.starting_gold) {
+      enriched.starting_gold = seed.starting_gold
+    }
+
+    return applySrdFlavorDescription(enriched as Record<string, unknown>, "background") as T
   })
 }
 
 export function normalizeBackgroundRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  return rows.map(normalizeBackgroundRow)
+  return enrichBackgroundList(rows.map(normalizeBackgroundRow))
 }

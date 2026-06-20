@@ -1,3 +1,20 @@
+/** Standard weapon property tags (SRD 2024). */
+export const WEAPON_PROPERTIES = [
+  "Ammunition",
+  "Finesse",
+  "Heavy",
+  "Light",
+  "Loading",
+  "Range",
+  "Reach",
+  "Special",
+  "Thrown",
+  "Two-Handed",
+  "Versatile",
+] as const
+
+export type WeaponPropertyTag = (typeof WEAPON_PROPERTIES)[number]
+
 /** Normalize equipment.properties from DB (array or SRD object shape) to string[]. */
 export function propertiesToStringArray(props: unknown): string[] {
   if (Array.isArray(props)) {

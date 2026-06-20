@@ -18,6 +18,7 @@ const timestamps = {
 const compendiumMeta = {
   icon: varchar("icon", { length: 255 }),
   accent_color: varchar("accent_color", { length: 32 }),
+  card_image_url: mediumtext("card_image_url"),
   source: varchar("source", { length: 64 }).notNull().default("Custom"),
   creator_url: varchar("creator_url", { length: 512 }),
   enabled: boolean("enabled").notNull().default(true),
@@ -28,6 +29,7 @@ export const classes = mysqlTable("classes", {
   id: id(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   description: text("description"),
+  card_blurb: varchar("card_blurb", { length: 120 }),
   hit_die: int("hit_die").notNull().default(8),
   primary_ability: json("primary_ability").$type<string[]>(),
   saving_throws: json("saving_throws").$type<string[]>(),
@@ -77,6 +79,9 @@ export const backgrounds = mysqlTable("backgrounds", {
   feat_granted: varchar("feat_granted", { length: 255 }),
   starting_gold: int("starting_gold"),
   starting_equipment: json("starting_equipment"),
+  starting_equipment_groups: json("starting_equipment_groups").$type<
+    import("@/lib/types").StartingEquipmentGroup[]
+  >(),
   equipment: json("equipment"),
   feature: json("feature"),
   grants_spells: boolean("grants_spells").notNull().default(false),
@@ -116,6 +121,9 @@ export const feats = mysqlTable("feats", {
   benefits: json("benefits"),
   modifier_refs: json("modifier_refs").$type<string[]>().default([]),
   linked_modifiers: json("linked_modifiers").$type<unknown[]>().default([]),
+  is_choice: boolean("is_choice").notNull().default(false),
+  choices: json("choices").$type<import("@/lib/types").FeatureChoice | null>(),
+  duration: varchar("duration", { length: 32 }),
   repeatable: boolean("repeatable").notNull().default(false),
   ...compendiumMeta,
 })
@@ -203,8 +211,13 @@ export const characters = mysqlTable("characters", {
   armor_proficiencies: json("armor_proficiencies").$type<string[]>(),
   languages: json("languages").$type<string[]>(),
   equipment_ids: json("equipment_ids").$type<string[]>().default([]),
+  equipped_armor_id: char("equipped_armor_id", { length: 36 }),
+  equipped_shield_id: char("equipped_shield_id", { length: 36 }),
+  equipped_weapon_id: char("equipped_weapon_id", { length: 36 }),
   spell_ids: json("spell_ids").$type<string[]>().default([]),
   feat_ids: json("feat_ids").$type<string[]>().default([]),
+  feat_choice_picks: json("feat_choice_picks").$type<Record<string, string[]>>(),
+  modifier_player_picks: json("modifier_player_picks").$type<Record<string, string[]>>(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 })

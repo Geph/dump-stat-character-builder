@@ -1,0 +1,86 @@
+import type { AbilityModifierKey } from "@/lib/compendium/characteristic-modifiers"
+
+export type RollBonusMode =
+  | "fixed"
+  | "proficiency"
+  | "ability_modifier"
+  | "multiplier"
+  | "die"
+  | "spell_attack"
+  | "character_level"
+
+export type RollBonusResultFloorMode = "none" | "fixed" | "ability"
+
+export interface RollBonusResultFloor {
+  mode: RollBonusResultFloorMode
+  fixed?: number | null
+  ability?: AbilityModifierKey | null
+}
+
+export type RollBonusDieScaling = "fixed" | "by_level" | "class_resource"
+
+export interface RollBonusConfig {
+  mode: RollBonusMode
+  fixed?: number | null
+  ability?: AbilityModifierKey | null
+  /** Multiplier applied to proficiency or ability modifier (e.g. 0.5 rounds down). */
+  multiplier?: number | null
+  dieCount?: number | null
+  dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
+  dieScaling?: RollBonusDieScaling | null
+  classResourceKey?: string | null
+  /** Minimum result after applying the bonus (e.g. Reliable Talent). */
+  resultFloor?: RollBonusResultFloor | null
+}
+
+export type BuffAllyMode = "advantage" | "bonus"
+
+export const ROLL_BONUS_MODE_LABELS: Record<RollBonusMode, string> = {
+  fixed: "Fixed amount",
+  proficiency: "Proficiency bonus",
+  ability_modifier: "Ability modifier",
+  multiplier: "Multiplier (× prof. or ability)",
+  die: "Die roll",
+  spell_attack: "Spell attack modifier",
+  character_level: "Character level",
+}
+
+export function defaultRollBonusConfig(mode: RollBonusMode = "fixed"): RollBonusConfig {
+  return { mode, fixed: mode === "fixed" ? 1 : null, multiplier: mode === "multiplier" ? 1 : null }
+}
+
+/** Migrate legacy numeric bonusAmount to RollBonusConfig. */
+export function rollBonusFromLegacy(bonusAmount: number | null | undefined): RollBonusConfig | null {
+  if (bonusAmount == null) return null
+  return { mode: "fixed", fixed: bonusAmount }
+}
+
+export function formatRollBonusSummary(config: RollBonusConfig | null | undefined): string {
+  if (!config) return "—"
+  switch (config.mode) {
+    case "fixed":
+      return config.fixed != null ? `+${config.fixed}` : "Fixed"
+    case "proficiency":
+      return "Proficiency bonus"
+    case "ability_modifier":
+      return config.ability ? `${config.ability} modifier` : "Ability modifier"
+    case "multiplier":
+      return `×${config.multiplier ?? 1} (${config.ability ? `${config.ability} mod` : "proficiency"})`
+    case "die":
+      if (config.dieScaling === "class_resource" && config.classResourceKey) {
+        return `${config.classResourceKey} die`
+      }
+      if (config.dieCount && config.dieType) {
+        return config.dieScaling === "by_level"
+          ? `${config.dieCount}${config.dieType} (scales by level)`
+          : `${config.dieCount}${config.dieType}`
+      }
+      return "Die bonus"
+    case "character_level":
+      return "Character level"
+    case "spell_attack":
+      return "Spell attack modifier"
+    default:
+      return "—"
+  }
+}

@@ -21,8 +21,16 @@ import {
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
+import {
+  getSystemCatalogMeta,
+  isSystemCatalogEditor,
+  SYSTEM_OPTION_CATALOG_IDS,
+} from "@/lib/compendium/system-option-catalogs"
 
-type CommonModifiersCatalogEditorProps = {
+type CatalogEditorProps = {
+  catalogId: string
+  catalogName: string
+  catalogInfo: string
   catalog: ModifierCatalogEntry[]
   spellOptions: { id: string; name: string }[]
   otherAbilities: { id: string; name: string }[]
@@ -32,7 +40,10 @@ type CommonModifiersCatalogEditorProps = {
   onSubmit: (e: React.FormEvent) => void
 }
 
-export function CommonModifiersCatalogEditor({
+export function CatalogEditor({
+  catalogId,
+  catalogName,
+  catalogInfo,
   catalog,
   spellOptions,
   otherAbilities,
@@ -40,7 +51,7 @@ export function CommonModifiersCatalogEditor({
   error,
   onCatalogChange,
   onSubmit,
-}: CommonModifiersCatalogEditorProps) {
+}: CatalogEditorProps) {
   const navSections = useMemo(() => catalogEditorNavSections(catalog), [catalog])
 
   return (
@@ -48,7 +59,7 @@ export function CommonModifiersCatalogEditor({
       <MainNav />
       <CompendiumEditorToolbar
         tab="abilities"
-        title={COMMON_MODIFIERS_CATALOG_NAME}
+        title={catalogName}
         isNew={false}
         saving={saving}
         saveLabel="Save Catalog"
@@ -57,7 +68,7 @@ export function CommonModifiersCatalogEditor({
       <main className="max-w-4xl mx-auto px-4 py-8 pb-24 xl:pb-8">
         <CompendiumEditorHeaderRow
           nameLabel="Catalog name"
-          name={COMMON_MODIFIERS_CATALOG_NAME}
+          name={catalogName}
           onNameChange={() => {}}
           nameRequired={false}
           source="System"
@@ -81,7 +92,7 @@ export function CommonModifiersCatalogEditor({
           >
             <label className="block text-sm font-semibold text-foreground mb-2">Overview</label>
             <p className="rounded-xl border-2 border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground leading-relaxed">
-              {MODIFIER_CATALOG_INFO}
+              {catalogInfo}
             </p>
           </section>
 
@@ -97,20 +108,57 @@ export function CommonModifiersCatalogEditor({
   )
 }
 
+/** @deprecated Use CatalogEditor */
+export function CommonModifiersCatalogEditor(
+  props: Omit<CatalogEditorProps, "catalogId" | "catalogName" | "catalogInfo">,
+) {
+  return (
+    <CatalogEditor
+      catalogId={COMMON_MODIFIERS_CATALOG_ID}
+      catalogName={COMMON_MODIFIERS_CATALOG_NAME}
+      catalogInfo={MODIFIER_CATALOG_INFO}
+      {...props}
+    />
+  )
+}
+
+export function isSystemCatalogEditorRoute(id: string): boolean {
+  return id === COMMON_MODIFIERS_CATALOG_ID || isSystemCatalogEditor(id)
+}
+
+/** @deprecated Use isSystemCatalogEditorRoute */
 export function isCommonModifiersCatalogEditor(id: string): boolean {
-  return id === COMMON_MODIFIERS_CATALOG_ID
+  return isSystemCatalogEditorRoute(id)
+}
+
+export function getCatalogEditorMeta(id: string): { catalogId: string; name: string; info: string } | null {
+  if (id === COMMON_MODIFIERS_CATALOG_ID) {
+    return {
+      catalogId: COMMON_MODIFIERS_CATALOG_ID,
+      name: COMMON_MODIFIERS_CATALOG_NAME,
+      info: MODIFIER_CATALOG_INFO,
+    }
+  }
+  const systemMeta = getSystemCatalogMeta(id)
+  if (systemMeta) {
+    return { catalogId: id, ...systemMeta }
+  }
+  return null
 }
 
 export function parseCatalogFromRow(data: Record<string, unknown>): ModifierCatalogEntry[] {
   return normalizeModifierCatalog(data.modifier_catalog)
 }
 
-export function buildCatalogSavePayload(catalog: ModifierCatalogEntry[]): Record<string, unknown> {
+export function buildCatalogSavePayload(
+  catalog: ModifierCatalogEntry[],
+  catalogInfo: string,
+): Record<string, unknown> {
   return {
-    description: `<p>${MODIFIER_CATALOG_INFO}</p>`,
+    description: `<p>${catalogInfo}</p>`,
     modifier_catalog: catalog,
     creator_url: null,
   }
 }
 
-export { COMMON_MODIFIERS_CATALOG_ID }
+export { COMMON_MODIFIERS_CATALOG_ID, SYSTEM_OPTION_CATALOG_IDS }

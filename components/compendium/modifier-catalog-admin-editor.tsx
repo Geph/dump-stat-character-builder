@@ -8,9 +8,11 @@ import {
   CATALOG_EDITOR_SECTION_CLASS,
   groupModifierCatalogEntries,
   MODIFIER_CATALOG_GROUPS,
+  TEMPLATE_PREVIEW_SECTION_CLASS,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { SpecialAttackTemplateSection } from "@/components/compendium/special-attack-template-section"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import { FeatureEffectList } from "@/components/compendium/feature-effect-list"
 import type { FeatureActivation } from "@/lib/types"
@@ -83,6 +85,7 @@ export function ModifierCatalogAdminEditor({
             <CatalogEntryEditor
               key={entry.id}
               entry={entry}
+              modifierCatalog={value}
               classResources={classResources}
               spellOptions={spellOptions}
               otherAbilities={otherAbilities}
@@ -98,6 +101,7 @@ export function ModifierCatalogAdminEditor({
 
 function CatalogEntryEditor({
   entry,
+  modifierCatalog,
   classResources,
   spellOptions,
   otherAbilities,
@@ -105,6 +109,7 @@ function CatalogEntryEditor({
   onRemove,
 }: {
   entry: ModifierCatalogEntry
+  modifierCatalog: ModifierCatalogEntry[]
   classResources: { id: string; name: string }[]
   spellOptions: { id: string; name: string }[]
   otherAbilities: { id: string; name: string }[]
@@ -172,18 +177,26 @@ function CatalogEntryEditor({
         />
       </div>
 
-      <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Passive characteristics (template choices)</p>
+      <SpecialAttackTemplateSection entry={entry} onChange={onChange} />
+
+      <div className={cn("pt-2 border-t border-border", TEMPLATE_PREVIEW_SECTION_CLASS)}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
+          Passive characteristics (template choices)
+        </p>
         <CharacteristicModifiersEditor
           value={entry.characteristics ?? []}
           onChange={(characteristics) => onChange({ characteristics })}
           otherAbilities={otherAbilities}
           spellOptions={spellOptions}
+          modifierCatalog={modifierCatalog}
+          templatePreview
         />
       </div>
 
-      <div className="pt-2 border-t border-border space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Active activation (template choices)</p>
+      <div className={cn("pt-2 border-t border-border", TEMPLATE_PREVIEW_SECTION_CLASS)}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
+          Active activation (template choices)
+        </p>
         <div className="flex flex-wrap gap-4 text-sm">
           {(
             [
@@ -219,7 +232,9 @@ function CatalogEntryEditor({
               name: r.name,
               uses: { type: "unlimited" as const },
             }))}
+            otherAbilities={otherAbilities}
             onChange={(next) => onChange({ activation: next })}
+            templatePreview
           />
         )}
       </div>

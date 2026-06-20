@@ -124,6 +124,39 @@ export function resolveLinkedModifiers(
   return { characteristics, activations }
 }
 
+/** Copy feature-level action/bonus/reaction flags onto each linked modifier instance. */
+export function syncFeatureActivationTiming(
+  featureActivation: FeatureActivation | null | undefined,
+  instances: LinkedModifierInstance[],
+): LinkedModifierInstance[] {
+  const timing = {
+    action: Boolean(featureActivation?.action),
+    bonusAction: Boolean(featureActivation?.bonusAction),
+    reaction: Boolean(featureActivation?.reaction),
+    onInitiative: Boolean(featureActivation?.onInitiative),
+    onDropToZeroHp: Boolean(featureActivation?.onDropToZeroHp),
+    onFailedSave: Boolean(featureActivation?.onFailedSave),
+    onSuccessfulSave: Boolean(featureActivation?.onSuccessfulSave),
+    oncePerTurn: Boolean(featureActivation?.oncePerTurn),
+    spendClassResourceKey: featureActivation?.spendClassResourceKey ?? null,
+    spendClassResourceAmount: featureActivation?.spendClassResourceAmount ?? null,
+    usesExistingClassFeature: Boolean(featureActivation?.usesExistingClassFeature),
+    existingClassFeatureName: featureActivation?.existingClassFeatureName ?? null,
+  }
+  return instances.map((instance) => {
+    const base = instance.activation ?? {}
+    return {
+      ...instance,
+      activation: {
+        ...base,
+        ...timing,
+        effects: base.effects,
+        effect: base.effect,
+      },
+    }
+  })
+}
+
 export function effectiveLinkedModifiers(
   linked: LinkedModifierInstance[] | undefined | null,
   legacyRefs: string[] | undefined | null,

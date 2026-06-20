@@ -50,14 +50,19 @@ import {
 import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import {
+  calculateArmorClass,
   calculateWeaponAttack,
   getWeaponDamageText,
   getWeaponMastery,
   getWeaponPropertyTags,
   getWeaponRangeText,
+  isArmorItem,
+  isShieldItem,
   isWeaponItem,
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
+import { computeLoadoutArmorClass, suggestEquipmentLoadout } from "@/lib/builder/equipment-loadout"
+import { EquippedGearPanel } from "@/components/character-sheet/equipped-gear-panel"
 import {
   getEffectiveArmorProficiencies,
   getEffectiveWeaponProficiencies,
@@ -140,6 +145,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("")
+  const [equippedArmorId, setEquippedArmorId] = useState<string | null>(null)
+  const [equippedShieldId, setEquippedShieldId] = useState<string | null>(null)
+  const [equippedWeaponId, setEquippedWeaponId] = useState<string | null>(null)
   const [usedSpellSlots, setUsedSpellSlots] = useState<number[]>([])
   const conditionButtonRef = useRef<HTMLButtonElement>(null)
   const [conditionMenuPos, setConditionMenuPos] = useState<{ top: number; left: number } | null>(
@@ -158,6 +166,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
       if (!error && data) {
         setCharacter(data)
+        setEquippedArmorId((data as Character).equipped_armor_id ?? null)
+        setEquippedShieldId((data as Character).equipped_shield_id ?? null)
+        setEquippedWeaponId((data as Character).equipped_weapon_id ?? null)
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
 
         if (data.spell_ids?.length) {
@@ -204,6 +215,51 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
     fetchCharacter()
   }, [id])
+
+  const persistEquipmentLoadout = useCallback(
+    async (next: {
+      armorId?: string | null
+      shieldId?: string | null
+      weaponId?: string | null
+    }) => {
+      if (!character) return
+      const loadout = {
+        armorId: next.armorId !== undefined ? next.armorId : equippedArmorId,
+        shieldId: next.shieldId !== undefined ? next.shieldId : equippedShieldId,
+        weaponId: next.weaponId !== undefined ? next.weaponId : equippedWeaponId,
+      }
+      const dexMod = Math.floor((character.dexterity - 10) / 2)
+      const nextAc = computeLoadoutArmorClass(dexMod, loadout, equipment)
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({
+          equipped_armor_id: loadout.armorId,
+          equipped_shield_id: loadout.shieldId,
+          equipped_weapon_id: loadout.weaponId,
+          armor_class: nextAc,
+        })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      if (!error && data) {
+        setCharacter(data)
+        setEquippedArmorId(loadout.armorId)
+        setEquippedShieldId(loadout.shieldId)
+        setEquippedWeaponId(loadout.weaponId)
+      }
+    },
+    [character, equippedArmorId, equippedShieldId, equippedWeaponId, equipment],
+  )
+
+  useEffect(() => {
+    if (!character || !equipment.length) return
+    if (equippedArmorId || equippedShieldId || equippedWeaponId) return
+    const suggestion = suggestEquipmentLoadout(character.equipment_ids ?? [], equipment)
+    if (suggestion.armorId || suggestion.shieldId || suggestion.weaponId) {
+      void persistEquipmentLoadout(suggestion)
+    }
+  }, [character, equipment, equippedArmorId, equippedShieldId, equippedWeaponId, persistEquipmentLoadout])
 
   const asiBonuses = useMemo(
     () => aggregateAsiBonuses((character?.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {}),
@@ -312,7 +368,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }
 
   const proficiencyBonus = Math.floor((character.level - 1) / 4) + 2
-  const armorClass = character.armor_class || 10 + abilityMods.dexterity
+  const armorOptions = equipment.filter(isArmorItem)
+  const shieldOptions = equipment.filter(isShieldItem)
+  const armorClass = computeLoadoutArmorClass(abilityMods.dexterity, {
+    armorId: equippedArmorId,
+    shieldId: equippedShieldId,
+    weaponId: equippedWeaponId,
+  }, equipment)
   const speed = character.speed || 30
   const initiative = character.initiative ?? abilityMods.dexterity
   const maxHp = character.hit_point_max || 0
@@ -335,7 +397,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     character.armor_proficiencies,
   )
   const weapons = equipment.filter(isWeaponItem)
-  const nonWeaponEquipment = equipment.filter((item) => !isWeaponItem(item))
+  const nonWeaponEquipment = equipment.filter(
+    (item) => !isWeaponItem(item) && !isArmorItem(item) && !isShieldItem(item),
+  )
   const filteredEquipment = filterEquipmentList(nonWeaponEquipment, equipmentSearchQuery)
   const spellcastingAbilityLabel =
     character.classes?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
@@ -859,6 +923,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               </div>
 
               <div className="bg-card rounded-xl p-3 border border-border">
+                <h2 className="text-sm font-bold text-foreground mb-2">Equipped Gear</h2>
+                <EquippedGearPanel
+                  armorOptions={armorOptions}
+                  shieldOptions={shieldOptions}
+                  weaponOptions={weapons}
+                  equippedArmorId={equippedArmorId}
+                  equippedShieldId={equippedShieldId}
+                  equippedWeaponId={equippedWeaponId}
+                  onEquippedArmorChange={(id) => {
+                    void persistEquipmentLoadout({ armorId: id })
+                  }}
+                  onEquippedShieldChange={(id) => {
+                    void persistEquipmentLoadout({ shieldId: id })
+                  }}
+                  onEquippedWeaponChange={(id) => {
+                    void persistEquipmentLoadout({ weaponId: id })
+                  }}
+                />
+              </div>
+
+              <div className="bg-card rounded-xl p-3 border border-border">
                 <h2 className="text-sm font-bold text-foreground mb-2">Weapons</h2>
                 {weapons.length ? (
                   <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -881,7 +966,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           key={weapon.id}
                           className="p-2.5 bg-muted/50 rounded-lg border border-border/60 min-w-0"
                         >
-                          <p className="font-bold text-xs text-foreground mb-1.5">{weapon.name}</p>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <p className="font-bold text-xs text-foreground">{weapon.name}</p>
+                            {equippedWeaponId === weapon.id && (
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-primary">
+                                Equipped
+                              </span>
+                            )}
+                          </div>
                           {attack && (
                             <div className="flex items-center justify-between gap-2 mb-1.5">
                               <div className="flex items-center gap-1.5">
