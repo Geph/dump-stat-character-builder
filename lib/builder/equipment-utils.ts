@@ -31,6 +31,12 @@ export function findEquipmentByName(name: string, equipment: Equipment[]): Equip
   const exact = equipment.find((e) => e.name.toLowerCase() === normalized)
   if (exact) return exact
 
+  const singular = normalized.replace(/ies$/, "y").replace(/s$/, "")
+  if (singular !== normalized) {
+    const bySingular = equipment.find((e) => e.name.toLowerCase() === singular)
+    if (bySingular) return bySingular
+  }
+
   const parenMatch = name.match(/^(.+?)\s*\((.+)\)$/)
   if (parenMatch) {
     const variant = equipment.find((e) =>
@@ -62,3 +68,28 @@ export function resolvePackageEquipmentIds(
   }
   return ids
 }
+
+export function getEquipmentCostGp(item: Equipment): number {
+  if (!item.cost) return 0
+  const unit = item.cost.unit?.toLowerCase() ?? "gp"
+  if (unit === "cp") return item.cost.amount / 100
+  if (unit === "sp") return item.cost.amount / 10
+  if (unit === "ep") return item.cost.amount / 2
+  if (unit === "pp") return item.cost.amount * 10
+  return item.cost.amount
+}
+
+export function sumEquipmentGoldCost(ids: string[], equipment: Equipment[]): number {
+  let total = 0
+  for (const id of ids) {
+    const item = equipment.find((e) => e.id === id)
+    if (item) total += getEquipmentCostGp(item)
+  }
+  return total
+}
+
+export function formatEquipmentCost(item: Equipment): string | null {
+  if (!item.cost) return null
+  return `${item.cost.amount} ${item.cost.unit?.toUpperCase() ?? "GP"}`
+}
+

@@ -18,7 +18,8 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
+import { enrichBackgroundList, normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
+import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
 import {
@@ -27,6 +28,9 @@ import {
   type BackgroundProficiencies,
 } from "@/lib/compendium/background-proficiencies"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import { StartingEquipmentGroupsEditor } from "@/components/compendium/starting-equipment-groups-editor"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
+import type { StartingEquipmentGroup } from "@/lib/types"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import {
   normalizeLinkedModifiers,
@@ -56,10 +60,12 @@ interface BackgroundFormData {
   feat_granted: string
   starting_gold: number
   starting_equipment: EquipmentItem[]
+  starting_equipment_groups: StartingEquipmentGroup[]
   source: string
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
   feature_name: string
   feature_description: string
   feature_linked_modifiers: LinkedModifierInstance[]
@@ -77,10 +83,12 @@ const defaultBackground: BackgroundFormData = {
   feat_granted: "",
   starting_gold: 0,
   starting_equipment: [],
+  starting_equipment_groups: [],
   source: "Custom",
   creator_url: "",
   icon: null,
   accent_color: null,
+  card_image_url: null,
   feature_name: "",
   feature_description: "",
   feature_linked_modifiers: [],
@@ -105,6 +113,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
   const [spellSearch, setSpellSearch] = useState("")
   const [characterLevelPick, setCharacterLevelPick] = useState(1)
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("backgrounds", id)
 
   // Fetch origin feats for the dropdown
   useEffect(() => {
@@ -169,13 +178,18 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               row.proficiencies,
               row.tool_proficiencies as string[] | null | undefined,
             ),
-            feat_granted: String(row.feat_granted || ""),
+            feat_granted: String(
+              (enriched as { feat_granted?: string | null }).feat_granted || row.feat_granted || "",
+            ),
             starting_gold: (row.starting_gold as number | null | undefined) ?? 0,
             starting_equipment: (row.starting_equipment as BackgroundFormData["starting_equipment"]) || [],
+            starting_equipment_groups:
+              (row.starting_equipment_groups as StartingEquipmentGroup[] | null | undefined) || [],
             source: String(row.source || "Custom"),
             creator_url: String(row.creator_url || ""),
             icon: (row.icon as string | null) ?? null,
             accent_color: (row.accent_color as string | null) ?? null,
+            card_image_url: (row.card_image_url as string | null) ?? null,
             feature_name: (row.feature as { name?: string } | null)?.name || "",
             feature_description: (row.feature as { description?: string } | null)?.description || "",
             feature_linked_modifiers: readLinkedModifiers(
@@ -215,8 +229,12 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
       ...rest
     } = form
     const normalizedProficiencies = normalizeBackgroundProficiencies(proficiencies)
-    const payload = {
+    const normalizedRow = normalizeBackgroundRow({
       ...rest,
+      ability_bonuses: Object.keys(rest.ability_bonuses).length ? rest.ability_bonuses : null,
+    })
+    const payload = {
+      ...normalizedRow,
       proficiencies: normalizedProficiencies,
       tool_proficiencies: [
         ...normalizedProficiencies.tools,
@@ -267,11 +285,18 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
   }
 
   const setAbilityBonus = (ability: string, value: number) => {
-    setForm(prev => {
-      const newBonuses = { ...prev.ability_bonuses }
-      if (value === 0) delete newBonuses[ability]
-      else newBonuses[ability] = value
-      return { ...prev, ability_bonuses: newBonuses }
+    setForm((prev) => ({
+      ...prev,
+      ability_bonuses: { ...prev.ability_bonuses, [ability]: value },
+    }))
+  }
+
+  const toggleEligibleAbility = (ability: string, enabled: boolean) => {
+    setForm((prev) => {
+      const next = { ...prev.ability_bonuses }
+      if (enabled) next[ability] = next[ability] ?? 0
+      else delete next[ability]
+      return { ...prev, ability_bonuses: next }
     })
   }
 
@@ -351,15 +376,17 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         title={id === "new" ? "New Background" : "Edit Background"}
         isNew={id === "new"}
         saving={saving}
-        saveLabel="Save Background"
+        saveLabel="Save"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -377,6 +404,8 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           <div>
@@ -394,27 +423,41 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               Ability Score Bonuses
             </label>
             <p className="text-xs text-muted-foreground mb-4">
-              Use +2 / +1 for fixed bonuses. Leave eligible abilities at +0 (2024 backgrounds: player
-              chooses +2 and +1 from listed scores).
+              Check which abilities are eligible for player choice (+2/+1 or +1/+1/+1). Use +1 or +2 for
+              fixed bonuses instead of +0.
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {(Object.keys(form.ability_bonuses).length
-                ? BACKGROUND_ABILITY_KEYS.filter((ability) => ability in form.ability_bonuses)
-                : BACKGROUND_ABILITY_KEYS
-              ).map((ability) => (
-                <div key={ability} className="flex items-center gap-3">
-                  <span className="text-foreground capitalize w-24 text-sm">{ability}</span>
-                  <select
-                    value={form.ability_bonuses[ability] || 0}
-                    onChange={(e) => setAbilityBonus(ability, parseInt(e.target.value))}
-                    className="flex-1 px-3 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {BACKGROUND_ABILITY_KEYS.map((ability) => {
+                const included = ability in form.ability_bonuses
+                const value = form.ability_bonuses[ability] ?? 0
+                return (
+                  <div
+                    key={ability}
+                    className="flex flex-wrap items-center gap-3 p-2 rounded-lg border border-border bg-background"
                   >
-                    <option value={0}>+0</option>
-                    <option value={1}>+1</option>
-                    <option value={2}>+2</option>
-                  </select>
-                </div>
-              ))}
+                    <label className="flex items-center gap-2 text-sm cursor-pointer min-w-[8rem]">
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        onChange={(e) => toggleEligibleAbility(ability, e.target.checked)}
+                        className="accent-primary"
+                      />
+                      <span className="text-foreground capitalize">{ability}</span>
+                    </label>
+                    {included && (
+                      <select
+                        value={value}
+                        onChange={(e) => setAbilityBonus(ability, parseInt(e.target.value, 10))}
+                        className="flex-1 min-w-[5rem] px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                      >
+                        <option value={0}>+0 (eligible)</option>
+                        <option value={1}>+1 fixed</option>
+                        <option value={2}>+2 fixed</option>
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -598,16 +641,11 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             <p className="text-xs text-muted-foreground mb-2">
               Backgrounds grant a 1st-level Origin feat. Only Origin-category feats are listed.
             </p>
-            <select
+            <OriginFeatGrantedSelect
               value={form.feat_granted}
-              onChange={(e) => setForm({ ...form, feat_granted: e.target.value })}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="">None / Custom</option>
-              {originFeats.map(f => (
-                <option key={f.id} value={f.name}>{f.name}</option>
-              ))}
-            </select>
+              onChange={(feat_granted) => setForm({ ...form, feat_granted })}
+              originFeats={originFeats}
+            />
             {originFeats.length === 0 && (
               <p className="text-xs text-muted-foreground mt-1 italic">
                 No Origin feats found. Add feats with the &quot;Origin&quot; category to populate this list.
@@ -616,10 +654,21 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
           </div>
 
           {/* Starting Equipment */}
+          <StartingEquipmentGroupsEditor
+            groups={form.starting_equipment_groups}
+            startingGold={form.starting_gold}
+            onGroupsChange={(starting_equipment_groups) =>
+              setForm((prev) => ({ ...prev, starting_equipment_groups }))
+            }
+            onStartingGoldChange={(starting_gold) =>
+              setForm((prev) => ({ ...prev, starting_gold }))
+            }
+          />
+
           <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Starting Equipment</label>
-              <p className="text-xs text-muted-foreground">Add specific items this background provides.</p>
+              <label className="block text-sm font-semibold text-foreground mb-1">Legacy flat equipment list</label>
+              <p className="text-xs text-muted-foreground">Optional — used when no packages are defined above.</p>
             </div>
 
             {/* Add item row */}
@@ -663,22 +712,6 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               </div>
             )}
 
-            {/* Starting Gold */}
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Starting Gold (gp)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  value={form.starting_gold}
-                  onChange={(e) => setForm({ ...form, starting_gold: Math.max(0, parseInt(e.target.value) || 0) })}
-                  className="w-32 px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                />
-                <span className="text-sm text-muted-foreground">gold pieces in addition to equipment</span>
-              </div>
-            </div>
           </div>
 
           {/* Submit */}

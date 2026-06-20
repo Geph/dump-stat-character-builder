@@ -90,7 +90,7 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         db.from("classes").select("id, name").order("name"),
         db.from("species").select("id, name").order("name"),
         db.from("backgrounds").select("id, name").order("name"),
-        db.from("spells").select("id, name").order("name").limit(500),
+        db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
       setAllFeats(feats || [])
       setAllClasses(classes || [])

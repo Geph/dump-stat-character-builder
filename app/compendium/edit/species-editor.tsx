@@ -16,10 +16,12 @@ import {
   normalizeCharacteristics,
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
+import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import {
   normalizeLinkedModifiers,
   readLinkedModifiers,
@@ -27,6 +29,7 @@ import {
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+import { DurationEditor } from "@/components/compendium/duration-editor"
 import type { Trait } from "@/lib/types"
 
 interface SpeciesFormData {
@@ -41,6 +44,7 @@ interface SpeciesFormData {
   linked_modifiers: LinkedModifierInstance[]
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
   source: string
   creator_url: string
 }
@@ -59,6 +63,7 @@ const defaultSpecies: SpeciesFormData = {
   linked_modifiers: [],
   icon: null,
   accent_color: null,
+  card_image_url: null,
   source: "Custom",
   creator_url: "",
 }
@@ -71,11 +76,12 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("species", id)
 
   useEffect(() => {
     const fetchSpells = async () => {
       const db = createClient()
-      const { data } = await db.from("spells").select("id, name").order("name").limit(500)
+      const { data } = await db.from("spells").select("id, name, level").order("level").order("name").limit(500)
       setAllSpells(data || [])
     }
     fetchSpells()
@@ -95,20 +101,22 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Species not found")
         } else if (data) {
+          const [enriched] = enrichSpeciesList([data as Record<string, unknown>])
           setForm({
-            name: data.name || "",
-            description: data.description || "",
-            speed: data.speed || 30,
-            size: data.size || "Medium",
-            creature_type: data.creature_type || "Humanoid",
-            traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
-            characteristics: normalizeCharacteristics(data.characteristics, null),
-            modifier_refs: readModifierRefs(data as Record<string, unknown>),
-            linked_modifiers: readLinkedModifiers(data as Record<string, unknown>, modifierCatalog),
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
+            name: enriched.name || "",
+            description: enriched.description || "",
+            speed: enriched.speed || 30,
+            size: enriched.size || "Medium",
+            creature_type: enriched.creature_type || "Humanoid",
+            traits: enriched.traits?.length ? enriched.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
+            characteristics: normalizeCharacteristics(enriched.characteristics, null),
+            modifier_refs: readModifierRefs(enriched as Record<string, unknown>),
+            linked_modifiers: readLinkedModifiers(enriched as Record<string, unknown>, modifierCatalog),
+            icon: enriched.icon || null,
+            accent_color: enriched.accent_color || null,
+            card_image_url: enriched.card_image_url || null,
+            source: enriched.source || "Custom",
+            creator_url: enriched.creator_url || "",
           })
         }
         setLoading(false)
@@ -284,13 +292,15 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Species"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -309,6 +319,8 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           {/* Description */}
@@ -433,6 +445,10 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                         onChange={(description) => updateTrait(index, { description })}
                         placeholder="Trait description..."
                         minHeightClass="min-h-[3rem]"
+                      />
+                      <DurationEditor
+                        value={trait.duration}
+                        onChange={(duration) => updateTrait(index, { duration })}
                       />
                       <LinkedModifiersEditor
                         value={normalizeLinkedModifiers(trait.linkedModifiers, modifierCatalog, trait.modifierRefs)}

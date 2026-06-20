@@ -17,7 +17,8 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { enrichBackgroundList, normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
+import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
 import {
   emptyBackgroundProficiencies,
@@ -144,16 +145,22 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
         if (error) {
           setError("Background not found")
         } else if (data) {
+          const row = data as Record<string, unknown> & { name: string }
+          const enriched = enrichBackgroundList([row])[0]
           setForm({
             name: data.name || "",
             description: data.description || "",
-            ability_bonuses: normalizeBackgroundAbilityBonuses(data.ability_bonuses),
+            ability_bonuses: normalizeBackgroundAbilityBonuses(
+              (enriched as { ability_bonuses?: Record<string, number> }).ability_bonuses ??
+                data.ability_bonuses,
+            ),
             skill_proficiencies: data.skill_proficiencies || [],
             proficiencies: normalizeBackgroundProficiencies(
               data.proficiencies,
               data.tool_proficiencies,
             ),
-            feat_granted: data.feat_granted || "",
+            feat_granted:
+              String((enriched as { feat_granted?: string | null }).feat_granted || data.feat_granted || ""),
             starting_gold: data.starting_gold ?? 0,
             starting_equipment: data.starting_equipment || [],
             source: data.source || "Custom",
@@ -312,7 +319,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
         title={id === "new" ? "New Background" : "Edit Background"}
         isNew={id === "new"}
         saving={saving}
-        saveLabel="Save Background"
+        saveLabel="Save"
         onExport={handleExport}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
@@ -544,16 +551,11 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
             <p className="text-xs text-muted-foreground mb-2">
               Backgrounds grant a 1st-level Origin feat. Only Origin-category feats are listed.
             </p>
-            <select
+            <OriginFeatGrantedSelect
               value={form.feat_granted}
-              onChange={(e) => setForm({ ...form, feat_granted: e.target.value })}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="">None / Custom</option>
-              {originFeats.map(f => (
-                <option key={f.id} value={f.name}>{f.name}</option>
-              ))}
-            </select>
+              onChange={(feat_granted) => setForm({ ...form, feat_granted })}
+              originFeats={originFeats}
+            />
             {originFeats.length === 0 && (
               <p className="text-xs text-muted-foreground mt-1 italic">
                 No Origin feats found. Add feats with the &quot;Origin&quot; category to populate this list.

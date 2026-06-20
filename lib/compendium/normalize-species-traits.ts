@@ -1,3 +1,4 @@
+import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { FeatureChoice, Trait } from "@/lib/types"
 import bundledSpecies from "@/lib/srd/seed-data/species.json"
@@ -99,32 +100,30 @@ function speciesHasChoiceTraits(traits: Trait[]): boolean {
   return traits.some((trait) => trait.isChoice && (trait.choices?.options?.length ?? 0) > 0)
 }
 
-/** Normalize stored species rows and fill missing choice traits from bundled SRD seed. */
+/** Normalize stored species rows, fill missing choice traits from bundled SRD seed, and apply modifier presets. */
 export function enrichSpeciesList<T extends { name: string; traits?: unknown; source?: string | null }>(
   rows: T[],
 ): T[] {
   return rows.map((row) => {
-    const traits = normalizeSpeciesTraits(row.traits)
+    let traits = normalizeSpeciesTraits(row.traits)
     let next = { ...withModifierRefs(row), traits } as T & { modifierRefs: string[]; traits: Trait[] }
-
-    if (speciesHasChoiceTraits(traits)) {
-      return next as T
-    }
 
     if (!isSrdSource(row.source)) {
       return next as T
     }
 
-    const seed = bundledSpeciesByName.get(row.name)
-    if (!seed) {
-      return next as T
+    if (!speciesHasChoiceTraits(traits)) {
+      const seed = bundledSpeciesByName.get(row.name)
+      if (seed) {
+        const seedTraits = normalizeSpeciesTraits(seed.traits)
+        if (speciesHasChoiceTraits(seedTraits)) {
+          traits = seedTraits
+          next = { ...next, traits } as typeof next
+        }
+      }
     }
 
-    const seedTraits = normalizeSpeciesTraits(seed.traits)
-    if (speciesHasChoiceTraits(seedTraits)) {
-      return { ...next, traits: seedTraits } as T
-    }
-
-    return next as T
+    const enriched = enrichSrdSpeciesRow(next as Record<string, unknown>)
+    return { ...next, traits: enriched.traits as Trait[] } as T
   })
 }

@@ -15,17 +15,28 @@ export type BuilderDraftSnapshot = {
   backgroundSearch: string
   spellSearch: string
   equipmentSearch: string
+  equipmentFilterCategory?: string
+  spellFilterLevelByClassId?: Record<string, string>
+  spellLevelPages?: Record<string, number>
   previewTab: "summary" | "combat" | "features" | "custom"
   mobilePanel: "steps" | "preview"
   equippedArmorId: string | null
   equippedShieldId: string | null
   equippedWeaponId: string | null
   classLevels: { classId: string; level: number }[]
+  primaryClassId: string | null
+  classAddOrder: string[]
   subclassByClassId: Record<string, string>
   classSkillPicks: Record<string, string[]>
+  classToolPicks?: Record<string, string[]>
   featureChoicePicks: Record<string, string[]>
+  featChoicePicks: Record<string, string[]>
+  modifierPlayerPicks: Record<string, string[]>
   speciesTraitPicks: Record<string, string[]>
   startingEquipmentOptionIndex: number | null
+  backgroundStartingEquipmentOptionIndex: number | null
+  goldPurchasedEquipmentIds: string[]
+  cardViewMode: "dense" | "cinematic"
   spellPicksByClassId: Record<string, string[]>
   asiAllocationsByFeatId: Record<string, Partial<Record<string, number>>>
   standardArrayAssignments: Partial<

@@ -1,13 +1,20 @@
 import { enrichSubclassFeaturesWithResources } from "@/lib/compendium/class-resource-features"
+import { enrichSubclassFeaturesWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 
 /** Apply SRD defaults to subclass feature rows (class resource links, modifier presets). */
 export function enrichSrdSubclassRow(
   row: Record<string, unknown>,
   parentClassName: string,
 ): Record<string, unknown> {
+  const subclassName = String(row.name ?? "")
+  const features = enrichSubclassFeaturesWithResources(parentClassName, row.features)
   return {
     ...row,
-    features: enrichSubclassFeaturesWithResources(parentClassName, row.features),
+    features: enrichSubclassFeaturesWithModifierPresets(
+      parentClassName,
+      subclassName,
+      features,
+    ),
   }
 }
 

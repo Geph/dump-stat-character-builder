@@ -1,5 +1,7 @@
 /** Shared HTML helpers for rich text fields (editor + import). */
 
+import { markdownToHtml } from "@/lib/compendium/markdown-to-html"
+
 export function isHtml(value: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(value)
 }
@@ -15,11 +17,7 @@ export function escapeHtml(text: string): string {
 export function toEditorHtml(value: string): string {
   if (!value?.trim()) return ""
   if (isHtml(value)) return value
-  const escaped = escapeHtml(value)
-  return escaped
-    .split(/\n{2,}/)
-    .map((block) => `<p>${block.replace(/\n/g, "<br>")}</p>`)
-    .join("")
+  return markdownToHtml(value)
 }
 
 export function createEmptyTableHtml(rows = 3, cols = 2, headerRow = true): string {

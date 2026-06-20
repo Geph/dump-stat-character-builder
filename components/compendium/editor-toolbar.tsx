@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, Save, Trash2, Download } from "lucide-react"
+import { ArrowLeft, Copy, Save, Trash2, Download } from "lucide-react"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import { compendiumListHref } from "@/lib/compendium/content-types"
 
@@ -14,6 +14,8 @@ type CompendiumEditorToolbarProps = {
   saving: boolean
   saveLabel: string
   onExport?: () => void
+  onCopy?: () => void
+  copying?: boolean
   onDelete?: () => void
 }
 
@@ -24,6 +26,8 @@ export function CompendiumEditorToolbar({
   saving,
   saveLabel,
   onExport,
+  onCopy,
+  copying = false,
   onDelete,
 }: CompendiumEditorToolbarProps) {
   const listHref = compendiumListHref(tab)
@@ -51,6 +55,17 @@ export function CompendiumEditorToolbar({
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Export</span>
+            </button>
+          ) : null}
+          {!isNew && onCopy ? (
+            <button
+              type="button"
+              onClick={onCopy}
+              disabled={copying || saving}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted rounded-xl transition-colors disabled:opacity-50"
+            >
+              <Copy className="w-4 h-4" />
+              <span className="hidden sm:inline">{copying ? "Copying…" : "Make a copy"}</span>
             </button>
           ) : null}
           {!isNew && onDelete ? (

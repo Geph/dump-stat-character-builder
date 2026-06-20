@@ -1,4 +1,5 @@
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { defaultRollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { Feature, FeatureActivation, FeatureEffect, UsesConfig } from "@/lib/types"
 
 /** Catalog entry ids from buildDefaultModifierCatalog (cat_fx_*). */
@@ -7,25 +8,29 @@ export const CLASS_RESOURCE_FX_CATALOG = {
   healFromPool: "cat_fx_heal_from_pool",
   damageReduction: "cat_fx_damage_reduction",
   bonusDamageByLevel: "cat_fx_bonus_damage_by_level",
-  checkAdvantage: "cat_fx_check_advantage",
-  buffAllyRoll: "cat_fx_buff_ally_roll",
+  checkAdvantage: "cat_fx_check_roll_modifier",
+  buffAllyRoll: "cat_fx_modify_creature",
+  debuffEnemyRoll: "cat_fx_modify_creature",
+  extraAttack: "cat_fx_extra_attack",
   transform: "cat_fx_transform",
   extraAction: "cat_fx_extra_action",
-  checkBonus: "cat_fx_check_bonus",
+  checkBonus: "cat_fx_check_roll_modifier",
   forceSaveControl: "cat_fx_force_save_control",
   selfBuffCaster: "cat_fx_self_buff_caster",
   classResource: "cat_fx_class_resource",
+  reactionAttack: "cat_fx_reaction_attack",
+  imposeDisadvantage: "cat_fx_impose_disadvantage",
 } as const
 
 function modInstance(
   instanceId: string,
   catalogRefId: string,
-  activation?: FeatureActivation | null,
+  effects: FeatureEffect[],
 ): LinkedModifierInstance {
   return {
     instanceId,
     catalogRefId,
-    activation: activation ?? undefined,
+    activation: { effects },
   }
 }
 
@@ -33,70 +38,60 @@ function fx(id: string, partial: Omit<FeatureEffect, "id">): FeatureEffect {
   return { id, ...partial }
 }
 
-function activation(
-  timing: Pick<FeatureActivation, "action" | "bonusAction" | "reaction">,
-  effects: FeatureEffect[],
-): FeatureActivation {
-  return { ...timing, effects }
-}
-
 type ResourceFeaturePreset = {
   featureName: string
-  resourceKey: string
+  resourceKey?: string
   activation?: FeatureActivation | null
   linkedModifiers: LinkedModifierInstance[]
 }
 
+function extraAttackPreset(featureName: string, count: number): ResourceFeaturePreset {
+  return {
+    featureName,
+    activation: { action: true },
+    linkedModifiers: [
+      modInstance(`modinst_${featureName.toLowerCase().replace(/\s+/g, "_")}`, CLASS_RESOURCE_FX_CATALOG.extraAttack, [
+        fx(`fx_${featureName.toLowerCase().replace(/\s+/g, "_")}`, {
+          kind: "extra_attack",
+          extraAttackCount: count,
+        }),
+      ]),
+    ],
+  }
+}
+
 const RAGE_MODIFIERS: LinkedModifierInstance[] = [
-  modInstance(
-    "modinst_rage_resist",
-    CLASS_RESOURCE_FX_CATALOG.damageReduction,
-    activation({ bonusAction: true }, [
-      fx("fx_rage_resist", {
-        kind: "damage_reduction",
-        mitigation: "resistance",
-        damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
-      }),
-    ]),
-  ),
-  modInstance(
-    "modinst_rage_damage",
-    CLASS_RESOURCE_FX_CATALOG.bonusDamageByLevel,
-    activation({ bonusAction: true }, [
-      fx("fx_rage_damage", {
-        kind: "bonus_damage_by_level",
-        bonusByLevel: [
-          { level: 1, bonus: "+2" },
-          { level: 9, bonus: "+3" },
-          { level: 16, bonus: "+4" },
-        ],
-      }),
-    ]),
-  ),
-  modInstance(
-    "modinst_rage_adv_attack",
-    CLASS_RESOURCE_FX_CATALOG.checkAdvantage,
-    activation({ bonusAction: true }, [
-      fx("fx_rage_adv_attack", {
-        kind: "check_advantage",
-        checkCategory: "attack",
-        checkAbility: "Strength",
-        grantAdvantage: true,
-      }),
-    ]),
-  ),
-  modInstance(
-    "modinst_rage_adv_save",
-    CLASS_RESOURCE_FX_CATALOG.checkAdvantage,
-    activation({ bonusAction: true }, [
-      fx("fx_rage_adv_save", {
-        kind: "check_advantage",
-        checkCategory: "save",
-        checkAbility: "Strength",
-        grantAdvantage: true,
-      }),
-    ]),
-  ),
+  modInstance("modinst_rage_resist", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
+    fx("fx_rage_resist", {
+      kind: "damage_reduction",
+      mitigation: "resistance",
+      damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+    }),
+  ]),
+  modInstance("modinst_rage_damage", CLASS_RESOURCE_FX_CATALOG.bonusDamageByLevel, [
+    fx("fx_rage_damage", {
+      kind: "bonus_damage_by_level",
+      bonusByLevel: [
+        { level: 1, bonus: "+2" },
+        { level: 9, bonus: "+3" },
+        { level: 16, bonus: "+4" },
+      ],
+    }),
+  ]),
+  modInstance("modinst_rage_adv_attack", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
+    fx("fx_rage_adv_attack", {
+      kind: "check_advantage",
+      checkCategory: "attack",
+      checkAbility: "Strength",
+    }),
+  ]),
+  modInstance("modinst_rage_adv_save", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
+    fx("fx_rage_adv_save", {
+      kind: "check_advantage",
+      checkCategory: "save",
+      checkAbility: "Strength",
+    }),
+  ]),
 ]
 
 /** SRD class features that spend a class resource pool, with common modifier presets. */
@@ -108,6 +103,16 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       activation: { bonusAction: true },
       linkedModifiers: RAGE_MODIFIERS,
     },
+    {
+      featureName: "Retaliation",
+      activation: { reaction: true },
+      linkedModifiers: [
+        modInstance("modinst_retaliation", CLASS_RESOURCE_FX_CATALOG.reactionAttack, [
+          fx("fx_retaliation", { kind: "reaction_attack" }),
+        ]),
+      ],
+    },
+    extraAttackPreset("Extra Attack", 2),
   ],
   Bard: [
     {
@@ -115,13 +120,39 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "bardic_inspiration",
       activation: { bonusAction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_bardic_inspiration",
-          CLASS_RESOURCE_FX_CATALOG.buffAllyRoll,
-          activation({ bonusAction: true }, [
-            fx("fx_bardic_inspiration", { kind: "buff_ally_roll" }),
-          ]),
-        ),
+        modInstance("modinst_bardic_inspiration", CLASS_RESOURCE_FX_CATALOG.buffAllyRoll, [
+          fx("fx_bardic_inspiration", {
+            kind: "modify_creature",
+            creatureModifyMode: "roll",
+            rollTarget: "ally",
+            buffMode: "bonus",
+            buffBonus: {
+              mode: "die",
+              dieScaling: "class_resource",
+              classResourceKey: "bardic_inspiration",
+            },
+          }),
+        ]),
+      ],
+    },
+    {
+      featureName: "Cutting Words",
+      resourceKey: "bardic_inspiration",
+      activation: { reaction: true },
+      linkedModifiers: [
+        modInstance("modinst_cutting_words", CLASS_RESOURCE_FX_CATALOG.debuffEnemyRoll, [
+          fx("fx_cutting_words", {
+            kind: "modify_creature",
+            creatureModifyMode: "roll",
+            rollTarget: "enemy",
+            buffMode: "bonus",
+            buffBonus: {
+              mode: "die",
+              dieScaling: "class_resource",
+              classResourceKey: "bardic_inspiration",
+            },
+          }),
+        ]),
       ],
     },
   ],
@@ -131,13 +162,9 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "channel_divinity",
       activation: { action: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_cleric_channel",
-          CLASS_RESOURCE_FX_CATALOG.forceSaveControl,
-          activation({ action: true }, [
-            fx("fx_cleric_channel", { kind: "force_save_control" }),
-          ]),
-        ),
+        modInstance("modinst_cleric_channel", CLASS_RESOURCE_FX_CATALOG.forceSaveControl, [
+          fx("fx_cleric_channel", { kind: "force_save_control" }),
+        ]),
       ],
     },
   ],
@@ -147,11 +174,9 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "wild_shape",
       activation: { bonusAction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_wild_shape",
-          CLASS_RESOURCE_FX_CATALOG.transform,
-          activation({ bonusAction: true }, [fx("fx_wild_shape", { kind: "transform" })]),
-        ),
+        modInstance("modinst_wild_shape", CLASS_RESOURCE_FX_CATALOG.transform, [
+          fx("fx_wild_shape", { kind: "transform" }),
+        ]),
       ],
     },
   ],
@@ -161,19 +186,15 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "second_wind",
       activation: { bonusAction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_second_wind",
-          CLASS_RESOURCE_FX_CATALOG.healSelf,
-          activation({ bonusAction: true }, [
-            fx("fx_second_wind", {
-              kind: "heal_self",
-              healMode: "dice",
-              healDiceCount: 1,
-              healDieType: "d10",
-              healFlatBonus: 0,
-            }),
-          ]),
-        ),
+        modInstance("modinst_second_wind", CLASS_RESOURCE_FX_CATALOG.healSelf, [
+          fx("fx_second_wind", {
+            kind: "heal_self",
+            healMode: "dice",
+            healDiceCount: 1,
+            healDieType: "d10",
+            healFlatBonus: 0,
+          }),
+        ]),
       ],
     },
     {
@@ -181,50 +202,63 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "action_surge",
       activation: { action: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_action_surge",
-          CLASS_RESOURCE_FX_CATALOG.extraAction,
-          activation({ action: true }, [fx("fx_action_surge", { kind: "extra_action" })]),
-        ),
+        modInstance("modinst_action_surge", CLASS_RESOURCE_FX_CATALOG.extraAction, [
+          fx("fx_action_surge", { kind: "extra_action" }),
+        ]),
       ],
     },
     {
       featureName: "Indomitable",
-      resourceKey: "indomitable",
+      activation: { reaction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_indomitable",
-          CLASS_RESOURCE_FX_CATALOG.checkBonus,
-          activation({}, [
-            fx("fx_indomitable", {
-              kind: "check_bonus",
-              checkCategory: "save",
-              bonusAmount: null,
-            }),
-          ]),
-        ),
+        modInstance("modinst_indomitable", CLASS_RESOURCE_FX_CATALOG.checkBonus, [
+          fx("fx_indomitable", {
+            kind: "check_bonus",
+            checkCategory: "save",
+            bonusConfig: defaultRollBonusConfig("fixed"),
+          }),
+        ]),
       ],
     },
+    extraAttackPreset("Extra Attack", 2),
+    extraAttackPreset("Two Extra Attacks", 3),
+    extraAttackPreset("Three Extra Attacks", 4),
   ],
   Monk: [
     {
       featureName: "Monk's Focus",
       resourceKey: "focus_points",
+      activation: { bonusAction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_monks_focus",
-          CLASS_RESOURCE_FX_CATALOG.classResource,
-          activation({ bonusAction: true }, [
-            fx("fx_monks_focus_spend", {
-              kind: "class_resource",
-              classResourceKey: "focus_points",
-              classResourceChange: "reduce",
-              classResourceAmount: 1,
-            }),
-          ]),
-        ),
+        modInstance("modinst_monks_focus", CLASS_RESOURCE_FX_CATALOG.classResource, [
+          fx("fx_monks_focus_spend", {
+            kind: "class_resource",
+            classResourceKey: "focus_points",
+            classResourceChange: "reduce",
+            classResourceAmount: 1,
+          }),
+        ]),
       ],
     },
+    {
+      featureName: "Deflect Attacks",
+      activation: { reaction: true },
+      linkedModifiers: [
+        modInstance("modinst_deflect_attacks", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
+          fx("fx_deflect_attacks", { kind: "damage_reduction", mitigation: "reduction" }),
+        ]),
+      ],
+    },
+    {
+      featureName: "Slow Fall",
+      activation: { reaction: true },
+      linkedModifiers: [
+        modInstance("modinst_slow_fall", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
+          fx("fx_slow_fall", { kind: "damage_reduction", mitigation: "reduction" }),
+        ]),
+      ],
+    },
+    extraAttackPreset("Extra Attack", 2),
   ],
   Paladin: [
     {
@@ -232,18 +266,14 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "lay_on_hands",
       activation: { action: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_lay_on_hands",
-          CLASS_RESOURCE_FX_CATALOG.healFromPool,
-          activation({ action: true }, [
-            fx("fx_lay_on_hands", {
-              kind: "heal_from_pool",
-              classResourceKey: "lay_on_hands",
-              classResourceChange: "reduce",
-              classResourceAmount: 1,
-            }),
-          ]),
-        ),
+        modInstance("modinst_lay_on_hands", CLASS_RESOURCE_FX_CATALOG.healFromPool, [
+          fx("fx_lay_on_hands", {
+            kind: "heal_from_pool",
+            classResourceKey: "lay_on_hands",
+            classResourceChange: "reduce",
+            classResourceAmount: 1,
+          }),
+        ]),
       ],
     },
     {
@@ -251,97 +281,58 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       resourceKey: "channel_divinity",
       activation: { action: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_paladin_channel",
-          CLASS_RESOURCE_FX_CATALOG.forceSaveControl,
-          activation({ action: true }, [
-            fx("fx_paladin_channel", { kind: "force_save_control" }),
-          ]),
-        ),
+        modInstance("modinst_paladin_channel", CLASS_RESOURCE_FX_CATALOG.forceSaveControl, [
+          fx("fx_paladin_channel", { kind: "force_save_control" }),
+        ]),
       ],
     },
+    extraAttackPreset("Extra Attack", 2),
   ],
+  Ranger: [extraAttackPreset("Extra Attack", 2)],
   Sorcerer: [
     {
       featureName: "Innate Sorcery",
       resourceKey: "innate_sorcery",
       activation: { bonusAction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_innate_sorcery",
-          CLASS_RESOURCE_FX_CATALOG.selfBuffCaster,
-          activation({ bonusAction: true }, [
-            fx("fx_innate_sorcery", { kind: "self_buff_caster" }),
-          ]),
-        ),
+        modInstance("modinst_innate_sorcery", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
+          fx("fx_innate_sorcery", { kind: "self_buff_caster" }),
+        ]),
       ],
     },
     {
       featureName: "Metamagic",
       resourceKey: "sorcery_points",
       linkedModifiers: [
-        modInstance(
-          "modinst_metamagic",
-          CLASS_RESOURCE_FX_CATALOG.classResource,
-          activation({}, [
-            fx("fx_metamagic_spend", {
-              kind: "class_resource",
-              classResourceKey: "sorcery_points",
-              classResourceChange: "reduce",
-              classResourceAmount: 1,
-            }),
-          ]),
-        ),
+        modInstance("modinst_metamagic", CLASS_RESOURCE_FX_CATALOG.classResource, [
+          fx("fx_metamagic_spend", {
+            kind: "class_resource",
+            classResourceKey: "sorcery_points",
+            classResourceChange: "reduce",
+            classResourceAmount: 1,
+          }),
+        ]),
       ],
     },
   ],
-  Warlock: [
+  Rogue: [
     {
-      featureName: "Pact Magic",
-      resourceKey: "pact_magic_slots",
+      featureName: "Uncanny Dodge",
+      activation: { reaction: true },
       linkedModifiers: [
-        modInstance(
-          "modinst_pact_magic",
-          CLASS_RESOURCE_FX_CATALOG.classResource,
-          activation({}, [
-            fx("fx_pact_magic", {
-              kind: "class_resource",
-              classResourceKey: "pact_magic_slots",
-              classResourceChange: "reduce",
-              classResourceAmount: 1,
-            }),
-          ]),
-        ),
-      ],
-    },
-  ],
-  Wizard: [
-    {
-      featureName: "Arcane Recovery",
-      resourceKey: "arcane_recovery",
-      linkedModifiers: [
-        modInstance(
-          "modinst_arcane_recovery",
-          CLASS_RESOURCE_FX_CATALOG.classResource,
-          activation({}, [
-            fx("fx_arcane_recovery", {
-              kind: "class_resource",
-              classResourceKey: "arcane_recovery",
-              classResourceChange: "reduce",
-              classResourceAmount: 1,
-            }),
-          ]),
-        ),
+        modInstance("modinst_uncanny_dodge", CLASS_RESOURCE_FX_CATALOG.imposeDisadvantage, [
+          fx("fx_uncanny_dodge", { kind: "impose_disadvantage" }),
+        ]),
       ],
     },
   ],
 }
 
-/** Subclass features that spend the parent class's Channel Divinity pool (etc.). */
+/** Subclass features that spend the parent class's resource pool (etc.). */
 export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
   parentClass: string
   featureName: string
-  resourceKey: string
+  resourceKey?: string
   linkedModifiers?: LinkedModifierInstance[]
   activation?: FeatureActivation | null
 }> = [
@@ -351,33 +342,25 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
     resourceKey: "channel_divinity",
     activation: { action: true },
     linkedModifiers: [
-      modInstance(
-        "modinst_preserve_life",
-        CLASS_RESOURCE_FX_CATALOG.healFromPool,
-        activation({ action: true }, [
-          fx("fx_preserve_life", {
-            kind: "heal_from_pool",
-            classResourceKey: "channel_divinity",
-            classResourceChange: "reduce",
-            classResourceAmount: 1,
-          }),
-        ]),
-      ),
+      modInstance("modinst_preserve_life", CLASS_RESOURCE_FX_CATALOG.healFromPool, [
+        fx("fx_preserve_life", {
+          kind: "heal_from_pool",
+          classResourceKey: "channel_divinity",
+          classResourceChange: "reduce",
+          classResourceAmount: 1,
+        }),
+      ]),
     ],
   },
   {
-    parentClass: "Cleric",
+    parentClass: "Druid",
     featureName: "Land's Aid",
-    resourceKey: "channel_divinity",
+    resourceKey: "wild_shape",
     activation: { action: true },
     linkedModifiers: [
-      modInstance(
-        "modinst_lands_aid",
-        CLASS_RESOURCE_FX_CATALOG.forceSaveControl,
-        activation({ action: true }, [
-          fx("fx_lands_aid", { kind: "force_save_control" }),
-        ]),
-      ),
+      modInstance("modinst_lands_aid", CLASS_RESOURCE_FX_CATALOG.forceSaveControl, [
+        fx("fx_lands_aid", { kind: "force_save_control" }),
+      ]),
     ],
   },
   {
@@ -386,13 +369,52 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
     resourceKey: "channel_divinity",
     activation: { action: true },
     linkedModifiers: [
-      modInstance(
-        "modinst_sacred_weapon",
-        CLASS_RESOURCE_FX_CATALOG.selfBuffCaster,
-        activation({ action: true }, [
-          fx("fx_sacred_weapon", { kind: "self_buff_caster" }),
-        ]),
-      ),
+      modInstance("modinst_sacred_weapon", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
+        fx("fx_sacred_weapon", { kind: "self_buff_caster" }),
+      ]),
+    ],
+  },
+  {
+    parentClass: "Bard",
+    featureName: "Cutting Words",
+    resourceKey: "bardic_inspiration",
+    activation: { reaction: true },
+    linkedModifiers: [
+      modInstance("modinst_lore_cutting_words", CLASS_RESOURCE_FX_CATALOG.debuffEnemyRoll, [
+        fx("fx_lore_cutting_words", {
+          kind: "debuff_enemy_roll",
+          buffMode: "bonus",
+          buffBonus: {
+            mode: "die",
+            dieScaling: "class_resource",
+            classResourceKey: "bardic_inspiration",
+          },
+        }),
+      ]),
+    ],
+  },
+  {
+    parentClass: "Barbarian",
+    featureName: "Retaliation",
+    activation: { reaction: true },
+    linkedModifiers: [
+      modInstance("modinst_berserker_retaliation", CLASS_RESOURCE_FX_CATALOG.reactionAttack, [
+        fx("fx_berserker_retaliation", { kind: "reaction_attack" }),
+      ]),
+    ],
+  },
+  {
+    parentClass: "Ranger",
+    featureName: "Superior Hunter's Defense",
+    activation: { reaction: true },
+    linkedModifiers: [
+      modInstance("modinst_superior_hunters_defense", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
+        fx("fx_superior_hunters_defense", {
+          kind: "damage_reduction",
+          mitigation: "resistance",
+          label: "Reaction: Resistance to triggering damage type",
+        }),
+      ]),
     ],
   },
 ]
@@ -417,11 +439,14 @@ function applyResourcePreset(feature: Feature, preset: ResourceFeaturePreset): F
     return feature
   }
 
+  const limitedUses =
+    preset.resourceKey && !featureHasResourceBinding(feature)
+      ? classResourceUses(preset.resourceKey)
+      : feature.limitedUses
+
   return syncModifierRefs({
     ...feature,
-    limitedUses: featureHasResourceBinding(feature)
-      ? feature.limitedUses
-      : classResourceUses(preset.resourceKey),
+    limitedUses: limitedUses ?? null,
     activation: feature.activation ?? preset.activation ?? null,
     linkedModifiers: featureHasLinkedModifiers(feature)
       ? feature.linkedModifiers

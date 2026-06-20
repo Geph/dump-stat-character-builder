@@ -17,6 +17,7 @@ import {
 } from "@/lib/compendium/linked-modifiers"
 import { catalogEntryById, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+import { linkedModifiersForFeat, type FeatSelectionEntry } from "@/lib/builder/feat-choices"
 import type { DndClass, Feat, Feature, Species, Subclass } from "@/lib/types"
 
 export type AbilityScorePoolGrant = {
@@ -108,6 +109,9 @@ export function collectAbilityScorePoolGrants(params: {
   speciesTraitPicks: Record<string, string[]>
   feats: Feat[]
   selectedFeatIds: string[]
+  grantedFeatIds?: string[]
+  featSelectionEntries?: FeatSelectionEntry[]
+  featChoicePicks?: Record<string, string[]>
   classLevels: { classId: string; level: number }[]
   classes: DndClass[]
   subclasses: Subclass[]
@@ -120,6 +124,9 @@ export function collectAbilityScorePoolGrants(params: {
     speciesTraitPicks,
     feats,
     selectedFeatIds,
+    grantedFeatIds = [],
+    featSelectionEntries = [],
+    featChoicePicks = {},
     classLevels,
     classes,
     subclasses,
@@ -190,15 +197,30 @@ export function collectAbilityScorePoolGrants(params: {
     }
   }
 
-  selectedFeatIds.filter(Boolean).forEach((featId, slotIndex) => {
+  const featEntries =
+    featSelectionEntries.length > 0
+      ? featSelectionEntries
+      : [...new Set([...selectedFeatIds, ...grantedFeatIds].filter(Boolean))].map((featId) => ({
+          featId,
+          choicePickKey: grantedFeatIds.includes(featId)
+            ? `feat:granted:${featId}`
+            : `feat:${featId}`,
+        }))
+
+  featEntries.forEach(({ featId, choicePickKey }) => {
     const feat = feats.find((entry) => entry.id === featId)
     if (!feat) return
-    const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
+    const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
     grants.push(
-      ...grantsFromLinkedModifiers(feat.linkedModifiers, refs, catalog, `feat:${featId}`, feat.name),
-      ...grantsFromCharacteristics(feat.benefits, `feat:${featId}`, feat.name),
+      ...grantsFromLinkedModifiers(
+        instances,
+        feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>),
+        catalog,
+        choicePickKey,
+        feat.name,
+      ),
+      ...grantsFromCharacteristics(feat.benefits, choicePickKey, feat.name),
     )
-    void slotIndex
   })
 
   return grants

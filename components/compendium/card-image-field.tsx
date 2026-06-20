@@ -1,0 +1,101 @@
+"use client"
+
+import { useRef } from "react"
+import { ImageIcon, X } from "lucide-react"
+import {
+  CARD_IMAGE_ASPECT_LABEL,
+  CARD_IMAGE_RECOMMENDED,
+  normalizeCardImageUrl,
+} from "@/lib/compendium/card-image"
+import { MAX_PORTRAIT_FILE_BYTES } from "@/lib/portrait"
+
+type CardImageFieldProps = {
+  value: string | null
+  onChange: (value: string | null) => void
+  label?: string
+}
+
+export function CardImageField({
+  value,
+  onChange,
+  label = "Card background graphic",
+}: CardImageFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const preview = normalizeCardImageUrl(value)
+
+  const onFile = (file: File | undefined) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) return
+    if (file.size > MAX_PORTRAIT_FILE_BYTES) {
+      alert(`Image must be under ${MAX_PORTRAIT_FILE_BYTES / (1024 * 1024)} MB`)
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = normalizeCardImageUrl(reader.result)
+      onChange(result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="rounded-xl border-2 border-border bg-card/50 p-4 space-y-3">
+      <div>
+        <label className="block text-sm font-semibold text-foreground">{label}</label>
+        <p className="text-xs text-muted-foreground mt-1">
+          Shown on compendium cards and detail overlays. {CARD_IMAGE_ASPECT_LABEL} · {CARD_IMAGE_RECOMMENDED}
+        </p>
+      </div>
+
+      {preview ? (
+        <div className="relative aspect-[16/10] w-full max-w-md overflow-hidden rounded-lg border border-border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="" className="h-full w-full object-cover" />
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="absolute top-2 right-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+            title="Remove image"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="flex aspect-[16/10] w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+        >
+          <ImageIcon className="h-8 w-8 opacity-60" />
+          <span className="text-sm font-medium">Upload background graphic</span>
+        </button>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="text-xs text-primary hover:underline"
+        >
+          {preview ? "Replace image" : "Choose file"}
+        </button>
+        <span className="text-xs text-muted-foreground">or paste URL:</span>
+        <input
+          type="url"
+          value={value?.startsWith("data:") ? "" : value ?? ""}
+          onChange={(e) => onChange(normalizeCardImageUrl(e.target.value))}
+          placeholder="https://…"
+          className="flex-1 min-w-[200px] px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
+    </div>
+  )
+}

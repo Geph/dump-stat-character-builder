@@ -1,3 +1,8 @@
+import {
+  getClassSkillPickRequirement,
+  getMulticlassToolPickRequirement,
+} from "@/lib/builder/multiclass-proficiencies"
+import { resolvePrimaryClassId } from "@/lib/builder/primary-class"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import type { DndClass, Species, Subclass } from "@/lib/types"
 
@@ -78,16 +83,31 @@ export function validateClassStepChoices(
   classSkillPicks: Record<string, string[]>,
   subclassByClassId: Record<string, string>,
   featureChoicePicks: Record<string, string[]>,
+  primaryClassId: string | null = null,
+  classAddOrder: string[] = [],
+  classToolPicks: Record<string, string[]> = {},
 ): boolean {
   if (classLevels.length === 0) return false
+
+  const resolvedPrimaryId = resolvePrimaryClassId(primaryClassId, classAddOrder, classLevels)
 
   for (const entry of classLevels) {
     const cls = classes.find((c) => c.id === entry.classId)
     if (!cls) return false
 
-    if (entry.level >= 1 && cls.skill_choices?.options?.length) {
-      const picks = classSkillPicks[entry.classId] ?? []
-      if (!choiceCountMet(picks, cls.skill_choices.count)) return false
+    if (entry.level >= 1) {
+      const isPrimary = entry.classId === resolvedPrimaryId
+      const skillReq = getClassSkillPickRequirement(cls, isPrimary)
+      if (skillReq) {
+        const picks = classSkillPicks[entry.classId] ?? []
+        if (!choiceCountMet(picks, skillReq.count)) return false
+      }
+
+      const toolReq = getMulticlassToolPickRequirement(cls, isPrimary)
+      if (toolReq) {
+        const picks = classToolPicks[entry.classId] ?? []
+        if (!choiceCountMet(picks, toolReq.count)) return false
+      }
     }
 
     const availableSubclasses = getSubclassesForClass(subclasses, entry.classId)
@@ -111,6 +131,8 @@ export function validateOriginStepChoices(
   backgroundId: string | null,
   selectedSpecies: Species | undefined,
   speciesTraitPicks: Record<string, string[]>,
+  speciesFeatPickKeys: string[] = [],
+  featureChoicePicks: Record<string, string[]> = {},
 ): boolean {
   if (!speciesId || !backgroundId || !selectedSpecies) return false
 
@@ -119,6 +141,10 @@ export function validateOriginStepChoices(
     if (!trait.isChoice || !trait.choices) continue
     const picks = speciesTraitPicks[String(index)] ?? []
     if (!choiceCountMet(picks, trait.choices.count)) return false
+  }
+
+  for (const key of speciesFeatPickKeys) {
+    if (!(featureChoicePicks[key]?.[0] ?? "")) return false
   }
 
   return true

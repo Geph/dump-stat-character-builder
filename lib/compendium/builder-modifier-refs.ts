@@ -1,3 +1,8 @@
+import {
+  linkedModifiersForFeat,
+  type FeatSelectionEntry,
+} from "@/lib/builder/feat-choices"
+import { applyModifierPlayerPicks } from "@/lib/builder/modifier-player-choices"
 import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
@@ -164,6 +169,11 @@ export function collectBuilderModifierRefIds(params: {
   background?: Background | null
   feats: Feat[]
   selectedFeatIds: string[]
+  /** Origin feat from background (not a milestone slot pick). */
+  grantedFeatIds?: string[]
+  featSelectionEntries?: FeatSelectionEntry[]
+  featChoicePicks?: Record<string, string[]>
+  modifierPlayerPicks?: Record<string, string[]>
   classLevels: { classId: string; level: number }[]
   classes: DndClass[]
   subclasses: Subclass[]
@@ -178,6 +188,10 @@ export function collectBuilderModifierRefIds(params: {
     background,
     feats,
     selectedFeatIds,
+    grantedFeatIds = [],
+    featSelectionEntries = [],
+    featChoicePicks = {},
+    modifierPlayerPicks = {},
     classLevels,
     classes,
     subclasses,
@@ -217,14 +231,24 @@ export function collectBuilderModifierRefIds(params: {
     ? resolveLinkedModifiers(backgroundInstances, catalog).characteristics
     : []
 
-  const featMods = selectedFeatIds
-    .filter(Boolean)
-    .flatMap((featId) => {
-      const feat = feats.find((entry) => entry.id === featId)
-      if (!feat) return []
-      const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
-      return characteristicsFromLinkedModifiers(catalog, feat.linkedModifiers, refs, feat.benefits)
-    })
+  const featEntries =
+    featSelectionEntries.length > 0
+      ? featSelectionEntries
+      : [...new Set([...selectedFeatIds, ...grantedFeatIds].filter(Boolean))].map((featId) => ({
+          featId,
+          choicePickKey: grantedFeatIds.includes(featId)
+            ? `feat:granted:${featId}`
+            : `feat:${featId}`,
+        }))
+
+  const featMods = featEntries.flatMap(({ featId, choicePickKey }) => {
+    const feat = feats.find((entry) => entry.id === featId)
+    if (!feat) return []
+    const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
+    const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
+    const mods = characteristicsFromLinkedModifiers(catalog, instances, refs, feat.benefits)
+    return applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks)
+  })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
     const refs = ability.modifierRefs ?? readModifierRefs(ability as unknown as Record<string, unknown>)

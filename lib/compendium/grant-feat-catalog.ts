@@ -1,5 +1,6 @@
 import { createModifierId, type GrantFeatCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import {
+  createModifierInstanceId,
   effectiveLinkedModifiers,
   resolveLinkedModifierInstance,
   type LinkedModifierInstance,
@@ -9,26 +10,37 @@ import { catalogEntryById } from "@/lib/compendium/modifier-catalog"
 import type { Feature } from "@/lib/types"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 
-/** Preset catalog entry ids for feat-granting modifiers. */
-export const GRANT_FEAT_CATALOG_IDS = {
-  /** Configurable categories — edit in Common Modifier Effects. */
-  custom: "cat_char_grant_feat",
+/** Single catalog entry for feat-granting modifiers (categories configured per link). */
+export const GRANT_FEAT_CATALOG_ID = "cat_char_grant_feat"
+
+/** Legacy preset ids — resolved to categories at runtime, not separate catalog rows. */
+export const LEGACY_GRANT_FEAT_CATALOG_IDS = {
   general: "cat_char_grant_feat_general",
   epicBoon: "cat_char_grant_feat_epic_boon",
   fightingStyle: "cat_char_grant_feat_fighting_style",
 } as const
 
-export type GrantFeatCatalogPreset = keyof typeof GRANT_FEAT_CATALOG_IDS
+/** @deprecated Use GRANT_FEAT_CATALOG_ID and LEGACY_GRANT_FEAT_CATALOG_IDS */
+export const GRANT_FEAT_CATALOG_IDS = {
+  custom: GRANT_FEAT_CATALOG_ID,
+  ...LEGACY_GRANT_FEAT_CATALOG_IDS,
+} as const
 
-export function grantFeatCatalogIdForCategories(categories: string[]): string {
-  const normalized = categories.map((c) => c.toLowerCase())
-  if (normalized.includes("epic boon")) return GRANT_FEAT_CATALOG_IDS.epicBoon
-  if (normalized.includes("fighting style")) return GRANT_FEAT_CATALOG_IDS.fightingStyle
-  if (normalized.length === 1 && normalized[0] === "general") return GRANT_FEAT_CATALOG_IDS.general
-  return GRANT_FEAT_CATALOG_IDS.custom
+const LEGACY_GRANT_FEAT_CATEGORIES: Record<string, FeatPickCategory[]> = {
+  [LEGACY_GRANT_FEAT_CATALOG_IDS.general]: ["General"],
+  [LEGACY_GRANT_FEAT_CATALOG_IDS.epicBoon]: ["Epic Boon"],
+  [LEGACY_GRANT_FEAT_CATALOG_IDS.fightingStyle]: ["Fighting Style"],
 }
 
-function grantFeatCharacteristic(
+export function featCategoriesForLegacyGrantRef(refId: string): FeatPickCategory[] | null {
+  return LEGACY_GRANT_FEAT_CATEGORIES[refId] ?? null
+}
+
+export function grantFeatCatalogIdForCategories(_categories: string[]): string {
+  return GRANT_FEAT_CATALOG_ID
+}
+
+export function grantFeatCharacteristic(
   featCategories: FeatPickCategory[],
   count = 1,
 ): GrantFeatCharacteristic {
@@ -40,31 +52,9 @@ function grantFeatCharacteristic(
   }
 }
 
-/** Preset common-modifier catalog rows for feat picks (linked from class features). */
+/** @deprecated Preset rows merged into single "Gain a Feat" catalog entry. */
 export function buildGrantFeatCatalogEntries(): ModifierCatalogEntry[] {
-  return [
-    {
-      id: GRANT_FEAT_CATALOG_IDS.general,
-      name: "Gain a General Feat",
-      group: "Feats & choices",
-      summary: "Passive: choose a General feat",
-      characteristics: [grantFeatCharacteristic(["General"])],
-    },
-    {
-      id: GRANT_FEAT_CATALOG_IDS.epicBoon,
-      name: "Gain an Epic Boon",
-      group: "Feats & choices",
-      summary: "Passive: choose an Epic Boon feat",
-      characteristics: [grantFeatCharacteristic(["Epic Boon"])],
-    },
-    {
-      id: GRANT_FEAT_CATALOG_IDS.fightingStyle,
-      name: "Gain a Fighting Style",
-      group: "Feats & choices",
-      summary: "Passive: choose a Fighting Style feat",
-      characteristics: [grantFeatCharacteristic(["Fighting Style"])],
-    },
-  ]
+  return []
 }
 
 export type ResolvedGrantFeat = {
@@ -72,6 +62,29 @@ export type ResolvedGrantFeat = {
   label: string
   featCategories: string[]
   count: number
+}
+
+function resolveGrantFeatCategories(
+  refId: string,
+  mod: GrantFeatCharacteristic,
+): string[] {
+  const legacy = featCategoriesForLegacyGrantRef(refId)
+  if (legacy) return legacy
+  return mod.featCategories?.length ? mod.featCategories : ["General"]
+}
+
+function grantFeatLabel(entry: ModifierCatalogEntry | undefined, refId: string, mod: GrantFeatCharacteristic): string {
+  if (entry?.name && entry.id === GRANT_FEAT_CATALOG_ID) {
+    const categories = resolveGrantFeatCategories(refId, mod)
+    if (categories.length === 1) {
+      const only = categories[0]
+      if (only === "General") return "General Feat"
+      if (only === "Epic Boon") return "Epic Boon"
+      if (only === "Fighting Style") return "Fighting Style"
+    }
+    return `${entry.name} (${categories.join(", ")})`
+  }
+  return entry?.name ?? refId
 }
 
 export function grantFeatsFromModifierRefs(
@@ -83,13 +96,31 @@ export function grantFeatsFromModifierRefs(
 
   for (const refId of refIds) {
     const entry = catalogEntryById(catalog, refId)
-    if (!entry?.characteristics?.length) continue
+    const legacyCategories = featCategoriesForLegacyGrantRef(refId)
+
+    if (!entry?.characteristics?.length) {
+      if (legacyCategories) {
+        grants.push({
+          catalogEntryId: refId,
+          label:
+            legacyCategories[0] === "Epic Boon"
+              ? "Epic Boon"
+              : legacyCategories[0] === "Fighting Style"
+                ? "Fighting Style"
+                : "General Feat",
+          featCategories: legacyCategories,
+          count: 1,
+        })
+      }
+      continue
+    }
+
     for (const mod of entry.characteristics) {
       if (mod.type !== "grant_feat") continue
       grants.push({
         catalogEntryId: refId,
-        label: entry.name,
-        featCategories: mod.featCategories?.length ? mod.featCategories : ["General"],
+        label: grantFeatLabel(entry, refId, mod),
+        featCategories: resolveGrantFeatCategories(refId, mod),
         count: mod.count ?? 1,
       })
     }
@@ -114,8 +145,8 @@ export function grantFeatsFromLinkedModifiers(
       if (mod.type !== "grant_feat") continue
       grants.push({
         catalogEntryId: instance.catalogRefId,
-        label: entry?.name ?? instance.catalogRefId,
-        featCategories: mod.featCategories?.length ? mod.featCategories : ["General"],
+        label: grantFeatLabel(entry, instance.catalogRefId, mod),
+        featCategories: resolveGrantFeatCategories(instance.catalogRefId, mod),
         count: mod.count ?? 1,
       })
     }
@@ -136,13 +167,14 @@ export function grantFeatsFromFeature(
   if (fromRefs.length) return fromRefs
 
   if (feature.isChoice && feature.choices?.kind === "feats") {
+    const featCategories = feature.choices.featCategories?.length
+      ? feature.choices.featCategories
+      : [feature.choices.category || "General"]
     return [
       {
-        catalogEntryId: grantFeatCatalogIdForCategories(feature.choices.featCategories ?? ["General"]),
+        catalogEntryId: GRANT_FEAT_CATALOG_ID,
         label: feature.choices.category || feature.name,
-        featCategories: feature.choices.featCategories?.length
-          ? feature.choices.featCategories
-          : [feature.choices.category || "General"],
+        featCategories,
         count: feature.choices.count ?? 1,
       },
     ]
@@ -158,14 +190,21 @@ export function featureGrantsFeats(feature: Feature, catalog: ModifierCatalogEnt
 export function migrateFeatureFeatChoiceToModifierRefs(feature: Feature): Feature {
   if (!feature.isChoice || feature.choices?.kind !== "feats") return feature
 
-  const refId = grantFeatCatalogIdForCategories(feature.choices.featCategories ?? ["General"])
-  const existing = feature.modifierRefs ?? []
-  const modifierRefs = existing.includes(refId) ? existing : [...existing, refId]
+  const featCategories = (feature.choices.featCategories?.length
+    ? feature.choices.featCategories
+    : [feature.choices.category || "General"]) as FeatPickCategory[]
 
   return {
     ...feature,
     isChoice: false,
     choices: undefined,
-    modifierRefs,
+    modifierRefs: [GRANT_FEAT_CATALOG_ID],
+    linkedModifiers: [
+      {
+        instanceId: createModifierInstanceId(),
+        catalogRefId: GRANT_FEAT_CATALOG_ID,
+        characteristics: [grantFeatCharacteristic(featCategories, feature.choices.count ?? 1)],
+      },
+    ],
   }
 }

@@ -3,7 +3,7 @@ import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import {
   featureGrantsFeats,
   grantFeatsFromFeature,
-  GRANT_FEAT_CATALOG_IDS,
+  GRANT_FEAT_CATALOG_ID,
 } from "@/lib/compendium/grant-feat-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { DndClass, Feature, Subclass } from "@/lib/types"
@@ -115,7 +115,7 @@ export function getFeatPickSlots(
       level: lvl,
       name: lvl === 19 ? "Epic Boon" : "General Feat",
       description: "",
-      modifierRefs: [lvl === 19 ? GRANT_FEAT_CATALOG_IDS.epicBoon : GRANT_FEAT_CATALOG_IDS.general],
+      modifierRefs: [GRANT_FEAT_CATALOG_ID],
     },
     milestoneLevel: lvl,
     featCategories: [lvl === 19 ? "Epic Boon" : "General"],

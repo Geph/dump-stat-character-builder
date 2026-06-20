@@ -26,8 +26,12 @@ import {
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
+import { DurationEditor } from "@/components/compendium/duration-editor"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import { ModifierChoiceFields } from "@/components/compendium/modifier-choice-fields"
+import type { FeatureChoice, FeatureDurationKey } from "@/lib/types"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import {
   normalizeLinkedModifiers,
   readLinkedModifiers,
@@ -50,11 +54,15 @@ interface FeatFormData {
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
   linked_modifiers: LinkedModifierInstance[]
+  is_choice: boolean
+  choices: FeatureChoice | null
   source: string
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
   repeatable: boolean
+  duration: FeatureDurationKey | null
 }
 
 const defaultFeat: FeatFormData = {
@@ -69,11 +77,15 @@ const defaultFeat: FeatFormData = {
   characteristics: [],
   modifier_refs: [],
   linked_modifiers: [],
+  is_choice: false,
+  choices: null,
   source: "Custom",
   creator_url: "",
   icon: null,
   accent_color: null,
+  card_image_url: null,
   repeatable: false,
+  duration: null,
 }
 
 export default function FeatEditorPage({ id }: { id: string }) {
@@ -88,6 +100,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
   const [allBackgrounds, setAllBackgrounds] = useState<{ id: string; name: string }[]>([])
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("feats", id)
 
   useEffect(() => {
     const fetchPrereqOptions = async () => {
@@ -103,7 +116,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
         db.from("classes").select("id, name").order("name"),
         db.from("species").select("id, name").order("name"),
         db.from("backgrounds").select("id, name").order("name"),
-        db.from("spells").select("id, name").order("name").limit(500),
+        db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
       setAllFeats(feats || [])
       setAllClasses(classes || [])
@@ -128,7 +141,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Feat not found")
         } else if (data) {
-          const [enriched] = enrichFeatsList([data as Record<string, unknown>])
+          const [enriched] = enrichFeatsList([data as Record<string, unknown>], modifierCatalog)
           setForm({
             name: enriched.name || "",
             description: enriched.description || "",
@@ -141,11 +154,15 @@ export default function FeatEditorPage({ id }: { id: string }) {
             characteristics: normalizeCharacteristics(enriched.benefits, null),
             modifier_refs: readModifierRefs(enriched),
             linked_modifiers: readLinkedModifiers(enriched, modifierCatalog),
+            is_choice: Boolean(enriched.isChoice),
+            choices: enriched.choices ?? null,
             source: enriched.source || "Custom",
             creator_url: enriched.creator_url || "",
             icon: enriched.icon || null,
             accent_color: enriched.accent_color || null,
+            card_image_url: enriched.card_image_url || null,
             repeatable: Boolean(enriched.repeatable),
+            duration: (enriched.duration as FeatureDurationKey | null) ?? null,
           })
         }
         setLoading(false)
@@ -221,6 +238,66 @@ export default function FeatEditorPage({ id }: { id: string }) {
     setForm((prev) => ({ ...prev, [field]: prev[field].filter((id) => id !== value) }))
   }
 
+  const toggleFeatChoice = (checked: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      is_choice: checked,
+      choices: checked
+        ? prev.choices ?? {
+            category: "Benefit Option",
+            options: [{ name: "", description: "" }],
+            count: 1,
+          }
+        : null,
+      linked_modifiers: checked ? [] : prev.linked_modifiers,
+      modifier_refs: checked ? [] : prev.modifier_refs,
+    }))
+  }
+
+  const updateFeatChoiceField = (field: keyof FeatureChoice, value: unknown) => {
+    setForm((prev) => ({
+      ...prev,
+      choices: { ...(prev.choices ?? { category: "", options: [], count: 1 }), [field]: value },
+    }))
+  }
+
+  const addFeatChoiceOption = () => {
+    setForm((prev) => ({
+      ...prev,
+      choices: {
+        ...(prev.choices ?? { category: "Benefit Option", options: [], count: 1 }),
+        options: [...(prev.choices?.options ?? []), { name: "", description: "" }],
+      },
+    }))
+  }
+
+  const updateFeatChoiceOption = (
+    optionIndex: number,
+    field: "name" | "description" | "modifierRefs" | "linkedModifiers",
+    value: string | string[] | LinkedModifierInstance[],
+  ) => {
+    setForm((prev) => {
+      const choices = prev.choices ?? { category: "", options: [], count: 1 }
+      const options = choices.options.map((option, index) =>
+        index === optionIndex ? { ...option, [field]: value } : option,
+      )
+      return { ...prev, choices: { ...choices, options } }
+    })
+  }
+
+  const removeFeatChoiceOption = (optionIndex: number) => {
+    setForm((prev) => {
+      const choices = prev.choices ?? { category: "", options: [], count: 1 }
+      return {
+        ...prev,
+        choices: {
+          ...choices,
+          options: choices.options.filter((_, index) => index !== optionIndex),
+        },
+      }
+    })
+  }
+
   const renderPrereqTags = (
     ids: string[],
     lookup: { id: string; name: string }[],
@@ -275,13 +352,15 @@ export default function FeatEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Feat"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -299,6 +378,8 @@ export default function FeatEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           {/* Category, level requirement, repeatable */}
@@ -471,19 +552,45 @@ export default function FeatEditorPage({ id }: { id: string }) {
             />
           </div>
 
-          <LinkedModifiersEditor
-            value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
-            onChange={(linked_modifiers) =>
-              setForm((prev) => ({
-                ...prev,
-                ...syncModifierRefs({ linkedModifiers: linked_modifiers }),
-                linked_modifiers,
-              }))
-            }
-            catalog={modifierCatalog}
-            label="Modifier effects (from shared catalog)"
-            spellOptions={allSpells}
+          <DurationEditor
+            value={form.duration}
+            onChange={(duration) => setForm({ ...form, duration })}
           />
+
+          <ModifierChoiceFields
+            isChoice={form.is_choice}
+            choices={form.choices ?? undefined}
+            modifierCatalog={modifierCatalog}
+            spellOptions={allSpells}
+            toggleLabel="This feat offers a choice between modifier options"
+            onToggleChoice={toggleFeatChoice}
+            onUpdateChoiceField={updateFeatChoiceField}
+            onAddChoiceOption={addFeatChoiceOption}
+            onUpdateChoiceOption={updateFeatChoiceOption}
+            onRemoveChoiceOption={removeFeatChoiceOption}
+          />
+
+          {!form.is_choice && (
+            <LinkedModifiersEditor
+              value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
+              onChange={(linked_modifiers) =>
+                setForm((prev) => ({
+                  ...prev,
+                  ...syncModifierRefs({ linkedModifiers: linked_modifiers }),
+                  linked_modifiers,
+                }))
+              }
+              catalog={modifierCatalog}
+              label="Modifier effects (from shared catalog)"
+              spellOptions={allSpells}
+            />
+          )}
+
+          {form.is_choice && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Link modifiers on each choice option above. Top-level modifiers are disabled while choice mode is on.
+            </p>
+          )}
 
           <details className="rounded-xl border border-border p-4">
             <summary className="cursor-pointer text-sm font-semibold text-foreground">

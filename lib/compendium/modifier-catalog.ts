@@ -1,6 +1,8 @@
 import {
   ACTION_EFFECT_GROUPS,
   ACTION_EFFECT_OPTIONS,
+  EXCLUDED_ACTION_CATALOG_KINDS,
+  EXCLUDED_PASSIVE_CATALOG_TYPES,
 } from "@/lib/compendium/class-feature-metadata"
 import {
   CHARACTERISTIC_MODIFIER_TYPE_OPTIONS,
@@ -10,10 +12,24 @@ import {
   type CharacteristicModifierType,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatureActivation } from "@/lib/types"
-import { buildGrantFeatCatalogEntries } from "@/lib/compendium/grant-feat-catalog"
+import {
+  buildGrantFeatCatalogEntries,
+  GRANT_FEAT_CATALOG_ID,
+  LEGACY_GRANT_FEAT_CATALOG_IDS,
+} from "@/lib/compendium/grant-feat-catalog"
 
 /** Fixed id for the system-owned common modifiers custom ability. */
 export const COMMON_MODIFIERS_CATALOG_ID = "00000000-0000-4000-8000-000000000001"
+
+/** Fixed UUIDs for system-owned modifier option catalogs (see system-option-catalogs.ts). */
+export const SYSTEM_MODIFIER_CATALOG_IDS = [
+  COMMON_MODIFIERS_CATALOG_ID,
+  "00000000-0000-4000-8000-000000000002",
+  "00000000-0000-4000-8000-000000000003",
+] as const
+
+/** Catalog entry id for the shared Special Attack passive template. */
+export const SPECIAL_ATTACK_CATALOG_ID = "cat_char_special_attack"
 
 export const COMMON_MODIFIERS_CATALOG_NAME = "Common Modifier Effects"
 
@@ -27,6 +43,7 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Armor & hit points",
   "Movement & senses",
   "Attack & damage",
+  "Special attacks",
   "Damage mitigation",
   "Spells & casting",
   "Active abilities",
@@ -61,15 +78,33 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   speed: "Movement & senses",
   attack_roll_modifiers: "Attack & damage",
   damage_roll_modifiers: "Attack & damage",
-  unarmed_strike_damage: "Attack & damage",
+  unarmed_strike_damage: "Special attacks",
+  special_attack: "Special attacks",
   damage_resistance: "Damage mitigation",
   damage_immunity: "Damage mitigation",
+  condition_immunity: "Damage mitigation",
   damage_reduction: "Damage mitigation",
   spells: "Spells & casting",
   spells_known: "Spells & casting",
+  spell_list_access: "Spells & casting",
   spellcasting_ability: "Spells & casting",
   uses: "Resources & uses",
+  attunement_slots: "Resources & uses",
+  aura: "Movement & senses",
+  feature_option_picker: "Feats & choices",
+  bonus_damage_riders: "Attack & damage",
+  saving_throw_trigger: "Skills & saving throws",
+  on_hit_trigger: "Active abilities",
+  failed_roll_trigger: "Active abilities",
+  on_cast_spell_trigger: "Spells & casting",
+  spell_healing_modifier: "Spells & casting",
+  resource_ability_menu: "Resources & uses",
+  extra_turn: "Active abilities",
   grant_feat: "Feats & choices",
+  rest_replacement: "Other",
+  creature_size: "Other",
+  magical_sleep_immunity: "Other",
+  movement_effects: "Movement & senses",
 }
 
 const ACTION_EFFECT_GROUP: Record<string, ModifierCatalogGroup> = {
@@ -95,22 +130,39 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
   const entries: ModifierCatalogEntry[] = []
 
   for (const option of CHARACTERISTIC_MODIFIER_TYPE_OPTIONS) {
+    if (EXCLUDED_PASSIVE_CATALOG_TYPES.has(option.value)) continue
     const mod = createCharacteristicModifier(option.value)
-    entries.push({
+    const entry: ModifierCatalogEntry = {
       id: catalogId("char", option.value),
-      name: option.value === "grant_feat" ? "Gain a Feat (custom categories)" : option.label,
+      name: option.value === "grant_feat" ? "Gain a Feat" : option.label,
       group: CHARACTERISTIC_GROUP[option.value],
       summary:
         option.value === "grant_feat"
-          ? "Passive: choose a feat — edit categories in this entry"
+          ? "Passive: choose a feat — set allowed categories below"
           : option.value === "ability_scores"
             ? "Passive: fixed ability bonuses or ASI-style player choice"
-            : `Passive: ${option.label}`,
+            : option.value === "special_attack"
+              ? "Passive: configurable special attack (breath weapon, horns, etc.)"
+              : `Passive: ${option.label}`,
       characteristics: [mod],
-    })
+    }
+    if (option.value === "special_attack") {
+      entry.description =
+        "<p>Template defaults for species traits and features that grant a special attack. Linked instances inherit these fields and override specifics inline.</p>"
+      const sa = entry.characteristics![0] as import("@/lib/compendium/characteristic-modifiers").SpecialAttackCharacteristic
+      sa.attackName = "Special Attack"
+      sa.attackProfile = "force_save"
+      sa.areaShape = "cone_or_line"
+      sa.areaLengthFeet = 15
+      sa.alternateAreaLengthFeet = 30
+      sa.damageTypes = []
+      sa.properties = []
+    }
+    entries.push(entry)
   }
 
   for (const option of ACTION_EFFECT_OPTIONS) {
+    if (EXCLUDED_ACTION_CATALOG_KINDS.has(option.value)) continue
     const groupMeta = ACTION_EFFECT_GROUPS.find((g) => g.id === option.group)
     entries.push({
       id: catalogId("fx", option.value),
@@ -118,13 +170,21 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       group: ACTION_EFFECT_GROUP[option.group] ?? "Active abilities",
       summary: groupMeta ? `${groupMeta.label} — ${option.label}` : option.label,
       activation: {
-        action: true,
         effects: [{ id: `fx_${option.value}`, kind: option.value }],
       },
     })
   }
 
   entries.push(...buildGrantFeatCatalogEntries())
+
+  entries.push({
+    id: catalogId("other", "gain_inspiration"),
+    name: "Gain Inspiration",
+    group: "Other",
+    summary: "Passive: gain Heroic Inspiration",
+    description:
+      "<p>The character gains Heroic Inspiration. Configure when inspiration is granted in the linked feature or trait description (e.g. after a long rest, or when rolling a natural 1 on a d20).</p>",
+  })
 
   return entries
 }
@@ -144,9 +204,23 @@ export function normalizeModifierCatalog(raw: unknown): ModifierCatalogEntry[] {
 
 export function mergeDefaultCatalogEntries(existing: ModifierCatalogEntry[]): ModifierCatalogEntry[] {
   const defaults = buildDefaultModifierCatalog()
-  const byId = new Map(existing.map((entry) => [entry.id, entry]))
+  const deprecatedGrantFeatIds = new Set(Object.values(LEGACY_GRANT_FEAT_CATALOG_IDS))
+  const filteredExisting = existing.filter(
+    (entry) => !(deprecatedGrantFeatIds.has(entry.id as (typeof LEGACY_GRANT_FEAT_CATALOG_IDS)[keyof typeof LEGACY_GRANT_FEAT_CATALOG_IDS]) && defaults.some((d) => d.id === GRANT_FEAT_CATALOG_ID)),
+  )
+  const byId = new Map(filteredExisting.map((entry) => [entry.id, entry]))
   for (const entry of defaults) {
-    if (!byId.has(entry.id)) byId.set(entry.id, entry)
+    const existing = byId.get(entry.id)
+    if (!existing) {
+      byId.set(entry.id, entry)
+    } else if (existing.group !== entry.group && entry.id.startsWith("cat_")) {
+      byId.set(entry.id, {
+        ...existing,
+        group: entry.group,
+        name: entry.name,
+        summary: entry.summary ?? existing.summary,
+      })
+    }
   }
   return [...byId.values()].sort((a, b) => {
     const groupCmp = String(a.group).localeCompare(String(b.group))
@@ -162,6 +236,10 @@ export function catalogEditorSectionId(section: string): string {
 
 /** Scroll margin so sticky headers do not cover section titles. */
 export const CATALOG_EDITOR_SECTION_CLASS = "scroll-mt-32"
+
+/** Distinct styling for catalog template-choice previews (not live compendium editors). */
+export const TEMPLATE_PREVIEW_SECTION_CLASS =
+  "rounded-xl border-2 border-dashed border-secondary/50 bg-secondary/5 p-4 space-y-3"
 
 export function groupModifierCatalogEntries(catalog: ModifierCatalogEntry[]): {
   group: string
@@ -195,7 +273,21 @@ export function catalogEntryById(
   catalog: ModifierCatalogEntry[],
   id: string,
 ): ModifierCatalogEntry | undefined {
-  return catalog.find((entry) => entry.id === id)
+  const aliases: Record<string, string> = {
+    cat_fx_buff_ally_roll: "cat_fx_modify_creature",
+    cat_fx_debuff_enemy_roll: "cat_fx_modify_creature",
+    cat_fx_modify_creature_roll: "cat_fx_modify_creature",
+    cat_fx_check_advantage: "cat_fx_check_roll_modifier",
+    cat_fx_check_bonus: "cat_fx_check_roll_modifier",
+    cat_fx_check_disadvantage: "cat_fx_check_roll_modifier",
+  }
+  const grantFeatAliases: Record<string, string> = {
+    [LEGACY_GRANT_FEAT_CATALOG_IDS.general]: GRANT_FEAT_CATALOG_ID,
+    [LEGACY_GRANT_FEAT_CATALOG_IDS.epicBoon]: GRANT_FEAT_CATALOG_ID,
+    [LEGACY_GRANT_FEAT_CATALOG_IDS.fightingStyle]: GRANT_FEAT_CATALOG_ID,
+  }
+  const resolvedId = aliases[id] ?? grantFeatAliases[id] ?? id
+  return catalog.find((entry) => entry.id === resolvedId)
 }
 
 export function resolveModifierRefIds(
@@ -234,7 +326,10 @@ export function summarizeModifierRefs(
 }
 
 export function isCommonModifiersCatalogAbility(row: { id?: string; is_system?: boolean | null }): boolean {
-  return row.id === COMMON_MODIFIERS_CATALOG_ID || row.is_system === true
+  return (
+    row.id != null &&
+    SYSTEM_MODIFIER_CATALOG_IDS.includes(row.id as (typeof SYSTEM_MODIFIER_CATALOG_IDS)[number])
+  )
 }
 
 export function buildCommonModifiersCatalogRow(): Record<string, unknown> {

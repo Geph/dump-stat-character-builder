@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { GameIconPicker } from "@/components/game-icon-picker"
 import { CompendiumThemeColorPicker } from "@/components/compendium/theme-color-picker"
 import { SourceLinkField } from "@/components/compendium/source-link-field"
+import { CardImageField } from "@/components/compendium/card-image-field"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
@@ -23,6 +24,8 @@ type CompendiumEditorHeaderRowProps = {
   onIconChange: (icon: string | null) => void
   accentColor?: CompendiumThemeColorId | null
   onAccentColorChange?: (color: CompendiumThemeColorId | null) => void
+  cardImageUrl?: string | null
+  onCardImageUrlChange?: (url: string | null) => void
   /** Optional field between name and source (e.g. parent class). */
   afterName?: ReactNode
 }
@@ -41,6 +44,8 @@ export function CompendiumEditorHeaderRow({
   onIconChange,
   accentColor = null,
   onAccentColorChange,
+  cardImageUrl = null,
+  onCardImageUrlChange,
   afterName,
 }: CompendiumEditorHeaderRowProps) {
   const gridCols = afterName
@@ -48,6 +53,7 @@ export function CompendiumEditorHeaderRow({
     : "grid-cols-1 md:grid-cols-3"
 
   return (
+    <div className="space-y-4">
     <div className="flex flex-col sm:flex-row gap-4 items-start">
       <div className="shrink-0 flex flex-col gap-3">
         <div className="flex flex-col">
@@ -89,6 +95,10 @@ export function CompendiumEditorHeaderRow({
           compact
         />
       </div>
+    </div>
+    {onCardImageUrlChange ? (
+      <CardImageField value={cardImageUrl} onChange={onCardImageUrlChange} />
+    ) : null}
     </div>
   )
 }

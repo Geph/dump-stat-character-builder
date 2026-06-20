@@ -15,6 +15,7 @@ import {
   stringifyPropertiesForDb,
 } from "@/lib/compendium/equipment-properties"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 
 const CATEGORIES = [
   "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
@@ -35,11 +36,7 @@ const DAMAGE_TYPES = [
   "Lightning", "Necrotic", "Poison", "Psychic", "Radiant", "Thunder"
 ]
 
-const WEAPON_PROPERTIES = [
-  "Ammunition", "Finesse", "Heavy", "Light", "Loading", "Range", "Reach", 
-  "Special", "Thrown", "Two-Handed", "Versatile"
-]
-
+import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
 const WEAPON_MASTERIES = [
   "Cleave", "Graze", "Nick", "Push", "Sap", "Slow", "Topple", "Vex"
 ]
@@ -64,6 +61,7 @@ interface EquipmentFormData {
   properties: string[]
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
 }
 
 const defaultEquipment: EquipmentFormData = {
@@ -84,6 +82,7 @@ const defaultEquipment: EquipmentFormData = {
   properties: [],
   icon: null,
   accent_color: null,
+  card_image_url: null,
 }
 
 export default function EquipmentEditorPage({ id }: { id: string }) {
@@ -94,6 +93,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
   const [customAbilities, setCustomAbilities] = useState<{ id: string; name: string }[]>([])
   const [rawProperties, setRawProperties] = useState<unknown>(null)
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("equipment", id)
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -146,6 +146,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             properties: propTags,
             icon: data.icon || null,
             accent_color: data.accent_color || null,
+            card_image_url: data.card_image_url || null,
           })
         }
         setLoading(false)
@@ -262,13 +263,15 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Equipment"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -286,6 +289,8 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

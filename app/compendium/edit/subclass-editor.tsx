@@ -17,6 +17,7 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 
@@ -32,6 +33,7 @@ interface SubclassFormData {
   creator_url: string
   icon: string | null
   accent_color: string | null
+  card_image_url: string | null
 }
 
 const defaultSubclass: SubclassFormData = {
@@ -44,6 +46,7 @@ const defaultSubclass: SubclassFormData = {
   creator_url: "",
   icon: null,
   accent_color: null,
+  card_image_url: null,
 }
 
 export default function SubclassEditorPage({ id }: { id: string }) {
@@ -56,6 +59,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
   const [hasSpellcasting, setHasSpellcasting] = useState(false)
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const router = useRouter()
+  const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("subclasses", id)
 
   // Fetch classes for dropdown
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             creator_url: data.creator_url || "",
             icon: data.icon || null,
             accent_color: data.accent_color || null,
+            card_image_url: data.card_image_url || null,
           })
           setHasSpellcasting(!!data.spellcasting)
         }
@@ -296,13 +301,15 @@ export default function SubclassEditorPage({ id }: { id: string }) {
         saving={saving}
         saveLabel="Save Subclass"
         onExport={handleExport}
+        onCopy={canCopy ? handleCopy : undefined}
+        copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {error && (
+        {(error || copyError) && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-            {error}
+            {error || copyError}
           </div>
         )}
 
@@ -320,6 +327,8 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
             afterName={
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
@@ -460,6 +469,10 @@ export default function SubclassEditorPage({ id }: { id: string }) {
                     index={index}
                     classResources={classResources}
                     modifierCatalog={modifierCatalog}
+                    siblingFeatures={form.features.map((feat) => ({
+                      name: feat.name,
+                      level: feat.level,
+                    }))}
                     onUpdate={updateFeature}
                     onToggleChoice={toggleFeatureChoice}
                     onUpdateChoiceField={updateFeatureChoiceField}

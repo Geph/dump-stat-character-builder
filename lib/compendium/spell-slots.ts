@@ -155,6 +155,30 @@ export function getSpellSlotTable(
   }
 }
 
+/** Build class-resource uses config for spell slot pools (full or half caster). */
+export function spellSlotResourceUsesForCasterType(
+  casterType: "full" | "half",
+): import("@/lib/types").UsesConfig {
+  const className = casterType === "full" ? "Wizard" : "Paladin"
+  const spellcasting = { type: "spellcasting" } as DndClass["spellcasting"]
+  const tiers: { level: number; count: number }[] = []
+  let lastTotal = -1
+  for (let level = 1; level <= 20; level++) {
+    const table = getSpellSlotTable(className, level, spellcasting)
+    const total = table?.slotsByLevel.reduce((sum, count) => sum + count, 0) ?? 0
+    if (total !== lastTotal) {
+      tiers.push({ level, count: total })
+      lastTotal = total
+    }
+  }
+  return {
+    type: "at_level",
+    atLevelMode: "tier",
+    recharges: [{ rest: "long_rest" }],
+    atLevelTable: tiers.length ? tiers : [{ level: 1, count: 0 }],
+  }
+}
+
 export function formatSpellSlotLevel(level: number): string {
   if (level === 1) return "1st"
   if (level === 2) return "2nd"

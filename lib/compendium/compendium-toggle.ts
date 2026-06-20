@@ -1,4 +1,5 @@
-import { isCommonModifiersCatalogAbility, COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
+import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
+import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
@@ -32,11 +33,15 @@ export function tableToContentType(table: CompendiumTable): CompendiumContentTyp
 
 /** System-owned rows that cannot be disabled or cleared with the rest of the section. */
 export function isProtectedSystemCompendiumItem(table: CompendiumTable, id: string): boolean {
-  return table === "custom_abilities" && id === COMMON_MODIFIERS_CATALOG_ID
+  if (table !== "custom_abilities") return false
+  return (
+    id === COMMON_MODIFIERS_CATALOG_ID ||
+    SYSTEM_OPTION_CATALOG_IDS.includes(id as (typeof SYSTEM_OPTION_CATALOG_IDS)[number])
+  )
 }
 
 export function isProtectedSystemCompendiumRow(row: { id?: string; is_system?: boolean | null }): boolean {
-  return isCommonModifiersCatalogAbility(row)
+  return isProtectedSystemCompendiumItem("custom_abilities", row.id ?? "")
 }
 
 function idsInclude(value: unknown, id: string): boolean {

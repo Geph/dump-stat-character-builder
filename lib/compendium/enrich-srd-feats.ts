@@ -19,8 +19,9 @@ export const FEAT_MODIFIER_CATALOG = {
   uses: "cat_char_uses",
   healSelf: "cat_fx_heal_self",
   riderDamage: "cat_fx_rider_damage",
-  checkAdvantage: "cat_fx_check_advantage",
-  checkBonus: "cat_fx_check_bonus",
+  checkAdvantage: "cat_fx_check_roll_modifier",
+  checkBonus: "cat_fx_check_roll_modifier",
+  checkRollModifier: "cat_fx_check_roll_modifier",
   extraAction: "cat_fx_extra_action",
   movementOption: "cat_fx_movement_option",
   selfBuffCaster: "cat_fx_self_buff_caster",
@@ -76,22 +77,26 @@ function usesInstance(
 }
 
 type FeatModifierPreset = {
-  linkedModifiers: LinkedModifierInstance[]
+  linkedModifiers?: LinkedModifierInstance[]
   repeatable?: boolean
+  isChoice?: boolean
+  choices?: import("@/lib/types").FeatureChoice
 }
 
 /** SRD feat name → common modifier presets (linked catalog entries with inline config). */
 export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   Alert: {
     linkedModifiers: [
-      charInstance("modinst_alert_initiative", FEAT_MODIFIER_CATALOG.initiative, [
-        {
-          id: modId("alert_initiative"),
-          type: "initiative",
-          mode: "add_proficiency",
-          label: "Add proficiency bonus to initiative",
-        },
-      ]),
+      fxInstance("modinst_alert_initiative", FEAT_MODIFIER_CATALOG.checkBonus, {
+        effects: [
+          {
+            id: modId("alert_initiative"),
+            kind: "check_bonus",
+            checkCategory: "initiative",
+            bonusConfig: { mode: "proficiency" },
+          },
+        ],
+      }),
     ],
   },
   "Magic Initiate": {
@@ -102,7 +107,13 @@ export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
           id: modId("magic_initiate_spells"),
           type: "spells_known",
           spells: [],
-          label: "2 cantrips + 1 level-1 spell (Cleric, Druid, or Wizard list)",
+          choiceGrants: [
+            { level: 0, count: 2 },
+            { level: 1, count: 1 },
+          ],
+          spellListClassOptions: ["Cleric", "Druid", "Wizard"],
+          playerPicksSpellList: true,
+          label: "Magic Initiate spells",
         },
       ]),
       charInstance("modinst_magic_initiate_ability", FEAT_MODIFIER_CATALOG.spellcastingAbility, [
@@ -136,7 +147,11 @@ export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
           id: modId("skilled_skills"),
           type: "skills",
           entries: [],
-          label: "Choose 3 skill proficiencies",
+          allowAnySkill: true,
+          choiceCount: 0,
+          sharedChoiceGroup: "skilled_proficiencies",
+          sharedChoiceCount: 3,
+          label: "Choose 3 skills or tools",
         },
       ]),
       charInstance("modinst_skilled_tools", FEAT_MODIFIER_CATALOG.toolProficiencies, [
@@ -144,7 +159,9 @@ export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
           id: modId("skilled_tools"),
           type: "tool_proficiencies",
           values: [],
-          label: "Or tool proficiencies (3 total skills/tools combined)",
+          choiceCount: 0,
+          sharedChoiceGroup: "skilled_proficiencies",
+          sharedChoiceCount: 3,
         },
       ]),
     ],
@@ -163,7 +180,6 @@ export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
             id: "fx_grappler_advantage",
             kind: "check_advantage",
             checkCategory: "attack",
-            grantAdvantage: true,
           },
         ],
       }),
@@ -341,15 +357,75 @@ function featHasLinkedModifiers(row: Record<string, unknown>): boolean {
   return Array.isArray(refs) && refs.length > 0
 }
 
+function featHasModifierConfig(row: Record<string, unknown>): boolean {
+  if (featHasLinkedModifiers(row)) return true
+  if (Boolean(row.is_choice ?? row.isChoice)) {
+    const choices = row.choices as { options?: unknown[] } | null | undefined
+    return Array.isArray(choices?.options) && choices.options.length > 0
+  }
+  return false
+}
+
+function isLegacySkilledRow(row: Record<string, unknown>): boolean {
+  if (String(row.name ?? "") !== "Skilled") return false
+  if (Boolean(row.is_choice ?? row.isChoice)) return true
+  const linked = (row.linkedModifiers ?? row.linked_modifiers) as LinkedModifierInstance[] | undefined
+  if (!Array.isArray(linked)) return false
+  return linked.some((item) =>
+    item.characteristics?.some(
+      (mod) =>
+        mod.type === "skills" &&
+        (mod as { choiceCount?: number }).choiceCount === 3 &&
+        !(mod as { sharedChoiceGroup?: string }).sharedChoiceGroup,
+    ),
+  )
+}
+
+function migrateSkilledRow(row: Record<string, unknown>, preset: FeatModifierPreset): Record<string, unknown> {
+  const linked = preset.linkedModifiers ?? []
+  return {
+    ...row,
+    is_choice: false,
+    isChoice: false,
+    choices: null,
+    linked_modifiers: linked,
+    linkedModifiers: linked,
+    modifier_refs: linked.map((instance) => instance.catalogRefId),
+    modifierRefs: linked.map((instance) => instance.catalogRefId),
+    benefits: row.benefits ?? null,
+    repeatable: row.repeatable ?? preset.repeatable ?? false,
+  }
+}
+
 /** Apply SRD common-modifier presets to a feat row when not already configured. */
 export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source)) return row
   const name = String(row.name ?? "")
   const preset = SRD_FEAT_MODIFIER_PRESETS[name]
   if (!preset) return row
-  if (featHasLinkedModifiers(row)) return row
 
-  const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers })
+  if (name === "Skilled" && isLegacySkilledRow(row) && preset.linkedModifiers) {
+    return migrateSkilledRow(row, preset)
+  }
+
+  if (featHasModifierConfig(row)) return row
+
+  if (preset.isChoice && preset.choices) {
+    return {
+      ...row,
+      is_choice: true,
+      isChoice: true,
+      choices: preset.choices,
+      linked_modifiers: [],
+      linkedModifiers: [],
+      modifier_refs: [],
+      modifierRefs: [],
+      benefits: row.benefits ?? null,
+      repeatable: row.repeatable ?? preset.repeatable ?? false,
+    }
+  }
+
+  const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
   return {
     ...row,
     linked_modifiers: synced.linkedModifiers,
