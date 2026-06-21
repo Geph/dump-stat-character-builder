@@ -62,7 +62,7 @@ Examples: `feature/compendium-card-images`, `fix/builder-feat-slots`, `chore/ci-
 
 ### SRD and rules accuracy
 
-Changes that affect D&D 5.5e / SRD rules accuracy (class features, species traits, spell data, builder calculations, etc.) should cite the source in the PR description — for example the [SRD on D&D Beyond](https://www.dndbeyond.com/srd) section or page reference you used. Seed data is rebuilt from official SRD markdown via `pnpm srd:build`; see [lib/srd/README.md](lib/srd/README.md).
+Changes that affect SRD / 5E rules accuracy (class features, species traits, spell data, builder calculations, etc.) should cite the source in the PR description — for example the [SRD on D&D Beyond](https://www.dndbeyond.com/srd) section or page reference you used. Seed data is rebuilt from SRD 5.2.1 markdown via `pnpm srd:build`; see [lib/srd/README.md](lib/srd/README.md).
 
 ## Where changes belong
 

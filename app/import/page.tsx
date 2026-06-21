@@ -3,7 +3,12 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
+import { ImportReportPanel } from "@/components/import/import-report-panel"
+import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
+import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
+import { ImportStagingPanel } from "@/components/import/import-staging-panel"
 import { MainNav } from "@/components/main-nav"
+import { SiteFooter } from "@/components/site-footer"
 import {
   canUseServerImport,
   getStorageLabel,
@@ -24,8 +29,20 @@ import {
   ClipboardPaste,
   Info,
 } from "lucide-react"
+import type { ImportReport } from "@/lib/import/build-import-report"
+import type { ImportContent } from "@/lib/import/content-schema"
+import type {
+  ImportProposalSelections,
+  ImportProposalSet,
+} from "@/lib/import/import-proposals"
+import {
+  defaultRenameMap,
+  type ImportCollision,
+  type ImportRenameMap,
+} from "@/lib/import/import-collisions"
+import type { ImportStage } from "@/lib/import/import-staging"
 
-type ImportStatus = "idle" | "uploading" | "processing" | "success" | "error"
+type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
 type ImportTab = "clipboard" | "pdf" | "web" | "pack"
 
 const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
@@ -61,14 +78,103 @@ export default function ImportPage() {
   const [packStatus, setPackStatus] = useState<ImportStatus>("idle")
   const [packFile, setPackFile] = useState<File | null>(null)
   const [message, setMessage] = useState("")
+  const [importReport, setImportReport] = useState<ImportReport | null>(null)
+  const [pendingImport, setPendingImport] = useState<{
+    content: ImportContent
+    proposals: ImportProposalSet
+    previewSummary: string
+    source: "pdf" | "text"
+    collisions: ImportCollision[]
+    stages: ImportStage[]
+    stagingSummary: string
+  } | null>(null)
+  const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
+  const [confirmingImport, setConfirmingImport] = useState(false)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
+
+  const clearPendingImport = () => {
+    setPendingImport(null)
+    setRenameMap({})
+    setPdfStatus("idle")
+    setTextStatus("idle")
+  }
+
+  const applyImportSuccess = (
+    data: {
+      report?: ImportReport
+      breakdown?: Record<string, number>
+      count?: number
+      pagesParsed?: { from?: number; to?: number; total?: number }
+    },
+    setStatus: (status: ImportStatus) => void,
+  ) => {
+    setStatus("success")
+    setPendingImport(null)
+    setImportReport(data.report ?? null)
+    const breakdownText = data.breakdown
+      ? Object.entries(data.breakdown)
+          .filter(([, count]) => (count as number) > 0)
+          .map(([type, count]) => `${count} ${type}`)
+          .join(", ")
+      : ""
+    const pagesText = data.pagesParsed?.from
+      ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
+      : ""
+    setMessage(
+      data.report?.headline ??
+        `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`,
+    )
+  }
+
+  const handleConfirmImport = async (selections: ImportProposalSelections) => {
+    if (!pendingImport) return
+
+    setConfirmingImport(true)
+    setMessage("")
+    setImportReport(null)
+
+    try {
+      const response = await fetch("/api/import/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmImport: true,
+          pendingContent: pendingImport.content,
+          proposalSelections: selections,
+          renameMap,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        if (pendingImport.source === "pdf") {
+          applyImportSuccess(data, setPdfStatus)
+        } else {
+          applyImportSuccess(data, setTextStatus)
+        }
+      } else {
+        if (pendingImport.source === "pdf") setPdfStatus("error")
+        else setTextStatus("error")
+        setMessage(data.error || "Failed to complete import")
+      }
+    } catch (err) {
+      if (pendingImport.source === "pdf") setPdfStatus("error")
+      else setTextStatus("error")
+      setMessage(err instanceof Error ? err.message : "Failed to complete import.")
+    } finally {
+      setConfirmingImport(false)
+    }
+  }
 
   const handlePdfUpload = async () => {
     if (!pdfFile) return
 
     setPdfStatus("uploading")
     setMessage("")
+    setImportReport(null)
+    setPendingImport(null)
 
     if (pdfPageScope === "range") {
       const start = parseInt(pdfPageStart, 10)
@@ -113,19 +219,23 @@ export default function ImportPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setPdfStatus("success")
-        const breakdownText = data.breakdown
-          ? Object.entries(data.breakdown)
-              .filter(([, count]) => (count as number) > 0)
-              .map(([type, count]) => `${count} ${type}`)
-              .join(", ")
-          : ""
-        const pagesText = data.pagesParsed?.from
-          ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
-          : ""
-        setMessage(
-          `Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`,
-        )
+        if (data.needsConfirmation) {
+          setPdfStatus("review")
+          const collisions = (data.collisions ?? []) as ImportCollision[]
+          setRenameMap(defaultRenameMap(collisions))
+          setPendingImport({
+            content: data.pendingContent,
+            proposals: data.proposals,
+            previewSummary: data.previewSummary ?? "",
+            source: "pdf",
+            collisions,
+            stages: (data.stages ?? []) as ImportStage[],
+            stagingSummary: data.stagingSummary ?? "",
+          })
+          setMessage("Review this import before writing to the compendium.")
+          return
+        }
+        applyImportSuccess(data, setPdfStatus)
       } else {
         setPdfStatus("error")
         setMessage(data.error || "Failed to import file")
@@ -141,6 +251,8 @@ export default function ImportPage() {
 
     setTextStatus("processing")
     setMessage("")
+    setImportReport(null)
+    setPendingImport(null)
 
     try {
       const response = await fetch("/api/import/text", {
@@ -155,16 +267,23 @@ export default function ImportPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setTextStatus("success")
-        const breakdownText = data.breakdown
-          ? Object.entries(data.breakdown)
-              .filter(([, count]) => (count as number) > 0)
-              .map(([type, count]) => `${count} ${type}`)
-              .join(", ")
-          : ""
-        setMessage(
-          `Successfully imported ${data.count} items${breakdownText ? `: ${breakdownText}` : ""}`,
-        )
+        if (data.needsConfirmation) {
+          setTextStatus("review")
+          const collisions = (data.collisions ?? []) as ImportCollision[]
+          setRenameMap(defaultRenameMap(collisions))
+          setPendingImport({
+            content: data.pendingContent,
+            proposals: data.proposals,
+            previewSummary: data.previewSummary ?? "",
+            source: "text",
+            collisions,
+            stages: (data.stages ?? []) as ImportStage[],
+            stagingSummary: data.stagingSummary ?? "",
+          })
+          setMessage("Review this import before writing to the compendium.")
+          return
+        }
+        applyImportSuccess(data, setTextStatus)
       } else {
         setTextStatus("error")
         setMessage(data.error || "Failed to import text")
@@ -283,6 +402,8 @@ export default function ImportPage() {
       case "processing":
       case "uploading":
         return <Loader2 className="w-5 h-5 animate-spin" />
+      case "review":
+        return <Info className="w-5 h-5 text-primary" />
       case "success":
         return <CheckCircle className="w-5 h-5 text-success" />
       case "error":
@@ -299,9 +420,11 @@ export default function ImportPage() {
     textStatus === "success" ||
     packStatus === "success"
 
+  const isReviewMessage = pdfStatus === "review" || textStatus === "review"
+
   const SRD_SEED_DESCRIPTION = staticMode
     ? "Load or reset the bundled SRD 5.2.1 into browser storage (IndexedDB). First visit auto-seeds; use this button to reload after clearing data."
-    : "Populate your database with the full official SRD 5.2.1: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
+    : "Populate your database with bundled SRD 5.2.1 content: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
 
   return (
     <div id="import-root" className="min-h-screen bg-background">
@@ -323,7 +446,7 @@ export default function ImportPage() {
                   ? "Seeding..."
                   : staticMode
                     ? "Load bundled SRD"
-                    : "Seed D&D 5.5e SRD Content"}
+                    : "Seed SRD 5.2.1 Content"}
               </span>
               <span className="sm:hidden">
                 {seedStatus === "processing" ? "Seeding..." : staticMode ? "Load SRD" : "Seed SRD"}
@@ -374,17 +497,48 @@ export default function ImportPage() {
           )}
         </div>
 
-        {message && (
+        {message && !importReport && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             className={`p-4 rounded-xl mb-6 ${
               isSuccessMessage
                 ? "bg-success/10 text-success border border-success/20"
-                : "bg-destructive/10 text-destructive border border-destructive/20"
+                : isReviewMessage
+                  ? "bg-primary/10 text-foreground border border-primary/20"
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}
           >
             {message}
+          </motion.div>
+        )}
+
+        {pendingImport && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-4">
+            {pendingImport.stagingSummary ? (
+              <ImportStagingPanel
+                stages={pendingImport.stages}
+                summary={pendingImport.stagingSummary}
+              />
+            ) : null}
+            <ImportCollisionPanel
+              collisions={pendingImport.collisions}
+              value={renameMap}
+              onChange={setRenameMap}
+            />
+            <ImportProposalPanel
+              proposals={pendingImport.proposals}
+              previewSummary={pendingImport.previewSummary}
+              confirming={confirmingImport}
+              onConfirm={handleConfirmImport}
+              onCancel={clearPendingImport}
+            />
+          </motion.div>
+        )}
+
+        {importReport && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+            <ImportReportPanel report={importReport} />
           </motion.div>
         )}
 
@@ -548,7 +702,7 @@ export default function ImportPage() {
                         <li>Optional: override model with IMPORT_AI_MODEL (e.g. gpt-4o-mini)</li>
                         <li>Extracts classes, species, spells, feats, equipment, and more</li>
                         <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
-                        <li>Large PDFs are truncated to 50,000 characters for processing</li>
+                        <li>Large PDFs are processed in multiple sections automatically (no 50k truncation)</li>
                         <li>Optionally import only a specific page range (e.g. pages 12–24)</li>
                       </ul>
                     </div>
@@ -731,6 +885,7 @@ export default function ImportPage() {
           </div>
         </motion.div>
       </main>
+      <SiteFooter />
     </div>
   )
 }

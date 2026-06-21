@@ -1,4 +1,4 @@
-/** Source label stored on compendium rows seeded from the official SRD. */
+/** Source label stored on compendium rows seeded from SRD 5.2.1. */
 export const SRD_SOURCE = "D&D 5.5e SRD"
 
 export const SRD_CREATOR_URL = "https://www.dndbeyond.com/srd"

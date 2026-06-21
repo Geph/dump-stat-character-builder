@@ -1,8 +1,9 @@
 "use client"
 
-import { Check, Coins } from "lucide-react"
+import { Coins } from "lucide-react"
 import type { StartingEquipmentOption } from "@/lib/types"
 import { isGoldOnlyOption } from "@/lib/builder/equipment-utils"
+import { STARTING_EQUIPMENT_CARD_IMAGES } from "@/lib/site-images"
 import { cn } from "@/lib/utils"
 
 type StartingEquipmentPackagePickerProps = {
@@ -19,7 +20,7 @@ type StartingEquipmentPackagePickerProps = {
 export function StartingEquipmentPackagePicker({
   title,
   description,
-  options,
+  options = [],
   selectedIndex,
   startingGold,
   onSelect,
@@ -43,9 +44,10 @@ export function StartingEquipmentPackagePicker({
           const goldOnly = isGoldOnlyOption(option, startingGold)
           const side =
             imageSide === "alternate" ? (index % 2 === 0 ? "left" : "right") : imageSide
-          const gpInPackage = option.items.find(
-            (item) => item.name.toLowerCase() === "gold pieces",
-          )
+          const optionItems = option.items ?? []
+          const edgeImage = goldOnly
+            ? STARTING_EQUIPMENT_CARD_IMAGES.gold
+            : STARTING_EQUIPMENT_CARD_IMAGES.gear
 
           return (
             <button
@@ -61,19 +63,26 @@ export function StartingEquipmentPackagePicker({
             >
               <div
                 className={cn(
-                  "absolute left-1/2 top-0 z-20 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 bg-card transition-colors",
-                  selected
-                    ? "border-primary bg-destructive text-white"
-                    : "border-border bg-muted text-transparent group-hover:border-primary/50",
+                  "relative w-[45%] shrink-0 overflow-hidden bg-muted/20",
+                  side === "right" ? "order-2" : "order-1",
                 )}
+                aria-hidden
               >
-                {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={edgeImage}
+                  alt=""
+                  className={cn(
+                    "h-full w-full object-cover",
+                    side === "right" ? "object-right" : "object-left",
+                  )}
+                />
               </div>
 
               <div
                 className={cn(
-                  "relative z-10 flex flex-1 flex-col justify-center gap-2 p-4 pt-5",
-                  side === "right" ? "order-1 pr-28" : "pl-28",
+                  "flex min-w-0 flex-1 flex-col justify-center gap-2 p-4",
+                  side === "right" ? "order-1" : "order-2",
                 )}
               >
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
@@ -88,7 +97,7 @@ export function StartingEquipmentPackagePicker({
                   </div>
                 ) : (
                   <ul className="space-y-0.5">
-                    {option.items.map((item, ii) => {
+                    {optionItems.map((item, ii) => {
                       const isGp = item.name.toLowerCase() === "gold pieces"
                       return (
                         <li
@@ -116,18 +125,6 @@ export function StartingEquipmentPackagePicker({
                     Buy equipment from the list below with your starting gold.
                   </p>
                 )}
-              </div>
-
-              <div
-                className={cn(
-                  "absolute bottom-0 top-0 w-24 bg-gradient-to-br from-muted/80 via-primary/20 to-muted/40 opacity-80",
-                  side === "right" ? "right-0" : "left-0",
-                )}
-                aria-hidden
-              >
-                <div className="flex h-full items-center justify-center text-4xl opacity-30">
-                  {goldOnly ? "💰" : "🎒"}
-                </div>
               </div>
             </button>
           )

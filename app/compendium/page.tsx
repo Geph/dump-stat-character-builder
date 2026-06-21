@@ -48,7 +48,7 @@ import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
-import { getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
+import { getCompendiumCardImageUrl, CLASS_CARD_ASPECT_CLASS } from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
@@ -61,6 +61,7 @@ import {
 } from "@/lib/compendium/system-option-catalogs"
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 type ContentType = CompendiumContentType
 
@@ -591,9 +592,13 @@ function CompendiumPageContent() {
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
         {cardImage ? (
-          <div className="relative h-32 w-full">
+          <div className={cn("relative w-full shrink-0 overflow-hidden", CLASS_CARD_ASPECT_CLASS)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cardImage} alt="" className="h-full w-full object-cover object-top" />
+            <img
+              src={cardImage}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
           </div>
         ) : null}
@@ -1286,6 +1291,9 @@ function CompendiumPageContent() {
         <CompendiumDetailOverlay
           open
           onClose={() => setSelectedItem(null)}
+          imageAspect={
+            activeTab === "classes" || activeTab === "subclasses" ? "3/4" : "21/9"
+          }
           item={
             activeTab === "class_resources"
               ? {

@@ -209,13 +209,15 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
     },
     {
       featureName: "Indomitable",
+      resourceKey: "indomitable",
       activation: { reaction: true },
       linkedModifiers: [
         modInstance("modinst_indomitable", CLASS_RESOURCE_FX_CATALOG.checkBonus, [
           fx("fx_indomitable", {
-            kind: "check_bonus",
+            kind: "check_roll_modifier",
             checkCategory: "save",
-            bonusConfig: defaultRollBonusConfig("fixed"),
+            checkRollMode: "replace_failure",
+            label: "When you fail a saving throw, you can choose to succeed instead",
           }),
         ]),
       ],
@@ -360,6 +362,31 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
     linkedModifiers: [
       modInstance("modinst_lands_aid", CLASS_RESOURCE_FX_CATALOG.forceSaveControl, [
         fx("fx_lands_aid", { kind: "force_save_control" }),
+      ]),
+    ],
+  },
+  {
+    parentClass: "Druid",
+    featureName: "Titan Form",
+    resourceKey: "wild_shape",
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      modInstance("modinst_titan_form", CLASS_RESOURCE_FX_CATALOG.transform, [
+        fx("fx_titan_form", { kind: "transform", label: "Titan Form" }),
+      ]),
+    ],
+  },
+  {
+    parentClass: "Sorcerer",
+    featureName: "Abyssal Rupture",
+    resourceKey: "innate_sorcery",
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      modInstance("modinst_abyssal_rupture", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
+        fx("fx_abyssal_rupture", {
+          kind: "self_buff_caster",
+          casterBuffLabel: "Abyssal Rupture (extends Innate Sorcery)",
+        }),
       ]),
     ],
   },

@@ -1490,6 +1490,7 @@ function CheckRollModifierEditor({
           <option value="bonus">Bonus</option>
           <option value="advantage">Advantage</option>
           <option value="disadvantage">Disadvantage</option>
+          <option value="replace_failure">Replace failed save (auto-success)</option>
         </select>
       </div>
 

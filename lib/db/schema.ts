@@ -180,6 +180,10 @@ export const characters = mysqlTable("characters", {
   experience: int("experience").notNull().default(0),
   class_id: char("class_id", { length: 36 }),
   subclass_id: char("subclass_id", { length: 36 }),
+  character_classes: json("character_classes").$type<
+    import("@/lib/character/character-classes").CharacterClassRow[]
+  >(),
+  class_add_order: json("class_add_order").$type<string[]>(),
   species_id: char("species_id", { length: 36 }),
   background_id: char("background_id", { length: 36 }),
   strength: int("strength").notNull().default(10),
@@ -211,6 +215,7 @@ export const characters = mysqlTable("characters", {
   armor_proficiencies: json("armor_proficiencies").$type<string[]>(),
   languages: json("languages").$type<string[]>(),
   equipment_ids: json("equipment_ids").$type<string[]>().default([]),
+  gold: int("gold").notNull().default(0),
   equipped_armor_id: char("equipped_armor_id", { length: 36 }),
   equipped_shield_id: char("equipped_shield_id", { length: 36 }),
   equipped_weapon_id: char("equipped_weapon_id", { length: 36 }),
@@ -220,6 +225,16 @@ export const characters = mysqlTable("characters", {
   modifier_player_picks: json("modifier_player_picks").$type<Record<string, string[]>>(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export const characterClasses = mysqlTable("character_classes", {
+  id: id(),
+  character_id: char("character_id", { length: 36 }).notNull(),
+  class_id: char("class_id", { length: 36 }).notNull(),
+  level: int("level").notNull().default(1),
+  subclass_id: char("subclass_id", { length: 36 }),
+  sort_order: int("sort_order").notNull().default(0),
+  created_at: timestamp("created_at").defaultNow().notNull(),
 })
 
 export const tableMap = {

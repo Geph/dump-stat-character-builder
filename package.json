@@ -16,7 +16,9 @@
     "srd:build": "node scripts/build-srd-seed.mjs",
     "version:bump": "node scripts/bump-version.mjs",
     "push": "node scripts/git-push.mjs Cursor",
-    "check:mysql": "node scripts/check-no-supabase.mjs"
+    "check:mysql": "node scripts/check-no-supabase.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.66",
@@ -86,6 +88,7 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "vitest": "^3.2.4"
   }
 }

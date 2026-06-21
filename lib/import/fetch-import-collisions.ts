@@ -1,0 +1,50 @@
+import { listRows } from "@/lib/db/repository"
+import {
+  buildImportCollisions,
+  type ImportCollision,
+  type ImportCollisionKind,
+} from "@/lib/import/import-collisions"
+import type { ImportContent } from "@/lib/import/content-schema"
+
+const COLLISION_TABLES: ImportCollisionKind[] = [
+  "class",
+  "feat",
+  "species",
+  "spell",
+  "background",
+  "ability",
+]
+
+const TABLE_BY_KIND: Record<ImportCollisionKind, "classes" | "feats" | "species" | "spells" | "backgrounds" | "abilities"> = {
+  class: "classes",
+  feat: "feats",
+  species: "species",
+  spell: "spells",
+  background: "backgrounds",
+  ability: "abilities",
+}
+
+/** Load compendium names for import collision detection. */
+export async function fetchExistingForImportCollisions(): Promise<
+  Partial<Record<ImportCollisionKind, { name: string; source?: string | null }[]>>
+> {
+  const result: Partial<Record<ImportCollisionKind, { name: string; source?: string | null }[]>> = {}
+
+  await Promise.all(
+    COLLISION_TABLES.map(async (kind) => {
+      const table = TABLE_BY_KIND[kind]
+      const rows = (await listRows(table)) as { name: string; source?: string | null }[]
+      result[kind] = rows.map((row) => ({
+        name: row.name,
+        source: row.source ?? null,
+      }))
+    }),
+  )
+
+  return result
+}
+
+export async function detectImportCollisions(content: ImportContent): Promise<ImportCollision[]> {
+  const existingByKind = await fetchExistingForImportCollisions()
+  return buildImportCollisions(content, existingByKind)
+}

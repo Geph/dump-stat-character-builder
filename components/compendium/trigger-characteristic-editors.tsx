@@ -13,6 +13,11 @@ import {
   type FeatureOptionPickerCharacteristic,
   type FeatureOptionPickerOption,
   type ResourceAbilityMenuOption,
+  type D20TestReactionCharacteristic,
+  type DamageHalvingReactionCharacteristic,
+  type HealingDicePoolCharacteristic,
+  type OnCreatureDeathTriggerCharacteristic,
+  type TelepathyCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { NestedModifierEffectEditor } from "@/components/compendium/nested-modifier-effect-editor"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -120,6 +125,23 @@ export function SavingThrowTriggerEditor({
         />
         <span className="text-muted-foreground">Uses your Reaction</span>
       </label>
+      <div>
+        <label className="block text-xs font-semibold text-foreground mb-1">Replace failed roll with (optional)</label>
+        <input
+          type="number"
+          min={1}
+          max={30}
+          value={mod.replaceFailedRollWith ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...mod,
+              replaceFailedRollWith: e.target.value ? parseInt(e.target.value, 10) : null,
+            })
+          }
+          placeholder="e.g. 20 for Bend Reality"
+          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
       <NestedModifierEffectEditor
         value={mod.effect}
         onChange={(effect) => onChange({ ...mod, effect })}
@@ -182,7 +204,20 @@ export function FailedRollTriggerEditor({
 }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">Trigger when</label>
+          <select
+            value={mod.triggerOn ?? "fail"}
+            onChange={(e) =>
+              onChange({ ...mod, triggerOn: e.target.value as FailedRollTriggerCharacteristic["triggerOn"] })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="fail">Roll fails</option>
+            <option value="success">Roll succeeds</option>
+          </select>
+        </div>
         <select
           value={mod.rollKind}
           onChange={(e) =>
@@ -207,6 +242,24 @@ export function FailedRollTriggerEditor({
           ))}
         </select>
       </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.useReaction}
+          onChange={(e) => onChange({ ...mod, useReaction: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Uses your Reaction</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.refundResourceOnStillFailed}
+          onChange={(e) => onChange({ ...mod, refundResourceOnStillFailed: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Refund spent resource if roll still fails (Peerless Skill)</span>
+      </label>
       <NestedModifierEffectEditor
         value={mod.effect}
         onChange={(effect) => onChange({ ...mod, effect })}
@@ -297,6 +350,15 @@ export function SpellHealingModifierEditor({
           className="accent-primary"
         />
         <span className="text-muted-foreground">Maximize healing dice</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.maximizeOnlyAtZeroHp}
+          onChange={(e) => onChange({ ...mod, maximizeOnlyAtZeroHp: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Maximize only when target is at 0 HP (Return to Life)</span>
       </label>
     </div>
   )
@@ -457,6 +519,206 @@ export function ExtraTurnEditor({
         onChange={(e) => onChange({ ...mod, turnCount: parseInt(e.target.value, 10) || 1 })}
         className="w-16 px-2 py-1 bg-background border border-border rounded text-sm"
       />
+    </div>
+  )
+}
+
+export function D20TestReactionEditor({
+  mod,
+  onChange,
+  modifierCatalog,
+  classResources = [],
+}: {
+  mod: D20TestReactionCharacteristic
+  onChange: (next: D20TestReactionCharacteristic) => void
+  modifierCatalog: ModifierCatalogEntry[]
+  classResources?: ClassResource[]
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <select
+          value={mod.modifierMode}
+          onChange={(e) =>
+            onChange({ ...mod, modifierMode: e.target.value as D20TestReactionCharacteristic["modifierMode"] })
+          }
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        >
+          <option value="add">Add to roll</option>
+          <option value="subtract">Subtract from roll</option>
+        </select>
+        <select
+          value={mod.targetScope}
+          onChange={(e) =>
+            onChange({ ...mod, targetScope: e.target.value as D20TestReactionCharacteristic["targetScope"] })
+          }
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        >
+          {SAVING_THROW_TARGET_SCOPES.map((scope) => (
+            <option key={scope.value} value={scope.value}>{scope.label}</option>
+          ))}
+        </select>
+        <input
+          type="number"
+          min={0}
+          value={mod.rangeFeet ?? ""}
+          onChange={(e) => onChange({ ...mod, rangeFeet: e.target.value ? parseInt(e.target.value, 10) : null })}
+          placeholder="Range (ft.)"
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.useReaction}
+          onChange={(e) => onChange({ ...mod, useReaction: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Uses your Reaction</span>
+      </label>
+      <NestedModifierEffectEditor
+        value={mod.effect}
+        onChange={(effect) => onChange({ ...mod, effect })}
+        modifierCatalog={modifierCatalog}
+        classResources={classResources}
+      />
+    </div>
+  )
+}
+
+export function DamageHalvingReactionEditor({
+  mod,
+  onChange,
+}: {
+  mod: DamageHalvingReactionCharacteristic
+  onChange: (next: DamageHalvingReactionCharacteristic) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.cancelCritRiders}
+          onChange={(e) => onChange({ ...mod, cancelCritRiders: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Cancel critical hit rider effects</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.requiresPriorDisadvantage}
+          onChange={(e) => onChange({ ...mod, requiresPriorDisadvantage: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Only vs. creature you imposed disadvantage on</span>
+      </label>
+    </div>
+  )
+}
+
+export function HealingDicePoolEditor({
+  mod,
+  onChange,
+}: {
+  mod: HealingDicePoolCharacteristic
+  onChange: (next: HealingDicePoolCharacteristic) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          value={mod.dieType}
+          onChange={(e) => onChange({ ...mod, dieType: e.target.value as HealingDicePoolCharacteristic["dieType"] })}
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        >
+          {["d4", "d6", "d8", "d10", "d12", "d20"].map((die) => (
+            <option key={die} value={die}>{die}</option>
+          ))}
+        </select>
+        <input
+          type="number"
+          min={0}
+          value={mod.poolSize ?? ""}
+          onChange={(e) => onChange({ ...mod, poolSize: e.target.value ? parseInt(e.target.value, 10) : null })}
+          placeholder="Pool size (dice)"
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
+    </div>
+  )
+}
+
+export function OnCreatureDeathTriggerEditor({
+  mod,
+  onChange,
+  modifierCatalog,
+  classResources = [],
+}: {
+  mod: OnCreatureDeathTriggerCharacteristic
+  onChange: (next: OnCreatureDeathTriggerCharacteristic) => void
+  modifierCatalog: ModifierCatalogEntry[]
+  classResources?: ClassResource[]
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <select
+          value={mod.creatureFilter}
+          onChange={(e) =>
+            onChange({ ...mod, creatureFilter: e.target.value as OnCreatureDeathTriggerCharacteristic["creatureFilter"] })
+          }
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        >
+          <option value="enemy">Enemy dies</option>
+          <option value="ally">Ally dies</option>
+          <option value="any">Any creature dies</option>
+        </select>
+        <input
+          type="number"
+          min={0}
+          value={mod.rangeFeet}
+          onChange={(e) => onChange({ ...mod, rangeFeet: parseInt(e.target.value, 10) || 0 })}
+          placeholder="Range (ft.)"
+          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
+      <NestedModifierEffectEditor
+        value={mod.effect}
+        onChange={(effect) => onChange({ ...mod, effect })}
+        modifierCatalog={modifierCatalog}
+        classResources={classResources}
+      />
+    </div>
+  )
+}
+
+export function TelepathyEditor({
+  mod,
+  onChange,
+}: {
+  mod: TelepathyCharacteristic
+  onChange: (next: TelepathyCharacteristic) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <input
+        type="number"
+        min={0}
+        value={mod.rangeFeet}
+        onChange={(e) => onChange({ ...mod, rangeFeet: parseInt(e.target.value, 10) || 0 })}
+        placeholder="Range (ft.)"
+        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+      />
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={mod.canInitiate !== false}
+          onChange={(e) => onChange({ ...mod, canInitiate: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Can initiate telepathic contact</span>
+      </label>
     </div>
   )
 }

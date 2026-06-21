@@ -15,6 +15,7 @@ const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 const REST_TYPES: { rest: RestType; label: string }[] = [
   { rest: "short_rest", label: "Short Rest" },
   { rest: "long_rest", label: "Long Rest" },
+  { rest: "initiative", label: "Initiative" },
 ]
 
 type UsesConfigEditorProps = {
@@ -338,6 +339,68 @@ export function UsesConfigEditor({
       {value.type !== "unlimited" && value.type !== "class_resource" && value.type !== "special" && (
         <div className="space-y-4 pt-2 border-t border-border">
           <RechargeRulesEditor value={value} onChange={onChange} />
+          <div className="rounded-lg border border-border bg-card/40 p-3 space-y-3">
+            <label className="block text-sm font-semibold text-foreground">Initiative recharge</label>
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value.rechargeOnInitiative != null && value.rechargeOnInitiative !== false}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    rechargeOnInitiative: e.target.checked ? true : undefined,
+                  })
+                }
+                className="accent-primary"
+              />
+              Gain uses when rolling initiative
+            </label>
+            {value.rechargeOnInitiative != null && value.rechargeOnInitiative !== false ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={typeof value.rechargeOnInitiative === "number" ? value.rechargeOnInitiative : ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      rechargeOnInitiative: e.target.value
+                        ? parseInt(e.target.value, 10)
+                        : true,
+                    })
+                  }
+                  placeholder="All uses"
+                  className="w-28 px-3 py-2 bg-background border-2 border-border rounded-xl text-sm text-foreground focus:outline-none focus:border-primary"
+                />
+                <span className="text-xs text-muted-foreground">
+                  uses restored (empty = full pool)
+                </span>
+              </div>
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Free use after level
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={value.freeUseAfterLevel ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  freeUseAfterLevel: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                })
+              }
+              placeholder="None"
+              className="w-28 px-3 py-2 bg-background border-2 border-border rounded-xl text-sm text-foreground focus:outline-none focus:border-primary"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              At this level and above, activations do not consume uses (e.g. free exploits).
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Resource Die Count</label>

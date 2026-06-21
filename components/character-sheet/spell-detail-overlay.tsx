@@ -11,6 +11,7 @@ import {
   willReplaceConcentration,
 } from "@/lib/compendium/spell-slots"
 import { rollD20, d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
+import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 
 type SpellDetailOverlayProps = {
   spell: Spell
@@ -35,6 +36,7 @@ export function SpellDetailOverlay({
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
+  const history = useSheetRollHistory()
   const needsAttack = spellRequiresAttack(spell.description)
   const isCantrip = spell.level === 0
 
@@ -54,9 +56,14 @@ export function SpellDetailOverlay({
 
     if (needsAttack && spellAttackMod != null) {
       result.attackRoll = rollD20(spellAttackMod)
-      feedbackParts.push(
-        `Attack: ${result.attackRoll.natural} + ${spellAttackMod >= 0 ? spellAttackMod : `(${spellAttackMod})`} = ${result.attackRoll.total}${d20CriticalSuffix(result.attackRoll.natural)}`,
-      )
+      const attackSummary = `${result.attackRoll.natural}${spellAttackMod >= 0 ? ` + ${spellAttackMod}` : ` − ${Math.abs(spellAttackMod)}`} = ${result.attackRoll.total}${d20CriticalSuffix(result.attackRoll.natural)}`
+      feedbackParts.push(`Attack: ${attackSummary}`)
+      history?.logRoll({
+        kind: "spell",
+        label: `${spell.name} attack`,
+        summary: attackSummary,
+        natural: result.attackRoll.natural,
+      })
     }
     if (spell.concentration) {
       result.concentrationApplied = concentrationConditionName(spell.name)

@@ -26,6 +26,14 @@ const SPELL_HEALING_MODIFIER_CATALOG_ID = "cat_char_spell_healing_modifier"
 const RESOURCE_ABILITY_MENU_CATALOG_ID = "cat_char_resource_ability_menu"
 const EXTRA_TURN_CATALOG_ID = "cat_char_extra_turn"
 const SELF_BUFF_CASTER_CATALOG_ID = "cat_fx_self_buff_caster"
+const D20_TEST_REACTION_CATALOG_ID = "cat_char_d20_test_reaction"
+const DAMAGE_HALVING_REACTION_CATALOG_ID = "cat_char_damage_halving_reaction"
+const HEALING_DICE_POOL_CATALOG_ID = "cat_char_healing_dice_pool"
+const ON_CREATURE_DEATH_TRIGGER_CATALOG_ID = "cat_char_on_creature_death_trigger"
+const TELEPATHY_CATALOG_ID = "cat_char_telepathy"
+const IMPOSE_DISADVANTAGE_CATALOG_ID = "cat_fx_impose_disadvantage"
+const REACTION_ATTACK_CATALOG_ID = "cat_fx_reaction_attack"
+const EXTRA_ATTACK_CATALOG_ID = "cat_fx_extra_attack"
 
 type ClassFeatureModifierPreset =
   | LinkedModifierInstance[]
@@ -56,7 +64,7 @@ function fxInstance(
 
 function unarmoredDefense(
   instanceKey: string,
-  abilities: ("DEX" | "CON" | "WIS")[],
+  abilities: ("DEX" | "CON" | "WIS" | "CHA")[],
   label?: string,
 ): LinkedModifierInstance {
   return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.ac, [
@@ -660,19 +668,170 @@ function failedRollTriggerPreset(
   instanceKey: string,
   config: {
     rollKind: "ability" | "skill" | "attack" | "save"
+    triggerOn?: "fail" | "success"
+    targetScope?: import("@/lib/compendium/characteristic-modifiers").SavingThrowTargetScope
     effectCatalogRefId: string
     spendResourceKey?: string
+    useReaction?: boolean
+    rangeFeet?: number
+    refundResourceOnStillFailed?: boolean
   },
 ): LinkedModifierInstance {
   return charInstance(`modinst_${instanceKey}`, FAILED_ROLL_TRIGGER_CATALOG_ID, [
     {
       id: modId(instanceKey),
       type: "failed_roll_trigger",
+      triggerOn: config.triggerOn ?? "fail",
       rollKind: config.rollKind,
-      targetScope: "self",
+      targetScope: config.targetScope ?? "self",
+      rangeFeet: config.rangeFeet ?? null,
+      useReaction: config.useReaction ?? false,
       spendResourceKey: config.spendResourceKey ?? null,
       spendResourceAmount: config.spendResourceKey ? 1 : null,
+      refundResourceOnStillFailed: config.refundResourceOnStillFailed ?? false,
       effect: { catalogRefId: config.effectCatalogRefId },
+    },
+  ])
+}
+
+function d20TestReactionPreset(
+  instanceKey: string,
+  config: {
+    modifierMode: "add" | "subtract"
+    targetScope: import("@/lib/compendium/characteristic-modifiers").SavingThrowTargetScope
+    effectCatalogRefId: string
+    useReaction?: boolean
+    rangeFeet?: number
+    spendResourceKey?: string
+    dieSource?: "resource_die" | "fixed"
+    fixedDie?: string
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, D20_TEST_REACTION_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "d20_test_reaction",
+      modifierMode: config.modifierMode,
+      rollKinds: [],
+      targetScope: config.targetScope,
+      rangeFeet: config.rangeFeet ?? null,
+      useReaction: config.useReaction ?? false,
+      spendResourceKey: config.spendResourceKey ?? null,
+      spendResourceAmount: config.spendResourceKey ? 1 : null,
+      dieSource: config.dieSource ?? "resource_die",
+      fixedDie: config.fixedDie ?? null,
+      effect: { catalogRefId: config.effectCatalogRefId },
+    },
+  ])
+}
+
+function damageHalvingReactionPreset(
+  instanceKey: string,
+  config?: { cancelCritRiders?: boolean; requiresPriorDisadvantage?: boolean },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, DAMAGE_HALVING_REACTION_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "damage_halving_reaction",
+      useReaction: true,
+      cancelCritRiders: config?.cancelCritRiders ?? false,
+      requiresPriorDisadvantage: config?.requiresPriorDisadvantage ?? false,
+    },
+  ])
+}
+
+function healingDicePoolPreset(
+  instanceKey: string,
+  config: {
+    dieType: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"
+    poolSize?: number
+    poolSizeByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+    maxAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
+    label?: string
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, HEALING_DICE_POOL_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "healing_dice_pool",
+      dieType: config.dieType,
+      poolSize: config.poolSize ?? null,
+      poolSizeByLevel: config.poolSizeByLevel ?? [],
+      maxDicePerUse: config.maxAbility
+        ? { type: "ability_modifier", ability: config.maxAbility.toLowerCase() as import("@/lib/compendium/characteristic-modifiers").AbilityScoreKey }
+        : null,
+      activation: "bonus_action",
+      recharges: [{ rest: "long_rest" }],
+      label: config.label,
+    },
+  ])
+}
+
+function onCreatureDeathTriggerPreset(
+  instanceKey: string,
+  config: {
+    creatureFilter: "enemy" | "ally" | "any"
+    rangeFeet: number
+    effectCatalogRefId: string
+    useReaction?: boolean
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, ON_CREATURE_DEATH_TRIGGER_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "on_creature_death_trigger",
+      creatureFilter: config.creatureFilter,
+      rangeFeet: config.rangeFeet,
+      useReaction: config.useReaction ?? false,
+      effect: { catalogRefId: config.effectCatalogRefId },
+    },
+  ])
+}
+
+function telepathyPreset(instanceKey: string, rangeFeet: number, label?: string): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, TELEPATHY_CATALOG_ID, [
+    { id: modId(instanceKey), type: "telepathy", rangeFeet, canInitiate: true, label },
+  ])
+}
+
+function usesPoolWithRestore(
+  uses: UsesConfig,
+  label: string,
+  restoreByResource?: UsesConfig["restoreByResource"],
+  restoreBySpellSlot?: UsesConfig["restoreBySpellSlot"],
+): LinkedModifierInstance {
+  return usesPool(
+    {
+      ...uses,
+      ...(restoreByResource ? { restoreByResource } : {}),
+      ...(restoreBySpellSlot ? { restoreBySpellSlot } : {}),
+    },
+    label,
+  )
+}
+
+function allySaveReplacePreset(
+  instanceKey: string,
+  config: {
+    replaceWith: number
+    spendResourceKey: string
+    useReaction?: boolean
+    bonusEqualToLevel?: boolean
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, SAVING_THROW_TRIGGER_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "saving_throw_trigger",
+      triggerOn: "ally_fails",
+      targetScope: "allied_creature",
+      useReaction: config.useReaction ?? true,
+      replaceFailedRollWith: config.replaceWith,
+      spendResourceKey: config.spendResourceKey,
+      spendResourceAmount: 1,
+      effect: config.bonusEqualToLevel
+        ? { catalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID }
+        : null,
     },
   ])
 }
@@ -743,6 +902,47 @@ function onCastSpellChar(
   ])
 }
 
+function schoolSavantPreset(school: string): LinkedModifierInstance {
+  const key = school.toLowerCase().replace(/\s+/g, "_")
+  return spellsKnownChar(`${key}_savant`, {
+    choiceGrants: [
+      { level: 1, count: 2 },
+      { level: 2, count: 2 },
+    ],
+    spellListClassOptions: ["Wizard"],
+    label: `${school} spells (≤2nd) in spellbook; +1 ${school} spell per new slot level`,
+  })
+}
+
+function toolsPreset(instanceKey: string, tools: string[], label?: string): LinkedModifierInstance {
+  return charInstance(`modinst_tools_${instanceKey}`, "cat_char_tool_proficiencies", [
+    {
+      id: modId(`tools_${instanceKey}`),
+      type: "tool_proficiencies",
+      values: tools,
+      label,
+    },
+  ])
+}
+
+function battleReadyPreset(): LinkedModifierInstance[] {
+  return [
+    charInstance("modinst_battle_ready_weapons", "cat_char_weapon_proficiencies", [
+      {
+        id: modId("battle_ready_weapons"),
+        type: "weapon_proficiencies",
+        mode: "martial_weapons",
+        values: [],
+        label: "Martial weapons; INT for magic weapon attack/damage; weapon as spellcasting focus",
+      },
+    ]),
+  ]
+}
+
+function companionPreset(name: string): LinkedModifierInstance {
+  return featureOptionPicker(`${name} (companion stat block)`, false)
+}
+
 function damageResReaction(instanceKey: string, label: string): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, DAMAGE_REDUCTION_CATALOG_ID, {
     reaction: true,
@@ -788,19 +988,26 @@ function movementHalfSpeedOnExistingFeature(
   })
 }
 
-function intimidatingPresence(): LinkedModifierInstance {
-  return fxInstance("modinst_intimidating_presence", FORCE_SAVE_CATALOG_ID, {
-    bonusAction: true,
-    effects: [
-      {
-        id: modId("intimidating_presence"),
-        kind: "force_save_control",
-        attackProfile: "force_save",
-        saveAbility: "Wisdom",
-        effectConditionTypes: ["Frightened"],
-      },
-    ],
-  })
+function intimidatingPresence(): LinkedModifierInstance[] {
+  return [
+    usesPoolWithRestore(
+      { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+      "Intimidating Presence",
+      { resourceKey: "rage", restores: 1 },
+    ),
+    fxInstance("modinst_intimidating_presence", FORCE_SAVE_CATALOG_ID, {
+      bonusAction: true,
+      effects: [
+        {
+          id: modId("intimidating_presence"),
+          kind: "force_save_control",
+          attackProfile: "force_save",
+          saveAbility: "Wisdom",
+          effectConditionTypes: ["Frightened"],
+        },
+      ],
+    }),
+  ]
 }
 
 function naturesVeil(): LinkedModifierInstance[] {
@@ -921,7 +1128,10 @@ function normalizePreset(preset: ClassFeatureModifierPreset): {
   activation?: Partial<FeatureActivation>
 } {
   if (Array.isArray(preset)) return { linkedModifiers: preset }
-  return preset
+  return {
+    linkedModifiers: preset.linkedModifiers ?? [],
+    activation: preset.activation,
+  }
 }
 
 const CUNNING_STRIKE_RIDERS = [
@@ -1093,13 +1303,22 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       label: "Aura of Protection 30 ft.",
     }),
   ],
-  "*::Holy Nimbus": [
-    auraPreset("holy_nimbus", {
-      radiusFeet: 30,
-      halfCover: true,
-      label: "Holy Nimbus",
-    }),
-  ],
+  "*::Holy Nimbus": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Holy Nimbus",
+        undefined,
+        { minSpellLevel: 5, restores: 1 },
+      ),
+      auraPreset("holy_nimbus", {
+        radiusFeet: 30,
+        halfCover: true,
+        label: "Holy Ward (adv. vs Fiend/Undead saves), radiant damage on enemy turn, sunlight",
+      }),
+    ],
+  },
   "*::Paladin's Smite": [alwaysPreparedSpells("Divine Smite")],
   "*::Favored Enemy": [alwaysPreparedSpells("Hunter's Mark")],
   "*::Faithful Steed": [alwaysPreparedSpells("Find Steed")],
@@ -1108,6 +1327,48 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Fiend Spells": [alwaysPreparedSpells("Fiend Patron spells")],
   "*::Draconic Spells": [alwaysPreparedSpells("Draconic Sorcery spells")],
   "*::Circle of the Land Spells": [alwaysPreparedSpells("Circle of the Land spells")],
+  "*::Circle of the Titan Spells": [alwaysPreparedSpells("Circle of the Titan spells")],
+  "*::Demonic Spells": [alwaysPreparedSpells("Demonic Sorcery spells")],
+  "Fighter::Hell Knight::Infernal Wound": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "ability_modifier",
+          abilityModifier: "CON",
+          recharges: [{ rest: "short_rest" }],
+        },
+        "Infernal Wound uses",
+      ),
+    ],
+  },
+  "Fighter::Hell Knight::Hellfire Surge": {
+    activation: { bonusAction: true },
+  },
+  "Fighter::Hell Knight::Devil's Misfortune": {
+    activation: { reaction: true },
+  },
+  "Sorcerer::Demonic Sorcery::Abyssal Rupture": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "innate_sorcery", classResourceAmount: 1 },
+        "Extends Innate Sorcery",
+      ),
+    ],
+  },
+  "Sorcerer::Demonic Sorcery::Abyssal Explosion": {
+    activation: { action: true },
+  },
+  "Druid::Circle of the Titan::Titan Form": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 },
+        "Titan Form (Wild Shape)",
+      ),
+    ],
+  },
   "*::Persistent Rage": [resourceResetOnInitiative("rage", undefined, "Regain all Rage uses on Initiative")],
   "*::Font of Inspiration": [
     resourceResetOnRest("bardic_inspiration", "short_or_long_rest", "Regain all BI on Short/Long Rest"),
@@ -1186,7 +1447,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: [movementHalfSpeedOnExistingFeature("instinctive_pounce", "Rage")],
   },
   "*::Intimidating Presence": {
-    linkedModifiers: [intimidatingPresence()],
+    activation: { bonusAction: true },
+    linkedModifiers: intimidatingPresence(),
   },
   "*::Nature's Veil": {
     linkedModifiers: naturesVeil(),
@@ -1231,9 +1493,15 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: [
       bonusRidersPreset(
         "supreme_sneak",
-        [{ name: "Stealth Attack", costDice: "1d6", description: "Hide as part of Cunning Strike attack" }],
+        [
+          {
+            name: "Stealth Attack",
+            costDice: "1d6",
+            description: "Hide Invisibility not ended if you end turn behind Three-Quarters or Total Cover",
+          },
+        ],
         1,
-        "Sneak Attack",
+        "Cunning Strike",
       ),
     ],
   },
@@ -1253,6 +1521,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         rollKind: "ability",
         effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
         spendResourceKey: "bardic_inspiration",
+        refundResourceOnStillFailed: true,
       }),
     ],
   },
@@ -1482,6 +1751,221 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         spellSchool: "Evocation",
         effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
         label: "Maximize damage on level 1–5 evocation spells (risk self-damage on repeat)",
+      }),
+    ],
+  },
+  "*::Abjuration Savant": { linkedModifiers: [schoolSavantPreset("Abjuration")] },
+  "*::Divination Savant": { linkedModifiers: [schoolSavantPreset("Divination")] },
+  "*::Illusion Savant": { linkedModifiers: [schoolSavantPreset("Illusion")] },
+  "*::Arcane Ward": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Once per Long Rest: ward HP = 2×Wizard level + INT; absorbs damage; regains 2×slot level on Abjuration cast (or BA expend slot)",
+          recharges: [{ rest: "long_rest" }],
+        },
+        "Arcane Ward",
+      ),
+      onCastSpellChar("arcane_ward_recharge", {
+        spellSchool: "Abjuration",
+        effect: { catalogRefId: GRANT_TEMP_HP_CATALOG_ID },
+        label: "Abjuration spell with slot: ward regains 2×slot level HP",
+      }),
+    ],
+  },
+  "*::Projected Ward": {
+    linkedModifiers: [
+      damageResReaction(
+        "projected_ward",
+        "Reaction: ally within 30 ft. — your Arcane Ward absorbs their damage",
+      ),
+    ],
+  },
+  "*::Spell Breaker": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Counterspell and Dispel Magic"),
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Dispel Magic as Bonus Action; add PB to Dispel check; slot not expended if Counterspell/Dispel fails to stop a spell",
+        },
+        "Spell Breaker",
+      ),
+    ],
+  },
+  "*::Spell Resistance": {
+    linkedModifiers: [
+      checkAdvantage("spell_resistance_saves", { category: "save", conditions: ["spell"] }),
+      damageResistance([], "Resistance to spell damage"),
+    ],
+  },
+  "*::Portent": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "fixed",
+          fixedAmount: 2,
+          recharges: [{ rest: "long_rest" }],
+          specialDescription:
+            "Foretelling d20s after Long Rest: replace any visible D20 Test before roll (once per turn)",
+        },
+        "Portent",
+      ),
+    ],
+  },
+  "*::Greater Portent": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "fixed",
+          fixedAmount: 3,
+          recharges: [{ rest: "long_rest" }],
+          specialDescription: "Portent: roll three foretelling d20s after each Long Rest",
+        },
+        "Greater Portent",
+      ),
+    ],
+  },
+  "*::Expert Divination": {
+    linkedModifiers: [
+      onCastSpellChar("expert_divination", {
+        spellSchool: "Divination",
+        effect: { catalogRefId: CLASS_RESOURCE_CATALOG_ID },
+        label: "Cast Divination spell level 2+: regain one lower spell slot (max 5th)",
+      }),
+    ],
+  },
+  "*::The Third Eye": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      featureOptionPicker(
+        "Third Eye (Darkvision / Greater Comprehension / See Invisibility)",
+        true,
+      ),
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "The Third Eye",
+      ),
+    ],
+  },
+  "*::Improved Illusions": {
+    linkedModifiers: [
+      onCastSpellChar("improved_illusions", {
+        spellSchool: "Illusion",
+        label: "Illusion spells: no verbal components; +60 ft. range on spells with 10+ ft. range",
+      }),
+      spellsKnownChar("improved_illusions_cantrip", {
+        spells: [{ spellId: "minor-illusion" }],
+        spellListClassOptions: ["Wizard"],
+        label: "Minor Illusion (extra cantrip if known); BA cast; sound and image together",
+      }),
+    ],
+  },
+  "*::Phantasmal Creatures": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Summon Beast and Summon Fey"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Phantasmal Creatures",
+        undefined,
+        { minSpellLevel: 1, restores: 1 },
+      ),
+    ],
+  },
+  "*::Illusory Self": {
+    linkedModifiers: [
+      fxInstance("modinst_illusory_self", IMPOSE_DISADVANTAGE_CATALOG_ID, {
+        reaction: true,
+        effects: [{ id: modId("illusory_self"), kind: "impose_disadvantage", label: "Reaction: attack auto-misses" }],
+      }),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Illusory Self",
+        undefined,
+        { minSpellLevel: 2, restores: 1 },
+      ),
+    ],
+  },
+  "*::Illusory Reality": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      onCastSpellChar("illusory_reality", {
+        spellSchool: "Illusion",
+        label: "Bonus Action while Illusion spell ongoing: make one inanimate illusion object real for 1 minute",
+      }),
+    ],
+  },
+  "*::Bladesong": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "ability_modifier",
+          abilityModifier: "INT",
+          recharges: [{ rest: "long_rest" }],
+          specialDescription: "Regain one expended use when you use Arcane Recovery",
+        },
+        "Bladesong",
+      ),
+      fxInstance("modinst_bladesong", SELF_BUFF_CASTER_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("bladesong"),
+            kind: "self_buff_caster",
+            casterBuffLabel: "Bladesong: +INT AC (min +1), +10 Speed, Advantage on Acrobatics",
+          },
+        ],
+      }),
+      checkBonus("bladesong_concentration", {
+        category: "save",
+        ability: "CON",
+        bonusConfig: { mode: "ability_modifier", ability: "INT" },
+      }),
+    ],
+  },
+  "*::Training In War and Song": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Melee martial weapons (no Two-Handed/Heavy); melee weapon as Wizard spell focus",
+        },
+        "Training In War and Song",
+      ),
+      skillChoice(1, "Acrobatics, Athletics, Performance, or Persuasion"),
+    ],
+  },
+  "*::Song of Defense": {
+    linkedModifiers: [
+      fxInstance("modinst_song_of_defense", DAMAGE_REDUCTION_CATALOG_ID, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("song_of_defense"),
+            kind: "damage_reduction",
+            label: "While Bladesong: Reaction expend spell slot; reduce damage by 5×slot level",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Song of Victory": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_song_of_victory", "cat_fx_bonus_action_attack", {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("song_of_victory"),
+            kind: "bonus_action_attack",
+            label: "After casting an action spell, make one weapon attack",
+          },
+        ],
       }),
     ],
   },
@@ -1881,6 +2365,2305 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
     ],
   },
+
+  // —— Cleric domains (2024) ——
+  "*::Grave Domain Spells": [alwaysPreparedSpells("Grave Domain spells")],
+  "*::Knowledge Domain Spells": [alwaysPreparedSpells("Knowledge Domain spells")],
+  "*::Light Domain Spells": [alwaysPreparedSpells("Light Domain spells")],
+  "*::Trickery Domain Spells": [alwaysPreparedSpells("Trickery Domain spells")],
+  "*::War Domain Spells": [alwaysPreparedSpells("War Domain spells")],
+  "*::Mind Domain Spells": [alwaysPreparedSpells("Mind Domain spells")],
+  "*::Return to Life": {
+    linkedModifiers: [
+      spellHealingModifier("return_to_life", { maximizeOnlyAtZeroHp: true, maximizeHealingDice: true }),
+    ],
+  },
+  "*::Warding Flare": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Warding Flare",
+      ),
+      fxInstance("modinst_warding_flare", IMPOSE_DISADVANTAGE_CATALOG_ID, {
+        reaction: true,
+        effects: [{ id: modId("warding_flare"), kind: "impose_disadvantage" }],
+      }),
+    ],
+  },
+  "*::Improved Warding Flare": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "ability_modifier",
+          abilityModifier: "WIS",
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
+        "Improved Warding Flare",
+      ),
+      fxInstance("modinst_improved_warding_flare", IMPOSE_DISADVANTAGE_CATALOG_ID, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("improved_warding_flare"),
+            kind: "impose_disadvantage",
+            label: "Impose disadvantage; grant temp HP to self or ally within 30 ft.",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::War Priest": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "War Priest",
+      ),
+      fxInstance("modinst_war_priest", "cat_fx_bonus_action_attack", {
+        bonusAction: true,
+        effects: [{ id: modId("war_priest"), kind: "bonus_action_attack" }],
+      }),
+    ],
+  },
+  "*::Pull of the Grave": {
+    linkedModifiers: [
+      onHitTriggerPreset("pull_of_grave", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+      extraDamageOnHit("pull_of_grave_rider", "1d4"),
+    ],
+  },
+  "*::Gestalt Anchor": [
+    auraPreset("gestalt_anchor", {
+      radiusFeet: 10,
+      saveAbility: "INT",
+      label: "Allies within 10 ft. add INT/WIS/CHA mod to INT/WIS/CHA saves",
+    }),
+  ],
+  "*::Sentinel at Death's Door": [damageHalvingReactionPreset("sentinel_death_door", { cancelCritRiders: true })],
+  "*::Psychic Feedback": {
+    linkedModifiers: [
+      failedRollTriggerPreset("psychic_feedback", {
+        rollKind: "save",
+        triggerOn: "success",
+        targetScope: "self",
+        useReaction: true,
+        effectCatalogRefId: MODIFY_CREATURE_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Bend Reality": {
+    linkedModifiers: [
+      allySaveReplacePreset("bend_reality", {
+        replaceWith: 20,
+        spendResourceKey: "channel_divinity",
+      }),
+    ],
+  },
+  "*::Keeper of Souls": {
+    linkedModifiers: [
+      onCreatureDeathTriggerPreset("keeper_of_souls", {
+        creatureFilter: "enemy",
+        rangeFeet: 60,
+        effectCatalogRefId: "cat_fx_heal_from_pool",
+      }),
+      usesPoolWithRestore(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Keeper of Souls",
+        undefined,
+        { minSpellLevel: 6, restores: 1 },
+      ),
+    ],
+  },
+  "*::Healing Light": [
+    healingDicePoolPreset("healing_light", {
+      dieType: "d6",
+      poolSize: 6,
+      maxAbility: "CHA",
+      label: "Healing Light d6 pool",
+    }),
+  ],
+  "*::Awakened Mind": [telepathyPreset("awakened_mind", 60, "Telepathy 60 ft.")],
+  "*::Unfettered Mind": [telepathyPreset("unfettered_mind", 60, "Telepathy 60 ft.")],
+  "*::Cosmic Omen": {
+    linkedModifiers: [
+      d20TestReactionPreset("cosmic_omen_boon", {
+        modifierMode: "add",
+        targetScope: "allies_in_area",
+        rangeFeet: 30,
+        useReaction: true,
+        dieSource: "fixed",
+        fixedDie: "1d6",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Cosmic Omen",
+        { resourceKey: "wild_shape", restores: 1 },
+      ),
+    ],
+  },
+
+  // —— Warlock patrons (2024) ——
+  "*::Archfey Spells": [alwaysPreparedSpells("Archfey Patron spells")],
+  "*::Celestial Spells": [alwaysPreparedSpells("Celestial Patron spells")],
+  "*::Great Old One Spells": [alwaysPreparedSpells("Great Old One Patron spells")],
+  "*::Undead Spells": [alwaysPreparedSpells("Undead Patron spells")],
+  "*::Form of Dread": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
+        "Form of Dread",
+      ),
+      conditionImmunity(["Frightened"], "While Form of Dread is active"),
+    ],
+  },
+
+  // —— Druid circles (2024) ——
+  "*::Circle of the Moon Spells": [alwaysPreparedSpells("Circle of the Moon spells")],
+  "*::Circle of the Sea Spells": [alwaysPreparedSpells("Circle of the Sea spells")],
+  "*::Circle of the Forged Spells": [alwaysPreparedSpells("Circle of the Forged spells")],
+  "*::Starry Form": {
+    linkedModifiers: [
+      featureOptionPicker("Starry Form constellation", true),
+      usesPool({ type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 }, "Starry Form"),
+    ],
+  },
+  "*::Wrath of the Sea": {
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 }, "Wrath of the Sea"),
+    ],
+  },
+
+  // —— Barbarian paths (2024) ——
+  "*::Retaliation": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      fxInstance("modinst_retaliation", REACTION_ATTACK_CATALOG_ID, {
+        reaction: true,
+        effects: [{ id: modId("retaliation"), kind: "reaction_attack" }],
+      }),
+    ],
+  },
+  "*::Animal Speaker": [alwaysPreparedSpells("Beast Sense and Speak with Animals (ritual)")],
+  "*::Rage of the Wilds": [featureOptionPicker("Rage of the Wilds (Bear/Eagle/Wolf)")],
+  "*::Aspect of the Wilds": [featureOptionPicker("Aspect of the Wilds (Owl/Panther/Salmon)", true)],
+  "*::Nature Speaker": [alwaysPreparedSpells("Commune with Nature (ritual)")],
+  "*::Power of the Wilds": [featureOptionPicker("Power of the Wilds (Falcon/Lion/Ram)")],
+  "*::Vitality of the Tree": {
+    linkedModifiers: [
+      grantTempHpPool("Vitality Surge temp HP on Rage"),
+      fxInstance("modinst_life_giving_force", GRANT_TEMP_HP_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("life_giving_force"),
+            kind: "grant_temp_hp",
+            tempHpTrigger: "on_action",
+            healMode: "dice",
+            healDiceCount: 1,
+            healDieType: "d6",
+            label: "Life-Giving Force: ally within 10 ft. gains temp HP (Rage Damage d6s)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Branches of the Tree": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      savingThrowTriggerPreset("branches_of_tree", {
+        triggerOn: "make",
+        targetScope: "target_creature",
+        effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+        useReaction: true,
+      }),
+    ],
+  },
+  "*::Battering Roots": {
+    linkedModifiers: [
+      charInstance("modinst_battering_roots", FEAT_MODIFIER_CATALOG.attackRollModifiers, [
+        {
+          id: modId("battering_roots"),
+          type: "attack_roll_modifiers",
+          entries: [{ bonus: 0, target: "all" }],
+          label: "+10 ft. reach with Heavy or Versatile melee weapons; extra Push/Topple mastery",
+        },
+      ]),
+    ],
+  },
+  "*::Travel along the Tree": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_travel_tree", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("travel_tree"),
+            kind: "movement_option",
+            movementTeleport: true,
+            moveDistanceMode: "fixed",
+            moveDistanceFeet: 60,
+            label: "Teleport up to 60 ft. (150 ft. once per Rage with allies)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Divine Fury": {
+    linkedModifiers: [
+      onHitTriggerPreset("divine_fury", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+      extraDamageOnHit("divine_fury_damage", "1d6"),
+    ],
+  },
+  "*::Warrior of the Gods": [
+    healingDicePoolPreset("warrior_of_gods", {
+      dieType: "d12",
+      poolSize: 4,
+      poolSizeByLevel: [
+        { level: 6, mode: "fixed", fixed: 5 },
+        { level: 12, mode: "fixed", fixed: 6 },
+        { level: 17, mode: "fixed", fixed: 7 },
+      ],
+      label: "Warrior of the Gods healing d12 pool",
+    }),
+  ],
+  "*::Fanatical Focus": {
+    linkedModifiers: [
+      failedRollTriggerPreset("fanatical_focus", {
+        rollKind: "save",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        spendResourceKey: "rage",
+      }),
+    ],
+  },
+  "*::Zealous Presence": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Zealous Presence",
+        { resourceKey: "rage", restores: 1 },
+      ),
+      fxInstance("modinst_zealous_presence", CHECK_ROLL_MODIFIER_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("zealous_presence"),
+            kind: "check_roll_modifier",
+            checkRollMode: "advantage",
+            checkCategory: "other",
+            label: "Allies within 60 ft. have Advantage on attacks and saves until your next turn",
+          },
+        ],
+      }),
+    ],
+  },
+
+  // —— Bard colleges (2024) ——
+  "*::Dazzling Footwork": {
+    linkedModifiers: [
+      unarmoredDefense("dance_uac", ["DEX", "CHA"], "Unarmored Defense (10 + DEX + CHA)"),
+      checkAdvantage("dance_virtuoso", { category: "skill", skills: ["Performance"] }),
+    ],
+  },
+  "*::Leading Evasion": [evasion()],
+  "*::Cutting Words": {
+    linkedModifiers: [
+      failedRollTriggerPreset("cutting_words", {
+        rollKind: "attack",
+        triggerOn: "success",
+        targetScope: "target_creature",
+        rangeFeet: 60,
+        useReaction: true,
+        spendResourceKey: "bardic_inspiration",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Combat Inspiration": {
+    linkedModifiers: [
+      charInstance("modinst_combat_inspiration", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+        {
+          id: modId("combat_inspiration"),
+          type: "resource_ability_menu",
+          resourceKey: "bardic_inspiration",
+          options: [
+            { name: "Defense", description: "Reaction: add BI die to AC vs one attack" },
+            { name: "Offense", description: "After hit: add BI die to damage" },
+          ],
+        },
+      ]),
+    ],
+  },
+  "*::Martial Training": {
+    linkedModifiers: [
+      charInstance("modinst_martial_training_weapons", "cat_char_weapon_proficiencies", [
+        { id: modId("martial_training_weapons"), type: "weapon_proficiencies", mode: "martial_weapons", values: [] },
+      ]),
+      charInstance("modinst_martial_training_armor", "cat_char_armor_proficiencies", [
+        {
+          id: modId("martial_training_armor"),
+          type: "armor_proficiencies",
+          values: ["Medium armor", "Shields"],
+        },
+      ]),
+    ],
+  },
+  "*::Extra Attack": {
+    linkedModifiers: [
+      fxInstance("modinst_extra_attack", EXTRA_ATTACK_CATALOG_ID, {
+        effects: [{ id: modId("extra_attack"), kind: "extra_attack", extraAttackCount: 1 }],
+      }),
+    ],
+  },
+  "*::Battle Magic": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_battle_magic", "cat_fx_bonus_action_attack", {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("battle_magic"),
+            kind: "bonus_action_attack",
+            label: "After casting an action spell, make one weapon attack",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Beguiling Magic": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Charm Person and Mirror Image"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Beguiling Magic rider",
+        { resourceKey: "bardic_inspiration", restores: 1 },
+      ),
+    ],
+  },
+  "*::Mantle of Inspiration": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_mantle_inspiration", GRANT_TEMP_HP_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("mantle_inspiration"),
+            kind: "grant_temp_hp",
+            tempHpTrigger: "on_action",
+            healMode: "dice",
+            healDiceCount: 2,
+            label: "Temp HP = 2× Bardic Inspiration die; allies can move",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Mantle of Majesty": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Command"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Mantle of Majesty",
+        undefined,
+        { minSpellLevel: 3, restores: 1 },
+      ),
+    ],
+  },
+  "*::Unbreakable Majesty": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] }, "Unbreakable Majesty"),
+      fxInstance("modinst_unbreakable_majesty", MODIFY_CREATURE_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("unbreakable_majesty"),
+            kind: "modify_creature",
+            rollTarget: "enemy",
+            creatureModifyMode: "roll",
+            label: "First hit each turn: attacker CHA save or miss",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Spirits from Beyond": {
+    linkedModifiers: [
+      charInstance("modinst_spirits_beyond", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+        {
+          id: modId("spirits_beyond"),
+          type: "resource_ability_menu",
+          resourceKey: "bardic_inspiration",
+          label: "Channel spirits — each option is a custom ability (see Spirits table)",
+          options: [],
+        },
+      ]),
+    ],
+  },
+  "*::Broad Inspiration": {
+    linkedModifiers: [
+      charInstance("modinst_broad_inspiration", FEAT_MODIFIER_CATALOG.spellsKnown, [
+        {
+          id: modId("broad_inspiration"),
+          type: "spells_known",
+          spells: [],
+          choiceGrants: [{ level: 0, count: 1 }],
+          spellListClassOptions: ["Bard"],
+          label: "Guidance cantrip (Bard spell); confer BI to two creatures",
+        },
+      ]),
+    ],
+  },
+  "*::Keeper of History": [
+    skillChoice(2, "History and Performance (Expertise if already proficient)", true),
+  ],
+  "*::Commanding Voice": {
+    linkedModifiers: [
+      fxInstance("modinst_commanding_voice", REACTION_ATTACK_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("commanding_voice"),
+            kind: "reaction_attack",
+            label: "Allies with BI die may Reaction attack when you Attack or cast",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Battle Hymn": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      auraPreset("battle_hymn", {
+        radiusFeet: 30,
+        label: "Allies within 30 ft. add 1d4 to ability checks and saves while hymn is active",
+      }),
+    ],
+  },
+
+  // —— Fighter subclasses (2024) ——
+  "*::Knightly Envoy": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Comprehend Languages (ritual)"),
+      skillChoice(1, "Knightly Envoy skill"),
+      languages([], 1, "Polyglot language"),
+    ],
+  },
+  "*::Group Recovery": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] }, "Group Recovery"),
+      fxInstance("modinst_group_recovery", "cat_fx_heal_self", {
+        effects: [
+          {
+            id: modId("group_recovery"),
+            kind: "heal_self",
+            healMode: "dice",
+            healDiceCount: 1,
+            healDieType: "d4",
+            label: "On Second Wind: allies in 30 ft. heal 1d4 + Fighter level",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Team Tactics": {
+    linkedModifiers: [
+      checkAdvantage("team_tactics", { category: "other", ability: null }),
+    ],
+  },
+  "*::Rallying Surge": {
+    linkedModifiers: [
+      fxInstance("modinst_rallying_surge", REACTION_ATTACK_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("rallying_surge"),
+            kind: "reaction_attack",
+            label: "On Action Surge: allies Reaction attack or move half Speed",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Shared Resilience": {
+    linkedModifiers: [
+      charInstance("modinst_shared_resilience", SAVING_THROW_TRIGGER_CATALOG_ID, [
+        {
+          id: modId("shared_resilience"),
+          type: "saving_throw_trigger",
+          triggerOn: "ally_fails",
+          targetScope: "allied_creature",
+          useReaction: true,
+          spendResourceKey: "indomitable",
+          spendResourceAmount: 1,
+          effect: { catalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID },
+          label: "Ally rerolls failed save with bonus equal to Fighter level",
+        },
+      ]),
+    ],
+  },
+  "*::Inspiring Commander": {
+    linkedModifiers: [
+      conditionImmunity(["Charmed", "Frightened"], "Unshakable Bravery"),
+    ],
+  },
+  "*::Combat Superiority": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "superiority_dice",
+          classResourceAmount: 1,
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
+        "Superiority Dice — maneuvers are custom abilities",
+      ),
+    ],
+  },
+  "*::Student of War": [skillChoice(1, "Student of War skill")],
+  "*::Know Your Enemy": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Know Your Enemy",
+        { resourceKey: "superiority_dice", resourceAmount: 1, restores: 1 },
+      ),
+    ],
+  },
+  "*::Improved Combat Superiority": {
+    linkedModifiers: [
+      charInstance("modinst_improved_combat_superiority", FEAT_MODIFIER_CATALOG.uses, [
+        {
+          id: modId("improved_combat_superiority"),
+          type: "uses",
+          uses: { type: "class_resource", classResourceKey: "superiority_dice", dieType: "d10" },
+          label: "Superiority Die becomes d10",
+        },
+      ]),
+    ],
+  },
+  "*::Ultimate Combat Superiority": {
+    linkedModifiers: [
+      charInstance("modinst_ultimate_combat_superiority", FEAT_MODIFIER_CATALOG.uses, [
+        {
+          id: modId("ultimate_combat_superiority"),
+          type: "uses",
+          uses: { type: "class_resource", classResourceKey: "superiority_dice", dieType: "d12" },
+          label: "Superiority Die becomes d12",
+        },
+      ]),
+    ],
+  },
+  "*::Relentless": {
+    linkedModifiers: [
+      charInstance("modinst_relentless_bm", FEAT_MODIFIER_CATALOG.uses, [
+        {
+          id: modId("relentless_bm"),
+          type: "uses",
+          uses: { type: "class_resource", classResourceKey: "superiority_dice", freeUseAfterLevel: 15 },
+          label: "Once per turn: roll 1d8 instead of expending Superiority Die",
+        },
+      ]),
+    ],
+  },
+  "*::War Magic": {
+    linkedModifiers: [
+      fxInstance("modinst_war_magic", "cat_fx_weapon_attack", {
+        effects: [
+          {
+            id: modId("war_magic"),
+            kind: "weapon_attack",
+            label: "Replace one Attack action attack with a Wizard cantrip",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Arcane Charge": {
+    linkedModifiers: [
+      fxInstance("modinst_arcane_charge", FEAT_MODIFIER_CATALOG.movementOption, {
+        effects: [
+          {
+            id: modId("arcane_charge"),
+            kind: "movement_option",
+            movementTeleport: true,
+            moveDistanceMode: "fixed",
+            moveDistanceFeet: 30,
+            label: "On Action Surge: teleport up to 30 ft.",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Psionic Power": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "psionic_energy_dice",
+          classResourceAmount: 1,
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
+        "Psionic Energy Dice",
+      ),
+    ],
+  },
+  "*::Guarded Mind": [damageResistance(["Psychic"], "Psychic Resistance")],
+
+  // —— Monk warriors (2024) ——
+  "*::Hand of Harm": {
+    linkedModifiers: [
+      onHitTriggerPreset("hand_of_harm", {
+        appliesTo: "Unarmed Strike",
+        spendResourceKey: "focus_points",
+        spendResourceAmount: 1,
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+    ],
+  },
+  "*::Hand of Healing": {
+    linkedModifiers: [
+      fxInstance("modinst_hand_of_healing", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("hand_of_healing"),
+            kind: "heal_self",
+            healMode: "dice",
+            healDiceCount: 1,
+            label: "Magic action: heal Martial Arts die + WIS (touch)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Implements of Mercy": [skillChoice(2, "Insight and Medicine")],
+  "*::Physician's Touch": {
+    linkedModifiers: [
+      onHitTriggerPreset("physicians_harm", {
+        appliesTo: "Unarmed Strike",
+        effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Shadow Arts": {
+    linkedModifiers: [
+      vision(60, "darkvision", "Darkvision 60 ft."),
+      alwaysPreparedSpells("Minor Illusion"),
+    ],
+  },
+  "*::Shadow Step": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_shadow_step", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("shadow_step"),
+            kind: "movement_option",
+            movementTeleport: true,
+            moveDistanceMode: "fixed",
+            moveDistanceFeet: 60,
+            label: "Teleport 60 ft. in dim light/darkness; Advantage on next melee attack",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Elemental Attunement": [featureOptionPicker("Martial Form / Elemental Attunement")],
+  "*::Elemental Burst": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "focus_points", classResourceAmount: 2 }, "Elemental Burst"),
+      fxInstance("modinst_elemental_burst", FORCE_SAVE_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("elemental_burst"),
+            kind: "force_save_control",
+            attackProfile: "force_save",
+            saveAbility: "DEX",
+            areaShape: "sphere",
+            areaRadiusFeet: 20,
+            label: "20-ft. sphere DEX save for 3× Martial Arts die elemental damage",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Martial Form": [featureOptionPicker("Martial Form (Forged Heart/Nightmare Shroud/Traveler's Blade/Weretouched)")],
+  "*::Manifest Blow": [featureOptionPicker("Manifest Blow upgrade", true)],
+  "*::Reflexive Adaptation": {
+    linkedModifiers: [
+      fxInstance("modinst_reflexive_adaptation", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("reflexive_adaptation"),
+            kind: "heal_self",
+            removeConditions: ["Blinded", "Deafened", "Grappled"],
+            label: "Self-Restoration also ends Blinded, Deafened, Grappled; remove Exhaustion on rest",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Hand of Ultimate Mercy": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Hand of Ultimate Mercy"),
+      fxInstance("modinst_hand_ultimate_mercy", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("hand_ultimate_mercy"),
+            kind: "heal_self",
+            healMode: "dice",
+            healDiceCount: 4,
+            healDieType: "d10",
+            label: "Revive corpse within 24 hours (5 Focus Points)",
+          },
+        ],
+      }),
+    ],
+  },
+
+  // —— Paladin oaths (2024) ——
+  "*::Sacred Weapon": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Sacred Weapon"),
+      fxInstance("modinst_sacred_weapon", SELF_BUFF_CASTER_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("sacred_weapon"),
+            kind: "self_buff_caster",
+            casterBuffLabel: "Sacred Weapon (+CHA attacks, radiant option, light)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Oath of Glory Spells": [alwaysPreparedSpells("Oath of Glory spells")],
+  "*::Inspiring Smite": {
+    linkedModifiers: [
+      onCastSpellChar("inspiring_smite", {
+        spellTags: ["smite", "divine smite"],
+        effect: { catalogRefId: GRANT_TEMP_HP_CATALOG_ID },
+        label: "After Divine Smite: CD → temp HP divided among allies within 30 ft.",
+      }),
+    ],
+  },
+  "*::Peerless Athlete": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Peerless Athlete"),
+      checkAdvantage("peerless_athlete_athletics", { category: "skill", skills: ["Athletics"] }),
+      checkAdvantage("peerless_athlete_acrobatics", { category: "skill", skills: ["Acrobatics"] }),
+    ],
+  },
+  "*::Aura of Alacrity": {
+    linkedModifiers: [
+      speedAdd(10, "+10 ft. Speed"),
+      auraPreset("aura_alacrity", {
+        radiusFeet: 10,
+        label: "Allies in Aura of Protection gain +10 ft. Speed when entering or starting turn there",
+      }),
+    ],
+  },
+  "*::Glorious Defense": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
+        "Glorious Defense",
+      ),
+      fxInstance("modinst_glorious_defense", "cat_fx_boost_ac", {
+        reaction: true,
+        effects: [
+          {
+            id: modId("glorious_defense"),
+            kind: "boost_ac",
+            label: "Reaction: +CHA AC vs hit; counterattack if miss",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Living Legend": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Living Legend",
+        undefined,
+        { minSpellLevel: 5, restores: 1 },
+      ),
+      checkAdvantage("living_legend_charisma", { category: "ability", ability: "Charisma" }),
+      failedRollTriggerPreset("living_legend_save", {
+        rollKind: "save",
+        useReaction: true,
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Oath of the Ancients Spells": [alwaysPreparedSpells("Oath of the Ancients spells")],
+  "*::Nature's Wrath": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Nature's Wrath"),
+      fxInstance("modinst_natures_wrath", FORCE_SAVE_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("natures_wrath"),
+            kind: "force_save_control",
+            attackProfile: "force_save",
+            saveAbility: "STR",
+            effectConditionTypes: ["Restrained"],
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Aura of Warding": [
+    auraPreset("aura_warding", {
+      radiusFeet: 10,
+      label: "Allies in Aura of Protection: Resistance to Necrotic, Psychic, and Radiant",
+    }),
+    damageResistance(["Necrotic", "Psychic", "Radiant"], "Aura of Warding"),
+  ],
+  "*::Undying Sentinel": {
+    activation: { onDropToZeroHp: true },
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Undying Sentinel"),
+      fxInstance("modinst_undying_sentinel", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("undying_sentinel"),
+            kind: "heal_self",
+            healMode: "character_level",
+            healLevelMultiplier: 3,
+            label: "Drop to 1 HP instead; heal 3× Paladin level",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Elder Champion": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Elder Champion",
+        undefined,
+        { minSpellLevel: 5, restores: 1 },
+      ),
+      auraPreset("elder_champion", {
+        radiusFeet: 10,
+        label: "Enemies in aura: Disadvantage on saves vs your spells/CD; regen 10 HP/turn; action spells as BA",
+      }),
+    ],
+  },
+  "*::Genie Spells": [alwaysPreparedSpells("Oath of the Noble Genies spells")],
+  "*::Elemental Strike": {
+    linkedModifiers: [
+      onCastSpellChar("elemental_strike", {
+        spellTags: ["smite", "divine smite"],
+        effect: { catalogRefId: FORCE_SAVE_CATALOG_ID },
+        label: "After Divine Smite: CD → Dao/Djinni/Efreeti/Marid effect",
+      }),
+      featureOptionPicker("Elemental Strike (Dao/Djinni/Efreeti/Marid)"),
+    ],
+  },
+  "*::Genie's Splendor": {
+    linkedModifiers: [
+      unarmoredDefense("genie_splendor_uac", ["DEX", "CHA"], "Unarmored Defense (10 + DEX + CHA, shield OK)"),
+      skillChoice(1, "Genie's Splendor skill"),
+    ],
+  },
+  "*::Aura of Elemental Shielding": [
+    featureOptionPicker("Elemental Shielding damage type (swappable each turn)", true),
+    auraPreset("aura_elemental_shield", {
+      radiusFeet: 10,
+      label: "Allies in Aura of Protection: Resistance to chosen elemental type",
+    }),
+  ],
+  "*::Elemental Rebuke": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
+        "Elemental Rebuke",
+      ),
+      damageHalvingReactionPreset("elemental_rebuke"),
+      fxInstance("modinst_elemental_rebuke_reflect", FORCE_SAVE_CATALOG_ID, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("elemental_rebuke_reflect"),
+            kind: "force_save_control",
+            attackProfile: "force_save",
+            saveAbility: "DEX",
+            label: "DEX save or take 2d10+CHA elemental damage (half on save)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Noble Scion": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Noble Scion",
+        undefined,
+        { minSpellLevel: 5, restores: 1 },
+      ),
+      speedTypeAdd("fly", 60, "Fly Speed 60 ft. (hover)"),
+      d20TestReactionPreset("noble_scion_wish", {
+        modifierMode: "add",
+        targetScope: "allies_in_area",
+        rangeFeet: 10,
+        useReaction: true,
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Oath of Vengeance Spells": [alwaysPreparedSpells("Oath of Vengeance spells")],
+  "*::Vow of Enmity": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Vow of Enmity"),
+      checkAdvantage("vow_of_enmity", { category: "attack", ability: null }),
+    ],
+  },
+  "*::Relentless Avenger": {
+    linkedModifiers: [
+      fxInstance("modinst_relentless_avenger", FEAT_MODIFIER_CATALOG.movementOption, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("relentless_avenger"),
+            kind: "movement_option",
+            movementDisengage: true,
+            moveDistanceMode: "multiplier",
+            moveDistanceMultiplier: 0.5,
+            label: "On Opportunity Attack hit: target Speed 0; move half Speed",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Soul of Vengeance": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      fxInstance("modinst_soul_of_vengeance", REACTION_ATTACK_CATALOG_ID, {
+        reaction: true,
+        effects: [{ id: modId("soul_of_vengeance"), kind: "reaction_attack" }],
+      }),
+    ],
+  },
+  "*::Avenging Angel": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Avenging Angel",
+        undefined,
+        { minSpellLevel: 5, restores: 1 },
+      ),
+      speedTypeAdd("fly", 60, "Fly Speed 60 ft. (hover)"),
+      auraPreset("avenging_angel", {
+        radiusFeet: 10,
+        label: "Frightful Aura: WIS save or Frightened; attacks vs Frightened have Advantage",
+      }),
+    ],
+  },
+
+  // —— Ranger subclasses (2024) ——
+  "*::Primal Companion": [featureOptionPicker("Primal Companion (Land/Sea/Sky)")],
+  "*::Exceptional Training": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_exceptional_training", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("exceptional_training"),
+            kind: "movement_option",
+            movementDash: true,
+            movementDisengage: true,
+            label: "Command beast: also Dash, Disengage, Dodge, or Help as Bonus Action",
+          },
+        ],
+      }),
+      onHitTriggerPreset("exceptional_training_force", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+    ],
+  },
+  "*::Bestial Fury": {
+    linkedModifiers: [
+      onHitTriggerPreset("bestial_fury_mark", {
+        appliesTo: "Hunter's Mark target",
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+    ],
+  },
+  "*::Share Spells": {
+    linkedModifiers: [
+      charInstance("modinst_share_spells", FEAT_MODIFIER_CATALOG.spellsKnown, [
+        {
+          id: modId("share_spells"),
+          type: "spells_known",
+          spells: [],
+          label: "Self-targeting spells also affect Primal Companion within 30 ft.",
+        },
+      ]),
+    ],
+  },
+  "*::Fey Wanderer Spells": [alwaysPreparedSpells("Fey Wanderer spells")],
+  "*::Feywild Gifts": [featureOptionPicker("Feywild Gift (or random)", false)],
+  "*::Dreadful Strikes": {
+    linkedModifiers: [
+      onHitTriggerPreset("dreadful_strikes", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+      extraDamageOnHit("dreadful_strikes_psychic", "1d4"),
+    ],
+  },
+  "*::Otherworldly Glamour": {
+    linkedModifiers: [
+      checkBonus("otherworldly_glamour", {
+        category: "ability",
+        ability: "Charisma",
+        bonusConfig: { mode: "ability_modifier", ability: "WIS" },
+      }),
+      skillChoice(1, "Otherworldly Glamour skill (Deception/Performance/Persuasion)"),
+    ],
+  },
+  "*::Beguiling Twist": {
+    linkedModifiers: [
+      checkAdvantage("beguiling_twist_saves", {
+        category: "save",
+        ability: "Wisdom",
+        conditions: ["Charmed", "Frightened"],
+      }),
+      savingThrowTriggerPreset("beguiling_twist", {
+        triggerOn: "make",
+        targetScope: "self",
+        useReaction: true,
+        effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Fey Reinforcements": {
+    linkedModifiers: [
+      spellsKnownChar("fey_reinforcements", {
+        choiceGrants: [{ level: 5, count: 1 }],
+        spellListClassOptions: ["Ranger"],
+        freeCastPerLongRest: [{ spellName: "Summon Fey", count: 1 }],
+        label: "Summon Fey without slot/M once per Long Rest; optional no-concentration",
+      }),
+    ],
+  },
+  "*::Misty Wanderer": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Misty Step without slot",
+      ),
+      castSpellFx("misty_wanderer", { castSpellName: "Misty Step", castSpellWithoutSlot: true }, { bonusAction: true }),
+    ],
+  },
+  "*::Gloom Stalker Spells": [alwaysPreparedSpells("Gloom Stalker spells")],
+  "*::Dread Ambusher": {
+    linkedModifiers: [
+      speedAdd(10, "Ambusher's Leap: +10 ft. Speed first turn"),
+      checkBonus("dread_ambusher_init", {
+        category: "initiative",
+        bonusConfig: { mode: "ability_modifier", ability: "WIS" },
+      }),
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Dreadful Strike (2d6 Psychic)",
+      ),
+      onHitTriggerPreset("dread_ambusher", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+      extraDamageOnHit("dread_ambusher_psychic", "2d6"),
+    ],
+  },
+  "*::Umbral Sight": {
+    linkedModifiers: [
+      vision(60, "darkvision", "Darkvision 60 ft. (+60 if already had)"),
+      fxInstance("modinst_umbral_sight", MODIFY_CREATURE_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("umbral_sight"),
+            kind: "modify_creature",
+            rollTarget: "self",
+            creatureModifyMode: "roll",
+            label: "Invisible to Darkvision while in Darkness",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Iron Mind": [savingThrows(["Wisdom"], "WIS saves (or INT/CHA if already proficient)")],
+  "*::Stalker's Flurry": {
+    linkedModifiers: [
+      extraDamageOnHit("stalkers_flurry", "2d8"),
+      featureOptionPicker("Stalker's Flurry rider (Sudden Strike / Mass Fear)"),
+    ],
+  },
+  "*::Shadowy Dodge": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      fxInstance("modinst_shadowy_dodge", IMPOSE_DISADVANTAGE_CATALOG_ID, {
+        reaction: true,
+        effects: [{ id: modId("shadowy_dodge"), kind: "impose_disadvantage" }],
+      }),
+      fxInstance("modinst_shadowy_dodge_tp", FEAT_MODIFIER_CATALOG.movementOption, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("shadowy_dodge_tp"),
+            kind: "movement_option",
+            label: "Then teleport up to 30 ft.",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Hollow Warden Spells": [alwaysPreparedSpells("Hollow Warden spells")],
+  "*::Wrath of the Wild": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Wrath of the Wild (Favored Enemy)"),
+      fxInstance("modinst_wrath_wild", "cat_fx_boost_ac", {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("wrath_wild"),
+            kind: "boost_ac",
+            label: "Transform: +1 AC (+2 at 11), Frightened aura, retribution Opportunity Attack",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Hungering Might": [
+    checkBonus("hungering_might", {
+      category: "save",
+      ability: "Constitution",
+      bonusConfig: { mode: "ability_modifier", ability: "WIS" },
+    }),
+    fxInstance("modinst_hungering_might", FEAT_MODIFIER_CATALOG.healSelf, {
+      effects: [
+        {
+          id: modId("hungering_might"),
+          kind: "heal_self",
+          healMode: "dice",
+          healDiceCount: 1,
+          healDieType: "d10",
+          label: "Once/turn while transformed and Bloodied: heal 1d10+WIS on hit",
+        },
+      ],
+    }),
+  ],
+  "*::Rot and Violence": {
+    linkedModifiers: [
+      weaponMasterySwap("rot_violence", ["Sap", "Slow"], "Sap or Slow mastery in addition while transformed"),
+    ],
+  },
+  "*::Ancient Might": {
+    activation: { onDropToZeroHp: true },
+    linkedModifiers: [
+      onHitTriggerPreset("ancient_might_ominous", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+      conditionImmunity(["Exhausted"], "Timeless"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Persistent Wrath",
+        undefined,
+        { minSpellLevel: 4, restores: 1 },
+      ),
+      fxInstance("modinst_persistent_wrath", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("persistent_wrath"),
+            kind: "heal_self",
+            healMode: "character_level",
+            healLevelMultiplier: 2,
+            label: "While transformed at 0 HP: surge to 2× Ranger level HP",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Frigid Explorer": {
+    linkedModifiers: [
+      damageResistance(["Cold"], "Frost Resistance"),
+      onHitTriggerPreset("polar_strikes", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+      extraDamageOnHit("polar_strikes_cold", "1d4"),
+    ],
+  },
+  "*::Hunter's Rime": {
+    linkedModifiers: [
+      onCastSpellChar("hunters_rime", {
+        spellTags: ["hunter's mark"],
+        effect: { catalogRefId: GRANT_TEMP_HP_CATALOG_ID },
+      }),
+      fxInstance("modinst_hunters_rime", MODIFY_CREATURE_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("hunters_rime"),
+            kind: "modify_creature",
+            rollTarget: "enemy",
+            creatureModifyMode: "movement",
+            label: "Marked creature can't Disengage",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Winter Walker Spells": [alwaysPreparedSpells("Winter Walker spells")],
+  "*::Fortifying Soul": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Fortifying Soul"),
+      fxInstance("modinst_fortifying_soul", FEAT_MODIFIER_CATALOG.healSelf, {
+        action: true,
+        effects: [
+          {
+            id: modId("fortifying_soul"),
+            kind: "heal_self",
+            healMode: "character_level",
+            healLevelMultiplier: 1,
+            label: "WIS-mod allies heal 1d10+level; Advantage vs Frightened 1 hour",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Chilling Retribution": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Chilling Retribution",
+      ),
+      fxInstance("modinst_chilling_retribution", FORCE_SAVE_CATALOG_ID, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("chilling_retribution"),
+            kind: "force_save_control",
+            attackProfile: "force_save",
+            saveAbility: "WIS",
+            effectConditionTypes: ["Stunned"],
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Frozen Haunt": {
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Frozen Haunt",
+        undefined,
+        { minSpellLevel: 4, restores: 1 },
+      ),
+      damageResistance(["Cold"], "Frozen Soul immunity while in form"),
+      conditionImmunity(["Grappled", "Prone", "Restrained"], "Partially Incorporeal"),
+    ],
+  },
+
+  // —— Rogue subclasses (2024) ——
+  "*::Mage Hand Legerdemain": {
+    linkedModifiers: [
+      castSpellFx(
+        "mage_hand_legerdemain",
+        { castSpellName: "Mage Hand", castSpellCastingTime: "bonus_action" },
+        { bonusAction: true },
+      ),
+    ],
+  },
+  "*::Magical Ambush": {
+    linkedModifiers: [
+      onCastSpellChar("magical_ambush", {
+        effect: { catalogRefId: MODIFY_CREATURE_CATALOG_ID },
+        label: "Invisible when casting: targets have Disadvantage on save vs spell",
+      }),
+    ],
+  },
+  "*::Versatile Trickster": {
+    linkedModifiers: [
+      bonusRidersPreset(
+        "versatile_trickster",
+        [{ name: "Trip (Mage Hand)", costDice: "1d6", description: "Trip second creature within 5 ft. of hand" }],
+        1,
+        "Cunning Strike",
+      ),
+    ],
+  },
+  "*::Spell Thief": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Spell Thief"),
+      savingThrowTriggerPreset("spell_thief", {
+        triggerOn: "make",
+        targetScope: "target_creature",
+        useReaction: true,
+        saveAbility: "Intelligence",
+        effectCatalogRefId: "cat_fx_cast_spell",
+      }),
+    ],
+  },
+  "*::Assassinate": {
+    linkedModifiers: [
+      checkAdvantage("assassinate_init", { category: "initiative" }),
+      checkAdvantage("assassinate_surprise", { category: "attack", ability: null }),
+      onHitTriggerPreset("assassinate_surprise_damage", {
+        effectCatalogRefId: "cat_fx_bonus_damage_by_level",
+      }),
+    ],
+  },
+  "*::Assassin's Tools": [
+    charInstance("modinst_assassin_tools", "cat_char_tool_proficiencies", [
+      { id: modId("assassin_tools"), type: "tool_proficiencies", values: ["Disguise Kit", "Poisoner's Kit"] },
+    ]),
+  ],
+  "*::Infiltration Expertise": {
+    linkedModifiers: [
+      charInstance("modinst_roving_aim", FEAT_MODIFIER_CATALOG.attackRollModifiers, [
+        {
+          id: modId("roving_aim"),
+          type: "attack_roll_modifiers",
+          entries: [{ bonus: 0, target: "all" }],
+          label: "Speed not reduced to 0 when using Steady Aim",
+        },
+      ]),
+    ],
+  },
+  "*::Envenom Weapons": {
+    linkedModifiers: [
+      bonusRidersPreset(
+        "envenom_weapons",
+        [{ name: "Poison", costDice: "1d6", description: "Failed Poison save: +2d6 Poison damage (ignores Resistance)" }],
+        1,
+        "Cunning Strike",
+      ),
+    ],
+  },
+  "*::Death Strike": {
+    linkedModifiers: [
+      onHitTriggerPreset("death_strike", { effectCatalogRefId: FORCE_SAVE_CATALOG_ID }),
+    ],
+  },
+  "*::Wails from the Grave": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "DEX", recharges: [{ rest: "long_rest" }] },
+        "Wails from the Grave",
+      ),
+      onHitTriggerPreset("wails_from_grave", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+    ],
+  },
+  "*::Whispers of the Dead": [skillChoice(1, "Whispers of the Dead proficiency (swap on rest)")],
+  "*::Tokens of the Departed": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 2, recharges: [{ rest: "long_rest" }] }, "Soul trinkets"),
+      checkAdvantage("life_essence", { category: "save", ability: "Constitution" }),
+    ],
+  },
+  "*::Ghost Walk": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Once per Long Rest; restore by destroying a soul trinket (no action)",
+          recharges: [{ rest: "long_rest" }],
+        },
+        "Ghost Walk",
+      ),
+      speedTypeAdd("fly", 10, "Fly Speed 10 ft. (hover) while spectral"),
+    ],
+  },
+  "*::Death's Friend": {
+    linkedModifiers: [
+      onHitTriggerPreset("deaths_lament", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+    ],
+  },
+  "*::Bloodthirst": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Bloodthirst",
+      ),
+      fxInstance("modinst_bloodthirst", REACTION_ATTACK_CATALOG_ID, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("bloodthirst"),
+            kind: "reaction_attack",
+            label: "Reaction teleport 5 ft. and melee attack when enemy becomes Bloodied",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Dread Allegiance": {
+    linkedModifiers: [
+      featureOptionPicker("Dread Allegiance (Bane/Bhaal/Myrkul)", true),
+      damageResistance([], "Resistance from chosen Dead Three patron"),
+    ],
+  },
+  "*::Strike Fear": {
+    linkedModifiers: [
+      bonusRidersPreset(
+        "strike_fear",
+        [{ name: "Terrify", costDice: "1d6", description: "WIS save or Frightened 1 minute" }],
+        1,
+        "Cunning Strike",
+      ),
+    ],
+  },
+  "*::Aura of Malevolence": {
+    linkedModifiers: [
+      onHitTriggerPreset("aura_malevolence", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+    ],
+  },
+  "*::Dread Incarnate": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }] }, "Cutthroat Bloodthirst refresh"),
+      charInstance("modinst_murderous_intent", FEAT_MODIFIER_CATALOG.damageRollModifiers, [
+        {
+          id: modId("murderous_intent"),
+          type: "damage_roll_modifiers",
+          entries: [{ bonus: 0, target: "all" }],
+          label: "Sneak Attack: treat 1–2 on die as 3",
+        },
+      ]),
+    ],
+  },
+  "*::Psychic Blades": {
+    linkedModifiers: [
+      charInstance("modinst_psychic_blades", FEAT_MODIFIER_CATALOG.unarmedStrikeDamage, [
+        {
+          id: modId("psychic_blades"),
+          type: "unarmed_strike_damage",
+          die: "1d6",
+          label: "Psychic Blades: 1d6 Psychic, Finesse, Thrown 60/120; BA second blade 1d4",
+        },
+      ]),
+    ],
+  },
+  "*::Soul Blades": {
+    linkedModifiers: [
+      failedRollTriggerPreset("homing_strikes", {
+        rollKind: "attack",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        spendResourceKey: "psionic_energy_dice",
+      }),
+    ],
+  },
+  "*::Psychic Veil": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Psychic Veil",
+        { resourceKey: "psionic_energy_dice", restores: 1 },
+      ),
+      fxInstance("modinst_psychic_veil", MODIFY_CREATURE_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("psychic_veil"),
+            kind: "modify_creature",
+            rollTarget: "self",
+            creatureModifyMode: "roll",
+            label: "Invisible 1 hour; ends early on damage or forced save",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Rend Mind": {
+    linkedModifiers: [
+      onHitTriggerPreset("rend_mind", {
+        appliesTo: "Psychic Blades Sneak Attack",
+        effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+      }),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Rend Mind",
+        { resourceKey: "psionic_energy_dice", resourceAmount: 3, restores: 1 },
+      ),
+    ],
+  },
+
+  // —— Sorcerer subclasses (2024) ——
+  "*::Psionic Spells": [alwaysPreparedSpells("Psionic Spells (Aberrant Sorcery)")],
+  "*::Telepathic Speech": [telepathyPreset("telepathic_speech", 1, "Telepathy miles = CHA mod (min 1)")],
+  "*::Psionic Sorcery": {
+    linkedModifiers: [
+      charInstance("modinst_psionic_sorcery", ON_CAST_SPELL_TRIGGER_CATALOG_ID, [
+        {
+          id: modId("psionic_sorcery"),
+          type: "on_cast_spell_trigger",
+          spellTags: ["psionic"],
+          effect: { catalogRefId: CLASS_RESOURCE_CATALOG_ID },
+          label: "Cast Psionic Spells with Sorcery Points (no V/S/M unless consumed)",
+        },
+      ]),
+    ],
+  },
+  "*::Psychic Defenses": {
+    linkedModifiers: [
+      damageResistance(["Psychic"], "Psychic Resistance"),
+      checkAdvantage("psychic_defenses", {
+        category: "save",
+        ability: "Wisdom",
+        conditions: ["Charmed", "Frightened"],
+      }),
+    ],
+  },
+  "*::Revelation in Flesh": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      featureOptionPicker("Revelation in Flesh (Aquatic/Glistening/See Invisible/Wormlike)"),
+      usesPool({ type: "class_resource", classResourceKey: "sorcery_points", classResourceAmount: 1 }, "Revelation in Flesh"),
+    ],
+  },
+  "*::Warping Implosion": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Warping Implosion",
+        { resourceKey: "sorcery_points", resourceAmount: 5, restores: 1 },
+      ),
+      fxInstance("modinst_warping_implosion", FORCE_SAVE_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("warping_implosion"),
+            kind: "force_save_control",
+            attackProfile: "force_save",
+            saveAbility: "STR",
+            label: "Teleport 120 ft.; STR save or 3d10 Force and pulled",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Clockwork Spells": [alwaysPreparedSpells("Clockwork Spells")],
+  "*::Manifestations of Order": [featureOptionPicker("Manifestations of Order (or random)", false)],
+  "*::Restore Balance": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
+        "Restore Balance",
+      ),
+      d20TestReactionPreset("restore_balance", {
+        modifierMode: "subtract",
+        targetScope: "target_creature",
+        rangeFeet: 60,
+        useReaction: true,
+        dieSource: "fixed",
+        fixedDie: "0",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Bastion of Law": {
+    activation: { action: true },
+    linkedModifiers: [
+      charInstance("modinst_bastion_of_law", HEALING_DICE_POOL_CATALOG_ID, [
+        {
+          id: modId("bastion_of_law"),
+          type: "healing_dice_pool",
+          dieType: "d8",
+          activation: "action",
+          label: "Spend 1–5 SP: ward creature with d8s = SP spent",
+        },
+      ]),
+    ],
+  },
+  "*::Trance of Order": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Trance of Order",
+        { resourceKey: "sorcery_points", resourceAmount: 5, restores: 1 },
+      ),
+      checkRollFloor("trance_of_order", { category: "other", below: 9, setTo: 10 }),
+      elusive(),
+    ],
+  },
+  "*::Clockwork Cavalcade": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Clockwork Cavalcade",
+        { resourceKey: "sorcery_points", resourceAmount: 7, restores: 1 },
+      ),
+      fxInstance("modinst_clockwork_cavalcade", FEAT_MODIFIER_CATALOG.healSelf, {
+        action: true,
+        effects: [
+          {
+            id: modId("clockwork_cavalcade"),
+            kind: "heal_self",
+            healMode: "fixed",
+            healAmount: 100,
+            label: "30-ft. cube: heal 100 HP split, repair objects, dispel level 6−",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Shadow Spells": [alwaysPreparedSpells("Shadow Spells")],
+  "*::Power of Shadow": {
+    activation: { onDropToZeroHp: true },
+    linkedModifiers: [
+      vision(120, "darkvision", "Darkvision 120 ft."),
+      vision(10, "blindsight", "Blindsight 10 ft."),
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Strength of the Grave"),
+      savingThrowTriggerPreset("strength_of_grave", {
+        triggerOn: "fail",
+        targetScope: "self",
+        saveAbility: "Charisma",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Beasts of Ill Omen": {
+    linkedModifiers: [
+      spellsKnownChar("beasts_ill_omen", {
+        choiceGrants: [{ level: 6, count: 1 }],
+        spellListClassOptions: ["Sorcerer"],
+        freeCastPerLongRest: [{ spellName: "Summon Beast", count: 1 }],
+        label: "Summon Beast as BA for 3 SP; shadow beast; no-concentration option",
+      }),
+    ],
+  },
+  "*::Shadow Walk": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_shadow_walk", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("shadow_walk"),
+            kind: "movement_option",
+            label: "Teleport up to 120 ft. between dim light/darkness",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Umbral Form": {
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Umbral Form",
+        { resourceKey: "sorcery_points", resourceAmount: 6, restores: 1 },
+      ),
+      damageResistance([], "Resistance to all damage except Force and Radiant while Umbral"),
+    ],
+  },
+  "*::Spellfire Burst": {
+    linkedModifiers: [
+      onCastSpellChar("spellfire_burst", {
+        effect: { catalogRefId: GRANT_TEMP_HP_CATALOG_ID },
+        label: "Once/turn when spending SP: Bolstering Flames or Radiant Fire",
+      }),
+    ],
+  },
+  "*::Spellfire Spells": [alwaysPreparedSpells("Spellfire Spells")],
+  "*::Absorb Spells": [alwaysPreparedSpells("Counterspell")],
+  "*::Honed Spellfire": {
+    linkedModifiers: [
+      onCastSpellChar("honed_spellfire", {
+        effect: { catalogRefId: GRANT_TEMP_HP_CATALOG_ID },
+        label: "Bolstering Flames +level HP; Radiant Fire 1d8",
+      }),
+    ],
+  },
+  "*::Crown of Spellfire": {
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Crown of Spellfire",
+        { resourceKey: "sorcery_points", resourceAmount: 5, restores: 1 },
+      ),
+      speedTypeAdd("fly", 60, "Fly Speed 60 ft. (hover)"),
+      evasion(),
+    ],
+  },
+  "*::Wild Magic Surge": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Once per turn after casting with slot: roll d20; on 20 roll Wild Magic Surge table",
+        },
+        "Wild Magic Surge",
+      ),
+    ],
+  },
+  "*::Tides of Chaos": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Tides of Chaos"),
+      checkAdvantage("tides_of_chaos", { category: "other" }),
+    ],
+  },
+  "*::Bend Luck": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      d20TestReactionPreset("bend_luck", {
+        modifierMode: "add",
+        targetScope: "target_creature",
+        rangeFeet: 60,
+        useReaction: true,
+        spendResourceKey: "sorcery_points",
+        dieSource: "fixed",
+        fixedDie: "1d4",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+      }),
+    ],
+  },
+  "*::Controlled Chaos": {
+    linkedModifiers: [
+      charInstance("modinst_controlled_chaos", FEAT_MODIFIER_CATALOG.uses, [
+        {
+          id: modId("controlled_chaos"),
+          type: "uses",
+          uses: { type: "special", specialDescription: "Roll Wild Magic Surge table twice; choose result" },
+        },
+      ]),
+    ],
+  },
+  "*::Tamed Surge": {
+    linkedModifiers: [
+      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Tamed Surge"),
+      charInstance("modinst_tamed_surge", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+        {
+          id: modId("tamed_surge"),
+          type: "resource_ability_menu",
+          resourceKey: "sorcery_points",
+          label: "Choose Wild Magic Surge effect instead of rolling (except row 97–00)",
+          options: [],
+        },
+      ]),
+    ],
+  },
+
+  // —— Artificer subclasses ——
+  "*::Alchemist Spells": [alwaysPreparedSpells("Alchemist spells")],
+  "Artificer::Alchemist::Tools of the Trade": {
+    linkedModifiers: [
+      toolsPreset("alchemist", ["Alchemist's Supplies", "Herbalism Kit"], "Alchemist tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Potion crafting time halved (DMG crafting rules)" },
+        "Potion Crafting",
+      ),
+    ],
+  },
+  "*::Experimental Elixir": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "at_level",
+          atLevelMode: "tier",
+          recharges: [{ rest: "long_rest" }],
+          atLevelTable: [
+            { level: 3, count: 2 },
+            { level: 5, count: 3 },
+            { level: 9, count: 4 },
+            { level: 15, count: 5 },
+          ],
+          restoreBySpellSlot: { minSpellLevel: 1, restores: 1 },
+        },
+        "Experimental Elixir",
+      ),
+      featureOptionPicker("Experimental Elixir effect"),
+    ],
+  },
+  "*::Alchemical Savant": {
+    linkedModifiers: [
+      onCastSpellChar("alchemical_savant", {
+        effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+        label: "Cast through Alchemist's Supplies: +INT to healing or Acid/Fire/Poison damage roll (min +1)",
+      }),
+    ],
+  },
+  "*::Restorative Reagents": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Restorative Reagents (Lesser Restoration)",
+      ),
+    ],
+  },
+  "*::Chemical Mastery": {
+    linkedModifiers: [
+      damageResistance(["Acid", "Poison"], "Resistance to Acid and Poison damage"),
+      charInstance("modinst_chemical_mastery_immune", CONDITION_IMMUNITY_CATALOG_ID, [
+        { id: modId("chemical_mastery_immune"), type: "condition_immunity", values: ["Poisoned"] },
+      ]),
+      onHitTriggerPreset("alchemical_eruption", {
+        effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+      }),
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Conjured Cauldron (Tasha's Bubbling Cauldron)",
+      ),
+    ],
+  },
+  "*::Armorer Spells": [alwaysPreparedSpells("Armorer spells")],
+  "Artificer::Armorer::Tools of the Trade": {
+    linkedModifiers: [
+      charInstance("modinst_armorer_heavy", "cat_char_armor_proficiencies", [
+        { id: modId("armorer_heavy"), type: "armor_proficiencies", values: ["Heavy armor"] },
+      ]),
+      toolsPreset("armorer", ["Smith's Tools"], "Armorer tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Armor crafting time halved" },
+        "Armor Crafting",
+      ),
+    ],
+  },
+  "*::Arcane Armor": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Magic action with Smith's Tools: worn armor becomes Arcane Armor (no STR req, quick don/doff, spell focus)",
+        },
+        "Arcane Armor",
+      ),
+    ],
+  },
+  "*::Armor Model": {
+    linkedModifiers: [featureOptionPicker("Arcane Armor model (Dreadnaught / Guardian / Infiltrator)", true)],
+  },
+  "*::Improved Armorer": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Extra Replicate Magic Item armor plan and item; +1 to Arcane Armor model weapon attacks",
+        },
+        "Improved Armorer",
+      ),
+    ],
+  },
+  "*::Perfected Armor": {
+    linkedModifiers: [featureOptionPicker("Perfected Armor model upgrades", true)],
+  },
+  "*::Artillerist Spells": [alwaysPreparedSpells("Artillerist spells")],
+  "Artificer::Artillerist::Tools of the Trade": {
+    linkedModifiers: [
+      charInstance("modinst_artillerist_ranged", "cat_char_weapon_proficiencies", [
+        {
+          id: modId("artillerist_ranged"),
+          type: "weapon_proficiencies",
+          mode: "martial_weapons",
+          values: ["Martial ranged weapons"],
+        },
+      ]),
+      toolsPreset("artillerist", ["Woodcarver's Tools"], "Artillerist tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Magic wand crafting time halved" },
+        "Wand Crafting",
+      ),
+    ],
+  },
+  "*::Eldritch Cannon": {
+    activation: { action: true },
+    linkedModifiers: [
+      companionPreset("Eldritch Cannon"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Eldritch Cannon",
+        undefined,
+        { minSpellLevel: 1, restores: 1 },
+      ),
+    ],
+  },
+  "*::Arcane Firearm": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Long Rest: inscribe Rod/Staff/Wand/Martial Ranged weapon as spell focus; +1d8 to one Artificer spell damage roll",
+        },
+        "Arcane Firearm",
+      ),
+    ],
+  },
+  "*::Explosive Cannon": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Detonate cannon on damage (Reaction); cannon damage and Protector temp HP +1d8",
+        },
+        "Explosive Cannon",
+      ),
+    ],
+  },
+  "*::Fortified Position": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Two cannons per creation; activate both with one Bonus Action; Half Cover within 10 ft.",
+        },
+        "Fortified Position",
+      ),
+      auraPreset("fortified_position", { radiusFeet: 10, halfCover: true, label: "Half Cover near Eldritch Cannon" }),
+    ],
+  },
+  "*::Battle Smith Spells": [alwaysPreparedSpells("Battle Smith spells")],
+  "Artificer::Battle Smith::Tools of the Trade": {
+    linkedModifiers: [
+      toolsPreset("battle_smith", ["Smith's Tools"], "Battle Smith tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Weapon crafting time halved" },
+        "Weapon Crafting",
+      ),
+    ],
+  },
+  "*::Battle Ready": { linkedModifiers: battleReadyPreset() },
+  "*::Steel Defender": {
+    linkedModifiers: [companionPreset("Steel Defender")],
+  },
+  "*::Arcane Jolt": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Arcane Jolt",
+      ),
+      onHitTriggerPreset("arcane_jolt", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+    ],
+  },
+  "*::Improved Defender": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Arcane Jolt damage/healing 4d6; Deflect Attack deals 1d4+INT Force to attacker",
+        },
+        "Improved Defender",
+      ),
+    ],
+  },
+  "*::Cartographer Spells": [alwaysPreparedSpells("Cartographer spells")],
+  "Artificer::Cartographer::Tools of the Trade": {
+    linkedModifiers: [
+      toolsPreset("cartographer", ["Calligrapher's Supplies", "Cartographer's Tools"], "Cartographer tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Spell scroll crafting time halved" },
+        "Scroll Crafting",
+      ),
+    ],
+  },
+  "*::Adventurer's Atlas": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Long Rest with Cartographer's Tools: magical maps for 1+INT creatures; +1d4 Initiative; shared positioning",
+        },
+        "Adventurer's Atlas",
+      ),
+    ],
+  },
+  "*::Mapping Magic": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Illuminated Cartography (Faerie Fire)",
+      ),
+      fxInstance("modinst_portal_jump", FEAT_MODIFIER_CATALOG.movementOption, {
+        effects: [
+          {
+            id: modId("portal_jump"),
+            kind: "movement_option",
+            label: "Spend half Speed: teleport within 10 ft. of self or mapped ally within 30 ft.",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Guided Precision": {
+    linkedModifiers: [
+      onCastSpellChar("guided_precision", {
+        effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+        label: "Once per turn: +INT to damage on Cartographer spell or attack vs Faerie Fire target",
+      }),
+      spellsKnownChar("guided_precision_conc", {
+        concentrationImmuneForSpell: "Faerie Fire",
+        label: "Damage cannot break Concentration on Faerie Fire",
+      }),
+    ],
+  },
+  "*::Ingenious Movement": {
+    linkedModifiers: [
+      fxInstance("modinst_ingenious_movement", FEAT_MODIFIER_CATALOG.movementOption, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("ingenious_movement"),
+            kind: "movement_option",
+            label: "Flash of Genius Reaction: you or ally within 30 ft. teleports up to 30 ft.",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Superior Atlas": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Map holder at 0 HP: destroy map to set HP to 2×Artificer level and teleport near map holder",
+        },
+        "Safe Haven",
+      ),
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Unerring Path (Find the Path)",
+      ),
+    ],
+  },
+  "*::Reanimator Spells": [alwaysPreparedSpells("Reanimator spells")],
+  "*::Reanimator's Skillset": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Jolt to Life (Spare the Dying)",
+      ),
+      toolsPreset("reanimator", ["Alchemist's Supplies"], "Reanimator tool proficiencies"),
+    ],
+  },
+  "*::Reanimated Companion": {
+    activation: { action: true },
+    linkedModifiers: [
+      companionPreset("Reanimated Companion"),
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Reanimated Companion",
+        undefined,
+        { minSpellLevel: 1, restores: 1 },
+      ),
+    ],
+  },
+  "*::Strange Modifications": {
+    linkedModifiers: [featureOptionPicker("Strange Modifications (companion upgrade)", true)],
+  },
+  "*::Improved Reanimation": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Death Burst 4d4; companion Necrotic damage ignores Resistance",
+        },
+        "Improved Reanimation",
+      ),
+    ],
+  },
+  "*::Macabre Modifications": {
+    linkedModifiers: [
+      featureOptionPicker("Macabre Modifications (Bloated / Gaunt / Moist)", true),
+      usesPool(
+        { type: "special", specialDescription: "Companion gains two Strange Modifications options" },
+        "Macabre Modifications",
+      ),
+    ],
+  },
+  "*::Refined Reanimation": {
+    linkedModifiers: [
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Facilitated Revival (Raise Dead)",
+      ),
+      damageResReaction(
+        "life_transfer",
+        "Reaction when you or companion takes damage: gain HP equal to companion's current HP; companion dies",
+      ),
+      usesPool(
+        { type: "special", specialDescription: "Companion gains three Strange Modifications options" },
+        "Superior Modifications",
+      ),
+    ],
+  },
+  "*::Forge Adept Spells": [alwaysPreparedSpells("Forge Adept spells")],
+  "Artificer::Forge Adept::Tool Proficiency": {
+    linkedModifiers: [
+      toolsPreset("forge_adept", ["Smith's Tools"], "Forge Adept tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Weapon crafting time halved" },
+        "Weapon Crafting",
+      ),
+    ],
+  },
+  "*::Ghaal'Shaarat": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Magic action with Smith's Tools: imbue melee weapon (+1 attack/damage, Thrown 30/120, returns after throw)",
+        },
+        "Ghaal'Shaarat",
+      ),
+    ],
+  },
+  "*::Runes of War": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "ability_modifier",
+          abilityModifier: "INT",
+          recharges: [{ rest: "long_rest" }],
+          specialDescription: "While wielding Ghaal'Shaarat: +2 weapon; Aura of War 1d4 elemental damage to allies' weapon hits",
+        },
+        "Runes of War",
+      ),
+      auraPreset("aura_of_war", {
+        radiusFeet: 30,
+        label: "Aura of War: allies' weapon hits deal extra 1d4 chosen elemental damage",
+      }),
+    ],
+  },
+  "*::Perfect Weapon": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Ghaal'Shaarat +3; transfer weapon bonus to AC on first attack; Elemental Strike +1d6; Psychic resistance; immune Charmed/Frightened",
+        },
+        "Perfect Weapon",
+      ),
+    ],
+  },
+  "*::Maverick Spells": {
+    linkedModifiers: [
+      spellsKnownChar("maverick_cantrip", {
+        choiceGrants: [{ level: 0, count: 1 }],
+        spellListClassOptions: ["Artificer", "Cleric", "Wizard"],
+        label: "Extra cantrip from Artificer, Cleric, or Wizard list",
+      }),
+      usesPool(
+        {
+          type: "proficiency",
+          specialDescription: "Prepare additional spells equal to PB from Artificer/Cleric/Wizard lists",
+        },
+        "Maverick Spells",
+      ),
+    ],
+  },
+  "Artificer::Maverick::Tools Proficiency": {
+    linkedModifiers: [
+      toolsPreset("maverick", ["Tinker's Tools"], "Maverick tool proficiencies"),
+      usesPool(
+        { type: "special", specialDescription: "Magic item crafting time halved" },
+        "Magic Item Crafting",
+      ),
+    ],
+  },
+  "*::Arcane Prototype": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "at_level",
+          atLevelMode: "tier",
+          recharges: [{ rest: "long_rest" }],
+          atLevelTable: [
+            { level: 3, count: 1 },
+            { level: 5, count: 3 },
+            { level: 9, count: 5 },
+            { level: 13, count: 7 },
+            { level: 15, count: 9 },
+            { level: 17, count: 11 },
+            { level: 20, count: 13 },
+          ],
+          specialDescription: "Arcane Charges imbue prototype spell-scrolls at Long Rest",
+        },
+        "Arcane Charges",
+      ),
+      usesPool(
+        {
+          type: "at_level",
+          atLevelMode: "tier",
+          recharges: [{ rest: "long_rest" }],
+          atLevelTable: [
+            { level: 3, count: 1 },
+            { level: 5, count: 2 },
+            { level: 9, count: 3 },
+            { level: 15, count: 4 },
+            { level: 20, count: 5 },
+          ],
+          specialDescription: "Prototype max spell level scales 1–6 by Artificer level",
+        },
+        "Arcane Prototypes",
+      ),
+    ],
+  },
+  "*::Fine Tuning": {
+    linkedModifiers: [
+      onCastSpellChar("fine_tuning", {
+        effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+        label: "Cast Artificer spell with Tinker's Tools: +INT to one damage roll",
+      }),
+    ],
+  },
+  "*::Work In Progress": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "short_rest" }],
+          specialDescription: "Short Rest: replace one prepared spell from Artificer/Cleric/Wizard list",
+        },
+        "Work In Progress",
+      ),
+    ],
+  },
+  "*::Final Breakthrough": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "short_rest" }],
+          specialDescription: "Short Rest: swap spell in a Prototype; ignore attunement class/level requirements",
+        },
+        "Final Breakthrough",
+      ),
+    ],
+  },
 }
 
 /** Features still without a satisfactory common-modifier mapping. */
@@ -1903,7 +4686,25 @@ function resolvePresetKey(
   for (const key of keys) {
     if (SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]) return key
   }
+  if (/\bspells\b/i.test(normalized)) {
+    return "*::__subclass_spells__"
+  }
   return null
+}
+
+/** Whether a known modifier preset applies to this feature (for import reports). */
+export function featureHasModifierPreset(
+  className: string,
+  subclassName: string | null,
+  featureName: string,
+): boolean {
+  const key = resolvePresetKey(className, subclassName, featureName)
+  return key != null && key !== "*::__subclass_spells__"
+}
+
+/** Whether the feature name looks like a subclass spell-list feature. */
+export function featureLooksLikeSpellList(featureName: string): boolean {
+  return /\bspells\b/i.test(featureName.trim())
 }
 
 function mergePresetModifiers(
@@ -1944,6 +4745,11 @@ export function enrichClassFeatureWithModifierPresets(
 ): Feature {
   const key = resolvePresetKey(className, subclassName, feature.name ?? "")
   if (!key) return feature
+  if (key === "*::__subclass_spells__") {
+    return mergePresetModifiers(feature, {
+      linkedModifiers: [alwaysPreparedSpells(`${feature.name ?? "Subclass spells"}`)],
+    })
+  }
   return mergePresetModifiers(feature, SRD_CLASS_FEATURE_MODIFIER_PRESETS[key])
 }
 

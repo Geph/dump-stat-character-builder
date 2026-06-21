@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto"
 import { desc, eq } from "drizzle-orm"
 import { normalizePortraitUrl, normalizeBannerUrl } from "@/lib/portrait"
+import type { CharacterClassRow } from "@/lib/character/character-classes"
+import { attachMulticlassRelations, syncCharacterClassRows } from "@/lib/db/character-multiclass"
 import { getDb, schema } from "./index"
 import { serializeRow } from "./serialize"
 
@@ -69,7 +71,7 @@ async function attachRelations(character: Record<string, unknown>) {
     if (sub) out.subclasses = serializeRow(sub as Record<string, unknown>)
   }
 
-  return out
+  return attachMulticlassRelations(out)
 }
 
 function normalizeCharacterSpeed(value: unknown): number {
@@ -84,6 +86,7 @@ function normalizeCharacterSpeed(value: unknown): number {
 export async function updateCharacter(id: string, data: Record<string, unknown>) {
   const db = getDb()
   const now = new Date()
+  const classRows = data.character_classes as CharacterClassRow[] | undefined
   const payload = {
     ...data,
     speed: normalizeCharacterSpeed(data.speed),
@@ -95,6 +98,9 @@ export async function updateCharacter(id: string, data: Record<string, unknown>)
   delete payload.created_at
 
   await db.update(schema.characters).set(payload as never).where(eq(schema.characters.id, id))
+  if (classRows !== undefined) {
+    await syncCharacterClassRows(id, classRows)
+  }
   return getCharacterWithRelations(id)
 }
 
@@ -102,6 +108,7 @@ export async function insertCharacter(data: Record<string, unknown>) {
   const id = randomUUID()
   const db = getDb()
   const now = new Date()
+  const classRows = data.character_classes as CharacterClassRow[] | undefined
   const payload = {
     ...data,
     id,
@@ -112,5 +119,8 @@ export async function insertCharacter(data: Record<string, unknown>) {
     updated_at: now,
   }
   await db.insert(schema.characters).values(payload as never)
+  if (classRows?.length) {
+    await syncCharacterClassRows(id, classRows)
+  }
   return getCharacterWithRelations(id)
 }

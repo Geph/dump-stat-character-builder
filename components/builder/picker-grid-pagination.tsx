@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type PickerGridPaginationProps = {
   page: number
@@ -9,6 +10,7 @@ type PickerGridPaginationProps = {
   onNext: () => void
   previousLabel?: string
   nextLabel?: string
+  className?: string
 }
 
 export function PickerGridPagination({
@@ -18,11 +20,12 @@ export function PickerGridPagination({
   onNext,
   previousLabel = "Previous page",
   nextLabel = "Next page",
+  className,
 }: PickerGridPaginationProps) {
   if (pageCount <= 1) return null
 
   return (
-    <div className="flex items-center justify-center gap-3 mt-2">
+    <div className={cn("flex items-center justify-center gap-3 mt-2", className)}>
       <button
         type="button"
         aria-label={previousLabel}

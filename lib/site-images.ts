@@ -34,5 +34,11 @@ export const FEATURE_CARD_IMAGES = {
   exportDatabase: withBasePath("/images/features/export-database.png"),
 } as const
 
+/** Builder starting-equipment package cards (cinematic view edge art). */
+export const STARTING_EQUIPMENT_CARD_IMAGES = {
+  gear: withBasePath("/images/builder/starting-equipment-gear.png"),
+  gold: withBasePath("/images/builder/starting-equipment-gold.png"),
+} as const
+
 /** Screenshot for GitHub README (repo root path, not Pages basePath) */
 export const README_HERO_IMAGE = "/images/readme/hero.png"

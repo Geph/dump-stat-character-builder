@@ -101,7 +101,7 @@ export function srdFlavorDescription(
   return DESCRIPTIONS_BY_CATEGORY[category][name]
 }
 
-/** Apply SRD flavor summary when this row is from the official SRD. */
+/** Apply SRD flavor summary when this row is from the bundled SRD seed. */
 export function applySrdFlavorDescription(
   row: Record<string, unknown>,
   category: SrdFlavorCategory,

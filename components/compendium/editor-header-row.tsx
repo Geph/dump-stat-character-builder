@@ -26,6 +26,7 @@ type CompendiumEditorHeaderRowProps = {
   onAccentColorChange?: (color: CompendiumThemeColorId | null) => void
   cardImageUrl?: string | null
   onCardImageUrlChange?: (url: string | null) => void
+  cardImageAspect?: "3/4" | "21/9"
   /** Optional field between name and source (e.g. parent class). */
   afterName?: ReactNode
 }
@@ -46,6 +47,7 @@ export function CompendiumEditorHeaderRow({
   onAccentColorChange,
   cardImageUrl = null,
   onCardImageUrlChange,
+  cardImageAspect = "3/4",
   afterName,
 }: CompendiumEditorHeaderRowProps) {
   const gridCols = afterName
@@ -97,7 +99,11 @@ export function CompendiumEditorHeaderRow({
       </div>
     </div>
     {onCardImageUrlChange ? (
-      <CardImageField value={cardImageUrl} onChange={onCardImageUrlChange} />
+      <CardImageField
+        value={cardImageUrl}
+        onChange={onCardImageUrlChange}
+        imageAspect={cardImageAspect}
+      />
     ) : null}
     </div>
   )

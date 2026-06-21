@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import { Dices } from "lucide-react"
+import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 
 type D20RollButtonProps = {
   modifier: number
   title?: string
   size?: "sm" | "md"
+  onRoll?: () => void
 }
 
 export function rollD20(modifier: number): { natural: number; total: number } {
@@ -26,8 +28,9 @@ function RollDiceIcon({ className = "w-3 h-3" }: { className?: string }) {
   return <Dices className={`${className} text-muted-foreground shrink-0`} aria-hidden />
 }
 
-export function D20RollButton({ modifier, title, size = "sm" }: D20RollButtonProps) {
+export function D20RollButton({ modifier, title, size = "sm", onRoll }: D20RollButtonProps) {
   const [result, setResult] = useState<{ natural: number; total: number } | null>(null)
+  const history = useSheetRollHistory()
 
   const sizeClass =
     size === "md"
@@ -36,10 +39,22 @@ export function D20RollButton({ modifier, title, size = "sm" }: D20RollButtonPro
 
   const modLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`
 
+  const handleRoll = () => {
+    const rolled = rollD20(modifier)
+    setResult(rolled)
+    history?.logRoll({
+      kind: "d20",
+      label: title ?? `d20 ${modLabel}`,
+      summary: `${rolled.natural}${modifier >= 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`} = ${rolled.total}${d20CriticalSuffix(rolled.natural)}`,
+      natural: rolled.natural,
+    })
+    onRoll?.()
+  }
+
   return (
     <button
       type="button"
-      onClick={() => setResult(rollD20(modifier))}
+      onClick={handleRoll}
       className={`inline-flex items-center justify-center rounded border border-border bg-muted/80 font-bold tabular-nums hover:bg-muted shrink-0 ${sizeClass}`}
       title={title ?? `Roll d20 ${modLabel}`}
       aria-label={title ?? `Roll d20 ${modLabel}`}

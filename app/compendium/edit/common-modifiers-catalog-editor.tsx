@@ -62,7 +62,7 @@ export function CatalogEditor({
         title={catalogName}
         isNew={false}
         saving={saving}
-        saveLabel="Save Catalog"
+        saveLabel={`Save ${catalogName}`}
       />
       <CatalogEditorFloatingNav sections={navSections} />
       <main className="max-w-4xl mx-auto px-4 py-8 pb-24 xl:pb-8">

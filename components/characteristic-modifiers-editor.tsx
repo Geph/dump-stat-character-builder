@@ -55,6 +55,11 @@ import {
   SavingThrowTriggerEditor,
   OnHitTriggerEditor,
   FailedRollTriggerEditor,
+  D20TestReactionEditor,
+  DamageHalvingReactionEditor,
+  HealingDicePoolEditor,
+  OnCreatureDeathTriggerEditor,
+  TelepathyEditor,
   OnCastSpellTriggerEditor,
   SpellHealingModifierEditor,
   ResourceAbilityMenuEditor,
@@ -1386,6 +1391,35 @@ function ModifierFields({
           classResources={classResources}
         />
       )
+
+    case "d20_test_reaction":
+      return (
+        <D20TestReactionEditor
+          mod={mod}
+          onChange={onChange}
+          modifierCatalog={modifierCatalog}
+          classResources={classResources}
+        />
+      )
+
+    case "damage_halving_reaction":
+      return <DamageHalvingReactionEditor mod={mod} onChange={onChange} />
+
+    case "healing_dice_pool":
+      return <HealingDicePoolEditor mod={mod} onChange={onChange} />
+
+    case "on_creature_death_trigger":
+      return (
+        <OnCreatureDeathTriggerEditor
+          mod={mod}
+          onChange={onChange}
+          modifierCatalog={modifierCatalog}
+          classResources={classResources}
+        />
+      )
+
+    case "telepathy":
+      return <TelepathyEditor mod={mod} onChange={onChange} />
 
     case "on_cast_spell_trigger":
       return (

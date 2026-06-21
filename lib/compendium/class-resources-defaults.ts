@@ -115,6 +115,59 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
         ],
       },
     },
+    {
+      id: "indomitable",
+      name: "Indomitable",
+      description:
+        "Spent when you use Indomitable to turn a failed saving throw into a success. 1 use at 9th level, 2 at 13th, 3 at 17th. Recharges on a long rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        recharges: [{ rest: "long_rest" }],
+        atLevelTable: [
+          { level: 9, count: 1 },
+          { level: 13, count: 2 },
+          { level: 17, count: 3 },
+        ],
+      },
+    },
+    {
+      id: "superiority_dice",
+      name: "Superiority Dice",
+      description:
+        "Spent when you use a Battle Master maneuver. Four d8s at level 3, five at level 7, six at level 15. Die becomes d10 at level 10 and d12 at level 18. Recharges on a short or long rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        dieType: "d8",
+        recharges: SHORT_OR_LONG_REST,
+        atLevelTable: [
+          { level: 3, count: 4 },
+          { level: 7, count: 5 },
+          { level: 15, count: 6 },
+        ],
+      },
+    },
+    {
+      id: "psionic_energy_dice",
+      name: "Psionic Energy Dice",
+      description:
+        "Spent on Psi Warrior powers (Protective Field, Psionic Strike, Telekinetic Movement, and similar). Pool size and die size scale by Fighter level. Regain one die on a short rest and all dice on a long rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        dieType: "d6",
+        recharges: SHORT_OR_LONG_REST,
+        atLevelTable: [
+          { level: 3, count: 4 },
+          { level: 5, count: 6 },
+          { level: 9, count: 8 },
+          { level: 11, count: 8 },
+          { level: 13, count: 10 },
+          { level: 17, count: 12 },
+        ],
+      },
+    },
   ],
   Monk: [
     {
@@ -152,6 +205,28 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
     SPELL_SLOTS_HALF,
   ],
   Ranger: [SPELL_SLOTS_HALF],
+  Rogue: [
+    {
+      id: "psionic_energy_dice",
+      name: "Psionic Energy Dice",
+      description:
+        "Spent on Soulknife psionic powers (Psi-Bolstered Knack, Psychic Whispers, Homing Strikes, and similar). Pool size and die size scale by Rogue level. Regain one die on a short rest and all dice on a long rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        dieType: "d6",
+        recharges: SHORT_OR_LONG_REST,
+        atLevelTable: [
+          { level: 3, count: 4 },
+          { level: 5, count: 6 },
+          { level: 9, count: 8 },
+          { level: 11, count: 8 },
+          { level: 13, count: 10 },
+          { level: 17, count: 12 },
+        ],
+      },
+    },
+  ],
   Sorcerer: [
     {
       id: "sorcery_points",
@@ -194,4 +269,5 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
     },
   ],
   Wizard: [SPELL_SLOTS_FULL],
+  Artificer: [SPELL_SLOTS_HALF],
 }
