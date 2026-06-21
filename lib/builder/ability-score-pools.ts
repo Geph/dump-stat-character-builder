@@ -19,6 +19,7 @@ import { catalogEntryById, type ModifierCatalogEntry } from "@/lib/compendium/mo
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { linkedModifiersForFeat, type FeatSelectionEntry } from "@/lib/builder/feat-choices"
 import type { DndClass, Feat, Feature, Species, Subclass } from "@/lib/types"
+import { isAsiFeat, milestoneAsiPointTotal } from "@/lib/builder/asi-allocation"
 
 export type AbilityScorePoolGrant = {
   allocationKey: string
@@ -224,6 +225,44 @@ export function collectAbilityScorePoolGrants(params: {
   })
 
   return grants
+}
+
+/** Sum ASI pool points from grants tied to a feat selection entry. */
+export function poolGrantPointsForSelectionEntry(
+  grants: AbilityScorePoolGrant[],
+  choicePickKey: string,
+): number {
+  return grants
+    .filter((grant) => grant.allocationKey.startsWith(choicePickKey))
+    .reduce((sum, grant) => sum + grant.points, 0)
+}
+
+export function asiPoolPointsFromFeatSelections(
+  grants: AbilityScorePoolGrant[],
+  entries: FeatSelectionEntry[],
+  feats: Feat[],
+): number {
+  let total = 0
+  for (const entry of entries) {
+    const feat = feats.find((candidate) => candidate.id === entry.featId)
+    if (!isAsiFeat(feat)) continue
+    total += poolGrantPointsForSelectionEntry(grants, entry.choicePickKey)
+  }
+  return total
+}
+
+/** Legacy combined milestone UI only when catalog pool grants do not cover ASI feat picks. */
+export function shouldUseLegacyMilestoneAsiUi(params: {
+  milestoneAsiFeatCount: number
+  grants: AbilityScorePoolGrant[]
+  featSelectionEntries: FeatSelectionEntry[]
+  feats: Feat[]
+}): boolean {
+  const { milestoneAsiFeatCount, grants, featSelectionEntries, feats } = params
+  if (milestoneAsiFeatCount <= 0) return false
+  const required = milestoneAsiPointTotal(milestoneAsiFeatCount)
+  const covered = asiPoolPointsFromFeatSelections(grants, featSelectionEntries, feats)
+  return covered < required
 }
 
 export function allAbilityScorePoolAllocationsValid(

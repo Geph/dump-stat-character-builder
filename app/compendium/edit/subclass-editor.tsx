@@ -329,6 +329,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageAspect="3/4"
             afterName={
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">

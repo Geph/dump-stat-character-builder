@@ -205,6 +205,7 @@ export const SRD_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
           type: "ac",
           mode: "flat_bonus",
           flatBonus: 1,
+          requiresArmor: true,
           label: "+1 AC while wearing armor",
         },
       ]),

@@ -7,6 +7,7 @@ import {
   SPECIAL_ATTACK_AREA_SHAPES,
   SPECIAL_ATTACK_DIE_TYPES,
   SPECIAL_ATTACK_PROFILES,
+  SPECIAL_ATTACK_TARGET_MODES,
   type SpecialAttackCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
@@ -209,6 +210,56 @@ export function SpecialAttackFieldsEditor({
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Target mode</label>
+          <select
+            value={mod.targetMode ?? "single"}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                targetMode: e.target.value as SpecialAttackCharacteristic["targetMode"],
+              })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            {SPECIAL_ATTACK_TARGET_MODES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {mod.targetMode === "multi" && (
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Max targets</label>
+            <input
+              type="number"
+              min={1}
+              value={mod.maxTargets ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  maxTargets: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              placeholder="Unlimited"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        )}
+      </div>
+
+      <label className="inline-flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={mod.useWeaponDamage ?? false}
+          onChange={(e) => onChange({ ...mod, useWeaponDamage: e.target.checked })}
+          className="accent-primary"
+        />
+        Use weapon damage dice (Volley, Whirlwind, Steel Wind Slash, etc.)
+      </label>
+
       <div>
         <label className="block text-xs font-semibold text-foreground mb-2">Weapon properties</label>
         <WeaponPropertiesChecklist
@@ -270,7 +321,10 @@ export function SpecialAttackFieldsEditor({
 
       <DamageByLevelEditor rows={damageByLevel} onChange={(rows) => onChange({ ...mod, damageByLevel: rows })} />
 
-      {(mod.attackProfile === "force_save" || mod.attackProfile === "emanation") && (
+      {(mod.attackProfile === "force_save" ||
+        mod.attackProfile === "emanation" ||
+        mod.targetMode === "area" ||
+        mod.targetMode === "multi") && (
         <div className="grid gap-3 sm:grid-cols-2 rounded-lg border border-border bg-card/50 p-3">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Area shape</label>
@@ -343,6 +397,15 @@ export function SpecialAttackFieldsEditor({
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
                 />
               </div>
+              <label className="inline-flex items-center gap-2 text-sm sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={mod.saveHalfDamage ?? false}
+                  onChange={(e) => onChange({ ...mod, saveHalfDamage: e.target.checked })}
+                  className="accent-primary"
+                />
+                Half damage on successful save
+              </label>
             </>
           )}
         </div>

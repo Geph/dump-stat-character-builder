@@ -209,6 +209,8 @@ CREATE TABLE IF NOT EXISTS characters (
   experience INT NOT NULL DEFAULT 0,
   class_id CHAR(36),
   subclass_id CHAR(36),
+  character_classes JSON,
+  class_add_order JSON,
   species_id CHAR(36),
   background_id CHAR(36),
   strength INT NOT NULL DEFAULT 10,
@@ -239,6 +241,7 @@ CREATE TABLE IF NOT EXISTS characters (
   armor_proficiencies JSON,
   languages JSON,
   equipment_ids JSON,
+  gold INT NOT NULL DEFAULT 0,
   equipped_armor_id CHAR(36),
   equipped_shield_id CHAR(36),
   equipped_weapon_id CHAR(36),
@@ -253,6 +256,20 @@ CREATE TABLE IF NOT EXISTS characters (
   FOREIGN KEY (subclass_id) REFERENCES subclasses(id) ON DELETE SET NULL,
   FOREIGN KEY (species_id) REFERENCES species(id) ON DELETE SET NULL,
   FOREIGN KEY (background_id) REFERENCES backgrounds(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS character_classes (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  class_id CHAR(36) NOT NULL,
+  level INT NOT NULL DEFAULT 1,
+  subclass_id CHAR(36),
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (subclass_id) REFERENCES subclasses(id) ON DELETE SET NULL,
+  INDEX idx_character_classes_character (character_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;

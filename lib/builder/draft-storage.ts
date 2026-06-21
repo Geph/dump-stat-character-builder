@@ -51,6 +51,23 @@ function isBrowser() {
   return typeof window !== "undefined"
 }
 
+export function normalizeDraftClassLevels(
+  snapshot: Pick<BuilderDraftSnapshot, "classLevels" | "character">,
+): { classId: string; level: number }[] {
+  if (Array.isArray(snapshot.classLevels) && snapshot.classLevels.length > 0) {
+    return snapshot.classLevels
+  }
+  if (snapshot.character.class_id) {
+    return [
+      {
+        classId: snapshot.character.class_id,
+        level: snapshot.character.level > 0 ? snapshot.character.level : 1,
+      },
+    ]
+  }
+  return []
+}
+
 export function loadBuilderDraft(): BuilderDraftSnapshot | null {
   if (!isBrowser()) return null
   try {
@@ -58,7 +75,17 @@ export function loadBuilderDraft(): BuilderDraftSnapshot | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as BuilderDraftSnapshot
     if (parsed.version !== 1 || !parsed.character) return null
-    return parsed
+    const classLevels = normalizeDraftClassLevels(parsed)
+    return {
+      ...parsed,
+      classLevels,
+      classAddOrder:
+        Array.isArray(parsed.classAddOrder) && parsed.classAddOrder.length > 0
+          ? parsed.classAddOrder
+          : classLevels.map((entry) => entry.classId),
+      primaryClassId:
+        parsed.primaryClassId ?? parsed.character.class_id ?? classLevels[0]?.classId ?? null,
+    }
   } catch {
     return null
   }

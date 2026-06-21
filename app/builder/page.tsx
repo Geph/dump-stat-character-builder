@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { GameIcon } from "@/components/game-icon-picker"
@@ -44,15 +44,14 @@ import {
 } from "lucide-react"
 import {
   aggregateCharacteristics,
-  applyAcCharacteristics,
-  applyHpCharacteristics,
-  computeInitiative,
   normalizeCharacteristics,
   resolveUsesConfig,
-  sumAttackRollModifiers,
-  sumDamageRollModifiers,
   ABILITY_SCORE_KEYS,
 } from "@/lib/compendium/characteristic-modifiers"
+import {
+  buildCharacterSaveSnapshot,
+  computeDerivedCharacter,
+} from "@/lib/character/compute-derived"
 import {
   findBackgroundGrantedFeat,
   formatBackgroundAbilityBonuses,
@@ -69,13 +68,9 @@ import {
 } from "@/lib/compendium/background-proficiencies"
 import { formatUsesRecharges, getRechargeRules } from "@/lib/compendium/normalize-uses-config"
 import {
-  calculateArmorClass,
-  calculateWeaponAttack,
-  getWeaponPropertyTags,
   isArmorItem,
   isShieldItem,
   isWeaponItem,
-  isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
@@ -106,7 +101,6 @@ import {
   buildSkillPickSources,
   getSubclassesForClass,
   getTakenSkills,
-  mergeSkillProficiencies,
   SUBCLASS_LEVEL,
   validateClassStepChoices,
   validateOriginStepChoices,
@@ -119,6 +113,7 @@ import {
 } from "@/lib/builder/draft-storage"
 import { characterToBuilderState } from "@/lib/builder/character-to-draft"
 import {
+  computeStartingCharacterGold,
   findEquipmentByName,
   formatEquipmentCost,
   getEquipmentCostGp,
@@ -153,9 +148,9 @@ import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   allAbilityScorePoolAllocationsValid,
   collectAbilityScorePoolGrants,
+  shouldUseLegacyMilestoneAsiUi,
 } from "@/lib/builder/ability-score-pools"
 import {
-  aggregateBackgroundAbilityBonuses,
   BACKGROUND_ASI_KEY,
   BACKGROUND_ASI_TOTAL_POINTS,
   getBackgroundAbilityGrant,
@@ -168,7 +163,6 @@ import {
   isFeatEligibleForCategories,
 } from "@/lib/builder/feat-selection"
 import {
-  aggregateAsiBonuses,
   allSelectedAsiAllocationsValid,
   COMBINED_MILESTONE_ASI_KEY,
   countMilestoneAsiFeats,
@@ -191,9 +185,6 @@ import {
   resolvePrimaryClassId,
 } from "@/lib/builder/primary-class"
 import {
-  aggregateClassArmorProficiencies,
-  aggregateClassToolProficiencies,
-  aggregateClassWeaponProficiencies,
   getClassSkillPickRequirement,
   getMulticlassToolPickRequirement,
   multiclassProficiencySummary,
@@ -300,6 +291,7 @@ const EMPTY_CHARACTER: CharacterDraft = {
   languages: ["Common"],
   spell_ids: [],
   equipment_ids: [],
+  gold: 0,
   feat_ids: [],
   personality_traits: "",
   ideals: "",
@@ -393,6 +385,18 @@ export default function BuilderPage() {
   const [editIdParam, setEditIdParam] = useState<string | null>(null)
   const editHydratedRef = useRef(false)
 
+  const activeClassLevels = Array.isArray(classLevels) ? classLevels : []
+  const activeClassAddOrder = Array.isArray(classAddOrder) ? classAddOrder : []
+
+  useEffect(() => {
+    if (Array.isArray(classLevels)) return
+    setClassLevels(
+      character.class_id
+        ? [{ classId: character.class_id, level: Math.max(1, character.level || 1) }]
+        : [],
+    )
+  }, [classLevels, character.class_id, character.level])
+
   const applyBuilderSnapshot = (snapshot: Omit<BuilderDraftSnapshot, "version" | "savedAt">) => {
     setCurrentStep(snapshot.currentStep)
     setMaxStepReached(snapshot.maxStepReached)
@@ -418,19 +422,30 @@ export default function BuilderPage() {
     setEquippedArmorId(snapshot.equippedArmorId)
     setEquippedShieldId(snapshot.equippedShieldId)
     setEquippedWeaponId(snapshot.equippedWeaponId)
-    setClassLevels(snapshot.classLevels)
+    const restoredClassLevels =
+      Array.isArray(snapshot.classLevels) && snapshot.classLevels.length > 0
+        ? snapshot.classLevels
+        : snapshot.character.class_id
+          ? [
+              {
+                classId: snapshot.character.class_id,
+                level: snapshot.character.level > 0 ? snapshot.character.level : 1,
+              },
+            ]
+          : []
+    setClassLevels(restoredClassLevels)
     setPrimaryClassId(
       snapshot.primaryClassId ??
         snapshot.character.class_id ??
-        snapshot.classLevels[0]?.classId ??
+        restoredClassLevels[0]?.classId ??
         null,
     )
     setClassAddOrder(
       snapshot.classAddOrder?.length
         ? snapshot.classAddOrder
-        : snapshot.classLevels.map((entry) => entry.classId),
+        : restoredClassLevels.map((entry) => entry.classId),
     )
-    setSubclassByClassId(snapshot.subclassByClassId)
+    setSubclassByClassId(snapshot.subclassByClassId ?? {})
     setClassSkillPicks(snapshot.classSkillPicks)
     setClassToolPicks(snapshot.classToolPicks ?? {})
     setFeatureChoicePicks(snapshot.featureChoicePicks)
@@ -495,7 +510,7 @@ export default function BuilderPage() {
     const nextPrimary = resolvePrimaryAfterRemoval(
       classId,
       primaryClassId,
-      classAddOrder,
+      activeClassAddOrder,
       remainingIds,
     )
     setClassLevels(nextLevels)
@@ -503,7 +518,7 @@ export default function BuilderPage() {
   }
 
   const addClassToBuild = (classId: string) => {
-    const registration = registerClassAdded(classId, primaryClassId, classAddOrder)
+    const registration = registerClassAdded(classId, primaryClassId, activeClassAddOrder)
     setClassAddOrder(registration.classAddOrder)
     syncPrimaryClassToCharacter(registration.primaryClassId)
     setClassLevels((prev) => [...prev, { classId, level: 1 }])
@@ -638,9 +653,9 @@ export default function BuilderPage() {
       equippedArmorId,
       equippedShieldId,
       equippedWeaponId,
-      classLevels,
+      classLevels: activeClassLevels,
       primaryClassId,
-      classAddOrder,
+      classAddOrder: activeClassAddOrder,
       subclassByClassId,
       classSkillPicks,
       classToolPicks,
@@ -826,6 +841,10 @@ export default function BuilderPage() {
     })
   }
 
+  const patchCharacter = useCallback((patch: Partial<CharacterDraft>) => {
+    setCharacter((prev) => ({ ...prev, ...patch }))
+  }, [])
+
   const handlePortraitUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -837,7 +856,7 @@ export default function BuilderPage() {
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      setCharacter({ ...character, portrait_url: reader.result as string })
+      patchCharacter({ portrait_url: reader.result as string })
     }
     reader.readAsDataURL(file)
   }
@@ -853,7 +872,7 @@ export default function BuilderPage() {
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      setCharacter({ ...character, banner_url: reader.result as string })
+      patchCharacter({ banner_url: reader.result as string })
     }
     reader.readAsDataURL(file)
   }
@@ -876,18 +895,14 @@ export default function BuilderPage() {
   )
   const grantedFeatIds = backgroundGrantedFeat?.id ? [backgroundGrantedFeat.id] : []
   const backgroundAbilityGrant = getBackgroundAbilityGrant(selectedBackground)
-  const backgroundAbilityBonuses = aggregateBackgroundAbilityBonuses(
-    selectedBackground,
-    asiAllocationsByFeatId,
-  )
   
   // Calculate total level from all class levels
-  const totalLevel = classLevels.length > 0 
-    ? classLevels.reduce((sum, cl) => sum + cl.level, 0)
+  const totalLevel = activeClassLevels.length > 0 
+    ? activeClassLevels.reduce((sum, cl) => sum + cl.level, 0)
     : character.level
 
   const featPickSlots = getFeatPickSlots(
-    classLevels,
+    activeClassLevels,
     classes,
     modifierCatalog,
     totalLevel,
@@ -931,11 +946,17 @@ export default function BuilderPage() {
     grantedFeatIds,
     featSelectionEntries,
     featChoicePicks,
-    classLevels,
+    classLevels: activeClassLevels,
     classes,
     subclasses,
     subclassByClassId,
     featureChoicePicks,
+  })
+  const showLegacyMilestoneAsi = shouldUseLegacyMilestoneAsiUi({
+    milestoneAsiFeatCount,
+    grants: abilityScorePoolGrants,
+    featSelectionEntries,
+    feats,
   })
 
   // If level drops, clear feat picks that no longer apply.
@@ -1029,7 +1050,7 @@ export default function BuilderPage() {
   // Once Origin is chosen, enforce feat prerequisites for class feature feat picks.
   useEffect(() => {
     if (selectedFeatCount === 0) return
-    const classIds = classLevels.map((cl) => cl.classId)
+    const classIds = activeClassLevels.map((cl) => cl.classId)
     const context = {
       totalLevel,
       classIds,
@@ -1076,7 +1097,7 @@ export default function BuilderPage() {
   ])
 
   useEffect(() => {
-    if (milestoneAsiTotalPoints <= 0) {
+    if (!showLegacyMilestoneAsi || milestoneAsiTotalPoints <= 0) {
       setAsiAllocationsByFeatId((prev) => {
         if (!prev[COMBINED_MILESTONE_ASI_KEY]) return prev
         const next = { ...prev }
@@ -1097,7 +1118,13 @@ export default function BuilderPage() {
         trimAsiAllocation(allocation, milestoneAsiTotalPoints),
       ),
     )
-  }, [asiAllocationsByFeatId, selectedFeatIds, feats, milestoneAsiTotalPoints])
+  }, [
+    asiAllocationsByFeatId,
+    selectedFeatIds,
+    feats,
+    milestoneAsiTotalPoints,
+    showLegacyMilestoneAsi,
+  ])
 
   useEffect(() => {
     if (!abilityScorePoolGrants.length) return
@@ -1123,10 +1150,10 @@ export default function BuilderPage() {
   // Get all classes the character has levels in
   const resolvedPrimaryClassId = resolvePrimaryClassId(
     primaryClassId,
-    classAddOrder,
-    classLevels,
+    activeClassAddOrder,
+    activeClassLevels,
   )
-  const characterClasses = classLevels
+  const characterClasses = activeClassLevels
     .map((cl) => {
       const found = classes.find((c) => c.id === cl.classId)
       if (!found) return null
@@ -1165,11 +1192,11 @@ export default function BuilderPage() {
   const packageEquipmentIds = useMemo(() => {
     const ids: string[] = []
     if (selectedStartingOption && !useGoldEquipment) {
-      ids.push(...resolvePackageEquipmentIds(selectedStartingOption.items, equipment))
+      ids.push(...resolvePackageEquipmentIds(selectedStartingOption.items ?? [], equipment))
     }
     if (selectedBackgroundStartingOption && !useBackgroundGoldEquipment) {
       for (const id of resolvePackageEquipmentIds(
-        selectedBackgroundStartingOption.items,
+        selectedBackgroundStartingOption.items ?? [],
         equipment,
       )) {
         if (!ids.includes(id)) ids.push(id)
@@ -1195,7 +1222,7 @@ export default function BuilderPage() {
 
   const ownedEquipmentItems = useMemo(
     () =>
-      character.equipment_ids
+      (character.equipment_ids ?? [])
         .map((id) => equipment.find((item) => item.id === id))
         .filter((item): item is Equipment => !!item),
     [character.equipment_ids, equipment],
@@ -1306,7 +1333,7 @@ export default function BuilderPage() {
       featSelectionEntries,
       featChoicePicks,
       modifierPlayerPicks,
-      classLevels,
+      classLevels: activeClassLevels,
       classes,
       subclasses,
       subclassByClassId,
@@ -1317,206 +1344,123 @@ export default function BuilderPage() {
   const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
   const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
   const allSpellIds = [...new Set([...mergedSpellIds, ...featGrantedSpellIds])]
-  const asiBonuses = aggregateAsiBonuses(asiAllocationsByFeatId)
 
-  const mergedSkillProficiencies = mergeSkillProficiencies(
-    selectedBackground?.skill_proficiencies,
-    classSkillPicks,
-    [...character.skill_proficiencies, ...aggregatedCharacteristics.skills],
+  const characterDerived = useMemo(
+    () =>
+      computeDerivedCharacter({
+        baseAbilityScores: {
+          strength: character.strength,
+          dexterity: character.dexterity,
+          constitution: character.constitution,
+          intelligence: character.intelligence,
+          wisdom: character.wisdom,
+          charisma: character.charisma,
+        },
+        asiAllocations: asiAllocationsByFeatId,
+        background: selectedBackground ?? null,
+        species: selectedSpecies ?? null,
+        classLevels: activeClassLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+        primaryClassId: resolvedPrimaryClassId,
+        classAddOrder: activeClassAddOrder,
+        classSkillPicks,
+        classToolPicks,
+        featureChoicePicks,
+        speciesTraitPicks,
+        featChoicePicks,
+        modifierPlayerPicks,
+        selectedFeatIds,
+        grantedFeatIds,
+        featSelectionEntries,
+        extraSkillProficiencies: character.skill_proficiencies,
+        extraToolProficiencies: character.tool_proficiencies,
+        extraWeaponProficiencies: character.weapon_proficiencies,
+        extraArmorProficiencies: character.armor_proficiencies,
+        languages: character.languages ?? ["Common"],
+        equipment,
+        equippedArmorId,
+        equippedShieldId,
+        equippedWeaponId,
+        modifierCatalog,
+        feats,
+        customAbilities,
+      }),
+    [
+      character.strength,
+      character.dexterity,
+      character.constitution,
+      character.intelligence,
+      character.wisdom,
+      character.charisma,
+      character.skill_proficiencies,
+      character.tool_proficiencies,
+      character.weapon_proficiencies,
+      character.armor_proficiencies,
+      character.languages,
+      asiAllocationsByFeatId,
+      selectedBackground,
+      selectedSpecies,
+      classLevels,
+      classes,
+      subclasses,
+      subclassByClassId,
+      resolvedPrimaryClassId,
+      classAddOrder,
+      classSkillPicks,
+      classToolPicks,
+      featureChoicePicks,
+      speciesTraitPicks,
+      featChoicePicks,
+      modifierPlayerPicks,
+      selectedFeatIds,
+      grantedFeatIds,
+      featSelectionEntries,
+      equipment,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      modifierCatalog,
+      feats,
+      customAbilities,
+    ],
   )
 
-  const effectiveAbilityScores = ABILITY_SCORE_KEYS.reduce(
-    (scores, key) => {
-      scores[key] =
-        character[key] +
-        (aggregatedCharacteristics.abilityBonuses[key] ?? 0) +
-        (asiBonuses[key] ?? 0) +
-        (backgroundAbilityBonuses[key] ?? 0)
-      return scores
-    },
-    {} as Record<(typeof ABILITY_SCORE_KEYS)[number], number>,
-  )
+  const effectiveAbilityScores = characterDerived.abilityScores
+  const abilityMods = characterDerived.abilityMods
 
   const multiclassAbilityIssues = getMulticlassAbilityIssues({
-    classLevels,
+    classLevels: activeClassLevels,
     classes,
     primaryClassId: resolvedPrimaryClassId,
-    classAddOrder,
+    classAddOrder: activeClassAddOrder,
     abilityScores: effectiveAbilityScores,
   })
   const meetsMulticlassRequirements = multiclassAbilityRequirementsMet({
-    classLevels,
+    classLevels: activeClassLevels,
     classes,
     primaryClassId: resolvedPrimaryClassId,
-    classAddOrder,
+    classAddOrder: activeClassAddOrder,
     abilityScores: effectiveAbilityScores,
   })
-  
-  // Compute ability modifiers
-  const abilityMods = {
-    strength: Math.floor((effectiveAbilityScores.strength - 10) / 2),
-    dexterity: Math.floor((effectiveAbilityScores.dexterity - 10) / 2),
-    constitution: Math.floor((effectiveAbilityScores.constitution - 10) / 2),
-    intelligence: Math.floor((effectiveAbilityScores.intelligence - 10) / 2),
-    wisdom: Math.floor((effectiveAbilityScores.wisdom - 10) / 2),
-    charisma: Math.floor((effectiveAbilityScores.charisma - 10) / 2),
-  }
 
-  const aggregatedClassWeaponProficiencies = aggregateClassWeaponProficiencies({
-    classLevels,
-    classes,
-    primaryClassId: resolvedPrimaryClassId,
-  })
-  const aggregatedClassArmorProficiencies = aggregateClassArmorProficiencies({
-    classLevels,
-    classes,
-    primaryClassId: resolvedPrimaryClassId,
-  })
-  const aggregatedClassToolProficiencies = aggregateClassToolProficiencies({
-    classLevels,
-    classes,
-    primaryClassId: resolvedPrimaryClassId,
-    classToolPicks,
-  })
-
-  const effectiveSkillProficiencies = mergedSkillProficiencies
-  const effectiveSkillExpertise = [...aggregatedCharacteristics.skillExpertise]
-  const effectiveToolProficiencies = mergeProficiencyLists(
-    aggregatedClassToolProficiencies,
-    character.tool_proficiencies,
-    aggregatedCharacteristics.toolProficiencies,
-  )
-  const effectiveWeaponProficiencies = getEffectiveWeaponProficiencies(
-    aggregatedClassWeaponProficiencies,
-    character.weapon_proficiencies,
-    aggregatedCharacteristics.weaponProficiencies,
-  )
-  const effectiveArmorProficiencies = getEffectiveArmorProficiencies(
-    aggregatedClassArmorProficiencies,
-    character.armor_proficiencies,
-    aggregatedCharacteristics.armorProficiencies,
-  )
-  const savingThrowProficiencies = [
-    ...new Set([
-      ...(primaryClass?.saving_throws || []),
-      ...aggregatedCharacteristics.savingThrows,
-    ]),
-  ]
-  
-  // Calculate max HP (hit die + con mod at level 1, average + con mod thereafter)
-  const calculateMaxHp = () => {
-    const conMod = abilityMods.constitution
-    if (characterClasses.length === 0 && !selectedClass) return Math.max(8 + conMod, 1)
-    let hp = 0
-    let isFirstLevel = true
-    const classesForHp =
-      characterClasses.length > 0
-        ? characterClasses
-        : selectedClass
-          ? [{ ...selectedClass, level: character.level }]
-          : []
-    for (const cls of classesForHp) {
-      const hitDie = cls.hit_die ?? 8
-      for (let i = 0; i < cls.level; i++) {
-        if (isFirstLevel) {
-          hp += hitDie + conMod
-          isFirstLevel = false
-        } else {
-          hp += Math.floor(hitDie / 2) + 1 + conMod
-        }
-      }
-    }
-    const total = Number.isFinite(hp) ? hp : 8 + conMod
-    return Math.max(total, 1)
-  }
-  const totalCharacterLevel =
-    characterClasses.length > 0
-      ? characterClasses.reduce((sum, cls) => sum + cls.level, 0)
-      : character.level
-  const maxHp = applyHpCharacteristics(
-    calculateMaxHp(),
-    aggregatedCharacteristics,
-    totalCharacterLevel,
-  )
-  
   const armorOptions = equipment.filter(isArmorItem)
   const shieldOptions = equipment.filter(isShieldItem)
   const weaponOptions = equipment.filter(isWeaponItem)
-  const equippedArmor = armorOptions.find((item) => item.id === equippedArmorId) ?? null
-  const equippedShield = shieldOptions.find((item) => item.id === equippedShieldId) ?? null
-  const equippedWeapon = weaponOptions.find((item) => item.id === equippedWeaponId) ?? null
-  const baseArmorClass = calculateArmorClass(abilityMods.dexterity, equippedArmor, equippedShield)
-  const armorClass = applyAcCharacteristics(
-    baseArmorClass,
-    aggregatedCharacteristics,
-    abilityMods,
-    proficiencyBonus,
-  )
-  const baseEquippedWeaponAttack =
-    equippedWeapon && primaryClass
-      ? calculateWeaponAttack(
-          equippedWeapon,
-          abilityMods,
-          proficiencyBonus,
-          isWeaponProficient(equippedWeapon, effectiveWeaponProficiencies),
-        )
-      : equippedWeapon
-        ? calculateWeaponAttack(equippedWeapon, abilityMods, proficiencyBonus, false)
-        : null
-  const equippedWeaponAttack =
-    baseEquippedWeaponAttack && equippedWeapon
-      ? (() => {
-          const weaponProps = getWeaponPropertyTags(equippedWeapon)
-          const attackBonus =
-            baseEquippedWeaponAttack.attackBonus +
-            sumAttackRollModifiers(aggregatedCharacteristics, {
-              subcategory: equippedWeapon.subcategory ?? "",
-              properties: weaponProps,
-            })
-          const damageBonus = sumDamageRollModifiers(aggregatedCharacteristics, {
-            subcategory: equippedWeapon.subcategory ?? "",
-            properties: weaponProps,
-            damageType: equippedWeapon.damage_type ?? "",
-          })
-          const damageDisplay =
-            damageBonus > 0
-              ? `${baseEquippedWeaponAttack.damageDisplay} + ${damageBonus}`
-              : baseEquippedWeaponAttack.damageDisplay
-          return { attackBonus, damageDisplay }
-        })()
-      : baseEquippedWeaponAttack
-  
-  // Speed from species + characteristic modifiers
-  const baseWalkSpeed =
-    typeof selectedSpecies?.speed === "number"
-      ? selectedSpecies.speed
-      : typeof selectedSpecies?.speed === "object" && selectedSpecies?.speed
-        ? (selectedSpecies.speed as { walking?: number }).walking ?? 30
-        : 30
-  let speed = baseWalkSpeed
-  for (const mod of builderCharacteristicMods) {
-    if (mod.type !== "speed") continue
-    const key = mod.speedType === "custom" ? mod.customType?.toLowerCase() || "custom" : mod.speedType
-    if (key !== "walk") continue
-    speed = mod.mode === "set" ? mod.value : speed + mod.value
-  }
-  
-  // Passive Perception (10 + wis mod + proficiency if proficient)
-  const passivePerception =
-    10 +
-    abilityMods.wisdom +
-    (effectiveSkillProficiencies.includes("Perception")
-      ? proficiencyBonus *
-        (effectiveSkillExpertise.includes("Perception") ? 2 : 1)
-      : 0)
-  
-  // Initiative (DEX mod + characteristic modifiers)
-  const initiative = computeInitiative(
-    abilityMods.dexterity,
-    aggregatedCharacteristics,
-    abilityMods,
-    proficiencyBonus,
-  )
+
+  const effectiveSkillProficiencies = characterDerived.skillProficiencies
+  const effectiveSkillExpertise = characterDerived.skillExpertise
+  const effectiveToolProficiencies = characterDerived.toolProficiencies
+  const effectiveWeaponProficiencies = characterDerived.weaponProficiencies
+  const effectiveArmorProficiencies = characterDerived.armorProficiencies
+  const savingThrowProficiencies = characterDerived.savingThrowProficiencies
+  const maxHp = characterDerived.maxHp
+  const armorClass = characterDerived.armorClass
+  const equippedWeaponAttack = characterDerived.equippedWeaponAttack
+  const speed = characterDerived.speed
+  const passivePerception = characterDerived.passivePerception
+  const initiative = characterDerived.initiative
   
   // Darkvision from species traits + characteristic modifiers
   const speciesDarkvision = parseInt(
@@ -1531,13 +1475,13 @@ export default function BuilderPage() {
 
   const resistanceDisplay = [
     ...aggregatedCharacteristics.resistances,
-    ...(selectedSpecies?.traits
-      ?.filter(
+    ...((selectedSpecies?.traits ?? [])
+      .filter(
         (t) =>
           t.name.toLowerCase().includes("resistance") ||
           t.description?.toLowerCase().includes("resistance to"),
       )
-      .map((t) => t.name) || []),
+      .map((t) => t.name)),
   ]
   const immunityDisplay = aggregatedCharacteristics.immunities
 
@@ -1552,43 +1496,54 @@ export default function BuilderPage() {
     setSaving(true)
     try {
       const db = createClient()
-      const cls = classes.find((c) => c.id === character.class_id)
       const calculatedLevel =
-        classLevels.length > 0
-          ? classLevels.reduce((sum, cl) => sum + cl.level, 0)
+        activeClassLevels.length > 0
+          ? activeClassLevels.reduce((sum, cl) => sum + cl.level, 0)
           : character.level
-      const conMod = Math.floor((character.constitution - 10) / 2)
-      const dexMod = Math.floor((character.dexterity - 10) / 2)
 
-      let hitPointMax = 0
-      const classesForHp =
-        classLevels.length > 0
-          ? classLevels.map((cl) => ({ cls: classes.find((c) => c.id === cl.classId), level: cl.level }))
-          : cls
-            ? [{ cls, level: calculatedLevel }]
-            : []
-
-      let isFirst = true
-      for (const { cls: c, level: lvl } of classesForHp) {
-        if (!c) continue
-        for (let i = 0; i < lvl; i++) {
-          if (isFirst) {
-            hitPointMax += c.hit_die + conMod
-            isFirst = false
-          } else {
-            hitPointMax += Math.floor(c.hit_die / 2) + 1 + conMod
-          }
-        }
+      const buildInputs = {
+        baseAbilityScores: {
+          strength: character.strength,
+          dexterity: character.dexterity,
+          constitution: character.constitution,
+          intelligence: character.intelligence,
+          wisdom: character.wisdom,
+          charisma: character.charisma,
+        },
+        asiAllocations: asiAllocationsByFeatId,
+        background: backgrounds.find((b) => b.id === character.background_id) ?? null,
+        species: species.find((s) => s.id === character.species_id) ?? null,
+        classLevels: activeClassLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+        primaryClassId: resolvedPrimaryClassId,
+        classAddOrder: activeClassAddOrder,
+        classSkillPicks,
+        classToolPicks,
+        featureChoicePicks,
+        speciesTraitPicks,
+        featChoicePicks,
+        modifierPlayerPicks,
+        selectedFeatIds,
+        grantedFeatIds,
+        featSelectionEntries,
+        extraSkillProficiencies: character.skill_proficiencies,
+        extraToolProficiencies: character.tool_proficiencies,
+        extraWeaponProficiencies: character.weapon_proficiencies,
+        extraArmorProficiencies: character.armor_proficiencies,
+        languages: character.languages ?? ["Common"],
+        equipment,
+        equippedArmorId,
+        equippedShieldId,
+        equippedWeaponId,
+        modifierCatalog,
+        feats,
+        customAbilities,
       }
-      hitPointMax = Math.max(hitPointMax, 1)
+      const derived = computeDerivedCharacter(buildInputs)
+      const snapshot = buildCharacterSaveSnapshot(buildInputs, derived)
 
-      const savedEquippedArmor =
-        equipment.filter(isArmorItem).find((item) => item.id === equippedArmorId) ?? null
-      const savedEquippedShield =
-        equipment.filter(isShieldItem).find((item) => item.id === equippedShieldId) ?? null
-      const savedArmorClass = calculateArmorClass(dexMod, savedEquippedArmor, savedEquippedShield)
-
-      const bg = backgrounds.find((b) => b.id === character.background_id)
       const validClassId = pickEnabledId(resolvedPrimaryClassId ?? character.class_id, classes)
       const validSpeciesId = pickEnabledId(character.species_id, species)
       const validBackgroundId = pickEnabledId(character.background_id, backgrounds)
@@ -1617,12 +1572,12 @@ export default function BuilderPage() {
         subclass_id: validSubclassId,
         species_id: validSpeciesId,
         background_id: validBackgroundId,
-        strength: character.strength,
-        dexterity: character.dexterity,
-        constitution: character.constitution,
-        intelligence: character.intelligence,
-        wisdom: character.wisdom,
-        charisma: character.charisma,
+        strength: snapshot.strength,
+        dexterity: snapshot.dexterity,
+        constitution: snapshot.constitution,
+        intelligence: snapshot.intelligence,
+        wisdom: snapshot.wisdom,
+        charisma: snapshot.charisma,
         alignment: character.alignment ?? null,
         personality_traits: character.personality_traits || null,
         ideals: character.ideals || null,
@@ -1632,33 +1587,23 @@ export default function BuilderPage() {
         appearance: character.appearance ?? null,
         portrait_url: normalizePortraitUrl(character.portrait_url),
         banner_url: normalizeBannerUrl(character.banner_url),
-        skill_proficiencies: mergeSkillProficiencies(
-          bg?.skill_proficiencies,
-          classSkillPicks,
-          character.skill_proficiencies,
-        ),
-        tool_proficiencies: mergeProficiencyLists(
-          aggregateClassToolProficiencies({
-            classLevels,
-            classes,
-            primaryClassId: resolvedPrimaryClassId,
-            classToolPicks,
-          }),
-          character.tool_proficiencies,
-          aggregatedCharacteristics.toolProficiencies,
-        ),
-        weapon_proficiencies: aggregateClassWeaponProficiencies({
-          classLevels,
-          classes,
-          primaryClassId: resolvedPrimaryClassId,
-        }),
-        armor_proficiencies: aggregateClassArmorProficiencies({
-          classLevels,
-          classes,
-          primaryClassId: resolvedPrimaryClassId,
-        }),
-        languages: character.languages ?? ["Common"],
+        skill_proficiencies: snapshot.skill_proficiencies,
+        skill_expertise: snapshot.skill_expertise,
+        tool_proficiencies: snapshot.tool_proficiencies,
+        weapon_proficiencies: snapshot.weapon_proficiencies,
+        armor_proficiencies: snapshot.armor_proficiencies,
+        languages: snapshot.languages,
         equipment_ids: filterEnabledIds(character.equipment_ids, equipment),
+        gold: inGoldShoppingMode
+          ? goldRemaining
+          : editingCharacterId
+            ? Math.max(0, character.gold ?? 0)
+            : computeStartingCharacterGold({
+                inGoldShoppingMode,
+                goldRemaining,
+                classOption: selectedStartingOption,
+                backgroundOption: selectedBackgroundStartingOption,
+              }),
         spell_ids: filterEnabledIds(allSpellIds, spells),
         feat_ids: filterEnabledIds(
           [...new Set([...selectedFeatIds.filter(Boolean), ...grantedFeatIds])],
@@ -1667,15 +1612,17 @@ export default function BuilderPage() {
         feat_choice_picks: featChoicePicks,
         modifier_player_picks: modifierPlayerPicks,
         asi_allocations: asiAllocationsByFeatId,
-        hit_point_max: hitPointMax,
-        hit_points: currentHp ?? hitPointMax,
-        armor_class: savedArmorClass,
+        character_classes: snapshot.character_classes,
+        class_add_order: snapshot.class_add_order,
+        hit_point_max: snapshot.hit_point_max,
+        hit_points: currentHp ?? snapshot.hit_point_max,
+        armor_class: snapshot.armor_class,
         equipped_armor_id: equippedArmorId,
         equipped_shield_id: equippedShieldId,
         equipped_weapon_id: equippedWeaponId,
-        speed,
-        initiative,
-        proficiency_bonus: Math.floor((calculatedLevel - 1) / 4) + 2,
+        speed: snapshot.speed,
+        initiative: snapshot.initiative,
+        proficiency_bonus: snapshot.proficiency_bonus,
       }
 
       if (!editingCharacterId) {
@@ -1734,14 +1681,14 @@ export default function BuilderPage() {
       case 1:
         return (
           validateClassStepChoices(
-            classLevels,
+            activeClassLevels,
             classes,
             subclasses,
             classSkillPicks,
             subclassByClassId,
             featureChoicePicks,
             resolvedPrimaryClassId,
-            classAddOrder,
+            activeClassAddOrder,
             classToolPicks,
           ) &&
           selectedFeatCount === requiredFeatSlots &&
@@ -1801,7 +1748,9 @@ export default function BuilderPage() {
         )
       case 3:
         return (
-          allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats) &&
+          (showLegacyMilestoneAsi
+            ? allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats)
+            : true) &&
           allAbilityScorePoolAllocationsValid(abilityScorePoolGrants, asiAllocationsByFeatId) &&
           (!backgroundAbilityGrant.needsChoice ||
             isValidBackgroundAsiAllocation(
@@ -1819,7 +1768,7 @@ export default function BuilderPage() {
 
   const canSaveCharacter = () =>
     character.name.trim().length > 0 &&
-    classLevels.length > 0 &&
+    activeClassLevels.length > 0 &&
     meetsMulticlassRequirements
 
   const goToStep = (stepId: number) => {
@@ -1956,7 +1905,7 @@ export default function BuilderPage() {
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     type="button"
-                    title="Cinematic cards"
+                    title="Visual cards"
                     aria-pressed={cardViewMode === "cinematic"}
                     onClick={() => setCardViewMode("cinematic")}
                     className={`flex items-center gap-1 px-2.5 py-2 text-xs font-semibold transition-colors ${
@@ -1966,7 +1915,7 @@ export default function BuilderPage() {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Cards</span>
+                    <span className="hidden sm:inline">Visual</span>
                   </button>
                   <button
                     type="button"
@@ -2018,11 +1967,11 @@ export default function BuilderPage() {
                 <p className="text-muted-foreground mb-4">Your class determines your combat abilities and special features.</p>
                 
                 {/* Current Class Levels */}
-                {classLevels.length > 0 && (
+                {activeClassLevels.length > 0 && (
                   <div className="mb-4 p-3 bg-muted rounded-xl">
                     <p className="text-xs text-muted-foreground mb-2 uppercase font-bold">Current Classes (Total Level: {totalLevel})</p>
                     <div className="space-y-2">
-                      {classLevels.map((cl, idx) => {
+                      {activeClassLevels.map((cl, idx) => {
                         const cls = classes.find(c => c.id === cl.classId)
                         const isPrimary = cl.classId === resolvedPrimaryClassId
                         return (
@@ -2046,7 +1995,7 @@ export default function BuilderPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const newLevels = [...classLevels]
+                                  const newLevels = [...activeClassLevels]
                                   if (newLevels[idx].level > 1) {
                                     newLevels[idx].level--
                                     if (newLevels[idx].level < SUBCLASS_LEVEL) {
@@ -2058,7 +2007,7 @@ export default function BuilderPage() {
                                     }
                                     setClassLevels(newLevels)
                                   } else {
-                                    removeClassFromBuild(cl.classId, classLevels.filter((_, i) => i !== idx))
+                                    removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
                                   }
                                 }}
                                 className="p-1 bg-muted hover:bg-destructive/20 rounded"
@@ -2070,7 +2019,7 @@ export default function BuilderPage() {
                                 type="button"
                                 onClick={() => {
                                   if (totalLevel < 20) {
-                                    const newLevels = [...classLevels]
+                                    const newLevels = [...activeClassLevels]
                                     newLevels[idx].level++
                                     setClassLevels(newLevels)
                                   }
@@ -2084,7 +2033,7 @@ export default function BuilderPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                removeClassFromBuild(cl.classId, classLevels.filter((_, i) => i !== idx))
+                                removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
                               }}
                               className="p-1 text-muted-foreground hover:text-destructive"
                             >
@@ -2123,9 +2072,20 @@ export default function BuilderPage() {
 
                   return (
                     <>
+                      <PickerGridPagination
+                        page={safeClassPage}
+                        pageCount={classPageCount}
+                        onPrevious={() => setClassPickerPage((p) => Math.max(0, p - 1))}
+                        onNext={() =>
+                          setClassPickerPage((p) => Math.min(classPageCount - 1, p + 1))
+                        }
+                        previousLabel="Previous classes"
+                        nextLabel="Next classes"
+                        className="mb-2 mt-0"
+                      />
                       <div className={pickerGridClass}>
                         {visibleClasses.map((cls) => {
-                          const existingLevel = classLevels.find((cl) => cl.classId === cls.id)
+                          const existingLevel = activeClassLevels.find((cl) => cl.classId === cls.id)
                           const isSelected = !!existingLevel
                           const isPrimary = cls.id === resolvedPrimaryClassId
                           const accent = getCompendiumItemAccentColor(cls as Record<string, unknown>)
@@ -2133,7 +2093,7 @@ export default function BuilderPage() {
                             if (existingLevel) {
                               if (totalLevel < 20) {
                                 setClassLevels(
-                                  classLevels.map((cl) =>
+                                  activeClassLevels.map((cl) =>
                                     cl.classId === cls.id ? { ...cl, level: cl.level + 1 } : cl,
                                   ),
                                 )
@@ -2189,6 +2149,7 @@ export default function BuilderPage() {
                               disabled={totalLevel >= 20 && !existingLevel}
                               badge={levelBadge}
                               size="lg"
+                              imageAspect="3/4"
                               onSelect={selectClass}
                               onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
                             />
@@ -2226,13 +2187,13 @@ export default function BuilderPage() {
                   </div>
                 )}
 
-                {classLevels.length > 0 && (
+                {activeClassLevels.length > 0 && (
                   <div className="mt-6 space-y-2 border-t border-border pt-6">
                     <h3 className="text-lg font-bold text-foreground">Class Options</h3>
                     <p className="text-xs text-muted-foreground mb-2">
                       Complete choices for your selected class(es) before continuing.
                     </p>
-                    {classLevels.map((entry) => {
+                    {activeClassLevels.map((entry) => {
                       const cls = classes.find((c) => c.id === entry.classId)
                       if (!cls) return null
                       const isPrimary = entry.classId === resolvedPrimaryClassId
@@ -2356,7 +2317,7 @@ export default function BuilderPage() {
                                 key={key}
                                 title={feature.name}
                                 hint={feature.choices!.category}
-                                options={feature.choices!.options}
+                                options={feature.choices?.options ?? []}
                                 maxCount={feature.choices!.count}
                                 selected={featureChoicePicks[key] ?? []}
                                 unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
@@ -2377,7 +2338,7 @@ export default function BuilderPage() {
                 )}
 
                 {/* Feats granted by class features */}
-                {classLevels.length > 0 && requiredFeatSlots > 0 && (
+                {activeClassLevels.length > 0 && requiredFeatSlots > 0 && (
                   <div className="mt-6 p-4 bg-muted/40 rounded-xl border border-border">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
@@ -2410,7 +2371,7 @@ export default function BuilderPage() {
                       const picked = feats.find((f) => f.id === pickedId) ?? null
                       const featContext = {
                         totalLevel,
-                        classIds: classLevels.map((cl) => cl.classId),
+                        classIds: activeClassLevels.map((cl) => cl.classId),
                         selectedFeatIds,
                         speciesId: character.species_id,
                         backgroundId: character.background_id,
@@ -2621,6 +2582,7 @@ export default function BuilderPage() {
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
+                        imageAspect="21/9"
                         onSelect={selectSpecies}
                         onLearnMore={() => setDetailsModal({ type: "species", item: sp })}
                       />
@@ -2673,7 +2635,7 @@ export default function BuilderPage() {
                         const picked = feats.find((f) => f.id === pickedId) ?? null
                         const featContext = {
                           totalLevel,
-                          classIds: classLevels.map((cl) => cl.classId),
+                          classIds: activeClassLevels.map((cl) => cl.classId),
                           selectedFeatIds,
                           speciesId: character.species_id,
                           backgroundId: character.background_id,
@@ -2891,6 +2853,7 @@ export default function BuilderPage() {
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
+                        imageAspect="21/9"
                         onSelect={selectBackground}
                         onLearnMore={() => setDetailsModal({ type: "background", item: bg })}
                       />
@@ -3012,26 +2975,13 @@ export default function BuilderPage() {
                   ))}
                 </div>
 
-                {abilityMethod === "roll" && (
-                  <div className="mb-4">
-                    <button
-                      type="button"
-                      onClick={rollAbilities}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-secondary/15 text-secondary rounded-xl font-semibold hover:bg-secondary/25 transition-colors"
-                    >
-                      <Dices className="w-4 h-4" />
-                      Roll again
-                    </button>
-                  </div>
-                )}
-
                 {abilityMethod === "pointbuy" && (
                   <div className="mb-4 p-3 bg-primary/10 rounded-xl text-center">
                     <span className="font-bold text-primary">Points Remaining: {pointsRemaining}</span>
                   </div>
                 )}
 
-                {milestoneAsiFeatCount > 0 && (
+                {showLegacyMilestoneAsi && (
                   <div className="mb-6">
                     <AsiAllocator
                       allocation={milestoneAsiAllocation}
@@ -3200,7 +3150,7 @@ export default function BuilderPage() {
                             key={gi}
                             title="Starting Equipment"
                             description={`What does your ${equipmentClass?.name ?? "class"} carry?`}
-                            options={group.options}
+                            options={group.options ?? []}
                             selectedIndex={startingEquipmentOptionIndex}
                             startingGold={classStartingGold}
                             onSelect={selectStartingEquipmentOption}
@@ -3212,7 +3162,7 @@ export default function BuilderPage() {
                             <div key={gi}>
                               <p className="text-sm font-medium text-foreground mb-2">{group.description}</p>
                               <div className="space-y-2">
-                                {group.options.map((option, oi) => (
+                                {(group.options ?? []).map((option, oi) => (
                                   <label
                                     key={oi}
                                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
@@ -3232,7 +3182,7 @@ export default function BuilderPage() {
                                       <p className="font-medium text-sm text-foreground">{option.label}</p>
                                       {!isGoldOnlyOption(option, classStartingGold) ? (
                                         <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                                          {option.items.map((item, ii) => (
+                                          {(option.items ?? []).map((item, ii) => (
                                             <li key={ii}>
                                               {item.quantity > 1 ? `${item.quantity}× ` : ""}
                                               {item.name}
@@ -3263,7 +3213,7 @@ export default function BuilderPage() {
                             key={gi}
                             title="Background Equipment"
                             description={`What does your ${selectedBackground.name} background provide?`}
-                            options={group.options}
+                            options={group.options ?? []}
                             selectedIndex={backgroundStartingEquipmentOptionIndex}
                             startingGold={backgroundStartingGold}
                             onSelect={selectBackgroundStartingEquipmentOption}
@@ -3276,7 +3226,7 @@ export default function BuilderPage() {
                             <div key={gi}>
                               <p className="text-sm font-medium text-foreground mb-2">{group.description}</p>
                               <div className="space-y-2">
-                                {group.options.map((option, oi) => (
+                                {(group.options ?? []).map((option, oi) => (
                                   <label
                                     key={oi}
                                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
@@ -3296,7 +3246,7 @@ export default function BuilderPage() {
                                       <p className="font-medium text-sm text-foreground">{option.label}</p>
                                       {!isGoldOnlyOption(option, backgroundStartingGold) ? (
                                         <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                                          {option.items.map((item, ii) => (
+                                          {(option.items ?? []).map((item, ii) => (
                                             <li key={ii}>
                                               {item.quantity > 1 ? `${item.quantity}× ` : ""}
                                               {item.name}
@@ -3390,7 +3340,7 @@ export default function BuilderPage() {
 
                     {spellcastingClasses.map((casterClass) => {
                       const casterLevel =
-                        classLevels.find((cl) => cl.classId === casterClass.id)?.level ?? 1
+                        activeClassLevels.find((cl) => cl.classId === casterClass.id)?.level ?? 1
                       const spellLimits = getSpellLimits(casterClass.spellcasting, casterLevel)
                       const classSpellIds = spellPicksByClassId[casterClass.id] ?? []
                       const spellCounts = countSelectedSpells(classSpellIds, spells, casterClass.name)
@@ -3485,7 +3435,7 @@ export default function BuilderPage() {
                               const pageKey = `${casterClass.id}:${level}`
                               const page = spellLevelPages[pageKey] ?? 0
                               const {
-                                pageItems,
+                                items: pageItems,
                                 pageCount,
                                 safePage,
                               } = paginateList(levelSpells, page, pickerPageSize)
@@ -3631,7 +3581,7 @@ export default function BuilderPage() {
                             className="w-32 h-32 rounded-2xl object-cover border-4 border-border"
                           />
                           <button
-                            onClick={() => setCharacter({ ...character, portrait_url: null })}
+                            onClick={() => patchCharacter({ portrait_url: null })}
                             className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
                           >
                             <X className="w-4 h-4" />
@@ -3663,7 +3613,7 @@ export default function BuilderPage() {
                             className="w-full h-32 rounded-2xl object-cover border-4 border-border"
                           />
                           <button
-                            onClick={() => setCharacter({ ...character, banner_url: null })}
+                            onClick={() => patchCharacter({ banner_url: null })}
                             className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
                           >
                             <X className="w-4 h-4" />
@@ -3692,7 +3642,7 @@ export default function BuilderPage() {
                     <input
                       type="text"
                       value={character.name}
-                      onChange={(e) => setCharacter({ ...character, name: e.target.value })}
+                      onChange={(e) => patchCharacter({ name: e.target.value })}
                       placeholder="Enter character name"
                       className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                     />
@@ -3704,7 +3654,7 @@ export default function BuilderPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">Personality Traits</label>
                     <textarea
                       value={character.personality_traits}
-                      onChange={(e) => setCharacter({ ...character, personality_traits: e.target.value })}
+                      onChange={(e) => patchCharacter({ personality_traits: e.target.value })}
                       placeholder="Describe your character's personality..."
                       rows={3}
                       className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
@@ -3714,7 +3664,7 @@ export default function BuilderPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">Ideals</label>
                     <textarea
                       value={character.ideals}
-                      onChange={(e) => setCharacter({ ...character, ideals: e.target.value })}
+                      onChange={(e) => patchCharacter({ ideals: e.target.value })}
                       placeholder="What principles guide your character?"
                       rows={3}
                       className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
@@ -3724,7 +3674,7 @@ export default function BuilderPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">Bonds</label>
                     <textarea
                       value={character.bonds}
-                      onChange={(e) => setCharacter({ ...character, bonds: e.target.value })}
+                      onChange={(e) => patchCharacter({ bonds: e.target.value })}
                       placeholder="What connections matter most to your character?"
                       rows={3}
                       className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
@@ -3734,7 +3684,7 @@ export default function BuilderPage() {
                     <label className="block text-sm font-medium text-foreground mb-2">Flaws</label>
                     <textarea
                       value={character.flaws}
-                      onChange={(e) => setCharacter({ ...character, flaws: e.target.value })}
+                      onChange={(e) => patchCharacter({ flaws: e.target.value })}
                       placeholder="What weaknesses does your character have?"
                       rows={3}
                       className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
@@ -3746,7 +3696,7 @@ export default function BuilderPage() {
                   <label className="block text-sm font-medium text-foreground mb-2">Backstory</label>
                   <textarea
                     value={character.backstory}
-                    onChange={(e) => setCharacter({ ...character, backstory: e.target.value })}
+                    onChange={(e) => patchCharacter({ backstory: e.target.value })}
                     placeholder="Tell your character's story..."
                     rows={5}
                     className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
@@ -4261,7 +4211,9 @@ export default function BuilderPage() {
                       <div key={`${cls.id ?? "class"}-${i}`}>
                         <p className="text-[9px] text-primary uppercase font-bold mb-1">{cls.name} Features</p>
                         <div className="space-y-1">
-                          {cls.features?.filter(f => f.level <= cls.level).map((feature, i) => (
+                          {(cls.features ?? [])
+                            .filter((f) => f.level <= cls.level)
+                            .map((feature, i) => (
                             <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
                               <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
                               <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
@@ -4274,7 +4226,9 @@ export default function BuilderPage() {
                     <div>
                       <p className="text-[9px] text-primary uppercase font-bold mb-1">{primaryClass.name} Features</p>
                       <div className="space-y-1">
-                        {primaryClass.features.filter(f => f.level <= totalLevel).map((feature, i) => (
+                        {(primaryClass.features ?? [])
+                          .filter((f) => f.level <= totalLevel)
+                          .map((feature, i) => (
                           <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
                             <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
                             <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
@@ -4409,6 +4363,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={cls}
+              imageAspect="3/4"
               subtitle={cls.source || "Custom"}
               tagline={getCompendiumCardBlurb(cls).toUpperCase()}
               tags={[
@@ -4481,6 +4436,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={sp}
+              imageAspect="21/9"
               subtitle={sp.source || "Custom"}
               tags={[
                 { label: String(sp.size || "Medium") },
@@ -4517,6 +4473,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={bg}
+              imageAspect="21/9"
               subtitle={bg.source || "Custom"}
               tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
               accentColor={accent}

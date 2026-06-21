@@ -1,3 +1,4 @@
+import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { extractUsesConfig, normalizeCharacteristics } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import type { CompendiumTable } from "@/lib/db/tables"
@@ -72,6 +73,7 @@ function rowForTable(
     const characteristics = cleaned.characteristics ?? cleaned.benefits
     row.benefits = normalizeCharacteristics(characteristics, null)
     delete row.characteristics
+    if (cleaned.category != null) row.category = cleaned.category
   }
 
   if (exportType === "dnd-ability") {
@@ -130,11 +132,25 @@ export async function importDumpStatExportItems(
     row.class_id = classId
     delete row.class_name
     delete row.className
+    const classRows = await listRows("classes", {
+      filters: [{ op: "eq", column: "id", value: classId }],
+      limit: 1,
+    })
+    const classNameById = new Map<string, string>()
+    if (classRows[0]?.name) {
+      classNameById.set(classId, classRows[0].name as string)
+    }
+    const spellCatalogRows = await listRows("spells")
+    const spellCatalog = spellCatalogRows.map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+    }))
+    const [enriched] = enrichImportedSubclassRows([row], classNameById, spellCatalog)
     await deleteWhere("subclasses", [
-      { op: "eq", column: "name", value: row.name as string },
+      { op: "eq", column: "name", value: enriched.name as string },
       { op: "eq", column: "source", value: source },
     ])
-    await insertRows("subclasses", [row])
+    await insertRows("subclasses", [enriched])
     breakdown.subclasses = (breakdown.subclasses ?? 0) + 1
     totalImported += 1
   }

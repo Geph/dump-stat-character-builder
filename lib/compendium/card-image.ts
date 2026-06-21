@@ -3,8 +3,15 @@ import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
 /** Card / detail hero art — URL or data URL. */
-export const CARD_IMAGE_ASPECT_LABEL = "3:4 portrait or 16:9 landscape"
-export const CARD_IMAGE_RECOMMENDED = "800×600px or wider"
+export const CLASS_CARD_IMAGE_ASPECT = "3:4 portrait"
+export const WIDE_CARD_IMAGE_ASPECT = "21:9 landscape"
+export const CLASS_CARD_ASPECT_CLASS = "aspect-[3/4]"
+export const WIDE_CARD_ASPECT_CLASS = "aspect-[21/9]"
+/** Hero band for wide selection cards; card body adds height below. */
+export const WIDE_SELECTION_CARD_HERO_CLASS = "aspect-[21/9]"
+export const WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS = "min-h-[300px]"
+export const CARD_IMAGE_ASPECT_LABEL = `${CLASS_CARD_IMAGE_ASPECT} (classes) or ${WIDE_CARD_IMAGE_ASPECT} (species & backgrounds)`
+export const CARD_IMAGE_RECOMMENDED = "600×800px (classes) or 840×360px (species & backgrounds)"
 
 /** Max characters for the two-line card blurb (`line-clamp-2 text-xs`). */
 export const COMPENDIUM_CARD_BLURB_MAX_LENGTH = 120

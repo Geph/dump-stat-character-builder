@@ -138,7 +138,7 @@ export function EquipmentShoppingPanel({
         ) : (
           equipmentGroups.map(({ category, items }) => {
             const page = categoryPages[category] ?? 0
-            const { pageItems, pageCount, safePage } = paginateList(items, page, pageSize)
+            const { items: pageItems, pageCount, safePage } = paginateList(items, page, pageSize)
             return (
               <div key={category}>
                 <p className="text-xs font-bold text-primary uppercase mb-2">

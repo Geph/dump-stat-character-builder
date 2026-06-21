@@ -3,6 +3,7 @@ import type { RechargeRule, RestType, UsesConfig } from "@/lib/types"
 const REST_LABELS: Record<RestType, string> = {
   short_rest: "short rest",
   long_rest: "long rest",
+  initiative: "initiative",
 }
 
 export function getRechargeRules(uses: UsesConfig): RechargeRule[] {
@@ -32,12 +33,26 @@ function formatRechargeRule(rule: RechargeRule): string {
 
 export function formatUsesRecharges(uses: UsesConfig): string {
   const rules = getRechargeRules(uses)
-  if (!rules.length) return "rest"
+  const parts: string[] = []
+
+  if (uses.rechargeOnInitiative != null && uses.rechargeOnInitiative !== false) {
+    if (uses.rechargeOnInitiative === true) {
+      parts.push("initiative (full pool)")
+    } else {
+      parts.push(`${uses.rechargeOnInitiative} on initiative`)
+    }
+  }
+
+  if (!rules.length) return parts.length ? parts.join(", ") : "rest"
 
   const allFullPool = rules.every((rule) => rule.amount == null || rule.amount <= 0)
-  if (rules.length === 2 && allFullPool) return "short or long rest"
+  if (rules.length === 2 && allFullPool) {
+    parts.push("short or long rest")
+  } else {
+    parts.push(...rules.map(formatRechargeRule))
+  }
 
-  return rules.map(formatRechargeRule).join(", ")
+  return parts.join(", ")
 }
 
 export function isRestRechargeEnabled(uses: UsesConfig, rest: RestType): boolean {
@@ -77,6 +92,17 @@ export function setRestRecharge(
 
   const normalized = normalizeUsesConfig({ ...uses, recharges: sorted.length ? sorted : undefined })
   return normalized
+}
+
+export function getRechargeAmountOnInitiative(uses: UsesConfig): number | null {
+  const value = uses.rechargeOnInitiative
+  if (value == null || value === false) return null
+  if (value === true) return null
+  return value > 0 ? value : null
+}
+
+export function hasInitiativeRecharge(uses: UsesConfig): boolean {
+  return uses.rechargeOnInitiative != null && uses.rechargeOnInitiative !== false
 }
 
 export function updateRestRechargeAmount(

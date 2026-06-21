@@ -22,6 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:mysql
       - run: pnpm lint
+      - run: node node_modules/vitest/vitest.mjs run
+      - run: pnpm dlx tsx scripts/audit-srd-class-features.ts
 
   static-export:
     runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
+import { normalizeStartingEquipmentGroups } from "@/lib/compendium/normalize-class-data"
 import type { Background, StartingEquipmentGroup } from "@/lib/types"
 
 function parseItemList(text: string): { name: string; quantity: number }[] {
@@ -72,7 +73,7 @@ export function getBackgroundStartingEquipmentGroups(
 ): StartingEquipmentGroup[] {
   if (!background) return []
   if (background.starting_equipment_groups?.length) {
-    return background.starting_equipment_groups
+    return normalizeStartingEquipmentGroups(background.starting_equipment_groups)
   }
   if (background.starting_equipment?.length) {
     return [

@@ -6,6 +6,8 @@ import { X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import {
   getCompendiumCardImageUrl,
+  CLASS_CARD_ASPECT_CLASS,
+  WIDE_CARD_ASPECT_CLASS,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
 import {
@@ -29,6 +31,8 @@ type CompendiumDetailOverlayProps = {
   accentColor?: CompendiumThemeColorId | null
   headerActions?: ReactNode
   children: ReactNode
+  /** Portrait 3:4 for classes; wide 21:9 for species and backgrounds. */
+  imageAspect?: "3/4" | "21/9"
 }
 
 export function CompendiumDetailOverlay({
@@ -41,9 +45,11 @@ export function CompendiumDetailOverlay({
   accentColor = null,
   headerActions,
   children,
+  imageAspect = "21/9",
 }: CompendiumDetailOverlayProps) {
   const imageUrl = getCompendiumCardImageUrl(item)
   const accent = compendiumAccentColorStyles(accentColor)
+  const aspectClass = imageAspect === "3/4" ? CLASS_CARD_ASPECT_CLASS : WIDE_CARD_ASPECT_CLASS
 
   return (
     <AnimatePresence>
@@ -66,7 +72,7 @@ export function CompendiumDetailOverlay({
           >
             {/* Hero band — fixed aspect so art is not stretched over full overlay height */}
             <div className="relative shrink-0 overflow-hidden">
-              <div className="relative aspect-[21/9] min-h-[180px] max-h-[42vh] w-full">
+              <div className={cn("relative w-full", aspectClass, "min-h-[180px] max-h-[42vh]")}>
                 {imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

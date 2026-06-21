@@ -109,6 +109,16 @@ export function getWeaponAbilityMod(weapon: Equipment, abilityMods: AbilityMods)
   return abilityMods.strength
 }
 
+function weaponNameMatchesProficiency(proficiency: string, weaponName: string): boolean {
+  const prof = proficiency.trim().toLowerCase()
+  const name = weaponName.trim().toLowerCase()
+  if (!prof || !name) return false
+  if (prof === name) return true
+  if (prof.endsWith("s") && prof.slice(0, -1) === name) return true
+  if (name.endsWith("s") && name.slice(0, -1) === prof) return true
+  return false
+}
+
 export function isWeaponProficient(
   weapon: Equipment,
   proficiencies: string[] | null | undefined,
@@ -127,7 +137,7 @@ export function isWeaponProficient(
   if (sub.includes("martial")) {
     if (normalized.some((p) => p.includes("martial"))) return true
   }
-  if (normalized.some((p) => p === name || name.includes(p) || p.includes(name))) {
+  if (normalized.some((p) => weaponNameMatchesProficiency(p, name))) {
     return true
   }
   return false

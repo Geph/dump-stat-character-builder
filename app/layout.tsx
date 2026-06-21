@@ -8,8 +8,9 @@ import './globals.css'
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: 'Dump Stat - D&D 5.5e Character Builder',
-  description: 'A vibe-coded D&D 5.5e character creator with support for custom classes and content',
+  title: 'Dump Stat - 5E Compatible Character Builder',
+  description:
+    'Character builder and compendium for tabletop RPGs. Compatible with fifth edition. Bundled SRD 5.2.1 content and custom homebrew support.',
   icons: {
     icon: [
       {

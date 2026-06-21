@@ -92,6 +92,10 @@ export type SpellSlotTable = {
   classLevel: number
 }
 
+export function spellSlotTableKey(table: SpellSlotTable): string {
+  return `${table.className}-${table.type}-${table.classLevel}`
+}
+
 const HALF_CASTERS = new Set(["Paladin", "Ranger"])
 
 export function getCasterSlotType(
@@ -153,6 +157,15 @@ export function getSpellSlotTable(
     className,
     classLevel: level,
   }
+}
+
+/** Spell slot tables for each spellcasting class on a multiclass character. */
+export function getMulticlassSpellSlotTables(
+  entries: { className: string; classLevel: number; spellcasting: DndClass["spellcasting"] | null | undefined }[],
+): SpellSlotTable[] {
+  return entries
+    .map((entry) => getSpellSlotTable(entry.className, entry.classLevel, entry.spellcasting))
+    .filter((table): table is SpellSlotTable => table != null)
 }
 
 /** Build class-resource uses config for spell slot pools (full or half caster). */

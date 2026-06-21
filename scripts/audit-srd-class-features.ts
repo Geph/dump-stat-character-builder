@@ -36,6 +36,12 @@ const SKIP_NAMES = new Set([
   "epic boon",
 ])
 
+/** Known narrative-only features with no mechanical modifier hook. */
+const ALLOWED_UNMATCHED = new Set([
+  "Hunter's Lore",
+  "Pact Magic",
+])
+
 function couldHaveModifier(feature: Feature): boolean {
   const name = (feature.name ?? "").toLowerCase()
   if (SKIP_NAMES.has(name)) return false
@@ -90,6 +96,23 @@ for (const sc of enrichedSubclasses) {
 }
 
 console.log(`SRD class/subclass features without common modifiers: ${allUnmatched.length}\n`)
+
+const unexpected = allUnmatched.filter((item) => !ALLOWED_UNMATCHED.has(item.name))
+if (unexpected.length) {
+  console.error(`Unexpected unmatched features (${unexpected.length}):`)
+  for (const item of unexpected) {
+    console.error(`  ${item.source} L${item.level} ${item.name}`)
+  }
+  process.exit(1)
+}
+
+if (allUnmatched.length) {
+  console.log("Allowed unmatched (narrative-only):")
+  for (const item of allUnmatched) {
+    console.log(`  ${item.source} L${item.level} ${item.name}`)
+  }
+  console.log()
+}
 
 const bySource = new Map<string, Unmatched[]>()
 for (const item of allUnmatched) {

@@ -5,23 +5,29 @@ import { ImageIcon, X } from "lucide-react"
 import {
   CARD_IMAGE_ASPECT_LABEL,
   CARD_IMAGE_RECOMMENDED,
+  CLASS_CARD_ASPECT_CLASS,
+  WIDE_CARD_ASPECT_CLASS,
   normalizeCardImageUrl,
 } from "@/lib/compendium/card-image"
 import { MAX_PORTRAIT_FILE_BYTES } from "@/lib/portrait"
+import { cn } from "@/lib/utils"
 
 type CardImageFieldProps = {
   value: string | null
   onChange: (value: string | null) => void
   label?: string
+  imageAspect?: "3/4" | "21/9"
 }
 
 export function CardImageField({
   value,
   onChange,
   label = "Card background graphic",
+  imageAspect = "3/4",
 }: CardImageFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const preview = normalizeCardImageUrl(value)
+  const aspectClass = imageAspect === "21/9" ? WIDE_CARD_ASPECT_CLASS : CLASS_CARD_ASPECT_CLASS
 
   const onFile = (file: File | undefined) => {
     if (!file) return
@@ -48,7 +54,7 @@ export function CardImageField({
       </div>
 
       {preview ? (
-        <div className="relative aspect-[16/10] w-full max-w-md overflow-hidden rounded-lg border border-border">
+        <div className={cn("relative w-full max-w-md overflow-hidden rounded-lg border border-border", aspectClass)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview} alt="" className="h-full w-full object-cover" />
           <button
@@ -64,7 +70,10 @@ export function CardImageField({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex aspect-[16/10] w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+          className={cn(
+            "flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors",
+            aspectClass,
+          )}
         >
           <ImageIcon className="h-8 w-8 opacity-60" />
           <span className="text-sm font-medium">Upload background graphic</span>

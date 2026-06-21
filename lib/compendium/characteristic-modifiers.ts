@@ -124,7 +124,15 @@ export const SPECIAL_ATTACK_AREA_SHAPES = [
   { value: "cone", label: "Cone" },
   { value: "line", label: "Line" },
   { value: "sphere", label: "Sphere" },
+  { value: "cylinder", label: "Cylinder" },
+  { value: "cube", label: "Cube" },
   { value: "cone_or_line", label: "Cone or line (choose each use)" },
+] as const
+
+export const SPECIAL_ATTACK_TARGET_MODES = [
+  { value: "single", label: "Single target" },
+  { value: "multi", label: "Multiple targets (e.g. Volley)" },
+  { value: "area", label: "Area (all in zone)" },
 ] as const
 
 export const SAVING_THROW_TARGET_SCOPES = [
@@ -173,6 +181,27 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "saving_throw_trigger", label: "Saving Throw Trigger" },
   { value: "on_hit_trigger", label: "On Hit Trigger" },
   { value: "failed_roll_trigger", label: "Failed Roll Trigger" },
+  {
+    value: "d20_test_reaction",
+    label: "D20 Test Reaction",
+    hint: "Add or subtract dice to any creature's D20 Test (Cosmic Omen, initiative bonuses)",
+  },
+  {
+    value: "damage_halving_reaction",
+    label: "Damage Halving Reaction",
+    hint: "Halve incoming attack damage (Sentinel at Death's Door, Beguiling Defenses)",
+  },
+  {
+    value: "healing_dice_pool",
+    label: "Healing Dice Pool",
+    hint: "Pool of dice spent to heal (Healing Light, Warrior of the Gods)",
+  },
+  {
+    value: "on_creature_death_trigger",
+    label: "On Creature Death Trigger",
+    hint: "React when a creature dies nearby (Keeper of Souls)",
+  },
+  { value: "telepathy", label: "Telepathy", hint: "Passive telepathic communication range" },
   { value: "on_cast_spell_trigger", label: "On Cast Spell Trigger", hint: "When you cast a matching spell, apply a nested effect (e.g. Empowered Evocation bonus damage)" },
   { value: "spell_healing_modifier", label: "Spell Healing Modifier" },
   { value: "resource_ability_menu", label: "Resource Ability Menu" },
@@ -261,6 +290,8 @@ export interface AcCharacteristic extends CharacteristicModifierBase {
   /** Base AC when using ability_modifiers mode (default 10) */
   base?: number
   includeProficiency?: boolean
+  /** When true, flat_bonus only applies while wearing armor (Fighting Style: Defense). */
+  requiresArmor?: boolean
 }
 
 export type HitPointsCharacteristicMode = "flat" | "per_level"
@@ -333,7 +364,13 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   type: "special_attack"
   attackName?: string
   attackProfile?: "melee" | "ranged" | "emanation" | "force_save"
-  areaShape?: "cone" | "line" | "sphere" | "cone_or_line" | null
+  /** single = one creature; multi = pick N targets; area = all in zone (Volley, Whirlwind, etc.) */
+  targetMode?: "single" | "multi" | "area"
+  /** Cap on targets when targetMode is multi (omit for unlimited within range). */
+  maxTargets?: number | null
+  /** Damage uses equipped weapon dice + modifier instead of fixed dice below. */
+  useWeaponDamage?: boolean
+  areaShape?: "cone" | "line" | "sphere" | "cylinder" | "cube" | "cone_or_line" | null
   areaLengthFeet?: number | null
   areaWidthFeet?: number | null
   /** When areaShape is cone_or_line, length of the line option (e.g. 30 ft. breath line). */
@@ -345,6 +382,8 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   damageByLevel?: BonusByLevelEntry[]
   saveAbility?: string | null
   saveDCBase?: number | null
+  /** On a successful save, target takes half damage (area exploits). */
+  saveHalfDamage?: boolean
   rangeFeet?: number | null
 }
 
@@ -432,6 +471,8 @@ export interface SpellsKnownEntry {
   spellId: string
   prepared?: boolean
   alwaysPrepared?: boolean
+  /** Class level when this always-prepared spell unlocks (subclass spell tables). */
+  unlocksAtClassLevel?: number
 }
 
 export interface SpellsKnownCharacteristic extends CharacteristicModifierBase {
@@ -522,6 +563,10 @@ export interface SavingThrowTriggerCharacteristic extends CharacteristicModifier
   targetScope: SavingThrowTargetScope
   saveConditionFilter?: string[]
   useReaction?: boolean
+  /** When set, failed saves are treated as this total instead (Bend Reality, Shared Resilience). */
+  replaceFailedRollWith?: number | null
+  spendResourceKey?: string | null
+  spendResourceAmount?: number | null
   effect?: NestedModifierEffect | null
 }
 
@@ -536,13 +581,66 @@ export interface OnHitTriggerCharacteristic extends CharacteristicModifierBase {
 
 export interface FailedRollTriggerCharacteristic extends CharacteristicModifierBase {
   type: "failed_roll_trigger"
+  /** fail = Peerless Skill; success = Cutting Words, Psychic Feedback */
+  triggerOn?: "fail" | "success"
   rollKind: RollTriggerKind
   ability?: string | null
   skills?: string[]
   targetScope: SavingThrowTargetScope
+  rangeFeet?: number | null
+  useReaction?: boolean
   spendResourceKey?: string | null
   spendResourceAmount?: number | null
+  /** Peerless Skill: don't expend resource if the roll still fails after adding the die. */
+  refundResourceOnStillFailed?: boolean
   effect?: NestedModifierEffect | null
+}
+
+export interface D20TestReactionCharacteristic extends CharacteristicModifierBase {
+  type: "d20_test_reaction"
+  modifierMode: "add" | "subtract"
+  rollKinds?: RollTriggerKind[]
+  targetScope: SavingThrowTargetScope
+  rangeFeet?: number | null
+  useReaction?: boolean
+  spendResourceKey?: string | null
+  spendResourceAmount?: number | null
+  dieSource?: "resource_die" | "fixed" | "ability_modifier"
+  fixedDie?: string | null
+  effect?: NestedModifierEffect | null
+}
+
+export interface DamageHalvingReactionCharacteristic extends CharacteristicModifierBase {
+  type: "damage_halving_reaction"
+  cancelCritRiders?: boolean
+  rangeFeet?: number | null
+  useReaction?: boolean
+  /** Only against a creature you previously imposed disadvantage on (Sentinel). */
+  requiresPriorDisadvantage?: boolean
+}
+
+export interface HealingDicePoolCharacteristic extends CharacteristicModifierBase {
+  type: "healing_dice_pool"
+  dieType: "d4" | "d6" | "d8" | "d10" | "d12" | "d20"
+  poolSize?: number | null
+  poolSizeByLevel?: BonusByLevelEntry[]
+  maxDicePerUse?: { type: "ability_modifier"; ability: AbilityScoreKey } | null
+  activation: "bonus_action" | "action" | "magic_action"
+  recharges?: import("@/lib/types").RechargeRule[]
+}
+
+export interface OnCreatureDeathTriggerCharacteristic extends CharacteristicModifierBase {
+  type: "on_creature_death_trigger"
+  creatureFilter: "enemy" | "ally" | "any"
+  rangeFeet: number
+  useReaction?: boolean
+  effect?: NestedModifierEffect | null
+}
+
+export interface TelepathyCharacteristic extends CharacteristicModifierBase {
+  type: "telepathy"
+  rangeFeet: number
+  canInitiate?: boolean
 }
 
 export interface OnCastSpellTriggerCharacteristic extends CharacteristicModifierBase {
@@ -562,6 +660,8 @@ export interface SpellHealingModifierCharacteristic extends CharacteristicModifi
   selfHealFlat?: number
   selfHealPerSpellLevel?: number
   maximizeHealingDice?: boolean
+  /** Grave Domain Return to Life — maximize dice only when target is at 0 HP. */
+  maximizeOnlyAtZeroHp?: boolean
   halfDamageOnSaveSuccess?: boolean
 }
 
@@ -635,6 +735,11 @@ export type CharacteristicModifier =
   | SavingThrowTriggerCharacteristic
   | OnHitTriggerCharacteristic
   | FailedRollTriggerCharacteristic
+  | D20TestReactionCharacteristic
+  | DamageHalvingReactionCharacteristic
+  | HealingDicePoolCharacteristic
+  | OnCreatureDeathTriggerCharacteristic
+  | TelepathyCharacteristic
   | OnCastSpellTriggerCharacteristic
   | SpellHealingModifierCharacteristic
   | ResourceAbilityMenuCharacteristic
@@ -733,7 +838,31 @@ export function createCharacteristicModifier(
     case "on_hit_trigger":
       return { id, type, oncePerTurn: true, effect: null }
     case "failed_roll_trigger":
-      return { id, type, rollKind: "ability", targetScope: "self", effect: null }
+      return { id, type, triggerOn: "fail", rollKind: "ability", targetScope: "self", effect: null }
+    case "d20_test_reaction":
+      return {
+        id,
+        type,
+        modifierMode: "add",
+        rollKinds: [],
+        targetScope: "self",
+        dieSource: "resource_die",
+        effect: null,
+      }
+    case "damage_halving_reaction":
+      return { id, type, useReaction: true, cancelCritRiders: false }
+    case "healing_dice_pool":
+      return {
+        id,
+        type,
+        dieType: "d6",
+        activation: "bonus_action",
+        recharges: [{ rest: "long_rest" }],
+      }
+    case "on_creature_death_trigger":
+      return { id, type, creatureFilter: "enemy", rangeFeet: 30, effect: null }
+    case "telepathy":
+      return { id, type, rangeFeet: 60, canInitiate: true }
     case "on_cast_spell_trigger":
       return { id, type, spellTags: [], effect: null }
     case "spell_healing_modifier":
@@ -870,6 +999,9 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       targetScope: raw.targetScope ?? "self",
       saveConditionFilter: raw.saveConditionFilter ?? [],
       useReaction: raw.useReaction ?? false,
+      replaceFailedRollWith: raw.replaceFailedRollWith ?? null,
+      spendResourceKey: raw.spendResourceKey ?? null,
+      spendResourceAmount: raw.spendResourceAmount ?? null,
       effect: raw.effect ?? null,
     }
   }
@@ -887,9 +1019,69 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as FailedRollTriggerCharacteristic
     return {
       ...raw,
+      triggerOn: raw.triggerOn ?? "fail",
       rollKind: raw.rollKind ?? "ability",
       targetScope: raw.targetScope ?? "self",
+      rangeFeet: raw.rangeFeet ?? null,
+      useReaction: raw.useReaction ?? false,
+      refundResourceOnStillFailed: raw.refundResourceOnStillFailed ?? false,
       effect: raw.effect ?? null,
+    }
+  }
+
+  if (value.type === "d20_test_reaction") {
+    const raw = value as D20TestReactionCharacteristic
+    return {
+      ...raw,
+      modifierMode: raw.modifierMode ?? "add",
+      rollKinds: raw.rollKinds ?? [],
+      targetScope: raw.targetScope ?? "self",
+      rangeFeet: raw.rangeFeet ?? null,
+      useReaction: raw.useReaction ?? false,
+      dieSource: raw.dieSource ?? "resource_die",
+      fixedDie: raw.fixedDie ?? null,
+      effect: raw.effect ?? null,
+    }
+  }
+
+  if (value.type === "damage_halving_reaction") {
+    const raw = value as DamageHalvingReactionCharacteristic
+    return {
+      ...raw,
+      cancelCritRiders: raw.cancelCritRiders ?? false,
+      useReaction: raw.useReaction ?? true,
+      requiresPriorDisadvantage: raw.requiresPriorDisadvantage ?? false,
+    }
+  }
+
+  if (value.type === "healing_dice_pool") {
+    const raw = value as HealingDicePoolCharacteristic
+    return {
+      ...raw,
+      dieType: raw.dieType ?? "d6",
+      activation: raw.activation ?? "bonus_action",
+      recharges: raw.recharges ?? [{ rest: "long_rest" }],
+      poolSizeByLevel: raw.poolSizeByLevel ?? [],
+    }
+  }
+
+  if (value.type === "on_creature_death_trigger") {
+    const raw = value as OnCreatureDeathTriggerCharacteristic
+    return {
+      ...raw,
+      creatureFilter: raw.creatureFilter ?? "enemy",
+      rangeFeet: raw.rangeFeet ?? 30,
+      useReaction: raw.useReaction ?? false,
+      effect: raw.effect ?? null,
+    }
+  }
+
+  if (value.type === "telepathy") {
+    const raw = value as TelepathyCharacteristic
+    return {
+      ...raw,
+      rangeFeet: raw.rangeFeet ?? 60,
+      canInitiate: raw.canInitiate ?? true,
     }
   }
 
@@ -910,6 +1102,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       bonusFlat: raw.bonusFlat ?? 0,
       bonusPerSpellLevel: raw.bonusPerSpellLevel ?? 0,
       maximizeHealingDice: raw.maximizeHealingDice ?? false,
+      maximizeOnlyAtZeroHp: raw.maximizeOnlyAtZeroHp ?? false,
       halfDamageOnSaveSuccess: raw.halfDamageOnSaveSuccess ?? false,
     }
   }
@@ -950,6 +1143,10 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as SpecialAttackCharacteristic
     return {
       ...raw,
+      targetMode: raw.targetMode ?? "single",
+      maxTargets: raw.maxTargets ?? null,
+      useWeaponDamage: raw.useWeaponDamage ?? false,
+      saveHalfDamage: raw.saveHalfDamage ?? false,
       properties: raw.properties ?? [],
       damageTypes: raw.damageTypes ?? [],
       damageDiceCount: raw.damageDiceCount ?? 1,
@@ -1085,6 +1282,7 @@ export type AggregatedCharacteristics = {
   toolProficiencies: string[]
   savingThrows: string[]
   acFlatBonus: number
+  acFlatBonusWhileArmored: number
   acFixed: number | null
   acAbilityMods: AbilityModifierKey[]
   acBase: number
@@ -1153,6 +1351,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   toolProficiencies: [],
   savingThrows: [],
   acFlatBonus: 0,
+  acFlatBonusWhileArmored: 0,
   acFixed: null,
   acAbilityMods: [],
   acBase: 10,
@@ -1258,7 +1457,11 @@ export function aggregateCharacteristics(
         break
       case "ac":
         if (mod.mode === "flat_bonus") {
-          result.acFlatBonus += mod.flatBonus ?? 0
+          if (mod.requiresArmor) {
+            result.acFlatBonusWhileArmored += mod.flatBonus ?? 0
+          } else {
+            result.acFlatBonus += mod.flatBonus ?? 0
+          }
         } else if (mod.mode === "set_fixed") {
           result.acFixed = Math.max(result.acFixed ?? 0, mod.fixedAc ?? 0)
         } else if (mod.mode === "ability_modifiers") {
@@ -1462,11 +1665,16 @@ export function applyAcCharacteristics(
   aggregated: AggregatedCharacteristics,
   abilityMods: Record<AbilityScoreKey, number>,
   proficiencyBonus: number,
+  options?: { shieldBonus?: number; wearingArmor?: boolean },
 ): number {
+  const shieldBonus = options?.shieldBonus ?? 0
+  const armoredFlat =
+    options?.wearingArmor ? aggregated.acFlatBonusWhileArmored : 0
+
   if (aggregated.acFixed != null && aggregated.acFixed > 0) {
     let ac = aggregated.acFixed
     if (aggregated.acIncludeProficiency) ac += proficiencyBonus
-    return ac + aggregated.acFlatBonus
+    return ac + aggregated.acFlatBonus + armoredFlat + shieldBonus
   }
 
   if (aggregated.acAbilityMods.length > 0) {
@@ -1475,10 +1683,10 @@ export function applyAcCharacteristics(
       ac += abilityMods[abilityModifierKeyToScoreKey(key)]
     }
     if (aggregated.acIncludeProficiency) ac += proficiencyBonus
-    return ac + aggregated.acFlatBonus
+    return ac + aggregated.acFlatBonus + armoredFlat + shieldBonus
   }
 
-  let ac = baseAc + aggregated.acFlatBonus
+  let ac = baseAc + aggregated.acFlatBonus + armoredFlat
   if (aggregated.acIncludeProficiency) ac += proficiencyBonus
   return ac
 }

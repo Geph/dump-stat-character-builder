@@ -1,5 +1,11 @@
 import type { Background, Character, CharacterDraft, DndClass } from "@/lib/types"
 import type { BuilderDraftSnapshot } from "@/lib/builder/draft-storage"
+import {
+  normalizeCharacterClassRows,
+  rowsToClassAddOrder,
+  rowsToClassLevels,
+  rowsToSubclassMap,
+} from "@/lib/character/character-classes"
 
 function deriveClassSkillPicks(
   character: Character,
@@ -47,6 +53,7 @@ export function characterToDraft(character: Character): CharacterDraft {
     armor_proficiencies: character.armor_proficiencies ?? [],
     languages: character.languages ?? ["Common"],
     equipment_ids: character.equipment_ids ?? [],
+    gold: character.gold ?? 0,
     spell_ids: character.spell_ids ?? [],
     feat_ids: character.feat_ids ?? [],
   }
@@ -57,18 +64,27 @@ export function characterToBuilderState(
   options: {
     dndClass?: DndClass | null
     background?: Background | null
+    allClasses?: DndClass[]
+    allSubclasses?: import("@/lib/types").Subclass[]
   } = {},
 ): Omit<BuilderDraftSnapshot, "version" | "savedAt"> {
-  const classLevels = character.class_id
-    ? [{ classId: character.class_id, level: character.level }]
-    : []
+  const classRows = normalizeCharacterClassRows(character)
+  const classLevels = classRows.length
+    ? rowsToClassLevels(classRows)
+    : character.class_id
+      ? [{ classId: character.class_id, level: character.level }]
+      : []
 
-  const subclassByClassId: Record<string, string> = {}
-  if (character.class_id && character.subclass_id) {
-    subclassByClassId[character.class_id] = character.subclass_id
-  }
+  const subclassByClassId = classRows.length
+    ? rowsToSubclassMap(classRows)
+    : character.class_id && character.subclass_id
+      ? { [character.class_id]: character.subclass_id }
+      : {}
 
-  const classSkillPicks = deriveClassSkillPicks(character, options.dndClass, options.background)
+  const primaryClass =
+    options.allClasses?.find((cls) => cls.id === character.class_id) ?? options.dndClass ?? null
+
+  const classSkillPicks = deriveClassSkillPicks(character, primaryClass, options.background)
 
   const spellPicksByClassId: Record<string, string[]> = {}
   if (character.class_id && character.spell_ids?.length) {
@@ -98,7 +114,9 @@ export function characterToBuilderState(
     featChoicePicks: (character.feat_choice_picks as Record<string, string[]>) ?? {},
     modifierPlayerPicks: (character.modifier_player_picks as Record<string, string[]>) ?? {},
     primaryClassId: character.class_id,
-    classAddOrder: classLevels.map((entry) => entry.classId),
+    classAddOrder:
+      character.class_add_order ??
+      (classRows.length ? rowsToClassAddOrder(classRows) : classLevels.map((entry) => entry.classId)),
     speciesTraitPicks: {},
     startingEquipmentOptionIndex: null,
     spellPicksByClassId,

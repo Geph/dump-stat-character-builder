@@ -189,6 +189,11 @@ export function GlobalSettingsMenu() {
               Import &amp; data management
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/#home-footer" className="gap-2 cursor-pointer flex items-center">
+              Licenses &amp; attribution
+            </Link>
+          </DropdownMenuItem>
           <HeroBackgroundSettings onStatus={setStatus} disabled={busy} />
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Appearance</DropdownMenuLabel>

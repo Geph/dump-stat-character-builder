@@ -1,3 +1,4 @@
+import { normalizeStartingEquipmentGroups } from "@/lib/compendium/normalize-class-data"
 import type { DndClass, Equipment } from "@/lib/types"
 
 export type StartingEquipmentGroup = {
@@ -13,15 +14,16 @@ export function getStartingEquipmentGroups(
 ): StartingEquipmentGroup[] {
   const groups = (dndClass as DndClass & { starting_equipment_groups?: StartingEquipmentGroup[] })
     ?.starting_equipment_groups
-  return groups?.length ? groups : []
+  return normalizeStartingEquipmentGroups(groups)
 }
 
 export function isGoldOnlyOption(
   option: { label: string; items: { name: string; quantity: number }[] },
   startingGold: number,
 ): boolean {
-  if (option.items.length !== 1) return false
-  const item = option.items[0]
+  const items = option.items ?? []
+  if (items.length !== 1) return false
+  const item = items[0]
   if (item.name.toLowerCase() !== "gold pieces") return false
   return startingGold > 0 && item.quantity === startingGold
 }
@@ -67,6 +69,29 @@ export function resolvePackageEquipmentIds(
     if (match && !ids.includes(match.id)) ids.push(match.id)
   }
   return ids
+}
+
+/** Sum GP bundled in a starting equipment package (excluding resolved item rows). */
+export function sumPackageGoldPieces(
+  items: { name: string; quantity: number }[] | undefined,
+): number {
+  if (!items?.length) return 0
+  return items
+    .filter((item) => item.name.toLowerCase() === "gold pieces")
+    .reduce((sum, item) => sum + item.quantity, 0)
+}
+
+export function computeStartingCharacterGold(options: {
+  inGoldShoppingMode: boolean
+  goldRemaining: number
+  classOption: { items: { name: string; quantity: number }[] } | null
+  backgroundOption: { items: { name: string; quantity: number }[] } | null
+}): number {
+  if (options.inGoldShoppingMode) return Math.max(0, options.goldRemaining)
+  return (
+    sumPackageGoldPieces(options.classOption?.items) +
+    sumPackageGoldPieces(options.backgroundOption?.items)
+  )
 }
 
 export function getEquipmentCostGp(item: Equipment): number {

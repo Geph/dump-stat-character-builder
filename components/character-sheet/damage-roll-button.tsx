@@ -2,16 +2,30 @@
 
 import { useState } from "react"
 import { Dices } from "lucide-react"
-import { parseDamageRoll, rollDamage } from "@/lib/dice/damage-roll"
+import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
+import { parseDamageRoll, rollDamage, formatDamageRollResult } from "@/lib/dice/damage-roll"
 
-export function DamageRollButton({ expression }: { expression: string }) {
+export function DamageRollButton({
+  expression,
+  label,
+}: {
+  expression: string
+  label?: string
+}) {
   const [total, setTotal] = useState<number | null>(null)
+  const history = useSheetRollHistory()
   const parsed = parseDamageRoll(expression)
 
   if (!parsed) return null
 
   const handleRoll = () => {
-    setTotal(rollDamage(parsed).total)
+    const result = rollDamage(parsed)
+    setTotal(result.total)
+    history?.logRoll({
+      kind: "damage",
+      label: label ?? `Damage (${expression})`,
+      summary: formatDamageRollResult(result.rolls, result.modifier, result.total),
+    })
   }
 
   return (

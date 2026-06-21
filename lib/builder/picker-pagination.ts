@@ -17,12 +17,14 @@ export function paginateList<T>(
   items: T[],
   page: number,
   pageSize: number,
-): { items: T[]; pageCount: number; safePage: number } {
+): { items: T[]; pageItems: T[]; pageCount: number; safePage: number } {
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize))
   const safePage = Math.min(Math.max(0, page), pageCount - 1)
   const start = safePage * pageSize
+  const pageSlice = items.slice(start, start + pageSize)
   return {
-    items: items.slice(start, start + pageSize),
+    items: pageSlice,
+    pageItems: pageSlice,
     pageCount,
     safePage,
   }

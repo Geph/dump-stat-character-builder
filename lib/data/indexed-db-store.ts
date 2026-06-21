@@ -1,6 +1,11 @@
 import { COMPENDIUM_TABLES, resolveTable, type CompendiumTable } from "@/lib/db/tables"
 import { normalizeBannerUrl, normalizePortraitUrl } from "@/lib/portrait"
 import type { DbResult, Filter, OrderBy, QueryBuilder } from "./types"
+import type { Character } from "@/lib/types"
+import {
+  attachClassDetails,
+  normalizeCharacterClassRows,
+} from "@/lib/character/character-classes"
 
 const DB_NAME = "dump-stat"
 const DB_VERSION = 2
@@ -137,11 +142,37 @@ async function attachCharacterRelations(
     return cache.get(name)!
   }
 
-  if (character.class_id) {
+  const classRows = normalizeCharacterClassRows(character as Character)
+  if (classRows.length) {
+    const classes = await getStore("classes")
+    const subclasses = await getStore("subclasses")
+    const classIds = [...new Set(classRows.map((row) => row.class_id))]
+    const allClasses = classes.filter((row) => classIds.includes(row.id as string))
+    const subclassIds = classRows
+      .map((row) => row.subclass_id)
+      .filter(Boolean) as string[]
+    const allSubclasses = subclasses.filter((row) => subclassIds.includes(row.id as string))
+    out.class_list = attachClassDetails(
+      classRows,
+      allClasses as never,
+      allSubclasses as never,
+    )
+
+    const primaryId = (character.class_id as string | null) ?? classRows[0]?.class_id
+    if (primaryId) {
+      out.classes = allClasses.find((row) => row.id === primaryId) ?? out.classes
+      const primaryRow = classRows.find((row) => row.class_id === primaryId)
+      if (primaryRow?.subclass_id) {
+        out.subclasses =
+          allSubclasses.find((row) => row.id === primaryRow.subclass_id) ?? out.subclasses
+      }
+    }
+  } else if (character.class_id) {
     const classes = await getStore("classes")
     const cls = classes.find((r) => r.id === character.class_id)
     if (cls) out.classes = cls
   }
+
   if (character.species_id) {
     const species = await getStore("species")
     const sp = species.find((r) => r.id === character.species_id)
@@ -152,7 +183,7 @@ async function attachCharacterRelations(
     const bg = backgrounds.find((r) => r.id === character.background_id)
     if (bg) out.backgrounds = bg
   }
-  if (character.subclass_id) {
+  if (!classRows.length && character.subclass_id) {
     const subclasses = await getStore("subclasses")
     const sub = subclasses.find((r) => r.id === character.subclass_id)
     if (sub) out.subclasses = sub

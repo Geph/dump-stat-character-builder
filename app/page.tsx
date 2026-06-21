@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { SiteFooter } from "@/components/site-footer"
 import Link from "next/link"
 import { BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/db/client"
@@ -186,7 +187,7 @@ export default function HomePage() {
 
               <p className="mb-10 max-w-2xl mx-auto">
                 <span className="text-lg font-bold text-pretty inline rounded-lg px-[5px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone]">
-                  A vibe-coded D&D 5.5e character creator with support for custom classes and content
+                  A 5E compatible character creator with bundled SRD content and support for custom homebrew
                 </span>
               </p>
 
@@ -353,61 +354,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer id="home-footer" className="py-8 px-4 border-t border-border bg-card">
-        <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm space-y-1">
-          <p>Dump Stat — D&D 5.5e Character Builder</p>
-          <p className="pt-0">Uses content from the 
-            <a
-            href="https://www.dndbeyond.com/srd"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-            >
-            D&D 5.5e SRD under the Creative Commons license
-            </a>.</p>
-          <p>
-            Logo icon:{" "}
-            <a
-              href="https://game-icons.net/1x1/delapouite/spiked-dragon-head.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              Spiked Dragon Head
-            </a>{" "}
-            by{" "}
-            <a
-              href="https://delapouite.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              Delapouite
-            </a>{" "}
-            under{" "}
-            <a
-              href="http://creativecommons.org/licenses/by/3.0/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              CC BY 3.0
-            </a>
-            {" · "}
-            Fonts: Solbera&apos;s D&D Fonts by{" "}
-            <a
-              href="https://jonathonf.github.io/solbera-dnd-fonts/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              Solbera / Ryrok
-            </a>{" "}
-            under CC BY-SA 4.0
-          </p>
-        </div>
-      </footer>
+      <SiteFooter id="home-footer" />
     </div>
   )
 }

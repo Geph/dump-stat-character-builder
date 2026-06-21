@@ -1,4 +1,5 @@
 import { extractUsesConfig, normalizeCharacteristics } from "@/lib/compendium/characteristic-modifiers"
+import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
@@ -69,6 +70,7 @@ function rowForTable(
     const characteristics = cleaned.characteristics ?? cleaned.benefits
     row.benefits = normalizeCharacteristics(characteristics, null)
     delete row.characteristics
+    if (cleaned.category != null) row.category = cleaned.category
   }
 
   if (exportType === "dnd-ability") {
@@ -128,14 +130,25 @@ export async function importDumpStatExportItemsLocal(
     delete row.class_name
     delete row.className
 
+    const allClasses = await getAllFromStore("classes")
+    const parentClass = allClasses.find((c) => c.id === classId)
+    const classNameById = new Map<string, string>()
+    if (parentClass?.name) classNameById.set(classId, parentClass.name as string)
+    const allSpells = await getAllFromStore("spells")
+    const spellCatalog = allSpells.map((spell) => ({
+      id: spell.id as string,
+      name: spell.name as string,
+    }))
+    const [enriched] = enrichImportedSubclassRows([row], classNameById, spellCatalog)
+
     const existing = await getAllFromStore("subclasses")
     for (const prev of existing) {
-      if (prev.name === row.name && prev.source === source) {
+      if (prev.name === enriched.name && prev.source === source) {
         await deleteIndexedDbRow("subclasses", prev.id as string)
       }
     }
     await putRows("subclasses", [{
-      ...row,
+      ...enriched,
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

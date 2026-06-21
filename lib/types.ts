@@ -78,8 +78,8 @@ export interface FeatureEffect {
   checkSkills?: string[]
   /** Conditions avoided or ended (typically with saving throws or ability checks). */
   checkConditionTypes?: string[]
-  /** check_roll_modifier: bonus, advantage, or disadvantage */
-  checkRollMode?: "bonus" | "advantage" | "disadvantage" | null
+  /** check_roll_modifier: bonus, advantage, disadvantage, or replace a failed save */
+  checkRollMode?: "bonus" | "advantage" | "disadvantage" | "replace_failure" | null
   /** Reroll when the d20 shows a natural 1 (e.g. Halfling Luck on D20 Tests). */
   checkRerollOnNaturalOne?: boolean
   /** Treat rolls below checkRollFloorBelow as checkRollFloorSetTo. */
@@ -376,7 +376,7 @@ export interface UsesAtLevel {
   count: number
 }
 
-export type RestType = "short_rest" | "long_rest"
+export type RestType = "short_rest" | "long_rest" | "initiative"
 
 export interface RechargeRule {
   rest: RestType
@@ -411,6 +411,20 @@ export interface UsesConfig {
   recharges?: RechargeRule[]
   dieCount?: number
   dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
+  /**
+   * Restore uses when rolling initiative. true = full pool; number = partial restore.
+   * Used by homebrew resources such as Relentless (regain all Exploit Dice).
+   */
+  rechargeOnInitiative?: boolean | number
+  /**
+   * At this character level and above, activations do not consume uses from this pool
+   * (e.g. Martial Superiority-style free exploits).
+   */
+  freeUseAfterLevel?: number
+  /** Spend a spell slot (no action) to restore uses from this pool. */
+  restoreBySpellSlot?: { minSpellLevel: number; restores: number }
+  /** Spend a class resource (no action) to restore uses from this pool. */
+  restoreByResource?: { resourceKey: string; resourceAmount?: number; restores: number }
 }
 
 export interface CustomAbility {
@@ -553,6 +567,10 @@ export interface Character {
   experience: number
   class_id: string | null
   subclass_id: string | null
+  /** Full multiclass level breakdown (persisted JSON + MySQL join rows). */
+  character_classes?: import("@/lib/character/character-classes").CharacterClassRow[] | null
+  /** Order classes were added in the builder (primary = first unless reordered). */
+  class_add_order?: string[] | null
   species_id: string | null
   background_id: string | null
   strength: number
@@ -584,6 +602,7 @@ export interface Character {
   armor_proficiencies: string[] | null
   languages: string[] | null
   equipment_ids: string[]
+  gold?: number | null
   equipped_armor_id?: string | null
   equipped_shield_id?: string | null
   equipped_weapon_id?: string | null
@@ -624,6 +643,7 @@ export interface CharacterDraft {
   armor_proficiencies?: string[]
   languages: string[]
   equipment_ids: string[]
+  gold?: number
   spell_ids: string[]
   feat_ids?: string[]
 }

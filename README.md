@@ -1,8 +1,8 @@
 # Dump Stat
 
-![Dump Stat — D&D 5.5e character creator](./public/images/readme/hero.png)
+![Dump Stat — 5E compatible character creator](./public/images/readme/hero.png)
 
-A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
+A modern 5E compatible character builder and compendium built with Next.js and MySQL.
 
 ## Features
 
@@ -37,9 +37,12 @@ A modern D&D 5.5e character builder and compendium built with Next.js and MySQL.
 - **Export options** — Download character and compendium data as JSON
 
 ### Import
-- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from official markdown)
+- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown)
 - **Web import** — Paste a URL to pull homebrew-style HTML into the compendium
-- **PDF & text import** — OpenAI-powered extraction (optional `OPENAI_API_KEY`) for pasted text or uploaded PDFs
+- **PDF & text import** — OpenAI-powered extraction (optional `OPENAI_API_KEY`) for pasted text or uploaded PDFs; subclasses, feat categories, and post-import modifier enrichment supported
+- **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
+
+See [Import formats](#import-formats) below for text/JSON structure and examples.
 
 ## Tech Stack
 
@@ -162,13 +165,13 @@ DATABASE_URL=mysql://DB_USER:DB_PASSWORD@127.0.0.1:3307/dump_stat
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed D&D 5.5e SRD Content**, or:
+Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed SRD 5.2.1 Content**, or:
 
 ```bash
 curl -X POST http://localhost:3000/api/seed
 ```
 
-Seed data is built from the official SRD 5.2.1 markdown source. To regenerate JSON after parser changes:
+Seed data is built from SRD 5.2.1 markdown. To regenerate JSON after parser changes:
 
 ```bash
 pnpm srd:build
@@ -186,7 +189,86 @@ OPENAI_API_KEY=sk-your-key-here
 # IMPORT_AI_MODEL=gpt-4o-mini
 ```
 
-Restart the dev server after adding the key. Without it, import still works for seed, web URLs, and manual compendium edits — only AI-powered PDF/text import returns a configuration error.
+Restart the dev server after adding the key. Without it, import still works for seed, web URLs, Dump Stat JSON bundles, and manual compendium edits — only AI-powered PDF/text import returns a configuration error.
+
+---
+
+## Import formats
+
+Dump Stat supports four compendium import paths:
+
+| Method | Input | Best for |
+|--------|--------|----------|
+| **SRD seed** | Button / `POST /api/seed` | Official SRD baseline |
+| **Dump Stat JSON** | `.json` file or pasted JSON | Homebrew with full `linkedModifiers`, repeatable imports |
+| **Text import** | Pasted plain text + optional content hint | UA PDFs, wiki pages, copied stat blocks |
+| **PDF import** | Uploaded PDF (+ optional page range) | Same as text; also accepts JSON export files |
+
+### Dump Stat JSON export
+
+Export bundles use type `dump-stat-export` with an `items` array. Each item has `type` (e.g. `dnd-subclass`, `dnd-feat`, `dnd-spell`) and `data` (compendium fields without server ids).
+
+**Single-item shape:**
+
+```json
+{
+  "type": "dnd-subclass",
+  "version": 1,
+  "data": {
+    "name": "Circle of the Titan",
+    "class_name": "Druid",
+    "description": "…",
+    "source": "UA 2026",
+    "features": [
+      { "level": 3, "name": "Circle of the Titan Spells", "description": "…" }
+    ]
+  }
+}
+```
+
+**Bulk bundle:**
+
+```json
+{
+  "type": "dump-stat-export",
+  "version": 1,
+  "section": "my-homebrew",
+  "items": [ … ]
+}
+```
+
+Import via **Import → PDF upload** (choose the `.json` file) or **paste the entire JSON into Text Import**.
+
+- Subclasses resolve parent classes by `class_name` (must exist in compendium — seed SRD first).
+- Subclass rows run **post-import enrichment** (always-prepared spell links, limited uses, class-resource bindings) when presets exist.
+- Feats should include `"category": "Origin"` or `"Epic Boon"` so they appear in the correct builder pickers.
+
+**Example bundle:** [lib/import/examples/ua-villainous-options-export.json](lib/import/examples/ua-villainous-options-export.json) — UA 2026 Villainous Options (three subclasses, Destructive Wave, Origin/Epic Boon feats). Regenerate with:
+
+```bash
+pnpm dlx tsx scripts/build-ua-villainous-export.ts
+```
+
+### Text import (AI extraction)
+
+Paste raw text (minimum ~20 characters). The model extracts structured content into species, classes, **subclasses**, backgrounds, spells, feats, equipment, and (text route only) custom abilities.
+
+**Tips for best results:**
+
+1. **Seed SRD first** — parent class names must match exactly (`Druid`, not `Druid (Circle of the Titan)`).
+2. **Content hint** — use the dropdown (e.g. `subclasses`) to focus extraction.
+3. **Subclasses** — each entry needs `class_name` plus `features[]` with `level`, `name`, `description`. Choice features (skill picks, titan forms) should set `isChoice: true` and `choices`.
+4. **Feats** — Origin and Epic Boon feats are categorized automatically when the source labels them; the model sets `category` accordingly.
+5. **Spell tables** — keep HTML `<table>` blocks in feature descriptions for subclass spell lists.
+6. **Dump Stat JSON** — if the pasted text is valid export JSON, it imports directly without AI (same as file upload).
+
+Imported rows use source **Text Import** or **PDF Import** and replace same-name rows from that source on re-import.
+
+### PDF import (AI extraction)
+
+Same schema and persistence as text import. Optional **page range** limits extraction to specific pages. Upload a **`.json` export bundle** through the PDF file picker for non-AI JSON import.
+
+Requires `OPENAI_API_KEY` for PDF text extraction only (not for JSON bundles or SRD seed).
 
 ---
 
@@ -454,9 +536,15 @@ The Dump Stat application source code in this repository is licensed under the [
 
 The MIT license applies to **application code only**. It does **not** cover third-party game content or assets bundled with or displayed by the app.
 
-### D&D 5.5e SRD
+### SRD 5.2.1 (game content)
 
-This project uses material from the **D&D 5.5e Systems Reference Document (SRD)** under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/). See [lib/srd/README.md](lib/srd/README.md) for attribution and how to rebuild seed data (`pnpm srd:build`).
+This work includes material from the System Reference Document 5.2.1 ("SRD 5.2.1") by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD 5.2.1 is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode.
+
+Compatible with fifth edition.
+
+Section 5 of CC-BY-4.0 includes a Disclaimer of Warranties and Limitation of Liability that limits our liability to you.
+
+Seed data is rebuilt from SRD-derived markdown via `pnpm srd:build` — see [lib/srd/README.md](lib/srd/README.md).
 
 ### Icons (game-icons.net)
 

@@ -99,7 +99,8 @@ export function classAndSubclassLinkedModifiers(params: {
     const cls = classes.find((c) => c.id === entry.classId)
     if (!cls) continue
 
-    collectLinkedFromFeatures(cls.features ?? [], entry.classId, entry.level, featureChoicePicks, catalog, instances)
+    const batch: LinkedModifierInstance[] = []
+    collectLinkedFromFeatures(cls.features ?? [], entry.classId, entry.level, featureChoicePicks, catalog, batch)
 
     const subclassId = subclassByClassId[entry.classId]
     if (subclassId && entry.level >= SUBCLASS_LEVEL) {
@@ -111,13 +112,39 @@ export function classAndSubclassLinkedModifiers(params: {
           entry.level,
           featureChoicePicks,
           catalog,
-          instances,
+          batch,
         )
       }
     }
+
+    instances.push(...filterSpellsKnownByClassLevel(batch, entry.level))
   }
 
   return instances
+}
+
+function filterSpellsKnownByClassLevel(
+  instances: LinkedModifierInstance[],
+  maxClassLevel: number,
+): LinkedModifierInstance[] {
+  return instances.map((instance) => {
+    const characteristics = instance.characteristics
+    if (!characteristics?.length) return instance
+
+    let changed = false
+    const nextCharacteristics = characteristics.map((char) => {
+      if (char.type !== "spells_known") return char
+      const spells = (char.spells ?? []).filter(
+        (entry) => !entry.unlocksAtClassLevel || entry.unlocksAtClassLevel <= maxClassLevel,
+      )
+      if (spells.length === (char.spells ?? []).length) return char
+      changed = true
+      return { ...char, spells }
+    })
+
+    if (!changed) return instance
+    return { ...instance, characteristics: nextCharacteristics }
+  })
 }
 
 /** @deprecated Use classAndSubclassLinkedModifiers */
