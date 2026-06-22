@@ -67,6 +67,7 @@ export type ImportReport = {
     aiProvider?: string
     aiModelId?: string
     extractionMode?: "deterministic" | "hybrid" | "ai"
+    cacheHits?: number
     confidence?: {
       level: "high" | "partial" | "low"
       score: number
