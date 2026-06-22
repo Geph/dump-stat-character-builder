@@ -2,6 +2,7 @@ import classes from "../lib/srd/seed-data/classes.json"
 import subclasses from "../lib/srd/seed-data/subclasses.json"
 import { enrichSrdClassList } from "../lib/compendium/enrich-srd-classes"
 import { enrichSrdSubclassList } from "../lib/compendium/enrich-srd-subclasses"
+import { enrichClassFeatureWithModifierPresets } from "../lib/compendium/enrich-srd-class-features"
 import type { Feature } from "../lib/types"
 
 function featureHasModifiers(feature: Feature): boolean {
@@ -81,6 +82,32 @@ const enrichedSubclasses = enrichSrdSubclassList(
   new Map(enrichedClasses.map((c) => [(c as { id?: string }).id ?? c.name, c.name as string])),
 )
 
+let detectorFallbackCount = 0
+for (const cls of enrichedClasses) {
+  for (const raw of (cls.features ?? []) as Feature[]) {
+    const presetOnly = enrichClassFeatureWithModifierPresets(String(cls.name), raw, null, {
+      skipMechanicalDetection: true,
+    })
+    const withFallback = enrichClassFeatureWithModifierPresets(String(cls.name), raw)
+    if ((withFallback.linkedModifiers?.length ?? 0) > (presetOnly.linkedModifiers?.length ?? 0)) {
+      detectorFallbackCount += 1
+    }
+  }
+}
+for (const sc of enrichedSubclasses) {
+  const parent = String((sc as { class_name?: string }).class_name ?? "")
+  const subclassName = String(sc.name ?? "")
+  for (const raw of (sc.features ?? []) as Feature[]) {
+    const presetOnly = enrichClassFeatureWithModifierPresets(parent, raw, subclassName, {
+      skipMechanicalDetection: true,
+    })
+    const withFallback = enrichClassFeatureWithModifierPresets(parent, raw, subclassName)
+    if ((withFallback.linkedModifiers?.length ?? 0) > (presetOnly.linkedModifiers?.length ?? 0)) {
+      detectorFallbackCount += 1
+    }
+  }
+}
+
 const allUnmatched: Unmatched[] = []
 
 for (const cls of enrichedClasses) {
@@ -95,7 +122,8 @@ for (const sc of enrichedSubclasses) {
   allUnmatched.push(...auditFeatures(`${parent} (${name})`, features))
 }
 
-console.log(`SRD class/subclass features without common modifiers: ${allUnmatched.length}\n`)
+console.log(`SRD class/subclass features without common modifiers: ${allUnmatched.length}`)
+console.log(`Features supplemented by phrase-detector fall-through: ${detectorFallbackCount}\n`)
 
 const unexpected = allUnmatched.filter((item) => !ALLOWED_UNMATCHED.has(item.name))
 if (unexpected.length) {

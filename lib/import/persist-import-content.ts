@@ -4,6 +4,7 @@ import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { deleteWhere, insertRows, listRows, upsertByName } from "@/lib/db/repository"
 import type { ImportContent } from "@/lib/import/content-schema"
 import { buildImportReport, type ImportReport } from "@/lib/import/build-import-report"
+import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
 import {
   buildClassResourceRowsForClass,
   enrichImportedClassList,
@@ -55,6 +56,7 @@ export async function persistImportedContent(
   content: ImportContent,
   source: ImportSourceLabel,
 ): Promise<PersistImportResult> {
+  const sanitized = sanitizeImportContentForPersist(content)
   let totalImported = 0
   const breakdown: Record<string, number> = {}
   const warnings: string[] = []
@@ -63,17 +65,17 @@ export async function persistImportedContent(
   let enrichedClasses: Record<string, unknown>[] = []
   let classNameById = new Map<string, string>()
   let spellCatalog = await loadSpellCatalog()
-  const explicitResources = asClassResourceImports(content)
+  const explicitResources = asClassResourceImports(sanitized)
 
-  if (content.species?.length) {
-    await upsertByName("species", content.species.map((s) => ({ ...s, source })))
-    breakdown.species = content.species.length
-    totalImported += content.species.length
+  if (sanitized.species?.length) {
+    await upsertByName("species", sanitized.species.map((s) => ({ ...s, source })))
+    breakdown.species = sanitized.species.length
+    totalImported += sanitized.species.length
   }
 
-  if (content.classes?.length) {
+  if (sanitized.classes?.length) {
     enrichedClasses = enrichImportedClassList(
-      content.classes.map((c) => ({ ...c, source })),
+      sanitized.classes.map((c) => ({ ...c, source })),
       explicitResources,
     )
     await upsertByName("classes", enrichedClasses)
@@ -81,11 +83,11 @@ export async function persistImportedContent(
     totalImported += enrichedClasses.length
   }
 
-  if (content.classes?.length || content.class_resources?.length) {
+  if (sanitized.classes?.length || sanitized.class_resources?.length) {
     const classNames = [
       ...new Set([
-        ...(content.classes?.map((c) => c.name) ?? []),
-        ...(content.class_resources?.map((r) => r.class_name) ?? []),
+        ...(sanitized.classes?.map((c) => c.name) ?? []),
+        ...(sanitized.class_resources?.map((r) => r.class_name) ?? []),
       ]),
     ]
     const classData = await listRows("classes", {
@@ -130,22 +132,22 @@ export async function persistImportedContent(
     }
   }
 
-  if (content.spells?.length) {
-    await upsertByName("spells", content.spells.map((s) => ({ ...s, source })))
-    breakdown.spells = content.spells.length
-    totalImported += content.spells.length
+  if (sanitized.spells?.length) {
+    await upsertByName("spells", sanitized.spells.map((s) => ({ ...s, source })))
+    breakdown.spells = sanitized.spells.length
+    totalImported += sanitized.spells.length
     spellCatalog = await loadSpellCatalog()
   }
 
-  if (content.subclasses?.length) {
-    const classNames = [...new Set(content.subclasses.map((sc) => sc.class_name))]
+  if (sanitized.subclasses?.length) {
+    const classNames = [...new Set(sanitized.subclasses.map((sc) => sc.class_name))]
     const classData = await listRows("classes", {
       filters: [{ op: "in", column: "name", values: classNames }],
     })
     classNameById = new Map(classData.map((c) => [c.id as string, c.name as string]))
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
 
-    skippedSubclasses = content.subclasses
+    skippedSubclasses = sanitized.subclasses
       .filter((sc) => !classIdMap.get(sc.class_name))
       .map((sc) => ({ name: sc.name, class_name: sc.class_name }))
     if (skippedSubclasses.length > 0) {
@@ -154,7 +156,7 @@ export async function persistImportedContent(
       )
     }
 
-    const subclassesWithIds = content.subclasses
+    const subclassesWithIds = sanitized.subclasses
       .map((sc) => ({
         name: sc.name,
         description: sc.description,
@@ -206,50 +208,57 @@ export async function persistImportedContent(
     }
   }
 
-  if (content.backgrounds?.length) {
+  if (sanitized.backgrounds?.length) {
     await upsertByName(
       "backgrounds",
-      normalizeBackgroundRows(content.backgrounds.map((b) => ({ ...b, source }))),
+      normalizeBackgroundRows(sanitized.backgrounds.map((b) => ({ ...b, source }))),
     )
-    breakdown.backgrounds = content.backgrounds.length
-    totalImported += content.backgrounds.length
+    breakdown.backgrounds = sanitized.backgrounds.length
+    totalImported += sanitized.backgrounds.length
   }
 
-  if (content.feats?.length) {
+  if (sanitized.feats?.length) {
     await upsertByName(
       "feats",
-      content.feats.map((f) => ({
-        name: f.name,
-        description: f.description ? formatFeatDescription(f.description) : null,
-        prerequisite: f.prerequisite ?? null,
-        category: normalizeFeatCategory(f.category),
-        source,
-      })),
+      sanitized.feats.map((f) => {
+        const row = f as Record<string, unknown>
+        const linkedModifiers = (row.linkedModifiers ?? row.linked_modifiers) as unknown[] | undefined
+        const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
+        return {
+          name: f.name,
+          description: f.description ? formatFeatDescription(f.description) : null,
+          prerequisite: f.prerequisite ?? null,
+          category: normalizeFeatCategory(f.category),
+          linked_modifiers: linkedModifiers ?? [],
+          modifier_refs: modifierRefs ?? [],
+          source,
+        }
+      }),
     )
-    breakdown.feats = content.feats.length
-    totalImported += content.feats.length
+    breakdown.feats = sanitized.feats.length
+    totalImported += sanitized.feats.length
   }
 
-  if (content.equipment?.length) {
+  if (sanitized.equipment?.length) {
     const equipment = normalizeEquipmentRows(
-      content.equipment.map((e) => ({ ...e, source })) as Record<string, unknown>[],
+      sanitized.equipment.map((e) => ({ ...e, source })) as Record<string, unknown>[],
     )
     await upsertByName("equipment", equipment)
-    breakdown.equipment = equipment.length
-    totalImported += equipment.length
+    breakdown.equipment = sanitized.equipment.length
+    totalImported += sanitized.equipment.length
   }
 
-  if (content.abilities?.length) {
+  if (sanitized.abilities?.length) {
     await upsertByName(
       "custom_abilities",
-      content.abilities.map((a) => ({ ...a, source, show_in_builder: true })),
+      sanitized.abilities.map((a) => ({ ...a, source, show_in_builder: true })),
     )
-    breakdown.abilities = content.abilities.length
-    totalImported += content.abilities.length
+    breakdown.abilities = sanitized.abilities.length
+    totalImported += sanitized.abilities.length
   }
 
   const report = buildImportReport({
-    content,
+    content: sanitized,
     enrichedClasses,
     enrichedSubclasses,
     classNameById,

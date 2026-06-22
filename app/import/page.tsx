@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
+import { ImportModifierPreviewPanel } from "@/components/import/import-modifier-preview-panel"
 import { ImportReportPanel } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
@@ -41,6 +42,10 @@ import {
   type ImportRenameMap,
 } from "@/lib/import/import-collisions"
 import type { ImportStage } from "@/lib/import/import-staging"
+import {
+  collectImportModifierPreviews,
+  removeImportModifierPreview,
+} from "@/lib/import/import-modifier-previews"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
 type ImportTab = "clipboard" | "pdf" | "web" | "pack"
@@ -92,6 +97,19 @@ export default function ImportPage() {
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
+
+  const modifierPreviews = useMemo(
+    () => (pendingImport ? collectImportModifierPreviews(pendingImport.content) : []),
+    [pendingImport],
+  )
+
+  const handleRemoveModifierPreview = (previewId: string) => {
+    setPendingImport((current) =>
+      current
+        ? { ...current, content: removeImportModifierPreview(current.content, previewId) }
+        : null,
+    )
+  }
 
   const clearPendingImport = () => {
     setPendingImport(null)
@@ -526,6 +544,10 @@ export default function ImportPage() {
               value={renameMap}
               onChange={setRenameMap}
             />
+            <ImportModifierPreviewPanel
+              previews={modifierPreviews}
+              onRemove={handleRemoveModifierPreview}
+            />
             <ImportProposalPanel
               proposals={pendingImport.proposals}
               previewSummary={pendingImport.previewSummary}
@@ -693,13 +715,16 @@ export default function ImportPage() {
                     <div className="mb-4 p-4 bg-orange/10 rounded-xl border border-orange/20">
                       <h3 className="font-bold text-orange mb-2">How AI Processing Works</h3>
                       <p className="text-sm text-muted-foreground mb-2">
-                        PDF and text imports use <strong>OpenAI</strong> (default model:{" "}
-                        <code className="text-xs">gpt-4o</code>) to parse and structure D&D content. Set{" "}
-                        <code className="text-xs">OPENAI_API_KEY</code> in your server environment.
+                        PDF and text imports use an AI model (OpenAI, Anthropic, or Google Gemini) to
+                        parse and structure D&D content. Set one API key on the server:{" "}
+                        <code className="text-xs">OPENAI_API_KEY</code>,{" "}
+                        <code className="text-xs">ANTHROPIC_API_KEY</code>, or{" "}
+                        <code className="text-xs">GOOGLE_GENERATIVE_AI_API_KEY</code>.
                       </p>
                       <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                        <li>Requires your own OpenAI API key on the server (not in the browser)</li>
-                        <li>Optional: override model with IMPORT_AI_MODEL (e.g. gpt-4o-mini)</li>
+                        <li>Keys stay on the server — never in the browser</li>
+                        <li>Optional: <code className="text-xs">IMPORT_AI_PROVIDER</code> (openai, anthropic, google)</li>
+                        <li>Optional: <code className="text-xs">IMPORT_AI_MODEL</code> to override the default model</li>
                         <li>Extracts classes, species, spells, feats, equipment, and more</li>
                         <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
                         <li>Large PDFs are processed in multiple sections automatically (no 50k truncation)</li>

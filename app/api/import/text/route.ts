@@ -9,6 +9,7 @@ import {
   CUSTOM_CLASS_IMPORT_HINT,
   FEAT_CATEGORY_IMPORT_HINT,
   IMPORT_PROPOSALS_HINT,
+  MECHANICS_IMPORT_HINT,
   SUBCLASS_IMPORT_HINT,
 } from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
@@ -18,6 +19,8 @@ import { detectImportCollisions } from "@/lib/import/fetch-import-collisions"
 import { persistImportedContent } from "@/lib/import/persist-import-content"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { NextRequest, NextResponse } from "next/server"
+
+export const runtime = "nodejs"
 
 const BASE_SYSTEM_PROMPT = `You are a D&D 2024 content parser. Extract game content from the provided text.
       
@@ -49,6 +52,8 @@ ${CLASS_RESOURCE_IMPORT_HINT}
 ${CUSTOM_CLASS_IMPORT_HINT}
 
 ${IMPORT_PROPOSALS_HINT}
+
+${MECHANICS_IMPORT_HINT}
 
 ${CLASS_SPELL_LIST_IMPORT_HINT}`
 

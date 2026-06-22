@@ -1,7 +1,14 @@
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import {
+  charInstance,
+  fxInstance,
+  modId,
+  usesInstance,
+} from "@/lib/compendium/modifier-instance-builders"
+import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { isSrdSource } from "@/lib/srd/source"
-import type { FeatureActivation, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
 
 /** Catalog entry ids from buildDefaultModifierCatalog (cat_char_* / cat_fx_*). */
 export const FEAT_MODIFIER_CATALOG = {
@@ -28,26 +35,6 @@ export const FEAT_MODIFIER_CATALOG = {
   damageReduction: "cat_fx_damage_reduction",
 } as const
 
-function modId(key: string): string {
-  return `mod_${key}`
-}
-
-function charInstance(
-  instanceId: string,
-  catalogRefId: string,
-  characteristics: CharacteristicModifier[],
-): LinkedModifierInstance {
-  return { instanceId, catalogRefId, characteristics }
-}
-
-function fxInstance(
-  instanceId: string,
-  catalogRefId: string,
-  activation: FeatureActivation,
-): LinkedModifierInstance {
-  return { instanceId, catalogRefId, activation }
-}
-
 function asiPool(instanceId: string, points = 2, label?: string): LinkedModifierInstance {
   return charInstance(instanceId, FEAT_MODIFIER_CATALOG.abilityScores, [
     {
@@ -56,21 +43,6 @@ function asiPool(instanceId: string, points = 2, label?: string): LinkedModifier
       mode: "asi_pool",
       points,
       bonuses: {},
-      label,
-    },
-  ])
-}
-
-function usesInstance(
-  instanceId: string,
-  uses: UsesConfig,
-  label?: string,
-): LinkedModifierInstance {
-  return charInstance(instanceId, FEAT_MODIFIER_CATALOG.uses, [
-    {
-      id: modId(`${instanceId}_uses`),
-      type: "uses",
-      uses,
       label,
     },
   ])
@@ -398,44 +370,76 @@ function migrateSkilledRow(row: Record<string, unknown>, preset: FeatModifierPre
   }
 }
 
+function applyFeatMechanicalDetection(row: Record<string, unknown>): Record<string, unknown> {
+  if (Boolean(row.is_choice ?? row.isChoice)) return row
+  const description = typeof row.description === "string" ? row.description : ""
+  if (!description.trim()) return row
+
+  const name = String(row.name ?? "")
+  const linked = (row.linkedModifiers ?? row.linked_modifiers) as LinkedModifierInstance[] | undefined
+  const refs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
+  const detected = enrichFeatureWithMechanicalDetection(
+    {
+      name,
+      description,
+      linkedModifiers: Array.isArray(linked) ? linked : undefined,
+      modifierRefs: Array.isArray(refs) ? refs : undefined,
+    },
+    {
+      contentKind: "feat",
+      sourceName: name,
+      featureName: name,
+    },
+  )
+
+  return {
+    ...row,
+    linked_modifiers: detected.linkedModifiers,
+    linkedModifiers: detected.linkedModifiers,
+    modifier_refs: detected.modifierRefs,
+    modifierRefs: detected.modifierRefs,
+  }
+}
+
 /** Apply SRD common-modifier presets to a feat row when not already configured. */
 export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source)) return row
   const name = String(row.name ?? "")
   const preset = SRD_FEAT_MODIFIER_PRESETS[name]
-  if (!preset) return row
 
-  if (name === "Skilled" && isLegacySkilledRow(row) && preset.linkedModifiers) {
-    return migrateSkilledRow(row, preset)
+  if (name === "Skilled" && isLegacySkilledRow(row) && preset?.linkedModifiers) {
+    return applyFeatMechanicalDetection(migrateSkilledRow(row, preset))
   }
 
-  if (featHasModifierConfig(row)) return row
+  if (preset && !featHasModifierConfig(row)) {
+    if (preset.isChoice && preset.choices) {
+      return {
+        ...row,
+        is_choice: true,
+        isChoice: true,
+        choices: preset.choices,
+        linked_modifiers: [],
+        linkedModifiers: [],
+        modifier_refs: [],
+        modifierRefs: [],
+        benefits: row.benefits ?? null,
+        repeatable: row.repeatable ?? preset.repeatable ?? false,
+      }
+    }
 
-  if (preset.isChoice && preset.choices) {
-    return {
+    const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
+    return applyFeatMechanicalDetection({
       ...row,
-      is_choice: true,
-      isChoice: true,
-      choices: preset.choices,
-      linked_modifiers: [],
-      linkedModifiers: [],
-      modifier_refs: [],
-      modifierRefs: [],
+      linked_modifiers: synced.linkedModifiers,
+      linkedModifiers: synced.linkedModifiers,
+      modifier_refs: synced.modifierRefs,
+      modifierRefs: synced.modifierRefs,
       benefits: row.benefits ?? null,
       repeatable: row.repeatable ?? preset.repeatable ?? false,
-    }
+    })
   }
 
-  const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
-  return {
-    ...row,
-    linked_modifiers: synced.linkedModifiers,
-    linkedModifiers: synced.linkedModifiers,
-    modifier_refs: synced.modifierRefs,
-    modifierRefs: synced.modifierRefs,
-    benefits: row.benefits ?? null,
-    repeatable: row.repeatable ?? preset.repeatable ?? false,
-  }
+  return applyFeatMechanicalDetection(row)
 }
 
 export function enrichSrdFeatList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

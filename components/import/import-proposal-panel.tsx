@@ -71,7 +71,7 @@ export function ImportProposalPanel({
         <p className="mt-1 text-muted-foreground">
           {proposals.classResources.length > 0 || proposals.customAbilities.length > 0
             ? "The import found class resources and custom abilities that need your confirmation. Uncheck anything you do not want created in the compendium."
-            : "Confirm to write the parsed content to the compendium."}
+            : "Review auto-wired modifiers below, then confirm to write the parsed content to the compendium."}
         </p>
         {previewSummary ? (
           <p className="mt-2 text-xs text-muted-foreground">{previewSummary}</p>
