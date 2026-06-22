@@ -62,12 +62,14 @@ export function ImportTokenSavingsSummary({
           Removed ~{savings.estimatedTokensSaved.toLocaleString()} estimated tokens (
           {savings.savedPercent}% of input) before AI extraction
           {savings.chunkCount > 1 ? ` · ${savings.chunkCount} AI sections` : ""}
+          {savings.cacheHits ? ` · ${savings.cacheHits} cached section${savings.cacheHits === 1 ? "" : "s"}` : ""}
           {savings.aiModelId ? ` · ${savings.aiProvider ?? "AI"} / ${savings.aiModelId}` : ""}
         </p>
       ) : (
         <p className="mt-1 text-xs text-muted-foreground">
           AI extraction used
           {savings.chunkCount > 0 ? ` · ${savings.chunkCount} section${savings.chunkCount === 1 ? "" : "s"}` : ""}
+          {savings.cacheHits ? ` · ${savings.cacheHits} cached section${savings.cacheHits === 1 ? "" : "s"}` : ""}
           {savings.aiModelId ? ` · ${savings.aiProvider ?? "AI"} / ${savings.aiModelId}` : ""}
         </p>
       )}

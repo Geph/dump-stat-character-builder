@@ -82,6 +82,16 @@ describe("import content AI schema", () => {
     expect(findBadAdditionalProperties(jsonSchema)).toEqual([])
   })
 
+  it("scopes schema fields when contentTypeHint is classes", async () => {
+    const jsonSchema = (await buildImportContentAiOutputSchema({
+      contentTypeHint: "classes",
+    }).jsonSchema) as JsonSchemaObject
+
+    expect(jsonSchema.properties?.classes).toBeDefined()
+    expect(jsonSchema.properties?.species).toBeUndefined()
+    expect(jsonSchema.properties?.equipment).toBeUndefined()
+  })
+
   it("normalizes null placeholders out of AI output", () => {
     const normalized = normalizeAiImportContent({
       species: null,

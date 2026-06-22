@@ -210,6 +210,8 @@ Restart the dev server after changing keys. Without any provider key, seed, web 
 
 **Zero-AI path:** Clean class documents (progression table + feature prose, e.g. homebrew Fighter PDFs) may import with **no AI calls** when the deterministic confidence gate is high. The import report shows a **Zero AI** badge when that path is used.
 
+**Chunk cache:** Successful AI sections are cached in server memory by hash. If a large import fails mid-way (quota/rate limit), retry the **same** text with the same provider/model — finished sections are reused without extra API cost until the server restarts.
+
 ---
 
 ## Import formats

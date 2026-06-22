@@ -8,9 +8,19 @@ import { chunkImportText } from "@/lib/import/chunk-import-text"
 import type { ImportContent } from "@/lib/import/content-schema"
 import { extractImportContentDeterministic } from "@/lib/import/extract-import-content-deterministic"
 import {
+  getCachedImportChunk,
+  importExtractionCacheKey,
+  setCachedImportChunk,
+} from "@/lib/import/import-extraction-cache"
+import {
   buildImportContentAiOutputSchema,
   normalizeAiImportContent,
+  type AiImportContent,
 } from "@/lib/import/import-content-ai-schema"
+import {
+  getImportChunkSize,
+  maxOutputTokensForImport,
+} from "@/lib/import/import-ai-limits"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { mergeImportContent } from "@/lib/import/merge-import-content"
 import {
@@ -34,6 +44,7 @@ export type ExtractImportContentResult = {
   aiModelId?: string
   extractionMode: ImportExtractionMode
   confidence?: ImportConfidenceAssessment
+  cacheHits?: number
 }
 
 export { ImportExtractionError } from "@/lib/import/ai-errors"
@@ -67,9 +78,11 @@ export async function extractImportContentFromText(
 
   const ContentSchema = buildImportContentAiOutputSchema({
     includeAbilities: options?.includeAbilities,
+    contentTypeHint: options?.contentTypeHint,
   })
-  const chunks = chunkImportText(preprocess.aiText)
+  const chunks = chunkImportText(preprocess.aiText, getImportChunkSize())
   const outputs: ImportContent[] = []
+  let cacheHits = 0
 
   const hasDeterministicPartial =
     Boolean(preprocess.deterministic.classes?.length) ||
@@ -92,8 +105,31 @@ export async function extractImportContentFromText(
     modelId: options?.modelId,
   })
 
+  const resolvedConfig = resolveImportAiConfig({
+    provider: options?.provider,
+    modelId: options?.modelId,
+  })
+  if ("error" in resolvedConfig) {
+    throw new Error(resolvedConfig.error)
+  }
+  const { provider: aiProvider, modelId: aiModelId } = resolvedConfig
+
   for (let index = 0; index < chunks.length; index++) {
     const chunk = chunks[index]
+    const cacheKey = importExtractionCacheKey({
+      provider: aiProvider,
+      modelId: aiModelId,
+      chunkText: chunk,
+      contentTypeHint: options?.contentTypeHint,
+      includeAbilities: options?.includeAbilities,
+    })
+    const cached = getCachedImportChunk(cacheKey)
+    if (cached) {
+      cacheHits += 1
+      outputs.push(cached)
+      continue
+    }
+
     const chunkNote =
       chunks.length > 1
         ? `\n\nNote: This is section ${index + 1} of ${chunks.length} from a large document. Extract all content in this section; duplicates will be merged later.`
@@ -102,29 +138,27 @@ export async function extractImportContentFromText(
     try {
       const result = await generateText({
         model,
+        maxOutputTokens: maxOutputTokensForImport(options?.contentTypeHint),
         system: systemPrompt,
         prompt: `Extract D&D content from this text:${chunkNote}\n\n${chunk}`,
         output: Output.object({ schema: ContentSchema }),
       })
 
-      outputs.push(
-        applyClassSpellListsToImport(normalizeAiImportContent(result.output)),
+      const normalized = applyClassSpellListsToImport(
+        normalizeAiImportContent(result.output as AiImportContent),
       )
+      setCachedImportChunk(cacheKey, normalized)
+      outputs.push(normalized)
     } catch (error) {
       const partial =
         outputs.length > 0 ? mergeImportContent(outputs) : preprocess.deterministic
       throw toImportExtractionError(error, {
         partialContent: partial,
-        completedChunks: index,
+        completedChunks: outputs.length,
         totalChunks: chunks.length,
       })
     }
   }
-
-  const resolved = resolveImportAiConfig({
-    provider: options?.provider,
-    modelId: options?.modelId,
-  })
 
   const extractionMode: ImportExtractionMode =
     deterministicAttempt.confidence.level === "partial" ? "hybrid" : "ai"
@@ -133,9 +167,10 @@ export async function extractImportContentFromText(
     content: mergeImportContent(outputs),
     preprocessStats: preprocess.stats,
     chunkCount: chunks.length,
-    aiProvider: "error" in resolved ? undefined : resolved.provider,
-    aiModelId: "error" in resolved ? undefined : resolved.modelId,
+    aiProvider,
+    aiModelId,
     extractionMode,
     confidence: deterministicAttempt.confidence,
+    cacheHits,
   }
 }

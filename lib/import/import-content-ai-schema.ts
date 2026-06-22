@@ -204,13 +204,63 @@ const ImportContentAiSchemaWithAbilities = ImportContentAiSchemaBase.extend({
 export type AiImportContent = z.infer<typeof ImportContentAiSchemaWithAbilities>
 
 /** Zod schema for AI structured extraction (OpenAI strict JSON schema compatible). */
-export function buildImportContentAiSchema(options?: { includeAbilities?: boolean }) {
-  if (options?.includeAbilities) return ImportContentAiSchemaWithAbilities
-  return ImportContentAiSchemaBase
+export function buildImportContentAiSchema(options?: {
+  includeAbilities?: boolean
+  contentTypeHint?: string | null
+}) {
+  const hint = options?.contentTypeHint?.trim().toLowerCase()
+  if (!hint || hint === "all") {
+    if (options?.includeAbilities) return ImportContentAiSchemaWithAbilities
+    return ImportContentAiSchemaBase
+  }
+
+  switch (hint) {
+    case "classes":
+      return z.object({
+        classes: z.array(ClassAiSchema).nullable(),
+        subclasses: z.array(SubclassAiSchema).nullable(),
+        class_resources: z.array(ClassResourceAiSchema).nullable(),
+        spells: z.array(SpellAiSchema).nullable(),
+        import_proposals: ImportProposalsAiSchema.nullable(),
+      })
+    case "subclasses":
+      return z.object({
+        subclasses: z.array(SubclassAiSchema).nullable(),
+        classes: z.array(ClassAiSchema).nullable(),
+        spells: z.array(SpellAiSchema).nullable(),
+        import_proposals: ImportProposalsAiSchema.nullable(),
+      })
+    case "species":
+      return z.object({
+        species: z.array(SpeciesAiSchema).nullable(),
+      })
+    case "spells":
+      return z.object({
+        spells: z.array(SpellAiSchema).nullable(),
+      })
+    case "feats":
+      return z.object({
+        feats: z.array(FeatAiSchema).nullable(),
+      })
+    case "backgrounds":
+      return z.object({
+        backgrounds: z.array(BackgroundAiSchema).nullable(),
+      })
+    case "equipment":
+      return z.object({
+        equipment: z.array(EquipmentAiSchema).nullable(),
+      })
+    default:
+      if (options?.includeAbilities) return ImportContentAiSchemaWithAbilities
+      return ImportContentAiSchemaBase
+  }
 }
 
 /** Pre-wrapped schema for `Output.object()` / OpenAI strict JSON mode. */
-export function buildImportContentAiOutputSchema(options?: { includeAbilities?: boolean }) {
+export function buildImportContentAiOutputSchema(options?: {
+  includeAbilities?: boolean
+  contentTypeHint?: string | null
+}) {
   return zodSchema(buildImportContentAiSchema(options))
 }
 

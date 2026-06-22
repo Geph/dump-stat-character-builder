@@ -23,6 +23,7 @@ export type ImportTokenSavingsReport = {
     ImportConfidenceAssessment,
     "level" | "score" | "matchRatio" | "matchedTableFeatures" | "tableFeatureCount"
   >
+  cacheHits?: number
   subtractedRegions: ImportPreprocessStats["subtractedRegions"]
 }
 
@@ -35,6 +36,7 @@ export function buildTokenSavingsReport(
     | "aiModelId"
     | "extractionMode"
     | "confidence"
+    | "cacheHits"
   >,
 ): ImportTokenSavingsReport {
   return {
@@ -43,6 +45,7 @@ export function buildTokenSavingsReport(
     aiProvider: extraction.aiProvider,
     aiModelId: extraction.aiModelId,
     extractionMode: extraction.extractionMode,
+    cacheHits: extraction.cacheHits,
     confidence: extraction.confidence
       ? {
           level: extraction.confidence.level,
@@ -58,13 +61,18 @@ export function buildTokenSavingsReport(
 
 export function importAiErrorResponse(error: unknown): NextResponse {
   if (error instanceof ImportExtractionError) {
+    const cacheNote =
+      error.retryable && (error.completedChunks ?? 0) > 0
+        ? " Completed sections are cached — retry the same import to resume without re-spending tokens on finished chunks."
+        : ""
     return NextResponse.json(
       {
-        error: error.userMessage,
+        error: `${error.userMessage}${cacheNote}`,
         code: error.code,
         partialContent: error.partialContent,
         completedChunks: error.completedChunks,
         totalChunks: error.totalChunks,
+        cacheRetryAvailable: (error.completedChunks ?? 0) > 0,
       },
       { status: error.status },
     )
