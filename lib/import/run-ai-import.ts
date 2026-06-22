@@ -1,9 +1,12 @@
 import { getImportModel } from "@/lib/import/ai"
 import { chunkImportText } from "@/lib/import/chunk-import-text"
-import { buildImportContentSchema } from "@/lib/import/content-schema"
+import type { ImportContent } from "@/lib/import/content-schema"
+import {
+  buildImportContentAiOutputSchema,
+  normalizeAiImportContent,
+} from "@/lib/import/import-content-ai-schema"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { mergeImportContent } from "@/lib/import/merge-import-content"
-import type { ImportContent } from "@/lib/import/content-schema"
 import { generateText, Output } from "ai"
 
 export async function extractImportContentFromText(
@@ -11,7 +14,9 @@ export async function extractImportContentFromText(
   systemPrompt: string,
   options?: { includeAbilities?: boolean },
 ): Promise<ImportContent> {
-  const ContentSchema = buildImportContentSchema({ includeAbilities: options?.includeAbilities })
+  const ContentSchema = buildImportContentAiOutputSchema({
+    includeAbilities: options?.includeAbilities,
+  })
   const chunks = chunkImportText(text)
   const outputs: ImportContent[] = []
 
@@ -29,7 +34,9 @@ export async function extractImportContentFromText(
       output: Output.object({ schema: ContentSchema }),
     })
 
-    outputs.push(applyClassSpellListsToImport(result.output))
+    outputs.push(
+      applyClassSpellListsToImport(normalizeAiImportContent(result.output)),
+    )
   }
 
   return mergeImportContent(outputs)

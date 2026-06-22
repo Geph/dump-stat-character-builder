@@ -36,6 +36,12 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
         <div>
           <p className="font-semibold text-success">{report.headline}</p>
+          {report.summary.autoWiredModifiers > 0 ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {report.summary.autoWiredModifiers} common modifier
+              {report.summary.autoWiredModifiers === 1 ? "" : "s"} linked from import text.
+            </p>
+          ) : null}
           {report.warnings.length > 0 && (
             <ul className="mt-2 space-y-1 text-destructive">
               {report.warnings.map((warning) => (

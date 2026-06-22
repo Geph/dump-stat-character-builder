@@ -1,5 +1,81 @@
 import { z } from "zod"
 
+const ABILITY_SCORE_KEYS = [
+  "strength",
+  "dexterity",
+  "constitution",
+  "intelligence",
+  "wisdom",
+  "charisma",
+] as const
+
+const SAVE_ABILITY_NAMES = [
+  "Strength",
+  "Dexterity",
+  "Constitution",
+  "Intelligence",
+  "Wisdom",
+  "Charisma",
+] as const
+
+const USES_ABILITY_CODES = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
+
+/** Characteristic / effect kinds the AI may emit in mechanics[] (subset of the Common Modifier catalog). */
+export const AI_MECHANIC_KINDS = [
+  "skills",
+  "tool_proficiencies",
+  "armor_proficiencies",
+  "weapon_proficiencies",
+  "saving_throws",
+  "ac",
+  "hit_points",
+  "attack_roll_modifiers",
+  "damage_roll_modifiers",
+  "damage_resistance",
+  "condition_immunity",
+  "speed",
+  "vision",
+  "uses",
+  "check_roll_modifier",
+  "extra_attack",
+] as const
+
+export const ImportMechanicSchema = z.object({
+  kind: z.enum(AI_MECHANIC_KINDS),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
+  sourcePhrase: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  grantExpertise: z.boolean().optional(),
+  choiceCount: z.number().optional(),
+  tools: z.array(z.string()).optional(),
+  armor: z.array(z.string()).optional(),
+  weaponMode: z.enum(["martial_weapons", "simple_weapons"]).optional(),
+  savingThrows: z.array(z.enum(SAVE_ABILITY_NAMES)).optional(),
+  acBase: z.number().optional(),
+  acAbilities: z.array(z.enum(ABILITY_SCORE_KEYS)).optional(),
+  acFlatBonus: z.number().optional(),
+  hpMode: z.enum(["per_level", "flat"]).optional(),
+  hpValue: z.number().optional(),
+  attackBonus: z.number().optional(),
+  attackTarget: z.enum(["all", "melee", "ranged"]).optional(),
+  bonusDice: z.string().optional(),
+  damageType: z.string().optional(),
+  damageTypes: z.array(z.string()).optional(),
+  conditions: z.array(z.string()).optional(),
+  speedType: z.enum(["walk", "fly", "swim", "climb"]).optional(),
+  speedFeet: z.number().optional(),
+  visionRangeFeet: z.number().optional(),
+  usesFixed: z.number().optional(),
+  usesAbility: z.enum(USES_ABILITY_CODES).optional(),
+  usesRecharge: z.enum(["short_rest", "long_rest", "both"]).optional(),
+  checkRollMode: z.enum(["advantage", "disadvantage"]).optional(),
+  checkCategory: z.enum(["save", "skill", "ability"]).optional(),
+  checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
+  checkSkills: z.array(z.string()).optional(),
+})
+
+export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
+
 export const ChoiceOptionsSchema = z.object({
   category: z.string(),
   count: z.number(),
@@ -170,7 +246,7 @@ export const ImportProposalsSchema = z.object({
   custom_abilities: z.array(ProposedCustomAbilityImportSchema).optional(),
 })
 
-/** Shared AI extraction schema for PDF and text import routes. */
+/** Internal validation shape for import content (not sent to OpenAI). Use `buildImportContentAiSchema` for AI extraction. */
 export function buildImportContentSchema(options?: { includeAbilities?: boolean }) {
   const base = {
     species: z
@@ -206,9 +282,19 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
 
 export type ImportContent = z.infer<ReturnType<typeof buildImportContentSchema>>
 
+export const MECHANICS_IMPORT_HINT = `Mechanical modifier wiring (AC, proficiencies, resistances, limited uses, etc.) is applied automatically after import from feature description text.
+- Do NOT include a mechanics[] array in your JSON output
+- Keep full rules text in each feature/trait/feat description — a deterministic parser maps phrasing to the Common Modifier catalog
+- Examples of phrasing to preserve verbatim in description:
+  - "You gain proficiency in Stealth"
+  - "your AC equals 10 + your Dexterity modifier"
+  - "+2 bonus to attack rolls"
+  - "resistance to fire damage"
+  - "finish a short or long rest before you can use this feature again"`
+
 export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose between fixed options (species lineage/ancestry/legacy, fighting style options listed by name, skill from a list, etc.):
-- Set isChoice: true on the trait or class feature
-- Populate choices with { category, count, options: [{ name, description }] }
+- Set isChoice: true on the trait or class feature (use null when not a choice)
+- Populate choices with { category, count, options: [{ name, description }] } or null when not applicable
 - Keep rules text in description; list each selectable option in choices.options
 - For feat picks (ASI, Epic Boon, fighting style feats), do NOT use isChoice — link a grant_feat common modifier instead`
 

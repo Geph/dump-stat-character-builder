@@ -3,6 +3,7 @@ import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
 
@@ -4742,15 +4743,29 @@ export function enrichClassFeatureWithModifierPresets(
   className: string,
   feature: Feature,
   subclassName: string | null = null,
+  options?: { skipMechanicalDetection?: boolean },
 ): Feature {
   const key = resolvePresetKey(className, subclassName, feature.name ?? "")
-  if (!key) return feature
-  if (key === "*::__subclass_spells__") {
-    return mergePresetModifiers(feature, {
-      linkedModifiers: [alwaysPreparedSpells(`${feature.name ?? "Subclass spells"}`)],
-    })
+  let next = feature
+  if (key) {
+    if (key === "*::__subclass_spells__") {
+      next = mergePresetModifiers(feature, {
+        linkedModifiers: [alwaysPreparedSpells(`${feature.name ?? "Subclass spells"}`)],
+      })
+    } else {
+      next = mergePresetModifiers(feature, SRD_CLASS_FEATURE_MODIFIER_PRESETS[key])
+    }
   }
-  return mergePresetModifiers(feature, SRD_CLASS_FEATURE_MODIFIER_PRESETS[key])
+
+  if (options?.skipMechanicalDetection) return next
+
+  return enrichFeatureWithMechanicalDetection(next, {
+    contentKind: subclassName ? "subclass_feature" : "class_feature",
+    sourceName: subclassName ?? className,
+    featureName: feature.name,
+    level: feature.level,
+    classPrefix: className,
+  })
 }
 
 export function enrichClassFeaturesWithModifierPresets(

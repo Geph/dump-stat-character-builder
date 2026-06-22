@@ -185,8 +185,8 @@ export default function HomePage() {
                 Dump Stat
               </h1>
 
-              <p className="mb-10 max-w-2xl mx-auto">
-                <span className="text-lg font-bold text-pretty inline rounded-lg px-[5px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone]">
+              <p className="mb-10 max-w-4xl mx-auto">
+                <span className="text-lg font-bold inline rounded-lg px-[5px] py-[2px] bg-card/92 backdrop-blur-sm shadow-sm border border-border/40 [box-decoration-break:clone] sm:whitespace-nowrap">
                   A 5E compatible character creator with bundled SRD content and support for custom homebrew
                 </span>
               </p>

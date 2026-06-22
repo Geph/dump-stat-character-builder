@@ -38,7 +38,7 @@ export function SrdAttribution({
   }
 
   return (
-    <div className={cn("space-y-2 text-sm text-muted-foreground leading-relaxed", className)}>
+    <div className={cn("space-y-1 text-xs sm:text-sm text-muted-foreground leading-snug", className)}>
       <p>
         This work includes material from the System Reference Document 5.2.1 (&ldquo;SRD 5.2.1&rdquo;) by
         Wizards of the Coast LLC, available at{" "}
@@ -52,8 +52,8 @@ export function SrdAttribution({
         </a>
         .
       </p>
-      {showCompatibility ? <p>{SRD_COMPATIBILITY_STATEMENT}</p> : null}
-      <p className="text-xs">{SRD_SECTION_5_DISCLAIMER}</p>
+      {showCompatibility ? <p className="text-xs sm:text-sm">{SRD_COMPATIBILITY_STATEMENT}</p> : null}
+      <p className="text-[11px] sm:text-xs leading-snug">{SRD_SECTION_5_DISCLAIMER}</p>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import {
   featureLooksLikeSpellList,
 } from "@/lib/compendium/enrich-srd-class-features"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { collectImportModifierPreviews } from "@/lib/import/import-modifier-previews"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
 import {
@@ -31,6 +32,7 @@ export type ImportReportSubclassFeature = {
   name: string
   level: number
   modifierStatus: "linked" | "preset_only" | "text_only"
+  linkedModifierCount: number
   spellTable?: ImportReportSpellTable
   notes: string[]
 }
@@ -54,6 +56,7 @@ export type ImportReport = {
   summary: {
     totalImported: number
     breakdown: Record<string, number>
+    autoWiredModifiers: number
   }
   warnings: string[]
   classes: ImportReportClass[]
@@ -157,10 +160,14 @@ function analyzeSubclassFeature(
     /psi/i.test(feature.limitedUses.classResourceKey ?? "")
 
   let modifierStatus: ImportReportSubclassFeature["modifierStatus"] = "text_only"
-  if (linkedSpellCount > 0 || linkedModifierCount > 1 || hasPsiLink) {
+  if (linkedSpellCount > 0 || linkedModifierCount > 0 || hasPsiLink) {
     modifierStatus = "linked"
-  } else if (hasPreset || linkedModifierCount > 0) {
+  } else if (hasPreset) {
     modifierStatus = "preset_only"
+  }
+
+  if (linkedModifierCount > 0) {
+    notes.push(`Auto-wired ${linkedModifierCount} common modifier${linkedModifierCount === 1 ? "" : "s"}.`)
   }
 
   if (hasPsiLink) {
@@ -187,6 +194,7 @@ function analyzeSubclassFeature(
     name: feature.name ?? "Feature",
     level: feature.level ?? 1,
     modifierStatus,
+    linkedModifierCount,
     spellTable,
     notes,
   }
@@ -351,6 +359,7 @@ function buildHeadline(
   breakdown: Record<string, number>,
   classReports: ImportReportClass[],
   subclassReports: ImportReportSubclass[],
+  autoWiredModifiers: number,
 ): string {
   const parts = Object.entries(breakdown)
     .filter(([, count]) => count > 0)
@@ -371,6 +380,9 @@ function buildHeadline(
 
   if (resourceCount > 0) {
     base += `. Class resources: ${resourceCount} pool${resourceCount === 1 ? "" : "s"} recognized.`
+  }
+  if (autoWiredModifiers > 0) {
+    base += ` ${autoWiredModifiers} auto-wired modifier${autoWiredModifiers === 1 ? "" : "s"}.`
   }
   if (psiLinked > 0) {
     base += ` ${psiLinked} psi-cost feature${psiLinked === 1 ? "" : "s"} linked.`
@@ -411,17 +423,25 @@ export function buildImportReport(params: {
     params.spellCatalog,
   )
   const nextSteps = buildNextSteps(classes, subclasses, params.warnings, params.content)
+  const autoWiredModifiers = collectImportModifierPreviews(params.content).length
 
   return {
     summary: {
       totalImported: params.totalImported,
       breakdown: params.breakdown,
+      autoWiredModifiers,
     },
     warnings: params.warnings,
     classes,
     subclasses,
     nextSteps,
-    headline: buildHeadline(params.totalImported, params.breakdown, classes, subclasses),
+    headline: buildHeadline(
+      params.totalImported,
+      params.breakdown,
+      classes,
+      subclasses,
+      autoWiredModifiers,
+    ),
   }
 }
 

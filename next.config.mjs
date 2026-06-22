@@ -12,6 +12,8 @@ const nextConfig = {
   basePath: isStatic && basePath ? basePath : undefined,
   assetPrefix: isStatic && basePath ? basePath : undefined,
   trailingSlash: isStatic ? true : undefined,
+  /** pdf-parse bundles native/pdf.js assets; keep it external on the server. */
+  serverExternalPackages: ["pdf-parse"],
   typescript: {
     ignoreBuildErrors: true,
   },

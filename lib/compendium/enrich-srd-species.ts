@@ -2,6 +2,7 @@ import type { CharacteristicModifier } from "@/lib/compendium/characteristic-mod
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
+import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import { isSrdSource } from "@/lib/srd/source"
@@ -728,7 +729,12 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
-  return next
+  return enrichFeatureWithMechanicalDetection(next, {
+    contentKind: "species_trait",
+    sourceName: speciesName,
+    featureName: trait.name,
+    level: trait.level,
+  })
 }
 
 export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {

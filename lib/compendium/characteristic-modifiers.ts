@@ -886,6 +886,14 @@ function isCharacteristicModifier(value: unknown): value is CharacteristicModifi
   )
 }
 
+function coerceStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()]
+  return []
+}
+
 function migrateWeaponProficiencies(value: CharacteristicModifier): WeaponProficienciesCharacteristic {
   const raw = value as WeaponProficienciesCharacteristic & { values?: string[] }
   if (raw.mode === "martial_weapons" || raw.mode === "specific") {
@@ -1124,10 +1132,19 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
   if (
     value.type === "tool_proficiencies" ||
     value.type === "languages" ||
-    value.type === "armor_proficiencies"
+    value.type === "armor_proficiencies" ||
+    value.type === "saving_throws"
   ) {
     const raw = value as ListCharacteristic
-    return { ...raw, values: raw.values ?? [], choiceCount: raw.choiceCount ?? null }
+    return { ...raw, values: coerceStringArray(raw.values), choiceCount: raw.choiceCount ?? null }
+  }
+
+  if (value.type === "damage_resistance" || value.type === "damage_immunity") {
+    const raw = value as DamageCharacteristic & { values?: string[] }
+    return {
+      ...raw,
+      damageTypes: coerceStringArray(raw.damageTypes ?? raw.values),
+    }
   }
 
   if (value.type === "unarmed_strike_damage") {
@@ -1184,8 +1201,11 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
   }
 
   if (value.type === "condition_immunity") {
-    const raw = value as ConditionImmunityCharacteristic
-    return { ...raw, conditions: raw.conditions ?? [] }
+    const raw = value as ConditionImmunityCharacteristic & { values?: string[] }
+    return {
+      ...raw,
+      conditions: coerceStringArray(raw.conditions ?? raw.values),
+    }
   }
 
   if (value.type === "attunement_slots") {
@@ -1217,6 +1237,11 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       bonuses: raw.bonuses ?? {},
       points: mode === "asi_pool" ? (raw.points ?? 2) : undefined,
     }
+  }
+
+  if (value.type === "spell_list_access") {
+    const raw = value as SpellListAccessCharacteristic
+    return { ...raw, classNames: coerceStringArray(raw.classNames) }
   }
 
   return value
@@ -1261,7 +1286,7 @@ export function getSkillEntries(mod: SkillsCharacteristic): SkillEntry[] {
 
 export function getWeaponProficiencyValues(mod: WeaponProficienciesCharacteristic): string[] {
   if (mod.mode === "martial_weapons") return [MARTIAL_WEAPONS_LABEL]
-  return mod.values
+  return mod.values ?? []
 }
 
 export type AggregatedRollModifier = { bonus: number; target: string; customTarget?: string }
@@ -1401,8 +1426,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   },
 })
 
-function pushUnique(list: string[], values: string[]) {
-  for (const value of values) {
+function pushUnique(list: string[], values: string[] | null | undefined) {
+  for (const value of values ?? []) {
     if (value && !list.includes(value)) list.push(value)
   }
 }
