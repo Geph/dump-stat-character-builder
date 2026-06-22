@@ -1,5 +1,10 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError } from "@/lib/import/ai"
+import {
+  buildTokenSavingsReport,
+  importAiErrorResponse,
+  parseImportAiOverride,
+} from "@/lib/import/import-route-utils"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 import { CLASS_SPELL_LIST_IMPORT_HINT } from "@/lib/import/class-spell-lists"
@@ -69,6 +74,9 @@ export async function POST(request: NextRequest) {
     const pageScope = formData.get("pageScope") as string | null
     const pageStart = formData.get("pageStart") as string | null
     const pageEnd = formData.get("pageEnd") as string | null
+    const aiProvider = formData.get("aiProvider") as string | null
+    const aiModel = formData.get("aiModel") as string | null
+    const aiOverride = parseImportAiOverride({ aiProvider, aiModel })
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -165,16 +173,23 @@ export async function POST(request: NextRequest) {
       ? `\n\nNote: Text was extracted from pages ${pageRange.first}–${pageRange.last} of ${totalPages} total pages.`
       : `\n\nNote: Full PDF has ${totalPages} pages.`
 
-    const aiConfigError = getImportAiConfigError()
+    const aiConfigError = getImportAiConfigError(aiOverride)
     if (aiConfigError) {
       return NextResponse.json({ error: aiConfigError }, { status: 503 })
     }
 
-    const content = await extractImportContentFromText(
+    const extraction = await extractImportContentFromText(
       `${pageRangeNote}\n\n${text}`,
       systemPrompt,
-      { includeAbilities: true },
+      {
+        includeAbilities: true,
+        contentTypeHint: contentTypeHint,
+        provider: aiOverride.provider,
+        modelId: aiOverride.modelId,
+      },
     )
+    const content = extraction.content
+    const tokenSavings = buildTokenSavingsReport(extraction)
 
     const multiClassBlock = getMultipleClassImportBlock(content, "pdf")
     if (multiClassBlock) {
@@ -202,6 +217,7 @@ export async function POST(request: NextRequest) {
         stages: prepared.stages,
         stagingSummary: prepared.stagingSummary,
         isLarge: prepared.isLarge,
+        tokenSavings,
         pagesParsed: pageRange
           ? { from: pageRange.first, to: pageRange.last, total: totalPages }
           : { total: totalPages },
@@ -226,13 +242,11 @@ export async function POST(request: NextRequest) {
         : { total: totalPages },
       breakdown,
       warnings: warnings.length > 0 ? warnings : undefined,
-      report,
+      report: report ? { ...report, tokenSavings } : undefined,
+      tokenSavings,
     })
   } catch (error) {
     console.error("PDF import error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to import PDF" },
-      { status: 500 },
-    )
+    return importAiErrorResponse(error)
   }
 }

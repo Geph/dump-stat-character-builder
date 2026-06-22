@@ -1,7 +1,8 @@
 "use client"
 
 import type { ImportReport } from "@/lib/import/build-import-report"
-import { AlertCircle, CheckCircle2, Info, ListChecks } from "lucide-react"
+import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
+import { AlertCircle, CheckCircle2, Info, ListChecks, Sparkles } from "lucide-react"
 
 const STATUS_LABELS = {
   linked: { label: "Modifiers linked", className: "text-success" },
@@ -23,6 +24,64 @@ const STEP_STYLES = {
 
 type ImportReportPanelProps = {
   report: ImportReport
+}
+
+export function ImportTokenSavingsSummary({
+  savings,
+}: {
+  savings: ImportTokenSavingsReport | ImportReport["tokenSavings"]
+}) {
+  if (!savings) return null
+
+  const isDeterministic = savings.extractionMode === "deterministic" || savings.chunkCount === 0
+
+  return (
+    <section className="rounded-lg border border-border/60 bg-background/70 p-3">
+      <div className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
+        <Sparkles className="h-4 w-4 text-primary" />
+        Pre-AI text reduction
+        {isDeterministic ? (
+          <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
+            Zero AI
+          </span>
+        ) : savings.extractionMode === "hybrid" ? (
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+            Hybrid
+          </span>
+        ) : null}
+      </div>
+      {isDeterministic ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Class parsed deterministically — no AI tokens used
+          {savings.confidence
+            ? ` (${savings.confidence.matchedTableFeatures}/${savings.confidence.tableFeatureCount} table features matched)`
+            : ""}
+        </p>
+      ) : savings.estimatedTokensSaved > 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Removed ~{savings.estimatedTokensSaved.toLocaleString()} estimated tokens (
+          {savings.savedPercent}% of input) before AI extraction
+          {savings.chunkCount > 1 ? ` · ${savings.chunkCount} AI sections` : ""}
+          {savings.aiModelId ? ` · ${savings.aiProvider ?? "AI"} / ${savings.aiModelId}` : ""}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          AI extraction used
+          {savings.chunkCount > 0 ? ` · ${savings.chunkCount} section${savings.chunkCount === 1 ? "" : "s"}` : ""}
+          {savings.aiModelId ? ` · ${savings.aiProvider ?? "AI"} / ${savings.aiModelId}` : ""}
+        </p>
+      )}
+      {savings.subtractedRegions.length > 0 ? (
+        <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+          {savings.subtractedRegions.map((region) => (
+            <li key={`${region.kind}-${region.label}`}>
+              {region.label} ({region.charCount.toLocaleString()} chars)
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  )
 }
 
 export function ImportReportPanel({ report }: ImportReportPanelProps) {
@@ -51,6 +110,8 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
           )}
         </div>
       </div>
+
+      {report.tokenSavings ? <ImportTokenSavingsSummary savings={report.tokenSavings} /> : null}
 
       {hasNextSteps && (
         <section>

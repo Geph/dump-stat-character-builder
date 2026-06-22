@@ -16,6 +16,11 @@ export type ParsedClassProgressionTable = {
   columns: ClassProgressionColumn[]
 }
 
+export type ProgressionTableFeature = {
+  level: number
+  name: string
+}
+
 const LEVEL_CELL_RE = /^(\d{1,2})(?:st|nd|rd|th)?$/i
 
 const RESOURCE_HEADER_RE =
@@ -87,6 +92,84 @@ function resourceKeyForHeader(header: string): string {
   const thirdParty = matchThirdPartyResourceHeader(header)
   if (thirdParty && thirdParty.resourceKey !== "exploits_known") return thirdParty.resourceKey
   return slugResourceKey(header)
+}
+
+function isFeaturesHeader(cell: string): boolean {
+  return /^features?$/i.test(cell.trim())
+}
+
+function splitFeatureNames(cell: string): string[] {
+  return stripHtml(cell)
+    .split(/,|;/)
+    .map((part) => part.replace(/\s*\(\d+\)\s*$/, "").trim())
+    .filter((part) => part.length > 1 && !/^[-—─]+$/.test(part))
+}
+
+function parseFeatureTableRows(rows: string[][]): ProgressionTableFeature[] {
+  if (rows.length < 2) return []
+
+  let headerRowIndex = 0
+  for (let i = 0; i < Math.min(rows.length, 4); i++) {
+    if (rows[i].some((cell) => isLevelHeader(cell))) {
+      headerRowIndex = i
+      break
+    }
+  }
+
+  const headers = rows[headerRowIndex].map((cell) => stripHtml(cell).replace(/\s+/g, " ").trim())
+  const levelCol = headers.findIndex((header) => isLevelHeader(header))
+  const featuresCol = headers.findIndex((header) => isFeaturesHeader(header))
+  if (levelCol < 0 || featuresCol < 0) return []
+
+  const features: ProgressionTableFeature[] = []
+  for (let r = headerRowIndex + 1; r < rows.length; r++) {
+    const row = rows[r]
+    const level = parseLevelCell(row[levelCol] ?? "")
+    if (level == null) continue
+    for (const name of splitFeatureNames(row[featuresCol] ?? "")) {
+      features.push({ level, name })
+    }
+  }
+  return features
+}
+
+const PLAIN_FEATURE_ROW_RE = /^(\d{1,2}(?:st|nd|rd|th)?)\s+\+\d+\s+(.+?)(?:\t+|$)/i
+
+function parsePlainTextFeatureRows(text: string): ProgressionTableFeature[] {
+  const features: ProgressionTableFeature[] = []
+  for (const line of text.split(/\n/)) {
+    const trimmed = line.trim()
+    const match = trimmed.match(PLAIN_FEATURE_ROW_RE)
+    if (!match) continue
+    const level = parseLevelCell(match[1])
+    if (level == null) continue
+    const featurePart = (match[2].split(/\t/)[0] ?? match[2]).trim()
+    for (const name of splitFeatureNames(featurePart)) {
+      features.push({ level, name })
+    }
+  }
+  return features
+}
+
+function dedupeProgressionFeatures(features: ProgressionTableFeature[]): ProgressionTableFeature[] {
+  const seen = new Set<string>()
+  return features.filter((feature) => {
+    const key = `${feature.level}::${feature.name.toLowerCase()}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** Read feature names + levels from class progression tables (HTML or plain PDF rows). */
+export function parseProgressionTableFeatures(text: string): ProgressionTableFeature[] {
+  const source = text ?? ""
+  const tableMatch = source.match(/<table[\s\S]*?<\/table>/i)
+  if (tableMatch) {
+    const fromTable = parseFeatureTableRows(parseHtmlTableRows(tableMatch[0]))
+    if (fromTable.length) return dedupeProgressionFeatures(fromTable)
+  }
+  return dedupeProgressionFeatures(parsePlainTextFeatureRows(source))
 }
 
 function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
