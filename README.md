@@ -39,7 +39,7 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 ### Import
 - **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown)
 - **Web import** — Paste a URL to pull homebrew-style HTML into the compendium
-- **PDF & text import** — OpenAI-powered extraction (optional `OPENAI_API_KEY`) for pasted text or uploaded PDFs; subclasses, feat categories, and post-import modifier enrichment supported
+- **PDF & text import** — Multi-provider AI extraction (OpenAI, Anthropic, or Google Gemini) or **zero-AI deterministic** parsing for well-structured class PDFs; subclasses, feat categories, and post-import modifier enrichment supported
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 
 See [Import formats](#import-formats) below for text/JSON structure and examples.
@@ -177,19 +177,38 @@ Seed data is built from SRD 5.2.1 markdown. To regenerate JSON after parser chan
 pnpm srd:build
 ```
 
-### 7. OpenAI (optional — PDF and text import)
+### 7. AI import (optional — PDF and text import)
 
-SRD seed and web import do **not** use AI. PDF upload and pasted-text import call OpenAI directly from the server.
+SRD seed, web import, and Dump Stat JSON bundles do **not** use AI. PDF upload and pasted-text import use a server-side AI provider when deterministic parsing is not confident enough.
 
-Add to `.env.local`:
+**Supported providers** (set **one** API key; the first configured provider is used unless you set `IMPORT_AI_PROVIDER`):
+
+| Provider | Environment variable | Default model |
+|----------|---------------------|---------------|
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| Google Gemini | `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.0-flash` |
+
+Add to `.env.local` (examples):
 
 ```env
+# Pick ONE provider key:
 OPENAI_API_KEY=sk-your-key-here
-# optional; defaults to gpt-4o
+# ANTHROPIC_API_KEY=sk-ant-your-key-here
+# GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-key-here
+
+# Optional: force a provider when multiple keys are set
+# IMPORT_AI_PROVIDER=openai|anthropic|google
+
+# Optional: override the default model for that provider
 # IMPORT_AI_MODEL=gpt-4o-mini
 ```
 
-Restart the dev server after adding the key. Without it, import still works for seed, web URLs, Dump Stat JSON bundles, and manual compendium edits — only AI-powered PDF/text import returns a configuration error.
+Restart the dev server after changing keys. Without any provider key, seed, web URLs, Dump Stat JSON, and manual compendium edits still work — only AI-powered PDF/text import returns a configuration error.
+
+**Import page UI:** On Clipboard and PDF tabs, **AI import settings** lets you override provider and model per import (stored in browser localStorage). Keys always stay on the server; the UI only sends provider/model names, not secrets. Google Gemini’s free tier is useful when OpenAI quota is tight.
+
+**Zero-AI path:** Clean class documents (progression table + feature prose, e.g. homebrew Fighter PDFs) may import with **no AI calls** when the deterministic confidence gate is high. The import report shows a **Zero AI** badge when that path is used.
 
 ---
 
@@ -251,16 +270,17 @@ pnpm dlx tsx scripts/build-ua-villainous-export.ts
 
 ### Text import (AI extraction)
 
-Paste raw text (minimum ~20 characters). The model extracts structured content into species, classes, **subclasses**, backgrounds, spells, feats, equipment, and (text route only) custom abilities.
+Paste raw text (minimum ~20 characters). When AI is used, the model extracts structured content into species, classes, **subclasses**, backgrounds, spells, feats, equipment, and (text route only) custom abilities. Well-structured **class** text may import deterministically without AI (see [AI import setup](#7-ai-import-optional--pdf-and-text-import)).
 
 **Tips for best results:**
 
 1. **Seed SRD first** — parent class names must match exactly (`Druid`, not `Druid (Circle of the Titan)`).
 2. **Content hint** — use the dropdown (e.g. `subclasses`) to focus extraction.
-3. **Subclasses** — each entry needs `class_name` plus `features[]` with `level`, `name`, `description`. Choice features (skill picks, titan forms) should set `isChoice: true` and `choices`.
-4. **Feats** — Origin and Epic Boon feats are categorized automatically when the source labels them; the model sets `category` accordingly.
-5. **Spell tables** — keep HTML `<table>` blocks in feature descriptions for subclass spell lists.
-6. **Dump Stat JSON** — if the pasted text is valid export JSON, it imports directly without AI (same as file upload).
+3. **AI settings** — choose provider/model on the import page if the server default is wrong or quota-limited.
+4. **Subclasses** — each entry needs `class_name` plus `features[]` with `level`, `name`, `description`. Choice features (skill picks, titan forms) should set `isChoice: true` and `choices`.
+5. **Feats** — Origin and Epic Boon feats are categorized automatically when the source labels them; the model sets `category` accordingly.
+6. **Spell tables** — keep HTML `<table>` blocks in feature descriptions for subclass spell lists.
+7. **Dump Stat JSON** — if the pasted text is valid export JSON, it imports directly without AI (same as file upload).
 
 Imported rows use source **Text Import** or **PDF Import** and replace same-name rows from that source on re-import.
 
@@ -268,7 +288,7 @@ Imported rows use source **Text Import** or **PDF Import** and replace same-name
 
 Same schema and persistence as text import. Optional **page range** limits extraction to specific pages. Upload a **`.json` export bundle** through the PDF file picker for non-AI JSON import.
 
-Requires `OPENAI_API_KEY` for PDF text extraction only (not for JSON bundles or SRD seed).
+Requires at least one [AI provider key](#7-ai-import-optional--pdf-and-text-import) for PDF text extraction (not for JSON bundles or SRD seed).
 
 ---
 
@@ -320,8 +340,13 @@ DATABASE_URL=mysql://APP_USER:APP_PASSWORD@localhost:3306/dump_stat
 NEXT_PUBLIC_SITE_URL=https://yourdomain.com
 NODE_ENV=production
 PORT=3000
+
+# AI import — one provider key (see "AI import" section above)
 OPENAI_API_KEY=sk-your-key-here
-# IMPORT_AI_MODEL=gpt-4o
+# ANTHROPIC_API_KEY=sk-ant-...
+# GOOGLE_GENERATIVE_AI_API_KEY=...
+# IMPORT_AI_PROVIDER=openai|anthropic|google
+# IMPORT_AI_MODEL=gpt-4o-mini
 ```
 
 Build and start:

@@ -58,6 +58,24 @@ export type ImportReport = {
     breakdown: Record<string, number>
     autoWiredModifiers: number
   }
+  tokenSavings?: {
+    inputCharsBefore: number
+    inputCharsAfter: number
+    estimatedTokensSaved: number
+    savedPercent: number
+    chunkCount: number
+    aiProvider?: string
+    aiModelId?: string
+    extractionMode?: "deterministic" | "hybrid" | "ai"
+    confidence?: {
+      level: "high" | "partial" | "low"
+      score: number
+      matchRatio: number
+      matchedTableFeatures: number
+      tableFeatureCount: number
+    }
+    subtractedRegions: { kind: string; label: string; charCount: number }[]
+  }
   warnings: string[]
   classes: ImportReportClass[]
   subclasses: ImportReportSubclass[]

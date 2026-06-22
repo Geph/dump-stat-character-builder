@@ -4,10 +4,15 @@ import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ImportModifierPreviewPanel } from "@/components/import/import-modifier-preview-panel"
-import { ImportReportPanel } from "@/components/import/import-report-panel"
+import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
 import { ImportStagingPanel } from "@/components/import/import-staging-panel"
+import {
+  ImportAiSettings,
+  importAiRequestBody,
+  useImportAiSettings,
+} from "@/components/import/import-ai-settings"
 import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import {
@@ -31,6 +36,7 @@ import {
   Info,
 } from "lucide-react"
 import type { ImportReport } from "@/lib/import/build-import-report"
+import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type {
   ImportProposalSelections,
@@ -92,11 +98,13 @@ export default function ImportPage() {
     collisions: ImportCollision[]
     stages: ImportStage[]
     stagingSummary: string
+    tokenSavings?: ImportTokenSavingsReport
   } | null>(null)
   const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
+  const [importAiSettings, setImportAiSettings] = useImportAiSettings()
 
   const modifierPreviews = useMemo(
     () => (pendingImport ? collectImportModifierPreviews(pendingImport.content) : []),
@@ -116,6 +124,22 @@ export default function ImportPage() {
     setRenameMap({})
     setPdfStatus("idle")
     setTextStatus("idle")
+  }
+
+  const formatImportError = (data: {
+    error?: string
+    code?: string
+    completedChunks?: number
+    totalChunks?: number
+  }) => {
+    let message = data.error || "Import failed"
+    if (data.completedChunks != null && data.totalChunks != null && data.totalChunks > 0) {
+      message += ` (${data.completedChunks}/${data.totalChunks} sections completed before failure)`
+    }
+    if (data.code === "quota_exceeded" || data.code === "rate_limit") {
+      message += " Try a different provider or model in AI import settings below."
+    }
+    return message
   }
 
   const applyImportSuccess = (
@@ -175,7 +199,7 @@ export default function ImportPage() {
       } else {
         if (pendingImport.source === "pdf") setPdfStatus("error")
         else setTextStatus("error")
-        setMessage(data.error || "Failed to complete import")
+        setMessage(formatImportError(data))
       }
     } catch (err) {
       if (pendingImport.source === "pdf") setPdfStatus("error")
@@ -226,6 +250,9 @@ export default function ImportPage() {
     if (pdfContentType === "specific" && pdfSpecificContent) {
       formData.append("specificContent", pdfSpecificContent)
     }
+    const aiBody = importAiRequestBody(importAiSettings)
+    if (aiBody.aiProvider) formData.append("aiProvider", aiBody.aiProvider)
+    if (aiBody.aiModel) formData.append("aiModel", aiBody.aiModel)
 
     try {
       setPdfStatus("processing")
@@ -249,6 +276,7 @@ export default function ImportPage() {
             collisions,
             stages: (data.stages ?? []) as ImportStage[],
             stagingSummary: data.stagingSummary ?? "",
+            tokenSavings: data.tokenSavings,
           })
           setMessage("Review this import before writing to the compendium.")
           return
@@ -256,7 +284,7 @@ export default function ImportPage() {
         applyImportSuccess(data, setPdfStatus)
       } else {
         setPdfStatus("error")
-        setMessage(data.error || "Failed to import file")
+        setMessage(formatImportError(data))
       }
     } catch (err) {
       setPdfStatus("error")
@@ -279,6 +307,7 @@ export default function ImportPage() {
         body: JSON.stringify({
           text: textContent,
           contentType: textContentType,
+          ...importAiRequestBody(importAiSettings),
         }),
       })
 
@@ -297,6 +326,7 @@ export default function ImportPage() {
             collisions,
             stages: (data.stages ?? []) as ImportStage[],
             stagingSummary: data.stagingSummary ?? "",
+            tokenSavings: data.tokenSavings,
           })
           setMessage("Review this import before writing to the compendium.")
           return
@@ -304,7 +334,7 @@ export default function ImportPage() {
         applyImportSuccess(data, setTextStatus)
       } else {
         setTextStatus("error")
-        setMessage(data.error || "Failed to import text")
+        setMessage(formatImportError(data))
       }
     } catch (err) {
       setTextStatus("error")
@@ -533,6 +563,9 @@ export default function ImportPage() {
 
         {pendingImport && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-4">
+            {pendingImport.tokenSavings ? (
+              <ImportTokenSavingsSummary savings={pendingImport.tokenSavings} />
+            ) : null}
             {pendingImport.stagingSummary ? (
               <ImportStagingPanel
                 stages={pendingImport.stages}
@@ -657,6 +690,8 @@ export default function ImportPage() {
                   </p>
 
                   <div className="space-y-3">
+                    <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
+
                     <ImportContentTypeHintSelect
                       value={textContentType}
                       onChange={setTextContentType}
@@ -724,7 +759,7 @@ export default function ImportPage() {
                       <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                         <li>Keys stay on the server — never in the browser</li>
                         <li>Optional: <code className="text-xs">IMPORT_AI_PROVIDER</code> (openai, anthropic, google)</li>
-                        <li>Optional: <code className="text-xs">IMPORT_AI_MODEL</code> to override the default model</li>
+                        <li>GPT-4o mini is the recommended low-cost default; override via Import settings or <code className="text-xs">IMPORT_AI_MODEL</code></li>
                         <li>Extracts classes, species, spells, feats, equipment, and more</li>
                         <li>Understands D&D 2024 rules (species vs race, background bonuses)</li>
                         <li>Large PDFs are processed in multiple sections automatically (no 50k truncation)</li>
@@ -734,6 +769,8 @@ export default function ImportPage() {
                   )}
 
                   <div className="space-y-3">
+                    <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
+
                     <ImportContentTypeHintSelect
                       value={pdfContentTypeHint}
                       onChange={setPdfContentTypeHint}

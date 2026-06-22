@@ -41,7 +41,7 @@ describe("import AI provider config", () => {
     process.env.OPENAI_API_KEY = "sk-test"
     expect(getImportAiProvider()).toBe("openai")
     expect(getImportAiConfigError()).toBeNull()
-    expect(getImportModelId("openai")).toBe("gpt-4o")
+    expect(getImportModelId("openai")).toBe("gpt-4o-mini")
   })
 
   it("respects IMPORT_AI_PROVIDER=anthropic", () => {
@@ -65,6 +65,7 @@ describe("import AI provider config", () => {
       provider: "openai",
       modelId: "gpt-4o-mini",
       label: "OpenAI",
+      configuredProviders: ["openai"],
     })
   })
 })

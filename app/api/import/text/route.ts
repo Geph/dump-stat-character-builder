@@ -1,5 +1,10 @@
 import { getDatabaseConfigError } from "@/lib/db/config"
 import { getImportAiConfigError } from "@/lib/import/ai"
+import {
+  buildTokenSavingsReport,
+  importAiErrorResponse,
+  parseImportAiOverride,
+} from "@/lib/import/import-route-utils"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 import { CLASS_SPELL_LIST_IMPORT_HINT } from "@/lib/import/class-spell-lists"
@@ -61,6 +66,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap } = body
+    const aiOverride = parseImportAiOverride(body)
 
     if (confirmImport && pendingContent) {
       const configError = getDatabaseConfigError()
@@ -122,14 +128,19 @@ export async function POST(request: NextRequest) {
     let systemPrompt = BASE_SYSTEM_PROMPT
     systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentType)
 
-    const aiConfigError = getImportAiConfigError()
+    const aiConfigError = getImportAiConfigError(aiOverride)
     if (aiConfigError) {
       return NextResponse.json({ error: aiConfigError }, { status: 503 })
     }
 
-    const content = await extractImportContentFromText(trimmedText, systemPrompt, {
+    const extraction = await extractImportContentFromText(trimmedText, systemPrompt, {
       includeAbilities: true,
+      contentTypeHint: contentType,
+      provider: aiOverride.provider,
+      modelId: aiOverride.modelId,
     })
+    const content = extraction.content
+    const tokenSavings = buildTokenSavingsReport(extraction)
 
     const multiClassBlock = getMultipleClassImportBlock(content, "text")
     if (multiClassBlock) {
@@ -157,6 +168,7 @@ export async function POST(request: NextRequest) {
         stages: prepared.stages,
         stagingSummary: prepared.stagingSummary,
         isLarge: prepared.isLarge,
+        tokenSavings,
       })
     }
 
@@ -174,13 +186,11 @@ export async function POST(request: NextRequest) {
       count: totalImported,
       breakdown,
       warnings: warnings.length > 0 ? warnings : undefined,
-      report,
+      report: report ? { ...report, tokenSavings } : undefined,
+      tokenSavings,
     })
   } catch (error) {
     console.error("Text import error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to import text" },
-      { status: 500 },
-    )
+    return importAiErrorResponse(error)
   }
 }
