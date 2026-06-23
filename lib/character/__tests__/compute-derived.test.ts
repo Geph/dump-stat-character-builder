@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildCharacterSaveSnapshot,
   computeDerivedCharacter,
+  deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
 import {
   barbarianShieldFixture,
@@ -104,6 +105,23 @@ describe("computeDerivedCharacter", () => {
 
     expect(armorAndDefense.armorClass).toBe(armorOnly.armorClass + 1)
     expect(unarmoredWithDefense.armorClass).toBe(unarmoredNoDefense.armorClass)
+  })
+
+  it("deriveArmorClassForLoadout matches computeDerivedCharacter for a hypothetical loadout", () => {
+    const inputs = fighterArcheryBackgroundFixture()
+    const withArmor = {
+      ...inputs,
+      equipment: [...inputs.equipment, chainMailEquipment],
+    }
+    const loadout = { armorId: chainMailEquipment.id, shieldId: null, weaponId: null }
+    expect(deriveArmorClassForLoadout(withArmor, loadout)).toBe(
+      computeDerivedCharacter({
+        ...withArmor,
+        equippedArmorId: chainMailEquipment.id,
+        equippedShieldId: null,
+        equippedWeaponId: null,
+      }).armorClass,
+    )
   })
 })
 

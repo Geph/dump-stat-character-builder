@@ -10,6 +10,8 @@ export type ClassProgressionColumn = {
   resourceKey: string
   resourceName: string
   valuesByLevel: UsesAtLevel[]
+  /** Die sides (e.g. 8 for d8) when table cells use NdM notation (Risk Dice). */
+  dieSidesByLevel?: UsesAtLevel[]
 }
 
 export type ParsedClassProgressionTable = {
@@ -60,7 +62,21 @@ function parseDieSizeCell(cell: string): number | null {
   return Number.isFinite(sides) && sides >= 4 ? sides : null
 }
 
+function parseDicePoolCell(cell: string): { count: number; dieSides: number } | null {
+  const trimmed = stripHtml(cell).trim()
+  const match = trimmed.match(/^(\d+)d(\d+)$/i)
+  if (!match) return null
+  const count = parseInt(match[1], 10)
+  const dieSides = parseInt(match[2], 10)
+  if (!Number.isFinite(count) || !Number.isFinite(dieSides) || dieSides < 4) return null
+  return { count, dieSides }
+}
+
 function parseResourceCell(header: string, cell: string): number | null {
+  if (/risk\s*dice/i.test(header)) {
+    const pool = parseDicePoolCell(cell)
+    if (pool) return pool.count
+  }
   if (/exploit\s*die(?!\s*dice)/i.test(header)) return parseDieSizeCell(cell)
   return parseCountCell(cell)
 }
@@ -81,6 +97,8 @@ function isResourceHeader(cell: string): boolean {
   if (/^spell\s+slots?$/i.test(normalized)) return false
   if (/^fighting\s*styles?$/i.test(normalized)) return false
   if (/^exploits?\s*known$/i.test(normalized)) return false
+  if (/^weapon\s+mastery$/i.test(normalized)) return true
+  if (/^risk\s+dice$/i.test(normalized)) return true
 
   const thirdParty = matchThirdPartyResourceHeader(normalized)
   if (thirdParty && thirdParty.resourceKey !== "exploits_known") return true
@@ -201,6 +219,7 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
     resourceKey: resourceKeyForHeader(col.header),
     resourceName: col.header,
     valuesByLevel: [] as UsesAtLevel[],
+    dieSidesByLevel: [] as UsesAtLevel[],
   }))
 
   for (let r = headerRowIndex + 1; r < rows.length; r++) {
@@ -209,11 +228,19 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
     if (level == null) continue
 
     resourceCols.forEach((col, colIndex) => {
-      const count = parseResourceCell(col.header, row[col.index] ?? "")
+      const cell = row[col.index] ?? ""
+      const dicePool = /risk\s*dice/i.test(col.header) ? parseDicePoolCell(cell) : null
+      const count = dicePool?.count ?? parseResourceCell(col.header, cell)
       if (count == null) return
       const existing = columnData[colIndex].valuesByLevel.find((entry) => entry.level === level)
       if (!existing) {
         columnData[colIndex].valuesByLevel.push({ level, count })
+      }
+      if (dicePool) {
+        const existingDie = columnData[colIndex].dieSidesByLevel.find((entry) => entry.level === level)
+        if (!existingDie) {
+          columnData[colIndex].dieSidesByLevel.push({ level, count: dicePool.dieSides })
+        }
       }
     })
   }
@@ -340,6 +367,21 @@ export function usesConfigForProgressionColumn(
       atLevelTable: sorted,
       atLevelMode: "tier",
       dieType: dieLabel as UsesConfig["dieType"],
+    }
+  }
+
+  if (/risk\s*dice/i.test(column.header) || column.resourceKey === "risk_dice") {
+    const dieSides = column.dieSidesByLevel?.length
+      ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
+      : []
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d8"
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      dieType: dieLabel,
+      recharges: shortAndLong,
     }
   }
 

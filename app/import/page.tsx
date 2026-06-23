@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
-import { ImportModifierPreviewPanel } from "@/components/import/import-modifier-preview-panel"
+import { ClipboardImportPanel } from "@/components/import/clipboard-import-panel"
+import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
@@ -27,7 +28,6 @@ import {
 } from "@/lib/data/local-import"
 import {
   Upload,
-  Globe,
   FileText,
   CheckCircle,
   AlertCircle,
@@ -48,18 +48,18 @@ import {
   type ImportRenameMap,
 } from "@/lib/import/import-collisions"
 import type { ImportStage } from "@/lib/import/import-staging"
+import { readImportApiJson } from "@/lib/import/read-import-api-response"
 import {
-  collectImportModifierPreviews,
+  collectImportModifierReview,
   removeImportModifierPreview,
 } from "@/lib/import/import-modifier-previews"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
-type ImportTab = "clipboard" | "pdf" | "web" | "pack"
+type ImportTab = "clipboard" | "pdf" | "pack"
 
 const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
   { id: "clipboard", label: "Clipboard", icon: ClipboardPaste },
   { id: "pdf", label: "PDF / JSON", icon: Upload },
-  { id: "web", label: "From Web", icon: Globe },
 ]
 
 const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Upload }[] = [
@@ -78,12 +78,11 @@ export default function ImportPage() {
   const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
   const [pdfPageStart, setPdfPageStart] = useState("")
   const [pdfPageEnd, setPdfPageEnd] = useState("")
-  const [webUrl, setWebUrl] = useState("")
-  const [webContentType, setWebContentType] = useState("all")
   const [textContent, setTextContent] = useState("")
+  const [jsonImportText, setJsonImportText] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
+  const [importMaterialSource, setImportMaterialSource] = useState("Custom")
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
-  const [webStatus, setWebStatus] = useState<ImportStatus>("idle")
   const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
   const [packStatus, setPackStatus] = useState<ImportStatus>("idle")
@@ -99,17 +98,47 @@ export default function ImportPage() {
     stages: ImportStage[]
     stagingSummary: string
     tokenSavings?: ImportTokenSavingsReport
+    materialSource: string
   } | null>(null)
   const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
   const [importAiSettings, setImportAiSettings] = useImportAiSettings()
+  const [serverAiEnabled, setServerAiEnabled] = useState(false)
+  const reviewRef = useRef<HTMLDivElement>(null)
+  const reportRef = useRef<HTMLDivElement>(null)
 
-  const modifierPreviews = useMemo(
-    () => (pendingImport ? collectImportModifierPreviews(pendingImport.content) : []),
+  useEffect(() => {
+    if (!canUseServerImport()) return
+    let cancelled = false
+    fetch("/api/import/ai-config")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { configuredProviders?: string[] } | null) => {
+        if (!cancelled && data) {
+          setServerAiEnabled((data.configuredProviders?.length ?? 0) > 0)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const modifierReviewRows = useMemo(
+    () => (pendingImport ? collectImportModifierReview(pendingImport.content) : []),
     [pendingImport],
   )
+
+  useEffect(() => {
+    if (!pendingImport) return
+    reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [pendingImport])
+
+  useEffect(() => {
+    if (!importReport) return
+    reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [importReport])
 
   const handleRemoveModifierPreview = (previewId: string) => {
     setPendingImport((current) =>
@@ -137,7 +166,7 @@ export default function ImportPage() {
       message += ` (${data.completedChunks}/${data.totalChunks} sections completed before failure)`
     }
     if (data.code === "quota_exceeded" || data.code === "rate_limit") {
-      message += " Try a different provider or model in AI import settings below."
+      message += " Try Clipboard → BYO JSON import, or a different server AI model."
     }
     return message
   }
@@ -185,10 +214,18 @@ export default function ImportPage() {
           pendingContent: pendingImport.content,
           proposalSelections: selections,
           renameMap,
+          materialSource: pendingImport.materialSource,
         }),
       })
 
-      const data = await response.json()
+      const parsed = await readImportApiJson(response)
+      if (!parsed.ok) {
+        if (pendingImport.source === "pdf") setPdfStatus("error")
+        else setTextStatus("error")
+        setMessage(parsed.message)
+        return
+      }
+      const data = parsed.data
 
       if (response.ok) {
         if (pendingImport.source === "pdf") {
@@ -292,9 +329,10 @@ export default function ImportPage() {
     }
   }
 
-  const handleTextImport = async () => {
-    if (!textContent.trim()) return
-
+  const submitTextImport = async (payload: {
+    text: string
+    importMode?: "byo-json" | "server-ai"
+  }) => {
     setTextStatus("processing")
     setMessage("")
     setImportReport(null)
@@ -305,13 +343,21 @@ export default function ImportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: textContent,
+          text: payload.text,
           contentType: textContentType,
-          ...importAiRequestBody(importAiSettings),
+          importMode: payload.importMode,
+          materialSource: importMaterialSource,
+          ...(payload.importMode === "server-ai" ? importAiRequestBody(importAiSettings) : {}),
         }),
       })
 
-      const data = await response.json()
+      const parsed = await readImportApiJson(response)
+      if (!parsed.ok) {
+        setTextStatus("error")
+        setMessage(parsed.message)
+        return
+      }
+      const data = parsed.data
 
       if (response.ok) {
         if (data.needsConfirmation) {
@@ -319,16 +365,22 @@ export default function ImportPage() {
           const collisions = (data.collisions ?? []) as ImportCollision[]
           setRenameMap(defaultRenameMap(collisions))
           setPendingImport({
-            content: data.pendingContent,
-            proposals: data.proposals,
-            previewSummary: data.previewSummary ?? "",
+            content: data.pendingContent as ImportContent,
+            proposals: data.proposals as ImportProposalSet,
+            previewSummary: (data.previewSummary as string) ?? "",
             source: "text",
             collisions,
             stages: (data.stages ?? []) as ImportStage[],
-            stagingSummary: data.stagingSummary ?? "",
-            tokenSavings: data.tokenSavings,
+            stagingSummary: (data.stagingSummary as string) ?? "",
+            tokenSavings: data.tokenSavings as ImportTokenSavingsReport | undefined,
+            materialSource: importMaterialSource,
           })
-          setMessage("Review this import before writing to the compendium.")
+          const warning = typeof data.warning === "string" ? data.warning : ""
+          setMessage(
+            warning
+              ? `${warning} Review this import before writing to the compendium.`
+              : "Review this import before writing to the compendium.",
+          )
           return
         }
         applyImportSuccess(data, setTextStatus)
@@ -342,32 +394,14 @@ export default function ImportPage() {
     }
   }
 
-  const handleWebImport = async () => {
-    if (!webUrl) return
+  const handleJsonImport = () => {
+    if (!jsonImportText.trim()) return
+    void submitTextImport({ text: jsonImportText, importMode: "byo-json" })
+  }
 
-    setWebStatus("processing")
-    setMessage("")
-
-    try {
-      const response = await fetch("/api/import/web", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: webUrl, contentType: webContentType }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setWebStatus("success")
-        setMessage(`Successfully imported ${data.count} items from ${data.source}`)
-      } else {
-        setWebStatus("error")
-        setMessage(data.error || "Failed to import from web")
-      }
-    } catch (err) {
-      setWebStatus("error")
-      setMessage(err instanceof Error ? err.message : "Failed to import from web. Please try again.")
-    }
+  const handleServerAiImport = () => {
+    if (!textContent.trim()) return
+    void submitTextImport({ text: textContent, importMode: "server-ai" })
   }
 
   const handleSeedSRD = async () => {
@@ -463,7 +497,6 @@ export default function ImportPage() {
 
   const isSuccessMessage =
     pdfStatus === "success" ||
-    webStatus === "success" ||
     seedStatus === "success" ||
     textStatus === "success" ||
     packStatus === "success"
@@ -536,11 +569,11 @@ export default function ImportPage() {
           <p className="text-muted-foreground text-lg">
             {staticMode
               ? "Import Dump Stat JSON packs or reload the bundled SRD (data stays in your browser)."
-              : "Add new content from PDFs, copied text, or online sources"}
+              : "Add new content from PDFs or pasted text and JSON"}
           </p>
           {staticMode && (
             <p className="text-sm text-muted-foreground mt-2">
-              Storage: {getStorageLabel()}. PDF, web, and AI import require a hosted deployment with MySQL.
+              Storage: {getStorageLabel()}. PDF and AI import require a hosted deployment with MySQL.
             </p>
           )}
         </div>
@@ -562,7 +595,13 @@ export default function ImportPage() {
         )}
 
         {pendingImport && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 space-y-4">
+          <motion.div
+            id="import-review"
+            ref={reviewRef}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 scroll-mt-24 space-y-4"
+          >
             {pendingImport.tokenSavings ? (
               <ImportTokenSavingsSummary savings={pendingImport.tokenSavings} />
             ) : null}
@@ -577,9 +616,10 @@ export default function ImportPage() {
               value={renameMap}
               onChange={setRenameMap}
             />
-            <ImportModifierPreviewPanel
-              previews={modifierPreviews}
-              onRemove={handleRemoveModifierPreview}
+            <ImportModifierReviewPanel
+              rows={modifierReviewRows}
+              onRemoveModifier={handleRemoveModifierPreview}
+              variant="review"
             />
             <ImportProposalPanel
               proposals={pendingImport.proposals}
@@ -592,7 +632,13 @@ export default function ImportPage() {
         )}
 
         {importReport && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <motion.div
+            id="import-report"
+            ref={reportRef}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 scroll-mt-24"
+          >
             <ImportReportPanel report={importReport} />
           </motion.div>
         )}
@@ -683,42 +729,22 @@ export default function ImportPage() {
                   exit={{ opacity: 0, x: 8 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <p className="text-muted-foreground mb-4">
-                    Paste D&D content text (class details, spells, species, etc.) and AI will extract
-                    structured data. You can also paste a Dump Stat JSON export to import directly without
-                    AI.
-                  </p>
-
-                  <div className="space-y-3">
-                    <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
-
-                    <ImportContentTypeHintSelect
-                      value={textContentType}
-                      onChange={setTextContentType}
-                      focusRingClassName="focus:ring-lime"
-                    />
-
-                    <textarea
-                      placeholder="Paste D&D content here (class features, spell descriptions, species traits, etc.)..."
-                      value={textContent}
-                      onChange={(e) => setTextContent(e.target.value)}
-                      rows={8}
-                      className="w-full px-4 py-3 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime resize-y font-mono text-sm"
-                    />
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-muted-foreground">{textContent.length} characters</span>
-                      <button
-                        type="button"
-                        onClick={handleTextImport}
-                        disabled={!textContent.trim() || textStatus === "processing"}
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-lime text-lime-foreground rounded-xl font-bold hover:bg-lime/90 transition-colors disabled:opacity-50"
-                      >
-                        {getStatusIcon(textStatus)}
-                        {textStatus === "processing" ? "Processing..." : "Import Text"}
-                      </button>
-                    </div>
-                  </div>
+                  <ClipboardImportPanel
+                    contentType={textContentType}
+                    onContentTypeChange={setTextContentType}
+                    materialSource={importMaterialSource}
+                    onMaterialSourceChange={setImportMaterialSource}
+                    sourceText={textContent}
+                    onSourceTextChange={setTextContent}
+                    jsonText={jsonImportText}
+                    onJsonTextChange={setJsonImportText}
+                    status={textStatus}
+                    serverAiEnabled={serverAiEnabled}
+                    importAiSettings={importAiSettings}
+                    onImportAiSettingsChange={setImportAiSettings}
+                    onImportJson={handleJsonImport}
+                    onServerAiImport={serverAiEnabled ? handleServerAiImport : undefined}
+                  />
                 </motion.div>
               )}
 
@@ -733,20 +759,32 @@ export default function ImportPage() {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-muted-foreground flex-1">
-                      Upload a D&D sourcebook PDF and our AI will extract the content automatically, or
-                      upload a Dump Stat JSON export to import compendium items directly.
+                      Upload a Dump Stat JSON export directly, or extract text from a PDF when server
+                      AI is configured. For PDF homebrew without server keys, use the Clipboard tab with
+                      your own LLM.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowAiInfo(!showAiInfo)}
-                      className="p-1.5 text-muted-foreground hover:text-orange transition-colors shrink-0"
-                      title="How does AI processing work?"
-                    >
-                      <Info className="w-4 h-4" />
-                    </button>
+                    {serverAiEnabled ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAiInfo(!showAiInfo)}
+                        className="p-1.5 text-muted-foreground hover:text-orange transition-colors shrink-0"
+                        title="How does server AI processing work?"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                    ) : null}
                   </div>
 
-                  {showAiInfo && (
+                  {!serverAiEnabled ? (
+                    <div className="mb-4 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                      Server AI is not configured on this host. Upload{" "}
+                      <code className="text-xs">.json</code> export files here, or use{" "}
+                      <strong className="font-medium text-foreground">Clipboard</strong> to extract PDF
+                      text elsewhere and paste structured JSON.
+                    </div>
+                  ) : null}
+
+                  {serverAiEnabled && showAiInfo && (
                     <div className="mb-4 p-4 bg-orange/10 rounded-xl border border-orange/20">
                       <h3 className="font-bold text-orange mb-2">How AI Processing Works</h3>
                       <p className="text-sm text-muted-foreground mb-2">
@@ -769,7 +807,9 @@ export default function ImportPage() {
                   )}
 
                   <div className="space-y-3">
-                    <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
+                    {serverAiEnabled ? (
+                      <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
+                    ) : null}
 
                     <ImportContentTypeHintSelect
                       value={pdfContentTypeHint}
@@ -897,52 +937,6 @@ export default function ImportPage() {
                 </motion.div>
               )}
 
-              {canUseServerImport() && activeTab === "web" && (
-                <motion.div
-                  key="web"
-                  role="tabpanel"
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <p className="text-muted-foreground mb-4">
-                    Paste a URL from dnd2024.wikidot.com to import species, classes, spells, and more into
-                    your compendium.
-                  </p>
-
-                  <div className="space-y-3">
-                    <ImportContentTypeHintSelect
-                      value={webContentType}
-                      onChange={setWebContentType}
-                      focusRingClassName="focus:ring-accent"
-                    />
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <input
-                        type="url"
-                        placeholder="https://dnd2024.wikidot.com/..."
-                        value={webUrl}
-                        onChange={(e) => setWebUrl(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleWebImport}
-                        disabled={!webUrl || webStatus === "processing"}
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-accent-foreground rounded-xl font-bold hover:bg-accent/90 transition-colors disabled:opacity-50"
-                      >
-                        {getStatusIcon(webStatus)}
-                        {webStatus === "processing" ? "Importing..." : "Import"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Imported content will appear in the Compendium after import completes.
-                  </p>
-                </motion.div>
-              )}
             </AnimatePresence>
           </div>
         </motion.div>

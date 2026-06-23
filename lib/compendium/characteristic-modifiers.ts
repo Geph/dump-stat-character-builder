@@ -551,9 +551,6 @@ export type NestedModifierEffect = {
   activation?: import("@/lib/types").FeatureActivation | null
 }
 
-/** @deprecated Use NestedModifierEffect */
-export type SavingThrowTriggerEffect = NestedModifierEffect
-
 export type RollTriggerKind = "ability" | "skill" | "attack" | "save"
 
 export interface SavingThrowTriggerCharacteristic extends CharacteristicModifierBase {

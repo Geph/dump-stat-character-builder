@@ -285,6 +285,3 @@ export function ActivationEditor({
     </div>
   )
 }
-
-/** @deprecated Use ActivationEditor */
-export const ActivationTimingEditor = ActivationEditor

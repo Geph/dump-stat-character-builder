@@ -1,4 +1,6 @@
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import { CHARACTERISTIC_MODIFIER_TYPE_OPTIONS } from "@/lib/compendium/characteristic-modifiers"
 import { isKnownEffectKind } from "@/lib/compendium/modifier-catalog-refs"
 import {
@@ -372,6 +374,18 @@ function buildFromMechanic(
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
+      }
+    }
+    case "grant_feat": {
+      const categories = (mechanic.featCategories?.length
+        ? mechanic.featCategories
+        : ["General"]) as FeatPickCategory[]
+      const characteristic = grantFeatCharacteristic(categories, mechanic.featCount ?? 1)
+      return {
+        ruleId: "ai.grant_feat",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, GRANT_FEAT_CATALOG_ID, [characteristic]),
       }
     }
     default:

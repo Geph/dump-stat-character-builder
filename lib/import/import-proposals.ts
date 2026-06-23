@@ -107,6 +107,12 @@ function defaultResourceDefinition(name: string, className: string): string {
   if (/psionic\s*energy\s*dice/i.test(name)) {
     return `Psionic energy dice pool for ${className} Psi Warrior powers. Regain one die on a short rest and all dice on a long rest.`
   }
+  if (/risk\s*dice/i.test(name)) {
+    return `Pool of risk dice for ${className} class features. Size and die type scale by level on the class table; typically recharges on short and long rests.`
+  }
+  if (/weapon\s*mastery/i.test(name)) {
+    return `Number of weapon masteries the ${className} can apply, scaling by level on the class table.`
+  }
   return `Level-scaling class resource for ${className}: ${name}.`
 }
 
@@ -481,19 +487,28 @@ function collectExplicitAbilities(
 
 /** Collect class resources and custom abilities that should be confirmed before creation. */
 export function collectImportProposals(content: ImportContent): ImportProposalSet {
+  const result: ImportProposalSet = { classResources: [], customAbilities: [] }
+  const seenResources = new Set<string>()
+  const seenAbilities = new Set<string>()
+
+  collectExplicitResources(content, result, seenResources)
+  collectTableResources(content, result, seenResources)
+
   const fromAi = collectFromAiProposals(content)
-  const seenResources = new Set(fromAi.classResources.map((row) => row.id))
-  const seenAbilities = new Set(fromAi.customAbilities.map((row) => row.id))
+  for (const resource of fromAi.classResources) {
+    pushResource(result.classResources, seenResources, resource)
+  }
+  for (const ability of fromAi.customAbilities) {
+    pushAbility(result.customAbilities, seenAbilities, ability)
+  }
 
-  collectExplicitResources(content, fromAi, seenResources)
-  collectTableResources(content, fromAi, seenResources)
-  collectDisciplineFeatures(content, fromAi, seenAbilities)
-  collectMartialExploitFeatures(content, fromAi, seenAbilities)
-  collectBattleMasterManeuverFeatures(content, fromAi, seenAbilities)
-  collectCompanionStatBlockFeatures(content, fromAi, seenAbilities)
-  collectExplicitAbilities(content, fromAi, seenAbilities)
+  collectDisciplineFeatures(content, result, seenAbilities)
+  collectMartialExploitFeatures(content, result, seenAbilities)
+  collectBattleMasterManeuverFeatures(content, result, seenAbilities)
+  collectCompanionStatBlockFeatures(content, result, seenAbilities)
+  collectExplicitAbilities(content, result, seenAbilities)
 
-  return fromAi
+  return result
 }
 
 export function importProposalsNeedConfirmation(proposals: ImportProposalSet): boolean {

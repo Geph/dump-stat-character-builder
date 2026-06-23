@@ -82,7 +82,7 @@ export function characteristicsForFeatSelection(
 ): CharacteristicModifier[] {
   const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
   const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
-  return characteristicsFromLinkedModifiers(catalog, instances, refs, feat.benefits)
+  return characteristicsFromLinkedModifiers(catalog, instances, refs)
 }
 
 function slotsFromCharacteristic(

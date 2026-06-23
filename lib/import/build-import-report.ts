@@ -3,8 +3,13 @@ import {
   featureLooksLikeSpellList,
 } from "@/lib/compendium/enrich-srd-class-features"
 import type { ImportContent } from "@/lib/import/content-schema"
-import { collectImportModifierPreviews } from "@/lib/import/import-modifier-previews"
-import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
+import {
+  collectImportModifierPreviews,
+  collectImportModifierReview,
+  collectUnmatchedModifierFeatures,
+  type ImportModifierReviewRow,
+  type ImportUnmatchedFeatureEntry,
+} from "@/lib/import/import-modifier-previews"
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
 import {
   isSubclassSpellTableFeature,
@@ -66,7 +71,7 @@ export type ImportReport = {
     chunkCount: number
     aiProvider?: string
     aiModelId?: string
-    extractionMode?: "deterministic" | "hybrid" | "ai"
+    extractionMode?: "deterministic" | "hybrid" | "ai" | "byo-json"
     cacheHits?: number
     confidence?: {
       level: "high" | "partial" | "low"
@@ -81,6 +86,8 @@ export type ImportReport = {
   classes: ImportReportClass[]
   subclasses: ImportReportSubclass[]
   nextSteps: ImportReportNextStep[]
+  unmatchedFeatures: ImportUnmatchedFeatureEntry[]
+  modifierReview: ImportModifierReviewRow[]
   headline: string
 }
 
@@ -443,6 +450,17 @@ export function buildImportReport(params: {
   )
   const nextSteps = buildNextSteps(classes, subclasses, params.warnings, params.content)
   const autoWiredModifiers = collectImportModifierPreviews(params.content).length
+  const unmatchedFeatures = collectUnmatchedModifierFeatures(params.content)
+  const modifierReview = collectImportModifierReview(params.content)
+
+  if (unmatchedFeatures.length > 0) {
+    nextSteps.unshift({
+      severity: "warning",
+      title: `${unmatchedFeatures.length} feature${unmatchedFeatures.length === 1 ? "" : "s"} without modifier links`,
+      detail:
+        "Open the compendium editor to wire common modifiers for features that stayed text-only.",
+    })
+  }
 
   return {
     summary: {
@@ -454,6 +472,8 @@ export function buildImportReport(params: {
     classes,
     subclasses,
     nextSteps,
+    unmatchedFeatures,
+    modifierReview,
     headline: buildHeadline(
       params.totalImported,
       params.breakdown,
@@ -469,6 +489,7 @@ export function importReportHasDetail(report: ImportReport): boolean {
     report.nextSteps.length > 0 ||
     report.classes.length > 0 ||
     report.subclasses.some((subclass) => subclass.features.length > 0) ||
-    report.warnings.length > 0
+    report.warnings.length > 0 ||
+    report.unmatchedFeatures.length > 0
   )
 }

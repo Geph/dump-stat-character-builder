@@ -94,6 +94,17 @@ describe("detectFeatureModifiers", () => {
       text: "You have advantage on Constitution saving throws.",
       ruleId: "save.advantage",
     },
+    {
+      label: "fighting style feat grant",
+      text:
+        "You gain a Fighting Style feat of your choice. If you choose a feat, such as Great Weapon Fighting, that requires you to hold a Melee weapon in one or two hands, you can use that feat with Ranged weapons.",
+      ruleId: "grant.fighting_style",
+      assert: (detections) => {
+        expect(detections[0]?.instance.catalogRefId).toBe("cat_char_grant_feat")
+        const char = detections[0]?.instance.characteristics?.[0]
+        expect(char?.type).toBe("grant_feat")
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {

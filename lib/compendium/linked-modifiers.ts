@@ -9,11 +9,36 @@ import {
 } from "@/lib/compendium/modifier-catalog"
 import type { FeatureActivation } from "@/lib/types"
 
+import type { UsesConfig } from "@/lib/types"
+
 export type LinkedModifierInstance = {
   instanceId: string
   catalogRefId: string
   characteristics?: CharacteristicModifier[]
   activation?: FeatureActivation | null
+}
+
+/** Stored on migrated inline-only modifier instances (characteristics live on the instance). */
+export const MIGRATED_INLINE_CATALOG_ID = "cat_migrated_inline"
+
+export function appendInlineCharacteristicsAsLinked(
+  linked: LinkedModifierInstance[],
+  inline: CharacteristicModifier[] | null | undefined,
+  uses?: UsesConfig | null,
+): LinkedModifierInstance[] {
+  const normalized = normalizeCharacteristics(inline ?? null, uses ?? null)
+  if (!normalized.length) return linked
+  if (linked.some((item) => item.catalogRefId === MIGRATED_INLINE_CATALOG_ID)) {
+    return linked
+  }
+  return [
+    ...linked,
+    {
+      instanceId: createModifierInstanceId(),
+      catalogRefId: MIGRATED_INLINE_CATALOG_ID,
+      characteristics: normalized,
+    },
+  ]
 }
 
 export function createModifierInstanceId(): string {
@@ -177,5 +202,12 @@ export function readLinkedModifiers(
     : Array.isArray(row.modifier_refs)
       ? row.modifier_refs
       : undefined
-  return normalizeLinkedModifiers(raw, catalog, legacyRefs as string[] | undefined)
+  const linked = normalizeLinkedModifiers(raw, catalog, legacyRefs as string[] | undefined)
+  const inline = row.benefits ?? row.characteristics
+  const uses = row.uses as UsesConfig | null | undefined
+  return appendInlineCharacteristicsAsLinked(
+    linked,
+    inline as CharacteristicModifier[] | undefined,
+    uses,
+  )
 }

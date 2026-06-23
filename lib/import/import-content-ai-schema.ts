@@ -1,6 +1,8 @@
 import { zodSchema } from "ai"
 import { z } from "zod"
-import type { ImportContent } from "@/lib/import/content-schema"
+import { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
+import type { ImportContent, ImportMechanic } from "@/lib/import/content-schema"
+import { ImportMechanicSchema } from "@/lib/import/content-schema"
 
 /**
  * OpenAI structured output requires every object property in `required`.
@@ -19,12 +21,57 @@ const ChoiceOptionsAiSchema = z.object({
   ),
 })
 
+const ImportMechanicAiSchema = z.object({
+  kind: z.enum(AI_MECHANIC_KINDS),
+  confidence: z.enum(["high", "medium", "low"]).nullable(),
+  sourcePhrase: z.string().nullable(),
+  skills: z.array(z.string()).nullable(),
+  grantExpertise: z.boolean().nullable(),
+  choiceCount: z.number().nullable(),
+  tools: z.array(z.string()).nullable(),
+  armor: z.array(z.string()).nullable(),
+  weaponMode: z.enum(["martial_weapons", "simple_weapons"]).nullable(),
+  savingThrows: z
+    .array(z.enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]))
+    .nullable(),
+  acBase: z.number().nullable(),
+  acAbilities: z
+    .array(z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]))
+    .nullable(),
+  acFlatBonus: z.number().nullable(),
+  hpMode: z.enum(["per_level", "flat"]).nullable(),
+  hpValue: z.number().nullable(),
+  attackBonus: z.number().nullable(),
+  attackTarget: z.enum(["all", "melee", "ranged"]).nullable(),
+  bonusDice: z.string().nullable(),
+  damageType: z.string().nullable(),
+  damageTypes: z.array(z.string()).nullable(),
+  conditions: z.array(z.string()).nullable(),
+  speedType: z.enum(["walk", "fly", "swim", "climb"]).nullable(),
+  speedFeet: z.number().nullable(),
+  visionRangeFeet: z.number().nullable(),
+  usesFixed: z.number().nullable(),
+  usesAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
+  usesRecharge: z.enum(["short_rest", "long_rest", "both"]).nullable(),
+  checkRollMode: z.enum(["advantage", "disadvantage"]).nullable(),
+  checkCategory: z.enum(["save", "skill", "ability"]).nullable(),
+  checkAbility: z
+    .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
+    .nullable(),
+  checkSkills: z.array(z.string()).nullable(),
+  featCategories: z
+    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon"]))
+    .nullable(),
+  featCount: z.number().nullable(),
+})
+
 const ClassFeatureAiSchema = z.object({
   level: z.number(),
   name: z.string(),
   description: z.string(),
   isChoice: z.boolean().nullable(),
   choices: ChoiceOptionsAiSchema.nullable(),
+  mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 
 const SpeciesTraitAiSchema = z.object({
@@ -32,6 +79,7 @@ const SpeciesTraitAiSchema = z.object({
   description: z.string(),
   isChoice: z.boolean().nullable(),
   choices: ChoiceOptionsAiSchema.nullable(),
+  mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 
 const SpellcastingAiSchema = z.object({
@@ -148,6 +196,7 @@ const FeatAiSchema = z.object({
   category: z
     .enum(["Origin", "General", "Fighting Style", "Epic Boon"])
     .nullable(),
+  mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 
 const SpellAiSchema = z.object({
@@ -285,6 +334,18 @@ function normalizeUsesConfig(
   return next as NonNullable<ImportContent["class_resources"]>[number]["uses"]
 }
 
+function normalizeMechanics(
+  mechanics: z.infer<typeof ImportMechanicAiSchema>[] | null | undefined,
+): ImportMechanic[] | undefined {
+  if (!mechanics?.length) return undefined
+  const cleaned: ImportMechanic[] = []
+  for (const entry of mechanics) {
+    const parsed = ImportMechanicSchema.safeParse(omitNull(entry as Record<string, unknown>))
+    if (parsed.success) cleaned.push(parsed.data)
+  }
+  return cleaned.length ? cleaned : undefined
+}
+
 function normalizeFeatureLike(
   feature: z.infer<typeof ClassFeatureAiSchema>,
 ): ImportContent["classes"] extends (infer T)[] | undefined
@@ -298,6 +359,7 @@ function normalizeFeatureLike(
     description: feature.description,
     isChoice: feature.isChoice === true ? true : undefined,
     choices: feature.choices ?? undefined,
+    mechanics: normalizeMechanics(feature.mechanics),
   })
   return next as ImportContent["classes"] extends (infer T)[] | undefined
     ? T extends { features: (infer F)[] }
@@ -350,6 +412,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           description: trait.description,
           isChoice: trait.isChoice === true ? true : undefined,
           choices: trait.choices ?? undefined,
+          mechanics: normalizeMechanics(trait.mechanics),
         }),
       ),
     }))
@@ -405,6 +468,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         description: feat.description,
         prerequisite: feat.prerequisite,
         category: feat.category,
+        mechanics: normalizeMechanics(feat.mechanics),
       }),
     ) as NonNullable<ImportContent["feats"]>
   }

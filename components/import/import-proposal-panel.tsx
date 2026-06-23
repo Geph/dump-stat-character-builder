@@ -107,6 +107,9 @@ export function ImportProposalPanel({
                       </span>
                       <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-muted-foreground">
                         {SOURCE_LABELS[resource.source]} · {resource.resourceKey}
+                        {resource.uses.atLevelTable?.length
+                          ? ` · ${resource.uses.atLevelTable.length} level tiers`
+                          : ""}
                       </span>
                     </span>
                   </label>

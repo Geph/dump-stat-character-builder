@@ -299,7 +299,7 @@ export function ClassFeatureFields({
 
               </div>
 
-              {feature.choices.options.map((opt, oi) => (
+              {(feature.choices.options ?? []).map((opt, oi) => (
 
                 <div key={oi} className="space-y-2 rounded-lg border border-border p-3 bg-card/50">
 

@@ -20,12 +20,6 @@ export const LEGACY_GRANT_FEAT_CATALOG_IDS = {
   fightingStyle: "cat_char_grant_feat_fighting_style",
 } as const
 
-/** @deprecated Use GRANT_FEAT_CATALOG_ID and LEGACY_GRANT_FEAT_CATALOG_IDS */
-export const GRANT_FEAT_CATALOG_IDS = {
-  custom: GRANT_FEAT_CATALOG_ID,
-  ...LEGACY_GRANT_FEAT_CATALOG_IDS,
-} as const
-
 const LEGACY_GRANT_FEAT_CATEGORIES: Record<string, FeatPickCategory[]> = {
   [LEGACY_GRANT_FEAT_CATALOG_IDS.general]: ["General"],
   [LEGACY_GRANT_FEAT_CATALOG_IDS.epicBoon]: ["Epic Boon"],
@@ -50,11 +44,6 @@ export function grantFeatCharacteristic(
     featCategories: [...featCategories],
     count,
   }
-}
-
-/** @deprecated Preset rows merged into single "Gain a Feat" catalog entry. */
-export function buildGrantFeatCatalogEntries(): ModifierCatalogEntry[] {
-  return []
 }
 
 export type ResolvedGrantFeat = {

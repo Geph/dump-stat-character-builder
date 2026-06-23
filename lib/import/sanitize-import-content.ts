@@ -1,4 +1,5 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import { markFeatureModifierReviewForPersist } from "@/lib/compendium/modifier-review"
 import type { Feature } from "@/lib/types"
 
 type StagingFeature = Feature & {
@@ -15,7 +16,9 @@ function stripFeatureStagingFields<T extends StagingFeature>(
 
 function stripFeatures(features: unknown[] | undefined): unknown[] | undefined {
   if (!features?.length) return features
-  return features.map((raw) => stripFeatureStagingFields(raw as StagingFeature))
+  return features.map((raw) =>
+    markFeatureModifierReviewForPersist(stripFeatureStagingFields(raw as StagingFeature) as Feature),
+  )
 }
 
 /** Remove import-only staging fields before writing to the compendium. */

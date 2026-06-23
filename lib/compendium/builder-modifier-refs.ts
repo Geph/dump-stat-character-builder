@@ -7,6 +7,7 @@ import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
   effectiveLinkedModifiers,
+  readLinkedModifiers,
   resolveLinkedModifiers,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
@@ -20,34 +21,18 @@ import type {
   Feat,
   Species,
   Subclass,
-  UsesConfig,
 } from "@/lib/types"
 
 export function characteristicsFromLinkedModifiers(
   catalog: ModifierCatalogEntry[],
   linked: LinkedModifierInstance[] | null | undefined,
   legacyRefs: string[] | null | undefined,
-  legacy: CharacteristicModifier[] | null | undefined,
-  uses?: UsesConfig | null,
 ): CharacteristicModifier[] {
   const instances = effectiveLinkedModifiers(linked, legacyRefs, catalog)
   const resolved = instances.length
     ? resolveLinkedModifiers(instances, catalog)
     : resolveModifierRefIds(legacyRefs, catalog)
-  return [
-    ...normalizeCharacteristics(resolved.characteristics, null),
-    ...normalizeCharacteristics(legacy ?? null, uses ?? null),
-  ]
-}
-
-/** @deprecated Use characteristicsFromLinkedModifiers */
-export function characteristicsFromModifierRefs(
-  catalog: ModifierCatalogEntry[],
-  refIds: string[] | null | undefined,
-  legacy: CharacteristicModifier[] | null | undefined,
-  uses?: UsesConfig | null,
-): CharacteristicModifier[] {
-  return characteristicsFromLinkedModifiers(catalog, null, refIds, legacy, uses)
+  return normalizeCharacteristics(resolved.characteristics, null)
 }
 
 function collectLinkedFromFeature(
@@ -147,18 +132,6 @@ function filterSpellsKnownByClassLevel(
   })
 }
 
-/** @deprecated Use classAndSubclassLinkedModifiers */
-export function classAndSubclassFeatureModifierRefIds(params: {
-  classLevels: { classId: string; level: number }[]
-  classes: DndClass[]
-  subclasses: Subclass[]
-  subclassByClassId: Record<string, string>
-  featureChoicePicks: Record<string, string[]>
-}): string[] {
-  const instances = classAndSubclassLinkedModifiers({ ...params, catalog: [] })
-  return instances.map((instance) => instance.catalogRefId)
-}
-
 export function speciesTraitLinkedModifiers(
   species: Species | undefined,
   speciesTraitPicks: Record<string, string[]>,
@@ -179,14 +152,6 @@ export function speciesTraitLinkedModifiers(
     }
   })
   return instances
-}
-
-/** @deprecated Use speciesTraitLinkedModifiers */
-export function speciesTraitModifierRefIds(
-  species: Species | undefined,
-  speciesTraitPicks: Record<string, string[]>,
-): string[] {
-  return speciesTraitLinkedModifiers(species, speciesTraitPicks, []).map((instance) => instance.catalogRefId)
 }
 
 export function collectBuilderModifierRefIds(params: {
@@ -227,8 +192,9 @@ export function collectBuilderModifierRefIds(params: {
     customAbilities = [],
   } = params
 
+  const speciesRow = species as unknown as Record<string, unknown> | undefined
   const speciesInstances = [
-    ...effectiveLinkedModifiers(species?.linkedModifiers, species?.modifierRefs, catalog),
+    ...(speciesRow ? readLinkedModifiers(speciesRow, catalog) : []),
     ...speciesTraitLinkedModifiers(species, speciesTraitPicks, catalog),
   ]
   const speciesResolved = speciesInstances.length
@@ -273,33 +239,22 @@ export function collectBuilderModifierRefIds(params: {
     if (!feat) return []
     const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
     const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
-    const mods = characteristicsFromLinkedModifiers(catalog, instances, refs, feat.benefits)
+    const mods = characteristicsFromLinkedModifiers(catalog, instances, refs)
     return applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks)
   })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
-    const refs = ability.modifierRefs ?? readModifierRefs(ability as unknown as Record<string, unknown>)
-    return characteristicsFromLinkedModifiers(
-      catalog,
-      readLinkedModifiersFromAbility(ability),
-      refs,
-      ability.characteristics,
-      ability.uses,
-    )
+    const row = ability as unknown as Record<string, unknown>
+    const linked = readLinkedModifiers(row, catalog)
+    const refs = ability.modifierRefs ?? readModifierRefs(row)
+    return characteristicsFromLinkedModifiers(catalog, linked, refs)
   })
 
   return [
     ...normalizeCharacteristics(speciesResolved, null),
-    ...normalizeCharacteristics(species?.characteristics ?? null, null),
     ...normalizeCharacteristics(classResolved, null),
     ...normalizeCharacteristics(backgroundResolved, null),
     ...featMods,
     ...customAbilityMods,
   ]
-}
-
-function readLinkedModifiersFromAbility(ability: CustomAbility): LinkedModifierInstance[] | null {
-  const raw = ability as unknown as Record<string, unknown>
-  if (!Array.isArray(raw.linkedModifiers) && !Array.isArray(raw.linked_modifiers)) return null
-  return (raw.linkedModifiers ?? raw.linked_modifiers) as LinkedModifierInstance[]
 }

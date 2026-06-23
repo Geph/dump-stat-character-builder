@@ -29,7 +29,7 @@ import {
 } from "@/lib/import/preprocess-import-text"
 import { generateText, Output } from "ai"
 
-export type ImportExtractionMode = "deterministic" | "hybrid" | "ai"
+export type ImportExtractionMode = "deterministic" | "hybrid" | "ai" | "byo-json"
 
 export type ExtractImportContentOptions = ImportAiRequestOverride & {
   includeAbilities?: boolean

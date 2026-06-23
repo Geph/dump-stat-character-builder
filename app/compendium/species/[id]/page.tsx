@@ -10,7 +10,8 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import Link from "next/link"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import {
   normalizeCharacteristics,
   type CharacteristicModifier,
@@ -487,11 +488,19 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <CharacteristicModifiersEditor
-            value={form.characteristics}
-            onChange={(characteristics) => setForm({ ...form, characteristics })}
-            spellOptions={allSpells}
-          />
+          {id && id !== "new" ? (
+            <p className="text-sm text-muted-foreground rounded-xl border border-border p-4">
+              Edit species-wide modifiers in the{" "}
+              <Link href={compendiumEditHref("species", id)} className="text-primary font-medium hover:underline">
+                catalog species editor
+              </Link>
+              .
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground rounded-xl border border-border p-4">
+              After saving, use the catalog species editor to add modifier effects from the shared catalog.
+            </p>
+          )}
 
           {/* Submit */}
         </form>

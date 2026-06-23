@@ -34,15 +34,15 @@ export async function POST() {
     await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
     const classData = await listRows("classes")
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
-
+    
     const subclassesWithIds = enrichSrdSubclassList(
       withSrdCreatorUrlList(
         subclasses
           .map((sc) => ({
-            name: sc.name,
-            description: sc.description,
-            features: sc.features,
-            source: sc.source,
+      name: sc.name,
+      description: sc.description,
+      features: sc.features,
+      source: sc.source,
             class_id: classIdMap.get(sc.class_name) ?? null,
           }))
           .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
@@ -70,8 +70,8 @@ export async function POST() {
 
     const { total, breakdown } = getSrdSeedTotals()
 
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       total,
       breakdown,
       srdVersion: getSrdSeedData().manifest.version,

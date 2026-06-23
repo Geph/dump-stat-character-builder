@@ -66,9 +66,23 @@ export function classifyImportAiError(error: unknown): ClassifiedImportAiError {
       code: "quota_exceeded",
       message,
       userMessage:
-        "Import provider quota exceeded. Switch provider or model in Import settings (Google Gemini has a generous free tier), or retry later.",
+        "Import provider quota exceeded. Use Clipboard → BYO JSON import with your own LLM, or switch provider/model in server AI settings.",
       retryable: true,
       status: 429,
+    }
+  }
+
+  if (
+    lower.includes("not found") &&
+    (lower.includes("model") || lower.includes("models/"))
+  ) {
+    return {
+      code: "config",
+      message,
+      userMessage:
+        "The selected import model is not available on this provider. Pick another model in server AI settings, or use Clipboard → BYO JSON import.",
+      retryable: false,
+      status: 400,
     }
   }
 

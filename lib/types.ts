@@ -236,6 +236,8 @@ export interface Feature {
   activation?: FeatureActivation | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
+  /** Cleared when the user edits modifier wiring in the compendium after import. */
+  modifierReviewPending?: boolean
   /** References into the Common Modifier Effects catalog. */
   modifierRefs?: string[]
   /** Per-instance catalog links with inline configuration. */

@@ -48,3 +48,31 @@ export async function detectImportCollisions(content: ImportContent): Promise<Im
   const existingByKind = await fetchExistingForImportCollisions()
   return buildImportCollisions(content, existingByKind)
 }
+
+const COLLISION_CHECK_TIMEOUT_MS = 8_000
+
+/** Collision detection with timeout — returns [] when MySQL is slow or unreachable. */
+export async function detectImportCollisionsSafe(
+  content: ImportContent,
+): Promise<{ collisions: ImportCollision[]; warning?: string }> {
+  try {
+    const collisions = await Promise.race([
+      detectImportCollisions(content),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Compendium collision check timed out")),
+          COLLISION_CHECK_TIMEOUT_MS,
+        )
+      }),
+    ])
+    return { collisions }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Collision check failed"
+    console.warn("Import collision check skipped:", message)
+    return {
+      collisions: [],
+      warning:
+        "Could not check compendium name collisions (database unreachable or slow). Review carefully before confirming.",
+    }
+  }
+}

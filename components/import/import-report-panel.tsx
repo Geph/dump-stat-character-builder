@@ -1,5 +1,7 @@
 "use client"
 
+import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
+import { ImportUnmatchedFeaturesPanel } from "@/components/import/import-unmatched-features-panel"
 import type { ImportReport } from "@/lib/import/build-import-report"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
 import { AlertCircle, CheckCircle2, Info, ListChecks, Sparkles } from "lucide-react"
@@ -33,7 +35,8 @@ export function ImportTokenSavingsSummary({
 }) {
   if (!savings) return null
 
-  const isDeterministic = savings.extractionMode === "deterministic" || savings.chunkCount === 0
+  const isDeterministic = savings.extractionMode === "deterministic"
+  const isByoJson = savings.extractionMode === "byo-json"
 
   return (
     <section className="rounded-lg border border-border/60 bg-background/70 p-3">
@@ -44,13 +47,21 @@ export function ImportTokenSavingsSummary({
           <span className="rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
             Zero AI
           </span>
+        ) : isByoJson ? (
+          <span className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-xs font-semibold text-lime-700 dark:text-lime-300">
+            BYO JSON
+          </span>
         ) : savings.extractionMode === "hybrid" ? (
           <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
             Hybrid
           </span>
         ) : null}
       </div>
-      {isDeterministic ? (
+      {isByoJson ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Imported from LLM JSON you pasted — no server AI tokens used.
+        </p>
+      ) : isDeterministic ? (
         <p className="mt-1 text-xs text-muted-foreground">
           Class parsed deterministically — no AI tokens used
           {savings.confidence
@@ -114,6 +125,12 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
       </div>
 
       {report.tokenSavings ? <ImportTokenSavingsSummary savings={report.tokenSavings} /> : null}
+
+      {(report.modifierReview?.length ?? 0) > 0 ? (
+        <ImportModifierReviewPanel rows={report.modifierReview!} variant="report" />
+      ) : report.unmatchedFeatures.length > 0 ? (
+        <ImportUnmatchedFeaturesPanel entries={report.unmatchedFeatures} variant="report" />
+      ) : null}
 
       {hasNextSteps && (
         <section>
