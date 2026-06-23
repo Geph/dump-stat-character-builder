@@ -1,6 +1,7 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import { enrichImportedClassList, mergeTableParsedClassResources, type ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
-import { collectImportModifierPreviews } from "@/lib/import/import-modifier-previews"
+import { collectImportModifierPreviews, collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import {
   applyProposalSelections,
   collectImportProposals,
@@ -19,7 +20,7 @@ import {
   largeImportSummary,
   type ImportStage,
 } from "@/lib/import/import-staging"
-import { persistImportedContent, type ImportSourceLabel } from "@/lib/import/persist-import-content"
+import { persistImportedContent, normalizeImportMaterialSource, type ImportSourceLabel } from "@/lib/import/persist-import-content"
 
 export function summarizeImportPreview(content: ImportContent): string {
   const parts = Object.entries({
@@ -59,6 +60,24 @@ export type PrepareImportOptions = {
   charLength?: number
 }
 
+function withSanitizedClassRows(content: ImportContent): ImportContent {
+  if (!content.classes?.length) return content
+
+  const classResources = mergeTableParsedClassResources(content)
+  const explicitResources = classResources.length
+    ? classResources
+    : (content.class_resources as ClassResourceImportRow[] | undefined)
+
+  return {
+    ...content,
+    ...(classResources.length ? { class_resources: classResources } : {}),
+    classes: enrichImportedClassList(
+      content.classes as Record<string, unknown>[],
+      explicitResources,
+    ) as ImportContent["classes"],
+  }
+}
+
 export function needsImportReview(
   proposals: ImportProposalSet,
   collisions: ImportCollision[],
@@ -69,7 +88,8 @@ export function needsImportReview(
     importProposalsNeedConfirmation(proposals) ||
     collisions.length > 0 ||
     isLargeImport(content, charLength) ||
-    collectImportModifierPreviews(content).length > 0
+    collectImportModifierPreviews(content).length > 0 ||
+    collectImportModifierReview(content).some((row) => row.status === "unwired")
   )
 }
 
@@ -77,7 +97,8 @@ export function prepareImportedContent(
   content: ImportContent,
   options: PrepareImportOptions = {},
 ): PreparedImportResult {
-  const enriched = enrichImportContentModifiers(content)
+  const sanitized = withSanitizedClassRows(content)
+  const enriched = enrichImportContentModifiers(sanitized)
   const proposals = collectImportProposals(enriched)
   const collisions = options.collisions ?? []
   const stages = buildImportStages(enriched)
@@ -105,10 +126,11 @@ export async function finalizeImportedContent(
   source: ImportSourceLabel,
   renameMap: ImportRenameMap = {},
 ) {
+  const materialSource = normalizeImportMaterialSource(source)
   const renamed = applyImportRenames(pendingContent, renameMap)
   const proposals = collectImportProposals(renamed)
   const withModifiers = enrichImportContentModifiers(
     applyProposalSelections(renamed, proposals, selections),
   )
-  return persistImportedContent(withModifiers, source)
+  return persistImportedContent(withModifiers, materialSource)
 }

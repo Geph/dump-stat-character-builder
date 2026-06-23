@@ -5,6 +5,9 @@ import {
   usesConfigForProgressionColumn,
 } from "@/lib/import/parse-class-progression-table"
 import {
+  findClassProgressionTableRegions,
+} from "@/lib/import/strip-class-progression-tables"
+import {
   findClassSpellListRegions,
   parseClassSpellListFromText,
 } from "@/lib/import/parse-class-spell-list"
@@ -78,72 +81,6 @@ function stripConservativeBoilerplate(text: string): {
   return { text: next, removedChars: Math.max(0, before - next.length) }
 }
 
-function findProgressionTableHtmlRegions(text: string): { start: number; end: number; table: string }[] {
-  const regions: { start: number; end: number; table: string }[] = []
-  const re = /<table[\s\S]*?<\/table>/gi
-  let match: RegExpExecArray | null
-  while ((match = re.exec(text))) {
-    const table = match[0]
-    const parsed = parseClassProgressionTable(table)
-    if (parsed?.columns.length) {
-      regions.push({ start: match.index, end: match.index + table.length, table })
-    }
-  }
-  return regions
-}
-
-const PLAIN_LEVEL_ROW_RE =
-  /^\d{1,2}(?:st|nd|rd|th)?\s+\+\d+\s+.+/im
-
-function findProgressionPlainTextRegions(
-  text: string,
-): { start: number; end: number; table: string }[] {
-  const lines = text.split("\n")
-  const regions: { start: number; end: number; table: string }[] = []
-  let runStart = -1
-  let charOffset = 0
-  const lineStarts: number[] = []
-
-  for (const line of lines) {
-    lineStarts.push(charOffset)
-    charOffset += line.length + 1
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const isLevelRow = PLAIN_LEVEL_ROW_RE.test(lines[i].trim())
-    if (isLevelRow && runStart < 0) {
-      runStart = i
-    } else if (!isLevelRow && runStart >= 0) {
-      if (i - runStart >= 3) {
-        const block = lines.slice(runStart, i).join("\n")
-        const parsed = parseClassProgressionTable(block)
-        if (parsed?.columns.length) {
-          regions.push({
-            start: lineStarts[runStart],
-            end: lineStarts[i] ?? text.length,
-            table: block,
-          })
-        }
-      }
-      runStart = -1
-    }
-  }
-
-  if (runStart >= 0 && lines.length - runStart >= 3) {
-    const block = lines.slice(runStart).join("\n")
-    const parsed = parseClassProgressionTable(block)
-    if (parsed?.columns.length) {
-      regions.push({
-        start: lineStarts[runStart],
-        end: text.length,
-        table: block,
-      })
-    }
-  }
-
-  return regions
-}
-
 function buildClassResourcesFromTable(
   className: string,
   tableText: string,
@@ -209,10 +146,13 @@ export function preprocessImportText(
   }
 
   if (runClass) {
-    const tableRegions = [
-      ...findProgressionTableHtmlRegions(working),
-      ...findProgressionPlainTextRegions(working),
-    ].sort((a, b) => a.start - b.start)
+    const tableRegions = findClassProgressionTableRegions(working)
+      .map((region) => ({
+        start: region.start,
+        end: region.end,
+        table: working.slice(region.start, region.end),
+      }))
+      .sort((a, b) => a.start - b.start)
 
     for (const region of tableRegions) {
       if (replacements.some((entry) => entry.start <= region.start && entry.end >= region.end)) {

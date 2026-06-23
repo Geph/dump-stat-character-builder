@@ -4,12 +4,9 @@ import {
   characteristicCatalogRefId,
   effectCatalogRefId,
 } from "@/lib/compendium/modifier-catalog-refs"
-import {
-  charInstance,
-  fxInstance,
-  modId,
-  usesInstance,
-} from "@/lib/compendium/modifier-instance-builders"
+import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
+import { charInstance, fxInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers"
 import type { UsesConfig } from "@/lib/types"
@@ -98,6 +95,12 @@ function instanceKey(ctx: DetectFeatureContext, ruleId: string): string {
 
 function newInstanceId(): string {
   return createModifierInstanceId()
+}
+
+function grantFeatInstance(categories: FeatPickCategory[], label: string): LinkedModifierInstance {
+  const characteristic = grantFeatCharacteristic(categories, 1)
+  characteristic.label = label
+  return charInstance(newInstanceId(), GRANT_FEAT_CATALOG_ID, [characteristic])
 }
 
 function parseAbilityWord(word: string): AbilityScoreKey | null {
@@ -700,6 +703,41 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         recharges: [{ rest: "long_rest" }],
       }
       return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
+    },
+  },
+  {
+    id: "grant.fighting_style",
+    confidence: "high",
+    test: /\b(?:gain|learn|adopt|choose)\s+(?:a|an|one)?\s*fighting\s+style(?:\s+feat)?(?:\s+of\s+your\s+choice)?\b/i,
+    build: () => grantFeatInstance(["Fighting Style"], "Fighting Style feat"),
+  },
+  {
+    id: "grant.fighting_style_feat",
+    confidence: "high",
+    test: /\bfighting\s+style\s+feat\s+of\s+your\s+choice\b/i,
+    build: () => grantFeatInstance(["Fighting Style"], "Fighting Style feat"),
+  },
+  {
+    id: "grant.epic_boon",
+    confidence: "high",
+    test: /\b(?:gain|choose)\s+(?:an?\s+)?epic\s+boon(?:\s+feat)?(?:\s+of\s+your\s+choice)?\b/i,
+    build: () => grantFeatInstance(["Epic Boon"], "Epic Boon"),
+  },
+  {
+    id: "grant.origin_feat",
+    confidence: "high",
+    test: /\b(?:gain|choose)\s+(?:an?\s+)?origin\s+feat(?:\s+of\s+your\s+choice)?\b/i,
+    build: () => grantFeatInstance(["Origin"], "Origin feat"),
+  },
+  {
+    id: "grant.general_feat",
+    confidence: "medium",
+    test: /\b(?:gain|choose)\s+(?:a|an|one)\s+(?:general\s+)?feat(?:\s+of\s+your\s+choice)?\b/i,
+    build: (_match, _ctx, text) => {
+      if (/\bfighting\s+style\b/i.test(text)) return null
+      if (/\bepic\s+boon\b/i.test(text)) return null
+      if (/\borigin\s+feat\b/i.test(text)) return null
+      return grantFeatInstance(["General"], "General feat")
     },
   },
 ]

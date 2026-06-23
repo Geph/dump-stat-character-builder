@@ -198,6 +198,10 @@ export function mergeFeatureModifierDetections(
 
 export function modifierSummaryFromInstance(instance: LinkedModifierInstance): string {
   const char = instance.characteristics?.[0] as CharacteristicModifier | undefined
+  if (char?.type === "grant_feat") {
+    const categories = char.featCategories?.length ? char.featCategories.join(", ") : "General"
+    return char.label ?? `Gain a Feat (${categories})`
+  }
   if (char?.label) return char.label
   if (char?.type) return char.type.replace(/_/g, " ")
   const kind = instance.activation?.effects?.[0]?.kind

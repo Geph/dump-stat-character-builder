@@ -139,8 +139,3 @@ export function usesClassFeatureFeats(
   }
   return false
 }
-
-/** @deprecated Use featureGrantsFeats from grant-feat-catalog */
-export function isFeatChoiceFeature(feature: Feature): boolean {
-  return feature.isChoice === true && feature.choices?.kind === "feats"
-}

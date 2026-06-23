@@ -13,7 +13,6 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatureActivation } from "@/lib/types"
 import {
-  buildGrantFeatCatalogEntries,
   GRANT_FEAT_CATALOG_ID,
   LEGACY_GRANT_FEAT_CATALOG_IDS,
 } from "@/lib/compendium/grant-feat-catalog"
@@ -179,8 +178,6 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       },
     })
   }
-
-  entries.push(...buildGrantFeatCatalogEntries())
 
   entries.push({
     id: catalogId("other", "gain_inspiration"),

@@ -22,6 +22,7 @@ function createPoolCache(): PoolCache {
     waitForConnections: true,
     maxIdle: isDev ? 1 : 10,
     idleTimeout: isDev ? 10_000 : 60_000,
+    connectTimeout: 8_000,
   })
   const db = drizzle(pool, { schema, mode: "default" })
   return { pool, db }

@@ -35,18 +35,27 @@ export const IMPORT_AI_MODEL_OPTIONS: Record<ImportAiProvider, ImportAiModelOpti
   ],
   google: [
     {
-      id: "gemini-2.0-flash",
+      id: "gemini-2.0-flash-001",
       label: "Gemini 2.0 Flash",
-      note: "Generous free tier — good default when OpenAI quota is tight",
+      note: "Stable Google model — check AI Studio quota/billing",
     },
-    { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash", note: "Fallback Google model" },
+    {
+      id: "gemini-2.5-flash",
+      label: "Gemini 2.5 Flash",
+      note: "Newer flash model when available on your API key",
+    },
+    {
+      id: "gemini-2.0-flash-lite",
+      label: "Gemini 2.0 Flash Lite",
+      note: "Lower cost fallback",
+    },
   ],
 }
 
 const DEFAULT_MODELS: Record<ImportAiProvider, string> = {
   openai: "gpt-4o-mini",
   anthropic: "claude-sonnet-4-20250514",
-  google: "gemini-2.0-flash",
+  google: "gemini-2.0-flash-001",
 }
 
 const PROVIDER_LABELS: Record<ImportAiProvider, string> = {
@@ -101,10 +110,6 @@ export function listConfiguredImportAiProviders(): ImportAiProvider[] {
 
 export function getImportAiProvider(): ImportAiProvider | null {
   return resolveConfiguredProvider()
-}
-
-export function getImportAiProviderLabel(provider: ImportAiProvider): string {
-  return PROVIDER_LABELS[provider]
 }
 
 export function resolveImportAiConfig(

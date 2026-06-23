@@ -1,4 +1,7 @@
 import { z } from "zod"
+import { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
+
+export { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
 
 const ABILITY_SCORE_KEYS = [
   "strength",
@@ -19,26 +22,6 @@ const SAVE_ABILITY_NAMES = [
 ] as const
 
 const USES_ABILITY_CODES = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
-
-/** Characteristic / effect kinds the AI may emit in mechanics[] (subset of the Common Modifier catalog). */
-export const AI_MECHANIC_KINDS = [
-  "skills",
-  "tool_proficiencies",
-  "armor_proficiencies",
-  "weapon_proficiencies",
-  "saving_throws",
-  "ac",
-  "hit_points",
-  "attack_roll_modifiers",
-  "damage_roll_modifiers",
-  "damage_resistance",
-  "condition_immunity",
-  "speed",
-  "vision",
-  "uses",
-  "check_roll_modifier",
-  "extra_attack",
-] as const
 
 export const ImportMechanicSchema = z.object({
   kind: z.enum(AI_MECHANIC_KINDS),
@@ -72,6 +55,10 @@ export const ImportMechanicSchema = z.object({
   checkCategory: z.enum(["save", "skill", "ability"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
+  featCategories: z
+    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon"]))
+    .optional(),
+  featCount: z.number().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
@@ -92,6 +79,7 @@ export const SpeciesTraitSchema = z.object({
   description: z.string(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
+  mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
 export const ClassFeatureSchema = z.object({
@@ -100,6 +88,7 @@ export const ClassFeatureSchema = z.object({
   description: z.string(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
+  mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
 export const SubclassImportSchema = z.object({
@@ -117,6 +106,7 @@ export const FeatImportSchema = z.object({
     .enum(["Origin", "General", "Fighting Style", "Epic Boon"])
     .nullable()
     .optional(),
+  mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
 export const SpellImportSchema = z.object({
@@ -282,21 +272,15 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
 
 export type ImportContent = z.infer<ReturnType<typeof buildImportContentSchema>>
 
-export const MECHANICS_IMPORT_HINT = `Mechanical modifier wiring (AC, proficiencies, resistances, limited uses, etc.) is applied automatically after import from feature description text.
-- Do NOT include a mechanics[] array in your JSON output
-- Keep full rules text in each feature/trait/feat description — a deterministic parser maps phrasing to the Common Modifier catalog
-- Examples of phrasing to preserve verbatim in description:
-  - "You gain proficiency in Stealth"
-  - "your AC equals 10 + your Dexterity modifier"
-  - "+2 bonus to attack rolls"
-  - "resistance to fire damage"
-  - "finish a short or long rest before you can use this feature again"`
+import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-import-hints"
+
+export const MECHANICS_IMPORT_HINT = COMMON_MODIFIERS_IMPORT_HINT
 
 export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose between fixed options (species lineage/ancestry/legacy, fighting style options listed by name, skill from a list, etc.):
 - Set isChoice: true on the trait or class feature (use null when not a choice)
 - Populate choices with { category, count, options: [{ name, description }] } or null when not applicable
 - Keep rules text in description; list each selectable option in choices.options
-- For feat picks (ASI, Epic Boon, fighting style feats), do NOT use isChoice — link a grant_feat common modifier instead`
+- For feat picks (ASI, Epic Boon, fighting style feats), do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring)`
 
 export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the source labels them:
 - "Origin" for Origin Feats (1st-level background-style feats)
@@ -311,8 +295,8 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present`
 
-export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki):
-- Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, etc.)
+export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice, Weapon Mastery):
+- Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, Weapon Mastery, etc.)
 - Set class_name to the parent class (e.g. "Psion")
 - resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit")
 - name: display name from the table header (e.g. "Psi Points")
@@ -321,10 +305,10 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - Psi Limit / per-activation caps can use type "special" with atLevelTable describing the cap by level
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
-export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. Psion):
+export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. Psion, Gunslinger):
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
 - Put each subclass/archetype/path in subclasses[] with class_name set to the parent class
-- Preserve the class level table in class description when present (Psi Points, Psi Limit columns, etc.)
+- Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
 - Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name`
 
@@ -335,4 +319,4 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement
 - For disciplines with talents, include choices { category, count, options: [{ name, description }] } and mention talent count in definition
-- Do NOT also duplicate the same entries in class_resources[] or abilities[] — proposals are reviewed first; table data may still appear in class description`
+- Do NOT also duplicate the same entries in class_resources[] or abilities[] — proposals are reviewed first; omit level tables from class description`

@@ -18,8 +18,75 @@ export type ImportModifierPreviewEntry = {
   ruleId: string
 }
 
+export type ImportUnmatchedFeatureEntry = {
+  id: string
+  sourceLabel: string
+  featureName: string
+  featureLevel?: number
+}
+
 type FeatureCarrier = Feature & {
   importModifierMeta?: ImportModifierMeta[]
+}
+
+function featureHasLinkedModifiers(feature: Feature): boolean {
+  return (feature.linkedModifiers?.length ?? 0) > 0
+}
+
+function collectUnmatchedFromFeature(
+  sourceLabel: string,
+  feature: Feature,
+  entries: ImportUnmatchedFeatureEntry[],
+): void {
+  const name = feature.name?.trim()
+  if (!name || featureHasLinkedModifiers(feature)) return
+  entries.push({
+    id: `${sourceLabel}::${name}::${feature.level ?? 0}`,
+    sourceLabel,
+    featureName: name,
+    featureLevel: feature.level,
+  })
+}
+
+/** Features with no auto-wired linked modifiers after enrichment. */
+export function collectUnmatchedModifierFeatures(
+  content: ImportContent,
+): ImportUnmatchedFeatureEntry[] {
+  const entries: ImportUnmatchedFeatureEntry[] = []
+
+  for (const cls of content.classes ?? []) {
+    for (const feature of cls.features ?? []) {
+      collectUnmatchedFromFeature(`Class: ${cls.name}`, feature, entries)
+    }
+  }
+
+  for (const subclass of content.subclasses ?? []) {
+    for (const feature of subclass.features ?? []) {
+      collectUnmatchedFromFeature(
+        `Subclass: ${subclass.name} (${subclass.class_name})`,
+        feature,
+        entries,
+      )
+    }
+  }
+
+  for (const species of content.species ?? []) {
+    for (const trait of species.traits ?? []) {
+      collectUnmatchedFromFeature(`Species: ${species.name}`, trait, entries)
+    }
+  }
+
+  for (const background of content.backgrounds ?? []) {
+    if (background.feature) {
+      collectUnmatchedFromFeature(`Background: ${background.name}`, background.feature, entries)
+    }
+  }
+
+  for (const feat of content.feats ?? []) {
+    collectUnmatchedFromFeature(`Feat: ${feat.name}`, feat, entries)
+  }
+
+  return entries
 }
 
 function previewFromFeature(
@@ -45,6 +112,80 @@ function previewFromFeature(
       ruleId: meta?.ruleId ?? "unknown",
     }
   })
+}
+
+export type ImportModifierReviewRow = {
+  id: string
+  sourceLabel: string
+  featureName: string
+  featureLevel?: number
+  status: "wired" | "unwired"
+  modifiers: ImportModifierPreviewEntry[]
+}
+
+function reviewRowId(sourceLabel: string, featureName: string, featureLevel?: number): string {
+  return `${sourceLabel}::${featureName}::${featureLevel ?? 0}`
+}
+
+function pushReviewRow(
+  rows: ImportModifierReviewRow[],
+  sourceLabel: string,
+  feature: FeatureCarrier,
+  previews: ImportModifierPreviewEntry[],
+): void {
+  rows.push({
+    id: reviewRowId(sourceLabel, feature.name, feature.level),
+    sourceLabel,
+    featureName: feature.name,
+    featureLevel: feature.level,
+    status: previews.length > 0 ? "wired" : "unwired",
+    modifiers: previews,
+  })
+}
+
+/** Per-feature modifier wiring status for import review. */
+export function collectImportModifierReview(content: ImportContent): ImportModifierReviewRow[] {
+  const rows: ImportModifierReviewRow[] = []
+
+  for (const cls of content.classes ?? []) {
+    for (const feature of (cls.features ?? []) as FeatureCarrier[]) {
+      pushReviewRow(rows, `Class: ${cls.name}`, feature, previewFromFeature(`Class: ${cls.name}`, feature))
+    }
+  }
+
+  for (const subclass of content.subclasses ?? []) {
+    for (const feature of (subclass.features ?? []) as FeatureCarrier[]) {
+      const label = `Subclass: ${subclass.name} (${subclass.class_name})`
+      pushReviewRow(rows, label, feature, previewFromFeature(label, feature))
+    }
+  }
+
+  for (const species of content.species ?? []) {
+    for (const trait of (species.traits ?? []) as FeatureCarrier[]) {
+      pushReviewRow(rows, `Species: ${species.name}`, trait, previewFromFeature(`Species: ${species.name}`, trait))
+    }
+  }
+
+  for (const background of content.backgrounds ?? []) {
+    if (!background.feature) continue
+    pushReviewRow(
+      rows,
+      `Background: ${background.name}`,
+      background.feature as FeatureCarrier,
+      previewFromFeature(`Background: ${background.name}`, background.feature as FeatureCarrier),
+    )
+  }
+
+  for (const feat of content.feats ?? []) {
+    pushReviewRow(
+      rows,
+      `Feat: ${feat.name}`,
+      feat as FeatureCarrier,
+      previewFromFeature(`Feat: ${feat.name}`, feat as FeatureCarrier),
+    )
+  }
+
+  return rows
 }
 
 /** Collect auto-wired modifier previews for the import review UI. */

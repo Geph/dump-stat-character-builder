@@ -6,12 +6,11 @@ import {
 } from "@/lib/builder/asi-allocation"
 import {
   ABILITY_SCORE_KEYS,
-  normalizeCharacteristics,
   type AbilityScoreKey,
-  type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
   effectiveLinkedModifiers,
+  readLinkedModifiers,
   resolveLinkedModifierInstance,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
@@ -27,22 +26,6 @@ export type AbilityScorePoolGrant = {
   points: number
 }
 
-function grantsFromCharacteristics(
-  mods: CharacteristicModifier[] | null | undefined,
-  allocationKeyPrefix: string,
-  label: string,
-): AbilityScorePoolGrant[] {
-  const grants: AbilityScorePoolGrant[] = []
-  for (const mod of normalizeCharacteristics(mods, null)) {
-    if (mod.type !== "ability_scores" || mod.mode !== "asi_pool") continue
-    grants.push({
-      allocationKey: `${allocationKeyPrefix}::${mod.id}`,
-      label: mod.label?.trim() || label,
-      points: mod.points ?? ASI_POINTS_PER_PICK,
-    })
-  }
-  return grants
-}
 
 function grantsFromLinkedModifiers(
   linked: LinkedModifierInstance[] | null | undefined,
@@ -137,12 +120,10 @@ export function collectAbilityScorePoolGrants(params: {
 
   const grants: AbilityScorePoolGrant[] = []
 
-  grants.push(
-    ...grantsFromCharacteristics(species?.characteristics, "species", species?.name ?? "Species"),
-  )
+  const speciesRow = species as unknown as Record<string, unknown> | undefined
   grants.push(
     ...grantsFromLinkedModifiers(
-      species?.linkedModifiers,
+      speciesRow ? readLinkedModifiers(speciesRow, catalog) : [],
       species?.modifierRefs,
       catalog,
       "species_refs",
@@ -220,7 +201,6 @@ export function collectAbilityScorePoolGrants(params: {
         choicePickKey,
         feat.name,
       ),
-      ...grantsFromCharacteristics(feat.benefits, choicePickKey, feat.name),
     )
   })
 

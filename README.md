@@ -187,7 +187,7 @@ SRD seed, web import, and Dump Stat JSON bundles do **not** use AI. PDF upload a
 |----------|---------------------|---------------|
 | OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
-| Google Gemini | `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.0-flash` |
+| Google Gemini | `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.0-flash-001` |
 
 Add to `.env.local` (examples):
 
@@ -206,7 +206,7 @@ OPENAI_API_KEY=sk-your-key-here
 
 Restart the dev server after changing keys. Without any provider key, seed, web URLs, Dump Stat JSON, and manual compendium edits still work — only AI-powered PDF/text import returns a configuration error.
 
-**Import page UI:** On Clipboard and PDF tabs, **AI import settings** lets you override provider and model per import (stored in browser localStorage). Keys always stay on the server; the UI only sends provider/model names, not secrets. Google Gemini’s free tier is useful when OpenAI quota is tight.
+**Import page UI:** When server AI is configured, Clipboard and PDF tabs show an optional **server AI extraction** section (provider/model override, stored in browser localStorage). Keys always stay on the server. When no provider is configured, only BYO JSON import is shown for pasted text.
 
 **Zero-AI path:** Clean class documents (progression table + feature prose, e.g. homebrew Fighter PDFs) may import with **no AI calls** when the deterministic confidence gate is high. The import report shows a **Zero AI** badge when that path is used.
 
@@ -270,19 +270,20 @@ Import via **Import → PDF upload** (choose the `.json` file) or **paste the en
 pnpm dlx tsx scripts/build-ua-villainous-export.ts
 ```
 
-### Text import (AI extraction)
+### Text import (BYO LLM + optional server AI)
 
-Paste raw text (minimum ~20 characters). When AI is used, the model extracts structured content into species, classes, **subclasses**, backgrounds, spells, feats, equipment, and (text route only) custom abilities. Well-structured **class** text may import deterministically without AI (see [AI import setup](#7-ai-import-optional--pdf-and-text-import)).
+The **Clipboard** tab is the primary import path for pasted text:
 
-**Tips for best results:**
+1. Paste raw source text (from a PDF copy, wiki, or document).
+2. Copy the **extraction prompt** and **JSON template** (matched to your content-type hint).
+3. Run the prompt in ChatGPT, Claude, Gemini, or any LLM — using your own API key or subscription.
+4. Paste the model's JSON output back into Dump Stat and click **Import JSON**.
 
-1. **Seed SRD first** — parent class names must match exactly (`Druid`, not `Druid (Circle of the Titan)`).
-2. **Content hint** — use the dropdown (e.g. `subclasses`) to focus extraction.
-3. **AI settings** — choose provider/model on the import page if the server default is wrong or quota-limited.
-4. **Subclasses** — each entry needs `class_name` plus `features[]` with `level`, `name`, `description`. Choice features (skill picks, titan forms) should set `isChoice: true` and `choices`.
-5. **Feats** — Origin and Epic Boon feats are categorized automatically when the source labels them; the model sets `category` accordingly.
-6. **Spell tables** — keep HTML `<table>` blocks in feature descriptions for subclass spell lists.
-7. **Dump Stat JSON** — if the pasted text is valid export JSON, it imports directly without AI (same as file upload).
+The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, etc.). No server API keys are required for this flow.
+
+**Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs. It stays hidden when no provider is configured.
+
+**Dump Stat JSON export** — if the pasted text is a valid `dump-stat-export` bundle, it imports directly without LLM extraction (same as file upload).
 
 Imported rows use source **Text Import** or **PDF Import** and replace same-name rows from that source on re-import.
 

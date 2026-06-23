@@ -8,14 +8,8 @@ import {
   isAttunableItem,
 } from "@/lib/compendium/equipment-attunement"
 import { filterEquipmentList } from "@/lib/compendium/equipment-display"
-import {
-  calculateWeaponAttack,
-  getWeaponDamageText,
-  isArmorItem,
-  isShieldItem,
-  isWeaponItem,
-  isWeaponProficient,
-} from "@/lib/compendium/combat-stats"
+import { getWeaponDamageText, isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
+import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -31,9 +25,7 @@ type SheetEquipmentPanelProps = {
   equippedWeaponId: string | null
   attunedItemIds: string[]
   maxAttunementSlots: number
-  weaponProficiencies: string[]
-  abilityMods: Record<string, number>
-  proficiencyBonus: number
+  equippedWeaponAttack: WeaponAttackDerived | null
   onEquipArmor: (id: string | null) => void
   onEquipShield: (id: string | null) => void
   onEquipWeapon: (id: string | null) => void
@@ -85,9 +77,7 @@ export function SheetEquipmentPanel({
   equippedWeaponId,
   attunedItemIds,
   maxAttunementSlots,
-  weaponProficiencies,
-  abilityMods,
-  proficiencyBonus,
+  equippedWeaponAttack,
   onEquipArmor,
   onEquipShield,
   onEquipWeapon,
@@ -174,11 +164,8 @@ export function SheetEquipmentPanel({
             const attunable = isAttunableItem(item)
             const isAttuned = attunedItemIds.includes(item.id)
             const attuneDisabled = attunable && !isAttuned && attunedCount >= slotCap
-            const proficient = isWeapon ? isWeaponProficient(item, weaponProficiencies) : false
             const attack =
-              isWeapon && equippedWeaponId === item.id
-                ? calculateWeaponAttack(item, abilityMods, proficiencyBonus, proficient)
-                : null
+              isWeapon && equippedWeaponId === item.id ? equippedWeaponAttack : null
             const damageText = isWeapon ? getWeaponDamageText(item) : null
 
             return (

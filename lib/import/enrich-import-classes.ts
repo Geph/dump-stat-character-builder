@@ -3,6 +3,7 @@ import {
   usesConfigForProgressionColumn,
 } from "@/lib/import/parse-class-progression-table"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
+import { stripClassProgressionTablesFromText } from "@/lib/import/strip-class-progression-tables"
 import {
   detectThirdPartyResourceSpend,
   THIRD_PARTY_RESOURCE_PATTERNS,
@@ -87,20 +88,93 @@ function resolveResourceKeysForClass(
   className: string,
   explicitResources: ClassResourceImportRow[] | undefined,
   progressionText: string,
-): { psi?: string; exploit?: string } {
-  const keys: { psi?: string; exploit?: string } = {}
+): { psi?: string; exploit?: string; risk?: string } {
+  const keys: { psi?: string; exploit?: string; risk?: string } = {}
   const classResources = explicitResources?.filter((r) => r.class_name === className) ?? []
 
   for (const resource of classResources) {
     if (/psi\s*points?/i.test(resource.name)) keys.psi = resource.resource_key
     if (/exploit\s*dice/i.test(resource.name)) keys.exploit = resource.resource_key
+    if (/risk\s*dice/i.test(resource.name)) keys.risk = resource.resource_key
   }
 
   const lower = progressionText.toLowerCase()
   if (!keys.psi && lower.includes("psi point")) keys.psi = "psi_points"
   if (!keys.exploit && /\bexploit\s+die\b/.test(lower)) keys.exploit = "exploit_dice"
+  if (!keys.risk && /\brisk\s+dice\b/.test(lower)) keys.risk = "risk_dice"
 
   return keys
+}
+
+function tableUsesHasLevels(uses: UsesConfig): boolean {
+  return (uses.atLevelTable?.length ?? 0) > 0
+}
+
+/** Prefer level-table data from a parsed progression column when explicit uses are incomplete. */
+export function mergeUsesFromProgressionTable(
+  explicit: UsesConfig,
+  fromTable: UsesConfig,
+): UsesConfig {
+  if (!tableUsesHasLevels(fromTable)) return explicit
+  const explicitLevels = explicit.atLevelTable?.length ?? 0
+  const tableLevels = fromTable.atLevelTable?.length ?? 0
+  if (tableUsesHasLevels(explicit) && explicitLevels >= tableLevels) return explicit
+
+  return {
+    ...explicit,
+    type: fromTable.type ?? explicit.type,
+    atLevelTable: fromTable.atLevelTable,
+    atLevelMode: fromTable.atLevelMode ?? explicit.atLevelMode,
+    dieType: fromTable.dieType ?? explicit.dieType,
+    recharges: fromTable.recharges?.length ? fromTable.recharges : explicit.recharges,
+    specialDescription: explicit.specialDescription ?? fromTable.specialDescription,
+  }
+}
+
+/** Parse progression tables from class text before descriptions are stripped. */
+export function mergeTableParsedClassResources(content: {
+  classes?: unknown[]
+  class_resources?: ClassResourceImportRow[]
+}): ClassResourceImportRow[] {
+  const merged = new Map<string, ClassResourceImportRow>()
+
+  for (const row of content.class_resources ?? []) {
+    merged.set(`${row.class_name}::${row.resource_key}`, { ...row })
+  }
+
+  for (const classRow of content.classes ?? []) {
+    const record = classRow as Record<string, unknown>
+    const className = String(record.name ?? "")
+    if (!className) continue
+
+    const parsed = parseClassProgressionTable(collectProgressionText(record))
+    if (!parsed?.columns.length) continue
+
+    for (const column of parsed.columns) {
+      const mapKey = `${className}::${column.resourceKey}`
+      const tableUses = usesConfigForProgressionColumn(column, className)
+      const existing = merged.get(mapKey)
+      if (existing) {
+        merged.set(mapKey, {
+          ...existing,
+          uses: mergeUsesFromProgressionTable(existing.uses, tableUses),
+          description:
+            existing.description ??
+            `${column.resourceName} progression parsed from the ${className} level table.`,
+        })
+      } else {
+        merged.set(mapKey, {
+          class_name: className,
+          resource_key: column.resourceKey,
+          name: column.resourceName,
+          description: `${column.resourceName} progression parsed from the ${className} level table.`,
+          uses: tableUses,
+        })
+      }
+    }
+  }
+
+  return [...merged.values()]
 }
 
 /** Build class_resources rows from explicit import data or parsed progression tables. */
@@ -129,7 +203,15 @@ export function buildClassResourceRowsForClass(
 
   const parsedColumns = parsed?.columns ?? []
   for (const column of parsedColumns) {
-    if (rows.some((row) => row.resource_key === column.resourceKey)) continue
+    const tableUses = usesConfigForProgressionColumn(column, className)
+    const existingRow = rows.find((row) => row.resource_key === column.resourceKey)
+    if (existingRow) {
+      existingRow.uses = mergeUsesFromProgressionTable(
+        existingRow.uses as UsesConfig,
+        tableUses,
+      )
+      continue
+    }
     rows.push({
       class_id: classId,
       resource_key: column.resourceKey,
@@ -162,7 +244,13 @@ export function enrichImportedClassRow(
     ? linkResourceCostsOnFeatures(features, resourceKeys)
     : features.map((feature) => normalizeFeatureRow(feature))
 
-  return { ...row, features: nextFeatures }
+  let description = typeof row.description === "string" ? row.description : null
+  if (description) {
+    const stripped = stripClassProgressionTablesFromText(description)
+    description = stripped.length > 0 ? stripped : null
+  }
+
+  return { ...row, description, features: nextFeatures }
 }
 
 export function enrichSubclassFeaturesWithPsiCosts(

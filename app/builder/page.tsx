@@ -21,12 +21,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Check, 
-  Shield, 
-  Users, 
-  Dices, 
-  Package, 
-  UserCircle, 
-  ClipboardCheck,
   Upload,
   X,
   Wand2,
@@ -41,6 +35,9 @@ import {
   LayoutGrid,
   Coins,
   Backpack,
+  UserCircle,
+  Shield,
+  Dices,
 } from "lucide-react"
 import {
   aggregateCharacteristics,
@@ -85,7 +82,6 @@ import { StartingEquipmentPackagePicker } from "@/components/builder/starting-eq
 import { compendiumCardBlurb, getCompendiumCardBlurb } from "@/lib/compendium/card-image"
 import { getClassDetailFeatures } from "@/lib/builder/class-detail-features"
 import {
-  sanitizeEquipmentLoadout,
   suggestEquipmentLoadout,
 } from "@/lib/builder/equipment-loadout"
 import {
@@ -175,6 +171,12 @@ import {
 } from "@/lib/builder/asi-allocation"
 import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
 import { paginateList } from "@/lib/builder/picker-pagination"
+import {
+  BUILDER_ABILITY_NAMES,
+  BUILDER_EMPTY_CHARACTER,
+  BUILDER_STANDARD_ARRAY,
+  BUILDER_STEPS,
+} from "@/lib/builder/builder-constants"
 import { formatSpellListGroupLabel } from "@/lib/compendium/spell-slots"
 import {
   formatMulticlassAbilityIssue,
@@ -210,23 +212,13 @@ import type {
   Feat,
 } from "@/lib/types"
 
-const STEPS = [
-  { id: 1, label: "Class & Level", icon: Shield },
-  { id: 2, label: "Origin", icon: Users },
-  { id: 3, label: "Abilities", icon: Dices },
-  { id: 4, label: "Gear & Spells", icon: Package },
-  { id: 5, label: "Details", icon: UserCircle },
-  { id: 6, label: "Review", icon: ClipboardCheck },
-]
-
-const ABILITY_NAMES = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"] as const
-
-const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const
+const ABILITY_NAMES = BUILDER_ABILITY_NAMES
 
 type AbilityName = (typeof ABILITY_NAMES)[number]
 
 type StandardArrayAssignments = Partial<Record<AbilityName, number>>
 
+const STANDARD_ARRAY = BUILDER_STANDARD_ARRAY
 const STANDARD_ARRAY_UNASSIGNED_SCORE = 10
 
 function standardAssignmentsFromCharacter(
@@ -271,36 +263,7 @@ const PREVIEW_SECTION_ICONS = {
 
 type AbilityMethod = "pointbuy" | "standard" | "roll" | "custom"
 
-const EMPTY_CHARACTER: CharacterDraft = {
-  name: "",
-  level: 1,
-  class_id: null,
-  subclass_id: null,
-  species_id: null,
-  background_id: null,
-  strength: 8,
-  dexterity: 8,
-  constitution: 8,
-  intelligence: 8,
-  wisdom: 8,
-  charisma: 8,
-  skill_proficiencies: [],
-  tool_proficiencies: [],
-  weapon_proficiencies: [],
-  armor_proficiencies: [],
-  languages: ["Common"],
-  spell_ids: [],
-  equipment_ids: [],
-  gold: 0,
-  feat_ids: [],
-  personality_traits: "",
-  ideals: "",
-  bonds: "",
-  flaws: "",
-  backstory: "",
-  portrait_url: null,
-  banner_url: null,
-}
+const EMPTY_CHARACTER = BUILDER_EMPTY_CHARACTER
 
 export default function BuilderPage() {
   const router = useRouter()
@@ -1811,7 +1774,7 @@ export default function BuilderPage() {
         {/* Step Indicator */}
         <div id="builder-steps" className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {STEPS.map((step, index) => {
+            {BUILDER_STEPS.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
               const isReachable = step.id <= maxStepReached
@@ -1847,7 +1810,7 @@ export default function BuilderPage() {
                       {step.label}
                     </span>
                   </button>
-                  {index < STEPS.length - 1 && (
+                  {index < BUILDER_STEPS.length - 1 && (
                     <div className={`flex-1 h-1 mx-1 md:mx-2 rounded min-w-[8px] ${
                       step.id < maxStepReached ? "bg-success" : "bg-muted"
                     }`} />

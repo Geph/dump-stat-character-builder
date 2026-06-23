@@ -49,6 +49,7 @@ import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import {
   buildInputsFromSavedCharacter,
   computeDerivedCharacter,
+  deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
@@ -64,7 +65,7 @@ import { DEFAULT_ATTUNEMENT_SLOTS } from "@/lib/compendium/equipment-attunement"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import { computeLoadoutArmorClass, suggestEquipmentLoadout } from "@/lib/builder/equipment-loadout"
+import { suggestEquipmentLoadout } from "@/lib/builder/equipment-loadout"
 import { getEquipmentCostGp } from "@/lib/builder/equipment-utils"
 import {
   getEffectiveArmorProficiencies,
@@ -254,6 +255,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     fetchCharacter()
   }, [id])
 
+  const characterBuildInputs = useMemo(() => {
+    if (!character) return null
+    const classList = character.class_list ?? []
+    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as DndClass[]
+    const subclassesFromList = classList
+      .map((entry) => entry.subclass)
+      .filter(Boolean) as Subclass[]
+    return buildInputsFromSavedCharacter({
+      character,
+      classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
+      subclasses: subclassesFromList.length
+        ? subclassesFromList
+        : character.subclasses
+          ? [character.subclasses]
+          : [],
+      species: character.species,
+      background: character.backgrounds,
+      feats: characterFeats,
+      equipment,
+      modifierCatalog,
+    })
+  }, [character, characterFeats, equipment, modifierCatalog])
+
+  const derived = useMemo(() => {
+    if (!characterBuildInputs) return null
+    return computeDerivedCharacter(characterBuildInputs)
+  }, [characterBuildInputs])
+
   const persistEquipmentLoadout = useCallback(
     async (next: {
       armorId?: string | null
@@ -266,8 +295,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         shieldId: next.shieldId !== undefined ? next.shieldId : equippedShieldId,
         weaponId: next.weaponId !== undefined ? next.weaponId : equippedWeaponId,
       }
-      const dexMod = Math.floor((character.dexterity - 10) / 2)
-      const nextAc = computeLoadoutArmorClass(dexMod, loadout, equipment)
+      const nextAc = characterBuildInputs
+        ? deriveArmorClassForLoadout(characterBuildInputs, loadout)
+        : character.armor_class
       const db = createClient()
       const { data, error } = await db
         .from("characters")
@@ -287,7 +317,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedWeaponId(loadout.weaponId)
       }
     },
-    [character, equippedArmorId, equippedShieldId, equippedWeaponId, equipment],
+    [character, characterBuildInputs, equippedArmorId, equippedShieldId, equippedWeaponId],
   )
 
   const persistGold = useCallback(
@@ -417,31 +447,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }),
     [classDetails, character?.species],
   )
-
-  const derived = useMemo(() => {
-    if (!character) return null
-    const classList = character.class_list ?? []
-    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as DndClass[]
-    const subclassesFromList = classList
-      .map((entry) => entry.subclass)
-      .filter(Boolean) as Subclass[]
-    const inputs = buildInputsFromSavedCharacter({
-      character,
-      classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
-      subclasses: subclassesFromList.length
-        ? subclassesFromList
-        : character.subclasses
-          ? [character.subclasses]
-          : [],
-      species: character.species,
-      background: character.backgrounds,
-      feats: characterFeats,
-      equipment,
-      modifierCatalog,
-    })
-    if (!inputs) return null
-    return computeDerivedCharacter(inputs)
-  }, [character, characterFeats, equipment, modifierCatalog])
 
   const usesResolveContext = useMemo(
     () => ({
@@ -1228,9 +1233,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     equippedWeaponId={equippedWeaponId}
                     attunedItemIds={attunedItemIds}
                     maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
-                    weaponProficiencies={weaponProficiencies}
-                    abilityMods={abilityMods}
-                    proficiencyBonus={proficiencyBonus}
+                    equippedWeaponAttack={derived?.equippedWeaponAttack ?? null}
                     onEquipArmor={(id) => {
                       void persistEquipmentLoadout({ armorId: id })
                     }}

@@ -1,0 +1,226 @@
+import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
+import type { ImportContentTypeHint } from "@/lib/import/content-type-hints"
+
+export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from PDF or web)
+
+For best extraction results, your source text should:
+- Include one primary content type per run when possible (e.g. a full class, one subclass, or a spell list section)
+- Keep level progression tables in the source so the importer can read features and class resources from them
+- Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Risk Dice, Ki, etc.) in class_resources[]
+- Keep feature headings with their full description paragraphs (e.g. "Fighting Style" followed by rules text)
+- Preserve mechanical sentences in descriptions (proficiencies, AC formulas, resistances, limited uses, feat grants) so Common Modifiers auto-wire; add mechanics[] when phrasing is non-standard
+- Preserve HTML <table> blocks for subclass spell lists in feature descriptions when present
+- Use a single class or subclass name consistently (match SRD names when importing into an SRD-seeded compendium)
+- Avoid mixing unrelated chapters (equipment tables + feats + multiple classes in one paste)
+
+PDF tips:
+- Copy text from a vector PDF when possible; scanned images need OCR first
+- If the PDF has page headers/footers, they are OK — importers strip obvious boilerplate
+- For long PDFs, import one chapter or page range at a time with the content-type hint set correctly
+- Homebrew class PDFs with a level table + feature sections work well; Dump Stat may parse them with zero AI when structure is clean`
+
+const JSON_OUTPUT_RULES = `Output format (required)
+
+Return ONLY valid JSON — no markdown fences, no commentary before or after.
+Use null for optional fields you do not have data for.
+Omit empty top-level arrays entirely, or set them to null.
+Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import.
+Optionally add mechanics[] on features, traits, or feats for explicit modifier hints (see Common Modifier wiring).`
+
+const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
+  classes:
+    "Focus on classes[] and class_resources[] when present. Include hit_die, proficiencies, and features[] with level, name, description. Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature.",
+  subclasses:
+    "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present.",
+  species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
+  backgrounds:
+    "Focus on backgrounds[] with skill_proficiencies, feat_granted, ability_bonuses, and feature.",
+  spells: "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description.",
+  feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
+  equipment:
+    "Focus on equipment[] with category, cost { amount, unit }, weight, and properties.",
+  all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
+}
+
+export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
+  all: {
+    classes: [
+      {
+        name: "Fighter",
+        description: "A master of weapons and armor.",
+        hit_die: 10,
+        primary_ability: ["Strength", "Dexterity"],
+        saving_throws: ["Strength", "Constitution"],
+        armor_proficiencies: ["All armor", "Shields"],
+        weapon_proficiencies: ["Simple weapons", "Martial weapons"],
+        skill_choices: { count: 2, options: ["Athletics", "Perception"] },
+        features: [
+          {
+            level: 1,
+            name: "Fighting Style",
+            description:
+              "You gain a Fighting Style feat of your choice. If you choose a feat that requires a melee weapon, you can use it with ranged weapons.",
+            mechanics: [
+              {
+                kind: "grant_feat",
+                featCategories: ["Fighting Style"],
+                featCount: 1,
+                sourcePhrase: "You gain a Fighting Style feat of your choice.",
+                confidence: "high",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  classes: {
+    classes: [
+      {
+        name: "Fighter",
+        description: null,
+        hit_die: 10,
+        primary_ability: ["Strength", "Dexterity"],
+        saving_throws: ["Strength", "Constitution"],
+        features: [{ level: 1, name: "Second Wind", description: "Regain hit points as a bonus action." }],
+      },
+    ],
+    class_resources: [
+      {
+        class_name: "Fighter",
+        resource_key: "second_wind",
+        name: "Second Wind",
+        description: "Uses per rest from the class table.",
+        uses: { type: "at_level", atLevelMode: "tier", atLevelTable: [{ level: 1, count: 1 }] },
+      },
+    ],
+  },
+  subclasses: {
+    subclasses: [
+      {
+        name: "Champion",
+        class_name: "Fighter",
+        description: "A simple martial subclass.",
+        features: [
+          {
+            level: 3,
+            name: "Improved Critical",
+            description: "Your weapon attacks score a critical hit on a roll of 19 or 20.",
+          },
+        ],
+      },
+    ],
+  },
+  species: {
+    species: [
+      {
+        name: "Elf",
+        description: "An agile people of otherworldly grace.",
+        speed: 30,
+        size: "Medium",
+        traits: [{ name: "Darkvision", description: "You can see in dim light within 60 feet." }],
+      },
+    ],
+  },
+  backgrounds: {
+    backgrounds: [
+      {
+        name: "Soldier",
+        description: "You served in an army.",
+        skill_proficiencies: ["Athletics", "Intimidation"],
+        feat_granted: "Savage Attacker",
+        ability_bonuses: { strength: 0, constitution: 0 },
+        feature: { name: "Military Rank", description: "You have a rank from your service." },
+      },
+    ],
+  },
+  spells: {
+    spells: [
+      {
+        name: "Fireball",
+        level: 3,
+        school: "Evocation",
+        casting_time: "1 action",
+        range: "150 feet",
+        components: ["V", "S", "M"],
+        duration: "Instantaneous",
+        concentration: false,
+        description: "A bright streak flashes to a point you choose within range.",
+        classes: ["Sorcerer", "Wizard"],
+      },
+    ],
+  },
+  feats: {
+    feats: [
+      {
+        name: "Archery",
+        description: "You gain a +2 bonus to attack rolls with ranged weapons.",
+        prerequisite: "Dexterity 13 or higher",
+        category: "Fighting Style",
+      },
+    ],
+  },
+  equipment: {
+    equipment: [
+      {
+        name: "Longsword",
+        category: "Weapon",
+        subcategory: "Martial Melee",
+        description: null,
+        cost: { amount: 15, unit: "GP" },
+        weight: 3,
+        properties: { damage: "1d8 slashing", properties: ["Versatile"] },
+      },
+    ],
+  },
+}
+
+function resolveHint(contentTypeHint?: string | null): ImportContentTypeHint {
+  if (
+    contentTypeHint &&
+    contentTypeHint in IMPORT_JSON_TEMPLATES &&
+    contentTypeHint !== "all"
+  ) {
+    return contentTypeHint as ImportContentTypeHint
+  }
+  return "all"
+}
+
+export function buildByoExtractionPrompt(contentTypeHint?: string | null): string {
+  const hint = resolveHint(contentTypeHint)
+  const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all
+  const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
+
+  return [
+    buildImportSystemPrompt(contentTypeHint),
+    "",
+    CLEAN_SOURCE_TEXT_GUIDELINES,
+    "",
+    focus,
+    "",
+    JSON_OUTPUT_RULES,
+    "",
+    "Example JSON shape (fill with extracted content; adjust or omit arrays you do not need):",
+    template,
+  ].join("\n")
+}
+
+export function buildByoFullPrompt(
+  sourceText: string,
+  contentTypeHint?: string | null,
+): string {
+  const trimmed = sourceText.trim()
+  const instructions = buildByoExtractionPrompt(contentTypeHint)
+  if (!trimmed) return instructions
+  return `${instructions}\n\n---\n\nSource text to extract:\n\n${trimmed}`
+}
+
+export function downloadTemplateFilename(contentTypeHint?: string | null): string {
+  const hint = resolveHint(contentTypeHint)
+  return `dump-stat-import-template-${hint}.json`
+}
+
+export function templateJsonString(contentTypeHint?: string | null): string {
+  const hint = resolveHint(contentTypeHint)
+  return JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
+}

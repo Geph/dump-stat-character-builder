@@ -11,7 +11,8 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
+import Link from "next/link"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import {
   Accordion,
   AccordionContent,
@@ -454,11 +455,19 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
             />
           </div>
 
-          <CharacteristicModifiersEditor
-            value={form.characteristics}
-            onChange={(characteristics) => setForm({ ...form, characteristics })}
-            spellOptions={allSpells}
-          />
+          {id && id !== "new" ? (
+            <p className="text-sm text-muted-foreground rounded-xl border border-border p-4">
+              Edit mechanical modifiers in the{" "}
+              <Link href={compendiumEditHref("feats", id)} className="text-primary font-medium hover:underline">
+                catalog feat editor
+              </Link>
+              .
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground rounded-xl border border-border p-4">
+              After saving, use the catalog feat editor to add modifier effects from the shared catalog.
+            </p>
+          )}
 
         </form>
       </main>

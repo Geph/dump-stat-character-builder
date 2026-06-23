@@ -15,7 +15,13 @@ import {
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import type { Feature } from "@/lib/types"
 
-export type ImportSourceLabel = "Text Import" | "PDF Import"
+export type ImportSourceLabel = string
+
+export function normalizeImportMaterialSource(value: unknown, fallback = "Custom"): string {
+  if (typeof value !== "string") return fallback
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed.slice(0, 120) : fallback
+}
 
 export type PersistImportResult = {
   totalImported: number

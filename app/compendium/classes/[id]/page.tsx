@@ -10,7 +10,7 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import type { UsesConfig, FeatureChoice } from "@/lib/types"
+import type { RestType, UsesConfig, FeatureChoice } from "@/lib/types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
@@ -801,7 +801,10 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                                 const newFeatures = [...form.features]
                                 newFeatures[index] = {
                                   ...newFeatures[index],
-                                  limitedUses: { ...feature.limitedUses!, abilityModifier: e.target.value as any }
+                                  limitedUses: {
+                                    ...feature.limitedUses!,
+                                    abilityModifier: (e.target.value || undefined) as UsesConfig["abilityModifier"],
+                                  }
                                 }
                                 setForm({ ...form, features: newFeatures })
                               }}
@@ -822,12 +825,21 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                             Recharges On
                           </label>
                           <select
-                            value={feature.limitedUses.recharge || ""}
+                            value={feature.limitedUses.recharges?.[0]?.rest ?? feature.limitedUses.recharge ?? ""}
                             onChange={(e) => {
+                              const rest = e.target.value as RestType | ""
                               const newFeatures = [...form.features]
+                              const limitedUses = { ...feature.limitedUses! }
+                              if (!rest) {
+                                delete limitedUses.recharges
+                                delete limitedUses.recharge
+                              } else {
+                                limitedUses.recharges = [{ rest }]
+                                delete limitedUses.recharge
+                              }
                               newFeatures[index] = {
                                 ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, recharge: e.target.value as any }
+                                limitedUses,
                               }
                               setForm({ ...form, features: newFeatures })
                             }}
@@ -868,7 +880,10 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                               const newFeatures = [...form.features]
                               newFeatures[index] = {
                                 ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, dieType: e.target.value as any }
+                                  limitedUses: {
+                                    ...feature.limitedUses!,
+                                    dieType: (e.target.value || undefined) as UsesConfig["dieType"],
+                                  }
                               }
                               setForm({ ...form, features: newFeatures })
                             }}

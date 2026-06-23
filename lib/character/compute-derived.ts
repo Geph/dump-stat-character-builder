@@ -372,6 +372,25 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   }
 }
 
+export type EquipmentLoadoutIds = {
+  armorId: string | null
+  shieldId: string | null
+  weaponId: string | null
+}
+
+/** AC for a hypothetical equipment loadout — same engine as the live character sheet. */
+export function deriveArmorClassForLoadout(
+  inputs: CharacterBuildInputs,
+  loadout: EquipmentLoadoutIds,
+): number {
+  return computeDerivedCharacter({
+    ...inputs,
+    equippedArmorId: loadout.armorId,
+    equippedShieldId: loadout.shieldId,
+    equippedWeaponId: loadout.weaponId,
+  }).armorClass
+}
+
 /** Snapshot combat/proficiency fields for persistence — derived from the same engine as preview. */
 export function buildCharacterSaveSnapshot(
   inputs: CharacterBuildInputs,

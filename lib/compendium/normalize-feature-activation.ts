@@ -1,4 +1,4 @@
-import type { Feature, FeatureActivation, FeatureEffect } from "@/lib/types"
+import type { Feature, FeatureActivation, FeatureChoice, FeatureEffect } from "@/lib/types"
 import { migrateFeatureFeatChoiceToModifierRefs } from "@/lib/compendium/grant-feat-catalog"
 
 function newEffectId(): string {
@@ -61,6 +61,25 @@ export function normalizeFeatureActivation(
   return { ...rest, effects }
 }
 
+export function normalizeFeatureChoices(
+  choices: FeatureChoice | null | undefined,
+): FeatureChoice | undefined {
+  if (!choices || typeof choices !== "object") return undefined
+  return {
+    ...choices,
+    category: choices.category ?? "",
+    count: typeof choices.count === "number" && choices.count > 0 ? choices.count : 1,
+    options: Array.isArray(choices.options)
+      ? choices.options.map((option) => ({
+          name: option?.name ?? "",
+          description: option?.description ?? "",
+          modifierRefs: Array.isArray(option?.modifierRefs) ? option.modifierRefs : undefined,
+          linkedModifiers: Array.isArray(option?.linkedModifiers) ? option.linkedModifiers : undefined,
+        }))
+      : [],
+  }
+}
+
 /** Move legacy feature.resourceId into limitedUses when loading old data. */
 export function normalizeFeatureRow(feature: Feature): Feature {
   let next = { ...feature }
@@ -86,6 +105,20 @@ export function normalizeFeatureRow(feature: Feature): Feature {
       },
       resourceId: null,
     }
+  }
+
+  if (next.isChoice) {
+    next = {
+      ...next,
+      choices: normalizeFeatureChoices(next.choices) ?? {
+        category: next.name || "Option",
+        count: 1,
+        options: [],
+      },
+    }
+  } else if (next.choices) {
+    const normalizedChoices = normalizeFeatureChoices(next.choices)
+    next = normalizedChoices ? { ...next, choices: normalizedChoices } : { ...next, choices: undefined }
   }
 
   return migrateFeatureFeatChoiceToModifierRefs(next)
