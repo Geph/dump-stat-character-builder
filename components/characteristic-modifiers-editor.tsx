@@ -86,8 +86,7 @@ import {
   defaultRollBonusConfig,
   formatRollBonusSummary,
 } from "@/lib/compendium/roll-bonus-config"
-  type BonusByLevelEntry,
-} from "@/lib/compendium/bonus-by-level"
+import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
 
 type CharacteristicModifiersEditorProps = {
