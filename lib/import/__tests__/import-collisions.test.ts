@@ -3,10 +3,31 @@ import {
   applyImportRenames,
   buildImportCollisions,
   defaultRenameMap,
+  type ImportCollisionKind,
 } from "@/lib/import/import-collisions"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { COMPENDIUM_TABLES, resolveTable } from "@/lib/db/tables"
 
 describe("buildImportCollisions", () => {
+  it("maps collision kinds to valid compendium tables", async () => {
+    const { fetchExistingForImportCollisions } = await import("@/lib/import/fetch-import-collisions")
+    const kinds: ImportCollisionKind[] = ["class", "feat", "species", "spell", "background", "ability"]
+    const tableByKind: Record<ImportCollisionKind, string> = {
+      class: "classes",
+      feat: "feats",
+      species: "species",
+      spell: "spells",
+      background: "backgrounds",
+      ability: "custom_abilities",
+    }
+    for (const kind of kinds) {
+      const table = resolveTable(tableByKind[kind]) ?? tableByKind[kind]
+      expect(COMPENDIUM_TABLES).toContain(table)
+    }
+    // Smoke: module exports without throwing on table resolution
+    expect(typeof fetchExistingForImportCollisions).toBe("function")
+  })
+
   it("detects class name conflicts and suggests alternate names", () => {
     const content: ImportContent = {
       classes: [{ name: "Fighter", features: [] }],

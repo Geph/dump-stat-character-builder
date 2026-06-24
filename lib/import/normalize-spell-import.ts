@@ -1,0 +1,87 @@
+import type { ImportContent } from "@/lib/import/content-schema"
+import {
+  parsePsionicAugmentsFromDescription,
+  type PsionicAugmentsConfig,
+} from "@/lib/compendium/parse-psionic-augments"
+
+type RawSpellRow = Record<string, unknown>
+
+function normalizeComponents(raw: unknown): string[] | null {
+  if (Array.isArray(raw)) {
+    const parts = raw
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter(Boolean)
+    return parts.length ? parts : null
+  }
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>
+    const parts: string[] = []
+    if (record.v === true) parts.push("V")
+    if (record.s === true) parts.push("S")
+    if (record.m === true) parts.push("M")
+    if (typeof record.m === "string" && record.m.trim()) parts.push(`M (${record.m.trim()})`)
+    return parts.length ? parts : null
+  }
+  return null
+}
+
+/** Coerce homebrew / Valda's / Kibbles spell rows into ImportContent spell shape. */
+export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportContent["spells"]>[number] {
+  const levelRaw = raw.level
+  const level =
+    typeof levelRaw === "number" && Number.isFinite(levelRaw)
+      ? levelRaw
+      : typeof levelRaw === "string"
+        ? parseInt(levelRaw, 10) || 0
+        : 0
+
+  const classes = Array.isArray(raw.classes)
+    ? raw.classes.filter((entry): entry is string => typeof entry === "string")
+    : null
+
+  return {
+    name: String(raw.name ?? "").trim(),
+    level,
+    school: typeof raw.school === "string" && raw.school.trim() ? raw.school.trim() : "Unknown",
+    casting_time: typeof raw.casting_time === "string" ? raw.casting_time : null,
+    range: typeof raw.range === "string" ? raw.range : null,
+    components: normalizeComponents(raw.components),
+    duration: typeof raw.duration === "string" ? raw.duration : null,
+    concentration: raw.concentration === true,
+    description: typeof raw.description === "string" ? raw.description : null,
+    classes,
+    psionic_augments: coercePsionicAugments(raw.psionic_augments, raw.description),
+  }
+}
+
+function coercePsionicAugments(
+  raw: unknown,
+  description: unknown,
+): PsionicAugmentsConfig | null {
+  if (raw && typeof raw === "object" && Array.isArray((raw as PsionicAugmentsConfig).augments)) {
+    return raw as PsionicAugmentsConfig
+  }
+  if (typeof description === "string") {
+    return parsePsionicAugmentsFromDescription(description)
+  }
+  return null
+}
+
+export function enrichSpellPsionicAugments<T extends { name: string; description?: string | null; psionic_augments?: PsionicAugmentsConfig | null }>(
+  spell: T,
+): T {
+  if (spell.psionic_augments?.augments?.length) return spell
+  const parsed = parsePsionicAugmentsFromDescription(spell.description, { powerName: spell.name })
+  if (!parsed) return spell
+  return { ...spell, psionic_augments: parsed }
+}
+
+export function normalizeSpellImportRows(
+  rows: RawSpellRow[] | undefined,
+): NonNullable<ImportContent["spells"]> {
+  if (!rows?.length) return []
+  return rows
+    .map(normalizeSpellImportRow)
+    .map(enrichSpellPsionicAugments)
+    .filter((row) => row.name.length > 0)
+}

@@ -234,6 +234,8 @@ export interface Feature {
   limitedUses?: UsesConfig | null
   duration?: FeatureDurationKey | null
   activation?: FeatureActivation | null
+  /** Parsed companion/minion stat block for the Companions sheet tab. */
+  companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
   /** Cleared when the user edits modifier wiring in the compendium after import. */
@@ -443,6 +445,8 @@ export interface CustomAbility {
   /** @deprecated Use a "uses" entry in characteristics instead */
   uses: UsesConfig | null
   show_in_builder: boolean
+  /** Structured stat block when this ability represents a class companion. */
+  companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
@@ -497,6 +501,8 @@ export interface Spell {
   description: string | null
   higher_levels: string | null
   classes: string[] | null
+  /** Psi-point empower options parsed from homebrew psionic power text (Kibbles Psion, etc.). */
+  psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
@@ -612,6 +618,8 @@ export interface Character {
   feat_ids: string[]
   feat_choice_picks?: Record<string, string[]> | null
   modifier_player_picks?: Record<string, string[]> | null
+  /** Per-companion HP overrides keyed by companion key. */
+  companion_state?: import("@/lib/character/companion-stat-block").CharacterCompanionState[] | null
   created_at: string
   updated_at: string
 }

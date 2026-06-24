@@ -6,7 +6,17 @@ import {
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
 import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
+import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
+import {
+  attachReferencedSpellsFromSupplements,
+  enrichSubclassSpellTablesOnImport,
+  mergeReferencedSpellsIntoImport,
+} from "@/lib/import/merge-import-content"
+import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
+import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
+import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import type { Feature, Trait } from "@/lib/types"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
@@ -24,21 +34,53 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
   item: T,
   ctx: DetectFeatureContext,
 ): T {
-  const aiDetections = aiMechanicsToDetections(item.mechanics, ctx)
-  const detectorDetections = detectFeatureModifiers(item.description ?? "", ctx)
-  if (!aiDetections.length && !detectorDetections.length) return item
+  const baseFeature = enrichWildcardFeaturePresets(item as Feature) as T
+  const aiDetections = aiMechanicsToDetections(baseFeature.mechanics, ctx)
+  const detectorDetections = detectFeatureModifiers(baseFeature.description ?? "", ctx)
+  if (!aiDetections.length && !detectorDetections.length) {
+    if (
+      isCompanionStatBlockFeature(baseFeature as Feature) &&
+      !baseFeature.companion_stat_block
+    ) {
+      const companion_stat_block = parseCompanionStatBlock(
+        baseFeature.name,
+        baseFeature.description ?? "",
+      )
+      return syncModifierRefs({
+        ...baseFeature,
+        companion_stat_block,
+        linkedModifiers: baseFeature.linkedModifiers,
+        modifierRefs: baseFeature.modifierRefs,
+      }) as T
+    }
+    if (baseFeature === item) return item
+    return syncModifierRefs({
+      ...baseFeature,
+      linkedModifiers: baseFeature.linkedModifiers,
+      modifierRefs: baseFeature.modifierRefs,
+    }) as T
+  }
 
   const merged = mergeFeatureModifierDetections(
-    item as Feature,
+    baseFeature as Feature,
     aiDetections,
     detectorDetections,
   )
 
+  const withCompanion =
+    isCompanionStatBlockFeature(merged as Feature) && !merged.companion_stat_block
+      ? {
+          ...merged,
+          companion_stat_block: parseCompanionStatBlock(merged.name, merged.description ?? ""),
+        }
+      : merged
+
   return {
-    ...item,
-    linkedModifiers: merged.linkedModifiers,
-    modifierRefs: merged.modifierRefs,
-    importModifierMeta: merged.importModifierMeta,
+    ...baseFeature,
+    linkedModifiers: withCompanion.linkedModifiers,
+    modifierRefs: withCompanion.modifierRefs,
+    importModifierMeta: withCompanion.importModifierMeta,
+    companion_stat_block: withCompanion.companion_stat_block ?? baseFeature.companion_stat_block,
   }
 }
 
@@ -152,5 +194,11 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
     next.feats = enrichFeats(content.feats)
   }
 
-  return next
+  const withSpells = attachReferencedSpellsFromSupplements(
+    mergeReferencedSpellsIntoImport(next),
+    normalizeSpellImportRows((content.spells ?? []) as Record<string, unknown>[]),
+  )
+  const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
+
+  return enrichImportChoiceFeatures(withSubclassSpells)
 }

@@ -25,6 +25,8 @@ import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activati
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
+import { cn } from "@/lib/utils"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -234,7 +236,10 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const updateFeature = (index: number, patch: Partial<ClassFeature>) => {
     setForm(prev => ({
       ...prev,
-      features: prev.features.map((f, i) => i === index ? { ...f, ...patch } : f)
+      features: prev.features.map((f, i) => {
+        if (i !== index) return f
+        return clearModifierReviewPending({ ...f, ...patch })
+      })
     }))
   }
 
@@ -710,7 +715,20 @@ export default function ClassEditorPage({ id }: { id: string }) {
             
             <div className="space-y-4">
               {form.features.map((feature, index) => (
-                <div key={index} className="bg-card border-2 border-border rounded-xl p-4 space-y-3">
+                <div
+                  key={index}
+                  className={cn(
+                    "bg-card border-2 rounded-xl p-4 space-y-3",
+                    featureNeedsModifierReview(feature)
+                      ? "border-destructive bg-destructive/5"
+                      : "border-border",
+                  )}
+                >
+                  {featureNeedsModifierReview(feature) ? (
+                    <p className="text-xs font-medium text-destructive">
+                      No modifier linked — use Modifier effects below, then save.
+                    </p>
+                  ) : null}
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <input

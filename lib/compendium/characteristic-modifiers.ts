@@ -161,8 +161,8 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "initiative", label: "Initiative" },
   { value: "vision", label: "Vision" },
   { value: "speed", label: "Speed" },
-  { value: "attack_roll_modifiers", label: "Attack Roll Modifiers" },
-  { value: "damage_roll_modifiers", label: "Damage Roll Modifiers" },
+  { value: "attack_roll_modifiers", label: "Attack Roll and Crit Modifiers" },
+  { value: "damage_roll_modifiers", label: "Weapon Damage Modifiers" },
   { value: "unarmed_strike_damage", label: "Unarmed Strike Damage Die" },
   { value: "special_attack", label: "Special Attack" },
   { value: "damage_resistance", label: "Damage Resistances" },
@@ -177,9 +177,17 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "attunement_slots", label: "Magic Item Attunement Slots" },
   { value: "aura", label: "Aura / Emanation" },
   { value: "feature_option_picker", label: "Feature Option Choice" },
-  { value: "bonus_damage_riders", label: "Bonus Damage Rider Options" },
+  {
+    value: "bonus_damage_riders",
+    label: "Attack Damage Riders (Hit/Crit)",
+    hint: "Optional cost riders (Sneak Attack) or automatic bonus on hit/crit (Devastating Critical)",
+  },
   { value: "saving_throw_trigger", label: "Saving Throw Trigger" },
-  { value: "on_hit_trigger", label: "On Hit Trigger" },
+  {
+    value: "on_hit_trigger",
+    label: "On Hit / Crit Trigger",
+    hint: "Nested effect or maximize damage when an attack hits or crits",
+  },
   { value: "failed_roll_trigger", label: "Failed Roll Trigger" },
   {
     value: "d20_test_reaction",
@@ -200,6 +208,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     value: "on_creature_death_trigger",
     label: "On Creature Death Trigger",
     hint: "React when a creature dies nearby (Keeper of Souls)",
+  },
+  {
+    value: "turn_start_trigger",
+    label: "Turn Start Trigger",
+    hint: "Passive effect at the start of your turn (Legendary Champion regen, etc.)",
   },
   { value: "telepathy", label: "Telepathy", hint: "Passive telepathic communication range" },
   { value: "on_cast_spell_trigger", label: "On Cast Spell Trigger", hint: "When you cast a matching spell, apply a nested effect (e.g. Empowered Evocation bonus damage)" },
@@ -325,7 +338,7 @@ export interface VisionCharacteristic extends CharacteristicModifierBase {
 export interface SpeedCharacteristic extends CharacteristicModifierBase {
   type: "speed"
   speedType: (typeof SPEED_TYPES)[number]["value"]
-  mode: "set" | "add"
+  mode: "set" | "add" | "equal_to_walk"
   value: number
   customType?: string
 }
@@ -334,6 +347,20 @@ export interface RollModifierEntry {
   bonus: number
   target: string
   customTarget?: string
+  /** Lowest d20 total that counts as a critical hit for this attack type (default 20). */
+  criticalHitMinimum?: number | null
+  /** Level-scaled critical hit minimum (fixed = lowest d20 that crits). */
+  criticalHitMinimumByLevel?: BonusByLevelEntry[]
+  /** Add ability modifier to weapon damage when the attack would not normally include it. */
+  grantAbilityModifierWhenMissing?: boolean
+  /** Extra damage dice when ability modifier is already included on the damage roll (e.g. 1d8). */
+  bonusDiceWhenModifierIncluded?: string | null
+  /** When true, bonus dice use the weapon's damage type. */
+  bonusDiceUsesWeaponDamageType?: boolean
+  /** Archery: ranged attacks ignore half cover. */
+  ignoreHalfCover?: boolean
+  /** Archery (extended): three-quarters cover counts as half cover. */
+  treatThreeQuartersCoverAsHalf?: boolean
 }
 
 export interface AttackRollModifiersCharacteristic extends CharacteristicModifierBase {
@@ -341,6 +368,8 @@ export interface AttackRollModifiersCharacteristic extends CharacteristicModifie
   entries: RollModifierEntry[]
   /** Lowest d20 total that counts as a critical hit (default 20). E.g. 19 = Improved Critical. */
   criticalHitMinimum?: number | null
+  /** Level-scaled critical hit minimum when not set per attack entry. */
+  criticalHitMinimumByLevel?: BonusByLevelEntry[]
   /** Tactical Master: replace weapon mastery with these properties. */
   weaponMasteryOverrides?: string[]
   /** Studied Attacks: advantage on next attack vs same target after a miss. */
@@ -536,11 +565,16 @@ export interface BonusDamageRiderEntry {
   conditionOnFailedSave?: string | null
 }
 
+export type BonusDamageRiderTrigger = "on_hit" | "on_crit"
+
 export interface BonusDamageRidersCharacteristic extends CharacteristicModifierBase {
   type: "bonus_damage_riders"
   riders: BonusDamageRiderEntry[]
   maxRidersPerUse?: number | null
   appliesTo?: string | null
+  /** When riders is empty, automatic bonus applied on hit or crit (e.g. +level on crit). */
+  triggerOn?: BonusDamageRiderTrigger | null
+  automaticBonus?: import("@/lib/compendium/roll-bonus-config").RollBonusConfig | null
 }
 
 /** Nested common-modifier effect fired by a trigger characteristic. */
@@ -567,12 +601,19 @@ export interface SavingThrowTriggerCharacteristic extends CharacteristicModifier
   effect?: NestedModifierEffect | null
 }
 
+export type OnHitTriggerKind = "hit" | "crit"
+
 export interface OnHitTriggerCharacteristic extends CharacteristicModifierBase {
   type: "on_hit_trigger"
+  /** hit = on any hit; crit = critical hit only (Devastating Critical maximize). */
+  triggerOn?: OnHitTriggerKind | null
   oncePerTurn?: boolean
   spendResourceKey?: string | null
   spendResourceAmount?: number | null
   appliesTo?: string | null
+  /** Maximize weapon damage dice instead of rolling (optional level gate). */
+  maximizeWeaponDamage?: boolean
+  maximizeWeaponDamageAtLevel?: number | null
   effect?: NestedModifierEffect | null
 }
 
@@ -634,6 +675,15 @@ export interface OnCreatureDeathTriggerCharacteristic extends CharacteristicModi
   effect?: NestedModifierEffect | null
 }
 
+export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBase {
+  type: "turn_start_trigger"
+  /** Regain HP when current HP is below this fraction of max (e.g. 0.5 = half). */
+  hpBelowFraction?: number | null
+  /** Minimum HP required (e.g. 1 = not at 0). */
+  hpAtLeast?: number | null
+  effect?: NestedModifierEffect | null
+}
+
 export interface TelepathyCharacteristic extends CharacteristicModifierBase {
   type: "telepathy"
   rangeFeet: number
@@ -673,6 +723,12 @@ export interface ResourceAbilityMenuCharacteristic extends CharacteristicModifie
   type: "resource_ability_menu"
   resourceKey: string
   options: ResourceAbilityMenuOption[]
+  /** Remarkable Strength: use menu abilities without spending the pool. */
+  waiveResourceCost?: boolean
+  /** Roll types that may trigger a free use (ability check, save, etc.). */
+  appliesOnRollKinds?: RollTriggerKind[]
+  /** Limit free use to these abilities (Strength, Constitution, etc.). */
+  appliesOnAbilities?: string[]
 }
 
 export interface ExtraTurnCharacteristic extends CharacteristicModifierBase {
@@ -736,6 +792,7 @@ export type CharacteristicModifier =
   | DamageHalvingReactionCharacteristic
   | HealingDicePoolCharacteristic
   | OnCreatureDeathTriggerCharacteristic
+  | TurnStartTriggerCharacteristic
   | TelepathyCharacteristic
   | OnCastSpellTriggerCharacteristic
   | SpellHealingModifierCharacteristic
@@ -780,7 +837,13 @@ export function createCharacteristicModifier(
     case "speed":
       return { id, type, speedType: "walk", mode: "add", value: 5 }
     case "attack_roll_modifiers":
-      return { id, type, entries: [{ bonus: 2, target: "ranged" }], criticalHitMinimum: null }
+      return {
+        id,
+        type,
+        entries: [{ bonus: 2, target: "ranged" }],
+        criticalHitMinimum: null,
+        criticalHitMinimumByLevel: [],
+      }
     case "condition_immunity":
       return { id, type, conditions: [] }
     case "damage_roll_modifiers":
@@ -858,6 +921,8 @@ export function createCharacteristicModifier(
       }
     case "on_creature_death_trigger":
       return { id, type, creatureFilter: "enemy", rangeFeet: 30, effect: null }
+    case "turn_start_trigger":
+      return { id, type, hpBelowFraction: 0.5, hpAtLeast: 1, effect: null }
     case "telepathy":
       return { id, type, rangeFeet: 60, canInitiate: true }
     case "on_cast_spell_trigger":
@@ -992,6 +1057,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       riders: raw.riders ?? [],
       maxRidersPerUse: raw.maxRidersPerUse ?? 1,
+      triggerOn: raw.triggerOn ?? "on_hit",
+      automaticBonus: raw.automaticBonus ?? null,
     }
   }
 
@@ -1015,7 +1082,10 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as OnHitTriggerCharacteristic
     return {
       ...raw,
+      triggerOn: raw.triggerOn ?? "hit",
       oncePerTurn: raw.oncePerTurn ?? true,
+      maximizeWeaponDamage: raw.maximizeWeaponDamage ?? false,
+      maximizeWeaponDamageAtLevel: raw.maximizeWeaponDamageAtLevel ?? null,
       effect: raw.effect ?? null,
     }
   }
@@ -1114,7 +1184,24 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
 
   if (value.type === "resource_ability_menu") {
     const raw = value as ResourceAbilityMenuCharacteristic
-    return { ...raw, resourceKey: raw.resourceKey ?? "", options: raw.options ?? [] }
+    return {
+      ...raw,
+      resourceKey: raw.resourceKey ?? "",
+      options: raw.options ?? [],
+      waiveResourceCost: raw.waiveResourceCost ?? false,
+      appliesOnRollKinds: raw.appliesOnRollKinds ?? [],
+      appliesOnAbilities: raw.appliesOnAbilities ?? [],
+    }
+  }
+
+  if (value.type === "turn_start_trigger") {
+    const raw = value as TurnStartTriggerCharacteristic
+    return {
+      ...raw,
+      hpBelowFraction: raw.hpBelowFraction ?? null,
+      hpAtLeast: raw.hpAtLeast ?? null,
+      effect: raw.effect ?? null,
+    }
   }
 
   if (value.type === "extra_turn") {
@@ -1218,8 +1305,21 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as AttackRollModifiersCharacteristic
     return {
       ...raw,
-      entries: raw.entries ?? [],
+      entries: (raw.entries ?? []).map((entry) => ({
+        ...entry,
+        criticalHitMinimum: entry.criticalHitMinimum ?? null,
+        criticalHitMinimumByLevel: normalizeBonusByLevel(entry.criticalHitMinimumByLevel),
+      })),
       criticalHitMinimum: raw.criticalHitMinimum ?? null,
+      criticalHitMinimumByLevel: normalizeBonusByLevel(raw.criticalHitMinimumByLevel),
+    }
+  }
+
+  if (value.type === "damage_roll_modifiers") {
+    const raw = value as DamageRollModifiersCharacteristic
+    return {
+      ...raw,
+      entries: (raw.entries ?? []).map((entry) => ({ ...entry })),
     }
   }
 
@@ -1286,7 +1386,7 @@ export function getWeaponProficiencyValues(mod: WeaponProficienciesCharacteristi
   return mod.values ?? []
 }
 
-export type AggregatedRollModifier = { bonus: number; target: string; customTarget?: string }
+export type AggregatedRollModifier = RollModifierEntry
 
 export type AggregatedSpellsKnown = {
   spellIds: string[]
@@ -1317,6 +1417,8 @@ export type AggregatedCharacteristics = {
   initiativeAbilityBonus: number
   vision: { type: string; rangeFeet: number }[]
   speed: Record<string, number>
+  /** Climb/swim/fly speeds that mirror walking speed (Peak Athlete). */
+  speedEqualToWalk: string[]
   attackRollModifiers: AggregatedRollModifier[]
   damageRollModifiers: AggregatedRollModifier[]
   unarmedStrikeDie: UnarmedStrikeDie | null
@@ -1325,6 +1427,7 @@ export type AggregatedCharacteristics = {
   immunities: string[]
   conditionImmunities: string[]
   criticalHitMinimum: number | null
+  criticalHitMinimumByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   attunementSlots: number | null
   auras: AuraCharacteristic[]
   featureOptionPickers: FeatureOptionPickerCharacteristic[]
@@ -1386,6 +1489,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   initiativeAbilityBonus: 0,
   vision: [],
   speed: {},
+  speedEqualToWalk: [],
   attackRollModifiers: [],
   damageRollModifiers: [],
   unarmedStrikeDie: null,
@@ -1394,6 +1498,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   immunities: [],
   conditionImmunities: [],
   criticalHitMinimum: null,
+  criticalHitMinimumByLevel: [],
   attunementSlots: null,
   auras: [],
   featureOptionPickers: [],
@@ -1519,8 +1624,14 @@ export function aggregateCharacteristics(
       case "speed": {
         const key =
           mod.speedType === "custom" ? mod.customType?.toLowerCase() || "custom" : mod.speedType
-        const current = result.speed[key] ?? 0
-        result.speed[key] = mod.mode === "set" ? mod.value : current + mod.value
+        if (mod.mode === "equal_to_walk") {
+          if (!result.speedEqualToWalk.includes(key)) {
+            result.speedEqualToWalk.push(key)
+          }
+        } else {
+          const current = result.speed[key] ?? 0
+          result.speed[key] = mod.mode === "set" ? mod.value : current + mod.value
+        }
         break
       }
       case "attack_roll_modifiers":
@@ -1530,6 +1641,12 @@ export function aggregateCharacteristics(
             result.criticalHitMinimum == null
               ? mod.criticalHitMinimum
               : Math.min(result.criticalHitMinimum, mod.criticalHitMinimum)
+        }
+        if (mod.criticalHitMinimumByLevel?.length) {
+          result.criticalHitMinimumByLevel = normalizeBonusByLevel([
+            ...result.criticalHitMinimumByLevel,
+            ...mod.criticalHitMinimumByLevel,
+          ]).sort((a, b) => a.level - b.level)
         }
         break
       case "damage_roll_modifiers":

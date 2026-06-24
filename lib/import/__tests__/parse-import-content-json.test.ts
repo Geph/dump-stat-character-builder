@@ -44,4 +44,26 @@ describe("parseImportContentJson", () => {
     const content = parseImportContentJson(raw)
     expect(content?.feats?.[0]?.name).toBe("Archery")
   })
+
+  it("parses spells-shaped BYO template", () => {
+    const raw = JSON.stringify(IMPORT_JSON_TEMPLATES.spells)
+    const content = parseImportContentJson(raw)
+    expect(content?.spells?.[0]?.name).toBe("Fireball")
+  })
+
+  it("merges a JSON array of import objects in listed order", () => {
+    const parts = [
+      IMPORT_JSON_TEMPLATES.spells,
+      IMPORT_JSON_TEMPLATES.classes,
+      IMPORT_JSON_TEMPLATES.subclasses,
+    ]
+    for (const part of parts) {
+      expect(parseImportContentJson(JSON.stringify(part))).not.toBeNull()
+    }
+    const raw = JSON.stringify(parts)
+    const content = parseImportContentJson(raw)
+    expect(content?.spells?.length).toBeGreaterThan(0)
+    expect(content?.classes?.[0]?.name).toBe("Fighter")
+    expect(content?.subclasses?.[0]?.name).toBe("Champion")
+  })
 })

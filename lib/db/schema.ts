@@ -104,6 +104,9 @@ export const spells = mysqlTable("spells", {
   description: text("description"),
   higher_levels: text("higher_levels"),
   classes: json("classes").$type<string[]>(),
+  psionic_augments: json("psionic_augments").$type<
+    import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig
+  >(),
   ...compendiumMeta,
 })
 
@@ -161,6 +164,9 @@ export const customAbilities = mysqlTable("custom_abilities", {
   attached_to_id: varchar("attached_to_id", { length: 128 }),
   uses: json("uses"),
   show_in_builder: boolean("show_in_builder").notNull().default(true),
+  companion_stat_block: json("companion_stat_block").$type<
+    import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
+  >(),
   is_system: boolean("is_system").notNull().default(false),
   modifier_catalog: json("modifier_catalog").$type<import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[]>().default([]),
   icon: varchar("icon", { length: 255 }),
@@ -223,6 +229,9 @@ export const characters = mysqlTable("characters", {
   feat_ids: json("feat_ids").$type<string[]>().default([]),
   feat_choice_picks: json("feat_choice_picks").$type<Record<string, string[]>>(),
   modifier_player_picks: json("modifier_player_picks").$type<Record<string, string[]>>(),
+  companion_state: json("companion_state").$type<
+    import("@/lib/character/companion-stat-block").CharacterCompanionState[]
+  >(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 })

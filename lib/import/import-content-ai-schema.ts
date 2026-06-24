@@ -3,6 +3,7 @@ import { z } from "zod"
 import { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
 import type { ImportContent, ImportMechanic } from "@/lib/import/content-schema"
 import { ImportMechanicSchema } from "@/lib/import/content-schema"
+import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 
 /**
  * OpenAI structured output requires every object property in `required`.
@@ -54,7 +55,7 @@ const ImportMechanicAiSchema = z.object({
   usesAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
   usesRecharge: z.enum(["short_rest", "long_rest", "both"]).nullable(),
   checkRollMode: z.enum(["advantage", "disadvantage"]).nullable(),
-  checkCategory: z.enum(["save", "skill", "ability"]).nullable(),
+  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).nullable(),
   checkAbility: z
     .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
     .nullable(),
@@ -142,7 +143,16 @@ const AbilityAiSchema = z.object({
   name: z.string(),
   description: z.string(),
   source_type: z
-    .enum(["class", "subclass", "species", "background", "feat", "item"])
+    .enum([
+      "class",
+      "subclass",
+      "species",
+      "background",
+      "feat",
+      "item",
+      "class_feature",
+      "subclass_feature",
+    ])
     .nullable(),
   source_name: z.string().nullable(),
   level_requirement: z.number().nullable(),
@@ -163,14 +173,14 @@ const ClassAiSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   card_blurb: z.string().max(120).nullable(),
-  hit_die: z.number(),
+  hit_die: z.number().nullable(),
   primary_ability: z.array(z.string()).nullable(),
   saving_throws: z.array(z.string()).nullable(),
   armor_proficiencies: z.array(z.string()).nullable(),
   weapon_proficiencies: z.array(z.string()).nullable(),
   skill_choices: SkillChoicesAiSchema.nullable(),
   spellcasting: SpellcastingAiSchema.nullable(),
-  features: z.array(ClassFeatureAiSchema),
+  features: z.array(ClassFeatureAiSchema).nullable(),
   spell_list: z.array(z.string()).nullable(),
 })
 
@@ -224,6 +234,21 @@ const BackgroundAiSchema = z.object({
   granted_spells: z.record(z.string(), z.array(z.string())).nullable(),
 })
 
+const EquipmentWeaponFormAiSchema = z.object({
+  name: z.string(),
+  damage: z.string().nullable(),
+  mastery: z.string().nullable(),
+  properties: z.array(z.string()).nullable(),
+})
+
+const EquipmentPropertiesAiSchema = z.object({
+  damage: z.string().nullable(),
+  mastery: z.string().nullable(),
+  properties: z.array(z.string()).nullable(),
+  ac: z.string().nullable(),
+  forms: z.array(EquipmentWeaponFormAiSchema).nullable(),
+})
+
 const EquipmentAiSchema = z.object({
   name: z.string(),
   category: z.string(),
@@ -231,7 +256,7 @@ const EquipmentAiSchema = z.object({
   description: z.string().nullable(),
   cost: z.object({ amount: z.number(), unit: z.string() }).nullable(),
   weight: z.number().nullable(),
-  properties: z.record(z.string()).nullable(),
+  properties: EquipmentPropertiesAiSchema.nullable(),
 })
 
 const ImportContentAiSchemaBase = z.object({
@@ -381,9 +406,9 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
   return {
     name: row.name,
     description: row.description,
-    hit_die: row.hit_die,
+    hit_die: row.hit_die ?? 8,
     primary_ability: row.primary_ability,
-    features: row.features.map(normalizeFeatureLike),
+    features: (row.features ?? []).map(normalizeFeatureLike),
     ...omitNull({
       card_blurb: row.card_blurb,
       saving_throws: row.saving_throws,
@@ -397,6 +422,18 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
 }
 
 /** Strip null placeholders from AI output and coerce to ImportContent. */
+function normalizeAbilitySourceType(
+  sourceType: string | null | undefined,
+): NonNullable<ImportContent["abilities"]>[number]["source_type"] {
+  if (!sourceType) return null
+  if (sourceType === "class_feature") return "class"
+  if (sourceType === "subclass_feature") return "subclass"
+  const allowed = ["class", "subclass", "species", "background", "feat", "item"] as const
+  return (allowed as readonly string[]).includes(sourceType)
+    ? (sourceType as (typeof allowed)[number])
+    : null
+}
+
 export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   const content: ImportContent = {}
 
@@ -458,7 +495,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.spells?.length) {
-    content.spells = raw.spells.map((spell) => ({ ...spell }))
+    content.spells = normalizeSpellImportRows(raw.spells as Record<string, unknown>[])
   }
 
   if (raw.feats?.length) {
@@ -488,7 +525,10 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.abilities?.length) {
-    content.abilities = raw.abilities.map((ability) => ({ ...ability }))
+    content.abilities = raw.abilities.map((ability) => ({
+      ...ability,
+      source_type: normalizeAbilitySourceType(ability.source_type),
+    }))
   }
 
   if (raw.import_proposals) {

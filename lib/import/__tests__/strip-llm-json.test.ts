@@ -15,4 +15,12 @@ describe("stripLlmJsonText", () => {
     const raw = "Here is the JSON:\n" + inner
     expect(stripLlmJsonText(raw)).toBe(inner)
   })
+
+  it("preserves JSON arrays for multi-file import batches", () => {
+    const inner = JSON.stringify([IMPORT_JSON_TEMPLATES.spells, IMPORT_JSON_TEMPLATES.classes])
+    const raw = "Batch import:\n" + inner
+    expect(stripLlmJsonText(raw)).toBe(inner)
+    expect(parseImportContentJson(raw)?.spells?.length).toBeGreaterThan(0)
+    expect(parseImportContentJson(raw)?.classes?.[0]?.name).toBe("Fighter")
+  })
 })

@@ -79,3 +79,23 @@ export function formatBonusByLevelEntry(entry: BonusByLevelEntry): string {
 export function defaultBonusByLevelEntry(level = 1): BonusByLevelEntry {
   return { level, mode: "fixed", fixed: 2 }
 }
+
+/** Pick the fixed value from the highest tier at or below character level. */
+export function resolveFixedValueAtLevel(
+  rows: BonusByLevelEntry[] | null | undefined,
+  characterLevel: number,
+  base: number | null = null,
+): number | null {
+  if (!rows?.length) return base
+  const sorted = [...rows].filter((row) => row.mode === "fixed").sort((a, b) => a.level - b.level)
+  let current = base
+  for (const row of sorted) {
+    if (row.level > characterLevel) break
+    if (row.fixed != null) current = row.fixed
+  }
+  return current
+}
+
+export function defaultCritByLevelEntry(level = 1, minimum = 19): BonusByLevelEntry {
+  return { level, mode: "fixed", fixed: minimum }
+}

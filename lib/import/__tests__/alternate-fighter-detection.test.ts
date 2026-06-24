@@ -91,6 +91,7 @@ describe("Alternate Fighter homebrew detection", () => {
     expect(previews.some((entry) => entry.summary.includes("damage resistance"))).toBe(true)
     expect(previews.some((entry) => entry.summary.includes("skills"))).toBe(true)
     expect(previews.some((entry) => entry.ruleId.startsWith("uses."))).toBe(true)
+    expect(previews.some((entry) => entry.ruleId === "check.bonus.resource_die")).toBe(true)
   })
 })
 

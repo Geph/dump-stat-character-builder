@@ -95,6 +95,17 @@ describe("detectFeatureModifiers", () => {
       ruleId: "save.advantage",
     },
     {
+      label: "initiative advantage",
+      text: "You have Advantage on Initiative rolls.",
+      ruleId: "check.advantage.initiative",
+      assert: (detections) => {
+        expect(detections[0]?.instance.catalogRefId).toBe("cat_fx_check_roll_modifier")
+        const effect = detections[0]?.instance.activation?.effects?.[0]
+        expect(effect?.checkRollMode).toBe("advantage")
+        expect(effect?.checkCategory).toBe("initiative")
+      },
+    },
+    {
       label: "fighting style feat grant",
       text:
         "You gain a Fighting Style feat of your choice. If you choose a feat, such as Great Weapon Fighting, that requires you to hold a Melee weapon in one or two hands, you can use that feat with Ranged weapons.",
@@ -103,6 +114,136 @@ describe("detectFeatureModifiers", () => {
         expect(detections[0]?.instance.catalogRefId).toBe("cat_char_grant_feat")
         const char = detections[0]?.instance.characteristics?.[0]
         expect(char?.type).toBe("grant_feat")
+      },
+    },
+    {
+      label: "ranged critical hit scaling",
+      text:
+        "Your attack rolls with Ranged weapons can score a Critical Hit on a roll of 19 or 20 on the d20. At level 9, your attack rolls with Ranged weapons score a Critical Hit on a roll of 18–20. At level 17, they score a Critical Hit on a roll of 17–20.",
+      ruleId: "attack.critical.scaling",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "attack.critical.scaling")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("attack_roll_modifiers")
+        const entry = char?.entries?.[0]
+        expect(entry?.target).toBe("ranged")
+        expect(entry?.criticalHitMinimum).toBe(19)
+        expect(entry?.criticalHitMinimumByLevel?.map((row) => row.level)).toEqual([9, 17])
+        expect(entry?.criticalHitMinimumByLevel?.map((row) => row.fixed)).toEqual([18, 17])
+      },
+    },
+    {
+      label: "weapon damage ability mod and extra dice",
+      text:
+        "When you deal damage with a Ranged weapon that doesn't add your ability modifier to the roll, you add your ability modifier nonetheless. If you already add your modifier to the damage roll, the target takes an extra 1d8 damage of the weapon's type.",
+      ruleId: "damage.weapon.ability_modifier",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "damage.weapon.ability_modifier")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("damage_roll_modifiers")
+        const entry = char?.entries?.[0]
+        expect(entry?.grantAbilityModifierWhenMissing).toBe(true)
+        expect(entry?.bonusDiceWhenModifierIncluded).toBe("1d8")
+        expect(entry?.bonusDiceUsesWeaponDamageType).toBe(true)
+      },
+    },
+    {
+      label: "speed equal to walk",
+      text: "You gain a climbing speed and swimming speed equal to your walking speed.",
+      ruleId: "speed.equal_to_walk",
+      assert: (detections) => {
+        const chars =
+          detections.find((d) => d.ruleId === "speed.equal_to_walk")?.instance.characteristics ?? []
+        expect(chars.map((c) => c.speedType).sort()).toEqual(["climb", "swim"])
+        expect(chars.every((c) => c.mode === "equal_to_walk")).toBe(true)
+      },
+    },
+    {
+      label: "crit bonus damage by level",
+      text:
+        "Whenever you score a critical hit with a weapon attack you deal bonus damage equal to your Fighter level.",
+      ruleId: "damage.crit.bonus",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "damage.crit.bonus")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("bonus_damage_riders")
+        expect(char?.triggerOn).toBe("on_crit")
+        expect(char?.automaticBonus?.mode).toBe("character_level")
+      },
+    },
+    {
+      label: "crit maximize at level",
+      text:
+        "At 15th level, when you score a critical hit with a weapon attack, you can maximize the damage instead of rolling.",
+      ruleId: "damage.crit.maximize",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "damage.crit.maximize")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("on_hit_trigger")
+        expect(char?.triggerOn).toBe("crit")
+        expect(char?.maximizeWeaponDamage).toBe(true)
+        expect(char?.maximizeWeaponDamageAtLevel).toBe(15)
+      },
+    },
+    {
+      label: "resource die save bonus",
+      text:
+        "Whenever you are forced to make an Intelligence, Wisdom, or Charisma saving throw you gain a bonus to the roll equal to your Exploit Die.",
+      ruleId: "check.bonus.resource_die",
+      assert: (detections) => {
+        const effects =
+          detections.find((d) => d.ruleId === "check.bonus.resource_die")?.instance.activation
+            ?.effects ?? []
+        expect(effects).toHaveLength(3)
+        expect(effects.every((e) => e.checkRollMode === "bonus")).toBe(true)
+        expect(effects[0]?.bonusConfig?.dieScaling).toBe("class_resource")
+        expect(effects[0]?.bonusConfig?.classResourceKey).toBe("exploit_die_size")
+      },
+    },
+    {
+      label: "ranged attack bonus with half cover ignore",
+      text:
+        "You gain a +2 bonus to attack rolls with ranged weapons, and your attacks with ranged weapons ignore half-cover.",
+      ruleId: "attack.bonus.all",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "attack.bonus.all")?.instance
+          .characteristics?.[0]
+        const entry = char?.entries?.[0]
+        expect(entry?.target).toBe("ranged")
+        expect(entry?.bonus).toBe(2)
+        expect(entry?.ignoreHalfCover).toBe(true)
+      },
+    },
+    {
+      label: "free resource use on ability check",
+      text:
+        "When you make a Strength or Constitution ability check or saving throw, you can use feat of strength or heroic fortitude without expending an Exploit Die.",
+      ruleId: "resource.free_use_on_roll",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "resource.free_use_on_roll")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("resource_ability_menu")
+        expect(char?.waiveResourceCost).toBe(true)
+        expect(char?.resourceKey).toBe("exploit_dice")
+        expect(char?.appliesOnAbilities).toEqual(["Strength", "Constitution"])
+        expect(char?.options?.map((o) => o.name)).toEqual(["Feat Of Strength", "Heroic Fortitude"])
+      },
+    },
+    {
+      label: "turn start heal below half hp",
+      text:
+        "If you begin your turn with less than half of your hit points remaining, but at least 1 hit point, you regain hit points equal to 5 + your Constitution modifier.",
+      ruleId: "heal.turn_start_low_hp",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "heal.turn_start_low_hp")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("turn_start_trigger")
+        expect(char?.hpBelowFraction).toBe(0.5)
+        expect(char?.hpAtLeast).toBe(1)
+        const healFx = char?.effect?.activation?.effects?.[0]
+        expect(healFx?.kind).toBe("heal_self")
+        expect(healFx?.healFixed).toBe(5)
+        expect(healFx?.healAbility).toBe("CON")
       },
     },
   ]
@@ -200,5 +341,48 @@ describe("enrichImportContentModifiers", () => {
     }
     expect(feat.linkedModifiers?.length).toBeGreaterThan(0)
     expect(feat.modifierRefs).toContain("cat_char_damage_resistance")
+  })
+})
+
+describe("detectFeatureModifiers by feature name", () => {
+  const classCtx = {
+    contentKind: "class_feature" as const,
+    sourceName: "Gunslinger",
+  }
+
+  it("wires Ability Score Improvement to Gain a Feat (General) without description", () => {
+    const detections = detectFeatureModifiers("", {
+      ...classCtx,
+      featureName: "Ability Score Improvement",
+      level: 4,
+    })
+    expect(detections.some((entry) => entry.ruleId === "grant.asi_by_name")).toBe(true)
+    expect(detections[0]?.instance.catalogRefId).toBe("cat_char_grant_feat")
+  })
+
+  it("wires Evasion by name and from SRD description text", () => {
+    const byName = detectFeatureModifiers("", { ...classCtx, featureName: "Evasion", level: 7 })
+    expect(byName.some((entry) => entry.ruleId === "defensive.evasion_by_name")).toBe(true)
+
+    const rogueText =
+      "When you're subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail."
+    const byText = detectFeatureModifiers(rogueText, { ...classCtx, featureName: "Custom Dodge" })
+    expect(byText.some((entry) => entry.ruleId === "defensive.evasion")).toBe(true)
+    expect(byText[0]?.instance.catalogRefId).toBe("cat_fx_damage_reduction")
+    const effect = byText[0]?.instance.activation?.effects?.[0]
+    expect(effect?.defensiveSaveScope).toBe(true)
+    expect(effect?.defensiveSaveSuccess).toBe("none")
+  })
+
+  it("wires Weapon Mastery by name", () => {
+    const detections = detectFeatureModifiers("", {
+      ...classCtx,
+      featureName: "Weapon Mastery",
+      level: 1,
+    })
+    expect(detections.some((entry) => entry.ruleId === "weapon.mastery_by_name")).toBe(true)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("feature_option_picker")
+    expect(char?.resourceKey).toBe("weapon_mastery")
   })
 })

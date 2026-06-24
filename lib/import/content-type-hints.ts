@@ -7,6 +7,7 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "spells", label: "Spells" },
   { value: "feats", label: "Feats" },
   { value: "equipment", label: "Equipment" },
+  { value: "abilities", label: "Custom Abilities / Resources" },
 ] as const
 
 export type ImportContentTypeHint = (typeof IMPORT_CONTENT_TYPE_HINTS)[number]["value"]

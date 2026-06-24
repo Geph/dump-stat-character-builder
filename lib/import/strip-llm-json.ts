@@ -9,8 +9,19 @@ export function stripLlmJsonText(raw: string): string {
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim()
   }
 
+  const firstBracket = text.indexOf("[")
+  const lastBracket = text.lastIndexOf("]")
   const firstBrace = text.indexOf("{")
   const lastBrace = text.lastIndexOf("}")
+
+  if (
+    firstBracket >= 0 &&
+    lastBracket > firstBracket &&
+    (firstBrace < 0 || firstBracket < firstBrace)
+  ) {
+    return text.slice(firstBracket, lastBracket + 1)
+  }
+
   if (firstBrace >= 0 && lastBrace > firstBrace) {
     text = text.slice(firstBrace, lastBrace + 1)
   }

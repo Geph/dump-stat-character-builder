@@ -71,6 +71,23 @@ function cleanProperties(props: unknown): Record<string, unknown> {
       )
   }
 
+  if (Array.isArray(p.forms)) {
+    p.forms = p.forms
+      .filter((form) => form && typeof form === "object")
+      .map((form) => {
+        const entry = { ...(form as Record<string, unknown>) }
+        if (typeof entry.name === "string") entry.name = stripHtml(entry.name)
+        if (typeof entry.damage === "string") entry.damage = stripHtml(entry.damage)
+        if (typeof entry.mastery === "string") entry.mastery = stripHtml(entry.mastery)
+        if (Array.isArray(entry.properties)) {
+          entry.properties = entry.properties
+            .map((prop) => (typeof prop === "string" ? stripHtml(prop) : prop))
+            .filter((prop): prop is string => typeof prop === "string" && prop.length > 0)
+        }
+        return entry
+      })
+  }
+
   if (typeof p.mastery === "string") {
     const mastery = stripHtml(p.mastery)
     p.mastery = mastery && mastery !== "—" ? mastery : null
@@ -81,6 +98,41 @@ function cleanProperties(props: unknown): Record<string, unknown> {
   }
 
   return p
+}
+
+function inferWeaponSubcategory(row: Record<string, unknown>): string | null {
+  const existing = typeof row.subcategory === "string" ? row.subcategory.trim() : ""
+  if (existing) return existing
+
+  if (row.category !== "Weapon") return null
+
+  const props = cleanProperties(row.properties)
+  const tags = Array.isArray(props.properties)
+    ? props.properties.filter((p): p is string => typeof p === "string").join(" ")
+    : ""
+  const name = String(row.name ?? "")
+  const haystack = `${name} ${tags}`.toLowerCase()
+
+  if (Array.isArray(props.forms) && props.forms.length > 0) {
+    return "Switch Weapon"
+  }
+
+  if (/firearm|ammunition|bullet|reload/i.test(haystack)) {
+    if (/renaissance|musket|blunderbuss|ballista/i.test(haystack)) return "Renaissance Firearm"
+    if (/modern|submachine|assault rifle|handgun|magnum|flare gun|sniper rifle/i.test(haystack)) {
+      return "Modern Firearm"
+    }
+    if (/industrial|cannon|gatling|double-barrel|hunting rifle|parlor gun|revolver/i.test(haystack)) {
+      return "Industrial Age Firearm"
+    }
+    return "Martial Ranged"
+  }
+
+  if (/ammunition|range \d/i.test(tags) && !/thrown/i.test(tags)) {
+    return /simple/i.test(haystack) ? "Simple Ranged" : "Martial Ranged"
+  }
+
+  return null
 }
 
 export function normalizeEquipmentRow(
@@ -104,9 +156,14 @@ export function normalizeEquipmentRow(
       ? stripHtml(row.description).replace(/^#+\s*/, "").trim() || null
       : (row.description as string | null) ?? null
 
+  const subcategory =
+    inferWeaponSubcategory(row) ??
+    (typeof row.subcategory === "string" ? row.subcategory.trim() || null : null)
+
   return {
     ...row,
     name,
+    subcategory,
     cost,
     weight: parseEquipmentWeight(row.weight),
     properties: cleanProperties(row.properties),

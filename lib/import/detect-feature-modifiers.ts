@@ -2,6 +2,7 @@ import type { CharacteristicModifier } from "@/lib/compendium/characteristic-mod
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import {
   FEATURE_MODIFIER_RULES,
+  FEATURE_NAME_MODIFIER_RULES,
   type DetectionConfidence,
   type FeatureModifierRule,
 } from "@/lib/import/detect-feature-modifier-rules"
@@ -96,8 +97,9 @@ function runRulesOnSegment(
 ): DetectedModifier[] {
   const results: DetectedModifier[] = []
   const seenFingerprints = new Set<string>()
+  const segmentRules = rules.filter((rule) => rule.scope !== "full")
 
-  for (const rule of rules) {
+  for (const rule of segmentRules) {
     const match = segment.match(rule.test)
     if (!match) continue
     const instance = rule.build(match, ctx, segment)
@@ -116,15 +118,47 @@ function runRulesOnSegment(
   return results
 }
 
+function detectFeatureModifiersByName(ctx: DetectFeatureContext): DetectedModifier[] {
+  const featureName = ctx.featureName?.trim()
+  if (!featureName) return []
+
+  const results: DetectedModifier[] = []
+  const seenFingerprints = new Set<string>()
+
+  for (const rule of FEATURE_NAME_MODIFIER_RULES) {
+    if (!rule.test(featureName, ctx)) continue
+    const instance = rule.build(ctx)
+    if (!instance) continue
+    const fingerprint = modifierInstanceFingerprint(instance)
+    if (seenFingerprints.has(fingerprint)) continue
+    seenFingerprints.add(fingerprint)
+    results.push({
+      ruleId: rule.id,
+      confidence: rule.confidence,
+      matchedPhrase: featureName,
+      instance,
+    })
+  }
+
+  return results
+}
+
 /** Detect common modifier wiring from freeform feature description text. */
 export function detectFeatureModifiers(text: string, ctx: DetectFeatureContext): DetectedModifier[] {
   const normalized = normalizeText(text)
-  if (!normalized) return []
-
-  const segments = clauseSegments(normalized)
   const all: DetectedModifier[] = []
   const globalFingerprints = new Set<string>()
 
+  for (const detection of detectFeatureModifiersByName(ctx)) {
+    const fp = modifierInstanceFingerprint(detection.instance)
+    if (globalFingerprints.has(fp)) continue
+    globalFingerprints.add(fp)
+    all.push(detection)
+  }
+
+  if (!normalized) return all
+
+  const segments = clauseSegments(normalized)
   for (const segment of segments) {
     for (const detection of runRulesOnSegment(segment, ctx, FEATURE_MODIFIER_RULES)) {
       const fp = modifierInstanceFingerprint(detection.instance)
@@ -132,6 +166,23 @@ export function detectFeatureModifiers(text: string, ctx: DetectFeatureContext):
       globalFingerprints.add(fp)
       all.push(detection)
     }
+  }
+
+  const fullTextRules = FEATURE_MODIFIER_RULES.filter((rule) => rule.scope === "full")
+  for (const rule of fullTextRules) {
+    const match = normalized.match(rule.test)
+    if (!match) continue
+    const instance = rule.build(match, ctx, normalized)
+    if (!instance) continue
+    const fp = modifierInstanceFingerprint(instance)
+    if (globalFingerprints.has(fp)) continue
+    globalFingerprints.add(fp)
+    all.push({
+      ruleId: rule.id,
+      confidence: rule.confidence,
+      matchedPhrase: match[0].trim(),
+      instance,
+    })
   }
 
   return all

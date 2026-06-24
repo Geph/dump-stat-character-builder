@@ -52,7 +52,7 @@ export const ImportMechanicSchema = z.object({
   usesAbility: z.enum(USES_ABILITY_CODES).optional(),
   usesRecharge: z.enum(["short_rest", "long_rest", "both"]).optional(),
   checkRollMode: z.enum(["advantage", "disadvantage"]).optional(),
-  checkCategory: z.enum(["save", "skill", "ability"]).optional(),
+  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
   featCategories: z
@@ -120,6 +120,7 @@ export const SpellImportSchema = z.object({
   concentration: z.boolean(),
   description: z.string().nullable(),
   classes: z.array(z.string()).nullable(),
+  psionic_augments: z.unknown().optional(),
 })
 
 export const ClassImportSchema = z.object({
@@ -179,6 +180,7 @@ export const AbilityImportSchema = z.object({
   source_type: z.enum(["class", "subclass", "species", "background", "feat", "item"]).nullable(),
   source_name: z.string().nullable(),
   level_requirement: z.number().nullable(),
+  companion_stat_block: z.record(z.unknown()).nullable().optional(),
 })
 
 const UsesAtLevelImportSchema = z.object({

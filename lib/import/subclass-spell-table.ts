@@ -79,6 +79,7 @@ function findSpellsColumnIndex(headers: string[], levelCol: number): number {
     if (i === levelCol) continue
     if (/prepared|spell/i.test(headers[i])) return i
   }
+  // Two-column tables: level in col 0, spell names in col 1
   return levelCol === 0 ? 1 : 0
 }
 

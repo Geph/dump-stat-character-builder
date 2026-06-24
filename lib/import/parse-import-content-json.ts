@@ -4,6 +4,7 @@ import {
   normalizeAiImportContent,
   type AiImportContent,
 } from "@/lib/import/import-content-ai-schema"
+import { combineImportContents } from "@/lib/import/merge-import-content"
 import { stripLlmJsonText } from "@/lib/import/strip-llm-json"
 
 const IMPORT_CONTENT_KEYS = [
@@ -51,17 +52,7 @@ function unwrapImportJsonCandidate(parsed: unknown): unknown {
   return record
 }
 
-/** Parse BYO / LLM structured JSON into ImportContent for the import pipeline. */
-export function parseImportContentJson(raw: string): ImportContent | null {
-  const trimmedText = stripLlmJsonText(raw)
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(trimmedText)
-  } catch {
-    return null
-  }
-
-  const candidate = unwrapImportJsonCandidate(parsed)
+function parseSingleImportContent(candidate: unknown): ImportContent | null {
   if (!hasImportContentShape(candidate)) return null
 
   const record = candidate as Record<string, unknown>
@@ -79,8 +70,36 @@ export function parseImportContentJson(raw: string): ImportContent | null {
   return result.data
 }
 
+function parseImportContentArray(parsed: unknown[]): ImportContent | null {
+  const parts: ImportContent[] = []
+  for (const item of parsed) {
+    const candidate = unwrapImportJsonCandidate(item)
+    const content = parseSingleImportContent(candidate)
+    if (content) parts.push(content)
+  }
+  if (!parts.length) return null
+  return parts.length === 1 ? parts[0] : combineImportContents(parts)
+}
+
+/** Parse BYO / LLM structured JSON into ImportContent for the import pipeline. */
+export function parseImportContentJson(raw: string): ImportContent | null {
+  const trimmedText = stripLlmJsonText(raw)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmedText)
+  } catch {
+    return null
+  }
+
+  const candidate = unwrapImportJsonCandidate(parsed)
+  if (Array.isArray(parsed)) {
+    return parseImportContentArray(parsed)
+  }
+  return parseSingleImportContent(candidate)
+}
+
 export function looksLikeImportContentJson(raw: string): boolean {
   const trimmed = stripLlmJsonText(raw)
-  if (!trimmed.startsWith("{")) return false
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false
   return parseImportContentJson(trimmed) !== null
 }

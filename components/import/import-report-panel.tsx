@@ -126,9 +126,9 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
 
       {report.tokenSavings ? <ImportTokenSavingsSummary savings={report.tokenSavings} /> : null}
 
-      {(report.modifierReview?.length ?? 0) > 0 ? (
-        <ImportModifierReviewPanel rows={report.modifierReview!} variant="report" />
-      ) : report.unmatchedFeatures.length > 0 ? (
+      <ImportModifierReviewPanel rows={report.modifierReview ?? []} variant="report" />
+
+      {report.unmatchedFeatures.length > 0 ? (
         <ImportUnmatchedFeaturesPanel entries={report.unmatchedFeatures} variant="report" />
       ) : null}
 

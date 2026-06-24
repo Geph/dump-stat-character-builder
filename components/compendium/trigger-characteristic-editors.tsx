@@ -17,6 +17,8 @@ import {
   type DamageHalvingReactionCharacteristic,
   type HealingDicePoolCharacteristic,
   type OnCreatureDeathTriggerCharacteristic,
+  type TurnStartTriggerCharacteristic,
+  type RollTriggerKind,
   type TelepathyCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { NestedModifierEffectEditor } from "@/components/compendium/nested-modifier-effect-editor"
@@ -165,20 +167,70 @@ export function OnHitTriggerEditor({
 }) {
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">Trigger on</label>
+          <select
+            value={mod.triggerOn ?? "hit"}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                triggerOn: e.target.value as OnHitTriggerCharacteristic["triggerOn"],
+              })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="hit">Hit</option>
+            <option value="crit">Critical hit</option>
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer md:mt-6">
+          <input
+            type="checkbox"
+            checked={mod.oncePerTurn !== false}
+            onChange={(e) => onChange({ ...mod, oncePerTurn: e.target.checked })}
+            className="accent-primary"
+          />
+          <span className="text-muted-foreground">Once per turn</span>
+        </label>
+      </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input
           type="checkbox"
-          checked={mod.oncePerTurn !== false}
-          onChange={(e) => onChange({ ...mod, oncePerTurn: e.target.checked })}
+          checked={Boolean(mod.maximizeWeaponDamage)}
+          onChange={(e) => onChange({ ...mod, maximizeWeaponDamage: e.target.checked })}
           className="accent-primary"
         />
-        <span className="text-muted-foreground">Once per turn</span>
+        <span className="text-muted-foreground">Maximize weapon damage dice</span>
       </label>
+      {mod.maximizeWeaponDamage ? (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">
+            Available from level (blank = always)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={mod.maximizeWeaponDamageAtLevel ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                maximizeWeaponDamageAtLevel: e.target.value
+                  ? parseInt(e.target.value, 10)
+                  : null,
+              })
+            }
+            className="w-24 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            placeholder="15"
+          />
+        </div>
+      ) : null}
       <input
         type="text"
         value={mod.appliesTo ?? ""}
         onChange={(e) => onChange({ ...mod, appliesTo: e.target.value || null })}
-        placeholder="Applies to (e.g. Flurry of Blows)"
+        placeholder="Applies to (e.g. weapon attacks)"
         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
       />
       <NestedModifierEffectEditor
@@ -381,6 +433,21 @@ export function ResourceAbilityMenuEditor({
     onChange({ ...mod, options })
   }
 
+  const rollKinds = mod.appliesOnRollKinds ?? []
+  const abilities = mod.appliesOnAbilities ?? []
+
+  const toggleRollKind = (kind: RollTriggerKind) => {
+    const next = rollKinds.includes(kind) ? rollKinds.filter((k) => k !== kind) : [...rollKinds, kind]
+    onChange({ ...mod, appliesOnRollKinds: next })
+  }
+
+  const toggleAbility = (ability: string) => {
+    const next = abilities.includes(ability)
+      ? abilities.filter((a) => a !== ability)
+      : [...abilities, ability]
+    onChange({ ...mod, appliesOnAbilities: next })
+  }
+
   return (
     <div className="space-y-4">
       <input
@@ -390,6 +457,46 @@ export function ResourceAbilityMenuEditor({
         placeholder="Resource key"
         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
       />
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(mod.waiveResourceCost)}
+          onChange={(e) => onChange({ ...mod, waiveResourceCost: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Free use (do not expend resource)</span>
+      </label>
+      <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+        <span className="text-xs font-semibold text-foreground">Free use applies on</span>
+        <div className="flex flex-wrap gap-2">
+          {(["ability", "save", "skill", "attack"] as const).map((kind) => (
+            <label key={kind} className="flex items-center gap-1.5 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rollKinds.includes(kind)}
+                onChange={() => toggleRollKind(kind)}
+                className="accent-primary"
+              />
+              <span className="text-muted-foreground capitalize">{kind}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"].map(
+            (ability) => (
+              <label key={ability} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={abilities.includes(ability)}
+                  onChange={() => toggleAbility(ability)}
+                  className="accent-primary"
+                />
+                <span className="text-muted-foreground">{ability}</span>
+              </label>
+            ),
+          )}
+        </div>
+      </div>
       {(mod.options ?? []).map((option, index) => (
         <div key={index} className="rounded-lg border border-border p-3 space-y-2">
           <input
@@ -645,6 +752,66 @@ export function HealingDicePoolEditor({
           className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
         />
       </div>
+    </div>
+  )
+}
+
+export function TurnStartTriggerEditor({
+  mod,
+  onChange,
+  modifierCatalog,
+  classResources = [],
+}: {
+  mod: TurnStartTriggerCharacteristic
+  onChange: (next: TurnStartTriggerCharacteristic) => void
+  modifierCatalog: ModifierCatalogEntry[]
+  classResources?: ClassResource[]
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">HP below fraction of max</label>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={mod.hpBelowFraction ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                hpBelowFraction: e.target.value ? parseFloat(e.target.value) : null,
+              })
+            }
+            placeholder="0.5 = half HP"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Minimum HP (at least)</label>
+          <input
+            type="number"
+            min={0}
+            value={mod.hpAtLeast ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                hpAtLeast: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
+            placeholder="1"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+      <NestedModifierEffectEditor
+        value={mod.effect}
+        onChange={(effect) => onChange({ ...mod, effect })}
+        modifierCatalog={modifierCatalog}
+        classResources={classResources}
+        label="Turn start effect"
+      />
     </div>
   )
 }

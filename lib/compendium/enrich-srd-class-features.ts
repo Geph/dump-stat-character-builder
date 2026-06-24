@@ -4,6 +4,10 @@ import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
+import {
+  buildEvasionModifier,
+  buildWeaponMasteryModifier,
+} from "@/lib/compendium/shared-feature-modifier-builders"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
 
@@ -445,19 +449,7 @@ function sneakAttackScaling(): BonusByLevelEntry[] {
 }
 
 function evasion(): LinkedModifierInstance {
-  return fxInstance("modinst_evasion", DAMAGE_REDUCTION_CATALOG_ID, {
-    effects: [
-      {
-        id: modId("evasion"),
-        kind: "damage_reduction",
-        mitigation: "reduction",
-        defensiveSaveScope: true,
-        checkCategory: "save",
-        checkAbility: "Dexterity",
-        defensiveSaveSuccess: "none",
-      },
-    ],
-  })
+  return buildEvasionModifier()
 }
 
 function elusive(): LinkedModifierInstance {
@@ -2207,6 +2199,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
       usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Quivering Palm kill"),
     ],
+  },
+
+  // —— Weapon Mastery (SRD martial classes) ——
+  "*::Weapon Mastery": {
+    linkedModifiers: [buildWeaponMasteryModifier()],
   },
 
   // —— Fighter ——
@@ -4691,6 +4688,14 @@ function resolvePresetKey(
     return "*::__subclass_spells__"
   }
   return null
+}
+
+/** Apply only global `*::Feature` presets (safe for homebrew imports). */
+export function enrichWildcardFeaturePresets(feature: Feature): Feature {
+  const key = `*::${(feature.name ?? "").trim()}`
+  const preset = SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]
+  if (!preset) return feature
+  return mergePresetModifiers(feature, preset)
 }
 
 /** Whether a known modifier preset applies to this feature (for import reports). */

@@ -51,14 +51,16 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
       if (!background.feature) return background
       return {
         ...background,
-        feature: stripFeatureStagingFields(background.feature as StagingFeature),
+        feature: markFeatureModifierReviewForPersist(
+          stripFeatureStagingFields(background.feature as StagingFeature) as Feature,
+        ),
       }
     })
   }
 
   if (content.feats?.length) {
     next.feats = content.feats.map((feat) =>
-      stripFeatureStagingFields(feat as StagingFeature),
+      markFeatureModifierReviewForPersist(stripFeatureStagingFields(feat as StagingFeature) as Feature),
     ) as typeof content.feats
   }
 

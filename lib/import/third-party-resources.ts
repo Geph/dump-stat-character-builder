@@ -58,6 +58,45 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
       "Die type (d6, d8, d10, d12) rolled when spending Exploit Dice — scales on the class level table, not a spendable pool.",
     spendPatterns: [],
   },
+  {
+    resourceKey: "hexes_known",
+    namePattern: /hexes?\s*known/i,
+    displayName: "Hexes Known",
+    definition: "Number of Hexes the Witch knows — chosen from the Hex list; count scales on the class table.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "grand_hexes",
+    namePattern: /grand\s*hexes?/i,
+    displayName: "Grand Hexes",
+    definition: "Powerful Witch options chosen at level 11+; typically one Grand Hex known at a time.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "hexmaster_uses",
+    namePattern: /hexmaster|insidious spell uses/i,
+    displayName: "Insidious Spell Uses",
+    definition: "Uses of Insidious Spell / Hexmaster — force a failed save on a Hex (Charisma modifier per long rest).",
+    spendPatterns: [
+      /\buse this feature a number of times equal to your \w+ modifier\b/i,
+      /\brestore one use of it by expending a spell slot\b/i,
+    ],
+  },
+  {
+    resourceKey: "alchemy_points",
+    namePattern: /alchemy\s*points?/i,
+    displayName: "Alchemy Points",
+    definition: "Pool spent to brew potions (typically equal to Witch level); recharges on a long rest.",
+    spendPatterns: [/\bexpend\s+(\d+)\s+alchemy\s+points?\b/i],
+  },
+  {
+    resourceKey: "upgrades",
+    namePattern: /upgrades?/i,
+    displayName: "Upgrades",
+    definition:
+      "Inventor subclass upgrades chosen from your specialization list; count scales on the class level table.",
+    spendPatterns: [],
+  },
 ]
 
 export function matchThirdPartyResourceHeader(header: string): ThirdPartyResourcePattern | null {
