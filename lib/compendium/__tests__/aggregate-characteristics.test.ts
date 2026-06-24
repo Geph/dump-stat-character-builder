@@ -32,4 +32,24 @@ describe("aggregateCharacteristics", () => {
     expect(aggregated.conditionImmunities).toEqual(["Frightened"])
     expect(aggregated.savingThrows).toEqual(["Wisdom"])
   })
+
+  it("aggregates climb/swim speeds equal to walk", () => {
+    const aggregated = aggregateCharacteristics([
+      {
+        id: "mod_climb",
+        type: "speed",
+        speedType: "climb",
+        mode: "equal_to_walk",
+        value: 0,
+      },
+      {
+        id: "mod_swim",
+        type: "speed",
+        speedType: "swim",
+        mode: "equal_to_walk",
+        value: 0,
+      },
+    ])
+    expect(aggregated.speedEqualToWalk.sort()).toEqual(["climb", "swim"])
+  })
 })

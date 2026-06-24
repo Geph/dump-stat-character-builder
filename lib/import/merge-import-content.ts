@@ -1,104 +1,193 @@
+import {
+  collectReferencedSpellNames,
+  normalizeSpellLookupKey,
+  spellNamesMatch,
+} from "@/lib/import/collect-referenced-spell-names"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
+import { enrichSubclassSpellTableFeatures } from "@/lib/compendium/enrich-subclass-spell-features"
 
-function dedupeByName<T extends { name: string }>(items: T[]): T[] {
+type SpellRow = NonNullable<ImportContent["spells"]>[number]
+
+function mergeArrayByName<T extends { name: string }>(
+  existing: T[] | undefined,
+  incoming: T[] | undefined,
+): T[] | undefined {
+  if (!incoming?.length) return existing
   const byName = new Map<string, T>()
-  for (const item of items) {
-    const key = item.name.trim().toLowerCase()
-    const existing = byName.get(key)
-    if (!existing) {
-      byName.set(key, item)
-      continue
-    }
-    const existingFeatures = (existing as { features?: unknown[] }).features?.length ?? 0
-    const nextFeatures = (item as { features?: unknown[] }).features?.length ?? 0
-    if (nextFeatures >= existingFeatures) {
-      byName.set(key, item)
-    }
+  for (const row of existing ?? []) {
+    byName.set(normalizeSpellLookupKey(row.name), row)
+  }
+  for (const row of incoming) {
+    const key = normalizeSpellLookupKey(row.name)
+    const prev = byName.get(key)
+    byName.set(key, prev ? { ...prev, ...row, name: prev.name } : row)
   }
   return [...byName.values()]
 }
 
-function dedupeSubclassByName<T extends { name: string; class_name: string }>(items: T[]): T[] {
-  const byKey = new Map<string, T>()
-  for (const item of items) {
-    const key = `${item.class_name.trim().toLowerCase()}::${item.name.trim().toLowerCase()}`
-    byKey.set(key, item)
-  }
-  return [...byKey.values()]
+function findSpellInPool(name: string, pool: Map<string, SpellRow>): SpellRow | undefined {
+  const direct = pool.get(normalizeSpellLookupKey(name))
+  if (direct) return direct
+  return [...pool.values()].find((spell) => spellNamesMatch(spell.name, name))
 }
 
-function dedupeClassResource<T extends { class_name: string; resource_key: string }>(items: T[]): T[] {
-  const byKey = new Map<string, T>()
-  for (const item of items) {
-    const key = `${item.class_name.trim().toLowerCase()}::${item.resource_key.trim().toLowerCase()}`
-    byKey.set(key, item)
-  }
-  return [...byKey.values()]
-}
+/** Pull referenced subclass spells from supplement libraries into the import batch. */
+export function attachReferencedSpellsFromSupplements(
+  content: ImportContent,
+  supplements: SpellRow[],
+): ImportContent {
+  const refs = collectReferencedSpellNames(content)
+  if (!refs.length || !supplements.length) return content
 
-function dedupeProposedResource<T extends { proposal_id: string }>(items: T[]): T[] {
-  const byKey = new Map<string, T>()
-  for (const item of items) {
-    byKey.set(item.proposal_id.trim().toLowerCase(), item)
-  }
-  return [...byKey.values()]
-}
-
-function dedupeProposedAbility<T extends { proposal_id: string }>(items: T[]): T[] {
-  const byKey = new Map<string, T>()
-  for (const item of items) {
-    byKey.set(item.proposal_id.trim().toLowerCase(), item)
-  }
-  return [...byKey.values()]
-}
-
-/** Merge multiple AI extraction passes into one import payload. */
-export function mergeImportContent(chunks: ImportContent[]): ImportContent {
-  const merged: ImportContent = {}
-
-  const species = chunks.flatMap((chunk) => chunk.species ?? [])
-  if (species.length) merged.species = dedupeByName(species)
-
-  const classes = chunks.flatMap((chunk) => chunk.classes ?? [])
-  if (classes.length) merged.classes = dedupeByName(classes)
-
-  const subclasses = chunks.flatMap((chunk) => chunk.subclasses ?? [])
-  if (subclasses.length) merged.subclasses = dedupeSubclassByName(subclasses)
-
-  const backgrounds = chunks.flatMap((chunk) => chunk.backgrounds ?? [])
-  if (backgrounds.length) merged.backgrounds = dedupeByName(backgrounds)
-
-  const spells = chunks.flatMap((chunk) => chunk.spells ?? [])
-  if (spells.length) merged.spells = dedupeByName(spells)
-
-  const feats = chunks.flatMap((chunk) => chunk.feats ?? [])
-  if (feats.length) merged.feats = dedupeByName(feats)
-
-  const equipment = chunks.flatMap((chunk) => chunk.equipment ?? [])
-  if (equipment.length) merged.equipment = dedupeByName(equipment)
-
-  const abilities = chunks.flatMap((chunk) => chunk.abilities ?? [])
-  if (abilities.length) merged.abilities = dedupeByName(abilities)
-
-  const classResources = chunks.flatMap((chunk) => chunk.class_resources ?? [])
-  if (classResources.length) merged.class_resources = dedupeClassResource(classResources)
-
-  const proposalResources = chunks.flatMap(
-    (chunk) => chunk.import_proposals?.class_resources ?? [],
+  const existing = new Map(
+    (content.spells ?? []).map((spell) => [normalizeSpellLookupKey(spell.name), { ...spell }]),
   )
-  const proposalAbilities = chunks.flatMap(
-    (chunk) => chunk.import_proposals?.custom_abilities ?? [],
+  const supplementPool = new Map(
+    supplements.map((spell) => [normalizeSpellLookupKey(spell.name), spell]),
   )
-  if (proposalResources.length || proposalAbilities.length) {
-    merged.import_proposals = {
-      ...(proposalResources.length
-        ? { class_resources: dedupeProposedResource(proposalResources) }
-        : {}),
-      ...(proposalAbilities.length
-        ? { custom_abilities: dedupeProposedAbility(proposalAbilities) }
-        : {}),
+
+  for (const ref of refs) {
+    const key = normalizeSpellLookupKey(ref.name)
+    const current = existing.get(key) ?? findSpellInPool(ref.name, existing)
+    if (current) {
+      if (!current.classes?.some((cls) => spellNamesMatch(cls, ref.className))) {
+        current.classes = [...(current.classes ?? []), ref.className]
+      }
+      existing.set(normalizeSpellLookupKey(current.name), current)
+      continue
+    }
+
+    const supplement = findSpellInPool(ref.name, supplementPool)
+    if (!supplement) continue
+
+    const attached: SpellRow = {
+      ...supplement,
+      classes: [...new Set([...(supplement.classes ?? []), ref.className])],
+    }
+    existing.set(normalizeSpellLookupKey(attached.name), attached)
+  }
+
+  return {
+    ...content,
+    spells: [...existing.values()],
+  }
+}
+
+/** Ensure parent class names are tagged on spells referenced by subclass tables. */
+export function mergeReferencedSpellsIntoImport(content: ImportContent): ImportContent {
+  const refs = collectReferencedSpellNames(content)
+  if (!refs.length || !content.spells?.length) return content
+
+  const nextSpells = (content.spells ?? []).map((spell) => ({
+    ...spell,
+    classes: [...(spell.classes ?? [])],
+  }))
+
+  for (const ref of refs) {
+    const match = nextSpells.find((spell) => spellNamesMatch(spell.name, ref.name))
+    if (!match) continue
+    if (!match.classes?.some((cls) => spellNamesMatch(cls, ref.className))) {
+      match.classes = [...(match.classes ?? []), ref.className]
     }
   }
 
-  return merged
+  return { ...content, spells: nextSpells }
+}
+
+function spellCatalogFromContent(content: ImportContent): { id: string; name: string }[] {
+  return (content.spells ?? []).map((spell) => ({
+    id: `import:${normalizeSpellLookupKey(spell.name)}`,
+    name: spell.name,
+  }))
+}
+
+/** Combine multiple import payloads (e.g. subclasses + spell libraries) into one batch. */
+export function combineImportContents(contents: ImportContent[]): ImportContent {
+  const merged: ImportContent = {}
+  const supplementSpells: SpellRow[] = []
+
+  for (const content of contents) {
+    if (content.spells?.length) {
+      supplementSpells.push(
+        ...normalizeSpellImportRows(content.spells as Record<string, unknown>[]),
+      )
+    }
+    if (content.classes?.length) {
+      merged.classes = mergeArrayByName(merged.classes, content.classes) as ImportContent["classes"]
+    }
+    if (content.subclasses?.length) {
+      merged.subclasses = mergeArrayByName(
+        merged.subclasses,
+        content.subclasses,
+      ) as ImportContent["subclasses"]
+    }
+    if (content.feats?.length) {
+      merged.feats = mergeArrayByName(merged.feats, content.feats) as ImportContent["feats"]
+    }
+    if (content.species?.length) {
+      merged.species = mergeArrayByName(merged.species, content.species) as ImportContent["species"]
+    }
+    if (content.backgrounds?.length) {
+      merged.backgrounds = mergeArrayByName(
+        merged.backgrounds,
+        content.backgrounds,
+      ) as ImportContent["backgrounds"]
+    }
+    if (content.equipment?.length) {
+      merged.equipment = mergeArrayByName(
+        merged.equipment,
+        content.equipment,
+      ) as ImportContent["equipment"]
+    }
+    if (content.abilities?.length) {
+      merged.abilities = mergeArrayByName(merged.abilities, content.abilities) as ImportContent["abilities"]
+    }
+    if (content.class_resources?.length) {
+      merged.class_resources = [
+        ...(merged.class_resources ?? []),
+        ...content.class_resources,
+      ] as ImportContent["class_resources"]
+    }
+    if (content.import_proposals) {
+      const prev = merged.import_proposals ?? {}
+      const next = content.import_proposals
+      merged.import_proposals = {
+        class_resources: [
+          ...(prev.class_resources ?? []),
+          ...(next.class_resources ?? []),
+        ],
+        custom_abilities: [
+          ...(prev.custom_abilities ?? []),
+          ...(next.custom_abilities ?? []),
+        ],
+      }
+    }
+  }
+
+  const withSpells = attachReferencedSpellsFromSupplements(
+    {
+      ...merged,
+      spells: mergeArrayByName(undefined, supplementSpells) as ImportContent["spells"],
+    },
+    supplementSpells,
+  )
+
+  return mergeReferencedSpellsIntoImport(withSpells)
+}
+
+/** Attach always-prepared subclass spell links using spells bundled in the same import. */
+export function enrichSubclassSpellTablesOnImport(content: ImportContent): ImportContent {
+  if (!content.subclasses?.length || !content.spells?.length) return content
+
+  const catalog = spellCatalogFromContent(content)
+  return {
+    ...content,
+    subclasses: content.subclasses.map((subclass) =>
+      enrichSubclassSpellTableFeatures(
+        subclass as Record<string, unknown>,
+        catalog,
+      ) as typeof subclass,
+    ),
+  }
 }

@@ -41,8 +41,9 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Web import** — Paste a URL to pull homebrew-style HTML into the compendium
 - **PDF & text import** — Multi-provider AI extraction (OpenAI, Anthropic, or Google Gemini) or **zero-AI deterministic** parsing for well-structured class PDFs; subclasses, feat categories, and post-import modifier enrichment supported
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
+- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
 
-See [Import formats](#import-formats) below for text/JSON structure and examples.
+See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
 
 ## Tech Stack
 
@@ -292,6 +293,58 @@ Imported rows use source **Text Import** or **PDF Import** and replace same-name
 Same schema and persistence as text import. Optional **page range** limits extraction to specific pages. Upload a **`.json` export bundle** through the PDF file picker for non-AI JSON import.
 
 Requires at least one [AI provider key](#7-ai-import-optional--pdf-and-text-import) for PDF text extraction (not for JSON bundles or SRD seed).
+
+### Multi-file homebrew import order
+
+Many third-party classes ship as **several JSON files** (spell libraries, discipline powers, class, subclasses). Import **supporting libraries before** the class and subclass files that reference them so modifier wiring and spell links resolve correctly.
+
+On the app: **Import → Multi-file import order** (expandable panel at the top of the page) lists workflows for spellcasters, Kibbles Psion, Laserllama-style Martial Exploits, and Inventor.
+
+**General rules**
+
+1. **SRD spells** — If your compendium is SRD-seeded, standard spells (e.g. *Fireball*, *Burning Hands*) do not need a separate import; only import homebrew spell JSON for third-party names.
+2. **One batch or sequential** — Either paste a **JSON array** of import objects in dependency order, or run separate imports in the same order (earlier files persist to the compendium before later ones wire references).
+3. **Set a source label** — Use the compendium source label field (e.g. `Kibbles Witch`) so you can filter and re-import safely.
+
+**Spellcasting classes** (Witch, Inventor, full casters)
+
+| Step | Content |
+|------|---------|
+| 1 | Homebrew spell libraries (`kibbles-spells-parsed.json`, Valda's supplements, etc.) |
+| 2 | Class spell list stub (optional) |
+| 3 | Class JSON |
+| 4 | Subclasses JSON (always-prepared spell tables) |
+| 5 | Choice options if separate (grand hexes, invocations, …) |
+
+**Kibbles Psion**
+
+| Step | Content |
+|------|---------|
+| 1 | `psion-disciplines.json` (powers in `spells[]`, discipline packages in `import_proposals`) |
+| 2 | `psion-class.json` |
+| 3 | Archetypes / subclasses (e.g. `psion-knowing-mind.json`) |
+
+Discipline powers with psi-point augments get `psionic_augments` at import; pick augments on the character sheet when casting those powers.
+
+**Martial Exploits** (Laserllama Alternate Fighter, etc.)
+
+| Step | Content |
+|------|---------|
+| 1 | Exploit / maneuver library (if separate) |
+| 2 | Class with level table (Exploit Dice, Exploits Known) |
+| 3 | Subclasses (if separate) |
+
+**JSON array example** (Clipboard → Step 2):
+
+```json
+[
+  { "spells": [ … ] },
+  { "classes": [ … ] },
+  { "subclasses": [ … ] }
+]
+```
+
+Dump Stat merges the array into one import batch before wiring modifiers.
 
 ---
 

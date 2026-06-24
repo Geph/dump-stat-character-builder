@@ -28,6 +28,8 @@ import {
   syncModifierRefs,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
+import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
+import { cn } from "@/lib/utils"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { DurationEditor } from "@/components/compendium/duration-editor"
 import type { Trait } from "@/lib/types"
@@ -201,7 +203,10 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
   const updateTrait = (index: number, updates: Partial<Trait>) => {
     setForm(prev => ({
       ...prev,
-      traits: prev.traits.map((t, i) => i === index ? { ...t, ...updates } : t)
+      traits: prev.traits.map((t, i) => {
+        if (i !== index) return t
+        return clearModifierReviewPending({ ...t, ...updates })
+      })
     }))
   }
 
@@ -400,7 +405,20 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             
             <div className="space-y-4">
               {form.traits.map((trait, index) => (
-                <div key={index} className="bg-card border-2 border-border rounded-xl p-4">
+                <div
+                  key={index}
+                  className={cn(
+                    "bg-card border-2 rounded-xl p-4",
+                    featureNeedsModifierReview(trait)
+                      ? "border-destructive bg-destructive/5"
+                      : "border-border",
+                  )}
+                >
+                  {featureNeedsModifierReview(trait) ? (
+                    <p className="mb-3 text-xs font-medium text-destructive">
+                      No modifier linked — use Modifier effects below, then save.
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-4 mb-3">
                     <input
                       type="text"

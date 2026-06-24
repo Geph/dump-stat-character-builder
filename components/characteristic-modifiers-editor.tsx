@@ -2,6 +2,10 @@
 
 import { useState } from "react"
 import { Plus, X } from "lucide-react"
+import {
+  defaultCritByLevelEntry,
+  type BonusByLevelEntry,
+} from "@/lib/compendium/bonus-by-level"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 import {
@@ -39,8 +43,10 @@ import {
   type FeatureOptionPickerCharacteristic,
   type BonusDamageRidersCharacteristic,
   type BonusDamageRiderEntry,
+  type SpeedCharacteristic,
   type SavingThrowTriggerCharacteristic,
   type OnHitTriggerCharacteristic,
+  type TurnStartTriggerCharacteristic,
   type FailedRollTriggerCharacteristic,
   type OnCastSpellTriggerCharacteristic,
   type SpellHealingModifierCharacteristic,
@@ -59,6 +65,7 @@ import {
   DamageHalvingReactionEditor,
   HealingDicePoolEditor,
   OnCreatureDeathTriggerEditor,
+  TurnStartTriggerEditor,
   TelepathyEditor,
   OnCastSpellTriggerEditor,
   SpellHealingModifierEditor,
@@ -74,8 +81,11 @@ import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
 import { STANDARD_SPELL_CLASSES } from "@/lib/import/class-spell-lists"
 import { SRD_WEAPON_NAMES } from "@/lib/compendium/weapon-proficiency-options"
 import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
+import { RollBonusEditor } from "@/components/compendium/roll-bonus-editor"
 import {
-  normalizeBonusByLevel,
+  defaultRollBonusConfig,
+  formatRollBonusSummary,
+} from "@/lib/compendium/roll-bonus-config"
   type BonusByLevelEntry,
 } from "@/lib/compendium/bonus-by-level"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
@@ -259,14 +269,89 @@ function WeaponProficienciesEditor({
   )
 }
 
+function CritByLevelEditor({
+  rows,
+  onChange,
+}: {
+  rows: BonusByLevelEntry[]
+  onChange: (rows: BonusByLevelEntry[]) => void
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold text-foreground">Critical hit range by level</label>
+        <button
+          type="button"
+          onClick={() => onChange([...rows, defaultCritByLevelEntry(rows.length ? rows[rows.length - 1].level + 4 : 5)])}
+          className="text-xs text-primary hover:underline"
+        >
+          + Add tier
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Lowest d20 that counts as a critical hit (e.g. 19 = crit on 19–20).
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No level tiers — uses default minimum above.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((row, idx) => (
+            <div key={idx} className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">At level</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={row.level}
+                onChange={(e) => {
+                  const next = [...rows]
+                  next[idx] = { ...row, level: parseInt(e.target.value, 10) || 1 }
+                  onChange(next)
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+              />
+              <span className="text-xs text-muted-foreground">crit on d20 ≥</span>
+              <input
+                type="number"
+                min={2}
+                max={20}
+                value={row.fixed ?? ""}
+                onChange={(e) => {
+                  const next = [...rows]
+                  next[idx] = {
+                    ...row,
+                    mode: "fixed",
+                    fixed: e.target.value ? parseInt(e.target.value, 10) : null,
+                  }
+                  onChange(next)
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(rows.filter((_, i) => i !== idx))}
+                className="p-1 text-muted-foreground hover:text-destructive"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RollModifiersEditor({
   entries,
   targets,
   onChange,
+  mode = "damage",
 }: {
   entries: RollModifierEntry[]
   targets: readonly { value: string; label: string }[]
   onChange: (entries: RollModifierEntry[]) => void
+  mode?: "attack" | "damage"
 }) {
   const updateEntry = (idx: number, next: RollModifierEntry) => {
     const copy = [...entries]
@@ -279,44 +364,164 @@ function RollModifiersEditor({
       {entries.map((entry, idx) => (
         <div
           key={idx}
-          className="flex flex-wrap items-center gap-2 p-2 bg-background rounded-lg border border-border"
+          className="space-y-2 p-2 bg-background rounded-lg border border-border"
         >
-          <input
-            type="number"
-            value={entry.bonus}
-            onChange={(e) =>
-              updateEntry(idx, { ...entry, bonus: parseInt(e.target.value, 10) || 0 })
-            }
-            className="w-20 px-2 py-1.5 bg-card border border-border rounded-lg text-sm text-center"
-            placeholder="+N"
-          />
-          <select
-            value={entry.target}
-            onChange={(e) => updateEntry(idx, { ...entry, target: e.target.value })}
-            className="flex-1 min-w-[160px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
-          >
-            {targets.map((target) => (
-              <option key={target.value} value={target.value}>
-                {target.label}
-              </option>
-            ))}
-          </select>
-          {entry.target === "custom" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground shrink-0">
+              {mode === "attack" ? "Bonus to hit" : "Bonus damage"}
+            </span>
             <input
-              type="text"
-              value={entry.customTarget ?? ""}
-              onChange={(e) => updateEntry(idx, { ...entry, customTarget: e.target.value })}
-              className="flex-1 min-w-[120px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
-              placeholder="Custom target"
+              type="number"
+              value={entry.bonus}
+              onChange={(e) =>
+                updateEntry(idx, { ...entry, bonus: parseInt(e.target.value, 10) || 0 })
+              }
+              className="w-20 px-2 py-1.5 bg-card border border-border rounded-lg text-sm text-center"
+              placeholder="+N"
             />
-          )}
-          <button
-            type="button"
-            onClick={() => onChange(entries.filter((_, i) => i !== idx))}
-            className="p-1 text-muted-foreground hover:text-destructive"
-          >
-            <X className="w-4 h-4" />
-          </button>
+            <select
+              value={entry.target}
+              onChange={(e) => updateEntry(idx, { ...entry, target: e.target.value })}
+              className="flex-1 min-w-[160px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+            >
+              {targets.map((target) => (
+                <option key={target.value} value={target.value}>
+                  {target.label}
+                </option>
+              ))}
+            </select>
+            {entry.target === "custom" && (
+              <input
+                type="text"
+                value={entry.customTarget ?? ""}
+                onChange={(e) => updateEntry(idx, { ...entry, customTarget: e.target.value })}
+                className="flex-1 min-w-[120px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+                placeholder="Custom target"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onChange(entries.filter((_, i) => i !== idx))}
+              className="p-1 text-muted-foreground hover:text-destructive"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {mode === "attack" ? (
+            <div className="flex flex-wrap items-center gap-3 pl-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Crit on d20 ≥</span>
+                <input
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={entry.criticalHitMinimum ?? ""}
+                  onChange={(e) =>
+                    updateEntry(idx, {
+                      ...entry,
+                      criticalHitMinimum: e.target.value ? parseInt(e.target.value, 10) : null,
+                    })
+                  }
+                  className="w-20 px-2 py-1.5 bg-card border border-border rounded-lg text-sm text-center"
+                  placeholder="20"
+                />
+                <span className="text-xs text-muted-foreground">(blank = 20 only)</span>
+              </div>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(entry.ignoreHalfCover)}
+                  onChange={(e) =>
+                    updateEntry(idx, { ...entry, ignoreHalfCover: e.target.checked })
+                  }
+                  className="accent-primary"
+                />
+                <span className="text-muted-foreground">Ignore half cover</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(entry.treatThreeQuartersCoverAsHalf)}
+                  onChange={(e) =>
+                    updateEntry(idx, {
+                      ...entry,
+                      treatThreeQuartersCoverAsHalf: e.target.checked,
+                    })
+                  }
+                  className="accent-primary"
+                />
+                <span className="text-muted-foreground">3/4 cover counts as half</span>
+              </label>
+            </div>
+          ) : null}
+          {mode === "attack" && (entry.criticalHitMinimumByLevel?.length ?? 0) > 0 ? (
+            <CritByLevelEditor
+              rows={entry.criticalHitMinimumByLevel ?? []}
+              onChange={(rows) => updateEntry(idx, { ...entry, criticalHitMinimumByLevel: rows })}
+            />
+          ) : null}
+          {mode === "attack" ? (
+            <button
+              type="button"
+              onClick={() =>
+                updateEntry(idx, {
+                  ...entry,
+                  criticalHitMinimumByLevel: [
+                    ...(entry.criticalHitMinimumByLevel ?? []),
+                    defaultCritByLevelEntry(
+                      (entry.criticalHitMinimumByLevel?.at(-1)?.level ?? 1) + 4,
+                      (entry.criticalHitMinimum ?? 19) - 1,
+                    ),
+                  ],
+                })
+              }
+              className="text-xs text-primary hover:underline"
+            >
+              + Add crit range by level (this attack type)
+            </button>
+          ) : null}
+          {mode === "damage" ? (
+            <div className="space-y-2 border-t border-border/60 pt-2">
+              <label className="flex items-center gap-2 text-xs text-foreground">
+                <input
+                  type="checkbox"
+                  checked={Boolean(entry.grantAbilityModifierWhenMissing)}
+                  onChange={(e) =>
+                    updateEntry(idx, { ...entry, grantAbilityModifierWhenMissing: e.target.checked })
+                  }
+                />
+                Add ability modifier to damage when weapon attack would not normally include it
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Extra dice when modifier already added</span>
+                <input
+                  type="text"
+                  value={entry.bonusDiceWhenModifierIncluded ?? ""}
+                  onChange={(e) =>
+                    updateEntry(idx, {
+                      ...entry,
+                      bonusDiceWhenModifierIncluded: e.target.value || null,
+                    })
+                  }
+                  className="w-24 px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
+                  placeholder="1d8"
+                />
+                <label className="flex items-center gap-1.5 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(entry.bonusDiceUsesWeaponDamageType)}
+                    onChange={(e) =>
+                      updateEntry(idx, {
+                        ...entry,
+                        bonusDiceUsesWeaponDamageType: e.target.checked,
+                      })
+                    }
+                  />
+                  Use weapon damage type
+                </label>
+              </div>
+            </div>
+          ) : null}
         </div>
       ))}
       <button
@@ -1202,20 +1407,30 @@ function ModifierFields({
           </select>
           <select
             value={mod.mode}
-            onChange={(e) => onChange({ ...mod, mode: e.target.value as "set" | "add" })}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                mode: e.target.value as SpeedCharacteristic["mode"],
+              })
+            }
             className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
           >
             <option value="add">Add to existing</option>
             <option value="set">Set to value</option>
+            <option value="equal_to_walk">Equal to walk speed</option>
           </select>
-          <input
-            type="number"
-            min={0}
-            value={mod.value}
-            onChange={(e) => onChange({ ...mod, value: parseInt(e.target.value, 10) || 0 })}
-            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
-            placeholder="Feet"
-          />
+          {mod.mode !== "equal_to_walk" ? (
+            <input
+              type="number"
+              min={0}
+              value={mod.value}
+              onChange={(e) => onChange({ ...mod, value: parseInt(e.target.value, 10) || 0 })}
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              placeholder="Feet"
+            />
+          ) : (
+            <span className="text-sm text-muted-foreground px-3 py-2">Matches walking speed</span>
+          )}
           {mod.speedType === "custom" && (
             <input
               type="text"
@@ -1235,23 +1450,31 @@ function ModifierFields({
             entries={mod.entries}
             targets={ATTACK_ROLL_TARGETS}
             onChange={(entries) => onChange({ ...mod, entries })}
+            mode="attack"
           />
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-muted-foreground">Critical hit on d20 ≥</label>
-            <select
-              value={mod.criticalHitMinimum ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...mod,
-                  criticalHitMinimum: e.target.value ? parseInt(e.target.value, 10) : null,
-                })
-              }
-              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
-            >
-              <option value="">20 (default)</option>
-              <option value="19">19 (Improved Critical)</option>
-              <option value="18">18 (Superior Critical)</option>
-            </select>
+          <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-sm text-muted-foreground">Default crit on d20 ≥</label>
+              <input
+                type="number"
+                min={2}
+                max={20}
+                value={mod.criticalHitMinimum ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...mod,
+                    criticalHitMinimum: e.target.value ? parseInt(e.target.value, 10) : null,
+                  })
+                }
+                className="w-20 px-3 py-2 bg-background border border-border rounded-lg text-sm text-center"
+                placeholder="20"
+              />
+              <span className="text-xs text-muted-foreground">(all attacks unless entry overrides)</span>
+            </div>
+            <CritByLevelEditor
+              rows={mod.criticalHitMinimumByLevel ?? []}
+              onChange={(rows) => onChange({ ...mod, criticalHitMinimumByLevel: rows })}
+            />
           </div>
         </div>
       )
@@ -1262,6 +1485,7 @@ function ModifierFields({
           entries={mod.entries}
           targets={DAMAGE_ROLL_TARGETS}
           onChange={(entries) => onChange({ ...mod, entries })}
+          mode="damage"
         />
       )
 
@@ -1411,6 +1635,16 @@ function ModifierFields({
     case "on_creature_death_trigger":
       return (
         <OnCreatureDeathTriggerEditor
+          mod={mod}
+          onChange={onChange}
+          modifierCatalog={modifierCatalog}
+          classResources={classResources}
+        />
+      )
+
+    case "turn_start_trigger":
+      return (
+        <TurnStartTriggerEditor
           mod={mod}
           onChange={onChange}
           modifierCatalog={modifierCatalog}
@@ -2284,18 +2518,58 @@ function BonusDamageRidersCharacteristicEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-muted-foreground">Applies to</label>
-        <input
-          type="text"
-          value={mod.appliesTo ?? ""}
-          onChange={(e) => onChange({ ...mod, appliesTo: e.target.value || null })}
-          placeholder="e.g. Sneak Attack"
-          className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Trigger</label>
+          <select
+            value={mod.triggerOn ?? "on_hit"}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                triggerOn: e.target.value as BonusDamageRidersCharacteristic["triggerOn"],
+              })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="on_hit">On hit (optional riders)</option>
+            <option value="on_crit">On critical hit</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Applies to</label>
+          <input
+            type="text"
+            value={mod.appliesTo ?? ""}
+            onChange={(e) => onChange({ ...mod, appliesTo: e.target.value || null })}
+            placeholder="e.g. weapon attacks, Sneak Attack"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+      <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-foreground">Automatic bonus</span>
+          {mod.automaticBonus ? (
+            <span className="text-xs text-muted-foreground">
+              {formatRollBonusSummary(mod.automaticBonus)}
+            </span>
+          ) : null}
+        </div>
+        <RollBonusEditor
+          value={mod.automaticBonus ?? defaultRollBonusConfig("fixed")}
+          onChange={(automaticBonus) => onChange({ ...mod, automaticBonus })}
+          label="Bonus on trigger (leave fixed 0 to disable)"
         />
+        <button
+          type="button"
+          onClick={() => onChange({ ...mod, automaticBonus: null })}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Clear automatic bonus
+        </button>
       </div>
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Max riders per use</span>
+        <span className="text-muted-foreground">Max optional riders per use</span>
         <input
           type="number"
           min={1}

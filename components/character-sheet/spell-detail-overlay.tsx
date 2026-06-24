@@ -10,8 +10,14 @@ import {
   spellRequiresAttack,
   willReplaceConcentration,
 } from "@/lib/compendium/spell-slots"
+import { formatPsionicAugmentSelectionSummary, totalPsionicAugmentCost } from "@/lib/compendium/parse-psionic-augments"
+import {
+  PsionicAugmentPicker,
+  resolveSpellPsionicAugments,
+} from "@/components/character-sheet/psionic-augment-picker"
 import { rollD20, d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
+import type { PsionicAugmentSelection } from "@/lib/compendium/parse-psionic-augments"
 
 type SpellDetailOverlayProps = {
   spell: Spell
@@ -22,8 +28,11 @@ type SpellDetailOverlayProps = {
     attackRoll?: { natural: number; total: number }
     concentrationApplied?: string
     slotUsed?: boolean
+    psionicAugments?: PsionicAugmentSelection[]
+    psiPointsSpent?: number
   }) => void
   canUseSlot: boolean
+  psiLimit?: number | null
 }
 
 export function SpellDetailOverlay({
@@ -33,23 +42,34 @@ export function SpellDetailOverlay({
   onClose,
   onCast,
   canUseSlot,
+  psiLimit,
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
+  const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const history = useSheetRollHistory()
+  const psionicAugments = resolveSpellPsionicAugments(spell)
   const needsAttack = spellRequiresAttack(spell.description)
   const isCantrip = spell.level === 0
 
   useEffect(() => {
     setConcentrationWarningOpen(false)
     setCastFeedback(null)
+    setAugmentSelections([])
   }, [spell.id])
+
+  const augmentSummary =
+    psionicAugments && augmentSelections.length
+      ? formatPsionicAugmentSelectionSummary(psionicAugments, augmentSelections)
+      : null
 
   const performCast = () => {
     const result: {
       attackRoll?: { natural: number; total: number }
       concentrationApplied?: string
       slotUsed?: boolean
+      psionicAugments?: PsionicAugmentSelection[]
+      psiPointsSpent?: number
     } = {}
 
     const feedbackParts: string[] = []
@@ -72,6 +92,11 @@ export function SpellDetailOverlay({
     if (!isCantrip && canUseSlot) {
       result.slotUsed = true
       feedbackParts.push(`Used 1 level ${spell.level} slot`)
+    }
+    if (psionicAugments && augmentSelections.length) {
+      result.psionicAugments = augmentSelections
+      result.psiPointsSpent = totalPsionicAugmentCost(psionicAugments, augmentSelections)
+      if (augmentSummary) feedbackParts.push(augmentSummary)
     }
     onCast(result)
     setConcentrationWarningOpen(false)
@@ -173,6 +198,15 @@ export function SpellDetailOverlay({
               </p>
             </div>
           )}
+
+          {psionicAugments ? (
+            <PsionicAugmentPicker
+              config={psionicAugments}
+              selections={augmentSelections}
+              onChange={setAugmentSelections}
+              psiLimit={psiLimit}
+            />
+          ) : null}
         </div>
 
         <div className="sticky bottom-0 p-4 border-t border-border bg-card/95 backdrop-blur-sm space-y-2">

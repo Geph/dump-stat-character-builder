@@ -9,6 +9,7 @@ import {
   CLEAN_SOURCE_TEXT_GUIDELINES,
   downloadTemplateFilename,
   templateJsonString,
+  type ByoPdfPageScope,
 } from "@/lib/import/byo-import-kit"
 import {
   Check,
@@ -16,8 +17,10 @@ import {
   ChevronUp,
   ClipboardCopy,
   Download,
+  FileText,
   Info,
   Loader2,
+  Type,
 } from "lucide-react"
 
 type ClipboardImportPanelProps = {
@@ -65,15 +68,32 @@ export function ClipboardImportPanel({
   const [showGuidelines, setShowGuidelines] = useState(false)
   const [showServerAi, setShowServerAi] = useState(false)
   const [copied, setCopied] = useState<"prompt" | "full" | null>(null)
+  const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
+  const [pdfPageStart, setPdfPageStart] = useState("")
+  const [pdfPageEnd, setPdfPageEnd] = useState("")
 
-  const extractionPrompt = useMemo(
-    () => buildByoExtractionPrompt(contentType),
-    [contentType],
+  const pdfPageScopeForPrompt = useMemo((): ByoPdfPageScope => {
+    if (pdfPageScope !== "range") return { mode: "all" }
+    const start = parseInt(pdfPageStart, 10)
+    const end = parseInt(pdfPageEnd, 10)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
+      return { mode: "all" }
+    }
+    return { mode: "range", start, end }
+  }, [pdfPageScope, pdfPageStart, pdfPageEnd])
+
+  const pdfExtractionPrompt = useMemo(
+    () =>
+      buildByoExtractionPrompt(contentType, {
+        pdfUpload: true,
+        pageScope: pdfPageScopeForPrompt,
+      }),
+    [contentType, pdfPageScopeForPrompt],
   )
 
   const handleCopy = async (kind: "prompt" | "full") => {
     const text =
-      kind === "prompt" ? extractionPrompt : buildByoFullPrompt(sourceText, contentType)
+      kind === "prompt" ? pdfExtractionPrompt : buildByoFullPrompt(sourceText, contentType)
     const ok = await copyText(text)
     if (ok) {
       setCopied(kind)
@@ -94,37 +114,51 @@ export function ClipboardImportPanel({
   const isProcessing = status === "processing"
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-lime/25 bg-lime/5 p-4 space-y-3">
-        <p className="text-sm font-semibold text-foreground">Extract with your own LLM</p>
-        <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
-          <li>Paste or type the raw source text below (from a PDF, wiki, or document).</li>
-          <li>Copy the extraction prompt and JSON template into ChatGPT, Claude, Gemini, or any LLM.</li>
-          <li>Give the model your source text and ask it to return JSON only.</li>
-          <li>Paste the model&apos;s JSON output into the box at the bottom and import.</li>
+    <div className="space-y-8">
+      <div className="rounded-xl border border-lime/25 bg-lime/5 p-4 space-y-2">
+        <p className="text-sm font-semibold text-foreground">How it works</p>
+        <ol className="text-sm text-muted-foreground space-y-2">
+          <li className="flex gap-2">
+            <span className="font-bold text-lime shrink-0">1.</span>
+            <span>
+              Send an extraction prompt to your LLM — attach a PDF{" "}
+              <span className="font-medium text-foreground">or</span> paste source text and copy
+              prompt + text. Ask the model to return JSON only.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-bold text-lime shrink-0">2.</span>
+            <span>Paste the model&apos;s JSON output below and import into your compendium.</span>
+          </li>
         </ol>
       </div>
 
-      <ImportContentTypeHintSelect
-        value={contentType}
-        onChange={onContentTypeChange}
-        focusRingClassName="focus:ring-lime"
-      />
-
-      <div className="space-y-2">
-        <label htmlFor="import-material-source" className="text-sm font-medium text-foreground">
-          Compendium source label
-        </label>
-        <input
-          id="import-material-source"
-          type="text"
-          value={materialSource}
-          onChange={(event) => onMaterialSourceChange(event.target.value)}
-          placeholder="e.g. Gunslinger (Third Party), MCDM, Homebrew"
-          className="w-full px-4 py-2.5 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
-        />
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <ImportContentTypeHintSelect
+            value={contentType}
+            onChange={onContentTypeChange}
+            focusRingClassName="focus:ring-lime"
+          />
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+            <label
+              htmlFor="import-material-source"
+              className="text-sm font-medium text-muted-foreground shrink-0"
+            >
+              Compendium source label:
+            </label>
+            <input
+              id="import-material-source"
+              type="text"
+              value={materialSource}
+              onChange={(event) => onMaterialSourceChange(event.target.value)}
+              placeholder="e.g. Gunslinger (Third Party), MCDM, Homebrew"
+              className="flex-1 min-w-[160px] px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+            />
+          </div>
+        </div>
         <p className="text-xs text-muted-foreground">
-          Stored on imported classes, spells, feats, and class resources so you can filter by book or homebrew name.
+          Source label is stored on imported entries so you can filter by book or homebrew name.
         </p>
       </div>
 
@@ -151,56 +185,181 @@ export function ClipboardImportPanel({
         ) : null}
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">1. Source text</label>
-        <textarea
-          placeholder="Paste class features, spell text, species traits, or PDF-extracted text here..."
-          value={sourceText}
-          onChange={(event) => onSourceTextChange(event.target.value)}
-          rows={7}
-          className="w-full px-4 py-3 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime resize-y font-mono text-sm"
-        />
-        <p className="text-xs text-muted-foreground">{sourceText.length} characters</p>
-      </div>
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Step 1 — Extract with your LLM</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose one path below. Both produce the same JSON format for Step 2.
+          </p>
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => handleCopy("prompt")}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60"
-        >
-          {copied === "prompt" ? (
-            <Check className="h-4 w-4 text-success" />
-          ) : (
-            <ClipboardCopy className="h-4 w-4" />
-          )}
-          Copy extraction prompt
-        </button>
-        <button
-          type="button"
-          onClick={() => handleCopy("full")}
-          disabled={!sourceText.trim()}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60 disabled:opacity-50"
-        >
-          {copied === "full" ? (
-            <Check className="h-4 w-4 text-success" />
-          ) : (
-            <ClipboardCopy className="h-4 w-4" />
-          )}
-          Copy prompt + source text
-        </button>
-        <button
-          type="button"
-          onClick={handleDownloadTemplate}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60"
-        >
-          <Download className="h-4 w-4" />
-          Download JSON template
-        </button>
-      </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border-2 border-border bg-card p-4 space-y-4 flex flex-col">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-lime/10 p-2 shrink-0">
+                <FileText className="h-5 w-5 text-lime" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  Option A
+                </p>
+                <h3 className="text-sm font-semibold text-foreground">PDF upload</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Copy the extraction prompt, attach your PDF in ChatGPT, Claude, Gemini, or any LLM,
+                  and ask for JSON only.
+                </p>
+              </div>
+            </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">2. LLM JSON output</label>
+            <div className="space-y-2 flex-1">
+              <p className="text-xs font-medium text-foreground">Pages to extract</p>
+              <div className="flex flex-wrap gap-4 items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="byoPdfPageScope"
+                    checked={pdfPageScope === "all"}
+                    onChange={() => setPdfPageScope("all")}
+                    className="w-4 h-4 accent-lime"
+                  />
+                  <span className="text-sm text-foreground">All pages</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="byoPdfPageScope"
+                    checked={pdfPageScope === "range"}
+                    onChange={() => setPdfPageScope("range")}
+                    className="w-4 h-4 accent-lime"
+                  />
+                  <span className="text-sm text-foreground">Page range</span>
+                </label>
+              </div>
+              {pdfPageScope === "range" ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    From
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="1"
+                      value={pdfPageStart}
+                      onChange={(event) => setPdfPageStart(event.target.value)}
+                      className="w-20 px-2 py-1.5 bg-muted rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    To
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="10"
+                      value={pdfPageEnd}
+                      onChange={(event) => setPdfPageEnd(event.target.value)}
+                      className="w-20 px-2 py-1.5 bg-muted rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+                    />
+                  </label>
+                  <span className="text-xs text-muted-foreground">1-based</span>
+                </div>
+              ) : null}
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Page scope and <span className="font-mono">source_page</span> tagging instructions
+                are included in the copied prompt.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleCopy("prompt")}
+              disabled={pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim())}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
+            >
+              {copied === "prompt" ? (
+                <Check className="h-4 w-4 text-success" />
+              ) : (
+                <ClipboardCopy className="h-4 w-4" />
+              )}
+              Copy extraction prompt for PDF upload
+            </button>
+          </div>
+
+          <div className="rounded-xl border-2 border-border bg-card p-4 space-y-4 flex flex-col">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-lime/10 p-2 shrink-0">
+                <Type className="h-5 w-5 text-lime" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  Option B
+                </p>
+                <h3 className="text-sm font-semibold text-foreground">Pasted source text</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Paste raw text from a PDF copy, website, wiki, or other document — then copy the
+                  combined prompt and text into your LLM.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 flex-1">
+              <label htmlFor="byo-source-text" className="text-xs font-medium text-foreground">
+                Source text
+              </label>
+              <textarea
+                id="byo-source-text"
+                placeholder="Paste class features, spell text, species traits, or PDF-extracted text here..."
+                value={sourceText}
+                onChange={(event) => onSourceTextChange(event.target.value)}
+                rows={6}
+                className="w-full px-3 py-2.5 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime resize-y font-mono text-sm min-h-[140px]"
+              />
+              <p className="text-[11px] text-muted-foreground">{sourceText.length} characters</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleCopy("full")}
+              disabled={!sourceText.trim()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
+            >
+              {copied === "full" ? (
+                <Check className="h-4 w-4 text-success" />
+              ) : (
+                <ClipboardCopy className="h-4 w-4" />
+              )}
+              Copy prompt + source text
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Option C
+            </p>
+            <p className="text-sm text-foreground mt-0.5">
+              Skip the LLM — download the JSON template and fill it in by hand.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDownloadTemplate}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60 shrink-0"
+          >
+            <Download className="h-4 w-4" />
+            Download JSON template
+          </button>
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-xl border-2 border-lime/20 bg-lime/[0.03] p-4">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Step 2 — Import JSON</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Paste the JSON your LLM returned (or your hand-filled template) and import. For
+            multi-file homebrew, paste a JSON array in dependency order — see the import order
+            guide at the top of this page.
+          </p>
+        </div>
         <textarea
           placeholder='Paste the model JSON here, e.g. { "classes": [ ... ] }'
           value={jsonText}
@@ -219,7 +378,7 @@ export function ClipboardImportPanel({
             {isProcessing ? "Importing..." : "Import JSON"}
           </button>
         </div>
-      </div>
+      </section>
 
       {serverAiEnabled && onServerAiImport ? (
         <div className="rounded-xl border border-border/80 bg-muted/20">
@@ -239,7 +398,7 @@ export function ClipboardImportPanel({
             <div className="space-y-3 border-t border-border px-4 py-4">
               <p className="text-xs text-muted-foreground">
                 Runs extraction on the server using the host&apos;s API key. Uses the source text
-                above — not the JSON output box.
+                from Option B above — not the JSON output box.
               </p>
               <ImportAiSettings value={importAiSettings} onChange={onImportAiSettingsChange} />
               <div className="flex justify-end">

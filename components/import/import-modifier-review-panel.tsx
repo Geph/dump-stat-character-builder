@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { ModifierWiringRegistryCoverageLine } from "@/components/import/modifier-wiring-registry-coverage-line"
 import type { ImportModifierReviewRow } from "@/lib/import/import-modifier-previews"
 import { AlertTriangle, CheckCircle2, Link2, Sparkles, X } from "lucide-react"
 
@@ -39,29 +40,33 @@ export function ImportModifierReviewPanel({
   const wiredCount = rows.filter((row) => row.status === "wired").length
   const unwiredCount = rows.length - wiredCount
 
-  if (!rows.length) return null
-
   return (
     <section className="space-y-4 rounded-xl border border-border bg-background/80 p-4 text-sm">
       <div className="flex items-start gap-2">
         <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground">Modifier wiring review</p>
           <p className="mt-1 text-muted-foreground">
             {variant === "review"
-              ? "Each feature below shows whether common modifiers were inferred from its text. Unwired features will stay highlighted in the compendium editor until you edit them."
+              ? "Auto-wiring runs on import; finish any “Not wired” rows in the compendium editor (Modifier effects on each feature), then save."
               : "Summary of modifier auto-wiring from this import."}
           </p>
-          <p className="mt-2 text-xs">
-            <span className="font-medium text-success">{wiredCount} wired</span>
-            <span className="text-muted-foreground"> · </span>
-            <span className={`font-medium ${unwiredCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
-              {unwiredCount} not wired
-            </span>
-          </p>
+          {rows.length > 0 ? (
+            <p className="mt-2 text-xs">
+              <span className="font-medium text-success">{wiredCount} wired</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className={`font-medium ${unwiredCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                {unwiredCount} not wired
+              </span>
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">No class, subclass, species, or feat features in this import.</p>
+          )}
+          <ModifierWiringRegistryCoverageLine className="mt-2" />
         </div>
       </div>
 
+      {rows.length > 0 ? (
       <ul className="space-y-3">
         {grouped.map(([sourceLabel, items]) => (
           <li key={sourceLabel} className="rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
@@ -146,6 +151,7 @@ export function ImportModifierReviewPanel({
           </li>
         ))}
       </ul>
+      ) : null}
     </section>
   )
 }

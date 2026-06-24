@@ -1,11 +1,33 @@
 import { usesConfigForProgressionColumn } from "@/lib/import/parse-class-progression-table"
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
+import type { CompanionStatBlockTemplate } from "@/lib/character/companion-stat-block"
+import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import type { UsesConfig } from "@/lib/types"
 
 export type ImportProposalSource = "ai" | "table" | "explicit" | "feature"
+
+function normalizeProposalSourceType(
+  sourceType: string | null | undefined,
+): ImportProposalCustomAbility["sourceType"] {
+  if (!sourceType) return null
+  if (sourceType === "class_feature") return "class"
+  if (sourceType === "subclass_feature") return "subclass"
+  const allowed: ImportProposalCustomAbility["sourceType"][] = [
+    "class",
+    "subclass",
+    "species",
+    "background",
+    "feat",
+    "item",
+  ]
+  return allowed.includes(sourceType as ImportProposalCustomAbility["sourceType"])
+    ? (sourceType as ImportProposalCustomAbility["sourceType"])
+    : null
+}
 
 export type ImportProposalClassResource = {
   id: string
@@ -29,8 +51,8 @@ export type ImportProposalCustomAbility = {
   talentCount?: number
   /** Class resource spent when activating (e.g. superiority_dice for maneuvers). */
   resourceKey?: string | null
-  /** Stat-block companion/minion (Steel Defender, Eldritch Cannon, etc.) for future sheet tab. */
-  companionStatBlock?: boolean
+  /** Parsed stat block for the Companions sheet tab. */
+  companionStatBlock?: CompanionStatBlockTemplate | null
   source: ImportProposalSource
 }
 
@@ -182,25 +204,8 @@ function maneuverDefinition(name: string, className: string): string {
   return `Battle Master maneuver for ${className}. Expend a Superiority Die when you use this technique (one maneuver per attack).`
 }
 
-const COMPANION_FRAME_FEATURES =
-  /^(?:steel defender|reanimated companion|eldritch cannon|primal companion|wild companion|spirit companion)$/i
-
-function isCompanionStatBlockFeature(feature: {
-  name?: string
-  description?: string
-}): boolean {
-  const name = (feature.name ?? "").trim()
-  if (COMPANION_FRAME_FEATURES.test(name)) return true
-  const desc = feature.description ?? ""
-  if (/Medium (?:Construct|Undead)|Small or Tiny Object/im.test(desc) && /\bActions\b/i.test(desc)) {
-    return true
-  }
-  if (/\b(?:Force-Empowered Rend|Dreadful Swipe|Activate Cannon)\b/i.test(desc)) return true
-  return false
-}
-
 function companionDefinition(name: string, className: string): string {
-  return `Companion or minion stat block for ${className} (${name}). Intended for a dedicated companion sheet tab when available.`
+  return `Companion or minion stat block for ${className} (${name}). Shown on the character sheet Companions tab when unlocked.`
 }
 
 function disciplineDefinition(
@@ -276,7 +281,7 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
         ability.definition?.trim() ||
         disciplineDefinition(ability.name, ability.source_name ?? "this class", talentCount),
       description: ability.description,
-      sourceType: ability.source_type ?? null,
+      sourceType: normalizeProposalSourceType(ability.source_type),
       sourceName: ability.source_name ?? null,
       levelRequirement: ability.level_requirement ?? null,
       talentCount,
@@ -453,7 +458,7 @@ function collectCompanionStatBlockFeatures(
         sourceType,
         sourceName,
         levelRequirement: feature.level,
-        companionStatBlock: true,
+        companionStatBlock: parseCompanionStatBlock(feature.name, feature.description),
         source: "feature",
       })
     }
@@ -473,13 +478,15 @@ function collectExplicitAbilities(
   seenAbilities: Set<string>,
 ) {
   for (const ability of content.abilities ?? []) {
+    const companionStatBlock = parseCompanionStatBlock(ability.name, ability.description)
     pushAbility(into.customAbilities, seenAbilities, {
       name: ability.name,
       definition: `Custom builder ability from ${ability.source_name ?? "imported content"}.`,
       description: ability.description,
-      sourceType: ability.source_type,
+      sourceType: normalizeProposalSourceType(ability.source_type),
       sourceName: ability.source_name,
       levelRequirement: ability.level_requirement,
+      companionStatBlock,
       source: "explicit",
     })
   }
@@ -555,6 +562,7 @@ export function applyProposalSelections(
     source_type: row.sourceType,
     source_name: row.sourceName,
     level_requirement: row.levelRequirement,
+    companion_stat_block: row.companionStatBlock ?? null,
   }))
 
   const base = stripProposalBackedContent(content)

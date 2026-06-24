@@ -1,4 +1,6 @@
 import { listRows } from "@/lib/db/repository"
+import type { CompendiumTable } from "@/lib/db/tables"
+import { resolveTable } from "@/lib/db/tables"
 import {
   buildImportCollisions,
   type ImportCollision,
@@ -15,13 +17,13 @@ const COLLISION_TABLES: ImportCollisionKind[] = [
   "ability",
 ]
 
-const TABLE_BY_KIND: Record<ImportCollisionKind, "classes" | "feats" | "species" | "spells" | "backgrounds" | "abilities"> = {
+const TABLE_BY_KIND: Record<ImportCollisionKind, CompendiumTable | "characters"> = {
   class: "classes",
   feat: "feats",
   species: "species",
   spell: "spells",
   background: "backgrounds",
-  ability: "abilities",
+  ability: "custom_abilities",
 }
 
 /** Load compendium names for import collision detection. */
@@ -32,7 +34,7 @@ export async function fetchExistingForImportCollisions(): Promise<
 
   await Promise.all(
     COLLISION_TABLES.map(async (kind) => {
-      const table = TABLE_BY_KIND[kind]
+      const table = resolveTable(TABLE_BY_KIND[kind]) ?? TABLE_BY_KIND[kind]
       const rows = (await listRows(table)) as { name: string; source?: string | null }[]
       result[kind] = rows.map((row) => ({
         name: row.name,

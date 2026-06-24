@@ -8,7 +8,7 @@ import {
   readHeroBackgroundFile,
   setCustomHeroBackground,
 } from "@/lib/site-settings/hero-background"
-import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
 export function HeroBackgroundSettings({
   onStatus,
@@ -51,7 +51,7 @@ export function HeroBackgroundSettings({
   }
 
   return (
-    <>
+    <div className="space-y-3">
       <input
         ref={inputRef}
         type="file"
@@ -63,41 +63,47 @@ export function HeroBackgroundSettings({
           e.target.value = ""
         }}
       />
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel>General</DropdownMenuLabel>
-      <div className="px-2 pb-2 space-y-2">
-        <p className="text-xs font-semibold text-foreground">Home page background</p>
-        <p className="text-xs text-muted-foreground leading-snug">
+      <div>
+        <p className="text-sm font-semibold text-foreground">Home page background</p>
+        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
           {formatHeroBackgroundUploadHint()}. One image replaces the random default hero art on this
           browser only.
         </p>
-        {preview && (
-          <div
-            className="h-16 w-full rounded-lg border border-border bg-muted bg-cover bg-center"
-            style={{ backgroundImage: `url(${preview})` }}
-            role="img"
-            aria-label="Custom hero background preview"
-          />
-        )}
       </div>
-      <DropdownMenuItem
-        className="gap-2 cursor-pointer"
-        disabled={disabled || busy}
-        onClick={() => inputRef.current?.click()}
-      >
-        <ImageIcon className="w-4 h-4" />
-        {preview ? "Replace home background" : "Upload home background"}
-      </DropdownMenuItem>
-      {preview && (
-        <DropdownMenuItem
-          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+      {preview ? (
+        <div
+          className="h-24 w-full rounded-xl border border-border bg-muted bg-cover bg-center"
+          style={{ backgroundImage: `url(${preview})` }}
+          role="img"
+          aria-label="Custom hero background preview"
+        />
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2"
           disabled={disabled || busy}
-          onClick={handleRemove}
+          onClick={() => inputRef.current?.click()}
         >
-          <Trash2 className="w-4 h-4" />
-          Remove custom background
-        </DropdownMenuItem>
-      )}
-    </>
+          <ImageIcon className="h-4 w-4" />
+          {preview ? "Replace background" : "Upload background"}
+        </Button>
+        {preview ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 text-destructive hover:text-destructive"
+            disabled={disabled || busy}
+            onClick={handleRemove}
+          >
+            <Trash2 className="h-4 w-4" />
+            Remove
+          </Button>
+        ) : null}
+      </div>
+    </div>
   )
 }

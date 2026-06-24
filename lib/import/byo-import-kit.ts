@@ -17,7 +17,12 @@ PDF tips:
 - Copy text from a vector PDF when possible; scanned images need OCR first
 - If the PDF has page headers/footers, they are OK — importers strip obvious boilerplate
 - For long PDFs, import one chapter or page range at a time with the content-type hint set correctly
-- Homebrew class PDFs with a level table + feature sections work well; Dump Stat may parse them with zero AI when structure is clean`
+- Homebrew class PDFs with a level table + feature sections work well; Dump Stat may parse them with zero AI when structure is clean
+
+Multi-file homebrew (spellcasters, Psion, Martial Exploits):
+- Import supporting libraries before classes and subclasses that reference them (spell JSON, discipline powers, exploit lists, then class, then subclasses)
+- You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers
+- SRD spell names resolve from your seeded compendium; only import homebrew spell files for third-party names`
 
 const JSON_OUTPUT_RULES = `Output format (required)
 
@@ -25,7 +30,8 @@ Return ONLY valid JSON — no markdown fences, no commentary before or after.
 Use null for optional fields you do not have data for.
 Omit empty top-level arrays entirely, or set them to null.
 Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import.
-Optionally add mechanics[] on features, traits, or feats for explicit modifier hints (see Common Modifier wiring).`
+Optionally add mechanics[] on features, traits, or feats for explicit modifier hints (see Common Modifier wiring).
+When extracting from a PDF, add source_page (integer, 1-based PDF page) on features[], traits[], spells[], feats[], and abilities[] when identifiable. Omit when unknown.`
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
   classes:
@@ -39,7 +45,34 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
   feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
   equipment:
     "Focus on equipment[] with category, cost { amount, unit }, weight, and properties.",
+  abilities:
+    "Focus on abilities[] (custom builder abilities, invocations, disciplines, fighting-style pickers, companion stat blocks) and class_resources[] (level-scaled pools such as Ki, Risk Dice, or Psionic Power). Set source_type and source_name on abilities to tie them to a class or subclass.",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
+}
+
+export type ByoPdfPageScope =
+  | { mode: "all" }
+  | { mode: "range"; start: number; end: number }
+
+export type ByoExtractionPromptOptions = {
+  /** Include PDF upload workflow instructions and page scope. */
+  pdfUpload?: boolean
+  pageScope?: ByoPdfPageScope
+}
+
+function formatPdfUploadBlock(pageScope?: ByoPdfPageScope): string {
+  const scopeLine =
+    pageScope?.mode === "range"
+      ? `Page scope: Extract ONLY from PDF pages ${pageScope.start}–${pageScope.end} (1-based, inclusive). Ignore content outside this range.`
+      : "Page scope: Extract from the full uploaded PDF."
+
+  return `PDF upload workflow
+
+Upload the source PDF to your LLM together with this prompt (attach the file in ChatGPT, Claude, Gemini, etc.).
+
+${scopeLine}
+
+Include source_page (1-based PDF page number) on each feature, trait, spell, feat, ability, and similar entry when you can identify the page. Omit source_page when unknown.`
 }
 
 export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
@@ -173,6 +206,26 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
       },
     ],
   },
+  abilities: {
+    abilities: [
+      {
+        name: "Psionic Discipline",
+        description: "Choose one discipline you know. You can manifest its powers using psionic energy.",
+        source_type: "class",
+        source_name: "Psion",
+        level_requirement: 1,
+      },
+    ],
+    class_resources: [
+      {
+        class_name: "Psion",
+        resource_key: "psi_points",
+        name: "Psionic Power",
+        description: "Psionic energy points from the class table.",
+        uses: { type: "at_level", atLevelTable: [{ level: 1, count: 2 }] },
+      },
+    ],
+  },
 }
 
 function resolveHint(contentTypeHint?: string | null): ImportContentTypeHint {
@@ -186,13 +239,21 @@ function resolveHint(contentTypeHint?: string | null): ImportContentTypeHint {
   return "all"
 }
 
-export function buildByoExtractionPrompt(contentTypeHint?: string | null): string {
+export function buildByoExtractionPrompt(
+  contentTypeHint?: string | null,
+  options?: ByoExtractionPromptOptions,
+): string {
   const hint = resolveHint(contentTypeHint)
   const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all
   const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
 
-  return [
-    buildImportSystemPrompt(contentTypeHint),
+  const sections = [buildImportSystemPrompt(contentTypeHint)]
+
+  if (options?.pdfUpload) {
+    sections.push("", formatPdfUploadBlock(options.pageScope))
+  }
+
+  sections.push(
     "",
     CLEAN_SOURCE_TEXT_GUIDELINES,
     "",
@@ -202,7 +263,9 @@ export function buildByoExtractionPrompt(contentTypeHint?: string | null): strin
     "",
     "Example JSON shape (fill with extracted content; adjust or omit arrays you do not need):",
     template,
-  ].join("\n")
+  )
+
+  return sections.join("\n")
 }
 
 export function buildByoFullPrompt(

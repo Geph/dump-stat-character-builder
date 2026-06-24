@@ -17,6 +17,8 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
+import { cn } from "@/lib/utils"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
@@ -206,7 +208,10 @@ export default function SubclassEditorPage({ id }: { id: string }) {
   const updateFeature = (index: number, updates: Partial<Feature>) => {
     setForm(prev => ({
       ...prev,
-      features: prev.features.map((f, i) => i === index ? { ...f, ...updates } : f)
+      features: prev.features.map((f, i) => {
+        if (i !== index) return f
+        return clearModifierReviewPending({ ...f, ...updates })
+      })
     }))
   }
 
@@ -422,7 +427,20 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             
             <div className="space-y-4">
               {form.features.map((feature, index) => (
-                <div key={index} className="bg-card border-2 border-border rounded-xl p-4">
+                <div
+                  key={index}
+                  className={cn(
+                    "bg-card border-2 rounded-xl p-4",
+                    featureNeedsModifierReview(feature)
+                      ? "border-destructive bg-destructive/5"
+                      : "border-border",
+                  )}
+                >
+                  {featureNeedsModifierReview(feature) ? (
+                    <p className="mb-3 text-xs font-medium text-destructive">
+                      No modifier linked — use Modifier effects below, then save.
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-4 mb-3">
                     <div className="w-20">
                       <label className="block text-xs text-muted-foreground mb-1">Level</label>

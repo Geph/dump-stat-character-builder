@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ClipboardImportPanel } from "@/components/import/clipboard-import-panel"
+import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
@@ -576,6 +577,10 @@ export default function ImportPage() {
               Storage: {getStorageLabel()}. PDF and AI import require a hosted deployment with MySQL.
             </p>
           )}
+        </div>
+
+        <div className="mb-6">
+          <ImportWorkflowGuidancePanel />
         </div>
 
         {message && !importReport && (

@@ -99,6 +99,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   damage_halving_reaction: "Damage mitigation",
   healing_dice_pool: "Resources & uses",
   on_creature_death_trigger: "Active abilities",
+  turn_start_trigger: "Active abilities",
   telepathy: "Movement & senses",
   on_cast_spell_trigger: "Spells & casting",
   spell_healing_modifier: "Spells & casting",
@@ -138,7 +139,14 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
     const mod = createCharacteristicModifier(option.value)
     const entry: ModifierCatalogEntry = {
       id: catalogId("char", option.value),
-      name: option.value === "grant_feat" ? "Gain a Feat" : option.label,
+      name:
+        option.value === "grant_feat"
+          ? "Gain a Feat"
+          : option.value === "attack_roll_modifiers"
+            ? "Attack Roll and Crit Modifiers"
+            : option.value === "damage_roll_modifiers"
+              ? "Weapon Damage Modifiers"
+              : option.label,
       group: CHARACTERISTIC_GROUP[option.value],
       summary:
         option.value === "grant_feat"
@@ -147,7 +155,11 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
             ? "Passive: fixed ability bonuses or ASI-style player choice"
             : option.value === "special_attack"
               ? "Passive: configurable special attack (breath weapon, horns, etc.)"
-              : `Passive: ${option.label}`,
+              : option.value === "attack_roll_modifiers"
+                ? "Passive: bonus to hit and expanded critical range (optional by level)"
+                : option.value === "damage_roll_modifiers"
+                  ? "Passive: weapon damage riders (extra dice, ability mod when missing)"
+                  : `Passive: ${option.label}`,
       characteristics: [mod],
     }
     if (option.value === "special_attack") {

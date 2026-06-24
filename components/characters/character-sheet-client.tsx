@@ -17,6 +17,7 @@ import {
   Pencil,
   FileText,
   Plus,
+  PawPrint,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -77,6 +78,13 @@ import { SheetDefaultActionsPanel } from "@/components/character-sheet/sheet-def
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
 import type { RestType } from "@/lib/types"
+import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
+import {
+  companionStateFromResolved,
+  mergeCompanionState,
+  resolveCharacterCompanions,
+} from "@/lib/character/resolve-companions"
+import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -104,7 +112,7 @@ const ABILITY_LABELS: Record<string, string> = {
   charisma: "CHA",
 }
 
-type SheetTab = "abilities" | "details" | "combat" | "features" | "custom"
+type SheetTab = "abilities" | "details" | "combat" | "features" | "companions" | "custom"
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
   if (character.class_list?.length) return character.class_list
@@ -159,6 +167,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [spells, setSpells] = useState<Spell[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
+  const [companionState, setCompanionState] = useState<CharacterCompanionState[]>([])
   const [characterFeats, setCharacterFeats] = useState<Feat[]>([])
   const [originFeat, setOriginFeat] = useState<Feat | null>(null)
   const [modifierCatalog, setModifierCatalog] = useState<ModifierCatalogEntry[]>([])
@@ -206,6 +215,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedShieldId((data as Character).equipped_shield_id ?? null)
         setEquippedWeaponId((data as Character).equipped_weapon_id ?? null)
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
+        setCompanionState((data as Character).companion_state ?? [])
 
         if (data.spell_ids?.length) {
           const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
@@ -618,6 +628,65 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const spellSaveDc = hasSpellcasting ? 8 + proficiencyBonus + spellAbilityMod : null
   const spellAttackMod = hasSpellcasting ? proficiencyBonus + spellAbilityMod : null
 
+  const companionRows = useMemo(() => {
+    if (!classDetails.length) return []
+    const ctx = {
+      abilityMods,
+      proficiencyBonus,
+      spellAttackModifier:
+        spellAttackMod ?? proficiencyBonus + (abilityMods.intelligence ?? 0),
+      spellSaveDc:
+        spellSaveDc ?? 8 + proficiencyBonus + (abilityMods.intelligence ?? 0),
+      classLevels: classDetails
+        .filter((entry) => entry.class?.name)
+        .map((entry) => ({ className: entry.class!.name, level: entry.row.level })),
+    }
+    const resolved = resolveCharacterCompanions({
+      classDetails,
+      customAbilities,
+      ctx,
+    })
+    return mergeCompanionState(resolved, companionState)
+  }, [
+    classDetails,
+    customAbilities,
+    companionState,
+    abilityMods,
+    proficiencyBonus,
+    spellAttackMod,
+    spellSaveDc,
+  ])
+
+  const persistCompanionState = useCallback(
+    async (next: CharacterCompanionState[]) => {
+      if (!character) return
+      setCompanionState(next)
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({ companion_state: next })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      if (!error && data) setCharacter(data)
+    },
+    [character],
+  )
+
+  const updateCompanionHp = useCallback(
+    (key: string, hp: number) => {
+      const next = companionRows.map((row) =>
+        row.key === key ? { key, currentHp: hp, customName: row.displayName !== row.template.name ? row.displayName : null } : {
+          key: row.key,
+          currentHp: row.currentHp,
+          customName: row.displayName !== row.template.name ? row.displayName : null,
+        },
+      )
+      void persistCompanionState(next)
+    },
+    [companionRows, persistCompanionState],
+  )
+
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
 
   const isPerceptionProficient =
@@ -865,6 +934,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             { id: "abilities" as const, label: "Abilities & Skills", icon: <UserCircle className="w-3.5 h-3.5" /> },
             { id: "combat" as const, label: "Combat", icon: <Swords className="w-3.5 h-3.5" /> },
             { id: "features" as const, label: "Features", icon: <Sparkles className="w-3.5 h-3.5" /> },
+            { id: "companions" as const, label: "Companions", icon: <PawPrint className="w-3.5 h-3.5" /> },
             { id: "custom" as const, label: "Custom", icon: <Wand2 className="w-3.5 h-3.5" /> },
             { id: "details" as const, label: "Character Details", icon: <FileText className="w-3.5 h-3.5" /> },
           ].map((tab) => (
@@ -1399,6 +1469,30 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     ))}
                   </div>
                 </section>
+              )}
+            </div>
+          )}
+
+          {activeTab === "companions" && (
+            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+              {companionRows.length > 0 ? (
+                companionRows.map((companion) => (
+                  <CompanionStatPanel
+                    key={companion.key}
+                    companion={companion}
+                    onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
+                  />
+                ))
+              ) : (
+                <div className="bg-card rounded-xl p-6 border border-border text-center">
+                  <PawPrint className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-foreground">No companions yet</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                    Companions appear when a class or subclass feature includes a stat block (e.g.
+                    Steel Defender, Reanimated Companion). Unlock the feature by level or import the
+                    subclass with a full stat-block description.
+                  </p>
+                </div>
               )}
             </div>
           )}

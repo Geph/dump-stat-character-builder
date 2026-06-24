@@ -4,6 +4,10 @@ import {
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import {
+  isSubclassSpellTableFeature,
+  parseSubclassSpellTable,
+} from "@/lib/import/subclass-spell-table"
 import type { Feature } from "@/lib/types"
 
 export type ImportModifierPreviewEntry = {
@@ -30,7 +34,15 @@ type FeatureCarrier = Feature & {
 }
 
 function featureHasLinkedModifiers(feature: Feature): boolean {
-  return (feature.linkedModifiers?.length ?? 0) > 0
+  if ((feature.linkedModifiers?.length ?? 0) > 0) return true
+  if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) return true
+  if (feature.companion_stat_block) return true
+  const name = feature.name ?? ""
+  const description = feature.description ?? ""
+  if (isSubclassSpellTableFeature(name, description)) {
+    return Boolean(parseSubclassSpellTable(description))
+  }
+  return false
 }
 
 function collectUnmatchedFromFeature(
@@ -133,12 +145,13 @@ function pushReviewRow(
   feature: FeatureCarrier,
   previews: ImportModifierPreviewEntry[],
 ): void {
+  const wiredByStructure = featureHasLinkedModifiers(feature)
   rows.push({
     id: reviewRowId(sourceLabel, feature.name, feature.level),
     sourceLabel,
     featureName: feature.name,
     featureLevel: feature.level,
-    status: previews.length > 0 ? "wired" : "unwired",
+    status: previews.length > 0 || wiredByStructure ? "wired" : "unwired",
     modifiers: previews,
   })
 }

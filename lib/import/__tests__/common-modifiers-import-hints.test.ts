@@ -11,13 +11,28 @@ describe("common modifiers import hints", () => {
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Fighting Style feat of your choice")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("grant_feat")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("mechanics[]")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("INDEX — Description phrases")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("INDEX — Feature name")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Gunslinger")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Weapon Mastery")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("defensive.evasion")
   })
 
   it("includes modifier guidance in BYO extraction prompt", () => {
     const prompt = buildByoExtractionPrompt("classes")
-    expect(prompt).toContain("Common Modifier wiring")
+    expect(prompt).toContain("Common Modifier wiring index")
     expect(prompt).toContain("grant_feat")
     expect(prompt).toContain("Do NOT output linkedModifiers")
+  })
+
+  it("includes PDF upload workflow and page range in BYO PDF prompt", () => {
+    const prompt = buildByoExtractionPrompt("classes", {
+      pdfUpload: true,
+      pageScope: { mode: "range", start: 5, end: 12 },
+    })
+    expect(prompt).toContain("PDF upload workflow")
+    expect(prompt).toContain("PDF pages 5–12")
+    expect(prompt).toContain("source_page")
   })
 
   it("preserves mechanics[] through AI content normalization", () => {
