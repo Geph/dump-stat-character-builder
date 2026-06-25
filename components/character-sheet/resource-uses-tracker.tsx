@@ -86,8 +86,8 @@ export function ResourceUsesTracker({
                     onClick={() => toggleUse(entry.id, max, index)}
                     className={`h-5 w-5 rounded-full border transition-colors ${
                       isUsed
-                        ? "border-primary/40 bg-muted text-transparent"
-                        : "border-primary bg-primary/20 hover:bg-primary/30"
+                        ? "border-primary bg-primary hover:bg-primary/90"
+                        : "border-primary bg-transparent hover:bg-primary/20"
                     }`}
                     title={isUsed ? "Mark available" : "Mark spent"}
                     aria-label={`${entry.name} use ${index + 1}${isUsed ? " spent" : " available"}`}

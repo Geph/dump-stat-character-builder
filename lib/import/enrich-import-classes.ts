@@ -39,9 +39,24 @@ export function detectBattleDieCost(text: string): number | null {
   return detectThirdPartyResourceSpend(text, "battle_dice")
 }
 
+export function detectTrinketCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "trinkets")
+}
+
+export function detectEnduranceDieCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "endurance_dice")
+}
+
 function linkResourceCostsOnFeatures(
   features: Feature[],
-  resourceKeys: { psi?: string; exploit?: string; risk?: string; battle?: string },
+  resourceKeys: {
+    psi?: string
+    exploit?: string
+    risk?: string
+    battle?: string
+    trinkets?: string
+    endurance?: string
+  },
 ): Feature[] {
   return features.map((feature) => {
     const description = feature.description ?? ""
@@ -77,6 +92,26 @@ function linkResourceCostsOnFeatures(
       }
     }
 
+    const trinketCost = resourceKeys.trinkets ? detectTrinketCost(description) : null
+    if (trinketCost != null && resourceKeys.trinkets) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.trinkets,
+        classResourceAmount: trinketCost,
+      }
+    }
+
+    const enduranceCost = resourceKeys.endurance ? detectEnduranceDieCost(description) : null
+    if (enduranceCost != null && resourceKeys.endurance) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.endurance,
+        classResourceAmount: enduranceCost,
+      }
+    }
+
     if (!limitedUses || limitedUses === feature.limitedUses) {
       return normalizeFeatureRow(feature)
     }
@@ -102,8 +137,15 @@ function resolveResourceKeysForClass(
   className: string,
   explicitResources: ClassResourceImportRow[] | undefined,
   progressionText: string,
-): { psi?: string; exploit?: string; risk?: string; battle?: string } {
-  const keys: { psi?: string; exploit?: string; risk?: string; battle?: string } = {}
+): { psi?: string; exploit?: string; risk?: string; battle?: string; trinkets?: string; endurance?: string } {
+  const keys: {
+    psi?: string
+    exploit?: string
+    risk?: string
+    battle?: string
+    trinkets?: string
+    endurance?: string
+  } = {}
   const classResources = explicitResources?.filter((r) => r.class_name === className) ?? []
 
   for (const resource of classResources) {
@@ -111,6 +153,8 @@ function resolveResourceKeysForClass(
     if (/exploit\s*dice/i.test(resource.name)) keys.exploit = resource.resource_key
     if (/risk\s*dice/i.test(resource.name)) keys.risk = resource.resource_key
     if (/battle\s*dice/i.test(resource.name)) keys.battle = resource.resource_key
+    if (/\btrinkets?\b/i.test(resource.name)) keys.trinkets = resource.resource_key
+    if (/endurance\s*dice/i.test(resource.name)) keys.endurance = resource.resource_key
   }
 
   const lower = progressionText.toLowerCase()
@@ -118,6 +162,8 @@ function resolveResourceKeysForClass(
   if (!keys.exploit && /\bexploit\s+die\b/.test(lower)) keys.exploit = "exploit_dice"
   if (!keys.risk && /\brisk\s+dice\b/.test(lower)) keys.risk = "risk_dice"
   if (!keys.battle && /\bbattle\s+dice\b/.test(lower)) keys.battle = "battle_dice"
+  if (!keys.trinkets && /\btrinkets?\b/.test(lower)) keys.trinkets = "trinkets"
+  if (!keys.endurance && /\bendurance\s+dice\b/.test(lower)) keys.endurance = "endurance_dice"
 
   return keys
 }
@@ -254,6 +300,9 @@ export function enrichImportedClassRow(
   const shouldLink =
     resourceKeys.psi ||
     resourceKeys.exploit ||
+    resourceKeys.battle ||
+    resourceKeys.trinkets ||
+    resourceKeys.endurance ||
     explicitResources?.some((resource) => resource.class_name === className)
 
   const nextFeatures = shouldLink

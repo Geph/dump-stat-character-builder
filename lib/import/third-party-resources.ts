@@ -10,6 +10,13 @@ export type ThirdPartyResourcePattern = {
   defaultUses?: Partial<UsesConfig>
   /** Text patterns that spend this resource (for feature linking) */
   spendPatterns: RegExp[]
+  /**
+   * Propose this resource when its namePattern appears in class prose even if it has no
+   * dedicated level-table column (e.g. Charnel Touch, whose pool is defined by a formula).
+   */
+  proposeFromText?: boolean
+  /** Full uses config emitted when proposed from prose (paired with proposeFromText). */
+  textProposalUses?: UsesConfig
 }
 
 export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
@@ -112,6 +119,102 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     displayName: "Upgrades",
     definition:
       "Inventor subclass upgrades chosen from your specialization list; count scales on the class level table.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "rushed_incantation",
+    namePattern: /rushed\s*incantation/i,
+    displayName: "Rushed Incantation",
+    definition:
+      "Uses of Rushed Incantation — cast a grimoire spell as a Bonus Action. Regain one expended use on a Short Rest and all uses on a Long Rest; the count scales on the class level table.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "trinkets",
+    namePattern: /\btrinkets?\b/i,
+    displayName: "Trinkets",
+    definition:
+      "Uses of supernatural Trinkets granted by your Investigator subclass. Regain one expended use on a Short Rest and all uses on a Long Rest; the count scales on the class level table.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend(?:ing)?\s+(?:a|one|1)\s+use\s+of\s+(?:your\s+)?trinkets\b/i,
+      /\bexpend(?:ing)?\s+(?:a|one|1)?\s*use\s+of\s+your\s+trinkets\b/i,
+    ],
+  },
+  {
+    resourceKey: "ritual_level",
+    namePattern: /ritual\s*level/i,
+    displayName: "Ritual Level",
+    definition:
+      "Maximum spell level you can add to your grimoire and cast as a Ritual at each Investigator level — a cap, not a spendable pool.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "finisher",
+    namePattern: /\bfinisher\b/i,
+    displayName: "Finisher",
+    definition:
+      "Bonus damage dice dealt by your Finisher (e.g. 1d8 → 3d8). The die count and size scale on the class level table; this is a damage rider, not a spendable pool.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "charnel_touch",
+    namePattern: /charnel\s*touch/i,
+    displayName: "Charnel Touch",
+    definition:
+      "Pool of Charnel Touch points equal to 5 × your Necromancer level. Spend points (up to 5 × your Proficiency Bonus per use) to channel necrotic energy; the pool replenishes on a Long Rest and can be refilled by Dark Arcana.",
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 5 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend[^.]{0,40}charnel\s+touch\b/i,
+      /\bcharnel\s+touch\s+points?[^.]{0,40}\bexpend/i,
+    ],
+  },
+  {
+    resourceKey: "endurance_die_size",
+    namePattern: /endurance\s*die\s*size/i,
+    displayName: "Endurance Die Size",
+    definition:
+      "Die type (d8, d10, d12) rolled when spending Endurance Dice — scales on the class level table, not a spendable pool.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "endurance_dice",
+    namePattern: /endurance\s*dice/i,
+    displayName: "Endurance Dice",
+    definition:
+      "Pool of Endurance Dice rolled to reduce damage taken or boost a saving throw (no action required). The die size scales by level; regain all expended dice when you finish a Short or Long Rest.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\broll\s+(?:an?|one|1)\s+endurance\s+die\b/i,
+      /\bexpend\s+(?:an?|one|1)\s+endurance\s+die\b/i,
+      /\broll\s+(?:up\s+to\s+)?(\d+)\s+endurance\s+dice\b/i,
+    ],
+  },
+  {
+    resourceKey: "primal_manifestations",
+    namePattern: /primal\s*manifestations?/i,
+    displayName: "Primal Manifestations",
+    definition:
+      "Number of Primal Manifestations the Warden knows — chosen from the manifestation list; the count scales on the class level table, not a spendable pool.",
     spendPatterns: [],
   },
 ]

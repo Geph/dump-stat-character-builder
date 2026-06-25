@@ -343,6 +343,31 @@ function collectTableResources(
   }
 }
 
+function collectTextDerivedResources(
+  content: ImportContent,
+  into: ImportProposalSet,
+  seenResources: Set<string>,
+) {
+  for (const classRow of content.classes ?? []) {
+    const className = classRow.name
+    const text = collectClassText(classRow as Record<string, unknown>)
+    if (!text) continue
+    for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
+      if (!pattern.proposeFromText || !pattern.textProposalUses) continue
+      if (!pattern.namePattern.test(text)) continue
+      pushResource(into.classResources, seenResources, {
+        className,
+        resourceKey: pattern.resourceKey,
+        name: pattern.displayName,
+        definition: pattern.definition,
+        description: `${pattern.displayName} for ${className} (detected from class description).`,
+        uses: pattern.textProposalUses,
+        source: "feature",
+      })
+    }
+  }
+}
+
 function collectDisciplineFeatures(
   content: ImportContent,
   into: ImportProposalSet,
@@ -523,6 +548,7 @@ export function collectImportProposals(content: ImportContent): ImportProposalSe
 
   collectExplicitResources(content, result, seenResources)
   collectTableResources(content, result, seenResources)
+  collectTextDerivedResources(content, result, seenResources)
 
   const fromAi = collectFromAiProposals(content)
   for (const resource of fromAi.classResources) {

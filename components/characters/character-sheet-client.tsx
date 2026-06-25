@@ -18,6 +18,7 @@ import {
   FileText,
   Plus,
   PawPrint,
+  Backpack,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -66,6 +67,7 @@ import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-de
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -118,7 +120,7 @@ const ABILITY_LABELS: Record<string, string> = {
   charisma: "CHA",
 }
 
-type SheetTab = "abilities" | "details" | "combat" | "features" | "companions" | "custom"
+type SheetTab = "abilities" | "details" | "combat" | "equipment" | "features" | "companions" | "custom"
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
   if (character.class_list?.length) return character.class_list
@@ -168,9 +170,56 @@ function CollapsibleDetailField({
   )
 }
 
+/** A feature/trait card whose body can be accordioned away, leaving just the title row. */
+function CollapsibleFeatureCard({
+  name,
+  level,
+  description,
+  collapsedLines,
+}: {
+  name: string
+  level?: number | null
+  description?: string | null
+  collapsedLines?: number
+}) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="bg-muted rounded-lg text-xs overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 p-2 text-left hover:bg-muted/70 transition-colors"
+        aria-expanded={open}
+      >
+        <span className="font-bold min-w-0">
+          {name}
+          {level != null ? (
+            <span className="text-muted-foreground font-normal"> (Lv {level})</span>
+          ) : null}
+        </span>
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+      {open && description ? (
+        <div className="px-2 pb-2">
+          <ExpandableDescription
+            text={description}
+            className="text-muted-foreground"
+            collapsedLines={collapsedLines}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function CharacterSheetClient({ id }: { id: string }) {
   const [character, setCharacter] = useState<CharacterWithRelations | null>(null)
   const [spells, setSpells] = useState<Spell[]>([])
+  const [spellCatalog, setSpellCatalog] = useState<Spell[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
   const [companionState, setCompanionState] = useState<CharacterCompanionState[]>([])
@@ -233,6 +282,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
           if (spellData) setSpells(spellData)
         }
+
+        const { data: spellCatalogData } = await db.from("spells").select("*")
+        if (spellCatalogData) setSpellCatalog(spellCatalogData as Spell[])
 
         if (data.equipment_ids?.length) {
           const { data: equipmentData } = await db.from("equipment").select("*").in("id", data.equipment_ids)
@@ -520,8 +572,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   ])
 
   const asiBonuses = useMemo(
-    () => aggregateAsiBonuses((character?.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {}),
-    [character?.asi_allocations],
+    () =>
+      derived?.asiBonuses ??
+      aggregateAsiBonuses((character?.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {}),
+    [derived?.asiBonuses, character?.asi_allocations],
   )
 
   const classDetails = useMemo(
@@ -565,6 +619,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const resources = SRD_CLASS_RESOURCES_BY_NAME[className] ?? []
       for (const resource of resources) {
         if (resource.uses.type === "unlimited" || resource.uses.type === "class_resource") continue
+        if (resource.id === "spell_slots") continue
         entries.push({
           id: `${entry.row.class_id}_${resource.id}`,
           name:
@@ -584,8 +639,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       collectSheetActions({
         classDetails,
         species: character?.species ?? null,
+        backgroundFeature: character?.backgrounds?.feature ?? null,
       }),
-    [classDetails, character?.species],
+    [classDetails, character?.species, character?.backgrounds?.feature],
+  )
+
+  const combatActions = useMemo(
+    () => sheetActions.filter((action) => action.category !== "utility"),
+    [sheetActions],
+  )
+  const utilityActions = useMemo(
+    () => sheetActions.filter((action) => action.category === "utility"),
+    [sheetActions],
   )
 
   const equippedWeapon = useMemo(() => {
@@ -881,9 +946,32 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       abilityMods.wisdom +
       (isPerceptionProficient ? proficiencyBonus * (hasPerceptionExpertise ? 2 : 1) : 0)
 
+  const alwaysPreparedSpellIds = (() => {
+    const ids = new Set<string>()
+    if (!spellCatalog.length) return ids
+    for (const detail of classDetails) {
+      const features = (detail.subclass?.features as import("@/lib/types").Feature[] | undefined) ?? []
+      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, spellCatalog)) {
+        ids.add(grant.spellId)
+      }
+    }
+    return ids
+  })()
+
+  const displayedSpells = (() => {
+    if (!alwaysPreparedSpellIds.size) return spells
+    const byId = new Map(spells.map((spell) => [spell.id, spell]))
+    for (const id of alwaysPreparedSpellIds) {
+      if (byId.has(id)) continue
+      const row = spellCatalog.find((spell) => spell.id === id)
+      if (row) byId.set(id, row)
+    }
+    return [...byId.values()]
+  })()
+
   const spellsGroupedByLevel = (() => {
     const groups = new Map<number, Spell[]>()
-    for (const spell of spells) {
+    for (const spell of displayedSpells) {
       const list = groups.get(spell.level) ?? []
       list.push(spell)
       groups.set(spell.level, list)
@@ -1109,6 +1197,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {[
             { id: "abilities" as const, label: "Abilities & Skills", icon: <UserCircle className="w-3.5 h-3.5" /> },
             { id: "combat" as const, label: "Combat", icon: <Swords className="w-3.5 h-3.5" /> },
+            { id: "equipment" as const, label: "Equipment", icon: <Backpack className="w-3.5 h-3.5" /> },
             { id: "features" as const, label: "Features", icon: <Sparkles className="w-3.5 h-3.5" /> },
             { id: "companions" as const, label: "Companions", icon: <PawPrint className="w-3.5 h-3.5" /> },
             { id: "custom" as const, label: "Custom", icon: <Wand2 className="w-3.5 h-3.5" /> },
@@ -1220,10 +1309,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       <span className="font-bold tabular-nums">{passivePerception}</span>
                     </div>
                   </div>
-                  <DefaultActionsButton
-                    variant="footer"
-                    onClick={() => setDefaultActionsContext("abilities")}
-                  />
                 </div>
 
                 <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
@@ -1300,6 +1385,29 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
               </div>
 
+              <div className="bg-card rounded-xl p-3 border border-border">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <h2 className="text-sm font-bold text-foreground">Actions</h2>
+                  <DefaultActionsButton onClick={() => setDefaultActionsContext("abilities")} />
+                </div>
+                {utilityActions.length ? (
+                  <SheetActionsPanel
+                    actions={utilityActions}
+                    usedByActionId={usedActionUsesById}
+                    onUsedChange={setUsedActionUsesById}
+                    resolveContext={usesResolveContext}
+                    resourceEntries={resourceEntries}
+                    usedResourcesById={usedResourcesById}
+                    onResourceUsedChange={setUsedResourcesById}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    No non-combat actions from your features or traits. Use Standard Actions for
+                    options like Dash, Hide, and Search.
+                  </p>
+                )}
+              </div>
+
             </div>
           )}
 
@@ -1349,8 +1457,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "combat" && (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:items-stretch">
-                <div className="bg-card rounded-xl p-3 border border-border flex flex-col min-h-0 order-2 lg:order-1">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:items-start">
+                <div className="lg:col-span-2 space-y-3">
+                <div className="bg-card rounded-xl p-3 border border-border flex flex-col min-h-0">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h2 className="text-sm font-bold text-foreground">Actions</h2>
                     <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
@@ -1362,19 +1471,69 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     weaponProficiencies={derived?.weaponProficiencies ?? []}
                   />
                   <SheetActionsPanel
-                    actions={sheetActions}
+                    actions={combatActions}
                     usedByActionId={usedActionUsesById}
                     onUsedChange={setUsedActionUsesById}
                     resolveContext={usesResolveContext}
+                    resourceEntries={resourceEntries}
+                    usedResourcesById={usedResourcesById}
+                    onResourceUsedChange={setUsedResourcesById}
                   />
-                  {!equippedWeapon && !sheetActions.length ? (
+                  {!equippedWeapon && !combatActions.length ? (
                     <p className="text-xs text-muted-foreground italic">
                       No action-economy abilities listed.
                     </p>
                   ) : null}
                 </div>
 
-                <div className="space-y-3 order-1 lg:order-2">
+                {hasSpellcasting && (
+                  <div className="bg-card rounded-xl p-3 border border-border min-w-0">
+                    <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
+                    {spellsGroupedByLevel.length ? (
+                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                        {spellsGroupedByLevel.map((group) => (
+                          <div key={group.level}>
+                            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5">
+                              {group.label}
+                            </h3>
+                            <div className="space-y-1">
+                              {group.spells.map((spell) => (
+                                <button
+                                  key={spell.id}
+                                  type="button"
+                                  onClick={() => setSelectedSpell(spell)}
+                                  className="flex w-full justify-between items-center gap-2 text-xs px-2 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left"
+                                >
+                                  <span className="font-medium truncate">{spell.name}</span>
+                                  <span className="flex items-center gap-1 shrink-0">
+                                    {alwaysPreparedSpellIds.has(spell.id) && (
+                                      <span
+                                        className="text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                                        title="Always prepared by your subclass"
+                                      >
+                                        Always
+                                      </span>
+                                    )}
+                                    {spell.concentration && (
+                                      <span className="text-[9px] text-purple-600 dark:text-purple-400">
+                                        C
+                                      </span>
+                                    )}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No spells prepared</p>
+                    )}
+                  </div>
+                )}
+                </div>
+
+                <div className="space-y-3">
                   <div className="bg-card rounded-xl p-3 border border-border">
                     <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
                     <div className="space-y-1">
@@ -1412,47 +1571,40 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                         </>
                       )}
-                      <div className="pt-2 mt-1 border-t border-border/60 space-y-3">
-                        <div>
-                          <h3 className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">
-                            Resources
-                          </h3>
-                          {spellSlotTables.length > 0 && (
-                            <div className="space-y-3">
-                              {spellSlotTables.map((table) => {
-                                const key = spellSlotTableKey(table)
-                                return (
-                                  <SpellSlotTracker
-                                    key={key}
-                                    table={table}
-                                    usedByLevel={usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)}
-                                    onUsedChange={(used) =>
-                                      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: used }))
-                                    }
-                                  />
-                                )
-                              })}
-                            </div>
-                          )}
-                          {resourceEntries.length > 0 && (
-                            <ResourceUsesTracker
-                              entries={resourceEntries}
-                              usedById={usedResourcesById}
-                              onUsedChange={setUsedResourcesById}
-                              resolveContext={usesResolveContext}
-                            />
-                          )}
-                          {!spellSlotTables.length && !resourceEntries.length && (
-                            <p className="text-xs text-muted-foreground italic">
-                              No class resources to track
-                            </p>
-                          )}
-                        </div>
-                        <DeathSaveTracker
-                          deathSaves={deathSaves}
-                          onDeathSavesChange={setDeathSaves}
-                          compact
-                        />
+                      <div className="pt-2 mt-1 border-t border-border/60">
+                        <h3 className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">
+                          Resources
+                        </h3>
+                        {spellSlotTables.length > 0 && (
+                          <div className="space-y-3">
+                            {spellSlotTables.map((table) => {
+                              const key = spellSlotTableKey(table)
+                              return (
+                                <SpellSlotTracker
+                                  key={key}
+                                  table={table}
+                                  usedByLevel={usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)}
+                                  onUsedChange={(used) =>
+                                    setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: used }))
+                                  }
+                                />
+                              )
+                            })}
+                          </div>
+                        )}
+                        {resourceEntries.length > 0 && (
+                          <ResourceUsesTracker
+                            entries={resourceEntries}
+                            usedById={usedResourcesById}
+                            onUsedChange={setUsedResourcesById}
+                            resolveContext={usesResolveContext}
+                          />
+                        )}
+                        {!spellSlotTables.length && !resourceEntries.length && (
+                          <p className="text-xs text-muted-foreground italic">
+                            No class resources to track
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1483,10 +1635,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         },
                       )}
                     </div>
+                    <div className="pt-3 mt-3 border-t border-border/60">
+                      <DeathSaveTracker
+                        deathSaves={deathSaves}
+                        onDeathSavesChange={setDeathSaves}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
+          {activeTab === "equipment" && (
+            <div className="space-y-3">
               <div className="bg-card rounded-xl p-3 border border-border">
                 <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
                 <SheetEquipmentPanel
@@ -1569,42 +1731,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   onShowDetails={setSelectedEquipment}
                 />
               </div>
-
-              {hasSpellcasting && (
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0">
-                  <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
-                  {spellsGroupedByLevel.length ? (
-                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                      {spellsGroupedByLevel.map((group) => (
-                        <div key={group.level}>
-                          <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5">
-                            {group.label}
-                          </h3>
-                          <div className="space-y-1">
-                            {group.spells.map((spell) => (
-                              <button
-                                key={spell.id}
-                                type="button"
-                                onClick={() => setSelectedSpell(spell)}
-                                className="flex w-full justify-between items-center text-xs px-2 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left"
-                              >
-                                <span className="font-medium truncate">{spell.name}</span>
-                                {spell.concentration && (
-                                  <span className="text-[9px] text-purple-600 dark:text-purple-400 shrink-0 ml-2">
-                                    C
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No spells prepared</p>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
@@ -1623,13 +1749,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </h2>
                     <div className="space-y-2">
                       {classFeatures.map((feature, index) => (
-                        <div key={`${entry.row.class_id}-${index}`} className="p-2 bg-muted rounded-lg text-xs">
-                          <p className="font-bold">
-                            {feature.name}{" "}
-                            <span className="text-muted-foreground font-normal">(Lv {feature.level})</span>
-                          </p>
-                          <ExpandableDescription text={feature.description} className="text-muted-foreground" />
-                        </div>
+                        <CollapsibleFeatureCard
+                          key={`${entry.row.class_id}-${index}`}
+                          name={feature.name}
+                          level={feature.level}
+                          description={feature.description}
+                        />
                       ))}
                     </div>
                   </section>
@@ -1648,13 +1773,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     <h2 className="text-sm font-bold mb-2">{entry.subclass.name} Features</h2>
                     <div className="space-y-2">
                       {subclassFeatures.map((feature, index) => (
-                        <div key={index} className="p-2 bg-muted rounded-lg text-xs">
-                          <p className="font-bold">
-                            {feature.name}{" "}
-                            <span className="text-muted-foreground font-normal">(Lv {feature.level})</span>
-                          </p>
-                          <ExpandableDescription text={feature.description} className="text-muted-foreground" />
-                        </div>
+                        <CollapsibleFeatureCard
+                          key={index}
+                          name={feature.name}
+                          level={feature.level}
+                          description={feature.description}
+                        />
                       ))}
                     </div>
                   </section>
@@ -1666,10 +1790,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <h2 className="text-sm font-bold mb-2">{character.species.name} Traits</h2>
                   <div className="space-y-2">
                     {character.species.traits.map((trait, index) => (
-                      <div key={index} className="p-2 bg-muted rounded-lg text-xs">
-                        <p className="font-bold">{trait.name}</p>
-                        <ExpandableDescription text={trait.description} className="text-muted-foreground" />
-                      </div>
+                      <CollapsibleFeatureCard
+                        key={index}
+                        name={trait.name}
+                        description={trait.description}
+                      />
                     ))}
                   </div>
                 </section>
@@ -1678,26 +1803,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               {character.backgrounds?.feature && (
                 <section className="bg-card rounded-xl p-3 border border-border">
                   <h2 className="text-sm font-bold mb-2">Background Feature</h2>
-                  <div className="p-2 bg-muted rounded-lg text-xs">
-                    <p className="font-bold">{character.backgrounds.feature.name}</p>
-                    <ExpandableDescription
-                      text={character.backgrounds.feature.description}
-                      className="text-muted-foreground"
-                    />
-                  </div>
+                  <CollapsibleFeatureCard
+                    name={character.backgrounds.feature.name}
+                    description={character.backgrounds.feature.description}
+                  />
                 </section>
               )}
 
               {(originFeat || character.backgrounds?.feat_granted) && (
                 <section className="bg-card rounded-xl p-3 border border-border">
                   <h2 className="text-sm font-bold mb-2">Origin Feats</h2>
-                  <div className="p-2 bg-muted rounded-lg text-xs">
-                    <p className="font-bold">{originFeat?.name ?? character.backgrounds?.feat_granted}</p>
-                    <ExpandableDescription
-                      text={originFeat?.description ?? "Granted by your background at 1st level."}
-                      className="text-muted-foreground"
-                    />
-                  </div>
+                  <CollapsibleFeatureCard
+                    name={originFeat?.name ?? character.backgrounds?.feat_granted ?? "Origin Feat"}
+                    description={originFeat?.description ?? "Granted by your background at 1st level."}
+                  />
                 </section>
               )}
 
@@ -1706,10 +1825,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <h2 className="text-sm font-bold mb-2">General Feats & Epic Boons</h2>
                   <div className="space-y-2">
                     {characterFeats.map((feat, index) => (
-                      <div key={`${feat.id}-${index}`} className="p-2 bg-muted rounded-lg text-xs">
-                        <p className="font-bold">{feat.name}</p>
-                        <ExpandableDescription text={feat.description} className="text-muted-foreground" collapsedLines={4} />
-                      </div>
+                      <CollapsibleFeatureCard
+                        key={`${feat.id}-${index}`}
+                        name={feat.name}
+                        description={feat.description}
+                        collapsedLines={4}
+                      />
                     ))}
                   </div>
                 </section>
@@ -1786,19 +1907,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       <AnimatePresence>
         {defaultActionsContext ? (
           <DefaultActionsOverlay
+            key="default-actions"
             context={defaultActionsContext}
             onClose={() => setDefaultActionsContext(null)}
           />
         ) : null}
-        {selectedEquipment && (
+        {selectedEquipment ? (
           <EquipmentDetailOverlay
+            key="equipment-detail"
             item={selectedEquipment}
             catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
             baseSelections={equipmentBaseSelections}
             onClose={() => setSelectedEquipment(null)}
           />
-        )}
+        ) : null}
         <SheetAddEquipmentOverlay
+          key="add-equipment"
           open={addEquipmentOpen}
           onClose={() => setAddEquipmentOpen(false)}
           catalog={equipmentCatalog}
@@ -1806,8 +1930,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           currentGold={characterGold}
           onAddItem={(item, options) => void handleAddEquipmentFromCatalog(item, options)}
         />
-        {selectedSpell && (
+        {selectedSpell ? (
           <SpellDetailOverlay
+            key="spell-detail"
             spell={selectedSpell}
             spellAttackMod={spellAttackMod}
             activeConcentration={getActiveConcentration(activeConditions)}
@@ -1842,9 +1967,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 })())
             }
           />
-        )}
-        {portraitZoomOpen && character.portrait_url && (
+        ) : null}
+        {portraitZoomOpen && character.portrait_url ? (
           <motion.div
+            key="portrait-zoom"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1868,7 +1994,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               onClick={(e) => e.stopPropagation()}
             />
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
     </SheetRollHistoryProvider>

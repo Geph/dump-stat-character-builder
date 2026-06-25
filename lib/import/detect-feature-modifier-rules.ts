@@ -1414,6 +1414,23 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: () => buildEvasionModifier(`modinst_evasion_${newInstanceId()}`),
   },
   {
+    id: "defensive.flat_damage_reduction",
+    confidence: "medium",
+    test: /reduce\s+(?:the\s+)?damage\s+(?:taken|you\s+take)\s+by\s+(\d+)\b/i,
+    build: (match, ctx) => {
+      const amount = parseInt(match[1], 10)
+      if (!Number.isFinite(amount) || amount <= 0) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("damage_reduction"), [
+        {
+          id: modId(instanceKey(ctx, "damage_reduction")),
+          type: "damage_reduction",
+          amount,
+          damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+        },
+      ])
+    },
+  },
+  {
     id: "check.bonus.initiative.ability",
     confidence: "high",
     test:

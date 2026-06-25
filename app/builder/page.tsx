@@ -154,6 +154,7 @@ import {
   isValidBackgroundAsiAllocation,
 } from "@/lib/builder/background-asi"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
+import { collectSubclassAlwaysPreparedSpellIds } from "@/lib/character/subclass-granted-spells"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
   isFeatEligibleForCategories,
@@ -1306,7 +1307,15 @@ export default function BuilderPage() {
   ]
   const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
   const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
-  const allSpellIds = [...new Set([...mergedSpellIds, ...featGrantedSpellIds])]
+  const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
+    activeClassLevels.map((cl) => ({
+      subclass: subclasses.find((sc) => sc.id === subclassByClassId[cl.classId]) ?? null,
+      classLevel: cl.level,
+    })),
+    spells,
+  )
+  const grantedSpellIds = [...new Set([...featGrantedSpellIds, ...subclassGrantedSpellIds])]
+  const allSpellIds = [...new Set([...mergedSpellIds, ...grantedSpellIds])]
 
   const characterDerived = useMemo(
     () =>
@@ -3308,11 +3317,23 @@ export default function BuilderPage() {
                       const classSpellIds = spellPicksByClassId[casterClass.id] ?? []
                       const spellCounts = countSelectedSpells(classSpellIds, spells, casterClass.name)
                       const maxSpellLevel = spellLimits.maxSpellLevel
+                      // Spells the character already knows from another source (feat/modifier
+                      // grants or another caster class) can't be picked again here.
+                      const otherClassPickedIds = Object.entries(spellPicksByClassId)
+                        .filter(([classId]) => classId !== casterClass.id)
+                        .flatMap(([, ids]) => ids)
+                      const alreadyKnownSpellIds = new Set<string>([
+                        ...grantedSpellIds,
+                        ...otherClassPickedIds,
+                      ])
                       const availableSpells = spells
                         .filter(
                           (s) =>
                             s.classes?.includes(casterClass.name) &&
                             (s.level === 0 || s.level <= maxSpellLevel),
+                        )
+                        .filter(
+                          (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
                         )
                         .filter((s) => s.name.toLowerCase().includes(spellSearch.toLowerCase()))
 

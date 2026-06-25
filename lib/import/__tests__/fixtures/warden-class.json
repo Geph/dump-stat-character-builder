@@ -1,0 +1,78 @@
+{
+  "classes": [
+    {
+      "name": "Warden",
+      "description": "<table><tr><th>Level</th><th>Proficiency Bonus</th><th>Endurance Dice</th><th>Endurance Die Size</th><th>Primal Manifestation</th><th>Features</th></tr><tr><td>1st</td><td>+2</td><td>—</td><td>—</td><td>—</td><td>Mystic Bulwark, Warden Bond</td></tr><tr><td>2nd</td><td>+2</td><td>3</td><td>1d8</td><td>—</td><td>Primal Interdiction, Endurance Dice</td></tr><tr><td>3rd</td><td>+2</td><td>3</td><td>1d8</td><td>2</td><td>Primal Manifestations, Warden's Grasp</td></tr><tr><td>4th</td><td>+2</td><td>3</td><td>1d8</td><td>2</td><td>Ability Score Improvement</td></tr><tr><td>5th</td><td>+3</td><td>4</td><td>1d10</td><td>2</td><td>Extra Attack</td></tr><tr><td>6th</td><td>+3</td><td>4</td><td>1d10</td><td>3</td><td>Empowered Endurance, Primal Strike</td></tr><tr><td>9th</td><td>+4</td><td>5</td><td>1d10</td><td>4</td><td>Natural Body</td></tr><tr><td>11th</td><td>+4</td><td>5</td><td>1d12</td><td>4</td><td>Evolving Power</td></tr><tr><td>13th</td><td>+5</td><td>6</td><td>1d12</td><td>5</td><td>Mystic Barrier</td></tr><tr><td>15th</td><td>+5</td><td>6</td><td>1d12</td><td>6</td><td>Second Life, Movement Through Nature</td></tr><tr><td>18th</td><td>+6</td><td>7</td><td>1d12</td><td>7</td><td>Timeless Body, Invulnerable Endurance</td></tr><tr><td>20th</td><td>+6</td><td>7</td><td>1d12</td><td>7</td><td>Primal Decree</td></tr></table>",
+      "hit_die": 12,
+      "primary_ability": ["Strength", "Constitution"],
+      "saving_throws": ["Strength", "Wisdom"],
+      "weapon_proficiencies": ["Simple weapons"],
+      "armor_proficiencies": ["Light armor", "Medium armor", "Shields"],
+      "skill_choices": {
+        "count": 2,
+        "options": [
+          "Animal Handling",
+          "Athletics",
+          "Insight",
+          "Intimidation",
+          "Medicine",
+          "Nature",
+          "Perception",
+          "Survival"
+        ]
+      },
+      "features": [
+        {
+          "level": 1,
+          "name": "Mystic Bulwark",
+          "description": "When you don light or medium armor, you can enhance it with mystical defenses, integrating it with manifestations of your Warden Bond. When you do so, you can use your Wisdom modifier in place of your Dexterity modifier when calculating your AC with that armor. While you have your armor integrated with your primal power, when you take bludgeoning, piercing, or slashing damage, you can reduce the damage taken by 2. This value increases at 5th level (to 3), 9th level (to 4), 13th level (to 5), and 17th level (to 6)."
+        },
+        {
+          "level": 1,
+          "name": "Warden Bond",
+          "description": "You select an aspect of primal powers, gaining the ability to manifest your bond with that power. Your choice grants you features at 1st level and again at 3rd, 7th, 14th, and 17th levels."
+        },
+        {
+          "level": 2,
+          "name": "Endurance Dice",
+          "description": "You gain access to three d8 Endurance Dice. You have two ways to use these dice. Once per turn, when you take damage, you can roll an Endurance Die to reduce the damage taken by the amount rolled (no action required). When you make a saving throw, you can roll an Endurance Die and add it to the saving throw (no action required). You regain all expended Endurance Dice when you complete a short or long rest."
+        },
+        {
+          "level": 3,
+          "name": "Primal Manifestations",
+          "description": "Your connection to the primal forces you've bonded with develop in new ways. You gain two such Primal Manifestations selecting from the list at the end of the class description. When you gain certain Warden levels, you gain additional manifestations of your choice, as shown on the Warden Class Table."
+        },
+        {
+          "level": 4,
+          "name": "Ability Score Improvement",
+          "description": "When you reach 4th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1. You gain this feature again at 8th, 10th, 12th, 16th, and 19th levels."
+        },
+        {
+          "level": 5,
+          "name": "Extra Attack",
+          "description": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn."
+        },
+        {
+          "level": 6,
+          "name": "Empowered Endurance",
+          "description": "When you roll an Endurance Die to reduce damage, you can add your Constitution modifier to the result rolled. Additionally, if you roll for initiative with no Endurance Dice remaining, you regain one Endurance Die."
+        },
+        {
+          "level": 6,
+          "name": "Primal Strike",
+          "description": "Your attacks from natural weapons count as magical for the purpose of overcoming resistance and immunity to nonmagical attacks and damage."
+        },
+        {
+          "level": 13,
+          "name": "Mystic Barrier",
+          "description": "Your Mystic Bulwark damage reduction applies to all damage types (rather than just bludgeoning, piercing, and slashing damage)."
+        },
+        {
+          "level": 15,
+          "name": "Second Life",
+          "description": "When you would be reduced to 0 hit points, you are instead reduced to 1 hit point, and regain hit points equal to half your maximum hit points. Once this is triggered, you must finish a long rest before you can use this feature again."
+        }
+      ]
+    }
+  ]
+}

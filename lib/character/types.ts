@@ -74,6 +74,7 @@ export type WeaponAttackDerived = {
 export type DerivedCharacter = {
   abilityScores: Record<AbilityScoreKey, number>
   abilityMods: Record<AbilityScoreKey, number>
+  asiBonuses: Partial<Record<AbilityScoreKey, number>>
   proficiencyBonus: number
   totalLevel: number
   armorClass: number

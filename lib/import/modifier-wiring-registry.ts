@@ -533,6 +533,14 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes:
       "Scoped defensive save (Dex, no damage on success). NOT saving_throw_trigger — that is for reactive abilities.",
   },
+  {
+    ruleId: "defensive.flat_damage_reduction",
+    trigger: "description",
+    catalog: "cat_char_damage_reduction",
+    examples: ["you can reduce the damage taken by 2"],
+    notes:
+      "Flat damage reduction (e.g. Warden Mystic Bulwark). Defaults to Bludgeoning/Piercing/Slashing; widen damageTypes for all-damage variants. Requires a numeric amount — phrasing like 'reduce the damage by the amount rolled' is intentionally ignored.",
+  },
 ]
 
 /** Feature-name rules — must cover every FEATURE_NAME_MODIFIER_RULES id. */

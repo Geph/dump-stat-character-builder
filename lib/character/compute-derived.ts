@@ -209,7 +209,18 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     ...builderCharacteristicMods,
     ...equipmentMagicMods,
   ])
-  const asiBonuses = aggregateAsiBonuses(inputs.asiAllocations)
+  // Source IDs the character currently has, used to discard orphaned ability-score
+  // pool allocations left behind after a class/feat/species change.
+  const validAsiSourceIds = new Set<string>(
+    [
+      ...inputs.classLevels.map((entry) => entry.classId),
+      ...Object.values(inputs.subclassByClassId ?? {}),
+      ...(inputs.selectedFeatIds ?? []),
+      ...(inputs.grantedFeatIds ?? []),
+      ...(inputs.species?.id ? [inputs.species.id] : []),
+    ].filter(Boolean),
+  )
+  const asiBonuses = aggregateAsiBonuses(inputs.asiAllocations, validAsiSourceIds)
   const backgroundAbilityBonuses = aggregateBackgroundAbilityBonuses(
     background,
     inputs.asiAllocations,
@@ -369,6 +380,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   return {
     abilityScores,
     abilityMods,
+    asiBonuses,
     proficiencyBonus,
     totalLevel,
     armorClass,

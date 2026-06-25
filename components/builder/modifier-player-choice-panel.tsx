@@ -84,7 +84,7 @@ function SpellGrantPicker({
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
           {filtered.map((spell) => {
             const isSelected = selectedIds.includes(spell.id)
             const isDisabled = !isSelected && selectedIds.length >= slot.maxCount
