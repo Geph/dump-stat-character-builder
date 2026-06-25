@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "fs"
 import { describe, expect, it } from "vitest"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
@@ -10,20 +9,14 @@ import {
   parseSubclassSpellTable,
 } from "@/lib/import/subclass-spell-table"
 import type { ImportContent } from "@/lib/import/content-schema"
-
-const FIXTURE_DIR = join(
-  "d:",
-  "Google Drive",
-  "Code Projects",
-  "dump stat working files",
-  "JSON imports",
-)
+import {
+  hasHomebrewImportFixtures,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
 function loadFixture(name: string): ImportContent {
-  const path = join(FIXTURE_DIR, name)
-  if (!existsSync(path)) {
-    throw new Error(`Missing fixture: ${path}`)
-  }
+  const path = homebrewFixturePath(name)
+  if (!path) throw new Error(`Missing homebrew fixture: ${name}`)
   return normalizeAiImportContent(JSON.parse(readFileSync(path, "utf8")))
 }
 
@@ -34,7 +27,7 @@ function unwiredNames(content: ImportContent): string[] {
     .map((row) => `${row.sourceName ?? "?"} L${row.featureLevel ?? "?"} ${row.featureName}`)
 }
 
-describe("Witch / Psion homebrew import fixtures", () => {
+describe.runIf(hasHomebrewImportFixtures)("Witch / Psion homebrew import fixtures", () => {
   it("loads witch-class.json with core features wired", () => {
     const content = loadFixture("witch-class.json")
     const unwired = unwiredNames(content)
@@ -49,14 +42,7 @@ describe("Witch / Psion homebrew import fixtures", () => {
   })
 
   it("parses witch subclass spell tables when fixture is valid JSON", () => {
-    const path = join(FIXTURE_DIR, "witch-subclasses.json")
-    if (!existsSync(path)) return
-    let content: ImportContent
-    try {
-      content = loadFixture("witch-subclasses.json")
-    } catch {
-      return
-    }
+    const content = loadFixture("witch-subclasses.json")
     const spellFeatures = (content.subclasses ?? []).flatMap((sc) =>
       (sc.features ?? [])
         .filter((f) => /spell/i.test(f.name))
@@ -65,8 +51,6 @@ describe("Witch / Psion homebrew import fixtures", () => {
     for (const row of spellFeatures) {
       const detected = isSubclassSpellTableFeature(row.feature, row.description)
       const parsed = parseSubclassSpellTable(row.description)
-      // eslint-disable-next-line no-console
-      console.log(row.subclass, row.feature, "detected", detected, "rows", parsed?.rows.length ?? 0)
       if (row.feature.endsWith("Spells") && /<table/i.test(row.description)) {
         expect(detected, row.feature).toBe(true)
         expect(parsed?.rows.length ?? 0, row.feature).toBeGreaterThan(0)
@@ -75,12 +59,7 @@ describe("Witch / Psion homebrew import fixtures", () => {
   })
 
   it("wires common witch subclass features from fixture", () => {
-    let content: ImportContent
-    try {
-      content = loadFixture("witch-subclasses.json")
-    } catch {
-      return
-    }
+    const content = loadFixture("witch-subclasses.json")
     const enriched = enrichImportContentModifiers(content)
     const review = collectImportModifierReview(enriched)
     const wired = (name: string, subclass: string, className = "Witch") =>
@@ -118,11 +97,6 @@ describe("Witch / Psion homebrew import fixtures", () => {
   it("loads psion-disciplines as custom abilities", () => {
     const content = loadFixture("psion-disciplines.json")
     const proposals = collectImportProposals(content)
-    // eslint-disable-next-line no-console
-    console.log(
-      "psion disciplines proposals:",
-      proposals.customAbilities.map((a) => a.name),
-    )
     expect(proposals.customAbilities.length).toBeGreaterThan(5)
   })
 })

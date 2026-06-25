@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "fs"
 import { describe, expect, it } from "vitest"
 import {
   formatPsionicAugmentSelectionSummary,
@@ -11,18 +10,14 @@ import { normalizeAiImportContent } from "@/lib/import/import-content-ai-schema"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { combineImportContents } from "@/lib/import/merge-import-content"
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
-
-const FIXTURE_DIR = join(
-  "d:",
-  "Google Drive",
-  "Code Projects",
-  "dump stat working files",
-  "JSON imports",
-)
+import {
+  hasHomebrewImportFixtures,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
 function loadFixture(name: string) {
-  const path = join(FIXTURE_DIR, name)
-  if (!existsSync(path)) throw new Error(`Missing fixture: ${path}`)
+  const path = homebrewFixturePath(name)
+  if (!path) throw new Error(`Missing homebrew fixture: ${name}`)
   return normalizeAiImportContent(JSON.parse(readFileSync(path, "utf8")))
 }
 
@@ -34,7 +29,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(parsePsionicAugmentCost("0 psi points")).toEqual({ fixed: 0 })
   })
 
-  it("parses Seeing augments from psion-disciplines.json", () => {
+  it.runIf(hasHomebrewImportFixtures)("parses Seeing augments from psion-disciplines.json", () => {
     const content = loadFixture("psion-disciplines.json")
     const seeing = content.spells?.find((spell) => spell.name === "Seeing")
     expect(seeing).toBeTruthy()
@@ -51,7 +46,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(withheld?.cost.fixed).toBe(0)
   })
 
-  it("parses Enhancing Surge augments", () => {
+  it.runIf(hasHomebrewImportFixtures)("parses Enhancing Surge augments", () => {
     const content = loadFixture("psion-disciplines.json")
     const surge = content.spells?.find((spell) => spell.name === "Enhancing Surge")
     const parsed = parsePsionicAugmentsFromDescription(surge?.description ?? "")
@@ -59,7 +54,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(parsed?.augments.some((row) => row.name === "Resilient")).toBe(true)
   })
 
-  it("computes selection cost summaries", () => {
+  it.runIf(hasHomebrewImportFixtures)("computes selection cost summaries", () => {
     const content = loadFixture("psion-disciplines.json")
     const seeing = content.spells?.find((spell) => spell.name === "Seeing")
     const parsed = parsePsionicAugmentsFromDescription(seeing?.description ?? "")
@@ -74,7 +69,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
   })
 })
 
-describe("import enrich psionic augments", () => {
+describe.runIf(hasHomebrewImportFixtures)("import enrich psionic augments", () => {
   it("attaches psionic_augments to discipline powers on import", () => {
     const combined = combineImportContents([
       loadFixture("psion-disciplines.json"),

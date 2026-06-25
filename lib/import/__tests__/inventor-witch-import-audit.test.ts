@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "fs"
 import { describe, expect, it } from "vitest"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
@@ -12,20 +11,14 @@ import {
   parseSubclassSpellTable,
 } from "@/lib/import/subclass-spell-table"
 import type { ImportContent } from "@/lib/import/content-schema"
-
-const FIXTURE_DIR = join(
-  "d:",
-  "Google Drive",
-  "Code Projects",
-  "dump stat working files",
-  "JSON imports",
-)
+import {
+  hasHomebrewImportFixtures,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
 function loadFixture(name: string): ImportContent {
-  const path = join(FIXTURE_DIR, name)
-  if (!existsSync(path)) {
-    throw new Error(`Missing fixture: ${path}`)
-  }
+  const path = homebrewFixturePath(name)
+  if (!path) throw new Error(`Missing homebrew fixture: ${name}`)
   return normalizeAiImportContent(JSON.parse(readFileSync(path, "utf8")))
 }
 
@@ -43,7 +36,7 @@ function wired(
   )
 }
 
-describe("Inventor / Witch homebrew import fixtures", () => {
+describe.runIf(hasHomebrewImportFixtures)("Inventor / Witch homebrew import fixtures", () => {
   it("loads inventor-class.json core wiring", () => {
     const content = loadFixture("inventor-class.json")
     expect(wired(content, "Inventor Specialization", "Class: Inventor")).toBe(true)
@@ -64,7 +57,9 @@ describe("Inventor / Witch homebrew import fixtures", () => {
   })
 
   it("parses inventor-spell-list.json spell list stub", () => {
-    const raw = readFileSync(join(FIXTURE_DIR, "inventor-spell-list.json"), "utf8")
+    const path = homebrewFixturePath("inventor-spell-list.json")
+    if (!path) throw new Error("Missing homebrew fixture: inventor-spell-list.json")
+    const raw = readFileSync(path, "utf8")
     const parsed = parseImportContentJson(raw)
     expect(parsed).not.toBeNull()
     expect(parsed!.classes?.[0]?.spell_list?.length).toBeGreaterThan(50)
