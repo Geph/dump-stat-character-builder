@@ -16,6 +16,7 @@ import { enrichSrdSpeciesList } from "@/lib/compendium/enrich-srd-species"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 
@@ -28,8 +29,7 @@ export async function POST() {
 
     const appliedMigrations = await runPendingMigrationsOnPool(getPool())
 
-    const { classes, subclasses, species, backgrounds, spells, feats, equipment } =
-      getSrdSeedData()
+    const { classes, subclasses, species, backgrounds, spells, feats } = getSrdSeedData()
 
     await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
     const classData = await listRows("classes")
@@ -64,7 +64,16 @@ export async function POST() {
     await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
     await upsertByName("spells", withSrdCreatorUrlList(spells))
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
-    await upsertByName("equipment", withSrdCreatorUrlList(equipment))
+    const equipmentSeed = await seedSrdEquipment({
+      upsertByName,
+      listEquipmentByName: async () => {
+        const rows = await listRows("equipment")
+        return rows.map((row) => ({
+          name: row.name as string,
+          id: row.id as string,
+        }))
+      },
+    })
 
     await ensureModifierCatalog(createClient())
 
@@ -74,6 +83,7 @@ export async function POST() {
       success: true, 
       total,
       breakdown,
+      equipmentSeed,
       srdVersion: getSrdSeedData().manifest.version,
       migrationsApplied: appliedMigrations,
     })

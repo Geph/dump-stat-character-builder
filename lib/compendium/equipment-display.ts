@@ -1,5 +1,6 @@
 import type { Equipment } from "@/lib/types"
 import { propertiesToStringArray } from "@/lib/compendium/equipment-properties"
+import { equipmentRequiresAttunement, isMagicItem } from "@/lib/compendium/equipment-attunement"
 import {
   getArmorAcText,
   getWeaponDamageText,
@@ -62,7 +63,60 @@ export function getEquipmentDetailRows(item: Equipment): EquipmentDetailRow[] {
 
   if (item.source) rows.push({ label: "Source", value: item.source })
 
+  if (isMagicItem(item)) {
+    if (item.rarity) rows.push({ label: "Rarity", value: item.rarity })
+    if (item.magic_item_category) {
+      rows.push({ label: "Magic Type", value: item.magic_item_category })
+    }
+    if (item.requires_attunement != null) {
+      rows.push({
+        label: "Attunement",
+        value: item.requires_attunement ? "Required" : "Not required",
+      })
+    } else if (equipmentRequiresAttunement(item)) {
+      rows.push({ label: "Attunement", value: "Required" })
+    }
+    if (item.base_equipment_filter) {
+      rows.push({
+        label: "Base filter",
+        value: item.base_equipment_filter.replace(/_/g, " "),
+      })
+    } else if (item.base_equipment_ids?.length) {
+      rows.push({
+        label: "Base items",
+        value: `${item.base_equipment_ids.length} linked base(s)`,
+      })
+    }
+  }
+
   return rows
+}
+
+export function filterEquipmentByMagicKind(
+  items: Equipment[],
+  kind: "all" | "magic" | "mundane",
+): Equipment[] {
+  if (kind === "all") return items
+  return items.filter((item) => (kind === "magic" ? isMagicItem(item) : !isMagicItem(item)))
+}
+
+export function filterEquipmentByMagicCategory(
+  items: Equipment[],
+  category: string,
+): Equipment[] {
+  if (category === "all") return items
+  const needle = category.toLowerCase()
+  return items.filter(
+    (item) => (item.magic_item_category ?? "").toLowerCase() === needle,
+  )
+}
+
+export function getMagicItemCategoryOptions(items: Equipment[]): string[] {
+  const values = new Set<string>()
+  for (const item of items) {
+    if (item.magic_item_category) values.add(item.magic_item_category)
+  }
+  return [...values].sort((a, b) => a.localeCompare(b))
 }
 
 export function filterEquipmentList(items: Equipment[], query: string): Equipment[] {
@@ -75,8 +129,9 @@ export function filterEquipmentList(items: Equipment[], query: string): Equipmen
           item.category,
           item.subcategory ?? "",
           item.description ?? "",
-          item.damage ?? "",
-          item.damage_type ?? "",
+          item.rarity ?? "",
+          item.magic_item_category ?? "",
+          item.base_equipment_filter?.replace(/_/g, " ") ?? "",
         ]
           .join(" ")
           .toLowerCase()

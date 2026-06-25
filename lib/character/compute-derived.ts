@@ -8,6 +8,10 @@ import {
 } from "@/lib/builder/multiclass-proficiencies"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import {
+  collectEquipmentMagicCharacteristics,
+  resolveEquippedItems,
+} from "@/lib/compendium/equipment-magic-modifiers"
+import {
   getEffectiveArmorProficiencies,
   getEffectiveWeaponProficiencies,
   mergeProficiencyLists,
@@ -27,9 +31,6 @@ import {
   calculateWeaponAttack,
   getShieldBonus,
   getWeaponPropertyTags,
-  isArmorItem,
-  isShieldItem,
-  isWeaponItem,
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
 import type { Background, DndClass, Equipment } from "@/lib/types"
@@ -195,7 +196,19 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     customAbilities: inputs.customAbilities,
   })
 
-  const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
+  const equipmentMagicMods = collectEquipmentMagicCharacteristics({
+    equipment: inputs.equipment,
+    equippedArmorId: inputs.equippedArmorId,
+    equippedShieldId: inputs.equippedShieldId,
+    equippedWeaponId: inputs.equippedWeaponId,
+    attunedItemIds: inputs.attunedItemIds ?? [],
+    modifierCatalog: inputs.modifierCatalog,
+  })
+
+  const aggregatedCharacteristics = aggregateCharacteristics([
+    ...builderCharacteristicMods,
+    ...equipmentMagicMods,
+  ])
   const asiBonuses = aggregateAsiBonuses(inputs.asiAllocations)
   const backgroundAbilityBonuses = aggregateBackgroundAbilityBonuses(
     background,
@@ -279,12 +292,17 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     totalLevel,
   )
 
-  const equippedArmor =
-    inputs.equipment.filter(isArmorItem).find((item) => item.id === inputs.equippedArmorId) ?? null
-  const equippedShield =
-    inputs.equipment.filter(isShieldItem).find((item) => item.id === inputs.equippedShieldId) ?? null
-  const equippedWeapon =
-    inputs.equipment.filter(isWeaponItem).find((item) => item.id === inputs.equippedWeaponId) ?? null
+  const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon } =
+    resolveEquippedItems(
+      inputs.equipment,
+      {
+        equippedArmorId: inputs.equippedArmorId,
+        equippedShieldId: inputs.equippedShieldId,
+        equippedWeaponId: inputs.equippedWeaponId,
+      },
+      inputs.equipmentBaseSelections ?? {},
+      inputs.equipmentCatalog,
+    )
 
   const wearingArmor = Boolean(equippedArmor)
   const shieldBonus = getShieldBonus(equippedShield)
@@ -452,6 +470,8 @@ export function buildInputsFromSavedCharacter(params: {
     equipped_armor_id?: string | null
     equipped_shield_id?: string | null
     equipped_weapon_id?: string | null
+    attuned_item_ids?: string[] | null
+    equipment_base_selections?: Record<string, string> | null
   }
   classes: DndClass[]
   subclasses?: import("@/lib/types").Subclass[]
@@ -459,6 +479,7 @@ export function buildInputsFromSavedCharacter(params: {
   background: Background | null | undefined
   feats: import("@/lib/types").Feat[]
   equipment: Equipment[]
+  equipmentCatalog?: Equipment[]
   modifierCatalog: import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[]
 }): CharacterBuildInputs | null {
   const { character, classes } = params
@@ -502,9 +523,12 @@ export function buildInputsFromSavedCharacter(params: {
     extraArmorProficiencies: character.armor_proficiencies ?? [],
     languages: character.languages ?? ["Common"],
     equipment: params.equipment,
+    equipmentCatalog: params.equipmentCatalog,
     equippedArmorId: character.equipped_armor_id ?? null,
     equippedShieldId: character.equipped_shield_id ?? null,
     equippedWeaponId: character.equipped_weapon_id ?? null,
+    attunedItemIds: character.attuned_item_ids ?? [],
+    equipmentBaseSelections: character.equipment_base_selections ?? {},
     modifierCatalog: params.modifierCatalog,
     feats: params.feats,
   }

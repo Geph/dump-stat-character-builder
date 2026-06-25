@@ -8,8 +8,109 @@ import {
   barbarianShieldFixture,
   chainMailEquipment,
   fighterArcheryBackgroundFixture,
+  fighterClass,
   rogueExpertiseFixture,
+  shieldEquipment,
 } from "@/lib/character/__tests__/fixtures"
+import type { Equipment } from "@/lib/types"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+
+function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
+  return [
+    {
+      instanceId: `modinst_${chars[0]?.id ?? "test"}`,
+      catalogRefId: "cat_test",
+      characteristics: chars,
+    },
+  ]
+}
+
+const longswordEquipment: Equipment = {
+  id: "longsword",
+  name: "Longsword",
+  category: "Weapon",
+  subcategory: "Martial Melee Weapons",
+  properties: { damage: "1d8 Slashing", mastery: "Sap" },
+  icon: null,
+  source: "SRD",
+  creator_url: null,
+  created_at: "",
+}
+
+const plusOneLongsword: Equipment = {
+  id: "plus-one-longsword",
+  name: "+1 Longsword",
+  category: "Weapon",
+  subcategory: "Martial Melee Weapons",
+  rarity: "Uncommon",
+  magic_item_category: "Weapon",
+  requires_attunement: true,
+  base_equipment_ids: [longswordEquipment.id],
+  selected_base_equipment_id: longswordEquipment.id,
+  magic_effects: linked([
+    {
+      id: "plus_one_attack",
+      type: "attack_roll_modifiers",
+      entries: [{ bonus: 1, target: "all" }],
+    },
+    {
+      id: "plus_one_damage",
+      type: "damage_roll_modifiers",
+      entries: [{ bonus: 1, target: "all" }],
+    },
+  ]),
+  icon: null,
+  source: "SRD",
+  creator_url: null,
+  created_at: "",
+}
+
+const plusOneShield: Equipment = {
+  id: "plus-one-shield",
+  name: "+1 Shield",
+  category: "Armor",
+  subcategory: "Shield",
+  armor_class: "+2",
+  rarity: "Uncommon",
+  magic_item_category: "Armor",
+  requires_attunement: true,
+  base_equipment_ids: [shieldEquipment.id],
+  selected_base_equipment_id: shieldEquipment.id,
+  magic_effects: linked([
+    { id: "plus_one_shield_ac", type: "ac", mode: "flat_bonus", flatBonus: 1 },
+  ]),
+  icon: null,
+  source: "SRD",
+  creator_url: null,
+  created_at: "",
+}
+
+const plusOneChainMail: Equipment = {
+  id: "plus-one-chain-mail",
+  name: "+1 Chain Mail",
+  category: "Armor",
+  subcategory: "Heavy Armor",
+  armor_class: "16",
+  rarity: "Rare",
+  magic_item_category: "Armor",
+  requires_attunement: true,
+  base_equipment_ids: [chainMailEquipment.id],
+  selected_base_equipment_id: chainMailEquipment.id,
+  magic_effects: linked([
+    {
+      id: "plus_one_armor_ac",
+      type: "ac",
+      mode: "flat_bonus",
+      flatBonus: 1,
+      requiresArmor: true,
+    },
+  ]),
+  icon: null,
+  source: "SRD",
+  creator_url: null,
+  created_at: "",
+}
 
 describe("computeDerivedCharacter", () => {
   it("Barbarian 1 with shield uses Unarmored Defense + shield", () => {
@@ -122,6 +223,94 @@ describe("computeDerivedCharacter", () => {
         equippedWeaponId: null,
       }).armorClass,
     )
+  })
+
+  it("applies +1 weapon magic effects when wielded", () => {
+    const base = fighterArcheryBackgroundFixture()
+    const inputs = {
+      ...base,
+      selectedFeatIds: [],
+      feats: [],
+      classes: [fighterClass],
+      classLevels: [{ classId: fighterClass.id, level: 1 }],
+      equipment: [longswordEquipment, plusOneLongsword],
+      equippedWeaponId: plusOneLongsword.id,
+      attunedItemIds: [plusOneLongsword.id],
+    }
+    const withoutMagic = computeDerivedCharacter({
+      ...inputs,
+      equippedWeaponId: longswordEquipment.id,
+      attunedItemIds: [],
+      equipment: [longswordEquipment],
+    })
+    const withMagic = computeDerivedCharacter(inputs)
+
+    expect(withMagic.equippedWeaponAttack?.attackBonus).toBe(
+      (withoutMagic.equippedWeaponAttack?.attackBonus ?? 0) + 1,
+    )
+    expect(withMagic.equippedWeaponAttack?.damageDisplay).toContain("+ 1")
+  })
+
+  it("applies +1 shield magic effects when wielded", () => {
+    const base = barbarianShieldFixture()
+    const withoutMagic = computeDerivedCharacter(base)
+    const withMagic = computeDerivedCharacter({
+      ...base,
+      equipment: [shieldEquipment, plusOneShield],
+      equippedShieldId: plusOneShield.id,
+      attunedItemIds: [plusOneShield.id],
+    })
+
+    expect(withMagic.armorClass).toBe(withoutMagic.armorClass + 1)
+  })
+
+  it("applies +1 armor magic effects when worn", () => {
+    const base = fighterArcheryBackgroundFixture()
+    const withoutMagic = computeDerivedCharacter({
+      ...base,
+      equipment: [chainMailEquipment],
+      equippedArmorId: chainMailEquipment.id,
+      equippedWeaponId: null,
+    })
+    const withMagic = computeDerivedCharacter({
+      ...base,
+      equipment: [chainMailEquipment, plusOneChainMail],
+      equippedArmorId: plusOneChainMail.id,
+      equippedWeaponId: null,
+      attunedItemIds: [plusOneChainMail.id],
+    })
+
+    expect(withMagic.armorClass).toBe(withoutMagic.armorClass + 1)
+  })
+
+  it("does not apply attuned magic item effects without attunement", () => {
+    const base = fighterArcheryBackgroundFixture()
+    const ringOfProtection: Equipment = {
+      id: "ring-protection",
+      name: "Ring of Protection",
+      category: "Adventuring Gear",
+      magic_item_category: "Ring",
+      rarity: "Rare",
+      requires_attunement: true,
+      magic_effects: linked([
+        { id: "ring_ac", type: "ac", mode: "flat_bonus", flatBonus: 1 },
+      ]),
+      icon: null,
+      source: "SRD",
+      creator_url: null,
+      created_at: "",
+    }
+    const unattuned = computeDerivedCharacter({
+      ...base,
+      equipment: [...base.equipment, ringOfProtection],
+    })
+    const attuned = computeDerivedCharacter({
+      ...base,
+      equipment: [...base.equipment, ringOfProtection],
+      attunedItemIds: [ringOfProtection.id],
+    })
+
+    expect(attuned.armorClass).toBe(unattuned.armorClass + 1)
   })
 })
 

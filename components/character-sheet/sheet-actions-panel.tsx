@@ -64,7 +64,7 @@ export function SheetActionsPanel({
   resolveContext,
 }: SheetActionsPanelProps) {
   if (!actions.length) {
-    return <p className="text-xs text-muted-foreground italic">No action-economy abilities listed.</p>
+    return null
   }
 
   const toggleUse = (actionId: string, slotIndex: number, max: number) => {

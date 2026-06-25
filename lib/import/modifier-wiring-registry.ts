@@ -646,6 +646,15 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Bardic-Inspiration-style pools: class_resources + limited-uses phrasing in features.",
     ],
   },
+  {
+    source: "Captain / battle-dice martials",
+    guidance: [
+      "Battle Dice column on the class table → class_resources.battle_dice (NdM pool notation, e.g. 2d6 → 3d8).",
+      "Maneuver options in abilities[] with \"expend one Battle Die\" — proposed as custom abilities linked to battle_dice.",
+      "Cohort feature → companion stat block; wire Weapon Mastery and Fighting Style via standard feature names.",
+      "Blitz, Valiant Surge, Legendary Commander stay narrative unless clear passive phrasing is present.",
+    ],
+  },
 ] as const
 
 /** Content that should stay narrative — do not force mechanics[] unless a clear passive bonus exists. */
@@ -724,7 +733,7 @@ ${SRD_PRESET_FEATURE_NAMES.map((name) => `- ${name}`).join("\n")}
 Hundreds of additional SRD features wire when names match the seeded compendium — use official names when porting SRD content.`,
 
     `INDEX — Class resources (class_resources[], not feature modifiers):
-- Extract columns from level tables: Psi Points, Psi Limit, Rage, Ki, Risk Dice, Weapon Mastery, Superiority Dice, Exploit Dice, Sorcery Points, Bardic Inspiration, etc.
+- Extract columns from level tables: Psi Points, Psi Limit, Rage, Ki, Risk Dice, Battle Dice, Weapon Mastery, Superiority Dice, Exploit Dice, Sorcery Points, Bardic Inspiration, etc.
 - resource_key: snake_case (risk_dice, weapon_mastery, psi_points)
 - uses.type: at_level with atLevelTable [{ level, count }] from the table
 - Mention spend/regain in feature descriptions for automatic limited-use linking`,

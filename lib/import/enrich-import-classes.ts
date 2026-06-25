@@ -35,9 +35,13 @@ export function detectExploitDieCost(text: string): number | null {
   return detectThirdPartyResourceSpend(text, "exploit_dice")
 }
 
+export function detectBattleDieCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "battle_dice")
+}
+
 function linkResourceCostsOnFeatures(
   features: Feature[],
-  resourceKeys: { psi?: string; exploit?: string },
+  resourceKeys: { psi?: string; exploit?: string; risk?: string; battle?: string },
 ): Feature[] {
   return features.map((feature) => {
     const description = feature.description ?? ""
@@ -60,6 +64,16 @@ function linkResourceCostsOnFeatures(
         type: "class_resource",
         classResourceKey: resourceKeys.exploit,
         classResourceAmount: exploitCost,
+      }
+    }
+
+    const battleCost = resourceKeys.battle ? detectBattleDieCost(description) : null
+    if (battleCost != null && resourceKeys.battle) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.battle,
+        classResourceAmount: battleCost,
       }
     }
 
@@ -88,20 +102,22 @@ function resolveResourceKeysForClass(
   className: string,
   explicitResources: ClassResourceImportRow[] | undefined,
   progressionText: string,
-): { psi?: string; exploit?: string; risk?: string } {
-  const keys: { psi?: string; exploit?: string; risk?: string } = {}
+): { psi?: string; exploit?: string; risk?: string; battle?: string } {
+  const keys: { psi?: string; exploit?: string; risk?: string; battle?: string } = {}
   const classResources = explicitResources?.filter((r) => r.class_name === className) ?? []
 
   for (const resource of classResources) {
     if (/psi\s*points?/i.test(resource.name)) keys.psi = resource.resource_key
     if (/exploit\s*dice/i.test(resource.name)) keys.exploit = resource.resource_key
     if (/risk\s*dice/i.test(resource.name)) keys.risk = resource.resource_key
+    if (/battle\s*dice/i.test(resource.name)) keys.battle = resource.resource_key
   }
 
   const lower = progressionText.toLowerCase()
   if (!keys.psi && lower.includes("psi point")) keys.psi = "psi_points"
   if (!keys.exploit && /\bexploit\s+die\b/.test(lower)) keys.exploit = "exploit_dice"
   if (!keys.risk && /\brisk\s+dice\b/.test(lower)) keys.risk = "risk_dice"
+  if (!keys.battle && /\bbattle\s+dice\b/.test(lower)) keys.battle = "battle_dice"
 
   return keys
 }

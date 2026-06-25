@@ -57,13 +57,16 @@ import { ExpandableDescription } from "@/components/character-sheet/expandable-d
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
 import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-panel"
+import { SheetEquippedWeaponsPanel } from "@/components/character-sheet/sheet-equipped-weapons-panel"
 import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipment-panel"
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
 import { RollHistoryTrigger } from "@/components/character-sheet/roll-history-trigger"
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
-import { DEFAULT_ATTUNEMENT_SLOTS } from "@/lib/compendium/equipment-attunement"
+import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
+import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { suggestEquipmentLoadout } from "@/lib/builder/equipment-loadout"
@@ -74,7 +77,10 @@ import {
 } from "@/lib/compendium/background-proficiencies"
 import { SRD_CONDITIONS, getConditionDescription } from "@/lib/srd/condition-descriptions"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
-import { SheetDefaultActionsPanel } from "@/components/character-sheet/sheet-default-actions-panel"
+import {
+  DefaultActionsButton,
+  DefaultActionsOverlay,
+} from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
 import type { RestType } from "@/lib/types"
@@ -192,7 +198,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [hasInspiration, setHasInspiration] = useState(false)
   const [deathSaves, setDeathSaves] = useState({ successes: 0, failures: 0 })
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
+  const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
+  const [defaultActionsContext, setDefaultActionsContext] = useState<"abilities" | "combat" | null>(
+    null,
+  )
   const conditionButtonRef = useRef<HTMLButtonElement>(null)
   const [conditionMenuPos, setConditionMenuPos] = useState<{ top: number; left: number } | null>(
     null,
@@ -214,6 +224,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedArmorId((data as Character).equipped_armor_id ?? null)
         setEquippedShieldId((data as Character).equipped_shield_id ?? null)
         setEquippedWeaponId((data as Character).equipped_weapon_id ?? null)
+        setAttunedItemIds((data as Character).attuned_item_ids ?? [])
+        setEquipmentBaseSelections((data as Character).equipment_base_selections ?? {})
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
         setCompanionState((data as Character).companion_state ?? [])
 
@@ -226,6 +238,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           const { data: equipmentData } = await db.from("equipment").select("*").in("id", data.equipment_ids)
           if (equipmentData) setEquipment(equipmentData)
         }
+
+        const { data: catalogData } = await db.from("equipment").select("*").order("name")
+        if (catalogData) setEquipmentCatalog(catalogData as Equipment[])
 
         const { data: abilitiesData } = await db
           .from("custom_abilities")
@@ -272,7 +287,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const subclassesFromList = classList
       .map((entry) => entry.subclass)
       .filter(Boolean) as Subclass[]
-    return buildInputsFromSavedCharacter({
+    const inputs = buildInputsFromSavedCharacter({
       character,
       classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
       subclasses: subclassesFromList.length
@@ -284,9 +299,31 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       background: character.backgrounds,
       feats: characterFeats,
       equipment,
+      equipmentCatalog,
       modifierCatalog,
     })
-  }, [character, characterFeats, equipment, modifierCatalog])
+    if (!inputs) return null
+    return {
+      ...inputs,
+      equipmentCatalog,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      attunedItemIds,
+      equipmentBaseSelections,
+    }
+  }, [
+    character,
+    characterFeats,
+    equipment,
+    equipmentCatalog,
+    modifierCatalog,
+    equippedArmorId,
+    equippedShieldId,
+    equippedWeaponId,
+    attunedItemIds,
+    equipmentBaseSelections,
+  ])
 
   const derived = useMemo(() => {
     if (!characterBuildInputs) return null
@@ -347,6 +384,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character],
   )
 
+  const persistAttunement = useCallback(
+    async (nextAttunedIds: string[]) => {
+      if (!character) return
+      setAttunedItemIds(nextAttunedIds)
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({ attuned_item_ids: nextAttunedIds })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      if (!error && data) setCharacter(data)
+    },
+    [character],
+  )
+
+  const persistBaseSelection = useCallback(
+    async (magicItemId: string, baseEquipmentId: string) => {
+      if (!character) return
+      const nextSelections = { ...equipmentBaseSelections, [magicItemId]: baseEquipmentId }
+      setEquipmentBaseSelections(nextSelections)
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({ equipment_base_selections: nextSelections })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      if (!error && data) setCharacter(data)
+    },
+    [character, equipmentBaseSelections],
+  )
+
   const openAddEquipmentOverlay = useCallback(async () => {
     const db = createClient()
     const { data } = await db.from("equipment").select("*").order("name")
@@ -355,18 +425,29 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [])
 
   const handleAddEquipmentFromCatalog = useCallback(
-    async (item: Equipment, options: { deductCost: boolean }) => {
+    async (
+      item: Equipment,
+      options: { deductCost: boolean; selectedBaseId?: string },
+    ) => {
       if (!character) return
       const costGp = options.deductCost ? getEquipmentCostGp(item) : 0
       if (options.deductCost && characterGold < costGp) return
 
       const nextIds = [...new Set([...(character.equipment_ids ?? []), item.id])]
       const nextGold = options.deductCost ? characterGold - costGp : characterGold
+      const nextSelections = { ...equipmentBaseSelections }
+      if (options.selectedBaseId) {
+        nextSelections[item.id] = options.selectedBaseId
+      }
 
       const db = createClient()
       const { data, error } = await db
         .from("characters")
-        .update({ equipment_ids: nextIds, gold: nextGold })
+        .update({
+          equipment_ids: nextIds,
+          gold: nextGold,
+          equipment_base_selections: nextSelections,
+        })
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
@@ -375,9 +456,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
       setCharacter(data)
       setCharacterGold(nextGold)
+      setEquipmentBaseSelections(nextSelections)
       setEquipment((prev) => (prev.some((e) => e.id === item.id) ? prev : [...prev, item]))
     },
-    [character, characterGold],
+    [character, characterGold, equipmentBaseSelections],
   )
 
   useEffect(() => {
@@ -388,6 +470,54 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       void persistEquipmentLoadout(suggestion)
     }
   }, [character, equipment, equippedArmorId, equippedShieldId, equippedWeaponId, persistEquipmentLoadout])
+
+  useEffect(() => {
+    if (!character || !equipment.length) return
+    const byId = new Map(equipment.map((item) => [item.id, item]))
+    const clears: {
+      armorId?: string | null
+      shieldId?: string | null
+      weaponId?: string | null
+    } = {}
+    const armor = equippedArmorId ? byId.get(equippedArmorId) : undefined
+    if (
+      equippedArmorId &&
+      armor &&
+      mustAttuneBeforeEquip(armor) &&
+      !attunedItemIds.includes(equippedArmorId)
+    ) {
+      clears.armorId = null
+    }
+    const shield = equippedShieldId ? byId.get(equippedShieldId) : undefined
+    if (
+      equippedShieldId &&
+      shield &&
+      mustAttuneBeforeEquip(shield) &&
+      !attunedItemIds.includes(equippedShieldId)
+    ) {
+      clears.shieldId = null
+    }
+    const weapon = equippedWeaponId ? byId.get(equippedWeaponId) : undefined
+    if (
+      equippedWeaponId &&
+      weapon &&
+      mustAttuneBeforeEquip(weapon) &&
+      !attunedItemIds.includes(equippedWeaponId)
+    ) {
+      clears.weaponId = null
+    }
+    if (Object.keys(clears).length > 0) {
+      void persistEquipmentLoadout(clears)
+    }
+  }, [
+    character,
+    equipment,
+    equippedArmorId,
+    equippedShieldId,
+    equippedWeaponId,
+    attunedItemIds,
+    persistEquipmentLoadout,
+  ])
 
   const asiBonuses = useMemo(
     () => aggregateAsiBonuses((character?.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {}),
@@ -457,6 +587,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }),
     [classDetails, character?.species],
   )
+
+  const equippedWeapon = useMemo(() => {
+    if (!equippedWeaponId) return null
+    const raw = equipment.find((item) => item.id === equippedWeaponId)
+    if (!raw) return null
+    return resolveCharacterEquipment(raw, equipmentCatalog.length ? equipmentCatalog : equipment, equipmentBaseSelections)
+  }, [equipment, equipmentCatalog, equippedWeaponId, equipmentBaseSelections])
+
+  const sheetCustomAbilities = useMemo(() => {
+    if (!character) return []
+    return filterCustomAbilitiesForCharacterSheet(customAbilities, {
+      classIds: classDetails.map((entry) => entry.row.class_id),
+      classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
+      subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
+      subclassNames: classDetails.map((entry) => entry.subclass?.name).filter(Boolean) as string[],
+      speciesId: character.species_id ?? null,
+      speciesName: character.species?.name ?? null,
+      backgroundId: character.background_id ?? null,
+      backgroundName: character.backgrounds?.name ?? null,
+      featIds: [
+        ...(character.feat_ids ?? []),
+        ...characterFeats.map((feat) => feat.id),
+        ...(originFeat ? [originFeat.id] : []),
+      ],
+      featNames: [
+        ...characterFeats.map((feat) => feat.name),
+        ...(originFeat ? [originFeat.name] : []),
+      ],
+      equipmentIds: character.equipment_ids ?? [],
+      equipmentCategories: equipment.map((item) => item.category),
+      spellIds: character.spell_ids ?? [],
+    })
+  }, [customAbilities, character, classDetails, characterFeats, originFeat, equipment])
 
   const usesResolveContext = useMemo(
     () => ({
@@ -549,6 +712,80 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     }
   }, [conditionDropdownOpen])
 
+  const companionRows = useMemo(() => {
+    if (!character || !classDetails.length) return []
+    const abilityMods = derived?.abilityMods ?? {
+      strength: 0,
+      dexterity: 0,
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      charisma: 0,
+    }
+    const proficiencyBonus =
+      derived?.proficiencyBonus ?? Math.floor((character.level - 1) / 4) + 2
+    const spellcastingClass =
+      classDetails.find((entry) => entry.class?.spellcasting)?.class ?? character.classes
+    const spellcastingAbilityLabel =
+      spellcastingClass?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
+    const spellcastingAbilityKey = resolveSpellcastingAbilityKey(spellcastingAbilityLabel)
+    const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
+    const spellSaveDc = spellcastingAbilityKey ? 8 + proficiencyBonus + spellAbilityMod : null
+    const spellAttackMod = spellcastingAbilityKey ? proficiencyBonus + spellAbilityMod : null
+    const ctx = {
+      abilityMods,
+      proficiencyBonus,
+      spellAttackModifier:
+        spellAttackMod ?? proficiencyBonus + (abilityMods.intelligence ?? 0),
+      spellSaveDc: spellSaveDc ?? 8 + proficiencyBonus + (abilityMods.intelligence ?? 0),
+      classLevels: classDetails
+        .filter((entry) => entry.class?.name)
+        .map((entry) => ({ className: entry.class!.name, level: entry.row.level })),
+    }
+    const resolved = resolveCharacterCompanions({
+      classDetails,
+      customAbilities: sheetCustomAbilities,
+      ctx,
+    })
+    return mergeCompanionState(resolved, companionState)
+  }, [character, classDetails, sheetCustomAbilities, companionState, derived])
+
+  const persistCompanionState = useCallback(
+    async (next: CharacterCompanionState[]) => {
+      if (!character) return
+      setCompanionState(next)
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({ companion_state: next })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      if (!error && data) setCharacter(data)
+    },
+    [character],
+  )
+
+  const updateCompanionHp = useCallback(
+    (key: string, hp: number) => {
+      const next = companionRows.map((row) =>
+        row.key === key
+          ? {
+              key,
+              currentHp: hp,
+              customName: row.displayName !== row.template.name ? row.displayName : null,
+            }
+          : {
+              key: row.key,
+              currentHp: row.currentHp,
+              customName: row.displayName !== row.template.name ? row.displayName : null,
+            },
+      )
+      void persistCompanionState(next)
+    },
+    [companionRows, persistCompanionState],
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -627,65 +864,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
   const spellSaveDc = hasSpellcasting ? 8 + proficiencyBonus + spellAbilityMod : null
   const spellAttackMod = hasSpellcasting ? proficiencyBonus + spellAbilityMod : null
-
-  const companionRows = useMemo(() => {
-    if (!classDetails.length) return []
-    const ctx = {
-      abilityMods,
-      proficiencyBonus,
-      spellAttackModifier:
-        spellAttackMod ?? proficiencyBonus + (abilityMods.intelligence ?? 0),
-      spellSaveDc:
-        spellSaveDc ?? 8 + proficiencyBonus + (abilityMods.intelligence ?? 0),
-      classLevels: classDetails
-        .filter((entry) => entry.class?.name)
-        .map((entry) => ({ className: entry.class!.name, level: entry.row.level })),
-    }
-    const resolved = resolveCharacterCompanions({
-      classDetails,
-      customAbilities,
-      ctx,
-    })
-    return mergeCompanionState(resolved, companionState)
-  }, [
-    classDetails,
-    customAbilities,
-    companionState,
-    abilityMods,
-    proficiencyBonus,
-    spellAttackMod,
-    spellSaveDc,
-  ])
-
-  const persistCompanionState = useCallback(
-    async (next: CharacterCompanionState[]) => {
-      if (!character) return
-      setCompanionState(next)
-      const db = createClient()
-      const { data, error } = await db
-        .from("characters")
-        .update({ companion_state: next })
-        .eq("id", character.id)
-        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
-        .single()
-      if (!error && data) setCharacter(data)
-    },
-    [character],
-  )
-
-  const updateCompanionHp = useCallback(
-    (key: string, hp: number) => {
-      const next = companionRows.map((row) =>
-        row.key === key ? { key, currentHp: hp, customName: row.displayName !== row.template.name ? row.displayName : null } : {
-          key: row.key,
-          currentHp: row.currentHp,
-          customName: row.displayName !== row.template.name ? row.displayName : null,
-        },
-      )
-      void persistCompanionState(next)
-    },
-    [companionRows, persistCompanionState],
-  )
 
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
 
@@ -927,8 +1105,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           </div>
         </motion.div>
 
-        <SheetDefaultActionsPanel />
-
         <div className="flex gap-1.5 mb-3 overflow-x-auto">
           {[
             { id: "abilities" as const, label: "Abilities & Skills", icon: <UserCircle className="w-3.5 h-3.5" /> },
@@ -962,8 +1138,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "abilities" && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-foreground">Abilities and Skills</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-3 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-2 xl:col-span-1">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-2">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Skills</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:min-h-[300px]">
                     {skillsInOrder.map((skill) => {
@@ -1005,7 +1181,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1 xl:col-span-1">
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {ABILITY_SCORE_KEYS.map((key) => {
@@ -1044,9 +1220,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       <span className="font-bold tabular-nums">{passivePerception}</span>
                     </div>
                   </div>
+                  <DefaultActionsButton
+                    variant="footer"
+                    onClick={() => setDefaultActionsContext("abilities")}
+                  />
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-3 xl:col-span-1">
+                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Proficiencies</h3>
                   {!weaponProficiencies.length &&
                   !armorProficiencies.length &&
@@ -1169,161 +1349,225 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "combat" && (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                      <span>Armor Class</span>
-                      <span className="font-bold tabular-nums">{armorClass}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                      <span>Speed</span>
-                      <span className="font-bold tabular-nums">{speed} ft</span>
-                    </div>
-                    <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                      <span>Initiative</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold tabular-nums">{formatMod(initiative)}</span>
-                        <D20RollButton
-                          modifier={initiative}
-                          title="Roll initiative"
-                          onRoll={handleInitiativeRoll}
-                        />
-                      </div>
-                    </div>
-                    {hasSpellcasting && spellSaveDc != null && Number.isFinite(spellSaveDc) && (
-                      <>
-                        <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                          <span>Spell Save DC</span>
-                          <span className="font-bold tabular-nums">{spellSaveDc}</span>
-                        </div>
-                        <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                          <span>Spell Attack</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold tabular-nums">{formatMod(spellAttackMod!)}</span>
-                            <D20RollButton modifier={spellAttackMod!} title="Roll spell attack" />
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <div className="pt-2 mt-1 border-t border-border/60">
-                      <DeathSaveTracker
-                        deathSaves={deathSaves}
-                        onDeathSavesChange={setDeathSaves}
-                        compact
-                      />
-                    </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:items-stretch">
+                <div className="bg-card rounded-xl p-3 border border-border flex flex-col min-h-0 order-2 lg:order-1">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h2 className="text-sm font-bold text-foreground">Actions</h2>
+                    <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
                   </div>
-                </div>
-
-                <div className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold text-foreground mb-2">Saving Throws</h2>
-                  <div className="space-y-1">
-                    {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
-                      (ability) => {
-                        const isProficient = savingThrowProficiencies.includes(ability)
-                        const mod =
-                          abilityMods[ability.toLowerCase() as keyof typeof abilityMods] +
-                          (isProficient ? proficiencyBonus : 0)
-                        return (
-                          <div
-                            key={ability}
-                            className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${
-                              isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
-                            }`}
-                          >
-                            <span>{ability}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold tabular-nums">{formatMod(mod)}</span>
-                              <D20RollButton modifier={mod} title={`Roll ${ability} save`} />
-                            </div>
-                          </div>
-                        )
-                      },
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-card rounded-xl p-3 border border-border space-y-3">
-                  <h2 className="text-sm font-bold text-foreground mb-1">Resources</h2>
-                  {spellSlotTables.length > 0 && (
-                    <div className="space-y-3">
-                      {spellSlotTables.map((table) => {
-                        const key = spellSlotTableKey(table)
-                        return (
-                          <SpellSlotTracker
-                            key={key}
-                            table={table}
-                            usedByLevel={usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)}
-                            onUsedChange={(used) =>
-                              setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: used }))
-                            }
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
-                  {resourceEntries.length > 0 && (
-                    <ResourceUsesTracker
-                      entries={resourceEntries}
-                      usedById={usedResourcesById}
-                      onUsedChange={setUsedResourcesById}
-                      resolveContext={usesResolveContext}
-                    />
-                  )}
-                  {!spellSlotTables.length && !resourceEntries.length && (
-                    <p className="text-xs text-muted-foreground italic">No class resources to track</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold text-foreground mb-2">Actions</h2>
+                  <SheetEquippedWeaponsPanel
+                    weapon={equippedWeapon}
+                    attack={derived?.equippedWeaponAttack ?? null}
+                    buildInputs={characterBuildInputs}
+                    weaponProficiencies={derived?.weaponProficiencies ?? []}
+                  />
                   <SheetActionsPanel
                     actions={sheetActions}
                     usedByActionId={usedActionUsesById}
                     onUsedChange={setUsedActionUsesById}
                     resolveContext={usesResolveContext}
                   />
+                  {!equippedWeapon && !sheetActions.length ? (
+                    <p className="text-xs text-muted-foreground italic">
+                      No action-economy abilities listed.
+                    </p>
+                  ) : null}
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
-                  <SheetEquipmentPanel
-                    equipment={equipment}
-                    gold={characterGold}
-                    onGoldChange={(gold) => void persistGold(gold)}
-                    onAddEquipment={() => void openAddEquipmentOverlay()}
-                    searchQuery={equipmentSearchQuery}
-                    onSearchQueryChange={setEquipmentSearchQuery}
-                    equippedArmorId={equippedArmorId}
-                    equippedShieldId={equippedShieldId}
-                    equippedWeaponId={equippedWeaponId}
-                    attunedItemIds={attunedItemIds}
-                    maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
-                    equippedWeaponAttack={derived?.equippedWeaponAttack ?? null}
-                    onEquipArmor={(id) => {
-                      void persistEquipmentLoadout({ armorId: id })
-                    }}
-                    onEquipShield={(id) => {
-                      void persistEquipmentLoadout({ shieldId: id })
-                    }}
-                    onEquipWeapon={(id) => {
-                      void persistEquipmentLoadout({ weaponId: id })
-                    }}
-                    onToggleAttune={(itemId) => {
-                      setAttunedItemIds((prev) => {
-                        if (prev.includes(itemId)) return prev.filter((id) => id !== itemId)
-                        const cap = derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS
-                        if (prev.length >= cap) return prev
-                        return [...prev, itemId]
-                      })
-                    }}
-                    onShowDetails={setSelectedEquipment}
-                  />
+                <div className="space-y-3 order-1 lg:order-2">
+                  <div className="bg-card rounded-xl p-3 border border-border">
+                    <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <span>Armor Class</span>
+                        <span className="font-bold tabular-nums">{armorClass}</span>
+                      </div>
+                      <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <span>Speed</span>
+                        <span className="font-bold tabular-nums">{speed} ft</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <span>Initiative</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold tabular-nums">{formatMod(initiative)}</span>
+                          <D20RollButton
+                            modifier={initiative}
+                            title="Roll initiative"
+                            onRoll={handleInitiativeRoll}
+                          />
+                        </div>
+                      </div>
+                      {hasSpellcasting && spellSaveDc != null && Number.isFinite(spellSaveDc) && (
+                        <>
+                          <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                            <span>Spell Save DC</span>
+                            <span className="font-bold tabular-nums">{spellSaveDc}</span>
+                          </div>
+                          <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                            <span>Spell Attack</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold tabular-nums">{formatMod(spellAttackMod!)}</span>
+                              <D20RollButton modifier={spellAttackMod!} title="Roll spell attack" />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <div className="pt-2 mt-1 border-t border-border/60 space-y-3">
+                        <div>
+                          <h3 className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">
+                            Resources
+                          </h3>
+                          {spellSlotTables.length > 0 && (
+                            <div className="space-y-3">
+                              {spellSlotTables.map((table) => {
+                                const key = spellSlotTableKey(table)
+                                return (
+                                  <SpellSlotTracker
+                                    key={key}
+                                    table={table}
+                                    usedByLevel={usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)}
+                                    onUsedChange={(used) =>
+                                      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: used }))
+                                    }
+                                  />
+                                )
+                              })}
+                            </div>
+                          )}
+                          {resourceEntries.length > 0 && (
+                            <ResourceUsesTracker
+                              entries={resourceEntries}
+                              usedById={usedResourcesById}
+                              onUsedChange={setUsedResourcesById}
+                              resolveContext={usesResolveContext}
+                            />
+                          )}
+                          {!spellSlotTables.length && !resourceEntries.length && (
+                            <p className="text-xs text-muted-foreground italic">
+                              No class resources to track
+                            </p>
+                          )}
+                        </div>
+                        <DeathSaveTracker
+                          deathSaves={deathSaves}
+                          onDeathSavesChange={setDeathSaves}
+                          compact
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-card rounded-xl p-3 border border-border">
+                    <h2 className="text-sm font-bold text-foreground mb-2">Saving Throws</h2>
+                    <div className="space-y-1">
+                      {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
+                        (ability) => {
+                          const isProficient = savingThrowProficiencies.includes(ability)
+                          const mod =
+                            abilityMods[ability.toLowerCase() as keyof typeof abilityMods] +
+                            (isProficient ? proficiencyBonus : 0)
+                          return (
+                            <div
+                              key={ability}
+                              className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${
+                                isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
+                              }`}
+                            >
+                              <span>{ability}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold tabular-nums">{formatMod(mod)}</span>
+                                <D20RollButton modifier={mod} title={`Roll ${ability} save`} />
+                              </div>
+                            </div>
+                          )
+                        },
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <div className="bg-card rounded-xl p-3 border border-border">
+                <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
+                <SheetEquipmentPanel
+                  equipment={equipment}
+                  catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
+                  equipmentBaseSelections={equipmentBaseSelections}
+                  onBaseSelectionChange={(magicItemId, baseId) =>
+                    void persistBaseSelection(magicItemId, baseId)
+                  }
+                  gold={characterGold}
+                  onGoldChange={(gold) => void persistGold(gold)}
+                  onAddEquipment={() => void openAddEquipmentOverlay()}
+                  searchQuery={equipmentSearchQuery}
+                  onSearchQueryChange={setEquipmentSearchQuery}
+                  equippedArmorId={equippedArmorId}
+                  equippedShieldId={equippedShieldId}
+                  equippedWeaponId={equippedWeaponId}
+                  attunedItemIds={attunedItemIds}
+                  maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
+                  onEquipArmor={(id) => {
+                    if (id) {
+                      const item = equipment.find((entry) => entry.id === id)
+                      if (
+                        item &&
+                        mustAttuneBeforeEquip(item) &&
+                        !attunedItemIds.includes(id)
+                      ) {
+                        return
+                      }
+                    }
+                    void persistEquipmentLoadout({ armorId: id })
+                  }}
+                  onEquipShield={(id) => {
+                    if (id) {
+                      const item = equipment.find((entry) => entry.id === id)
+                      if (
+                        item &&
+                        mustAttuneBeforeEquip(item) &&
+                        !attunedItemIds.includes(id)
+                      ) {
+                        return
+                      }
+                    }
+                    void persistEquipmentLoadout({ shieldId: id })
+                  }}
+                  onEquipWeapon={(id) => {
+                    if (id) {
+                      const item = equipment.find((entry) => entry.id === id)
+                      if (
+                        item &&
+                        mustAttuneBeforeEquip(item) &&
+                        !attunedItemIds.includes(id)
+                      ) {
+                        return
+                      }
+                    }
+                    void persistEquipmentLoadout({ weaponId: id })
+                  }}
+                  onToggleAttune={(itemId) => {
+                    if (attunedItemIds.includes(itemId)) {
+                      const nextAttuned = attunedItemIds.filter((id) => id !== itemId)
+                      void persistAttunement(nextAttuned)
+                      const clears: {
+                        armorId?: string | null
+                        shieldId?: string | null
+                        weaponId?: string | null
+                      } = {}
+                      if (equippedArmorId === itemId) clears.armorId = null
+                      if (equippedShieldId === itemId) clears.shieldId = null
+                      if (equippedWeaponId === itemId) clears.weaponId = null
+                      if (Object.keys(clears).length > 0) {
+                        void persistEquipmentLoadout(clears)
+                      }
+                      return
+                    }
+                    const cap = derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS
+                    if (attunedItemIds.length >= cap) return
+                    void persistAttunement([...attunedItemIds, itemId])
+                  }}
+                  onShowDetails={setSelectedEquipment}
+                />
               </div>
 
               {hasSpellcasting && (
@@ -1509,14 +1753,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   Add Custom Ability
                 </Link>
               </div>
-              {customAbilities.length ? (
+              {sheetCustomAbilities.length ? (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {customAbilities.map((ability) => {
+                  {sheetCustomAbilities.map((ability) => {
                     const uses = resolveUsesConfig(ability.characteristics, ability.uses)
                     return (
                       <div key={ability.id} className="p-2 bg-muted rounded-lg text-xs">
                         <p className="font-bold">{ability.name}</p>
-                        <p className="text-muted-foreground">{ability.description}</p>
+                        {ability.description ? (
+                          <ExpandableDescription
+                            text={ability.description}
+                            className="text-muted-foreground"
+                          />
+                        ) : null}
                         {uses && uses.type !== "unlimited" && (
                           <p className="text-[10px] text-magenta mt-1">
                             Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
@@ -1535,9 +1784,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       </main>
 
       <AnimatePresence>
+        {defaultActionsContext ? (
+          <DefaultActionsOverlay
+            context={defaultActionsContext}
+            onClose={() => setDefaultActionsContext(null)}
+          />
+        ) : null}
         {selectedEquipment && (
           <EquipmentDetailOverlay
             item={selectedEquipment}
+            catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
+            baseSelections={equipmentBaseSelections}
             onClose={() => setSelectedEquipment(null)}
           />
         )}

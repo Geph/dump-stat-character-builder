@@ -1,6 +1,7 @@
 import backgrounds from "./seed-data/backgrounds.json"
 import classes from "./seed-data/classes.json"
 import equipment from "./seed-data/equipment.json"
+import magicItems from "./seed-data/magic-items.json"
 import feats from "./seed-data/feats.json"
 import manifest from "./seed-data/manifest.json"
 import species from "./seed-data/species.json"
@@ -22,6 +23,7 @@ export function getSrdSeedData() {
     spells: spells as Record<string, unknown>[],
     feats: feats as Record<string, unknown>[],
     equipment: equipment as Record<string, unknown>[],
+    magicItems: magicItems as Record<string, unknown>[],
   }
 }
 
@@ -38,6 +40,7 @@ export function getSrdSeedTotals() {
     data.spells.length +
     data.feats.length +
     data.equipment.length +
+    data.magicItems.length +
     classResourceCount
 
   return {
@@ -49,7 +52,8 @@ export function getSrdSeedTotals() {
       backgrounds: data.backgrounds.length,
       spells: data.spells.length,
       feats: data.feats.length,
-      equipment: data.equipment.length,
+      equipment: data.equipment.length + data.magicItems.length,
+      magic_items: data.magicItems.length,
       class_resources: classResourceCount,
     },
   }

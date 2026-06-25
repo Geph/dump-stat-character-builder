@@ -140,6 +140,13 @@ export const equipment = mysqlTable("equipment", {
   weight: decimal("weight", { precision: 10, scale: 2 }),
   properties: json("properties"),
   description: text("description"),
+  requires_attunement: boolean("requires_attunement"),
+  magic_item_category: varchar("magic_item_category", { length: 64 }),
+  rarity: varchar("rarity", { length: 32 }),
+  base_equipment_ids: json("base_equipment_ids").$type<string[]>(),
+  selected_base_equipment_id: char("selected_base_equipment_id", { length: 36 }),
+  base_equipment_filter: varchar("base_equipment_filter", { length: 32 }),
+  magic_effects: json("magic_effects").$type<unknown[]>().default([]),
   ...compendiumMeta,
 })
 
@@ -225,6 +232,8 @@ export const characters = mysqlTable("characters", {
   equipped_armor_id: char("equipped_armor_id", { length: 36 }),
   equipped_shield_id: char("equipped_shield_id", { length: 36 }),
   equipped_weapon_id: char("equipped_weapon_id", { length: 36 }),
+  attuned_item_ids: json("attuned_item_ids").$type<string[]>().default([]),
+  equipment_base_selections: json("equipment_base_selections").$type<Record<string, string>>(),
   spell_ids: json("spell_ids").$type<string[]>().default([]),
   feat_ids: json("feat_ids").$type<string[]>().default([]),
   feat_choice_picks: json("feat_choice_picks").$type<Record<string, string[]>>(),

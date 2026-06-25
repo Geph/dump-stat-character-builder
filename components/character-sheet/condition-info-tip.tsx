@@ -3,14 +3,20 @@
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-export function ConditionInfoTip({ description }: { description: string }) {
+export function ConditionInfoTip({
+  description,
+  ariaLabel = "More information",
+}: {
+  description: string
+  ariaLabel?: string
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className="p-0.5 text-muted-foreground hover:text-foreground shrink-0"
-          aria-label="Condition effect"
+          aria-label={ariaLabel}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >

@@ -100,6 +100,70 @@ function cleanProperties(props: unknown): Record<string, unknown> {
   return p
 }
 
+function coerceStringArray(value: unknown): string[] | null {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+      }
+    } catch {
+      return trimmed.split(/[,;]/).map((entry) => entry.trim()).filter(Boolean)
+    }
+  }
+  return null
+}
+
+function coerceBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value !== 0
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (/^(true|yes|required|1)$/.test(normalized)) return true
+    if (/^(false|no|none|0|not required)$/.test(normalized)) return false
+  }
+  return null
+}
+
+function coerceMagicFields(row: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...row }
+
+  if ("requires_attunement" in next) {
+    const attune = coerceBoolean(next.requires_attunement)
+    if (attune != null) next.requires_attunement = attune
+  }
+
+  if ("base_equipment_ids" in next) {
+    const ids = coerceStringArray(next.base_equipment_ids)
+    if (ids) next.base_equipment_ids = ids
+  }
+
+  if (typeof next.base_equipment_filter === "string") {
+    next.base_equipment_filter = next.base_equipment_filter.trim() || null
+  }
+
+  if (typeof next.magic_item_category === "string") {
+    next.magic_item_category = next.magic_item_category.trim() || null
+  }
+
+  if (typeof next.rarity === "string") {
+    next.rarity = next.rarity.trim() || null
+  }
+
+  if (Array.isArray(next.magic_effects)) {
+    next.magic_effects = next.magic_effects.filter(
+      (entry) => entry && typeof entry === "object" && !Array.isArray(entry),
+    )
+  }
+
+  return next
+}
+
 function inferWeaponSubcategory(row: Record<string, unknown>): string | null {
   const existing = typeof row.subcategory === "string" ? row.subcategory.trim() : ""
   if (existing) return existing
@@ -160,7 +224,7 @@ export function normalizeEquipmentRow(
     inferWeaponSubcategory(row) ??
     (typeof row.subcategory === "string" ? row.subcategory.trim() || null : null)
 
-  return {
+  return coerceMagicFields({
     ...row,
     name,
     subcategory,
@@ -168,7 +232,7 @@ export function normalizeEquipmentRow(
     weight: parseEquipmentWeight(row.weight),
     properties: cleanProperties(row.properties),
     description,
-  }
+  })
 }
 
 /** Dedupe by name; merge descriptions and fill missing cost/weight. */

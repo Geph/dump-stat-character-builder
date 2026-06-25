@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react"
 import { Check, Coins, Info, Search } from "lucide-react"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
-import { filterEquipmentList } from "@/lib/compendium/equipment-display"
+import { filterEquipmentByMagicKind, filterEquipmentList } from "@/lib/compendium/equipment-display"
+import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import {
   EQUIPMENT_CATEGORY_ORDER,
   groupEquipmentByCategory,
@@ -40,6 +41,7 @@ export function EquipmentShoppingPanel({
 }: EquipmentShoppingPanelProps) {
   const pageSize = usePickerPageSize()
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({})
+  const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("all")
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -55,12 +57,13 @@ export function EquipmentShoppingPanel({
 
   const equipmentGroups = useMemo(() => {
     const searched = filterEquipmentList(equipment, equipmentSearch)
-    const filtered =
+    const byCategory =
       equipmentFilterCategory === "all"
         ? searched
         : searched.filter((item) => (item.category?.trim() || "Other") === equipmentFilterCategory)
+    const filtered = filterEquipmentByMagicKind(byCategory, magicKindFilter)
     return groupEquipmentByCategory(filtered)
-  }, [equipment, equipmentSearch, equipmentFilterCategory])
+  }, [equipment, equipmentSearch, equipmentFilterCategory, magicKindFilter])
 
   const goldRemaining = totalGoldBudget - goldSpent
 
@@ -129,6 +132,18 @@ export function EquipmentShoppingPanel({
               Clear type filter
             </button>
           )}
+          <select
+            value={magicKindFilter}
+            onChange={(e) => {
+              setMagicKindFilter(e.target.value as "all" | "magic" | "mundane")
+              setCategoryPages({})
+            }}
+            className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+          >
+            <option value="all">All items</option>
+            <option value="magic">Magic only</option>
+            <option value="mundane">Mundane only</option>
+          </select>
         </div>
       )}
 
@@ -176,7 +191,10 @@ export function EquipmentShoppingPanel({
                           {isPurchased && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+                            <MagicEquipmentBadges item={item} />
+                          </div>
                           <p className="text-xs text-muted-foreground tabular-nums">
                             {formatEquipmentCost(item) ?? "—"}
                           </p>

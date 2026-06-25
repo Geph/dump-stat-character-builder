@@ -179,7 +179,7 @@ function isMartialExploitLikeFeature(feature: {
   return false
 }
 
-const BATTLE_MASTER_FRAME_FEATURE = /^(?:combat superiority|improved combat superiority|ultimate combat superiority|relentless|student of war|know your enemy|maneuvers?)$/i
+const BATTLE_MASTER_FRAME_FEATURE = /^(?:combat superiority|improved combat superiority|ultimate combat superiority|relentless|student of war|know your enemy|maneuvers?|battle tactics)$/i
 
 function isBattleMasterManeuverLikeFeature(feature: {
   name?: string
@@ -193,15 +193,22 @@ function isBattleMasterManeuverLikeFeature(feature: {
   if (feature.isChoice && /\bmaneuver/i.test(feature.choices?.category ?? name)) return true
   if (/\bexpend\s+(?:one|an?)\s+superiority\s+die\b/i.test(feature.description ?? "")) return true
   if (/\bexpend\s+(?:one|an?)\s+superiority\s+dice\b/i.test(feature.description ?? "")) return true
+  if (/\bexpend\s+(?:one|an?|a)\s+battle\s+die\b/i.test(feature.description ?? "")) return true
   return false
+}
+
+function maneuverResourceKey(feature: { description?: string }): string {
+  if (/\bbattle\s+die\b/i.test(feature.description ?? "")) return "battle_dice"
+  return "superiority_dice"
+}
+
+function maneuverDefinition(name: string, className: string, resourceKey: string): string {
+  const resourceLabel = resourceKey === "battle_dice" ? "Battle Die" : "Superiority Die"
+  return `${className} maneuver (${name}). Expend a ${resourceLabel} when you use this technique.`
 }
 
 function exploitDefinition(name: string, className: string): string {
   return `Martial exploit option for ${className}. Player-chosen technique fueled by exploit dice or similar resources.`
-}
-
-function maneuverDefinition(name: string, className: string): string {
-  return `Battle Master maneuver for ${className}. Expend a Superiority Die when you use this technique (one maneuver per attack).`
 }
 
 function companionDefinition(name: string, className: string): string {
@@ -417,16 +424,17 @@ function collectBattleMasterManeuverFeatures(
     for (const feature of features ?? []) {
       if (!isBattleMasterManeuverLikeFeature(feature)) continue
       const optionCount = feature.choices?.options?.length
+      const resourceKey = maneuverResourceKey(feature)
       pushAbility(into.customAbilities, seenAbilities, {
         name: feature.name,
-        definition: maneuverDefinition(feature.name, sourceName),
+        definition: maneuverDefinition(feature.name, sourceName, resourceKey),
         description: feature.description,
         sourceType,
         sourceName,
         levelRequirement: feature.level,
         talentCount: optionCount,
         source: "feature",
-        resourceKey: "superiority_dice",
+        resourceKey,
       })
     }
   }
@@ -436,6 +444,21 @@ function collectBattleMasterManeuverFeatures(
   }
   for (const subclass of content.subclasses ?? []) {
     scanFeatures(subclass.features, "subclass", subclass.name)
+  }
+
+  for (const ability of content.abilities ?? []) {
+    if (!isBattleMasterManeuverLikeFeature(ability)) continue
+    const resourceKey = maneuverResourceKey(ability)
+    pushAbility(into.customAbilities, seenAbilities, {
+      name: ability.name,
+      definition: maneuverDefinition(ability.name, ability.source_name ?? "this class", resourceKey),
+      description: ability.description,
+      sourceType: normalizeProposalSourceType(ability.source_type),
+      sourceName: ability.source_name ?? null,
+      levelRequirement: ability.level_requirement ?? null,
+      source: "explicit",
+      resourceKey,
+    })
   }
 }
 

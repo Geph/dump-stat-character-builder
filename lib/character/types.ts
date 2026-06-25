@@ -40,9 +40,13 @@ export type CharacterBuildInputs = {
   extraArmorProficiencies: string[]
   languages: string[]
   equipment: Equipment[]
+  /** Full compendium catalog for resolving magic item base stats (defaults to `equipment`). */
+  equipmentCatalog?: Equipment[]
   equippedArmorId: string | null
   equippedShieldId: string | null
   equippedWeaponId: string | null
+  attunedItemIds?: string[]
+  equipmentBaseSelections?: Record<string, string>
   modifierCatalog: ModifierCatalogEntry[]
   feats: Feat[]
   customAbilities?: CustomAbility[]

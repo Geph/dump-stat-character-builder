@@ -1,0 +1,110 @@
+{
+  "classes": [
+    {
+      "name": "Captain",
+      "description": "<table><tr><th>Level</th><th>Proficiency Bonus</th><th>Features</th><th>Battle Dice</th></tr><tr><td>1st</td><td>+2</td><td>Battle Tactics, Weapon Mastery</td><td>2d6</td></tr><tr><td>2nd</td><td>+2</td><td>Cohort, Fighting Style</td><td>2d6</td></tr><tr><td>5th</td><td>+3</td><td>Blitz, Cohort</td><td>3d6</td></tr><tr><td>9th</td><td>+4</td><td>Cohort</td><td>3d8</td></tr><tr><td>20th</td><td>+6</td><td>Legendary Commander</td><td>5d8</td></tr></table>",
+      "hit_die": 8,
+      "primary_ability": ["Strength", "Dexterity", "Charisma"],
+      "saving_throws": ["Constitution", "Charisma"],
+      "weapon_proficiencies": ["Simple weapons", "Martial weapons"],
+      "armor_proficiencies": ["Light armor", "Medium armor", "Heavy armor", "Shields"],
+      "skill_choices": {
+        "count": 2,
+        "options": [
+          "Animal Handling",
+          "Athletics",
+          "Deception",
+          "History",
+          "Insight",
+          "Intimidation",
+          "Perception",
+          "Persuasion"
+        ]
+      },
+      "features": [
+        {
+          "level": 1,
+          "name": "Battle Tactics",
+          "description": "You learn maneuvers that are fueled by special dice called Battle Dice.\n\nBattle Dice. You have two Battle Dice, which are d6s. A Battle Die is expended when you use it. You regain all expended Battle Dice when you roll Initiative or finish a Short or Long Rest.\n\nManeuvers. You can expend Battle Dice to perform maneuvers."
+        },
+        {
+          "level": 1,
+          "name": "Weapon Mastery",
+          "description": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency, such as Lances and Longswords.\n\nWhenever you finish a Long Rest, you can change the kinds of weapons you chose."
+        },
+        {
+          "level": 2,
+          "name": "Cohort",
+          "description": "You gain a loyal Cohort who carries your banner and follows your lead.\n\nInitiating a Cohort. Choose your Cohort's stat block from those listed later in the class description.\n\nCohort in Combat. Your Cohort is Friendly to you and your allies and obeys your commands. In combat, your Cohort takes its turn immediately before or after your turn each round (your choice)."
+        },
+        {
+          "level": 2,
+          "name": "Fighting Style",
+          "description": "You have honed your martial prowess and gain a Fighting Style feat of your choice."
+        },
+        {
+          "level": 5,
+          "name": "Blitz",
+          "description": "Once on each of your turns, you can direct your Cohort or an ally within 60 feet of yourself that can see or hear you. The chosen creature can take a Reaction to move up to its Speed or make one attack with a weapon or Unarmed Strike."
+        },
+        {
+          "level": 7,
+          "name": "Valiant Surge",
+          "description": "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die."
+        },
+        {
+          "level": 11,
+          "name": "Coordinated Strike",
+          "description": "Once per turn when you take the Attack action and hit with a weapon, you can deal an extra 2d8 damage to the target if your Cohort has dealt damage to that target since the end of your last turn."
+        },
+        {
+          "level": 19,
+          "name": "Epic Boon",
+          "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify."
+        },
+        {
+          "level": 20,
+          "name": "Legendary Commander",
+          "description": "Immediately after another creature's turn, you can choose yourself or an ally within 60 feet of yourself that can see or hear you to take a Legendary Action."
+        }
+      ]
+    }
+  ],
+  "abilities": [
+    {
+      "name": "Bolster",
+      "description": "As a Bonus Action, you can expend one Battle Die to motivate an ally within 60 feet of yourself. The next time your ally makes an attack before the start of your next turn, it adds the Battle Die to the attack and damage roll.",
+      "source_type": "class",
+      "source_name": "Captain",
+      "level_requirement": 1
+    },
+    {
+      "name": "Born Leader",
+      "description": "When you fail a Wisdom or Charisma check, you can expend one Battle Die to add it to the roll, potentially turning it into a success. You can only use this maneuver once per turn.",
+      "source_type": "class",
+      "source_name": "Captain",
+      "level_requirement": 1
+    },
+    {
+      "name": "Morale Boost",
+      "description": "When an ally you can see within 60 feet of yourself fails a saving throw, you can take a Reaction to expend one Battle Die and add it to the roll, potentially turning it into a success.",
+      "source_type": "class",
+      "source_name": "Captain",
+      "level_requirement": 1
+    },
+    {
+      "name": "Rally",
+      "description": "As a Bonus Action on your turn, you can expend one Battle Die to choose one ally within 60 feet of yourself that can see or hear you. That creature regains Hit Points equal to the number rolled + your Charisma modifier.",
+      "source_type": "class",
+      "source_name": "Captain",
+      "level_requirement": 1
+    },
+    {
+      "name": "Staggering Strike",
+      "description": "When you hit a creature with an attack using a Melee weapon or an Unarmed Strike, you can expend one Battle Die as a Bonus Action to daze the target. Add the Battle Die to the attack's damage roll.",
+      "source_type": "class",
+      "source_name": "Captain",
+      "level_requirement": 1
+    }
+  ]
+}

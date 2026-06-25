@@ -77,6 +77,10 @@ function parseResourceCell(header: string, cell: string): number | null {
     const pool = parseDicePoolCell(cell)
     if (pool) return pool.count
   }
+  if (/battle\s*dice/i.test(header)) {
+    const pool = parseDicePoolCell(cell)
+    if (pool) return pool.count
+  }
   if (/exploit\s*die(?!\s*dice)/i.test(header)) return parseDieSizeCell(cell)
   return parseCountCell(cell)
 }
@@ -99,6 +103,7 @@ function isResourceHeader(cell: string): boolean {
   if (/^exploits?\s*known$/i.test(normalized)) return false
   if (/^weapon\s+mastery$/i.test(normalized)) return true
   if (/^risk\s+dice$/i.test(normalized)) return true
+  if (/^battle\s+dice$/i.test(normalized)) return true
 
   const thirdParty = matchThirdPartyResourceHeader(normalized)
   if (thirdParty && thirdParty.resourceKey !== "exploits_known") return true
@@ -229,7 +234,10 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
 
     resourceCols.forEach((col, colIndex) => {
       const cell = row[col.index] ?? ""
-      const dicePool = /risk\s*dice/i.test(col.header) ? parseDicePoolCell(cell) : null
+      const dicePool =
+        /risk\s*dice/i.test(col.header) || /battle\s*dice/i.test(col.header)
+          ? parseDicePoolCell(cell)
+          : null
       const count = dicePool?.count ?? parseResourceCell(col.header, cell)
       if (count == null) return
       const existing = columnData[colIndex].valuesByLevel.find((entry) => entry.level === level)
@@ -382,6 +390,21 @@ export function usesConfigForProgressionColumn(
       atLevelTable: sorted,
       dieType: dieLabel,
       recharges: shortAndLong,
+    }
+  }
+
+  if (/battle\s*dice/i.test(column.header) || column.resourceKey === "battle_dice") {
+    const dieSides = column.dieSidesByLevel?.length
+      ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
+      : []
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      dieType: dieLabel,
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
     }
   }
 

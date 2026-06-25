@@ -166,6 +166,7 @@ export function calculateWeaponAttack(
 }
 
 export function getWeaponMastery(weapon: Equipment): string | null {
+  if (weapon.mastery?.trim()) return weapon.mastery.trim()
   const mastery = getPropertyRecord(weapon).mastery
   return typeof mastery === "string" && mastery.trim() ? mastery : null
 }

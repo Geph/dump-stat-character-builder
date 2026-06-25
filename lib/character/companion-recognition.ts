@@ -1,6 +1,6 @@
 /** Known companion feature names from SRD / common homebrew. */
 export const COMPANION_FEATURE_NAMES =
-  /^(?:steel defender|reanimated companion|eldritch cannon|primal companion|wild companion|spirit companion|arcsteel defender)$/i
+  /^(?:steel defender|reanimated companion|eldritch cannon|primal companion|wild companion|spirit companion|arcsteel defender|cohort)$/i
 
 export function isCompanionFeatureName(name: string): boolean {
   return COMPANION_FEATURE_NAMES.test(name.trim())

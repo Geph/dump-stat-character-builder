@@ -557,6 +557,18 @@ export interface Equipment {
   damage_type?: string | null // e.g. "slashing", "piercing", "bludgeoning"
   range?: string | null // e.g. "5 ft" or "80/320 ft"
   mastery?: string | null // e.g. "Cleave", "Graze"
+  /** Structured magic-item fields (optional until compendium seed catches up). */
+  requires_attunement?: boolean | null
+  magic_item_category?: string | null
+  rarity?: string | null
+  /** Mundane compendium ids this magic item can inherit stats from (Vorpal-style plural bases). */
+  base_equipment_ids?: string[] | null
+  /** Player/import-selected base when multiple bases or filter-based items are owned. */
+  selected_base_equipment_id?: string | null
+  /** Predicate when bases are not enumerated (e.g. +1 Any Melee Weapon). */
+  base_equipment_filter?: import("@/lib/compendium/equipment-magic").BaseEquipmentFilter | null
+  /** Modifier instances applied when scope rules are met (Phase 2 combat wiring). */
+  magic_effects?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null
   // Attached abilities (for finesse, two-handed, etc.)
   attached_ability_ids?: string[]
   icon: string | null
@@ -614,6 +626,9 @@ export interface Character {
   equipped_armor_id?: string | null
   equipped_shield_id?: string | null
   equipped_weapon_id?: string | null
+  attuned_item_ids?: string[] | null
+  /** Per-owned magic item: magic item id → chosen mundane base equipment id. */
+  equipment_base_selections?: Record<string, string> | null
   spell_ids: string[]
   feat_ids: string[]
   feat_choice_picks?: Record<string, string[]> | null
