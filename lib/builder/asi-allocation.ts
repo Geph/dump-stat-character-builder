@@ -162,10 +162,36 @@ export function trimAsiAllocation(allocation: AsiAllocation, totalPoints: number
   return trimmed
 }
 
-export function aggregateAsiBonuses(allocations: AsiAllocationsByFeatId): AsiAllocation {
+const REF_KEY_MARKER = "::ref::"
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+
+/**
+ * Ability-score pool allocations are keyed by the granting source, e.g.
+ * `feat:{classId}:Ability Score Improvement::ref::{cat}::{mod}`. When a class,
+ * feat, or species is removed/changed, its old allocation can linger in
+ * `asi_allocations` and inflate scores. An allocation is considered orphaned
+ * when its key embeds source ID(s), none of which belong to the character's
+ * current sources.
+ */
+function isOrphanedPoolAllocation(key: string, validSourceIds: ReadonlySet<string>): boolean {
+  const markerIndex = key.indexOf(REF_KEY_MARKER)
+  if (markerIndex === -1) return false
+  const prefix = key.slice(0, markerIndex)
+  const embeddedIds = prefix.match(UUID_PATTERN)
+  if (!embeddedIds || embeddedIds.length === 0) return false
+  return !embeddedIds.some((id) => validSourceIds.has(id.toLowerCase()))
+}
+
+export function aggregateAsiBonuses(
+  allocations: AsiAllocationsByFeatId,
+  validSourceIds?: ReadonlySet<string>,
+): AsiAllocation {
   const totals: AsiAllocation = {}
   const combined = allocations[COMBINED_MILESTONE_ASI_KEY]
   const useCombined = Boolean(combined && getAsiPointsUsed(combined) > 0)
+  const sourceIds = validSourceIds
+    ? new Set(Array.from(validSourceIds, (id) => id.toLowerCase()))
+    : null
 
   for (const [key, allocation] of Object.entries(allocations)) {
     if (key === BACKGROUND_ASI_KEY) continue
@@ -177,6 +203,7 @@ export function aggregateAsiBonuses(allocations: AsiAllocationsByFeatId): AsiAll
       if (useCombined) mergeAllocationsInto(totals, allocation)
       continue
     }
+    if (sourceIds && isOrphanedPoolAllocation(key, sourceIds)) continue
     mergeAllocationsInto(totals, allocation)
   }
 

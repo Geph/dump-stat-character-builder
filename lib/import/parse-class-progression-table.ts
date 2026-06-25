@@ -72,16 +72,21 @@ function parseDicePoolCell(cell: string): { count: number; dieSides: number } | 
   return { count, dieSides }
 }
 
+function headerUsesDicePool(header: string): boolean {
+  return /risk\s*dice/i.test(header) || /battle\s*dice/i.test(header) || /\bfinisher\b/i.test(header)
+}
+
 function parseResourceCell(header: string, cell: string): number | null {
-  if (/risk\s*dice/i.test(header)) {
-    const pool = parseDicePoolCell(cell)
-    if (pool) return pool.count
-  }
-  if (/battle\s*dice/i.test(header)) {
+  if (headerUsesDicePool(header)) {
     const pool = parseDicePoolCell(cell)
     if (pool) return pool.count
   }
   if (/exploit\s*die(?!\s*dice)/i.test(header)) return parseDieSizeCell(cell)
+  if (/endurance\s*die\s*size/i.test(header)) {
+    const pool = parseDicePoolCell(cell)
+    if (pool) return pool.dieSides
+    return parseDieSizeCell(cell)
+  }
   return parseCountCell(cell)
 }
 
@@ -234,10 +239,7 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
 
     resourceCols.forEach((col, colIndex) => {
       const cell = row[col.index] ?? ""
-      const dicePool =
-        /risk\s*dice/i.test(col.header) || /battle\s*dice/i.test(col.header)
-          ? parseDicePoolCell(cell)
-          : null
+      const dicePool = headerUsesDicePool(col.header) ? parseDicePoolCell(cell) : null
       const count = dicePool?.count ?? parseResourceCell(col.header, cell)
       if (count == null) return
       const existing = columnData[colIndex].valuesByLevel.find((entry) => entry.level === level)
@@ -405,6 +407,57 @@ export function usesConfigForProgressionColumn(
       atLevelTable: sorted,
       dieType: dieLabel,
       recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    }
+  }
+
+  if (column.resourceKey === "ritual_level" || /ritual\s*level/i.test(column.header)) {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Maximum spell level you can add to your grimoire and cast as a Ritual at each ${className} level${
+        latest ? ` (up to level ${latest.count})` : ""
+      }. This is a cap, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
+  if (column.resourceKey === "finisher" || /\bfinisher\b/i.test(column.header)) {
+    const dieSides = column.dieSidesByLevel?.length
+      ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
+      : []
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d8"
+    const latestCount = sorted[sorted.length - 1]?.count ?? 1
+    return {
+      type: "special",
+      specialDescription: `Bonus damage dealt by your Finisher: ${latestCount}${dieLabel} at the highest tier. The die count scales on the ${className} level table; this is a damage rider, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+      dieType: dieLabel,
+    }
+  }
+
+  if (column.resourceKey === "endurance_die_size" || /endurance\s*die\s*size/i.test(column.header)) {
+    const dieLabel = sorted.length ? `d${sorted[sorted.length - 1].count}` : "d8"
+    return {
+      type: "special",
+      specialDescription: `Endurance die size at each ${className} level (e.g. ${dieLabel}). Not a spendable pool — pairs with Endurance Dice.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+      dieType: dieLabel as UsesConfig["dieType"],
+    }
+  }
+
+  if (column.resourceKey === "primal_manifestations" || /primal\s*manifestations?/i.test(column.header)) {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Number of Primal Manifestations known at each ${className} level${
+        latest ? ` (up to ${latest.count})` : ""
+      }. A choice count, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
     }
   }
 

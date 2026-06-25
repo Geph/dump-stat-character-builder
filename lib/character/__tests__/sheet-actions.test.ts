@@ -1,0 +1,266 @@
+import { describe, expect, it } from "vitest"
+
+import { collectSheetActions } from "@/lib/character/sheet-actions"
+import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import type { Feature, Species } from "@/lib/types"
+
+function classDetail(
+  features: Feature[],
+  level = 5,
+  opts: { subclassFeatures?: Feature[] } = {},
+): CharacterClassDetail {
+  return {
+    row: { class_id: "class-1", level, subclass_id: opts.subclassFeatures ? "sub-1" : null, order: 0 },
+    class: { id: "class-1", name: "Tester", features } as unknown as CharacterClassDetail["class"],
+    subclass: opts.subclassFeatures
+      ? ({ id: "sub-1", name: "Test Path", features: opts.subclassFeatures } as unknown as CharacterClassDetail["subclass"])
+      : null,
+  }
+}
+
+describe("collectSheetActions", () => {
+  it("includes features with a top-level activation", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          { level: 1, name: "Channel Divinity", description: "x", activation: { action: true } },
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.map((a) => a.name)).toContain("Channel Divinity")
+    expect(actions.find((a) => a.name === "Channel Divinity")?.kinds).toEqual(["action"])
+  })
+
+  it("excludes features whose level exceeds the class level", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [{ level: 11, name: "High Level Action", description: "x", activation: { action: true } }],
+          5,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.map((a) => a.name)).not.toContain("High Level Action")
+  })
+
+  it("derives kinds from a healing dice pool characteristic when the feature has no activation", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Healing Light",
+            description: "Spend dice to heal.",
+            linkedModifiers: [
+              {
+                instanceId: "modinst_healing_light",
+                catalogRefId: "cat_char_healing_dice_pool",
+                characteristics: [
+                  {
+                    id: "mod_hl",
+                    type: "healing_dice_pool",
+                    dieType: "d6",
+                    poolSize: 6,
+                    activation: "bonus_action",
+                  },
+                ],
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const healing = actions.find((a) => a.name === "Healing Light")
+    expect(healing).toBeTruthy()
+    expect(healing?.kinds).toEqual(["bonus"])
+  })
+
+  it("derives a reaction from a trigger characteristic with useReaction", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 2,
+            name: "Deflect",
+            description: "React to halve damage.",
+            linkedModifiers: [
+              {
+                instanceId: "modinst_deflect",
+                catalogRefId: "cat_char_damage_halving_reaction",
+                characteristics: [
+                  { id: "mod_def", type: "damage_halving_reaction", useReaction: true },
+                ],
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.find((a) => a.name === "Deflect")?.kinds).toEqual(["reaction"])
+  })
+
+  it("derives the activation from a linked modifier instance activation", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Imported Maneuver",
+            description: "x",
+            linkedModifiers: [
+              {
+                instanceId: "modinst_maneuver",
+                catalogRefId: "cat_fx_extra_action",
+                activation: { bonusAction: true, effects: [] },
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.find((a) => a.name === "Imported Maneuver")?.kinds).toEqual(["bonus"])
+  })
+
+  it("binds an action to a class resource pool via resource_ability_menu", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Maneuver Menu",
+            description: "x",
+            activation: { bonusAction: true },
+            linkedModifiers: [
+              {
+                instanceId: "modinst_menu",
+                catalogRefId: "cat_char_resource_ability_menu",
+                characteristics: [
+                  {
+                    id: "mod_menu",
+                    type: "resource_ability_menu",
+                    resourceKey: "battle_dice",
+                    options: [],
+                  },
+                ],
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.find((a) => a.name === "Maneuver Menu")?.classResourceKey).toBe("battle_dice")
+  })
+
+  it("ignores purely passive features", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Darkvision Trait",
+            description: "x",
+            linkedModifiers: [
+              {
+                instanceId: "modinst_vision",
+                catalogRefId: "cat_char_vision",
+                characteristics: [{ id: "mod_v", type: "vision", senses: [] } as never],
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.map((a) => a.name)).not.toContain("Darkvision Trait")
+  })
+
+  it("surfaces a utility trait whose action economy is only described in prose (Stonecunning)", () => {
+    const species = {
+      id: "species-1",
+      name: "Dwarf",
+      traits: [
+        {
+          name: "Stonecunning",
+          description:
+            "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense.",
+        },
+      ],
+    } as unknown as Species
+    const actions = collectSheetActions({ classDetails: [classDetail([], 5)], species })
+    const stonecunning = actions.find((a) => a.name === "Stonecunning")
+    expect(stonecunning).toBeTruthy()
+    expect(stonecunning?.kinds).toEqual(["bonus"])
+    expect(stonecunning?.category).toBe("utility")
+  })
+
+  it("classifies attack/damage features as combat and senses/movement as utility", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Frenzied Strike",
+            description: "As a Bonus Action, make a weapon attack that deals extra damage.",
+            activation: { bonusAction: true },
+          },
+          {
+            level: 1,
+            name: "Misty Step",
+            description: "As a Bonus Action, you teleport up to 30 feet to an unoccupied space you can see.",
+          },
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.find((a) => a.name === "Frenzied Strike")?.category).toBe("combat")
+    expect(actions.find((a) => a.name === "Misty Step")?.category).toBe("utility")
+  })
+
+  it("surfaces a background feature action and labels it from Background", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 3)],
+      species: null,
+      backgroundFeature: {
+        name: "Wand Tinker",
+        description: "As a Magic Action, you can expend a charge to produce a minor effect.",
+      },
+    })
+    const tinker = actions.find((a) => a.name === "Wand Tinker")
+    expect(tinker?.kinds).toEqual(["action"])
+    expect(tinker?.sourceLabel).toBe("Background")
+  })
+
+  it("surfaces species traits whose action economy lives in linked modifiers", () => {
+    const species = {
+      id: "species-1",
+      name: "Dragonborn",
+      traits: [
+        {
+          name: "Breath Weapon",
+          description: "Exhale destructive energy.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_breath",
+              catalogRefId: "cat_char_special_attack",
+              activation: { action: true, effects: [] },
+            },
+          ],
+        },
+      ],
+    } as unknown as Species
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 5)],
+      species,
+    })
+    const breath = actions.find((a) => a.name === "Breath Weapon")
+    expect(breath).toBeTruthy()
+    expect(breath?.kinds).toEqual(["action"])
+    expect(breath?.sourceLabel).toBe("Dragonborn")
+  })
+})

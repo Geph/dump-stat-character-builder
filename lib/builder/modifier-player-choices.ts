@@ -380,11 +380,21 @@ export function spellOptionsForModifierSlot(
     classNames = [pickedClass]
   }
 
+  // Spells already chosen in other spell-grant slots can't be picked again.
+  const ownPicks = picks[slot.slotKey] ?? []
+  const otherSlotSpellIds = new Set<string>()
+  for (const [key, ids] of Object.entries(picks)) {
+    if (key === slot.slotKey) continue
+    if (!key.includes("::spell:")) continue
+    for (const id of ids) otherSlotSpellIds.add(id)
+  }
+
   const classSet = new Set(classNames.map((name) => name.toLowerCase()))
   return spells.filter(
     (spell) =>
       spell.level === slot.spellLevel &&
-      spell.classes?.some((className) => classSet.has(className.toLowerCase())),
+      spell.classes?.some((className) => classSet.has(className.toLowerCase())) &&
+      (!otherSlotSpellIds.has(spell.id) || ownPicks.includes(spell.id)),
   )
 }
 

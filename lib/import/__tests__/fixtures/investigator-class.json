@@ -1,0 +1,84 @@
+{
+  "classes": [
+    {
+      "name": "Investigator",
+      "description": "<table><tr><th>Level</th><th>Proficiency Bonus</th><th>Features</th><th>Ritual Level</th><th>Rushed Incantation</th><th>Finisher</th><th>Trinkets</th></tr><tr><td>1st</td><td>+2</td><td>Ritualist, Weapon Mastery</td><td>1</td><td>—</td><td>—</td><td>—</td></tr><tr><td>2nd</td><td>+2</td><td>Expertise, Finisher, Rushed Incantation</td><td>1</td><td>3</td><td>1d8</td><td>—</td></tr><tr><td>3rd</td><td>+2</td><td>Investigator Subclass, Trinkets</td><td>2</td><td>4</td><td>1d8</td><td>2</td></tr><tr><td>5th</td><td>+3</td><td>Exploit Weakness</td><td>3</td><td>5</td><td>1d8</td><td>3</td></tr><tr><td>7th</td><td>+3</td><td>Holy Trinkets</td><td>4</td><td>6</td><td>1d8</td><td>3</td></tr><tr><td>9th</td><td>+4</td><td>Expertise</td><td>5</td><td>7</td><td>1d8</td><td>4</td></tr><tr><td>11th</td><td>+4</td><td>Improved Finisher</td><td>6</td><td>7</td><td>2d8</td><td>4</td></tr><tr><td>17th</td><td>+6</td><td>Enigma Arcane, Improved Finisher</td><td>6</td><td>9</td><td>3d8</td><td>5</td></tr><tr><td>20th</td><td>+6</td><td>Spellbinder</td><td>6</td><td>10</td><td>3d8</td><td>6</td></tr></table>",
+      "hit_die": 8,
+      "primary_ability": ["Dexterity", "Intelligence"],
+      "saving_throws": ["Dexterity", "Intelligence"],
+      "weapon_proficiencies": ["Simple weapons", "Martial weapons"],
+      "armor_proficiencies": ["Light armor"],
+      "skill_choices": {
+        "count": 3,
+        "options": [
+          "Arcana",
+          "Athletics",
+          "Deception",
+          "History",
+          "Insight",
+          "Intimidation",
+          "Investigation",
+          "Medicine",
+          "Nature",
+          "Perception",
+          "Persuasion",
+          "Religion",
+          "Sleight of Hand",
+          "Stealth"
+        ]
+      },
+      "features": [
+        {
+          "level": 1,
+          "name": "Ritualist",
+          "description": "You have learned to cast Rituals to overcome supernatural threats. Your Rituals are recorded in a grimoire. The Ritual Level column on the Investigator Features table shows the maximum level of a spell you can add to your grimoire. Intelligence is your spellcasting ability for your Investigator spells."
+        },
+        {
+          "level": 1,
+          "name": "Weapon Mastery",
+          "description": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency, such as Rapiers and Heavy Crossbows. Whenever you finish a Long Rest, you can change the kinds of weapons you chose."
+        },
+        {
+          "level": 2,
+          "name": "Expertise",
+          "description": "You gain Expertise in two of your skill proficiencies of your choice. Arcana and Investigation are recommended if you have proficiency in them. At Investigator level 9, you gain Expertise in two more of your skill proficiencies of your choice."
+        },
+        {
+          "level": 2,
+          "name": "Finisher",
+          "description": "Once per turn when you deal damage to a creature that is Bloodied, you can deal an extra 1d8 damage to the target. The damage is the same type as the damage dealt by the weapon. This damage increases as you gain Investigator levels, as shown in the Finisher column of the Investigator Features table."
+        },
+        {
+          "level": 2,
+          "name": "Rushed Incantation",
+          "description": "You can hastily perform any spell in your grimoire that has a casting time of an action or Bonus Action, casting the spell as a Bonus Action. You can use this feature three times. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. You gain additional uses when you reach certain Investigator levels, as shown in the Rushed Incantation column of the Investigator Features table."
+        },
+        {
+          "level": 3,
+          "name": "Trinkets",
+          "description": "Your subclass grants you a number of supernatural trinkets to aid you in defeating supernatural threats and unraveling mysteries. You can use this feature twice, activating one of your trinket options each time you use it. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. You gain additional uses when you reach certain Investigator levels, as shown in the Trinkets column of the Investigator Features table."
+        },
+        {
+          "level": 4,
+          "name": "Ability Score Improvement",
+          "description": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Investigator levels 8, 12, and 16."
+        },
+        {
+          "level": 7,
+          "name": "Holy Trinkets",
+          "description": "You keep a wide array of Holy Symbols and blessed items on your person, even if you aren't particularly pious. You can use the following trinkets (expending a use of your Trinkets to do so). Amulet of Warding. As a Bonus Action, you place a divine ward on a creature of your choice within 60 feet of you. Restorative Ankh. As a Bonus Action, a creature of your choice within 60 feet of you regains Hit Points equal to your Investigator level plus your Intelligence modifier. Rune of Banishment. As a Bonus Action, choose one creature you can see within 60 feet of you that must succeed on a Charisma saving throw against your spell save DC or be banished."
+        },
+        {
+          "level": 18,
+          "name": "Supernatural Resolve",
+          "description": "You have Advantage on saving throws against spells and other magical effects unless you have the Incapacitated condition."
+        },
+        {
+          "level": 19,
+          "name": "Epic Boon",
+          "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify."
+        }
+      ]
+    }
+  ]
+}

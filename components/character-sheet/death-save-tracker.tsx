@@ -10,7 +10,6 @@ export type DeathSaveState = {
 type DeathSaveTrackerProps = {
   deathSaves: DeathSaveState
   onDeathSavesChange: (next: DeathSaveState) => void
-  compact?: boolean
 }
 
 function DeathSaveDots({
@@ -55,7 +54,6 @@ function DeathSaveDots({
 export function DeathSaveTracker({
   deathSaves,
   onDeathSavesChange,
-  compact = false,
 }: DeathSaveTrackerProps) {
   const toggleSuccess = (index: number) => {
     const active = index < deathSaves.successes
@@ -74,7 +72,7 @@ export function DeathSaveTracker({
   }
 
   return (
-    <div className={compact ? "space-y-2" : "rounded-lg border border-border/70 bg-muted/25 p-2.5 space-y-2"}>
+    <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] font-bold text-muted-foreground uppercase">Death Saves</p>
         <button

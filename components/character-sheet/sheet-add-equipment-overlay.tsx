@@ -130,8 +130,9 @@ export function SheetAddEquipmentOverlay({
 
   return (
     <AnimatePresence>
-      {open && (
+      {open ? (
         <motion.div
+          key="add-equipment-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -364,7 +365,7 @@ export function SheetAddEquipmentOverlay({
             )}
           </motion.div>
         </motion.div>
-      )}
+      ) : null}
     </AnimatePresence>
   )
 }

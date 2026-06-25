@@ -1,6 +1,8 @@
 "use client"
 
 import {
+  ABILITY_SCORE_KEYS,
+  type AbilityScoreKey,
   SAVING_THROW_NAMES,
   SAVING_THROW_TARGET_SCOPES,
   type SavingThrowTriggerCharacteristic,
@@ -731,26 +733,74 @@ export function HealingDicePoolEditor({
   mod: HealingDicePoolCharacteristic
   onChange: (next: HealingDicePoolCharacteristic) => void
 }) {
+  const maxAbility = mod.maxDicePerUse?.ability ?? ""
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <select
-          value={mod.dieType}
-          onChange={(e) => onChange({ ...mod, dieType: e.target.value as HealingDicePoolCharacteristic["dieType"] })}
-          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
-        >
-          {["d4", "d6", "d8", "d10", "d12", "d20"].map((die) => (
-            <option key={die} value={die}>{die}</option>
-          ))}
-        </select>
-        <input
-          type="number"
-          min={0}
-          value={mod.poolSize ?? ""}
-          onChange={(e) => onChange({ ...mod, poolSize: e.target.value ? parseInt(e.target.value, 10) : null })}
-          placeholder="Pool size (dice)"
-          className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
-        />
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Die type</label>
+          <select
+            value={mod.dieType}
+            onChange={(e) => onChange({ ...mod, dieType: e.target.value as HealingDicePoolCharacteristic["dieType"] })}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            {["d4", "d6", "d8", "d10", "d12", "d20"].map((die) => (
+              <option key={die} value={die}>{die}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Pool size (dice)</label>
+          <input
+            type="number"
+            min={0}
+            value={mod.poolSize ?? ""}
+            onChange={(e) => onChange({ ...mod, poolSize: e.target.value ? parseInt(e.target.value, 10) : null })}
+            placeholder="e.g. 6"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Activation</label>
+          <select
+            value={mod.activation}
+            onChange={(e) =>
+              onChange({ ...mod, activation: e.target.value as HealingDicePoolCharacteristic["activation"] })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="action">Action</option>
+            <option value="bonus_action">Bonus Action</option>
+            <option value="magic_action">Magic Action</option>
+          </select>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Controls whether this pool appears in the character sheet Actions area.
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Max dice per use</label>
+          <select
+            value={maxAbility}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                maxDicePerUse: e.target.value
+                  ? { type: "ability_modifier", ability: e.target.value as AbilityScoreKey }
+                  : null,
+              })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">No per-use cap</option>
+            {ABILITY_SCORE_KEYS.map((ability) => (
+              <option key={ability} value={ability}>
+                {ability.charAt(0).toUpperCase() + ability.slice(1)} modifier
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   )

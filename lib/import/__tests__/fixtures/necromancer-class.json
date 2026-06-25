@@ -1,0 +1,79 @@
+{
+  "classes": [
+    {
+      "name": "Necromancer",
+      "description": "Necromancers hold sway over the forces of life and death, commanding small armies of lifeless, animated thralls. The Necromancer is a full spellcaster that uses Intelligence as its spellcasting ability.",
+      "hit_die": 6,
+      "primary_ability": ["Intelligence"],
+      "saving_throws": ["Constitution", "Intelligence"],
+      "weapon_proficiencies": ["Simple weapons"],
+      "armor_proficiencies": [],
+      "skill_choices": {
+        "count": 2,
+        "options": [
+          "Arcana",
+          "Deception",
+          "History",
+          "Intimidation",
+          "Investigation",
+          "Medicine",
+          "Persuasion",
+          "Religion",
+          "Stealth"
+        ]
+      },
+      "features": [
+        {
+          "level": 1,
+          "name": "Spellcasting",
+          "description": "Though it steadily burns away your very soul, you can cast necromantic spells. You know three Necromancer cantrips of your choice. You prepare a list of level 1+ spells that are available for you to cast. Intelligence is your spellcasting ability for your Necromancer spells. You can use an Arcane Focus as a Spellcasting Focus for your Necromancer spells."
+        },
+        {
+          "level": 1,
+          "name": "Charnel Touch",
+          "description": "You can draw upon an inner nexus of necromantic power. You have a pool of Charnel Touch points equal to 5 × your Necromancer level that replenishes when you finish a Long Rest. As a Magic action, you can channel this negative energy through your touch. Choose a number of Charnel Touch points to expend, up to a maximum of 5 × your Proficiency Bonus, and make a melee spell attack against one creature within reach. On a hit, the target takes Necrotic damage equal to the number of points expended."
+        },
+        {
+          "level": 2,
+          "name": "Thralls",
+          "description": "Unlike other spellcasters, you animate Undead creatures with a portion of your own life force, ensuring obedience. You can animate Undead thralls by performing a ritual over the course of 10 minutes. The combined CR of all your thralls can't exceed the number shown in the CR Total column of the Necromancer Features table, and the total number of thralls under your control can't exceed the number shown in the Thralls column."
+        },
+        {
+          "level": 2,
+          "name": "Dead Space",
+          "description": "You gain an extradimensional space that can hold up to 12 Medium or smaller corpses, piles of bones, or Undead creatures."
+        },
+        {
+          "level": 4,
+          "name": "Ability Score Improvement",
+          "description": "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify. You gain this feature again at Necromancer levels 8, 12, and 16."
+        },
+        {
+          "level": 3,
+          "name": "Dark Arcana",
+          "description": "As a Bonus Action, you can expend a spell slot to replenish your Charnel Touch pool. The pool regains points equal to your Intelligence modifier plus 1d8 for each level of the spell slot expended, up to a maximum of your pool's total."
+        },
+        {
+          "level": 5,
+          "name": "Animate Dead",
+          "description": "You always have the Animate Dead spell prepared. When you cast this spell, its casting time is an action instead of 1 minute. You can also create a Spirit using the spell."
+        },
+        {
+          "level": 5,
+          "name": "Critical Spellcasting",
+          "description": "When a creature rolls a 1 on the d20 for a saving throw against one of your spells, it suffers a Critical Failure. Your spell attacks can score a Critical Hit on a roll of 19 or 20 on the d20."
+        },
+        {
+          "level": 18,
+          "name": "Undying Servitude",
+          "description": "When one of your thralls is reduced to 0 Hit Points, you take a Reaction to cause it to drop to 1 Hit Point instead and regain Hit Points equal to twice your Necromancer level. Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expending a level 3+ spell slot."
+        },
+        {
+          "level": 19,
+          "name": "Epic Boon",
+          "description": "You gain an Epic Boon feat or another feat of your choice for which you qualify."
+        }
+      ]
+    }
+  ]
+}

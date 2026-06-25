@@ -106,9 +106,9 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   resource_ability_menu: "Resources & uses",
   extra_turn: "Active abilities",
   grant_feat: "Feats & choices",
-  rest_replacement: "Other",
-  creature_size: "Other",
-  magical_sleep_immunity: "Other",
+  rest_replacement: "Resources & uses",
+  creature_size: "Movement & senses",
+  magical_sleep_immunity: "Damage mitigation",
   movement_effects: "Movement & senses",
 }
 
@@ -259,10 +259,12 @@ export function groupModifierCatalogEntries(catalog: ModifierCatalogEntry[]): {
   group: string
   entries: ModifierCatalogEntry[]
 }[] {
-  const grouped = MODIFIER_CATALOG_GROUPS.map((group) => ({
-    group,
-    entries: catalog.filter((entry) => entry.group === group),
-  })).filter((section) => section.entries.length > 0)
+  const grouped: { group: string; entries: ModifierCatalogEntry[] }[] = MODIFIER_CATALOG_GROUPS.map(
+    (group) => ({
+      group,
+      entries: catalog.filter((entry) => entry.group === group),
+    }),
+  ).filter((section) => section.entries.length > 0)
 
   const otherEntries = catalog.filter(
     (entry) => !MODIFIER_CATALOG_GROUPS.includes(entry.group as ModifierCatalogGroup),
