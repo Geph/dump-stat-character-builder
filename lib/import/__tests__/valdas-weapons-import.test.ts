@@ -1,27 +1,20 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "fs"
 import { describe, expect, it } from "vitest"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { normalizeAiImportContent } from "@/lib/import/import-content-ai-schema"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
-
-const FIXTURE_DIR = join(
-  "d:",
-  "Google Drive",
-  "Code Projects",
-  "dump stat working files",
-  "JSON imports",
-)
+import {
+  hasHomebrewImportFixtures,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
 function loadFixture(name: string) {
-  const path = join(FIXTURE_DIR, name)
-  if (!existsSync(path)) {
-    throw new Error(`Missing fixture: ${path}`)
-  }
+  const path = homebrewFixturePath(name)
+  if (!path) throw new Error(`Missing homebrew fixture: ${name}`)
   return readFileSync(path, "utf8")
 }
 
-describe("Valda's Spire of Secrets weapons import", () => {
+describe.runIf(hasHomebrewImportFixtures)("Valda's Spire of Secrets weapons import", () => {
   it("parses valdas-weapons.json through the import pipeline", () => {
     const raw = loadFixture("valdas-weapons.json")
     const parsed = parseImportContentJson(raw)
