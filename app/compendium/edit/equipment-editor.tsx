@@ -16,6 +16,15 @@ import {
 } from "@/lib/compendium/equipment-properties"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { normalizeLinkedModifiers } from "@/lib/compendium/linked-modifiers"
+import {
+  EQUIPMENT_RARITIES,
+  MAGIC_ITEM_CATEGORIES,
+  type BaseEquipmentFilter,
+} from "@/lib/compendium/equipment-magic"
 
 const CATEGORIES = [
   "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
@@ -62,6 +71,13 @@ interface EquipmentFormData {
   icon: string | null
   accent_color: string | null
   card_image_url: string | null
+  requires_attunement: boolean | null
+  magic_item_category: string
+  rarity: string
+  base_equipment_ids: string[]
+  selected_base_equipment_id: string
+  base_equipment_filter: BaseEquipmentFilter | ""
+  magic_effects: LinkedModifierInstance[]
 }
 
 const defaultEquipment: EquipmentFormData = {
@@ -83,6 +99,13 @@ const defaultEquipment: EquipmentFormData = {
   icon: null,
   accent_color: null,
   card_image_url: null,
+  requires_attunement: null,
+  magic_item_category: "",
+  rarity: "",
+  base_equipment_ids: [],
+  selected_base_equipment_id: "",
+  base_equipment_filter: "",
+  magic_effects: [],
 }
 
 export default function EquipmentEditorPage({ id }: { id: string }) {
@@ -91,9 +114,20 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [customAbilities, setCustomAbilities] = useState<{ id: string; name: string }[]>([])
+  const [allEquipment, setAllEquipment] = useState<{ id: string; name: string; category: string }[]>([])
   const [rawProperties, setRawProperties] = useState<unknown>(null)
   const router = useRouter()
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("equipment", id)
+
+  useEffect(() => {
+    const loadEquipmentCatalog = async () => {
+      const db = createClient()
+      const { data } = await db.from("equipment").select("id, name, category").order("name")
+      setAllEquipment(data || [])
+    }
+    void loadEquipmentCatalog()
+  }, [])
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -147,6 +181,18 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             icon: data.icon || null,
             accent_color: data.accent_color || null,
             card_image_url: data.card_image_url || null,
+            requires_attunement:
+              typeof data.requires_attunement === "boolean" ? data.requires_attunement : null,
+            magic_item_category: data.magic_item_category || "",
+            rarity: data.rarity || "",
+            base_equipment_ids: Array.isArray(data.base_equipment_ids)
+              ? data.base_equipment_ids
+              : [],
+            selected_base_equipment_id: data.selected_base_equipment_id || "",
+            base_equipment_filter: (data.base_equipment_filter as BaseEquipmentFilter | null) || "",
+            magic_effects: Array.isArray(data.magic_effects)
+              ? (data.magic_effects as LinkedModifierInstance[])
+              : [],
           })
         }
         setLoading(false)
@@ -194,6 +240,13 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
       ...form,
       properties: stringifyPropertiesForDb(form.properties, rawProperties),
       creator_url: normalizeCreatorUrl(form.creator_url),
+      requires_attunement: form.requires_attunement,
+      magic_item_category: form.magic_item_category || null,
+      rarity: form.rarity || null,
+      base_equipment_ids: form.base_equipment_filter ? [] : form.base_equipment_ids,
+      selected_base_equipment_id: form.selected_base_equipment_id || null,
+      base_equipment_filter: form.base_equipment_filter || null,
+      magic_effects: form.magic_effects,
     }
     
     if (id === "new") {
@@ -543,6 +596,153 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               </div>
             </div>
           )}
+
+          <div className="bg-card-lighter border-2 border-magenta/30 rounded-xl p-4 space-y-4">
+            <h3 className="font-semibold text-foreground">Magic Item</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">Rarity</label>
+                <select
+                  value={form.rarity}
+                  onChange={(e) => setForm({ ...form, rarity: e.target.value })}
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Not a magic item</option>
+                  {EQUIPMENT_RARITIES.map((rarity) => (
+                    <option key={rarity} value={rarity}>{rarity}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">Magic type</label>
+                <select
+                  value={form.magic_item_category}
+                  onChange={(e) => setForm({ ...form, magic_item_category: e.target.value })}
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">None</option>
+                  {MAGIC_ITEM_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">Attunement</label>
+                <select
+                  value={
+                    form.requires_attunement === null
+                      ? ""
+                      : form.requires_attunement
+                        ? "required"
+                        : "none"
+                  }
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      requires_attunement:
+                        e.target.value === ""
+                          ? null
+                          : e.target.value === "required",
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Unspecified</option>
+                  <option value="required">Requires attunement</option>
+                  <option value="none">No attunement</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  Base equipment filter
+                </label>
+                <select
+                  value={form.base_equipment_filter}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      base_equipment_filter: e.target.value as BaseEquipmentFilter | "",
+                      base_equipment_ids: e.target.value ? [] : form.base_equipment_ids,
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Specific base item(s)</option>
+                  <option value="any_melee_weapon">Any melee weapon</option>
+                  <option value="any_ranged_weapon">Any ranged weapon</option>
+                  <option value="any_weapon">Any simple or martial weapon</option>
+                </select>
+              </div>
+              {!form.base_equipment_filter ? (
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Base equipment (inherit stats)
+                  </label>
+                  <select
+                    multiple
+                    value={form.base_equipment_ids}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value)
+                      setForm({
+                        ...form,
+                        base_equipment_ids: selected,
+                        selected_base_equipment_id:
+                          selected.length === 1
+                            ? selected[0]
+                            : selected.includes(form.selected_base_equipment_id)
+                              ? form.selected_base_equipment_id
+                              : "",
+                      })
+                    }}
+                    className="w-full min-h-[7rem] px-3 py-2 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  >
+                    {allEquipment
+                      .filter((entry) => entry.id !== id)
+                      .map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name} ({entry.category})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ) : null}
+            </div>
+
+            {form.base_equipment_ids.length > 1 && !form.base_equipment_filter ? (
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  Default selected base
+                </label>
+                <select
+                  value={form.selected_base_equipment_id}
+                  onChange={(e) =>
+                    setForm({ ...form, selected_base_equipment_id: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Choose at acquisition</option>
+                  {form.base_equipment_ids.map((baseId) => {
+                    const entry = allEquipment.find((item) => item.id === baseId)
+                    return (
+                      <option key={baseId} value={baseId}>
+                        {entry?.name ?? baseId}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+            ) : null}
+
+            <LinkedModifiersEditor
+              value={normalizeLinkedModifiers(form.magic_effects, modifierCatalog, [])}
+              onChange={(magic_effects) => setForm({ ...form, magic_effects })}
+              catalog={modifierCatalog}
+              label="Magic effects"
+            />
+          </div>
 
         </form>
       </main>

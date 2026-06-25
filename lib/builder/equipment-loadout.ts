@@ -4,6 +4,7 @@ import {
   isShieldItem,
   isWeaponItem,
 } from "@/lib/compendium/combat-stats"
+import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 
 export type EquipmentLoadout = {
   armorId: string | null
@@ -26,9 +27,11 @@ export function suggestEquipmentLoadout(
   catalog: Equipment[],
 ): EquipmentLoadout {
   const owned = ownedEquipmentItems(equipmentIds, catalog)
+  const firstMundane = (predicate: (item: Equipment) => boolean) =>
+    owned.find((item) => predicate(item) && !isMagicItem(item))?.id ?? null
   return {
-    armorId: owned.find(isArmorItem)?.id ?? null,
-    shieldId: owned.find(isShieldItem)?.id ?? null,
-    weaponId: owned.find(isWeaponItem)?.id ?? null,
+    armorId: firstMundane(isArmorItem),
+    shieldId: firstMundane(isShieldItem),
+    weaponId: firstMundane(isWeaponItem),
   }
 }

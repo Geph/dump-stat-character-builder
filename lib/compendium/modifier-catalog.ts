@@ -346,6 +346,15 @@ export function isCommonModifiersCatalogAbility(row: { id?: string; is_system?: 
   )
 }
 
+/** Common Modifier Effects catalog — editor-only, never shown on character sheets. */
+export function isCommonModifiersCatalogEntry(row: {
+  id?: string | null
+  name?: string | null
+}): boolean {
+  if (row.id === COMMON_MODIFIERS_CATALOG_ID) return true
+  return row.name?.trim() === COMMON_MODIFIERS_CATALOG_NAME
+}
+
 export function buildCommonModifiersCatalogRow(): Record<string, unknown> {
   return {
     id: COMMON_MODIFIERS_CATALOG_ID,

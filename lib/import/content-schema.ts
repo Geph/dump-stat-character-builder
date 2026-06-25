@@ -172,6 +172,13 @@ export const EquipmentImportSchema = z.object({
   cost: z.object({ amount: z.number(), unit: z.string() }).nullable().optional(),
   weight: z.number().nullable().optional(),
   properties: z.record(z.unknown()).nullable().optional(),
+  requires_attunement: z.boolean().nullable().optional(),
+  magic_item_category: z.string().nullable().optional(),
+  rarity: z.string().nullable().optional(),
+  base_equipment_ids: z.array(z.string()).nullable().optional(),
+  selected_base_equipment_id: z.string().nullable().optional(),
+  base_equipment_filter: z.enum(["any_melee_weapon", "any_ranged_weapon", "any_weapon"]).nullable().optional(),
+  magic_effects: z.array(z.record(z.unknown())).nullable().optional(),
 })
 
 export const AbilityImportSchema = z.object({

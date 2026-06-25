@@ -33,6 +33,23 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     spendPatterns: [],
   },
   {
+    resourceKey: "battle_dice",
+    namePattern: /battle\s*dice/i,
+    displayName: "Battle Dice",
+    definition:
+      "Pool of dice spent on Captain maneuvers and battle tactics. Regain all expended Battle Dice when you roll Initiative or finish a Short or Long Rest.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+battle\s+die\b/i,
+      /\bexpend\s+(?:up\s+to\s+)?(\d+)\s+battle\s+dice\b/i,
+      /\bexpend\s+a\s+battle\s+die\b/i,
+    ],
+  },
+  {
     resourceKey: "exploit_dice",
     namePattern: /exploit\s*dice/i,
     displayName: "Exploit Dice",

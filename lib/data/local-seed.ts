@@ -6,6 +6,7 @@ import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { createClient } from "@/lib/db/client"
+import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 import {
@@ -54,12 +55,20 @@ async function seedClassResources(classIdMap: Map<string, string>): Promise<void
 }
 
 async function ensureBundledSrdFresh(): Promise<void> {
-  const { manifest, species, classes, backgrounds, feats, subclasses } = getSrdSeedData()
+  const { manifest, species, classes, backgrounds, feats, subclasses, spells } = getSrdSeedData()
   if (readStoredSrdVersion() === manifest.version) return
   await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
   await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes as Record<string, unknown>[])))
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
+  await upsertByName("spells", withSrdCreatorUrlList(spells as Record<string, unknown>[]))
+  await seedSrdEquipment({
+    upsertByName,
+    listEquipmentByName: async () => {
+      const rows = await getAllFromStore("equipment")
+      return rows.map((row) => ({ name: row.name as string, id: row.id as string }))
+    },
+  })
   const classRows = await getAllFromStore("classes")
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
   await seedClassResources(classIdMap)
@@ -98,7 +107,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
 }
 
 export async function seedLocalSrd(): Promise<LocalSeedResult> {
-  const { classes, subclasses, species, backgrounds, spells, feats, equipment, manifest } =
+  const { classes, subclasses, species, backgrounds, spells, feats, manifest } =
     getSrdSeedData()
 
   await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes as Record<string, unknown>[])))
@@ -138,7 +147,13 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
   await upsertByName("spells", withSrdCreatorUrlList(spells))
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
-  await upsertByName("equipment", withSrdCreatorUrlList(equipment))
+  await seedSrdEquipment({
+    upsertByName,
+    listEquipmentByName: async () => {
+      const rows = await getAllFromStore("equipment")
+      return rows.map((row) => ({ name: row.name as string, id: row.id as string }))
+    },
+  })
 
   await ensureModifierCatalog(createClient())
 

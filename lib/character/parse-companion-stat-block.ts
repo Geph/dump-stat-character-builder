@@ -384,7 +384,7 @@ export function parseCompanionStatBlock(
 }
 
 function isCompanionFeatureName(name: string): boolean {
-  return /companion|defender|cannon|familiar|homunculus|mount|pet|creature form|golem/i.test(name)
+  return /companion|defender|cannon|familiar|homunculus|mount|pet|creature form|golem|cohort/i.test(name)
 }
 
 export function templateFromFeature(feature: {

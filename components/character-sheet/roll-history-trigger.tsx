@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { History, RotateCcw, X } from "lucide-react"
+import { Dices, History, RotateCcw, X } from "lucide-react"
 import { isNat20OrNat1 } from "@/components/character-sheet/d20-roll-button"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import { formatRollTime } from "@/lib/character/sheet-roll-history"
@@ -26,7 +26,10 @@ export function RollHistoryTrigger() {
         aria-label={`Session roll history${count ? `, ${count} rolls` : ""}`}
         className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-lg border-2 border-border/70 bg-card/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
       >
-        <History className="w-5 h-5" />
+        <span className="flex items-center gap-0.5" aria-hidden>
+          <Dices className="w-3.5 h-3.5" />
+          <History className="w-3.5 h-3.5" />
+        </span>
         {count > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-black leading-none flex items-center justify-center">
             {count > 99 ? "99+" : count}

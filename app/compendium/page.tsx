@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch"
 import { GameIcon } from "@/components/game-icon-picker"
 import { formatCompendiumSource } from "@/lib/srd/source"
 import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
+import { getEquipmentDetailRows, getMagicItemCategoryOptions } from "@/lib/compendium/equipment-display"
+import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,6 +136,8 @@ function CompendiumPageContent() {
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
+  const [equipmentFilterKind, setEquipmentFilterKind] = useState<"all" | "magic" | "mundane">("all")
+  const [equipmentFilterMagicCategory, setEquipmentFilterMagicCategory] = useState<string>("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -331,6 +335,15 @@ function CompendiumPageContent() {
     if (activeTab === "equipment") {
       const eq = item as Equipment
       if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
+      if (equipmentFilterKind === "magic" && !isMagicItem(eq)) return false
+      if (equipmentFilterKind === "mundane" && isMagicItem(eq)) return false
+      if (
+        equipmentFilterKind === "magic" &&
+        equipmentFilterMagicCategory !== "all" &&
+        (eq.magic_item_category ?? "").toLowerCase() !== equipmentFilterMagicCategory.toLowerCase()
+      ) {
+        return false
+      }
     }
     return true
   })
@@ -339,6 +352,10 @@ function CompendiumPageContent() {
   const equipmentCategoryOptions = useMemo(
     () =>
       Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
+    [equipmentData],
+  )
+  const equipmentMagicCategoryOptions = useMemo(
+    () => getMagicItemCategoryOptions(equipmentData.filter((item) => isMagicItem(item))),
     [equipmentData],
   )
   const equipmentGroups = useMemo(() => {
@@ -754,6 +771,26 @@ function CompendiumPageContent() {
         )}
         {activeTab === "equipment" && (
           <div className="flex gap-2 flex-wrap">
+            {isMagicItem(data as Equipment) && (
+              <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full font-semibold">
+                Magic
+              </span>
+            )}
+            {(data as Equipment).rarity && (
+              <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                {(data as Equipment).rarity}
+              </span>
+            )}
+            {(data as Equipment).magic_item_category && (
+              <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
+                {(data as Equipment).magic_item_category}
+              </span>
+            )}
+            {(data as Equipment).requires_attunement && (
+              <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
+                Attunement
+              </span>
+            )}
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {(data as Equipment).category}
             </span>
@@ -1219,13 +1256,52 @@ function CompendiumPageContent() {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-            {equipmentFilterCategory !== "all" && (
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide ml-2">
+              Item kind
+            </label>
+            <select
+              value={equipmentFilterKind}
+              onChange={(e) => {
+                const next = e.target.value as "all" | "magic" | "mundane"
+                setEquipmentFilterKind(next)
+                if (next !== "magic") setEquipmentFilterMagicCategory("all")
+              }}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All items</option>
+              <option value="magic">Magic items</option>
+              <option value="mundane">Mundane only</option>
+            </select>
+            {equipmentFilterKind === "magic" && equipmentMagicCategoryOptions.length > 0 && (
+              <>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide ml-2">
+                  Magic type
+                </label>
+                <select
+                  value={equipmentFilterMagicCategory}
+                  onChange={(e) => setEquipmentFilterMagicCategory(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="all">All magic types</option>
+                  {equipmentMagicCategoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            {(equipmentFilterCategory !== "all" ||
+              equipmentFilterKind !== "all" ||
+              equipmentFilterMagicCategory !== "all") && (
               <button
                 type="button"
-                onClick={() => setEquipmentFilterCategory("all")}
+                onClick={() => {
+                  setEquipmentFilterCategory("all")
+                  setEquipmentFilterKind("all")
+                  setEquipmentFilterMagicCategory("all")
+                }}
                 className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
-                Clear type filter
+                Clear filters
               </button>
             )}
           </div>
@@ -1314,7 +1390,20 @@ function CompendiumPageContent() {
                     label: (selectedItem as ClassResourceRow).resource_key,
                   },
                 ]
-              : undefined
+              : activeTab === "equipment" && isMagicItem(selectedItem as Equipment)
+                ? [
+                    { label: "Magic", emphasis: true },
+                    ...((selectedItem as Equipment).rarity
+                      ? [{ label: (selectedItem as Equipment).rarity! }]
+                      : []),
+                    ...((selectedItem as Equipment).magic_item_category
+                      ? [{ label: (selectedItem as Equipment).magic_item_category! }]
+                      : []),
+                    ...((selectedItem as Equipment).requires_attunement
+                      ? [{ label: "Attunement" }]
+                      : []),
+                  ]
+                : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as Record<string, unknown>)}
           headerActions={
@@ -1335,6 +1424,16 @@ function CompendiumPageContent() {
             ) : undefined
           }
         >
+          {activeTab === "equipment" && (
+            <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              {getEquipmentDetailRows(selectedItem as Equipment).map((row) => (
+                <div key={row.label} className="contents">
+                  <dt className="text-white/50 font-semibold">{row.label}</dt>
+                  <dd className="text-white/90">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
           )}

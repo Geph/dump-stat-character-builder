@@ -26,6 +26,7 @@ const FILES = {
   spells: "spells.md",
   feats: "feats.md",
   equipment: "equipment.md",
+  magicItems: "magic-items.md",
 }
 
 async function fetchMarkdown(name) {
@@ -55,9 +56,10 @@ async function main() {
 
   fs.mkdirSync(outDir, { recursive: true })
   for (const [key, rows] of Object.entries(data)) {
-    const file = path.join(outDir, `${key}.json`)
+    const fileName = key === "magicItems" ? "magic-items.json" : `${key}.json`
+    const file = path.join(outDir, fileName)
     fs.writeFileSync(file, JSON.stringify(rows, null, 0))
-    console.log(`  ${key}.json: ${rows.length} records`)
+    console.log(`  ${fileName}: ${rows.length} records`)
   }
 
   const manifest = {
