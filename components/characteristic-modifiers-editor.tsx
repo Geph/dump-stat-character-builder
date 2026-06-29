@@ -28,6 +28,7 @@ import {
   getSkillEntries,
   type CharacteristicModifier,
   type CharacteristicModifierType,
+  type ListCharacteristic,
   type RollModifierEntry,
   type SkillEntry,
   type SkillsCharacteristic,
@@ -40,7 +41,6 @@ import {
   type CreatureSizeCharacteristic,
   type MovementEffectsCharacteristic,
   type AuraCharacteristic,
-  type FeatureOptionPickerCharacteristic,
   type BonusDamageRidersCharacteristic,
   type BonusDamageRiderEntry,
   type SpeedCharacteristic,
@@ -52,7 +52,6 @@ import {
   type SpellHealingModifierCharacteristic,
   type ResourceAbilityMenuCharacteristic,
   type ExtraTurnCharacteristic,
-  type FeatureOptionPickerOption,
   type ResourceAbilityMenuOption,
 } from "@/lib/compendium/characteristic-modifiers"
 import { NestedModifierEffectEditor } from "@/components/compendium/nested-modifier-effect-editor"
@@ -70,7 +69,6 @@ import {
   OnCastSpellTriggerEditor,
   SpellHealingModifierEditor,
   ResourceAbilityMenuEditor,
-  FeatureOptionPickerEditor,
   ExtraTurnEditor,
 } from "@/components/compendium/trigger-characteristic-editors"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -78,6 +76,11 @@ import type { ClassResource } from "@/lib/types"
 import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
 import { formatSpellOptionLabel, type SpellOption } from "@/lib/compendium/spell-options"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
+import {
+  SRD_LANGUAGES,
+  SRD_STANDARD_LANGUAGES,
+  SRD_RARE_LANGUAGES,
+} from "@/lib/compendium/srd-languages"
 import { STANDARD_SPELL_CLASSES } from "@/lib/import/class-spell-lists"
 import { SRD_WEAPON_NAMES } from "@/lib/compendium/weapon-proficiency-options"
 import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
@@ -86,7 +89,6 @@ import {
   defaultRollBonusConfig,
   formatRollBonusSummary,
 } from "@/lib/compendium/roll-bonus-config"
-import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
 
 type CharacteristicModifiersEditorProps = {
@@ -262,6 +264,133 @@ function WeaponProficienciesEditor({
               </option>
             ))}
           </select>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ARMOR_PROFICIENCY_OPTIONS = [
+  { value: "Light armor", label: "Light" },
+  { value: "Medium armor", label: "Medium" },
+  { value: "Heavy armor", label: "Heavy" },
+  { value: "Shields", label: "Shield" },
+] as const
+
+const ARMOR_PROFICIENCY_VALUE_SET = new Set<string>(
+  ARMOR_PROFICIENCY_OPTIONS.map((option) => option.value),
+)
+
+function ArmorProficienciesEditor({
+  values,
+  onChange,
+}: {
+  values: string[]
+  onChange: (values: string[]) => void
+}) {
+  const standard = values.filter((value) => ARMOR_PROFICIENCY_VALUE_SET.has(value))
+  const special = values.filter((value) => !ARMOR_PROFICIENCY_VALUE_SET.has(value))
+  const [specialEnabled, setSpecialEnabled] = useState(special.length > 0)
+  const [specialDraft, setSpecialDraft] = useState("")
+
+  const toggleStandard = (value: string) => {
+    const next = standard.includes(value)
+      ? values.filter((entry) => entry !== value)
+      : [...values, value]
+    onChange(next)
+  }
+
+  const addSpecial = () => {
+    const trimmed = specialDraft.trim()
+    if (!trimmed || values.includes(trimmed)) {
+      setSpecialDraft("")
+      return
+    }
+    onChange([...values, trimmed])
+    setSpecialDraft("")
+  }
+
+  const removeSpecial = (value: string) => {
+    onChange(values.filter((entry) => entry !== value))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-4">
+        {ARMOR_PROFICIENCY_OPTIONS.map((option) => (
+          <label
+            key={option.value}
+            className="inline-flex items-center gap-1.5 text-sm cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={standard.includes(option.value)}
+              onChange={() => toggleStandard(option.value)}
+              className="accent-primary"
+            />
+            {option.label}
+          </label>
+        ))}
+        <label className="inline-flex items-center gap-1.5 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={specialEnabled}
+            onChange={(e) => {
+              setSpecialEnabled(e.target.checked)
+              if (!e.target.checked && special.length > 0) {
+                onChange(values.filter((entry) => ARMOR_PROFICIENCY_VALUE_SET.has(entry)))
+              }
+            }}
+            className="accent-primary"
+          />
+          Special
+        </label>
+      </div>
+
+      {specialEnabled && (
+        <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-2.5">
+          {special.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {special.map((value) => (
+                <span
+                  key={value}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-lg text-sm"
+                >
+                  {value}
+                  <button
+                    type="button"
+                    onClick={() => removeSpecial(value)}
+                    className="hover:text-destructive"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={specialDraft}
+              onChange={(e) => setSpecialDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  addSpecial()
+                }
+              }}
+              placeholder="e.g. Mithral plate, Living armor..."
+              className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <button
+              type="button"
+              onClick={addSpecial}
+              className="flex items-center gap-1 px-2 py-2 text-xs bg-primary/10 text-primary rounded-lg"
+            >
+              <Plus className="w-3 h-3" />
+              Add
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -745,8 +874,8 @@ function ToolProficienciesEditor({
   mod,
   onChange,
 }: {
-  mod: Extract<CharacteristicModifier, { type: "tool_proficiencies" }>
-  onChange: (next: Extract<CharacteristicModifier, { type: "tool_proficiencies" }>) => void
+  mod: ListCharacteristic
+  onChange: (next: ListCharacteristic) => void
 }) {
   const choiceEnabled = (mod.choiceCount ?? 0) > 0
   const sharedEnabled = !!(mod.sharedChoiceGroup && (mod.sharedChoiceCount ?? 0) > 0)
@@ -800,6 +929,89 @@ function ToolProficienciesEditor({
         />
       )}
       </>
+      )}
+    </div>
+  )
+}
+
+function LanguagesEditor({
+  mod,
+  onChange,
+}: {
+  mod: ListCharacteristic
+  onChange: (next: ListCharacteristic) => void
+}) {
+  const choiceEnabled = (mod.choiceCount ?? 0) > 0
+  const pool = mod.choicePool ?? "standard"
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs font-semibold text-muted-foreground mb-1">
+          Languages always known
+        </label>
+        <TagInput
+          values={mod.values}
+          onChange={(values) => onChange({ ...mod, values })}
+          suggestions={SRD_LANGUAGES}
+          placeholder="Add a language (e.g. Common)..."
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Pick from the SRD Standard &amp; Rare Languages tables, or type a custom language.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={choiceEnabled}
+          onChange={(e) =>
+            onChange({
+              ...mod,
+              choiceCount: e.target.checked ? Math.max(1, mod.choiceCount ?? 1) : null,
+            })
+          }
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Player also chooses languages at build time</span>
+      </label>
+
+      {choiceEnabled && (
+        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Choose</span>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={mod.choiceCount ?? 1}
+              onChange={(e) =>
+                onChange({ ...mod, choiceCount: Math.max(1, parseInt(e.target.value, 10) || 1) })
+              }
+              className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
+            />
+            <span className="text-muted-foreground">language(s) from the</span>
+            <select
+              value={pool}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  choicePool: e.target.value as "standard" | "standard_and_rare",
+                })
+              }
+              className="px-2 py-1 bg-background border border-border rounded"
+            >
+              <option value="standard">Standard Languages table</option>
+              <option value="standard_and_rare">Standard &amp; Rare Languages</option>
+            </select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Standard: {SRD_STANDARD_LANGUAGES.join(", ")}.
+            {pool === "standard_and_rare" && ` Rare: ${SRD_RARE_LANGUAGES.join(", ")}.`} The player
+            can also enter a custom language. Example: grant Common above, then let the player choose
+            2 more from the Standard table (Dwarf).
+          </p>
+        </div>
       )}
     </div>
   )
@@ -1155,12 +1367,13 @@ function ModifierFields({
       )
 
     case "languages":
+      return <LanguagesEditor mod={mod} onChange={onChange} />
+
     case "armor_proficiencies":
       return (
-        <TagInput
+        <ArmorProficienciesEditor
           values={mod.values}
           onChange={(values) => onChange({ ...mod, values })}
-          placeholder={`Add ${mod.type.replace(/_/g, " ")}...`}
         />
       )
 
@@ -1574,16 +1787,6 @@ function ModifierFields({
 
     case "aura":
       return <AuraCharacteristicEditor mod={mod} onChange={onChange} />
-
-    case "feature_option_picker":
-      return (
-        <FeatureOptionPickerEditor
-          mod={mod}
-          onChange={onChange}
-          modifierCatalog={modifierCatalog}
-          classResources={classResources}
-        />
-      )
 
     case "saving_throw_trigger":
       return (

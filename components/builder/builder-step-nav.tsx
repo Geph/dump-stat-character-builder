@@ -13,6 +13,8 @@ type BuilderStepNavProps = {
   onSave: () => void
   saveLabel?: string
   className?: string
+  /** The final step id; the Save action shows on this step. Defaults to 6. */
+  lastStep?: number
 }
 
 export function BuilderStepNav({
@@ -25,6 +27,7 @@ export function BuilderStepNav({
   onSave,
   saveLabel = "Create Character",
   className = "",
+  lastStep = 6,
 }: BuilderStepNavProps) {
   const saveEnabled = canSave ?? canProceed
 
@@ -40,7 +43,7 @@ export function BuilderStepNav({
         Back
       </button>
 
-      {currentStep < 6 ? (
+      {currentStep < lastStep ? (
         <button
           type="button"
           onClick={onContinue}

@@ -52,8 +52,17 @@ export interface FeatureChoice {
     description: string
     modifierRefs?: string[]
     linkedModifiers?: LinkedModifierInstance[]
+    /** Optional resource cost to select/use this option (e.g. spend a point). */
+    resourceCost?: number | null
   }[]
   count: number // how many to choose
+  /** Picks may be swapped out when finishing a rest (e.g. Fighting Style, Weapon Mastery). */
+  swappableOnRest?: boolean
+  /**
+   * Links the choice to a class resource whose value scales the number of picks
+   * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
+   */
+  resourceKey?: string | null
   /** When "feats", builder offers compendium feats instead of static options. */
   /** @deprecated Feat picks use grant_feat modifiers from the common modifiers catalog. */
   kind?: "options" | "feats"
@@ -398,6 +407,13 @@ export interface UsesConfig {
     | "class_resource"
     | "unlimited"
     | "special"
+    | "spell_slots"
+  /**
+   * When type is spell_slots — which SRD caster progression to use. The per
+   * spell-level slot breakdown is derived from the canonical tables rather than
+   * stored as a flat tier count.
+   */
+  casterType?: "full" | "half" | "pact"
   fixedAmount?: number
   abilityModifier?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
   customAbilityId?: string

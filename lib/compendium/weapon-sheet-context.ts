@@ -15,7 +15,10 @@ import {
 } from "@/lib/compendium/combat-stats"
 import { describeWeaponMastery } from "@/lib/compendium/weapon-mastery"
 import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
-import type { Equipment } from "@/lib/types"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import type { CharacterBuildInputs } from "@/lib/character/types"
+import type { Equipment, Feature } from "@/lib/types"
 
 export type WeaponSheetAppliedModifier = {
   name: string
@@ -190,10 +193,30 @@ function pickMatchesWeapon(pick: string, weapon: Equipment): boolean {
   return false
 }
 
-function characterHasWeaponMasteryFeature(mods: CharacteristicModifier[]): boolean {
-  return mods.some(
-    (mod) => mod.type === "feature_option_picker" && mod.resourceKey === "weapon_mastery",
-  )
+function featureGrantsWeaponMastery(feature: Feature): boolean {
+  const migrated = migrateFeatureOptionPickers(feature)
+  return migrated.choices?.resourceKey === "weapon_mastery"
+}
+
+function characterHasWeaponMasteryFeature(inputs: CharacterBuildInputs): boolean {
+  for (const entry of inputs.classLevels) {
+    const cls = inputs.classes.find((c) => c.id === entry.classId)
+    if (cls?.features?.some((feature) => feature.level <= entry.level && featureGrantsWeaponMastery(feature))) {
+      return true
+    }
+    const subclassId = inputs.subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = inputs.subclasses.find((s) => s.id === subclassId)
+      if (
+        subclass?.features?.some(
+          (feature) => feature.level <= entry.level && featureGrantsWeaponMastery(feature),
+        )
+      ) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 export function buildWeaponSheetContext(
@@ -234,7 +257,7 @@ export function buildWeaponSheetContext(
 
   const masteryName = getWeaponMastery(weapon)
   const masteryDescription = masteryName ? describeWeaponMastery(masteryName) : null
-  const hasMasteryFeature = characterHasWeaponMasteryFeature(allMods)
+  const hasMasteryFeature = characterHasWeaponMasteryFeature(inputs)
   const proficient = isWeaponProficient(weapon, weaponProficiencies)
   const masteryPicks = collectWeaponMasteryPicks(inputs)
   const masteryActive =

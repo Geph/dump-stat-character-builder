@@ -19,6 +19,7 @@ import {
   Plus,
   PawPrint,
   Backpack,
+  Info,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -54,6 +55,7 @@ import {
   deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import type { StatBreakdownPart } from "@/lib/character/types"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
@@ -213,6 +215,68 @@ function CollapsibleFeatureCard({
         </div>
       ) : null}
     </div>
+  )
+}
+
+function formatSignedValue(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`
+}
+
+function StatBreakdownPopover({
+  title,
+  total,
+  parts,
+}: {
+  title: string
+  total: number
+  parts: StatBreakdownPart[]
+}) {
+  const [open, setOpen] = useState(false)
+  if (!parts.length) return null
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((value) => !value)
+        }}
+        className="text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={`How ${title} is calculated`}
+        aria-expanded={open}
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {open ? (
+        <>
+          <span
+            className="fixed inset-0 z-[99]"
+            aria-hidden
+            onClick={() => setOpen(false)}
+          />
+          <span className="absolute left-0 top-5 z-[100] block w-52 rounded-lg border border-border bg-card p-2 text-left shadow-xl">
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              {title}
+            </span>
+            <span className="block space-y-0.5">
+              {parts.map((part, index) => (
+                <span
+                  key={`${part.label}-${index}`}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="text-muted-foreground">{part.label}</span>
+                  <span className="font-medium tabular-nums">{formatSignedValue(part.value)}</span>
+                </span>
+              ))}
+            </span>
+            <span className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-1 text-xs font-bold">
+              <span>Total</span>
+              <span className="tabular-nums">{total}</span>
+            </span>
+          </span>
+        </>
+      ) : null}
+    </span>
   )
 }
 
@@ -1490,32 +1554,37 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <div className="bg-card rounded-xl p-3 border border-border min-w-0">
                     <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
                     {spellsGroupedByLevel.length ? (
-                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                      <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
                         {spellsGroupedByLevel.map((group) => (
                           <div key={group.level}>
-                            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5">
+                            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5 z-10">
                               {group.label}
+                              <span className="ml-1.5 font-medium text-muted-foreground/60 normal-case">
+                                ({group.spells.length})
+                              </span>
                             </h3>
-                            <div className="space-y-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                               {group.spells.map((spell) => (
                                 <button
                                   key={spell.id}
                                   type="button"
                                   onClick={() => setSelectedSpell(spell)}
-                                  className="flex w-full justify-between items-center gap-2 text-xs px-2 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left"
+                                  title={spell.name}
+                                  className="flex items-center justify-between gap-1 text-xs pl-2 pr-1.5 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left min-w-0"
                                 >
-                                  <span className="font-medium truncate">{spell.name}</span>
+                                  <span className="font-medium truncate min-w-0">{spell.name}</span>
                                   <span className="flex items-center gap-1 shrink-0">
                                     {alwaysPreparedSpellIds.has(spell.id) && (
                                       <span
-                                        className="text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                                        className="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"
                                         title="Always prepared by your subclass"
-                                      >
-                                        Always
-                                      </span>
+                                      />
                                     )}
                                     {spell.concentration && (
-                                      <span className="text-[9px] text-purple-600 dark:text-purple-400">
+                                      <span
+                                        className="text-[9px] font-bold text-purple-600 dark:text-purple-400"
+                                        title="Concentration"
+                                      >
                                         C
                                       </span>
                                     )}
@@ -1537,8 +1606,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <div className="bg-card rounded-xl p-3 border border-border">
                     <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                        <span>Armor Class</span>
+                      <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <span className="flex items-center gap-1.5">
+                          Armor Class
+                          <StatBreakdownPopover
+                            title="Armor Class"
+                            total={armorClass}
+                            parts={derived?.acBreakdown ?? []}
+                          />
+                        </span>
                         <span className="font-bold tabular-nums">{armorClass}</span>
                       </div>
                       <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
@@ -1611,7 +1687,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
                   <div className="bg-card rounded-xl p-3 border border-border">
                     <h2 className="text-sm font-bold text-foreground mb-2">Saving Throws</h2>
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                       {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
                         (ability) => {
                           const isProficient = savingThrowProficiencies.includes(ability)

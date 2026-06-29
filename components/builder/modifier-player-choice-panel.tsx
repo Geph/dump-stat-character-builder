@@ -161,6 +161,8 @@ export function ModifierPlayerChoicePanel({
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
             showSkillInfo={slot.kind === "skill" || slot.kind === "skill_or_tool"}
+            allowCustom={slot.allowCustom ?? false}
+            customPlaceholder={slot.kind === "language" ? "Add a custom language..." : undefined}
           />
         )
       })}

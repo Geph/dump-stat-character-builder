@@ -1,4 +1,5 @@
 import type { UsesConfig } from "@/lib/types"
+import { totalSpellSlotsForCasterType } from "@/lib/compendium/spell-slots"
 
 export type ResolveUsesContext = {
   proficiencyBonus?: number
@@ -39,6 +40,10 @@ export function resolveUsesAtLevel(
       }
       return tierCount(table, characterLevel)
     }
+    case "spell_slots":
+      // Total slots across all spell levels; the per-level breakdown is rendered
+      // via the dedicated spell-slot table on the character sheet.
+      return totalSpellSlotsForCasterType(uses.casterType ?? "full", characterLevel)
     case "unlimited":
       return null
     case "class_resource":

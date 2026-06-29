@@ -1,5 +1,6 @@
 import type { Background, Character, CharacterDraft, DndClass } from "@/lib/types"
 import type { BuilderDraftSnapshot } from "@/lib/builder/draft-storage"
+import { BUILDER_STEP_IDS } from "@/lib/builder/builder-constants"
 import {
   normalizeCharacterClassRows,
   rowsToClassAddOrder,
@@ -93,7 +94,7 @@ export function characterToBuilderState(
 
   return {
     currentStep: 1,
-    maxStepReached: 6,
+    maxStepReached: BUILDER_STEP_IDS.REVIEW,
     character: characterToDraft(character),
     abilityMethod: "pointbuy",
     pointsRemaining: 27,

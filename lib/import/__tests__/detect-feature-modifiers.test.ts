@@ -4,7 +4,9 @@ import {
   mergeDetectionsIntoFeature,
 } from "@/lib/import/detect-feature-modifiers"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { Feature } from "@/lib/types"
 
 const baseCtx = {
   contentKind: "class_feature" as const,
@@ -381,8 +383,13 @@ describe("detectFeatureModifiers by feature name", () => {
       level: 1,
     })
     expect(detections.some((entry) => entry.ruleId === "weapon.mastery_by_name")).toBe(true)
-    const char = detections[0]?.instance.characteristics?.[0]
-    expect(char?.type).toBe("feature_option_picker")
-    expect(char?.resourceKey).toBe("weapon_mastery")
+    const feature = migrateFeatureOptionPickers({
+      name: "Weapon Mastery",
+      level: 1,
+      description: "",
+      linkedModifiers: [detections[0]!.instance],
+    } as Feature)
+    expect(feature.isChoice).toBe(true)
+    expect(feature.choices?.resourceKey).toBe("weapon_mastery")
   })
 })

@@ -132,3 +132,59 @@ describe("subclass feature presets", () => {
     expect(featureHasModifierPreset("Artificer", "Maverick", "Arcane Prototype")).toBe(true)
   })
 })
+
+describe("canonical SRD feature choices", () => {
+  const baseFeature = (name: string): Feature => ({
+    id: "feat_test",
+    name,
+    description: "",
+    level: 1,
+    linkedModifiers: [],
+    modifierRefs: [],
+  })
+
+  it("wires Blessed Strikes with Divine Strike and Potent Spellcasting options", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Cleric", baseFeature("Blessed Strikes"))
+    expect(enriched.isChoice).toBe(true)
+    expect(enriched.choices?.options.map((option) => option.name)).toEqual([
+      "Divine Strike",
+      "Potent Spellcasting",
+    ])
+    expect(
+      enriched.choices?.options.every((option) => (option.linkedModifiers?.length ?? 0) > 0),
+    ).toBe(true)
+  })
+
+  it("wires Divine Order Thaumaturge with Arcana or Religion only (not History or Medicine)", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Cleric", baseFeature("Divine Order"))
+    const thaumaturge = enriched.choices?.options.find((option) => option.name === "Thaumaturge")
+    expect(thaumaturge?.description).toContain("Arcana or Religion")
+    expect(thaumaturge?.description).not.toContain("History")
+    expect(thaumaturge?.description).not.toContain("Medicine")
+    const chars =
+      thaumaturge?.linkedModifiers?.flatMap((mod) => mod.characteristics ?? []) ?? []
+    const skillMod = chars.find((char) => char.type === "skills")
+    expect(skillMod?.type).toBe("skills")
+    if (skillMod?.type === "skills") {
+      expect(skillMod.grantsProficiency).toBe(false)
+      expect(skillMod.entries.map((entry) => entry.skill)).toEqual(["Arcana", "Religion"])
+    }
+  })
+
+  it("wires Elemental Fury with Potent Spellcasting and Primal Strike options", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Druid", baseFeature("Elemental Fury"))
+    expect(enriched.choices?.options.map((option) => option.name)).toEqual([
+      "Potent Spellcasting",
+      "Primal Strike",
+    ])
+  })
+
+  it("wires Hunter's Prey with Colossus Slayer and Horde Breaker options", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Ranger", baseFeature("Hunter's Prey"))
+    expect(enriched.choices?.options.map((option) => option.name)).toEqual([
+      "Colossus Slayer",
+      "Horde Breaker",
+    ])
+    expect(enriched.choices?.swappableOnRest).toBe(true)
+  })
+})

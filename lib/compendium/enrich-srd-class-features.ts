@@ -9,6 +9,10 @@ import {
   buildWeaponMasteryModifier,
 } from "@/lib/compendium/shared-feature-modifier-builders"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import {
+  legacyFeatureOptionPickerCharacteristic,
+  migrateFeatureOptionPickers,
+} from "@/lib/compendium/feature-option-choice-migration"
 import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
@@ -529,15 +533,301 @@ function auraPreset(
 function featureOptionPicker(category: string, swappableOnRest = false): LinkedModifierInstance {
   const key = category.replace(/[^a-z0-9]+/gi, "_").toLowerCase()
   return charInstance(`modinst_feature_opt_${key}`, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId(`feature_opt_${key}`),
-      type: "feature_option_picker",
       category,
       choiceCount: 1,
       swappableOnRest,
       label: category,
-    },
+    }),
   ])
+}
+
+/** Fill option-level modifiers for known SRD choice features that only had empty pickers. */
+function enrichCanonicalFeatureChoices(feature: Feature): Feature {
+  const name = feature.name?.trim()
+  if (!name) return feature
+
+  const hasMechanicalOptions =
+    feature.choices?.options?.some(
+      (option) => (option.linkedModifiers?.length ?? 0) > 0 || (option.modifierRefs?.length ?? 0) > 0,
+    ) ?? false
+  if (hasMechanicalOptions) return feature
+
+  if (name === "Divine Order") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Divine Order",
+        count: 1,
+        options: [
+          {
+            name: "Protector",
+            description:
+              "You gain proficiency with Heavy armor and Martial weapons.",
+            linkedModifiers: [
+              charInstance("modinst_divine_order_protector_armor", "cat_char_armor_proficiencies", [
+                {
+                  id: modId("divine_order_protector_armor"),
+                  type: "armor_proficiencies",
+                  values: ["Heavy armor"],
+                  label: "Heavy armor proficiency",
+                },
+              ]),
+              charInstance("modinst_divine_order_protector_weapons", "cat_char_weapon_proficiencies", [
+                {
+                  id: modId("divine_order_protector_weapons"),
+                  type: "weapon_proficiencies",
+                  mode: "martial_weapons",
+                  values: [],
+                  label: "Martial weapon proficiency",
+                },
+              ]),
+            ],
+          },
+          {
+            name: "Thaumaturge",
+            description:
+              "You learn one extra Cleric cantrip. In addition, your mystical connection to the divine gives you a bonus to your Intelligence (Arcana or Religion) checks. The bonus equals your Wisdom modifier (minimum of +1).",
+            linkedModifiers: [
+              spellsKnownChar("divine_order_thaum_cantrip", {
+                choiceGrants: [{ level: 0, count: 1 }],
+                spellListClassOptions: ["Cleric"],
+                label: "Extra Cleric cantrip",
+              }),
+              charInstance("modinst_divine_order_thaum_skill", FEAT_MODIFIER_CATALOG.skills, [
+                {
+                  id: modId("divine_order_thaum_skill"),
+                  type: "skills",
+                  entries: [
+                    { skill: "Arcana", expertise: false },
+                    { skill: "Religion", expertise: false },
+                  ],
+                  choiceCount: 1,
+                  grantsProficiency: false,
+                  label: "Choose Arcana or Religion for Thaumaturge bonus",
+                },
+              ]),
+              checkBonus("divine_order_thaum_bonus", {
+                category: "skill",
+                skills: ["Arcana", "Religion"],
+                bonusConfig: { mode: "ability_modifier", ability: "WIS" },
+                label: "Thaumaturge: +WIS (min +1) on Arcana or Religion (your choice above)",
+              }),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Primal Order") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Primal Order",
+        count: 1,
+        options: [
+          {
+            name: "Magician",
+            description: "You learn one extra Druid cantrip.",
+            linkedModifiers: [
+              spellsKnownChar("primal_order_magician_cantrip", {
+                choiceGrants: [{ level: 0, count: 1 }],
+                spellListClassOptions: ["Druid"],
+                label: "Extra Druid cantrip",
+              }),
+            ],
+          },
+          {
+            name: "Warden",
+            description: "You gain proficiency with Martial weapons.",
+            linkedModifiers: [
+              charInstance("modinst_primal_order_warden_weapons", "cat_char_weapon_proficiencies", [
+                {
+                  id: modId("primal_order_warden_weapons"),
+                  type: "weapon_proficiencies",
+                  mode: "martial_weapons",
+                  values: [],
+                  label: "Martial weapon proficiency",
+                },
+              ]),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Blessed Strikes") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Blessed Strikes",
+        count: 1,
+        options: [
+          {
+            name: "Divine Strike",
+            description:
+              "Once on each of your turns when you hit a creature with a weapon attack, you can cause the attack to deal an extra 1d8 radiant damage.",
+            linkedModifiers: [
+              onHitTriggerPreset("blessed_divine_strike", {
+                effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+              }),
+              extraDamageOnHit("blessed_divine_strike_damage", "1d8"),
+            ],
+          },
+          {
+            name: "Potent Spellcasting",
+            description:
+              "Add your Wisdom modifier to the damage you deal with Cleric cantrips.",
+            linkedModifiers: [
+              onCastSpellChar("blessed_potent_spellcasting", {
+                spellTags: ["cantrip", "damage"],
+                effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+                label: "Add WIS to Cleric cantrip damage",
+              }),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Elemental Fury") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Elemental Fury",
+        count: 1,
+        options: [
+          {
+            name: "Potent Spellcasting",
+            description:
+              "Add your Wisdom modifier to the damage you deal with Druid cantrips.",
+            linkedModifiers: [
+              onCastSpellChar("elemental_fury_potent", {
+                spellTags: ["cantrip", "damage"],
+                effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+                label: "Add WIS to Druid cantrip damage",
+              }),
+            ],
+          },
+          {
+            name: "Primal Strike",
+            description:
+              "Once on each of your turns when you hit a creature with a weapon attack, you can cause the attack to deal an extra 1d8 elemental damage.",
+            linkedModifiers: [
+              onHitTriggerPreset("elemental_fury_primal_strike", {
+                effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+              }),
+              extraDamageOnHit("elemental_fury_primal_strike_damage", "1d8"),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Hunter's Prey") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Hunter's Prey",
+        count: 1,
+        swappableOnRest: true,
+        options: [
+          {
+            name: "Colossus Slayer",
+            description:
+              "Once per turn when you hit a creature with a weapon, the creature takes an extra 1d8 damage if it's below its hit point maximum.",
+            linkedModifiers: [
+              onHitTriggerPreset("colossus_slayer", {
+                effectCatalogRefId: "cat_fx_extra_damage_on_hit",
+              }),
+              extraDamageOnHit("colossus_slayer_damage", "1d8"),
+            ],
+          },
+          {
+            name: "Horde Breaker",
+            description:
+              "Once per turn when you make a weapon attack, you can make another attack with the same weapon against a different creature within 5 feet of the first target.",
+            linkedModifiers: [
+              fxInstance("modinst_horde_breaker", EXTRA_ATTACK_CATALOG_ID, {
+                effects: [
+                  {
+                    id: modId("horde_breaker"),
+                    kind: "extra_attack",
+                    extraAttackCount: 1,
+                    label: "Horde Breaker: extra attack vs. nearby creature",
+                  },
+                ],
+              }),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Defensive Tactics") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Defensive Tactics",
+        count: 1,
+        swappableOnRest: true,
+        options: [
+          {
+            name: "Escape the Horde",
+            description:
+              "Opportunity attacks have Disadvantage against you.",
+            linkedModifiers: [
+              checkAdvantage("escape_the_horde", {
+                category: "other",
+                conditions: ["Opportunity attacks against you"],
+              }),
+            ],
+          },
+          {
+            name: "Multiattack Defense",
+            description:
+              "When a creature hits you with an attack, you gain a +4 bonus to AC against all subsequent attacks from that creature for the rest of the turn.",
+            linkedModifiers: [
+              charInstance("modinst_multiattack_defense", "cat_char_ac", [
+                {
+                  id: modId("multiattack_defense"),
+                  type: "ac",
+                  mode: "flat_bonus",
+                  flatBonus: 4,
+                  label: "+4 AC vs. subsequent attacks from same creature this turn",
+                },
+              ]),
+            ],
+          },
+          {
+            name: "Steel Will",
+            description: "You have Advantage on saving throws against being Frightened.",
+            linkedModifiers: [
+              checkAdvantage("steel_will", {
+                category: "save",
+                ability: "Wisdom",
+                conditions: ["Frightened"],
+              }),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  return feature
 }
 
 function alwaysPreparedSpells(label: string): LinkedModifierInstance {
@@ -1023,17 +1313,16 @@ function naturesVeil(): LinkedModifierInstance[] {
 
 function fastHandsPicker(): LinkedModifierInstance {
   return charInstance("modinst_fast_hands", FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("fast_hands"),
-      type: "feature_option_picker",
       category: "Fast Hands",
       choiceCount: 1,
       options: [
-        { name: "Sleight of Hand" },
-        { name: "Use Object" },
-        { name: "Thieves' Tools" },
+        { name: "Sleight of Hand", description: "" },
+        { name: "Use Object", description: "" },
+        { name: "Thieves' Tools", description: "" },
       ],
-    },
+    }),
   ])
 }
 
@@ -4740,7 +5029,7 @@ function mergePresetModifiers(
     }
   }
 
-  return next
+  return enrichCanonicalFeatureChoices(migrateFeatureOptionPickers(next))
 }
 
 /** Append passive/action common-modifier presets to a class or subclass feature. */

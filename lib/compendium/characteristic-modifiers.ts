@@ -176,7 +176,6 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "uses", label: "Uses (Limited Ability / Resource)" },
   { value: "attunement_slots", label: "Magic Item Attunement Slots" },
   { value: "aura", label: "Aura / Emanation" },
-  { value: "feature_option_picker", label: "Feature Option Choice" },
   {
     value: "bonus_damage_riders",
     label: "Attack Damage Riders (Hit/Crit)",
@@ -269,6 +268,11 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
   choiceCount?: number | null
   /** When true, chosen or listed skills grant Expertise instead of proficiency. */
   grantExpertise?: boolean
+  /**
+   * When false, skill entries / player picks do not grant proficiency — only drive
+   * which skill a paired bonus applies to (e.g. Thaumaturge Arcana or Religion).
+   */
+  grantsProficiency?: boolean
   /** @deprecated legacy — migrated to entries on load */
   values?: string[]
 }
@@ -278,6 +282,12 @@ export interface ListCharacteristic extends CharacteristicModifierBase {
   values: string[]
   /** Player picks this many tools/languages when values are open-ended. */
   choiceCount?: number | null
+  /**
+   * For `languages` choices, which SRD table the player picks from.
+   * Defaults to the Standard Languages table. Players may always add a
+   * custom user-defined language regardless of pool.
+   */
+  choicePool?: "standard" | "standard_and_rare" | null
 }
 
 export interface WeaponProficienciesCharacteristic extends CharacteristicModifierBase {
@@ -541,22 +551,6 @@ export interface AuraCharacteristic extends CharacteristicModifierBase {
   reactionGrantResistance?: boolean
 }
 
-export interface FeatureOptionPickerOption {
-  name: string
-  description?: string
-  resourceCost?: number | null
-  effect?: NestedModifierEffect | null
-}
-
-export interface FeatureOptionPickerCharacteristic extends CharacteristicModifierBase {
-  type: "feature_option_picker"
-  category: string
-  choiceCount: number
-  swappableOnRest?: boolean
-  resourceKey?: string | null
-  options?: FeatureOptionPickerOption[]
-}
-
 export interface BonusDamageRiderEntry {
   name: string
   costDice?: string | null
@@ -783,7 +777,6 @@ export type CharacteristicModifier =
   | ConditionImmunityCharacteristic
   | AttunementSlotsCharacteristic
   | AuraCharacteristic
-  | FeatureOptionPickerCharacteristic
   | BonusDamageRidersCharacteristic
   | SavingThrowTriggerCharacteristic
   | OnHitTriggerCharacteristic
@@ -889,8 +882,6 @@ export function createCharacteristicModifier(
       return { id, type, bonusSlots: 1, totalSlots: null }
     case "aura":
       return { id, type, radiusFeet: 10, affectsSelf: true, affectsAllies: true }
-    case "feature_option_picker":
-      return { id, type, category: "", choiceCount: 1, swappableOnRest: false, options: [] }
     case "bonus_damage_riders":
       return { id, type, riders: [], maxRidersPerUse: 1 }
     case "saving_throw_trigger":
@@ -1037,17 +1028,6 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       radiusFeet: raw.radiusFeet ?? 10,
       conditionImmunities: raw.conditionImmunities ?? [],
       radiusByLevel: raw.radiusByLevel ?? [],
-    }
-  }
-
-  if (value.type === "feature_option_picker") {
-    const raw = value as FeatureOptionPickerCharacteristic
-    return {
-      ...raw,
-      category: raw.category ?? "",
-      choiceCount: raw.choiceCount ?? 1,
-      swappableOnRest: raw.swappableOnRest ?? false,
-      options: raw.options ?? [],
     }
   }
 
@@ -1430,7 +1410,6 @@ export type AggregatedCharacteristics = {
   criticalHitMinimumByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   attunementSlots: number | null
   auras: AuraCharacteristic[]
-  featureOptionPickers: FeatureOptionPickerCharacteristic[]
   bonusDamageRiders: BonusDamageRidersCharacteristic[]
   savingThrowTriggers: SavingThrowTriggerCharacteristic[]
   onHitTriggers: OnHitTriggerCharacteristic[]
@@ -1501,7 +1480,6 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   criticalHitMinimumByLevel: [],
   attunementSlots: null,
   auras: [],
-  featureOptionPickers: [],
   bonusDamageRiders: [],
   savingThrowTriggers: [],
   onHitTriggers: [],
@@ -1557,6 +1535,7 @@ export function aggregateCharacteristics(
         }
         break
       case "skills":
+        if (mod.grantsProficiency === false) break
         for (const entry of getSkillEntries(mod)) {
           pushUnique(result.skills, [entry.skill])
           if (entry.expertise || mod.grantExpertise) {
@@ -1711,9 +1690,6 @@ export function aggregateCharacteristics(
         if (mod.conditionImmunities?.length) {
           pushUnique(result.conditionImmunities, mod.conditionImmunities)
         }
-        break
-      case "feature_option_picker":
-        result.featureOptionPickers.push(mod)
         break
       case "bonus_damage_riders":
         result.bonusDamageRiders.push(mod)

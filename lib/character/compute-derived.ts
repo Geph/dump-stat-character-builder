@@ -18,6 +18,7 @@ import {
 } from "@/lib/compendium/background-proficiencies"
 import {
   ABILITY_SCORE_KEYS,
+  abilityModifierKeyToScoreKey,
   aggregateCharacteristics,
   applyAcCharacteristics,
   applyHpCharacteristics,
@@ -25,13 +26,16 @@ import {
   sumAttackRollModifiers,
   sumDamageRollModifiers,
   type AbilityScoreKey,
+  type AggregatedCharacteristics,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
   calculateArmorClass,
   calculateWeaponAttack,
+  getArmorAcText,
   getShieldBonus,
   getWeaponPropertyTags,
   isWeaponProficient,
+  parseArmorAc,
 } from "@/lib/compendium/combat-stats"
 import type { Background, DndClass, Equipment } from "@/lib/types"
 import type { CharacterClassRow } from "@/lib/character/character-classes"
@@ -49,6 +53,7 @@ import type {
   DerivedCharacter,
   SaveBonus,
   SkillBonus,
+  StatBreakdownPart,
 } from "@/lib/character/types"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
@@ -171,6 +176,74 @@ function buildSaveBonuses(
       bonus: abilityMods[ability] + (proficient ? proficiencyBonus : 0),
     }
   })
+}
+
+const ABILITY_MOD_LABELS: Record<AbilityScoreKey, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+  charisma: "Charisma",
+}
+
+/** Itemize the Armor Class contributions so they sum to the value `applyAcCharacteristics` returns. */
+function buildAcBreakdown(params: {
+  aggregated: AggregatedCharacteristics
+  abilityMods: Record<AbilityScoreKey, number>
+  proficiencyBonus: number
+  dexMod: number
+  armor: Equipment | null
+  shield: Equipment | null
+  shieldBonus: number
+  wearingArmor: boolean
+}): StatBreakdownPart[] {
+  const { aggregated, abilityMods, proficiencyBonus, dexMod, armor, shield, shieldBonus, wearingArmor } =
+    params
+  const parts: StatBreakdownPart[] = []
+  const armoredFlat = wearingArmor ? aggregated.acFlatBonusWhileArmored : 0
+
+  const pushIf = (label: string, value: number) => {
+    if (value !== 0) parts.push({ label, value })
+  }
+
+  if (aggregated.acFixed != null && aggregated.acFixed > 0) {
+    parts.push({ label: "Fixed AC (feature)", value: aggregated.acFixed })
+    if (aggregated.acIncludeProficiency) pushIf("Proficiency Bonus", proficiencyBonus)
+    pushIf("Feature bonus", aggregated.acFlatBonus)
+    pushIf("While armored", armoredFlat)
+    pushIf(shield?.name ?? "Shield", shieldBonus)
+    return parts
+  }
+
+  if (aggregated.acAbilityMods.length > 0) {
+    parts.push({ label: "Base (Unarmored Defense)", value: aggregated.acBase })
+    for (const key of aggregated.acAbilityMods) {
+      const scoreKey = abilityModifierKeyToScoreKey(key)
+      parts.push({ label: ABILITY_MOD_LABELS[scoreKey], value: abilityMods[scoreKey] })
+    }
+    if (aggregated.acIncludeProficiency) pushIf("Proficiency Bonus", proficiencyBonus)
+    pushIf("Feature bonus", aggregated.acFlatBonus)
+    pushIf("While armored", armoredFlat)
+    pushIf(shield?.name ?? "Shield", shieldBonus)
+    return parts
+  }
+
+  if (armor) {
+    const acText = getArmorAcText(armor)
+    parts.push({
+      label: armor.name,
+      value: acText ? parseArmorAc(acText, dexMod) : 10 + dexMod,
+    })
+  } else {
+    parts.push({ label: "Base", value: 10 })
+    parts.push({ label: "Dexterity", value: dexMod })
+  }
+  pushIf(shield?.name ?? "Shield", shieldBonus)
+  pushIf("Feature bonus", aggregated.acFlatBonus)
+  pushIf("While armored", armoredFlat)
+  if (aggregated.acIncludeProficiency) pushIf("Proficiency Bonus", proficiencyBonus)
+  return parts
 }
 
 export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCharacter {
@@ -325,6 +398,16 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     proficiencyBonus,
     { shieldBonus, wearingArmor },
   )
+  const acBreakdown = buildAcBreakdown({
+    aggregated: aggregatedCharacteristics,
+    abilityMods,
+    proficiencyBonus,
+    dexMod: abilityMods.dexterity,
+    armor: equippedArmor,
+    shield: equippedShield,
+    shieldBonus,
+    wearingArmor,
+  })
 
   const speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
 
@@ -384,6 +467,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     proficiencyBonus,
     totalLevel,
     armorClass,
+    acBreakdown,
     maxHp,
     initiative,
     speed,

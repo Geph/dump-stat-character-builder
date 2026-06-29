@@ -1,23 +1,30 @@
-import { choiceCountMet } from "@/lib/builder/choices"
+import { choiceCountMet, featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import {
   linkedModifiersForFeat,
   type FeatSelectionEntry,
 } from "@/lib/builder/feat-choices"
-import { characteristicsFromLinkedModifiers } from "@/lib/compendium/builder-modifier-refs"
 import {
   SKILL_NAMES,
+  normalizeCharacteristics,
   type CharacteristicModifier,
   type SkillsCharacteristic,
   type SpellsKnownCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import {
+  effectiveLinkedModifiers,
+  resolveLinkedModifiers,
+} from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
-import type { Feat, Spell } from "@/lib/types"
+import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
+import type { DndClass, Feat, Feature, Spell, Subclass } from "@/lib/types"
 
 export type ModifierPlayerChoiceKind =
   | "skill"
   | "tool"
+  | "language"
   | "skill_or_tool"
   | "spell_list_class"
   | "spell"
@@ -37,6 +44,8 @@ export type ModifierPlayerChoiceSlot = {
   spellListSlotKey?: string
   sharedChoiceGroup?: string
   sharedChoiceModIds?: string[]
+  /** When true, the player may add custom free-text options (e.g. user-defined languages). */
+  allowCustom?: boolean
 }
 
 const SKILL_NAME_SET = new Set<string>(SKILL_NAMES)
@@ -72,6 +81,18 @@ export function clearModifierPicksForSource(
     }
   }
   return changed ? next : picks
+}
+
+function characteristicsFromLinkedModifiers(
+  catalog: ModifierCatalogEntry[],
+  linked: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null | undefined,
+  legacyRefs: string[] | null | undefined,
+): CharacteristicModifier[] {
+  const instances = effectiveLinkedModifiers(linked, legacyRefs, catalog)
+  const resolved = instances.length
+    ? resolveLinkedModifiers(instances, catalog)
+    : { characteristics: [] as CharacteristicModifier[] }
+  return normalizeCharacteristics(resolved.characteristics, null)
 }
 
 export function characteristicsForFeatSelection(
@@ -133,6 +154,26 @@ function slotsFromCharacteristic(
       label: mod.label ?? `Choose ${count} tool${count === 1 ? "" : "s"}`,
       maxCount: count,
       options: SRD_TOOL_NAMES.map((name) => ({ name })),
+    })
+    return slots
+  }
+
+  if (mod.type === "languages") {
+    const count = mod.choiceCount ?? 0
+    if (count <= 0) return slots
+
+    const options = languageOptionsForPool(mod.choicePool, mod.values)
+
+    slots.push({
+      slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "language"),
+      sourceKey,
+      sourceLabel,
+      modId: mod.id,
+      kind: "language",
+      label: mod.label ?? `Choose ${count} language${count === 1 ? "" : "s"}`,
+      maxCount: count,
+      options: options.map((name) => ({ name })),
+      allowCustom: true,
     })
     return slots
   }
@@ -249,13 +290,110 @@ function splitSharedChoicePicks(selected: string[]): { skills: string[]; tools: 
   return { skills, tools }
 }
 
+function collectSlotsFromFeature(
+  rawFeature: Feature,
+  classId: string,
+  className: string,
+  featureChoicePicks: Record<string, string[]>,
+  catalog: ModifierCatalogEntry[],
+): ModifierPlayerChoiceSlot[] {
+  const feature = migrateFeatureOptionPickers(rawFeature)
+  const sourceKey = featureChoiceKey(classId, feature.name)
+  const sourceLabel = `${className}: ${feature.name}`
+  const slots: ModifierPlayerChoiceSlot[] = []
+
+  const baseMods = characteristicsFromLinkedModifiers(
+    catalog,
+    effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog),
+    feature.modifierRefs,
+  )
+  slots.push(...slotsFromCharacteristics(baseMods, sourceKey, sourceLabel))
+
+  if (feature.isChoice && feature.choices?.options?.length) {
+    const picked = featureChoicePicks[sourceKey] ?? []
+    for (const optionName of picked) {
+      const option = feature.choices.options.find((entry) => entry.name === optionName)
+      if (!option) continue
+      const optionMods = characteristicsFromLinkedModifiers(
+        catalog,
+        effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
+        option.modifierRefs,
+      )
+      slots.push(...slotsFromCharacteristics(optionMods, sourceKey, sourceLabel))
+    }
+  }
+
+  return slots
+}
+
+/** Spell/skill/tool picks granted by class or subclass feature choices (e.g. Divine Order). */
+export function collectClassFeatureModifierPlayerChoiceSlots(params: {
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  subclasses: Subclass[]
+  subclassByClassId: Record<string, string>
+  featureChoicePicks: Record<string, string[]>
+  catalog: ModifierCatalogEntry[]
+}): ModifierPlayerChoiceSlot[] {
+  const { classLevels, classes, subclasses, subclassByClassId, featureChoicePicks, catalog } =
+    params
+  const slots: ModifierPlayerChoiceSlot[] = []
+
+  for (const entry of classLevels) {
+    const cls = classes.find((candidate) => candidate.id === entry.classId)
+    if (!cls) continue
+
+    for (const feature of cls.features ?? []) {
+      if (feature.level > entry.level) continue
+      slots.push(
+        ...collectSlotsFromFeature(feature, entry.classId, cls.name, featureChoicePicks, catalog),
+      )
+    }
+
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = subclasses.find((candidate) => candidate.id === subclassId)
+      if (!subclass) continue
+      for (const feature of subclass.features ?? []) {
+        if (feature.level > entry.level) continue
+        slots.push(
+          ...collectSlotsFromFeature(
+            feature,
+            entry.classId,
+            `${cls.name} (${subclass.name})`,
+            featureChoicePicks,
+            catalog,
+          ),
+        )
+      }
+    }
+  }
+
+  return slots
+}
+
 export function collectModifierPlayerChoiceSlots(params: {
   featEntries: FeatSelectionEntry[]
   feats: Feat[]
   featChoicePicks: Record<string, string[]>
   catalog: ModifierCatalogEntry[]
+  classLevels?: { classId: string; level: number }[]
+  classes?: DndClass[]
+  subclasses?: Subclass[]
+  subclassByClassId?: Record<string, string>
+  featureChoicePicks?: Record<string, string[]>
 }): ModifierPlayerChoiceSlot[] {
-  const { featEntries, feats, featChoicePicks, catalog } = params
+  const {
+    featEntries,
+    feats,
+    featChoicePicks,
+    catalog,
+    classLevels = [],
+    classes = [],
+    subclasses = [],
+    subclassByClassId = {},
+    featureChoicePicks = {},
+  } = params
   const slots: ModifierPlayerChoiceSlot[] = []
 
   for (const entry of featEntries) {
@@ -270,6 +408,19 @@ export function collectModifierPlayerChoiceSlots(params: {
     )
 
     slots.push(...slotsFromCharacteristics(characteristics, entry.choicePickKey, feat.name))
+  }
+
+  if (classLevels.length > 0) {
+    slots.push(
+      ...collectClassFeatureModifierPlayerChoiceSlots({
+        classLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+        featureChoicePicks,
+        catalog,
+      }),
+    )
   }
 
   return slots
@@ -338,6 +489,18 @@ export function applyModifierPlayerPicks(
       const selected = picks[key] ?? []
       if (selected.length === 0) return mod
       return { ...mod, values: selected }
+    }
+
+    if (mod.type === "languages") {
+      const count = mod.choiceCount ?? 0
+      if (count <= 0) return mod
+
+      const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "language")
+      const selected = picks[key] ?? []
+      if (selected.length === 0) return mod
+      // Fixed languages (e.g. Common) are granted alongside the player's picks.
+      const merged = [...new Set([...mod.values, ...selected])]
+      return { ...mod, values: merged, choiceCount: 0 }
     }
 
     if (mod.type === "spells_known") {

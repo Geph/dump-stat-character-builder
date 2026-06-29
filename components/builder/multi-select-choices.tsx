@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
+import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 
 type ChoiceOption = { name: string; description?: string }
 
@@ -18,6 +19,10 @@ type MultiSelectChoicesProps = {
   unavailableOptions?: string[]
   /** When true, show an info button for D&D skill options. */
   showSkillInfo?: boolean
+  /** When true, let the player add custom free-text entries (e.g. user-defined languages). */
+  allowCustom?: boolean
+  /** Placeholder for the custom-entry input. */
+  customPlaceholder?: string
 }
 
 export function MultiSelectChoices({
@@ -30,9 +35,19 @@ export function MultiSelectChoices({
   accentClass = "border-primary bg-primary/10",
   unavailableOptions = [],
   showSkillInfo = false,
+  allowCustom = false,
+  customPlaceholder = "Add a custom entry...",
 }: MultiSelectChoicesProps) {
   const unavailable = new Set(unavailableOptions)
   const [skillInfo, setSkillInfo] = useState<string | null>(null)
+  const [customDraft, setCustomDraft] = useState("")
+
+  // Selected entries that aren't in the option list are custom additions; show them too.
+  const optionNames = new Set(options.map((option) => option.name))
+  const displayOptions: ChoiceOption[] = [
+    ...options,
+    ...selected.filter((name) => !optionNames.has(name)).map((name) => ({ name })),
+  ]
 
   const toggle = (name: string) => {
     if (selected.includes(name)) {
@@ -41,6 +56,13 @@ export function MultiSelectChoices({
     }
     if (unavailable.has(name) || selected.length >= maxCount) return
     onChange([...selected, name])
+  }
+
+  const addCustom = () => {
+    const trimmed = customDraft.trim()
+    if (!trimmed || selected.includes(trimmed) || selected.length >= maxCount) return
+    onChange([...selected, trimmed])
+    setCustomDraft("")
   }
 
   const activeSkillDescription = skillInfo ? getSkillDescription(skillInfo) : null
@@ -56,7 +78,7 @@ export function MultiSelectChoices({
         </div>
         {hint && <p className="text-xs text-muted-foreground mb-3">{hint}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {options.map((option) => {
+          {displayOptions.map((option) => {
             const isSelected = selected.includes(option.name)
             const isTakenElsewhere = !isSelected && unavailable.has(option.name)
             const isDisabled = isTakenElsewhere || (!isSelected && selected.length >= maxCount)
@@ -80,9 +102,11 @@ export function MultiSelectChoices({
                     <p className="text-xs text-muted-foreground mt-0.5">Already chosen</p>
                   )}
                   {option.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                      {option.description}
-                    </p>
+                    <ClampedRichText
+                      html={option.description}
+                      lines={2}
+                      className="text-xs mt-0.5"
+                    />
                   )}
                 </button>
                 {showSkillInfo && skillDescription && (
@@ -99,6 +123,32 @@ export function MultiSelectChoices({
             )
           })}
         </div>
+        {allowCustom && (
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              value={customDraft}
+              onChange={(e) => setCustomDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  addCustom()
+                }
+              }}
+              placeholder={customPlaceholder}
+              disabled={selected.length >= maxCount}
+              className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={addCustom}
+              disabled={!customDraft.trim() || selected.length >= maxCount}
+              className="px-3 py-2 rounded-lg border-2 border-border bg-card text-sm font-semibold hover:border-primary/40 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>

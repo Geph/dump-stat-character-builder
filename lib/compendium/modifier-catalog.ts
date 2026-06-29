@@ -90,7 +90,6 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   uses: "Resources & uses",
   attunement_slots: "Resources & uses",
   aura: "Movement & senses",
-  feature_option_picker: "Feats & choices",
   bonus_damage_riders: "Attack & damage",
   saving_throw_trigger: "Skills & saving throws",
   on_hit_trigger: "Active abilities",

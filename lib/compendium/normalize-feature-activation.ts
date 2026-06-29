@@ -1,5 +1,6 @@
 import type { Feature, FeatureActivation, FeatureChoice, FeatureEffect } from "@/lib/types"
 import { migrateFeatureFeatChoiceToModifierRefs } from "@/lib/compendium/grant-feat-catalog"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 
 function newEffectId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID()
@@ -69,12 +70,15 @@ export function normalizeFeatureChoices(
     ...choices,
     category: choices.category ?? "",
     count: typeof choices.count === "number" && choices.count > 0 ? choices.count : 1,
+    swappableOnRest: choices.swappableOnRest ?? undefined,
+    resourceKey: choices.resourceKey ?? undefined,
     options: Array.isArray(choices.options)
       ? choices.options.map((option) => ({
           name: option?.name ?? "",
           description: option?.description ?? "",
           modifierRefs: Array.isArray(option?.modifierRefs) ? option.modifierRefs : undefined,
           linkedModifiers: Array.isArray(option?.linkedModifiers) ? option.linkedModifiers : undefined,
+          resourceCost: option?.resourceCost ?? undefined,
         }))
       : [],
   }
@@ -82,8 +86,8 @@ export function normalizeFeatureChoices(
 
 /** Move legacy feature.resourceId into limitedUses when loading old data. */
 export function normalizeFeatureRow(feature: Feature): Feature {
-  let next = { ...feature }
-  next.activation = normalizeFeatureActivation(feature.activation)
+  let next = migrateFeatureOptionPickers({ ...feature })
+  next.activation = normalizeFeatureActivation(next.activation)
 
   if (feature.resourceId && feature.limitedUses && feature.limitedUses.type !== "class_resource") {
     next = {

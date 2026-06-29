@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react"
 import type { ClassResource, RestType, UsesConfig } from "@/lib/types"
 import { ABILITY_MODIFIER_KEYS } from "@/lib/compendium/characteristic-modifiers"
+import { SpellSlotProgressionTable } from "@/components/compendium/spell-slot-progression-table"
 import {
   getRechargeAmount,
   isRestRechargeEnabled,
@@ -104,6 +105,8 @@ export function UsesConfigEditor({
                 specialDescription: undefined,
                 atLevelTable: undefined,
                 atLevelMode: undefined,
+                casterType:
+                  e.target.value === "spell_slots" ? (value.casterType ?? "full") : undefined,
               })
             }
             className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
@@ -115,6 +118,7 @@ export function UsesConfigEditor({
             <option value="custom_ability">Same as Another Ability</option>
             <option value="at_level">Based on Level</option>
             <option value="class_resource">Class resource</option>
+            <option value="spell_slots">Spell slots (per caster table)</option>
             <option value="special">Special (custom description)</option>
           </select>
         </div>
@@ -336,7 +340,44 @@ export function UsesConfigEditor({
         </div>
       )}
 
-      {value.type !== "unlimited" && value.type !== "class_resource" && value.type !== "special" && (
+      {value.type === "spell_slots" && (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Caster progression
+            </label>
+            <select
+              value={value.casterType ?? "full"}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  casterType: e.target.value as UsesConfig["casterType"],
+                  recharges:
+                    e.target.value === "pact"
+                      ? [{ rest: "short_rest" }, { rest: "long_rest" }]
+                      : [{ rest: "long_rest" }],
+                })
+              }
+              className="w-full max-w-md px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="full">Full caster (Bard, Cleric, Druid, Sorcerer, Wizard)</option>
+              <option value="half">Half caster (Paladin, Ranger, Artificer)</option>
+              <option value="pact">Pact magic (Warlock)</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Slots follow the standard SRD table for this caster type. The per spell-level
+              breakdown below is derived automatically and recharges on a{" "}
+              {value.casterType === "pact" ? "short or long rest" : "long rest"}.
+            </p>
+          </div>
+          <SpellSlotProgressionTable casterType={value.casterType ?? "full"} />
+        </div>
+      )}
+
+      {value.type !== "unlimited" &&
+        value.type !== "class_resource" &&
+        value.type !== "special" &&
+        value.type !== "spell_slots" && (
         <div className="space-y-4 pt-2 border-t border-border">
           <RechargeRulesEditor value={value} onChange={onChange} />
           <div className="rounded-lg border border-border bg-card/40 p-3 space-y-3">

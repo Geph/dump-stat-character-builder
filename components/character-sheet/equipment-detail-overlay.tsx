@@ -10,6 +10,7 @@ import {
 import { getEquipmentDetailRows } from "@/lib/compendium/equipment-display"
 import { readMagicEffects } from "@/lib/compendium/equipment-magic"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import type { Equipment } from "@/lib/types"
 
 type EquipmentDetailOverlayProps = {
@@ -104,9 +105,7 @@ export function EquipmentDetailOverlay({
           {item.description ? (
             <div>
               <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1.5">Description</h3>
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {item.description}
-              </p>
+              <RichTextContent html={item.description} className="text-sm text-foreground leading-relaxed" />
             </div>
           ) : (
             !detailRows.length && (

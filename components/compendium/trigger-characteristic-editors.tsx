@@ -12,8 +12,6 @@ import {
   type SpellHealingModifierCharacteristic,
   type ResourceAbilityMenuCharacteristic,
   type ExtraTurnCharacteristic,
-  type FeatureOptionPickerCharacteristic,
-  type FeatureOptionPickerOption,
   type ResourceAbilityMenuOption,
   type D20TestReactionCharacteristic,
   type DamageHalvingReactionCharacteristic,
@@ -523,81 +521,6 @@ export function ResourceAbilityMenuEditor({
         className="text-sm text-primary hover:underline"
       >
         + Add ability option
-      </button>
-    </div>
-  )
-}
-
-export function FeatureOptionPickerEditor({
-  mod,
-  onChange,
-  modifierCatalog,
-  classResources = [],
-}: {
-  mod: FeatureOptionPickerCharacteristic
-  onChange: (next: FeatureOptionPickerCharacteristic) => void
-  modifierCatalog: ModifierCatalogEntry[]
-  classResources?: ClassResource[]
-}) {
-  const updateOption = (index: number, patch: Partial<FeatureOptionPickerOption>) => {
-    const options = [...(mod.options ?? [])]
-    options[index] = { ...options[index], ...patch }
-    onChange({ ...mod, options })
-  }
-
-  return (
-    <div className="space-y-3">
-      <input
-        type="text"
-        value={mod.category}
-        onChange={(e) => onChange({ ...mod, category: e.target.value })}
-        placeholder="Option category"
-        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
-      />
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Choose</span>
-        <input
-          type="number"
-          min={1}
-          value={mod.choiceCount}
-          onChange={(e) => onChange({ ...mod, choiceCount: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-          className="w-16 px-2 py-1 bg-background border border-border rounded text-center text-sm"
-        />
-        <span className="text-sm text-muted-foreground">option(s)</span>
-      </div>
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          checked={!!mod.swappableOnRest}
-          onChange={(e) => onChange({ ...mod, swappableOnRest: e.target.checked })}
-          className="accent-primary"
-        />
-        <span className="text-muted-foreground">Can swap on rest</span>
-      </label>
-      {(mod.options ?? []).map((option, index) => (
-        <div key={index} className="rounded-lg border border-border p-3 space-y-2">
-          <input
-            type="text"
-            value={option.name}
-            onChange={(e) => updateOption(index, { name: e.target.value })}
-            placeholder="Option name"
-            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
-          />
-          <NestedModifierEffectEditor
-            value={option.effect}
-            onChange={(effect) => updateOption(index, { effect })}
-            modifierCatalog={modifierCatalog}
-            classResources={classResources}
-            label="Option effect"
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() => onChange({ ...mod, options: [...(mod.options ?? []), { name: "" }] })}
-        className="text-sm text-primary hover:underline"
-      >
-        + Add fixed option
       </button>
     </div>
   )

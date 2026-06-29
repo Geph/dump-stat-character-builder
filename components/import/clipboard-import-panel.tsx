@@ -359,6 +359,20 @@ export function ClipboardImportPanel({
             multi-file homebrew, paste a JSON array in dependency order — see the import order
             guide at the top of this page.
           </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Also accepts{" "}
+            <a
+              href="https://github.com/foundryvtt/dnd5e"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-lime underline underline-offset-2 hover:text-lime/80"
+            >
+              Foundry VTT dnd5e
+            </a>{" "}
+            item exports — paste a single item, an array, or a compendium dump (spells, feats,
+            equipment, classes, subclasses, species, backgrounds) and it&apos;s detected
+            automatically.
+          </p>
         </div>
         <textarea
           placeholder='Paste the model JSON here, e.g. { "classes": [ ... ] }'

@@ -15,6 +15,7 @@ import {
   PsionicAugmentPicker,
   resolveSpellPsionicAugments,
 } from "@/components/character-sheet/psionic-augment-picker"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { rollD20, d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import type { PsionicAugmentSelection } from "@/lib/compendium/parse-psionic-augments"
@@ -184,18 +185,17 @@ export function SpellDetailOverlay({
           {spell.description && (
             <div>
               <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Description</h3>
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {spell.description}
-              </p>
+              <RichTextContent html={spell.description} className="text-sm text-foreground leading-relaxed" />
             </div>
           )}
 
           {spell.higher_levels && (
             <div>
               <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">At Higher Levels</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                {spell.higher_levels}
-              </p>
+              <RichTextContent
+                html={spell.higher_levels}
+                className="text-sm text-muted-foreground leading-relaxed"
+              />
             </div>
           )}
 

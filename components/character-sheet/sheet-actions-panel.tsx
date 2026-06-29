@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Info, X } from "lucide-react"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   ACTION_KIND_LABELS,
   type ActionEconomyKind,
@@ -126,13 +127,10 @@ function ActionInfoOverlay({
               </span>
             </p>
           ) : null}
-          {action.description ? (
-            <p className="text-sm text-foreground/90 whitespace-pre-line leading-relaxed">
-              {action.description}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">No description available.</p>
-          )}
+          <RichTextContent
+            html={action.description}
+            className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
+          />
         </div>
       </motion.div>
     </motion.div>
