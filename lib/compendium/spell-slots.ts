@@ -168,27 +168,54 @@ export function getMulticlassSpellSlotTables(
     .filter((table): table is SpellSlotTable => table != null)
 }
 
-/** Build class-resource uses config for spell slot pools (full or half caster). */
+/** Representative SRD class name for a caster progression type. */
+function casterTypeClassName(casterType: "full" | "half" | "pact"): string {
+  if (casterType === "pact") return "Warlock"
+  if (casterType === "half") return "Paladin"
+  return "Wizard"
+}
+
+/** Minimal spellcasting shape so getCasterSlotType resolves the right progression. */
+function casterTypeSpellcasting(
+  casterType: "full" | "half" | "pact",
+): DndClass["spellcasting"] {
+  return { type: casterType === "pact" ? "pact" : "spellcasting" } as DndClass["spellcasting"]
+}
+
+/** Spell slot table for a caster progression type at a character level (no class row needed). */
+export function spellSlotTableForCasterType(
+  casterType: "full" | "half" | "pact",
+  classLevel: number,
+): SpellSlotTable | null {
+  return getSpellSlotTable(
+    casterTypeClassName(casterType),
+    classLevel,
+    casterTypeSpellcasting(casterType),
+  )
+}
+
+/** Total spell slots (summed across spell levels) for a caster type at a level. */
+export function totalSpellSlotsForCasterType(
+  casterType: "full" | "half" | "pact",
+  classLevel: number,
+): number {
+  const table = spellSlotTableForCasterType(casterType, classLevel)
+  return table?.slotsByLevel.reduce((sum, count) => sum + count, 0) ?? 0
+}
+
+/**
+ * Build the class-resource uses config for spell slot pools. Spell slots are
+ * represented by caster type (full / half / pact) and the per spell-level
+ * breakdown is derived from the canonical SRD tables, rather than collapsed into
+ * a single total per character level.
+ */
 export function spellSlotResourceUsesForCasterType(
-  casterType: "full" | "half",
+  casterType: "full" | "half" | "pact",
 ): import("@/lib/types").UsesConfig {
-  const className = casterType === "full" ? "Wizard" : "Paladin"
-  const spellcasting = { type: "spellcasting" } as DndClass["spellcasting"]
-  const tiers: { level: number; count: number }[] = []
-  let lastTotal = -1
-  for (let level = 1; level <= 20; level++) {
-    const table = getSpellSlotTable(className, level, spellcasting)
-    const total = table?.slotsByLevel.reduce((sum, count) => sum + count, 0) ?? 0
-    if (total !== lastTotal) {
-      tiers.push({ level, count: total })
-      lastTotal = total
-    }
-  }
   return {
-    type: "at_level",
-    atLevelMode: "tier",
-    recharges: [{ rest: "long_rest" }],
-    atLevelTable: tiers.length ? tiers : [{ level: 1, count: 0 }],
+    type: "spell_slots",
+    casterType,
+    recharges: casterType === "pact" ? [{ rest: "short_rest" }, { rest: "long_rest" }] : [{ rest: "long_rest" }],
   }
 }
 

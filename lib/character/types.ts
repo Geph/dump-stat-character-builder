@@ -71,6 +71,12 @@ export type WeaponAttackDerived = {
   damageDisplay: string
 }
 
+/** A single labeled contribution to a derived statistic (e.g. Armor Class). */
+export type StatBreakdownPart = {
+  label: string
+  value: number
+}
+
 export type DerivedCharacter = {
   abilityScores: Record<AbilityScoreKey, number>
   abilityMods: Record<AbilityScoreKey, number>
@@ -78,6 +84,8 @@ export type DerivedCharacter = {
   proficiencyBonus: number
   totalLevel: number
   armorClass: number
+  /** Itemized contributions whose values sum to `armorClass`. */
+  acBreakdown: StatBreakdownPart[]
   maxHp: number
   initiative: number
   speed: number

@@ -23,6 +23,7 @@ import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { SpellSlotProgressionTable } from "@/components/compendium/spell-slot-progression-table"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
@@ -102,9 +103,24 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [hasSpellcasting, setHasSpellcasting] = useState(false)
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
+  const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("classes", id)
   const { catalog: modifierCatalog } = useModifierCatalog()
+
+  useEffect(() => {
+    const fetchSpells = async () => {
+      const db = createClient()
+      const { data: spells } = await db
+        .from("spells")
+        .select("id, name, level")
+        .order("level")
+        .order("name")
+        .limit(1000)
+      setAllSpells((spells ?? []) as { id: string; name: string }[])
+    }
+    fetchSpells()
+  }, [])
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -644,6 +660,20 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 </div>
               </div>
             )}
+
+            {hasSpellcasting && form.name.trim() && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-semibold text-foreground">Spell slots by level</p>
+                <p className="text-xs text-muted-foreground">
+                  SRD spell slot progression for this caster type (levels 1–20). Authoring a custom
+                  progression table on the class overrides builder spell-pick limits when present.
+                </p>
+                <SpellSlotProgressionTable
+                  className={form.name.trim()}
+                  spellcasting={form.spellcasting}
+                />
+              </div>
+            )}
           </div>
 
           {/* Class Resources — managed in compendium tab */}
@@ -763,6 +793,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                     index={index}
                     classResources={classResources}
                     modifierCatalog={modifierCatalog}
+                    spellOptions={allSpells}
                     siblingFeatures={form.features.map((feat) => ({
                       name: feat.name,
                       level: feat.level,

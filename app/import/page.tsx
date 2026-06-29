@@ -764,9 +764,9 @@ export default function ImportPage() {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-muted-foreground flex-1">
-                      Upload a Dump Stat JSON export directly, or extract text from a PDF when server
-                      AI is configured. For PDF homebrew without server keys, use the Clipboard tab with
-                      your own LLM.
+                      Upload a Dump Stat JSON export or a Foundry VTT dnd5e item export directly, or
+                      extract text from a PDF when server AI is configured. For PDF homebrew without
+                      server keys, use the Clipboard tab with your own LLM.
                     </p>
                     {serverAiEnabled ? (
                       <button

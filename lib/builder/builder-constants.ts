@@ -3,18 +3,30 @@ import {
   Dices,
   Package,
   Shield,
+  Sparkles,
   UserCircle,
   Users,
 } from "lucide-react"
 import type { CharacterDraft } from "@/lib/types"
 
+export const BUILDER_STEP_IDS = {
+  CLASS: 1,
+  ORIGIN: 2,
+  ABILITIES: 3,
+  GEAR: 4,
+  SPELLS: 5,
+  DETAILS: 6,
+  REVIEW: 7,
+} as const
+
 export const BUILDER_STEPS = [
-  { id: 1, label: "Class & Level", icon: Shield },
-  { id: 2, label: "Origin", icon: Users },
-  { id: 3, label: "Abilities", icon: Dices },
-  { id: 4, label: "Gear & Spells", icon: Package },
-  { id: 5, label: "Details", icon: UserCircle },
-  { id: 6, label: "Review", icon: ClipboardCheck },
+  { id: BUILDER_STEP_IDS.CLASS, label: "Class & Level", icon: Shield },
+  { id: BUILDER_STEP_IDS.ORIGIN, label: "Origin", icon: Users },
+  { id: BUILDER_STEP_IDS.ABILITIES, label: "Abilities", icon: Dices },
+  { id: BUILDER_STEP_IDS.GEAR, label: "Gear", icon: Package },
+  { id: BUILDER_STEP_IDS.SPELLS, label: "Spells", icon: Sparkles },
+  { id: BUILDER_STEP_IDS.DETAILS, label: "Details", icon: UserCircle },
+  { id: BUILDER_STEP_IDS.REVIEW, label: "Review", icon: ClipboardCheck },
 ] as const
 
 export const BUILDER_ABILITY_NAMES = [

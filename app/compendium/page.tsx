@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Copy, Trash2, ChevronLeft, ChevronRight, Settings, Download } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Copy, Trash2, ChevronLeft, ChevronRight, Settings, Download, Upload } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
@@ -35,6 +35,7 @@ import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-exp
 import {
   getCompendiumItemIcon,
   isCompendiumContentType,
+  type CompendiumContentType,
 } from "@/lib/compendium/content-types"
 import {
   compendiumAccentColorStyles,
@@ -50,6 +51,7 @@ import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
+import { CustomClassSpellListDialog } from "@/components/compendium/custom-class-spell-list-dialog"
 import { getCompendiumCardImageUrl, CLASS_CARD_ASPECT_CLASS } from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
@@ -105,6 +107,7 @@ function CompendiumPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
+  const [spellListDialogOpen, setSpellListDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
     species: [],
@@ -906,6 +909,16 @@ function CompendiumPageContent() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {activeTab === "spells" && (
+              <button
+                type="button"
+                onClick={() => setSpellListDialogOpen(true)}
+                className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-card border-2 border-border text-foreground rounded-xl font-semibold hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                <Upload className="w-5 h-5 shrink-0" />
+                Upload class spell list
+              </button>
+            )}
             <Link
               href={compendiumEditHref(activeTab, "new")}
               className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
@@ -915,6 +928,15 @@ function CompendiumPageContent() {
             </Link>
           </div>
         </div>
+
+        <CustomClassSpellListDialog
+          open={spellListDialogOpen}
+          onClose={() => setSpellListDialogOpen(false)}
+          onApplied={() => {
+            void refreshActiveTabContent()
+            void refreshTabCounts()
+          }}
+        />
 
         {/* Clear All Confirmation Dialog */}
         {clearConfirmOpen && (

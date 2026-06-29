@@ -13,6 +13,7 @@ import {
 } from "@/lib/compendium/linked-modifiers"
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import type {
   Background,
   CustomAbility,
@@ -36,12 +37,13 @@ export function characteristicsFromLinkedModifiers(
 }
 
 function collectLinkedFromFeature(
-  feature: Feature,
+  rawFeature: Feature,
   classId: string,
   featureChoicePicks: Record<string, string[]>,
   catalog: ModifierCatalogEntry[],
   instances: LinkedModifierInstance[],
 ): void {
+  const feature = migrateFeatureOptionPickers(rawFeature)
   instances.push(...effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog))
 
   if (feature.isChoice && feature.choices?.options?.length) {
@@ -132,6 +134,55 @@ function filterSpellsKnownByClassLevel(
   })
 }
 
+function classCharacteristicsWithPlayerPicks(params: {
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  subclasses: Subclass[]
+  subclassByClassId: Record<string, string>
+  featureChoicePicks: Record<string, string[]>
+  modifierPlayerPicks: Record<string, string[]>
+  catalog: ModifierCatalogEntry[]
+}): CharacteristicModifier[] {
+  const {
+    classLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    featureChoicePicks,
+    modifierPlayerPicks,
+    catalog,
+  } = params
+
+  const mods: CharacteristicModifier[] = []
+
+  for (const entry of classLevels) {
+    const cls = classes.find((candidate) => candidate.id === entry.classId)
+    if (!cls) continue
+
+    const processFeatures = (features: Feature[]) => {
+      for (const rawFeature of features) {
+        if (rawFeature.level > entry.level) continue
+        const instances: LinkedModifierInstance[] = []
+        collectLinkedFromFeature(rawFeature, entry.classId, featureChoicePicks, catalog, instances)
+        const filtered = filterSpellsKnownByClassLevel(instances, entry.level)
+        const key = featureChoiceKey(entry.classId, rawFeature.name)
+        const chars = characteristicsFromLinkedModifiers(catalog, filtered, rawFeature.modifierRefs)
+        mods.push(...applyModifierPlayerPicks(chars, key, modifierPlayerPicks))
+      }
+    }
+
+    processFeatures(cls.features ?? [])
+
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = subclasses.find((candidate) => candidate.id === subclassId)
+      if (subclass) processFeatures(subclass.features ?? [])
+    }
+  }
+
+  return mods
+}
+
 export function speciesTraitLinkedModifiers(
   species: Species | undefined,
   speciesTraitPicks: Record<string, string[]>,
@@ -201,17 +252,15 @@ export function collectBuilderModifierRefIds(params: {
     ? resolveLinkedModifiers(speciesInstances, catalog).characteristics
     : []
 
-  const classInstances = classAndSubclassLinkedModifiers({
+  const classResolved = classCharacteristicsWithPlayerPicks({
     classLevels,
     classes,
     subclasses,
     subclassByClassId,
     featureChoicePicks,
+    modifierPlayerPicks,
     catalog,
   })
-  const classResolved = classInstances.length
-    ? resolveLinkedModifiers(classInstances, catalog).characteristics
-    : []
 
   const backgroundInstances = background?.feature
     ? effectiveLinkedModifiers(

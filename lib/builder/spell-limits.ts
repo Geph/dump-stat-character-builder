@@ -1,4 +1,5 @@
 import type { DndClass } from "@/lib/types"
+import { getSpellSlotTable } from "@/lib/compendium/spell-slots"
 
 export type SpellProgressionEntry = {
   level: number
@@ -18,31 +19,48 @@ export function getSpellProgression(spellcasting: DndClass["spellcasting"]): Spe
   return spellcasting.progression
 }
 
+/** Default cantrips known for a full caster lacking an authored progression table. */
+function defaultCantripsKnown(classLevel: number): number {
+  if (classLevel >= 10) return 5
+  if (classLevel >= 4) return 4
+  return 3
+}
+
 export function getSpellLimits(
   spellcasting: DndClass["spellcasting"],
   classLevel: number,
+  className?: string,
 ): SpellLimits {
   const progression = getSpellProgression(spellcasting)
-  if (!progression.length) {
+  if (progression.length) {
+    const entry =
+      progression.find((p) => p.level === classLevel) ??
+      [...progression].filter((p) => p.level <= classLevel).sort((a, b) => b.level - a.level)[0]
+
+    if (!entry) {
+      return { cantrips: 0, prepared: 0, maxSpellLevel: 0 }
+    }
+
     return {
-      cantrips: 99,
-      prepared: 99,
-      maxSpellLevel: Math.min(9, Math.ceil(classLevel / 2)),
+      cantrips: entry.cantrips,
+      prepared: entry.prepared,
+      maxSpellLevel: entry.max_spell_level,
     }
   }
 
-  const entry =
-    progression.find((p) => p.level === classLevel) ??
-    [...progression].filter((p) => p.level <= classLevel).sort((a, b) => b.level - a.level)[0]
-
-  if (!entry) {
-    return { cantrips: 0, prepared: 0, maxSpellLevel: 0 }
-  }
+  // No authored progression table: derive bounded limits from the canonical SRD
+  // spell-slot tables rather than allowing unlimited (99) picks. An authored
+  // progression on the class is always preferred and overrides this fallback.
+  const slotTable = className ? getSpellSlotTable(className, classLevel, spellcasting) : null
+  const maxSpellLevel = slotTable
+    ? slotTable.slotsByLevel.reduce((max, count, idx) => (count > 0 ? idx + 1 : max), 0)
+    : Math.min(9, Math.ceil(classLevel / 2))
+  const totalSlots = slotTable ? slotTable.slotsByLevel.reduce((sum, count) => sum + count, 0) : 0
 
   return {
-    cantrips: entry.cantrips,
-    prepared: entry.prepared,
-    maxSpellLevel: entry.max_spell_level,
+    cantrips: spellcasting?.cantrips ?? defaultCantripsKnown(classLevel),
+    prepared: spellcasting?.spells_known ?? Math.max(1, totalSlots),
+    maxSpellLevel,
   }
 }
 

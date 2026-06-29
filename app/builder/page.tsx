@@ -74,6 +74,7 @@ import { BuilderStepNav } from "@/components/builder/builder-step-nav"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 import { CompendiumSelectionCard } from "@/components/compendium/compendium-selection-card"
 import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
@@ -177,6 +178,7 @@ import {
   BUILDER_EMPTY_CHARACTER,
   BUILDER_STANDARD_ARRAY,
   BUILDER_STEPS,
+  BUILDER_STEP_IDS,
 } from "@/lib/builder/builder-constants"
 import { formatSpellListGroupLabel } from "@/lib/compendium/spell-slots"
 import {
@@ -969,8 +971,23 @@ export default function BuilderPage() {
         feats,
         featChoicePicks,
         catalog: modifierCatalog,
+        classLevels: activeClassLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+        featureChoicePicks,
       }),
-    [featSelectionEntries, feats, featChoicePicks, modifierCatalog],
+    [
+      featSelectionEntries,
+      feats,
+      featChoicePicks,
+      modifierCatalog,
+      activeClassLevels,
+      classes,
+      subclasses,
+      subclassByClassId,
+      featureChoicePicks,
+    ],
   )
 
   useEffect(() => {
@@ -1731,9 +1748,10 @@ export default function BuilderPage() {
             )) &&
           (abilityMethod !== "standard" || isStandardArrayComplete(standardArrayAssignments))
         )
-      case 4: return true
-      case 5: return character.name.trim().length > 0
-      case 6: return character.name.trim().length > 0
+      case BUILDER_STEP_IDS.GEAR: return true
+      case BUILDER_STEP_IDS.SPELLS: return true
+      case BUILDER_STEP_IDS.DETAILS: return character.name.trim().length > 0
+      case BUILDER_STEP_IDS.REVIEW: return character.name.trim().length > 0
       default: return false
     }
   }
@@ -1743,18 +1761,42 @@ export default function BuilderPage() {
     activeClassLevels.length > 0 &&
     meetsMulticlassRequirements
 
+  const hasSpellStep = spellcastingClasses.length > 0
+  const visibleSteps = BUILDER_STEPS.filter(
+    (step) => step.id !== BUILDER_STEP_IDS.SPELLS || hasSpellStep,
+  )
+
+  const nextVisibleStepId = (stepId: number) =>
+    visibleSteps.find((step) => step.id > stepId)?.id ?? null
+  const prevVisibleStepId = (stepId: number) =>
+    [...visibleSteps].reverse().find((step) => step.id < stepId)?.id ?? null
+
   const goToStep = (stepId: number) => {
     if (stepId >= 1 && stepId <= maxStepReached) {
       setCurrentStep(stepId)
     }
   }
 
+  const goBackStep = () => {
+    const prev = prevVisibleStepId(currentStep)
+    if (prev != null) goToStep(prev)
+  }
+
   const advanceStep = () => {
-    if (!canProceed() || currentStep >= 6) return
-    const next = currentStep + 1
+    if (!canProceed()) return
+    const next = nextVisibleStepId(currentStep)
+    if (next == null) return
     setCurrentStep(next)
     setMaxStepReached((prev) => Math.max(prev, next))
   }
+
+  // If the character stops being a spellcaster while parked on the Spells step,
+  // bounce back to Gear so the user never lands on a hidden step.
+  useEffect(() => {
+    if (currentStep === BUILDER_STEP_IDS.SPELLS && !hasSpellStep) {
+      setCurrentStep(BUILDER_STEP_IDS.GEAR)
+    }
+  }, [currentStep, hasSpellStep])
 
   const getAbilityModifier = (score: number) => {
     const mod = Math.floor((score - 10) / 2)
@@ -1783,7 +1825,7 @@ export default function BuilderPage() {
         {/* Step Indicator */}
         <div id="builder-steps" className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {BUILDER_STEPS.map((step, index) => {
+            {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
               const isReachable = step.id <= maxStepReached
@@ -1819,7 +1861,7 @@ export default function BuilderPage() {
                       {step.label}
                     </span>
                   </button>
-                  {index < BUILDER_STEPS.length - 1 && (
+                  {index < visibleSteps.length - 1 && (
                     <div className={`flex-1 h-1 mx-1 md:mx-2 rounded min-w-[8px] ${
                       step.id < maxStepReached ? "bg-success" : "bg-muted"
                     }`} />
@@ -1911,10 +1953,11 @@ export default function BuilderPage() {
                 canProceed={canProceed()}
                 canSave={canSaveCharacter()}
                 saving={saving}
-                onBack={() => goToStep(currentStep - 1)}
+                onBack={goBackStep}
                 onContinue={advanceStep}
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
+                lastStep={BUILDER_STEP_IDS.REVIEW}
               />
             </div>
 
@@ -2271,9 +2314,11 @@ export default function BuilderPage() {
                                     >
                                       <p className="font-semibold text-sm text-foreground">{subclass.name}</p>
                                       {subclass.description && (
-                                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                                          {subclass.description}
-                                        </p>
+                                        <ClampedRichText
+                                          html={subclass.description}
+                                          lines={2}
+                                          className="text-xs mt-1"
+                                        />
                                       )}
                                     </button>
                                   )
@@ -2285,22 +2330,47 @@ export default function BuilderPage() {
                           {eligibleFeatures.map((feature) => {
                             const key = featureChoiceKey(entry.classId, feature.name)
                             return (
-                              <MultiSelectChoices
-                                key={key}
-                                title={feature.name}
-                                hint={feature.choices!.category}
-                                options={feature.choices?.options ?? []}
-                                maxCount={feature.choices!.count}
-                                selected={featureChoicePicks[key] ?? []}
-                                unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
-                                showSkillInfo={
-                                  feature.choices!.category.toLowerCase().includes("skill")
-                                }
-                                onChange={(selected) =>
-                                  setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
-                                }
-                                accentClass="border-accent bg-accent/10"
-                              />
+                              <div key={key} className="space-y-2">
+                                <MultiSelectChoices
+                                  title={feature.name}
+                                  hint={feature.choices!.category}
+                                  options={feature.choices?.options ?? []}
+                                  maxCount={feature.choices!.count}
+                                  selected={featureChoicePicks[key] ?? []}
+                                  unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
+                                  showSkillInfo={
+                                    feature.choices!.category.toLowerCase().includes("skill")
+                                  }
+                                  onChange={(selected) => {
+                                    setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
+                                    setModifierPlayerPicks((prev) =>
+                                      clearModifierPicksForSource(prev, key),
+                                    )
+                                  }}
+                                  accentClass="border-accent bg-accent/10"
+                                />
+                                <ModifierPlayerChoicePanel
+                                  sourceKey={key}
+                                  sourceLabel={`${cls.name}: ${feature.name}`}
+                                  slots={modifierPlayerChoiceSlots}
+                                  picks={modifierPlayerPicks}
+                                  spells={spells}
+                                  onChange={(slotKey, selected) => {
+                                    const slot = modifierPlayerChoiceSlots.find(
+                                      (entry) => entry.slotKey === slotKey,
+                                    )
+                                    if (!slot) return
+                                    setModifierPlayerPicks((prev) =>
+                                      setModifierPlayerPickValue(
+                                        prev,
+                                        slot,
+                                        modifierPlayerChoiceSlots,
+                                        selected,
+                                      ),
+                                    )
+                                  }}
+                                />
+                              </div>
                             )
                           })}
                         </div>
@@ -3105,8 +3175,8 @@ export default function BuilderPage() {
               </div>
             )}
 
-            {/* Step 4: Equipment & Spells */}
-            {currentStep === 4 && (
+            {/* Step 4: Gear */}
+            {currentStep === BUILDER_STEP_IDS.GEAR && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Select Equipment</h2>
@@ -3291,8 +3361,11 @@ export default function BuilderPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
 
-                {spellcastingClasses.length > 0 && (
+            {/* Step 5: Spells (skipped when the character has no spells to choose) */}
+            {currentStep === BUILDER_STEP_IDS.SPELLS && hasSpellStep && (
                   <div className="space-y-8">
                     <h2 className="text-2xl font-black text-foreground mb-2">Select Spells</h2>
 
@@ -3313,7 +3386,11 @@ export default function BuilderPage() {
                     {spellcastingClasses.map((casterClass) => {
                       const casterLevel =
                         activeClassLevels.find((cl) => cl.classId === casterClass.id)?.level ?? 1
-                      const spellLimits = getSpellLimits(casterClass.spellcasting, casterLevel)
+                      const spellLimits = getSpellLimits(
+                        casterClass.spellcasting,
+                        casterLevel,
+                        casterClass.name,
+                      )
                       const classSpellIds = spellPicksByClassId[casterClass.id] ?? []
                       const spellCounts = countSelectedSpells(classSpellIds, spells, casterClass.name)
                       const maxSpellLevel = spellLimits.maxSpellLevel
@@ -3531,12 +3608,10 @@ export default function BuilderPage() {
                       )
                     })}
                   </div>
-                )}
-              </div>
             )}
 
-            {/* Step 5: Character Details */}
-            {currentStep === 5 && (
+            {/* Step 6: Character Details */}
+            {currentStep === BUILDER_STEP_IDS.DETAILS && (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -3689,8 +3764,8 @@ export default function BuilderPage() {
               </div>
             )}
 
-            {/* Step 6: Review */}
-            {currentStep === 6 && (
+            {/* Step 7: Review */}
+            {currentStep === BUILDER_STEP_IDS.REVIEW && (
               <div>
                 <h2 className="text-2xl font-black text-foreground mb-6">Review Your Character</h2>
 
@@ -3763,10 +3838,11 @@ export default function BuilderPage() {
                 canProceed={canProceed()}
                 canSave={canSaveCharacter()}
                 saving={saving}
-                onBack={() => goToStep(currentStep - 1)}
+                onBack={goBackStep}
                 onContinue={advanceStep}
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
+                lastStep={BUILDER_STEP_IDS.REVIEW}
               />
             </div>
           </div>
@@ -4200,7 +4276,7 @@ export default function BuilderPage() {
                             .map((feature, i) => (
                             <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
                               <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
-                              <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
+                              <ClampedRichText html={feature.description} lines={2} className="text-[10px]" />
                             </div>
                           ))}
                         </div>
@@ -4215,7 +4291,7 @@ export default function BuilderPage() {
                           .map((feature, i) => (
                           <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
                             <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
-                            <p className="text-muted-foreground line-clamp-2">{feature.description}</p>
+                            <ClampedRichText html={feature.description} lines={2} className="text-[10px]" />
                           </div>
                         ))}
                       </div>
@@ -4232,7 +4308,7 @@ export default function BuilderPage() {
                         {selectedSpecies.traits.map((trait, i) => (
                           <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
                             <p className="font-bold text-foreground">{trait.name}</p>
-                            <p className="text-muted-foreground line-clamp-2">{trait.description}</p>
+                            <ClampedRichText html={trait.description} lines={2} className="text-[10px]" />
                           </div>
                         ))}
                       </div>
@@ -4245,7 +4321,11 @@ export default function BuilderPage() {
                       <p className="text-[9px] text-accent uppercase font-bold mb-1">Background Feature</p>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                         <p className="font-bold text-foreground">{selectedBackground.feature.name}</p>
-                        <p className="text-muted-foreground line-clamp-3">{selectedBackground.feature.description}</p>
+                        <ClampedRichText
+                          html={selectedBackground.feature.description}
+                          lines={3}
+                          className="text-[10px]"
+                        />
                       </div>
                     </div>
                   )}
@@ -4258,10 +4338,12 @@ export default function BuilderPage() {
                         <p className="font-bold text-foreground">
                           {backgroundGrantedFeat?.name ?? selectedBackground.feat_granted}
                         </p>
-                        <p className="text-muted-foreground line-clamp-2">
-                          {backgroundGrantedFeat?.description ??
-                            "Granted by your background at 1st level."}
-                        </p>
+                        <ClampedRichText
+                          html={backgroundGrantedFeat?.description}
+                          lines={2}
+                          className="text-[10px]"
+                          fallback="Granted by your background at 1st level."
+                        />
                       </div>
                     </div>
                   )}
@@ -4277,7 +4359,7 @@ export default function BuilderPage() {
                           return (
                             <div key={featId} className="p-1.5 bg-muted/30 rounded text-[10px]">
                               <p className="font-bold text-foreground">{feat.name}</p>
-                              <p className="text-muted-foreground line-clamp-2">{feat.description}</p>
+                              <ClampedRichText html={feat.description} lines={2} className="text-[10px]" />
                             </div>
                           )
                         })}
@@ -4299,7 +4381,7 @@ export default function BuilderPage() {
                           return (
                           <div key={ability.id} className="p-1.5 bg-muted/30 rounded text-[10px]">
                             <p className="font-bold text-foreground">{ability.name}</p>
-                            <p className="text-muted-foreground line-clamp-2">{ability.description}</p>
+                            <ClampedRichText html={ability.description} lines={2} className="text-[10px]" />
                             {uses && uses.type !== "unlimited" && (
                               <p className="text-[8px] text-magenta mt-0.5">
                                 Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
@@ -4545,7 +4627,7 @@ export default function BuilderPage() {
               subtitle={eq.category}
               accentColor={accent}
             >
-              {eq.description && <p className="text-sm">{eq.description}</p>}
+              {eq.description && <RichTextContent html={eq.description} className="text-sm" />}
             </CompendiumDetailOverlay>
           )
         }

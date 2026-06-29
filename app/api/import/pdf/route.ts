@@ -18,6 +18,8 @@ import {
   SUBCLASS_IMPORT_HINT,
 } from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
+import { parseFoundryDnd5eJson } from "@/lib/import/parse-foundry-dnd5e"
+import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
 import { prepareImportedContent } from "@/lib/import/finalize-import"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { detectImportCollisions } from "@/lib/import/fetch-import-collisions"
@@ -87,12 +89,20 @@ export async function POST(request: NextRequest) {
 
     if (isJsonFile) {
       const jsonText = await file.text()
-      const dumpStatItems = parseDumpStatExportJson(jsonText.trim())
+      const trimmedJson = jsonText.trim()
+      const dumpStatItems = parseDumpStatExportJson(trimmedJson)
       if (!dumpStatItems) {
+        const foundryContent = parseFoundryDnd5eJson(trimmedJson)
+        if (foundryContent) {
+          return await runTextImportPipeline(foundryContent, {
+            charLength: trimmedJson.length,
+            materialSource: "Foundry VTT Import",
+          })
+        }
         return NextResponse.json(
           {
             error:
-              "Invalid Dump Stat export JSON. Expected a dump-stat-export bundle or dnd-* item export.",
+              "Invalid JSON. Expected a Dump Stat export bundle, dnd-* item export, or a Foundry VTT dnd5e item export.",
           },
           { status: 400 },
         )

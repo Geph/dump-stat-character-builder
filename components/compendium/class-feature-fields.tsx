@@ -69,6 +69,9 @@ type ClassFeatureFieldsProps = {
   /** Other features on the same class/subclass for inherited activation. */
   siblingFeatures?: SiblingClassFeatureOption[]
 
+  /** Spell list used to populate fixed-spell pickers in linked modifiers. */
+  spellOptions?: { id: string; name: string }[]
+
 }
 
 
@@ -100,6 +103,8 @@ export function ClassFeatureFields({
   onUpdateLimitedUses,
 
   siblingFeatures = [],
+
+  spellOptions = [],
 
 }: ClassFeatureFieldsProps) {
 
@@ -156,6 +161,8 @@ export function ClassFeatureFields({
         catalog={modifierCatalog}
 
         classResources={classResources}
+
+        spellOptions={spellOptions}
 
         label="Modifier effects"
 
@@ -226,6 +233,14 @@ export function ClassFeatureFields({
         {feature.isChoice && feature.choices && (
 
           <div className="bg-background border-2 border-primary/20 rounded-xl p-3 space-y-3 ml-6">
+
+            <p className="text-xs text-muted-foreground">
+
+              Use this for features that let the player pick between options (e.g. Fighting Style,
+
+              Weapon Mastery, subclass picks). Each option can carry its own set of modifier effects.
+
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
 
@@ -360,6 +375,8 @@ export function ClassFeatureFields({
                     catalog={modifierCatalog}
 
                     classResources={classResources}
+
+                    spellOptions={spellOptions}
 
                     label="Option modifiers"
 

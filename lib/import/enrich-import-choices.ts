@@ -1,6 +1,7 @@
 import { buildWeaponMasteryModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { legacyFeatureOptionPickerCharacteristic } from "@/lib/compendium/feature-option-choice-migration"
 import { createModifierInstanceId, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -27,9 +28,8 @@ function buildChoiceOptionPicker(feature: Feature): LinkedModifierInstance | nul
 
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId(`choice_${feature.name.replace(/\s+/g, "_").toLowerCase()}`),
-      type: "feature_option_picker",
       category: feature.choices?.category ?? feature.name,
       choiceCount: feature.choices?.count ?? 1,
       swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
@@ -38,7 +38,7 @@ function buildChoiceOptionPicker(feature: Feature): LinkedModifierInstance | nul
         description: option.description,
       })),
       label: feature.name,
-    },
+    }),
   ])
 }
 
@@ -52,46 +52,43 @@ function buildGrandHexPicker(
   const choiceCount = countMatch ? parseInt(countMatch[1], 10) : 1
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("grand_hex_picker"),
-      type: "feature_option_picker",
       category: "Grand Hex",
       choiceCount: Number.isFinite(choiceCount) ? choiceCount : 1,
       swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
       resourceKey: "grand_hexes",
       options,
       label: "Grand Hex options",
-    },
+    }),
   ])
 }
 
 function buildHexesResourcePicker(feature: Feature): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("hexes_known"),
-      type: "feature_option_picker",
       category: "Hex",
       choiceCount: 1,
       swappableOnRest: true,
       resourceKey: "hexes_known",
       label: "Hexes known (count scales on class table)",
-    },
+    }),
   ])
 }
 
 function buildUpgradesResourcePicker(feature: Feature): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("upgrades"),
-      type: "feature_option_picker",
       category: "Upgrade",
       choiceCount: 1,
       swappableOnRest: /\bexchange\b/i.test(feature.description ?? ""),
       resourceKey: "upgrades",
       label: "Subclass upgrades (count scales on class table)",
-    },
+    }),
   ])
 }
 
@@ -105,14 +102,13 @@ function buildInventorSpecializationPicker(description: string): LinkedModifierI
   if (options.length < 2) return null
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("inventor_specialization"),
-      type: "feature_option_picker",
       category: "Inventor Specialization",
       choiceCount: 1,
       options: options.map((name) => ({ name, description: `${name} specialization` })),
       label: "Inventor Specialization",
-    },
+    }),
   ])
 }
 
@@ -172,10 +168,12 @@ function enrichFeatureChoices(feature: Feature, content: ImportContent): Feature
   if (
     isUpgradeSelectionFeature(feature) &&
     !(next.linkedModifiers ?? []).some((mod) =>
-      mod.characteristics?.some(
-        (char) => char.type === "feature_option_picker" && char.resourceKey === "upgrades",
-      ),
-    )
+      mod.characteristics?.some((char) => {
+        const legacy = char as { type?: string; resourceKey?: string | null }
+        return legacy.type === "feature_option_picker" && legacy.resourceKey === "upgrades"
+      }),
+    ) &&
+    !(next.isChoice && next.choices?.resourceKey === "upgrades")
   ) {
     next = syncModifierRefs({
       ...next,

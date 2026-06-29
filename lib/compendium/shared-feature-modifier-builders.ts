@@ -1,6 +1,7 @@
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import { charInstance, fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
+import { legacyFeatureOptionPickerCharacteristic } from "@/lib/compendium/feature-option-choice-migration"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 const DAMAGE_REDUCTION_CATALOG_ID = "cat_fx_damage_reduction"
@@ -41,14 +42,13 @@ export function buildWeaponMasteryModifier(
   instanceId = "modinst_weapon_mastery",
 ): LinkedModifierInstance {
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    {
+    legacyFeatureOptionPickerCharacteristic({
       id: modId("weapon_mastery"),
-      type: "feature_option_picker",
       category: "Weapon Mastery",
       choiceCount: 1,
       resourceKey: "weapon_mastery",
       swappableOnRest: true,
       label: "Weapon types with mastery (count scales on class table)",
-    },
+    }),
   ])
 }

@@ -261,30 +261,36 @@ function ResultFloorEditor({
   onPatch: (partial: Partial<RollBonusConfig>) => void
 }) {
   const floor = config.resultFloor ?? { mode: "none" as const }
+  // "Min +1" is a quick preset of the fixed floor (result can't drop below 1).
+  const selectValue =
+    floor.mode === "fixed" && floor.fixed === 1 ? "min_one" : floor.mode
 
   return (
     <div className="pt-2 border-t border-border space-y-2">
       <label className="block text-xs font-semibold text-foreground">Minimum result</label>
       <select
-        value={floor.mode}
+        value={selectValue}
         onChange={(e) => {
-          const mode = e.target.value as NonNullable<RollBonusConfig["resultFloor"]>["mode"]
+          const value = e.target.value
           onPatch({
             resultFloor:
-              mode === "none"
+              value === "none"
                 ? { mode: "none" }
-                : mode === "fixed"
-                  ? { mode: "fixed", fixed: 10 }
-                  : { mode: "ability", ability: "INT" },
+                : value === "min_one"
+                  ? { mode: "fixed", fixed: 1 }
+                  : value === "fixed"
+                    ? { mode: "fixed", fixed: 10 }
+                    : { mode: "ability", ability: "INT" },
           })
         }}
         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
       >
         <option value="none">No minimum</option>
+        <option value="min_one">Min +1 (result at least 1)</option>
         <option value="fixed">Cannot be less than a number</option>
         <option value="ability">Cannot be less than ability score</option>
       </select>
-      {floor.mode === "fixed" && (
+      {selectValue === "fixed" && (
         <input
           type="number"
           min={1}
