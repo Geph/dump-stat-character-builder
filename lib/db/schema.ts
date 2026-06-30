@@ -66,6 +66,17 @@ export const species = mysqlTable("species", {
   traits: json("traits").$type<unknown[]>().default([]),
   characteristics: json("characteristics").$type<unknown[]>().default([]),
   modifier_refs: json("modifier_refs").$type<string[]>().default([]),
+  linked_modifiers: json("linked_modifiers").$type<unknown[]>().default([]),
+  ...compendiumMeta,
+})
+
+export const languages = mysqlTable("languages", {
+  id: id(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  pool: varchar("pool", { length: 32 }).notNull().default("standard"),
+  typical_speakers: text("typical_speakers"),
+  script: varchar("script", { length: 128 }),
   ...compendiumMeta,
 })
 
@@ -267,6 +278,7 @@ export const tableMap = {
   spells,
   feats,
   equipment,
+  languages,
   class_resources: classResources,
   custom_abilities: customAbilities,
   characters,

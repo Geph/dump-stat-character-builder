@@ -1,0 +1,21 @@
+[
+  {"name":"Common","pool":"standard","typical_speakers":"Humans and most civilized peoples","script":"Common","source":"D&D 5.5e SRD"},
+  {"name":"Common Sign Language","pool":"standard","typical_speakers":"Deaf and hard-of-hearing communities","script":null,"source":"D&D 5.5e SRD"},
+  {"name":"Draconic","pool":"standard","typical_speakers":"Dragons, dragonborn","script":"Draconic","source":"D&D 5.5e SRD"},
+  {"name":"Dwarvish","pool":"standard","typical_speakers":"Dwarves","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Elvish","pool":"standard","typical_speakers":"Elves","script":"Elvish","source":"D&D 5.5e SRD"},
+  {"name":"Giant","pool":"standard","typical_speakers":"Giants, goliaths","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Gnomish","pool":"standard","typical_speakers":"Gnomes","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Goblin","pool":"standard","typical_speakers":"Goblins, orcs, bugbears","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Halfling","pool":"standard","typical_speakers":"Halflings","script":"Common","source":"D&D 5.5e SRD"},
+  {"name":"Orc","pool":"standard","typical_speakers":"Orcs","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Abyssal","pool":"rare","typical_speakers":"Demons","script":"Infernal","source":"D&D 5.5e SRD"},
+  {"name":"Celestial","pool":"rare","typical_speakers":"Celestials","script":"Celestial","source":"D&D 5.5e SRD"},
+  {"name":"Deep Speech","pool":"rare","typical_speakers":"Aberrations","script":null,"source":"D&D 5.5e SRD"},
+  {"name":"Druidic","pool":"rare","typical_speakers":"Druids (class feature)","script":"Druidic","source":"D&D 5.5e SRD"},
+  {"name":"Infernal","pool":"rare","typical_speakers":"Devils","script":"Infernal","source":"D&D 5.5e SRD"},
+  {"name":"Primordial","pool":"rare","typical_speakers":"Elementals","script":"Dwarvish","source":"D&D 5.5e SRD"},
+  {"name":"Sylvan","pool":"rare","typical_speakers":"Fey","script":"Elvish","source":"D&D 5.5e SRD"},
+  {"name":"Thieves' Cant","pool":"rare","typical_speakers":"Rogues and criminal underworld","script":null,"source":"D&D 5.5e SRD"},
+  {"name":"Undercommon","pool":"rare","typical_speakers":"Underdark traders","script":"Elvish","source":"D&D 5.5e SRD"}
+]

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
+import { useState, useEffect, useMemo, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Plus, Edit, Copy, Trash2, ChevronLeft, ChevronRight, Settings, Download, Upload } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow } from "@/lib/types"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
@@ -87,6 +87,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "spells", label: "Spells", icon: <Wand2 className="w-3.5 h-3.5" /> },
   { id: "feats", label: "Feats", icon: <Sparkles className="w-3.5 h-3.5" /> },
   { id: "equipment", label: "Equipment", icon: <Package className="w-3.5 h-3.5" /> },
+  { id: "languages", label: "Languages", icon: <Languages className="w-3.5 h-3.5" /> },
   { id: "class_resources", label: "Class Resources", icon: <Gauge className="w-3.5 h-3.5" /> },
   { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-3.5 h-3.5" /> },
 ]
@@ -99,6 +100,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   spells: "New Spell",
   feats: "New Feat",
   equipment: "New Item",
+  languages: "New Language",
   class_resources: "New Class Resource",
   abilities: "New Custom Ability",
 }
@@ -117,6 +119,7 @@ function CompendiumPageContent() {
     spells: [],
     feats: [],
     equipment: [],
+    languages: [],
     class_resources: [],
     abilities: [],
   })
@@ -141,6 +144,7 @@ function CompendiumPageContent() {
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [equipmentFilterKind, setEquipmentFilterKind] = useState<"all" | "magic" | "mundane">("all")
   const [equipmentFilterMagicCategory, setEquipmentFilterMagicCategory] = useState<string>("all")
+  const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -151,6 +155,7 @@ function CompendiumPageContent() {
     spells: 0,
     feats: 0,
     equipment: 0,
+    languages: 0,
     class_resources: 0,
     abilities: 0,
   })
@@ -161,40 +166,6 @@ function CompendiumPageContent() {
       setActiveTab(tab)
     }
   }, [searchParams])
-
-  const tabsScrollRef = useRef<HTMLDivElement>(null)
-  const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
-  const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
-
-  const updateTabsScrollState = useCallback(() => {
-    const el = tabsScrollRef.current
-    if (!el) return
-    const maxScroll = el.scrollWidth - el.clientWidth
-    setCanScrollTabsLeft(el.scrollLeft > 1)
-    setCanScrollTabsRight(el.scrollLeft < maxScroll - 1)
-  }, [])
-
-  useEffect(() => {
-    const el = tabsScrollRef.current
-    if (!el) return
-    updateTabsScrollState()
-    el.addEventListener("scroll", updateTabsScrollState, { passive: true })
-    const observer = new ResizeObserver(updateTabsScrollState)
-    observer.observe(el)
-    return () => {
-      el.removeEventListener("scroll", updateTabsScrollState)
-      observer.disconnect()
-    }
-  }, [updateTabsScrollState])
-
-  const scrollCompendiumTabs = (direction: "left" | "right") => {
-    const el = tabsScrollRef.current
-    if (!el) return
-    el.scrollBy({
-      left: direction === "left" ? -el.clientWidth : el.clientWidth,
-      behavior: "smooth",
-    })
-  }
 
   // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
@@ -208,6 +179,7 @@ function CompendiumPageContent() {
         { count: spellsCount },
         { count: featsCount },
         { count: equipmentCount },
+        { count: languagesCount },
         { count: classResourcesCount },
         { count: abilitiesCount },
       ] = await Promise.all([
@@ -218,6 +190,7 @@ function CompendiumPageContent() {
         db.from("spells").select("*", { count: "exact", head: true }),
         db.from("feats").select("*", { count: "exact", head: true }),
         db.from("equipment").select("*", { count: "exact", head: true }),
+        db.from("languages").select("*", { count: "exact", head: true }),
         db.from("class_resources").select("*", { count: "exact", head: true }),
         db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
@@ -229,6 +202,7 @@ function CompendiumPageContent() {
         spells: spellsCount ?? 0,
         feats: featsCount ?? 0,
         equipment: equipmentCount ?? 0,
+        languages: languagesCount ?? 0,
         class_resources: classResourcesCount ?? 0,
         abilities: abilitiesCount ?? 0,
       })
@@ -348,6 +322,10 @@ function CompendiumPageContent() {
         return false
       }
     }
+    if (activeTab === "languages") {
+      const language = item as Language
+      if (languageFilterPool !== "all" && language.pool !== languageFilterPool) return false
+    }
     return true
   })
 
@@ -383,6 +361,7 @@ function CompendiumPageContent() {
       { count: spellsCount },
       { count: featsCount },
       { count: equipmentCount },
+      { count: languagesCount },
       { count: classResourcesCount },
       { count: abilitiesCount },
     ] = await Promise.all([
@@ -393,6 +372,7 @@ function CompendiumPageContent() {
       db.from("spells").select("*", { count: "exact", head: true }),
       db.from("feats").select("*", { count: "exact", head: true }),
       db.from("equipment").select("*", { count: "exact", head: true }),
+      db.from("languages").select("*", { count: "exact", head: true }),
       db.from("class_resources").select("*", { count: "exact", head: true }),
       db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
@@ -404,6 +384,7 @@ function CompendiumPageContent() {
       spells: spellsCount ?? 0,
       feats: featsCount ?? 0,
       equipment: equipmentCount ?? 0,
+      languages: languagesCount ?? 0,
       class_resources: classResourcesCount ?? 0,
       abilities: abilitiesCount ?? 0,
     })
@@ -810,6 +791,27 @@ function CompendiumPageContent() {
             )}
           </div>
         )}
+        {activeTab === "languages" && (
+          <div className="flex gap-2 flex-wrap">
+            <span
+              className={`text-xs px-2 py-1 rounded-full ${
+                (data as Language).pool === "rare"
+                  ? "bg-magenta/10 text-magenta"
+                  : "bg-primary/10 text-primary"
+              }`}
+            >
+              {(data as Language).pool === "rare" ? "Rare" : "Standard"}
+            </span>
+            {(data as Language).script && (
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {(data as Language).script}
+              </span>
+            )}
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {formatCompendiumSource((data as Language).source) || "Custom"}
+            </span>
+          </div>
+        )}
         {activeTab === "class_resources" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
@@ -1050,66 +1052,26 @@ function CompendiumPageContent() {
         )}
 
         {/* Tabs — content type selection */}
-        <div className="relative mb-4 group/tabs">
-          {canScrollTabsLeft && (
-            <>
-              <div
-                className="pointer-events-none absolute left-0 top-0 bottom-3 z-[1] w-10 bg-gradient-to-r from-background to-transparent"
-                aria-hidden
-              />
-              <button
-                type="button"
-                aria-label="Scroll tabs left"
-                onClick={() => scrollCompendiumTabs("left")}
-                className="absolute left-0 top-1/2 z-10 -translate-y-[calc(50%+0.375rem)] flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            </>
-          )}
-          {canScrollTabsRight && (
-            <>
-              <div
-                className="pointer-events-none absolute right-0 top-0 bottom-3 z-[1] w-10 bg-gradient-to-l from-background to-transparent"
-                aria-hidden
-              />
-              <button
-                type="button"
-                aria-label="Scroll tabs right"
-                onClick={() => scrollCompendiumTabs("right")}
-                className="absolute right-0 top-1/2 z-10 -translate-y-[calc(50%+0.375rem)] flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-muted"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </>
-          )}
-          <div
-            id="compendium-tabs"
-            ref={tabsScrollRef}
-            className={`flex gap-1.5 overflow-x-auto pb-3 scrollbar-hide scroll-smooth ${
-              canScrollTabsLeft ? "pl-9" : ""
-            } ${canScrollTabsRight ? "pr-9" : ""}`}
-          >
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
-                }`}>
-                  {tabCounts[tab.id]}
-                </span>
-              </button>
-            ))}
-          </div>
+        <div id="compendium-tabs" className="flex flex-wrap gap-1.5 mb-4">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                activeTab === tab.id ? "bg-primary-foreground/20" : "bg-muted"
+              }`}>
+                {tabCounts[tab.id]}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Search (+ tab filters inline on sm+) */}
@@ -1329,6 +1291,23 @@ function CompendiumPageContent() {
           </div>
         )}
 
+        {activeTab === "languages" && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Pool
+            </label>
+            <select
+              value={languageFilterPool}
+              onChange={(e) => setLanguageFilterPool(e.target.value as "all" | "standard" | "rare")}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All pools</option>
+              <option value="standard">Standard</option>
+              <option value="rare">Rare</option>
+            </select>
+          </div>
+        )}
+
         {/* Content Grid */}
         {loading ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1412,7 +1391,7 @@ function CompendiumPageContent() {
                     label: (selectedItem as ClassResourceRow).resource_key,
                   },
                 ]
-              : activeTab === "equipment" && isMagicItem(selectedItem as Equipment)
+                : activeTab === "equipment" && isMagicItem(selectedItem as Equipment)
                 ? [
                     { label: "Magic", emphasis: true },
                     ...((selectedItem as Equipment).rarity
@@ -1425,6 +1404,16 @@ function CompendiumPageContent() {
                       ? [{ label: "Attunement" }]
                       : []),
                   ]
+                : activeTab === "languages"
+                  ? [
+                      {
+                        label: (selectedItem as Language).pool === "rare" ? "Rare" : "Standard",
+                        emphasis: true,
+                      },
+                      ...((selectedItem as Language).script
+                        ? [{ label: (selectedItem as Language).script! }]
+                        : []),
+                    ]
                 : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as Record<string, unknown>)}
@@ -1454,6 +1443,22 @@ function CompendiumPageContent() {
                   <dd className="text-white/90">{row.value}</dd>
                 </div>
               ))}
+            </dl>
+          )}
+          {activeTab === "languages" && (
+            <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              {(selectedItem as Language).typical_speakers ? (
+                <div className="contents">
+                  <dt className="text-white/50 font-semibold">Typical speakers</dt>
+                  <dd className="text-white/90">{(selectedItem as Language).typical_speakers}</dd>
+                </div>
+              ) : null}
+              {(selectedItem as Language).script ? (
+                <div className="contents">
+                  <dt className="text-white/50 font-semibold">Script</dt>
+                  <dd className="text-white/90">{(selectedItem as Language).script}</dd>
+                </div>
+              ) : null}
             </dl>
           )}
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (

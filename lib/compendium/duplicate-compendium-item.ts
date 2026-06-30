@@ -12,6 +12,7 @@ const TABLES_WITH_UNIQUE_NAME = new Set([
   "spells",
   "feats",
   "equipment",
+  "languages",
 ])
 
 export function newCompendiumItemId(): string {

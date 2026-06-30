@@ -777,11 +777,15 @@ export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string
   if (!speciesHasLanguageGrant(next)) {
     const existing = Array.isArray(next.linkedModifiers)
       ? (next.linkedModifiers as LinkedModifierInstance[])
-      : []
+      : Array.isArray(next.linked_modifiers)
+        ? (next.linked_modifiers as LinkedModifierInstance[])
+        : []
     const synced = syncModifierRefs({ linkedModifiers: [...existing, standardLanguages()] })
     next = {
       ...next,
+      linked_modifiers: synced.linkedModifiers,
       linkedModifiers: synced.linkedModifiers,
+      modifier_refs: synced.modifierRefs,
       modifierRefs: synced.modifierRefs,
     }
   }

@@ -55,12 +55,13 @@ async function seedClassResources(classIdMap: Map<string, string>): Promise<void
 }
 
 async function ensureBundledSrdFresh(): Promise<void> {
-  const { manifest, species, classes, backgrounds, feats, subclasses, spells } = getSrdSeedData()
+  const { manifest, species, classes, backgrounds, feats, subclasses, spells, languages } = getSrdSeedData()
   if (readStoredSrdVersion() === manifest.version) return
   await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
   await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes as Record<string, unknown>[])))
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
+  await upsertByName("languages", withSrdCreatorUrlList(languages as Record<string, unknown>[]))
   await upsertByName("spells", withSrdCreatorUrlList(spells as Record<string, unknown>[]))
   await seedSrdEquipment({
     upsertByName,

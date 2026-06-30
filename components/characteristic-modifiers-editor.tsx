@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, X } from "lucide-react"
 import {
   defaultCritByLevelEntry,
@@ -81,6 +81,8 @@ import {
   SRD_STANDARD_LANGUAGES,
   SRD_RARE_LANGUAGES,
 } from "@/lib/compendium/srd-languages"
+import { mergeLanguageNameLists } from "@/lib/compendium/language-options"
+import { createClient } from "@/lib/db/client"
 import { STANDARD_SPELL_CLASSES } from "@/lib/import/class-spell-lists"
 import { SRD_WEAPON_NAMES } from "@/lib/compendium/weapon-proficiency-options"
 import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
@@ -969,6 +971,24 @@ function ToolProficienciesEditor({
   )
 }
 
+function useLanguageSuggestions(): string[] {
+  const [suggestions, setSuggestions] = useState<string[]>(() => [...SRD_LANGUAGES])
+
+  useEffect(() => {
+    const db = createClient()
+    void db
+      .from("languages")
+      .select("name")
+      .then(({ data }) => {
+        if (data?.length) {
+          setSuggestions(mergeLanguageNameLists(data))
+        }
+      })
+  }, [])
+
+  return suggestions
+}
+
 function LanguagesEditor({
   mod,
   onChange,
@@ -976,6 +996,7 @@ function LanguagesEditor({
   mod: ListCharacteristic
   onChange: (next: ListCharacteristic) => void
 }) {
+  const languageSuggestions = useLanguageSuggestions()
   const choiceEnabled = (mod.choiceCount ?? 0) > 0
   const pool = mod.choicePool ?? "standard"
 
@@ -988,11 +1009,11 @@ function LanguagesEditor({
         <TagInput
           values={mod.values}
           onChange={(values) => onChange({ ...mod, values })}
-          suggestions={SRD_LANGUAGES}
+          suggestions={languageSuggestions}
           placeholder="Add a language (e.g. Common)..."
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Pick from the SRD Standard &amp; Rare Languages tables, or type a custom language.
+          Pick from the compendium Languages list (SRD Standard &amp; Rare tables), or type a custom language.
         </p>
       </div>
 

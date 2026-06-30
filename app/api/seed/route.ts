@@ -29,7 +29,7 @@ export async function POST() {
 
     const appliedMigrations = await runPendingMigrationsOnPool(getPool())
 
-    const { classes, subclasses, species, backgrounds, spells, feats } = getSrdSeedData()
+    const { classes, subclasses, species, backgrounds, spells, feats, languages } = getSrdSeedData()
 
     await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
     const classData = await listRows("classes")
@@ -64,6 +64,7 @@ export async function POST() {
     await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
     await upsertByName("spells", withSrdCreatorUrlList(spells))
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
+    await upsertByName("languages", withSrdCreatorUrlList(languages))
     const equipmentSeed = await seedSrdEquipment({
       upsertByName,
       listEquipmentByName: async () => {
