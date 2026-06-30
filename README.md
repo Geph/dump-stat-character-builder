@@ -49,9 +49,9 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Export options** — Download character and compendium data as JSON
 
 ### Import
-- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown)
-- **Web import** — Paste a URL to pull homebrew-style HTML into the compendium
-- **PDF & text import** — Multi-provider AI extraction (OpenAI, Anthropic, or Google Gemini) or **zero-AI deterministic** parsing for well-structured class PDFs; subclasses, feat categories, and post-import modifier enrichment supported
+- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown); **no AI**
+- **Web import** — Paste a supported wiki URL; server fetches HTML and parses it deterministically (**no AI**)
+- **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 - **Foundry VTT import** — Paste or upload Foundry `dnd5e` item exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e))
 - **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
@@ -191,9 +191,27 @@ Seed data is built from SRD 5.2.1 markdown. To regenerate JSON after parser chan
 pnpm srd:build
 ```
 
-### 7. AI import (optional — PDF and text import)
+### 7. AI import (optional — compendium import only)
 
-SRD seed, web import, and Dump Stat JSON bundles do **not** use AI. PDF upload and pasted-text import use a server-side AI provider when deterministic parsing is not confident enough.
+**AI is used only for compendium import** (PDF upload and optional server-side text extraction). The character builder, character sheet, derived stats, SRD seed, Foundry VTT import, web URL import, Dump Stat JSON bundles, and BYO LLM clipboard workflow do **not** call any AI APIs.
+
+| Path | Uses server AI? |
+|------|-----------------|
+| SRD seed (`POST /api/seed`) | No — bundled JSON |
+| Web import (wiki URLs) | No — HTML fetch + deterministic parsers |
+| Dump Stat JSON (file or paste) | No |
+| Foundry VTT JSON | No |
+| Clipboard BYO LLM | No — you run an external LLM and paste JSON |
+| PDF / server text extraction | Optional — see extraction modes below |
+
+**Extraction modes** (shown on the import report):
+
+| Mode | When |
+|------|------|
+| `deterministic` | Well-structured class documents pass the confidence gate with **zero** API calls |
+| `hybrid` | Partial deterministic parse (e.g. class shell + resources) plus AI for remaining sections |
+| `ai` | Full server AI extraction when deterministic parsing is not confident enough |
+| `byo-json` | You pasted LLM-generated JSON or a Dump Stat export bundle |
 
 **Supported providers** (set **one** API key; the first configured provider is used unless you set `IMPORT_AI_PROVIDER`):
 
@@ -202,6 +220,8 @@ SRD seed, web import, and Dump Stat JSON bundles do **not** use AI. PDF upload a
 | OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
 | Google Gemini | `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.0-flash-001` |
+
+The Import page also offers additional model choices per provider (e.g. GPT-4o, Claude 3.5 Haiku, Gemini 2.5 Flash); override the default with Import settings or `IMPORT_AI_MODEL`.
 
 Add to `.env.local` (examples):
 
@@ -218,11 +238,9 @@ OPENAI_API_KEY=sk-your-key-here
 # IMPORT_AI_MODEL=gpt-4o-mini
 ```
 
-Restart the dev server after changing keys. Without any provider key, seed, web URLs, Dump Stat JSON, and manual compendium edits still work — only AI-powered PDF/text import returns a configuration error.
+Restart the dev server after changing keys. Without any provider key, seed, web URLs, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or the Clipboard **Import with server AI** action returns a configuration error.
 
-**Import page UI:** When server AI is configured, Clipboard and PDF tabs show an optional **server AI extraction** section (provider/model override, stored in browser localStorage). Keys always stay on the server. When no provider is configured, only BYO JSON import is shown for pasted text.
-
-**Zero-AI path:** Clean class documents (progression table + feature prose, e.g. homebrew Fighter PDFs) may import with **no AI calls** when the deterministic confidence gate is high. The import report shows a **Zero AI** badge when that path is used.
+**Import page UI:** The Clipboard tab always shows the BYO LLM workflow (paste text → copy prompt → paste JSON). When server AI is configured, an expandable **server AI extraction** section also appears on Clipboard and PDF tabs (provider/model override stored in browser localStorage). API keys always stay on the server.
 
 **Chunk cache:** Successful AI sections are cached in server memory by hash. If a large import fails mid-way (quota/rate limit), retry the **same** text with the same provider/model — finished sections are reused without extra API cost until the server restarts.
 
@@ -230,15 +248,16 @@ Restart the dev server after changing keys. Without any provider key, seed, web 
 
 ## Import formats
 
-Dump Stat supports five compendium import paths:
+Dump Stat supports six compendium import paths:
 
-| Method | Input | Best for |
-|--------|--------|----------|
-| **SRD seed** | Button / `POST /api/seed` | Official SRD baseline |
-| **Dump Stat JSON** | `.json` file or pasted JSON | Homebrew with full `linkedModifiers`, repeatable imports |
-| **Foundry VTT JSON** | `dnd5e` item/pack export (file or pasted) | Migrating items, feats, spells, classes from Foundry — auto-detected, no AI |
-| **Text import** | Pasted plain text + optional content hint | UA PDFs, wiki pages, copied stat blocks |
-| **PDF import** | Uploaded PDF (+ optional page range) | Same as text; also accepts JSON export files |
+| Method | Input | AI? | Best for |
+|--------|--------|-----|----------|
+| **SRD seed** | Button / `POST /api/seed` | No | Official SRD baseline |
+| **Web import** | Wiki URL (e.g. dnd2024.wikidot.com) | No | Single species/class/spell/feat/background pages |
+| **Dump Stat JSON** | `.json` file or pasted JSON | No | Homebrew with full `linkedModifiers`, repeatable imports |
+| **Foundry VTT JSON** | `dnd5e` item/pack export (file or pasted) | No | Migrating items, feats, spells, classes from Foundry |
+| **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, wiki copy-paste, copied stat blocks |
+| **PDF import** | Uploaded PDF (+ optional page range) | Optional server AI | Same as text; also accepts JSON export files (no AI) |
 
 ### Dump Stat JSON export
 
@@ -296,17 +315,21 @@ The **Clipboard** tab is the primary import path for pasted text:
 
 The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, etc.). No server API keys are required for this flow.
 
-**Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs. It stays hidden when no provider is configured.
+**Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs (hidden when no provider is configured). The BYO prompt/template workflow remains available either way.
 
-**Dump Stat JSON export** — if the pasted text is a valid `dump-stat-export` bundle, it imports directly without LLM extraction (same as file upload).
+**Dump Stat JSON export** — if the pasted text is a valid `dump-stat-export` bundle, it imports directly without LLM extraction (same as file upload; extraction mode `byo-json`).
+
+### Web import (no AI)
+
+Paste a URL from a supported wiki host (currently **dnd2024.wikidot.com**). The server fetches the page HTML and runs deterministic parsers — species, classes, spells, feats, and backgrounds auto-detect from the URL path, or you can set a content-type hint. Requires a hosted instance with database access (not available in static/GitHub Pages mode).
 
 Imported rows use source **Text Import** or **PDF Import** and replace same-name rows from that source on re-import.
 
-### PDF import (AI extraction)
+### PDF import (optional server AI)
 
 Same schema and persistence as text import. Optional **page range** limits extraction to specific pages. Upload a **`.json` export bundle** through the PDF file picker for non-AI JSON import.
 
-Requires at least one [AI provider key](#7-ai-import-optional--pdf-and-text-import) for PDF text extraction (not for JSON bundles or SRD seed).
+PDF text extraction tries **deterministic** parsing first, then **hybrid** or full **AI** when needed. Requires at least one [AI provider key](#7-ai-import-optional--compendium-import-only) for PDF text extraction (not for JSON bundles, SRD seed, or Foundry JSON).
 
 ### Multi-file homebrew import order
 
@@ -512,7 +535,7 @@ No database server required. Data lives in the visitor's browser.
 
 **Static mode includes:** builder, characters, compendium, bundled SRD on first visit, JSON pack import/export.
 
-**Static mode excludes:** PDF/text/web AI import, server seed API. Use JSON exports from a hosted instance to share custom content.
+**Static mode excludes:** PDF/text server AI import, web URL import, server seed API. JSON paste (Dump Stat exports, Foundry, BYO LLM) still works. Use JSON exports from a hosted instance to share custom content.
 
 Environment variables for static builds are documented in [.env.example](.env.example).
 
