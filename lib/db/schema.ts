@@ -240,6 +240,7 @@ export const characters = mysqlTable("characters", {
   spell_ids: json("spell_ids").$type<string[]>().default([]),
   feat_ids: json("feat_ids").$type<string[]>().default([]),
   feat_choice_picks: json("feat_choice_picks").$type<Record<string, string[]>>(),
+  feature_choice_picks: json("feature_choice_picks").$type<Record<string, string[]>>(),
   modifier_player_picks: json("modifier_player_picks").$type<Record<string, string[]>>(),
   companion_state: json("companion_state").$type<
     import("@/lib/character/companion-stat-block").CharacterCompanionState[]

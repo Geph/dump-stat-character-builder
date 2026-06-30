@@ -290,6 +290,49 @@ export function ClassFeatureFields({
 
             </div>
 
+            <div className="flex flex-wrap items-center gap-3">
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
+
+                <input
+                  type="checkbox"
+                  checked={!!feature.choices.swappableOnRest}
+                  onChange={(e) => onUpdateChoiceField(index, "swappableOnRest", e.target.checked)}
+                />
+
+                Swappable when finishing a rest
+
+              </label>
+
+              {feature.choices.swappableOnRest && (
+
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+
+                  Swap on a
+
+                  <select
+                    value={feature.choices.swapRestType ?? "long"}
+                    onChange={(e) => onUpdateChoiceField(index, "swapRestType", e.target.value)}
+                    className="px-2 py-1 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="long">Long Rest</option>
+                    <option value="short">Short Rest</option>
+                  </select>
+
+                </label>
+
+              )}
+
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+
+              When enabled, the character sheet shows a drop-down on this feature so the player can
+              change the active option after a rest. The chosen option&apos;s modifier effects (spells,
+              resistances, bonuses, etc.) update automatically.
+
+            </p>
+
 
 
             <div className="space-y-3">

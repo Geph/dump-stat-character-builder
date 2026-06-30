@@ -71,6 +71,7 @@ export function normalizeFeatureChoices(
     category: choices.category ?? "",
     count: typeof choices.count === "number" && choices.count > 0 ? choices.count : 1,
     swappableOnRest: choices.swappableOnRest ?? undefined,
+    swapRestType: choices.swapRestType ?? undefined,
     resourceKey: choices.resourceKey ?? undefined,
     options: Array.isArray(choices.options)
       ? choices.options.map((option) => ({

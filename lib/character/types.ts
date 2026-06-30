@@ -69,6 +69,8 @@ export type SaveBonus = {
 export type WeaponAttackDerived = {
   attackBonus: number
   damageDisplay: string
+  /** Itemized contributions whose values sum to `attackBonus`. */
+  attackBreakdown: StatBreakdownPart[]
 }
 
 /** A single labeled contribution to a derived statistic (e.g. Armor Class). */

@@ -21,8 +21,32 @@ export async function syncCharacterClassRows(
     subclass_id: row.subclass_id ?? null,
     order: row.order ?? index,
   }))
-  await replaceCharacterClassRows(characterId, normalized)
-  return normalized
+
+  const db = getDb()
+  const sanitized: typeof normalized = []
+  for (const row of normalized) {
+    const [cls] = await db
+      .select({ id: schema.classes.id })
+      .from(schema.classes)
+      .where(eq(schema.classes.id, row.class_id))
+      .limit(1)
+    if (!cls) continue
+
+    let subclassId = row.subclass_id
+    if (subclassId) {
+      const [sub] = await db
+        .select({ id: schema.subclasses.id })
+        .from(schema.subclasses)
+        .where(eq(schema.subclasses.id, subclassId))
+        .limit(1)
+      if (!sub) subclassId = null
+    }
+
+    sanitized.push({ ...row, subclass_id: subclassId })
+  }
+
+  await replaceCharacterClassRows(characterId, sanitized)
+  return sanitized
 }
 
 export async function attachMulticlassRelations(

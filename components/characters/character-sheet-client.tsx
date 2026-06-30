@@ -71,6 +71,7 @@ import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selec
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
+import { featureChoiceKey } from "@/lib/builder/choices"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -95,7 +96,9 @@ import {
   mergeCompanionState,
   resolveCharacterCompanions,
 } from "@/lib/character/resolve-companions"
+import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
+import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -173,19 +176,52 @@ function CollapsibleDetailField({
   )
 }
 
+/**
+ * Collapse features that share the same name (e.g. Ability Score Improvement taken at several
+ * levels) into a single entry that records every level it was gained. Order is preserved by first
+ * appearance, and the first instance's data is used for the card body.
+ */
+function dedupeFeaturesByName(
+  features: import("@/lib/types").Feature[],
+): { feature: import("@/lib/types").Feature; levels: number[] }[] {
+  const byName = new Map<string, { feature: import("@/lib/types").Feature; levels: number[] }>()
+  const order: string[] = []
+  for (const feature of features) {
+    const existing = byName.get(feature.name)
+    if (existing) {
+      if (!existing.levels.includes(feature.level)) existing.levels.push(feature.level)
+    } else {
+      byName.set(feature.name, { feature, levels: [feature.level] })
+      order.push(feature.name)
+    }
+  }
+  for (const entry of byName.values()) entry.levels.sort((a, b) => a - b)
+  return order.map((name) => byName.get(name)!)
+}
+
 /** A feature/trait card whose body can be accordioned away, leaving just the title row. */
 function CollapsibleFeatureCard({
   name,
   level,
+  levels,
   description,
   collapsedLines,
+  children,
 }: {
   name: string
   level?: number | null
+  levels?: number[]
   description?: string | null
   collapsedLines?: number
+  children?: React.ReactNode
 }) {
   const [open, setOpen] = useState(true)
+  const levelLabel =
+    levels && levels.length
+      ? levels.map((value) => `Lv ${value}`).join(", ")
+      : level != null
+        ? `Lv ${level}`
+        : null
   return (
     <div className="bg-muted rounded-lg text-xs overflow-hidden">
       <button
@@ -196,8 +232,8 @@ function CollapsibleFeatureCard({
       >
         <span className="font-bold min-w-0">
           {name}
-          {level != null ? (
-            <span className="text-muted-foreground font-normal"> (Lv {level})</span>
+          {levelLabel ? (
+            <span className="text-muted-foreground font-normal"> ({levelLabel})</span>
           ) : null}
         </span>
         <ChevronDown
@@ -206,15 +242,71 @@ function CollapsibleFeatureCard({
           }`}
         />
       </button>
-      {open && description ? (
+      {open && (description || children) ? (
         <div className="px-2 pb-2">
-          <ExpandableDescription
-            text={description}
-            className="text-muted-foreground"
-            collapsedLines={collapsedLines}
-          />
+          {description ? (
+            <ExpandableDescription
+              text={description}
+              className="text-muted-foreground"
+              collapsedLines={collapsedLines}
+            />
+          ) : null}
+          {children}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Dropdown control for a feature choice that the rules let you swap when you finish a rest
+ * (e.g. Circle of the Land's land type). Changing the selection re-derives the character so the
+ * chosen option's effects (spells, resistances, etc.) take effect immediately.
+ */
+function RestSwappableChoiceControl({
+  feature,
+  classId,
+  picks,
+  onChange,
+}: {
+  feature: import("@/lib/types").Feature
+  classId: string
+  picks: string[]
+  onChange: (key: string, next: string[]) => void
+}) {
+  const choices = feature.choices
+  if (!choices?.swappableOnRest || !choices.options?.length) return null
+  const key = featureChoiceKey(classId, feature.name, feature.level)
+  const count = Math.max(1, choices.count ?? 1)
+  const restLabel = choices.swapRestType === "short" ? "Short Rest" : "Long Rest"
+
+  const setSlot = (index: number, value: string) => {
+    const next = [...picks]
+    if (value) next[index] = value
+    else next.splice(index, 1)
+    onChange(key, next.filter(Boolean))
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-border bg-background/60 p-2 space-y-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {choices.category || "Choice"} · choose on a {restLabel}
+      </p>
+      {Array.from({ length: count }).map((_, index) => (
+        <select
+          key={index}
+          value={picks[index] ?? ""}
+          onChange={(event) => setSlot(index, event.target.value)}
+          className="w-full rounded-md border border-border bg-card px-2 py-1 text-xs"
+        >
+          <option value="">Choose…</option>
+          {choices.options!.map((option) => (
+            <option key={option.name} value={option.name}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+      ))}
     </div>
   )
 }
@@ -288,6 +380,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
   const [companionState, setCompanionState] = useState<CharacterCompanionState[]>([])
+  const [featureChoicePicks, setFeatureChoicePicks] = useState<Record<string, string[]>>({})
   const [characterFeats, setCharacterFeats] = useState<Feat[]>([])
   const [originFeat, setOriginFeat] = useState<Feat | null>(null)
   const [modifierCatalog, setModifierCatalog] = useState<ModifierCatalogEntry[]>([])
@@ -342,6 +435,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquipmentBaseSelections((data as Character).equipment_base_selections ?? {})
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
         setCompanionState((data as Character).companion_state ?? [])
+        setFeatureChoicePicks((data as Character).feature_choice_picks ?? {})
 
         if (data.spell_ids?.length) {
           const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
@@ -422,6 +516,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (!inputs) return null
     return {
       ...inputs,
+      featureChoicePicks,
       equipmentCatalog,
       equippedArmorId,
       equippedShieldId,
@@ -435,6 +530,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equipment,
     equipmentCatalog,
     modifierCatalog,
+    featureChoicePicks,
     equippedArmorId,
     equippedShieldId,
     equippedWeaponId,
@@ -515,6 +611,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (!error && data) setCharacter(data)
     },
     [character],
+  )
+
+  const persistFeatureChoicePicks = useCallback(
+    async (key: string, picks: string[]) => {
+      if (!character) return
+      const next = { ...featureChoicePicks, [key]: picks }
+      setFeatureChoicePicks(next)
+      const db = createClient()
+      await db.from("characters").update({ feature_choice_picks: next }).eq("id", character.id)
+    },
+    [character, featureChoicePicks],
   )
 
   const persistBaseSelection = useCallback(
@@ -730,6 +837,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return resolveCharacterEquipment(raw, equipmentCatalog.length ? equipmentCatalog : equipment, equipmentBaseSelections)
   }, [equipment, equipmentCatalog, equippedWeaponId, equipmentBaseSelections])
 
+  // Tools the character is proficient with are surfaced automatically in the
+  // equipment list, even if they were never explicitly purchased/added.
+  const proficientToolEquipment = useMemo(() => {
+    const normalize = (value: string) =>
+      value.toLowerCase().replace(/[\u2018\u2019]/g, "'").trim()
+    const profNames = new Set(
+      (character?.tool_proficiencies ?? []).map(normalize).filter(Boolean),
+    )
+    if (!profNames.size || !equipmentCatalog.length) return [] as Equipment[]
+    const ownedIds = new Set(equipment.map((item) => item.id))
+    const ownedNames = new Set(equipment.map((item) => normalize(item.name)))
+    return equipmentCatalog.filter(
+      (item) =>
+        item.category === "Tool" &&
+        !ownedIds.has(item.id) &&
+        !ownedNames.has(normalize(item.name)) &&
+        profNames.has(normalize(item.name)),
+    )
+  }, [character?.tool_proficiencies, equipment, equipmentCatalog])
+
+  const displayedEquipment = useMemo(
+    () =>
+      proficientToolEquipment.length
+        ? [...equipment, ...proficientToolEquipment]
+        : equipment,
+    [equipment, proficientToolEquipment],
+  )
+
   const sheetCustomAbilities = useMemo(() => {
     if (!character) return []
     return filterCustomAbilitiesForCharacterSheet(customAbilities, {
@@ -755,6 +890,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       spellIds: character.spell_ids ?? [],
     })
   }, [customAbilities, character, classDetails, characterFeats, originFeat, equipment])
+
+  /** General/epic feats for display — excludes the background origin feat when it is also in feat_ids. */
+  const characterFeatsForDisplay = useMemo(() => {
+    const originName =
+      originFeat?.name ?? character?.backgrounds?.feat_granted ?? null
+    const originId = originFeat?.id ?? null
+    return characterFeats.filter((feat) => {
+      if (originId && feat.id === originId) return false
+      if (originName && feat.name.toLowerCase() === originName.toLowerCase()) return false
+      return true
+    })
+  }, [characterFeats, originFeat, character?.backgrounds?.feat_granted])
 
   const usesResolveContext = useMemo(
     () => ({
@@ -876,14 +1023,28 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       classLevels: classDetails
         .filter((entry) => entry.class?.name)
         .map((entry) => ({ className: entry.class!.name, level: entry.row.level })),
+      ownerMaxHp: derived?.maxHp,
+      ownerAbilityScores: derived?.abilityScores,
+      ownerSavingThrowProficiencies: derived?.savingThrowProficiencies,
     }
+    const hasFindFamiliar = spells.some((spell) => isFindFamiliarSpell(spell.name))
+    const spellcastingEntry =
+      classDetails.find((entry) => entry.class?.spellcasting) ?? classDetails[0]
+    const findFamiliarSpellSource = hasFindFamiliar
+      ? {
+          className: spellcastingClass?.name ?? "Spellcaster",
+          classId: spellcastingEntry?.row.class_id ?? "spellcaster",
+          subclassId: null,
+        }
+      : null
     const resolved = resolveCharacterCompanions({
       classDetails,
       customAbilities: sheetCustomAbilities,
       ctx,
+      findFamiliarSpellSource,
     })
     return mergeCompanionState(resolved, companionState)
-  }, [character, classDetails, sheetCustomAbilities, companionState, derived])
+  }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells])
 
   const persistCompanionState = useCallback(
     async (next: CharacterCompanionState[]) => {
@@ -973,9 +1134,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const classLabel = classDetails.length
     ? classDetails
-        .map((entry) => `${entry.class?.name ?? "Class"} ${entry.row.level}`)
-        .join(" / ")
-    : [character.classes?.name, character.subclasses?.name].filter(Boolean).join(" · ")
+        .map((entry) => `${entry.class?.name ?? "Class"} Level ${entry.row.level}`)
+        .join(" · ")
+    : character.classes?.name
+      ? `${character.classes.name} Level ${character.level}`
+      : "Adventurer"
 
   const skillsInOrder = getSkillsInAbilityOrder()
   const weaponProficiencies =
@@ -1021,7 +1184,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (!spellCatalog.length) return ids
     for (const detail of classDetails) {
       const features = (detail.subclass?.features as import("@/lib/types").Feature[] | undefined) ?? []
-      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, spellCatalog)) {
+      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, spellCatalog, {
+        classId: detail.row.class_id,
+        featureChoicePicks,
+      })) {
         ids.add(grant.spellId)
       }
     }
@@ -1120,9 +1286,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl font-black text-foreground leading-tight">{character.name}</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  Level {character.level} {classLabel || "Adventurer"}
-                </p>
+                <p className="text-sm text-muted-foreground mt-0.5">{classLabel}</p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {character.species && (
                     <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
@@ -1810,7 +1974,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <div className="bg-card rounded-xl p-3 border border-border">
                 <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
                 <SheetEquipmentPanel
-                  equipment={equipment}
+                  equipment={displayedEquipment}
                   catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
                   equipmentBaseSelections={equipmentBaseSelections}
                   onBaseSelectionChange={(magicItemId, baseId) =>
@@ -1893,12 +2057,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           )}
 
           {activeTab === "features" && (
-            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+            <div className="columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid">
               {classDetails.map((entry) => {
-                const classFeatures = (entry.class?.features as
-                  | { level: number; name: string; description: string }[]
-                  | undefined)?.filter((feature) => feature.level <= entry.row.level) ?? []
+                const classFeatures = ((entry.class?.features as
+                  | import("@/lib/types").Feature[]
+                  | undefined)?.filter((feature) => feature.level <= entry.row.level) ?? [])
                 if (!classFeatures.length) return null
+                const dedupedFeatures = dedupeFeaturesByName(classFeatures)
                 return (
                   <section key={entry.row.class_id} className="bg-card rounded-xl p-3 border border-border">
                     <h2 className="text-sm font-bold mb-2">
@@ -1906,13 +2071,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       {classDetails.length > 1 ? ` (Level ${entry.row.level})` : ""}
                     </h2>
                     <div className="space-y-2">
-                      {classFeatures.map((feature, index) => (
+                      {dedupedFeatures.map(({ feature, levels }, index) => (
                         <CollapsibleFeatureCard
                           key={`${entry.row.class_id}-${index}`}
                           name={feature.name}
                           level={feature.level}
+                          levels={levels.length > 1 ? levels : undefined}
                           description={feature.description}
-                        />
+                        >
+                          <RestSwappableChoiceControl
+                            feature={feature}
+                            classId={entry.row.class_id}
+                            picks={
+                              featureChoicePicks[
+                                featureChoiceKey(entry.row.class_id, feature.name, feature.level)
+                              ] ?? []
+                            }
+                            onChange={(key, next) => void persistFeatureChoicePicks(key, next)}
+                          />
+                        </CollapsibleFeatureCard>
                       ))}
                     </div>
                   </section>
@@ -1921,7 +2098,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               {classDetails.map((entry) => {
                 const subclassFeatures =
-                  entry.subclass?.features?.filter((feature) => feature.level <= entry.row.level) ?? []
+                  ((entry.subclass?.features as import("@/lib/types").Feature[] | undefined)?.filter(
+                    (feature) => feature.level <= entry.row.level,
+                  ) ?? [])
                 if (!subclassFeatures.length || !entry.subclass) return null
                 return (
                   <section
@@ -1936,7 +2115,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           name={feature.name}
                           level={feature.level}
                           description={feature.description}
-                        />
+                        >
+                          <RestSwappableChoiceControl
+                            feature={feature}
+                            classId={entry.row.class_id}
+                            picks={
+                              featureChoicePicks[
+                                featureChoiceKey(entry.row.class_id, feature.name, feature.level)
+                              ] ?? []
+                            }
+                            onChange={(key, next) => void persistFeatureChoicePicks(key, next)}
+                          />
+                        </CollapsibleFeatureCard>
                       ))}
                     </div>
                   </section>
@@ -1968,21 +2158,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </section>
               )}
 
-              {(originFeat || character.backgrounds?.feat_granted) && (
+              {(originFeat || character.backgrounds?.feat_granted || characterFeatsForDisplay.length > 0) && (
                 <section className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold mb-2">Origin Feats</h2>
-                  <CollapsibleFeatureCard
-                    name={originFeat?.name ?? character.backgrounds?.feat_granted ?? "Origin Feat"}
-                    description={originFeat?.description ?? "Granted by your background at 1st level."}
-                  />
-                </section>
-              )}
-
-              {characterFeats.length > 0 && (
-                <section className="bg-card rounded-xl p-3 border border-border">
-                  <h2 className="text-sm font-bold mb-2">General Feats & Epic Boons</h2>
+                  <h2 className="text-sm font-bold mb-2">Feats &amp; Boons</h2>
                   <div className="space-y-2">
-                    {characterFeats.map((feat, index) => (
+                    {(originFeat || character.backgrounds?.feat_granted) && (
+                      <CollapsibleFeatureCard
+                        name={originFeat?.name ?? character.backgrounds?.feat_granted ?? "Origin Feat"}
+                        description={
+                          originFeat?.description ?? "Granted by your background at 1st level."
+                        }
+                        collapsedLines={4}
+                      />
+                    )}
+                    {characterFeatsForDisplay.map((feat, index) => (
                       <CollapsibleFeatureCard
                         key={`${feat.id}-${index}`}
                         name={feat.name}
@@ -1999,13 +2188,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "companions" && (
             <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
               {companionRows.length > 0 ? (
-                companionRows.map((companion) => (
-                  <CompanionStatPanel
-                    key={companion.key}
-                    companion={companion}
-                    onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
-                  />
-                ))
+                <>
+                  {companionRows.some((companion) => companion.polymorph) && (
+                    <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                        {WILD_SHAPE_DIRECTIONS.name}
+                      </p>
+                      <ExpandableDescription
+                        text={WILD_SHAPE_DIRECTIONS.description}
+                        className="text-[11px] leading-snug text-muted-foreground"
+                      />
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground pt-1">
+                        {WILD_SHAPE_GAME_STATISTICS.name}
+                      </p>
+                      <ExpandableDescription
+                        text={WILD_SHAPE_GAME_STATISTICS.description}
+                        className="text-[11px] leading-snug text-muted-foreground"
+                      />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    {companionRows.map((companion) => (
+                      <CompanionStatPanel
+                        key={companion.key}
+                        companion={companion}
+                        onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
+                      />
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="bg-card rounded-xl p-6 border border-border text-center">
                   <PawPrint className="w-10 h-10 text-muted-foreground mx-auto mb-3" />

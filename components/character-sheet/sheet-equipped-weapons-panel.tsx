@@ -64,7 +64,11 @@ function WeaponAttackCard({
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground uppercase">To Hit</span>
-            <D20RollButton modifier={attack.attackBonus} title={`${weapon.name} attack`} />
+            <D20RollButton
+              modifier={attack.attackBonus}
+              title={`${weapon.name} attack`}
+              breakdown={attack.attackBreakdown}
+            />
           </div>
           {damageExpression ? (
             <div className="flex items-center gap-1.5">

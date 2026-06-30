@@ -116,7 +116,6 @@ import { characterToBuilderState } from "@/lib/builder/character-to-draft"
 import {
   computeStartingCharacterGold,
   findEquipmentByName,
-  formatEquipmentCost,
   getEquipmentCostGp,
   getStartingEquipmentGroups,
   isGoldOnlyOption,
@@ -1554,11 +1553,15 @@ export default function BuilderPage() {
       if (character.class_id && !validClassId) staleRefs.push("class")
       if (character.species_id && !validSpeciesId) staleRefs.push("species")
       if (character.background_id && !validBackgroundId) staleRefs.push("background")
+      const staleSubclass = snapshot.character_classes.some(
+        (row) => row.subclass_id && !pickEnabledId(row.subclass_id, subclasses),
+      )
+      if (staleSubclass) staleRefs.push("subclass")
 
       if (staleRefs.length > 0) {
         alert(
           `Your draft still points at old compendium IDs (${staleRefs.join(", ")}). ` +
-            "That usually happens after reseeding the database. Re-select your class, species, and background, then save again.",
+            "That usually happens after reseeding the database. Re-select your class, subclass, species, and background, then save again.",
         )
         return
       }
@@ -1614,9 +1617,15 @@ export default function BuilderPage() {
           feats,
         ),
         feat_choice_picks: featChoicePicks,
+        feature_choice_picks: featureChoicePicks,
         modifier_player_picks: modifierPlayerPicks,
         asi_allocations: asiAllocationsByFeatId,
-        character_classes: snapshot.character_classes,
+        character_classes: snapshot.character_classes.map((row) => ({
+          ...row,
+          subclass_id: row.subclass_id
+            ? pickEnabledId(row.subclass_id, subclasses)
+            : null,
+        })),
         class_add_order: snapshot.class_add_order,
         hit_point_max: snapshot.hit_point_max,
         hit_points: currentHp ?? snapshot.hit_point_max,
@@ -4360,18 +4369,9 @@ export default function BuilderPage() {
                           </span>
                         )}
                       </div>
-                      <ul className="space-y-0.5 text-[10px] text-foreground max-h-32 overflow-y-auto">
-                        {ownedEquipmentItems.map((item) => (
-                          <li key={item.id} className="flex justify-between gap-2">
-                            <span className="truncate">{item.name}</span>
-                            {goldPurchasedEquipmentIds.includes(item.id) && (
-                              <span className="text-muted-foreground shrink-0 tabular-nums">
-                                {formatEquipmentCost(item) ?? "—"}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                      <p className="text-[10px] leading-snug text-foreground">
+                        {ownedEquipmentItems.map((item) => item.name).join(", ")}
+                      </p>
                     </div>
                   )}
                 </div>

@@ -262,6 +262,7 @@ CREATE TABLE IF NOT EXISTS characters (
   spell_ids JSON,
   feat_ids JSON,
   feat_choice_picks JSON,
+  feature_choice_picks JSON,
   modifier_player_picks JSON,
   asi_allocations JSON,
   companion_state JSON,

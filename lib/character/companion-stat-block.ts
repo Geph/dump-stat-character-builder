@@ -48,6 +48,13 @@ export type CompanionStatBlockTemplate = {
   actions: CompanionNamedBlock[]
   bonusActions?: CompanionNamedBlock[]
   reactions?: CompanionNamedBlock[]
+  /**
+   * A "polymorph" form (e.g. Druid Wild Shape) where the owner becomes the
+   * creature instead of commanding a separate companion. When set, the owner
+   * retains their own Hit Points, Intelligence/Wisdom/Charisma scores, and
+   * skill/saving throw proficiencies (using the higher modifier).
+   */
+  polymorph?: boolean
 }
 
 export type CompanionSource = {
@@ -69,6 +76,14 @@ export type ResolvedCompanion = {
   maxHp: number
   hitDiceLabel?: string | null
   proficiencyBonus: number
+  /** True when the form follows polymorph rules (owner HP / mental stats retained). */
+  polymorph: boolean
+  /**
+   * Ability rows to display. For polymorph forms this merges the creature's
+   * physical scores with the owner's retained mental scores and the higher
+   * save modifier per ability; otherwise it mirrors the template.
+   */
+  abilityScores?: Partial<Record<AbilityScoreKey, CompanionAbilityRow>>
 }
 
 export type CharacterCompanionState = {
@@ -83,6 +98,11 @@ export type CompanionResolveContext = {
   spellAttackModifier: number | null
   spellSaveDc: number | null
   classLevels: { className: string; level: number }[]
+  /** Owner stats used to resolve polymorph (Wild Shape) forms. */
+  ownerMaxHp?: number
+  ownerAbilityScores?: Record<AbilityScoreKey, number>
+  /** Full ability names the owner is proficient in for saving throws. */
+  ownerSavingThrowProficiencies?: string[]
 }
 
 const ABILITY_KEY_MAP: Record<string, AbilityScoreKey> = {
@@ -154,19 +174,79 @@ function resolveScaleRef(ref: CompanionScaleRef, ctx: CompanionResolveContext): 
   }
 }
 
+const PHYSICAL_ABILITIES: AbilityScoreKey[] = ["strength", "dexterity", "constitution"]
+const MENTAL_ABILITIES: AbilityScoreKey[] = ["intelligence", "wisdom", "charisma"]
+
+function abilityFullName(key: AbilityScoreKey): string {
+  return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+function modifierFromScore(score: number): number {
+  return Math.floor((score - 10) / 2)
+}
+
+/**
+ * Merge a polymorph creature's stat block with the owner's retained statistics
+ * per the 2024 Wild Shape rule: keep the creature's physical scores, the owner's
+ * mental scores, and the higher saving-throw modifier for each ability.
+ */
+function resolvePolymorphAbilityScores(
+  template: CompanionStatBlockTemplate,
+  ctx: CompanionResolveContext,
+): Partial<Record<AbilityScoreKey, CompanionAbilityRow>> {
+  const ownerScores = ctx.ownerAbilityScores
+  if (!ownerScores) return template.abilityScores ?? {}
+
+  const saveProfs = new Set(ctx.ownerSavingThrowProficiencies ?? [])
+  const result: Partial<Record<AbilityScoreKey, CompanionAbilityRow>> = {}
+
+  const ownerRow = (key: AbilityScoreKey): CompanionAbilityRow => {
+    const score = ownerScores[key]
+    const modifier = ctx.abilityMods[key] ?? modifierFromScore(score)
+    const save = modifier + (saveProfs.has(abilityFullName(key)) ? ctx.proficiencyBonus : 0)
+    return { score, modifier, save }
+  }
+
+  // Physical abilities: use the creature's scores, but take the higher save.
+  for (const key of PHYSICAL_ABILITIES) {
+    const beast = template.abilityScores?.[key]
+    if (!beast) continue
+    const owner = ownerRow(key)
+    result[key] = { ...beast, save: Math.max(beast.save, owner.save) }
+  }
+
+  // Mental abilities: retained from the owner.
+  for (const key of MENTAL_ABILITIES) {
+    result[key] = ownerRow(key)
+  }
+
+  return result
+}
+
 export function resolveCompanion(
   template: CompanionStatBlockTemplate,
   source: CompanionSource,
   ctx: CompanionResolveContext,
 ): ResolvedCompanion {
+  const polymorph = Boolean(template.polymorph)
+  const maxHp =
+    polymorph && typeof ctx.ownerMaxHp === "number"
+      ? ctx.ownerMaxHp
+      : resolveCompanionScaledValue(template.hp, ctx)
+
   return {
     key: companionKey(source),
     template,
     source,
     ac: resolveCompanionScaledValue(template.ac, ctx),
-    maxHp: resolveCompanionScaledValue(template.hp, ctx),
-    hitDiceLabel: template.hitDiceNote ?? null,
+    maxHp,
+    // Polymorph forms keep the owner's own Hit Point Dice, so drop the beast's note.
+    hitDiceLabel: polymorph ? null : template.hitDiceNote ?? null,
     proficiencyBonus: ctx.proficiencyBonus,
+    polymorph,
+    abilityScores: polymorph
+      ? resolvePolymorphAbilityScores(template, ctx)
+      : template.abilityScores,
   }
 }
 

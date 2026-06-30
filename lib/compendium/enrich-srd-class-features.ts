@@ -14,7 +14,7 @@ import {
   legacyFeatureOptionPickerCharacteristic,
   migrateFeatureOptionPickers,
 } from "@/lib/compendium/feature-option-choice-migration"
-import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureActivation, FeatureChoice, UsesConfig } from "@/lib/types"
 import { SRD_ARTISANS_TOOLS, SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
@@ -624,10 +624,59 @@ function featureOptionPicker(category: string, swappableOnRest = false): LinkedM
   ])
 }
 
+/** Damage resistance granted by Circle of the Land's Nature's Ward, keyed by land type. */
+const CIRCLE_OF_THE_LAND_RESISTANCES: Record<string, string> = {
+  Arid: "Fire",
+  Polar: "Cold",
+  Temperate: "Lightning",
+  Tropical: "Poison",
+}
+
+/**
+ * Build the rest-swappable land-type choice for Circle of the Land's "Circle of the Land Spells".
+ * Each option keeps that land's spell table (parsed at runtime for always-prepared spells) and
+ * carries the matching Nature's Ward damage resistance, so a single sheet control drives both.
+ */
+function buildCircleOfTheLandChoice(feature: Feature): Feature {
+  const description = feature.description ?? ""
+  const sectionRe = /\*\*(\w+)\s+Land\*\*([\s\S]*?)(?=\*\*\w+\s+Land\*\*|$)/gi
+  const options: NonNullable<FeatureChoice["options"]> = []
+  let match: RegExpExecArray | null
+  while ((match = sectionRe.exec(description))) {
+    const land = match[1]
+    const body = match[2].trim()
+    if (!/<table/i.test(body)) continue
+    const resistance = CIRCLE_OF_THE_LAND_RESISTANCES[land]
+    options.push({
+      name: land,
+      description: `**${land} Land**\n${body}`,
+      linkedModifiers: resistance
+        ? [damageResistance([resistance], `Nature's Ward resistance (${land} land)`)]
+        : undefined,
+    })
+  }
+  if (options.length < 2) return feature
+  return {
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Land type",
+      count: 1,
+      swappableOnRest: true,
+      swapRestType: "long",
+      options,
+    },
+  }
+}
+
 /** Fill option-level modifiers for known SRD choice features that only had empty pickers. */
 function enrichCanonicalFeatureChoices(feature: Feature): Feature {
   const name = feature.name?.trim()
   if (!name) return feature
+
+  if (name === "Circle of the Land Spells") {
+    return buildCircleOfTheLandChoice(feature)
+  }
 
   const hasMechanicalOptions =
     feature.choices?.options?.some(

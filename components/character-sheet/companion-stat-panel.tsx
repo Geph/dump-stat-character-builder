@@ -1,8 +1,8 @@
 "use client"
 
-import { Heart, Shield, Footprints } from "lucide-react"
+import { Heart, Shield, Footprints, Sparkles } from "lucide-react"
 import { ABILITY_ORDER } from "@/lib/character/parse-companion-stat-block"
-import type { ResolvedCompanion } from "@/lib/character/companion-stat-block"
+import type { CompanionNamedBlock, ResolvedCompanion } from "@/lib/character/companion-stat-block"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 
 const ABILITY_LABEL_SHORT: Record<string, string> = {
@@ -23,150 +23,148 @@ type CompanionStatPanelProps = {
   onHpChange: (hp: number) => void
 }
 
+function MetaLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="text-[10px] leading-snug text-foreground">
+      <span className="text-muted-foreground">{label}: </span>
+      {value}
+    </p>
+  )
+}
+
+function BlockList({ title, blocks }: { title: string; blocks: CompanionNamedBlock[] }) {
+  if (!blocks.length) return null
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase font-bold text-muted-foreground">{title}</p>
+      {blocks.map((block) => (
+        <div key={block.name} className="px-2 py-1 bg-muted/30 rounded-md">
+          <p className="text-[11px] font-bold text-foreground">{block.name}</p>
+          <ExpandableDescription
+            text={block.description}
+            className="text-[10px] leading-snug text-muted-foreground"
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanelProps) {
-  const { template, ac, maxHp, currentHp, source } = companion
+  const { template, ac, maxHp, currentHp, source, polymorph } = companion
+  const abilityScores = companion.abilityScores ?? template.abilityScores
+  const hasAbilities = abilityScores && Object.keys(abilityScores).length > 0
+
+  const metaLines: { label: string; value: string }[] = []
+  if (template.resistances?.length) metaLines.push({ label: "Resistances", value: template.resistances.join(", ") })
+  if (template.damageImmunities?.length)
+    metaLines.push({ label: "Damage Immunities", value: template.damageImmunities.join(", ") })
+  if (template.conditionImmunities?.length)
+    metaLines.push({ label: "Condition Immunities", value: template.conditionImmunities.join(", ") })
+  if (template.senses) metaLines.push({ label: "Senses", value: template.senses })
+  if (template.languages) metaLines.push({ label: "Languages", value: template.languages })
+  if (template.cr) metaLines.push({ label: "CR", value: template.cr })
+
+  const hasMeta = metaLines.length > 0
+  const hasActions =
+    template.actions.length > 0 ||
+    (template.bonusActions?.length ?? 0) > 0 ||
+    (template.reactions?.length ?? 0) > 0
 
   return (
-    <section className="bg-card rounded-xl border border-border overflow-hidden">
-      <div className="px-4 py-3 border-b border-border bg-muted/30">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h3 className="text-base font-bold text-foreground">{companion.displayName}</h3>
-            {template.sizeTypeAlignment ? (
-              <p className="text-xs text-muted-foreground mt-0.5">{template.sizeTypeAlignment}</p>
-            ) : null}
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
-              {source.subclassName ? `${source.subclassName} · ` : ""}
-              {source.className} · L{source.featureLevel} {source.featureName}
-            </p>
+    <section className="bg-card rounded-xl border border-border overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-border bg-muted/30">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-bold text-foreground truncate">{companion.displayName}</h3>
+          {template.cr ? (
+            <span className="text-[9px] text-muted-foreground shrink-0">CR {template.cr}</span>
+          ) : null}
+        </div>
+        {template.sizeTypeAlignment ? (
+          <p className="text-[10px] text-muted-foreground">{template.sizeTypeAlignment}</p>
+        ) : null}
+        <p className="text-[9px] uppercase tracking-wide text-muted-foreground mt-0.5">
+          {source.subclassName ? `${source.subclassName} · ` : ""}
+          {source.className} · L{source.featureLevel} {source.featureName}
+        </p>
+      </div>
+
+      {/* AC / HP / Speed */}
+      <div className="px-3 py-2 grid grid-cols-3 gap-1.5 border-b border-border">
+        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+          <Shield className="w-3 h-3 mx-auto text-primary mb-0.5" />
+          <p className="text-[7px] text-muted-foreground uppercase">AC</p>
+          <p className="text-base font-black tabular-nums text-foreground">{ac}</p>
+        </div>
+        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+          <Heart className="w-3 h-3 mx-auto text-red-500 mb-0.5" />
+          <p className="text-[7px] text-muted-foreground uppercase">HP</p>
+          <div className="flex items-center justify-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={maxHp}
+              value={currentHp}
+              onChange={(e) => onHpChange(parseInt(e.target.value, 10) || 0)}
+              className="w-11 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span className="text-[10px] text-muted-foreground">/ {maxHp}</span>
           </div>
+        </div>
+        <div className="p-1.5 bg-muted/50 rounded-lg text-center">
+          <Footprints className="w-3 h-3 mx-auto text-secondary mb-0.5" />
+          <p className="text-[7px] text-muted-foreground uppercase">Speed</p>
+          <p className="text-[11px] font-semibold leading-tight">{template.speed ?? "—"}</p>
         </div>
       </div>
 
-      <div className="px-4 py-3 grid grid-cols-3 gap-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Shield className="w-4 h-4 text-primary shrink-0" />
-          <div>
-            <p className="text-[10px] uppercase text-muted-foreground">AC</p>
-            <p className="text-lg font-bold tabular-nums">{ac}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Heart className="w-4 h-4 text-red-500 shrink-0" />
-          <div>
-            <p className="text-[10px] uppercase text-muted-foreground">HP</p>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                min={0}
-                max={maxHp}
-                value={currentHp}
-                onChange={(e) => onHpChange(parseInt(e.target.value, 10) || 0)}
-                className="w-14 px-1 py-0.5 text-lg font-bold tabular-nums bg-background border border-border rounded text-center"
-              />
-              <span className="text-muted-foreground text-sm">/ {maxHp}</span>
-            </div>
-            {template.hitDiceNote ? (
-              <p className="text-[9px] text-muted-foreground line-clamp-2">{template.hitDiceNote}</p>
-            ) : null}
-          </div>
-        </div>
-        {template.speed ? (
-          <div className="flex items-center gap-2">
-            <Footprints className="w-4 h-4 text-secondary shrink-0" />
-            <div>
-              <p className="text-[10px] uppercase text-muted-foreground">Speed</p>
-              <p className="text-sm font-semibold">{template.speed}</p>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {template.abilityScores && Object.keys(template.abilityScores).length > 0 ? (
-        <div className="px-4 py-3 border-b border-border">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2">Ability Scores</p>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {ABILITY_ORDER.map((key) => {
-              const row = template.abilityScores?.[key]
-              if (!row) return null
-              return (
-                <div key={key} className="text-center p-2 bg-muted/40 rounded-lg">
-                  <p className="text-[10px] font-bold text-muted-foreground">
-                    {ABILITY_LABEL_SHORT[key]}
-                  </p>
-                  <p className="text-sm font-bold tabular-nums">{row.score}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {formatMod(row.modifier)} / {formatMod(row.save)} save
-                  </p>
-                </div>
-              )
-            })}
-          </div>
+      {/* Ability scores */}
+      {hasAbilities ? (
+        <div className="px-3 py-2 grid grid-cols-6 gap-1 border-b border-border">
+          {ABILITY_ORDER.map((key) => {
+            const row = abilityScores?.[key]
+            if (!row) return <div key={key} />
+            return (
+              <div key={key} className="text-center p-1 bg-muted/40 rounded-md">
+                <p className="text-[8px] font-bold text-muted-foreground">{ABILITY_LABEL_SHORT[key]}</p>
+                <p className="text-xs font-black tabular-nums text-foreground">{row.score}</p>
+                <p className="text-[8px] text-primary font-bold">{formatMod(row.modifier)}</p>
+                <p className="text-[7px] text-muted-foreground">save {formatMod(row.save)}</p>
+              </div>
+            )
+          })}
         </div>
       ) : null}
 
-      <div className="px-4 py-3 space-y-2 text-xs border-b border-border">
-        {template.resistances?.length ? (
-          <p>
-            <span className="font-semibold text-foreground">Resistances </span>
-            <span className="text-muted-foreground">{template.resistances.join(", ")}</span>
+      {polymorph ? (
+        <div className="px-3 py-1.5 border-b border-border flex items-start gap-1.5">
+          <Sparkles className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+          <p className="text-[9px] leading-snug text-muted-foreground">
+            You keep your own HP, Hit Dice, INT/WIS/CHA, class features, languages, feats, and skill/save
+            proficiencies (using the higher modifier).
           </p>
-        ) : null}
-        {template.damageImmunities?.length ? (
-          <p>
-            <span className="font-semibold text-foreground">Damage Immunities </span>
-            <span className="text-muted-foreground">{template.damageImmunities.join(", ")}</span>
-          </p>
-        ) : null}
-        {template.conditionImmunities?.length ? (
-          <p>
-            <span className="font-semibold text-foreground">Condition Immunities </span>
-            <span className="text-muted-foreground">{template.conditionImmunities.join(", ")}</span>
-          </p>
-        ) : null}
-        {template.senses ? (
-          <p>
-            <span className="font-semibold text-foreground">Senses </span>
-            <span className="text-muted-foreground">{template.senses}</span>
-          </p>
-        ) : null}
-        {template.languages ? (
-          <p>
-            <span className="font-semibold text-foreground">Languages </span>
-            <span className="text-muted-foreground">{template.languages}</span>
-          </p>
-        ) : null}
-        {template.cr ? (
-          <p>
-            <span className="font-semibold text-foreground">CR </span>
-            <span className="text-muted-foreground">{template.cr}</span>
-          </p>
-        ) : null}
-      </div>
-
-      {template.traits.length > 0 ? (
-        <div className="px-4 py-3 border-b border-border space-y-2">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground">Traits</p>
-          {template.traits.map((trait) => (
-            <div key={trait.name} className="p-2 bg-muted/30 rounded-lg">
-              <p className="font-bold text-foreground">{trait.name}</p>
-              <ExpandableDescription text={trait.description} className="text-muted-foreground" />
-            </div>
-          ))}
         </div>
       ) : null}
 
-      {template.actions.length > 0 ? (
-        <div className="px-4 py-3 space-y-2">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground">Actions</p>
-          {template.actions.map((action) => (
-            <div key={action.name} className="p-2 bg-muted/30 rounded-lg">
-              <p className="font-bold text-foreground">{action.name}</p>
-              <ExpandableDescription text={action.description} className="text-muted-foreground" />
+      {/* Meta + Traits + Actions in columns */}
+      {(hasMeta || template.traits.length > 0 || hasActions) && (
+        <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
+          {hasMeta ? (
+            <div className="space-y-0.5 sm:col-span-2">
+              {metaLines.map((line) => (
+                <MetaLine key={line.label} label={line.label} value={line.value} />
+              ))}
             </div>
-          ))}
+          ) : null}
+          <BlockList title="Traits" blocks={template.traits} />
+          <div className="space-y-2">
+            <BlockList title="Actions" blocks={template.actions} />
+            <BlockList title="Bonus Actions" blocks={template.bonusActions ?? []} />
+            <BlockList title="Reactions" blocks={template.reactions ?? []} />
+          </div>
         </div>
-      ) : null}
+      )}
     </section>
   )
 }
