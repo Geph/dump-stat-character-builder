@@ -41,6 +41,10 @@ const SKIP_NAMES = new Set([
 const ALLOWED_UNMATCHED = new Set([
   "Hunter's Lore",
   "Pact Magic",
+  // Level-up markers; damage scales via bonusByLevel on the level-7 Blessed Strikes choice.
+  "Improved Blessed Strikes",
+  // Level-up marker; damage scales via bonusByLevel on the level-7 Elemental Fury choice.
+  "Improved Elemental Fury",
 ])
 
 function couldHaveModifier(feature: Feature): boolean {
