@@ -2,8 +2,19 @@ import { describe, expect, it } from "vitest"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import { resolveCompanionScaledValue } from "@/lib/character/companion-stat-block"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
-import { collectCompanionCandidatesFromClasses } from "@/lib/character/resolve-companions"
+import {
+  collectCompanionCandidatesFromClasses,
+  resolveCharacterCompanions,
+} from "@/lib/character/resolve-companions"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+
+const FAMILIAR_CTX = {
+  abilityMods: { strength: 0, dexterity: 0, constitution: 0, intelligence: 0, wisdom: 0, charisma: 0 },
+  proficiencyBonus: 2,
+  spellAttackModifier: 5,
+  spellSaveDc: 13,
+  classLevels: [] as { className: string; level: number }[],
+}
 
 const REANIMATED_COMPANION = `Reanimated Companion
 
@@ -125,10 +136,72 @@ describe("Druid Beast forms", () => {
     expect(new Set(candidates.map((c) => `${c.source.featureName}:${c.source.formName}`)).size).toBe(4)
     const wolf = candidates.find((c) => c.template.name === "Wolf")
     expect(wolf?.template.traits.map((t) => t.name)).toContain("Pack Tactics")
-    expect(wolf?.template.traits.map((t) => t.name)).toContain("Wild Shape")
+    // Wild Shape directions are shown once at the top of the tab, not as a per-form trait.
+    expect(wolf?.template.traits.map((t) => t.name)).not.toContain("Wild Shape")
+    expect(wolf?.template.polymorph).toBe(true)
   })
 
   it("does not offer beast forms before Wild Shape is unlocked", () => {
     expect(collectCompanionCandidatesFromClasses([druidDetail(1)])).toHaveLength(0)
+  })
+})
+
+describe("Find Familiar companion", () => {
+  const detailWithFeature = (className: string, featureName: string): CharacterClassDetail =>
+    ({
+      row: { class_id: className.toLowerCase(), level: 5, subclass_id: null },
+      class: { name: className, features: [{ name: featureName, level: 3, description: "" }] },
+      subclass: null,
+    }) as unknown as CharacterClassDetail
+
+  it("adds a Familiar from the Druid's Wild Companion feature", () => {
+    const candidates = collectCompanionCandidatesFromClasses([
+      detailWithFeature("Druid", "Wild Companion"),
+    ])
+    const familiar = candidates.find((c) => c.template.name === "Familiar")
+    expect(familiar).toBeDefined()
+    expect(familiar!.template.traits.map((t) => t.name)).toEqual(
+      expect.arrayContaining(["Telepathic Link", "Shared Senses"]),
+    )
+    expect(familiar!.template.actions.map((a) => a.name)).toEqual(
+      expect.arrayContaining(["General", "Deliver Touch Spells (Reaction)"]),
+    )
+  })
+
+  it("adds a Familiar from the Warlock's Pact of the Chain feature", () => {
+    const candidates = collectCompanionCandidatesFromClasses([
+      detailWithFeature("Warlock", "Pact of the Chain"),
+    ])
+    expect(candidates.some((c) => c.template.name === "Familiar")).toBe(true)
+  })
+
+  it("adds a Familiar when the caster knows Find Familiar, deduping with features", () => {
+    const wizard = {
+      row: { class_id: "wizard", level: 1, subclass_id: null },
+      class: { name: "Wizard", features: [] },
+      subclass: null,
+    } as unknown as CharacterClassDetail
+
+    const fromSpell = resolveCharacterCompanions({
+      classDetails: [wizard],
+      ctx: FAMILIAR_CTX,
+      findFamiliarSpellSource: { className: "Wizard", classId: "wizard" },
+    })
+    expect(fromSpell.filter((c) => c.template.name === "Familiar")).toHaveLength(1)
+    expect(fromSpell[0].maxHp).toBe(1)
+    expect(fromSpell[0].polymorph).toBe(false)
+
+    // A Druid with Wild Companion AND the spell still shows only one familiar.
+    const druid = {
+      row: { class_id: "druid", level: 5, subclass_id: null },
+      class: { name: "Druid", features: [{ name: "Wild Companion", level: 3, description: "" }] },
+      subclass: null,
+    } as unknown as CharacterClassDetail
+    const deduped = resolveCharacterCompanions({
+      classDetails: [druid],
+      ctx: FAMILIAR_CTX,
+      findFamiliarSpellSource: { className: "Druid", classId: "druid" },
+    })
+    expect(deduped.filter((c) => c.template.name === "Familiar")).toHaveLength(1)
   })
 })

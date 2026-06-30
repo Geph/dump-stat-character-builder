@@ -101,12 +101,28 @@ export function calculateArmorClass(
 }
 
 export function getWeaponAbilityMod(weapon: Equipment, abilityMods: AbilityMods): number {
+  return getWeaponAttackAbility(weapon, abilityMods).mod
+}
+
+/**
+ * Which ability the weapon's attack/damage uses, with the resolved modifier and a
+ * human-readable label (used for roll breakdown tooltips). Ranged weapons use Dexterity,
+ * Finesse weapons use the higher of Strength/Dexterity, and everything else uses Strength.
+ */
+export function getWeaponAttackAbility(
+  weapon: Equipment,
+  abilityMods: AbilityMods,
+): { ability: "strength" | "dexterity"; mod: number; label: string } {
   const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
-  if (isRanged) return abilityMods.dexterity
-  if (hasWeaponProperty(weapon, "finesse")) {
-    return Math.max(abilityMods.strength, abilityMods.dexterity)
+  if (isRanged) {
+    return { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity" }
   }
-  return abilityMods.strength
+  if (hasWeaponProperty(weapon, "finesse")) {
+    return abilityMods.dexterity > abilityMods.strength
+      ? { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity (Finesse)" }
+      : { ability: "strength", mod: abilityMods.strength, label: "Strength (Finesse)" }
+  }
+  return { ability: "strength", mod: abilityMods.strength, label: "Strength" }
 }
 
 function weaponNameMatchesProficiency(proficiency: string, weaponName: string): boolean {
@@ -166,7 +182,11 @@ export function calculateWeaponAttack(
   abilityMods: AbilityMods,
   proficiencyBonus: number,
   isProficient: boolean,
-): { attackBonus: number; damageDisplay: string } | null {
+): {
+  attackBonus: number
+  damageDisplay: string
+  attackBreakdown: { label: string; value: number }[]
+} | null {
   const damageText = getWeaponDamageText(weapon)
   if (!damageText) return null
 
@@ -174,13 +194,18 @@ export function calculateWeaponAttack(
   const dice = match?.[1]?.trim() ?? damageText
   const damageType = match?.[2]?.trim() || weapon.damage_type || ""
 
-  const abilityMod = getWeaponAbilityMod(weapon, abilityMods)
+  const { mod: abilityMod, label: abilityLabel } = getWeaponAttackAbility(weapon, abilityMods)
   const attackBonus = abilityMod + (isProficient ? proficiencyBonus : 0)
   const modSuffix =
     abilityMod === 0 ? "" : abilityMod > 0 ? ` + ${abilityMod}` : ` - ${Math.abs(abilityMod)}`
   const damageDisplay = `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()
 
-  return { attackBonus, damageDisplay }
+  const attackBreakdown = [{ label: abilityLabel, value: abilityMod }]
+  if (isProficient) {
+    attackBreakdown.push({ label: "Proficiency", value: proficiencyBonus })
+  }
+
+  return { attackBonus, damageDisplay, attackBreakdown }
 }
 
 export function getWeaponMastery(weapon: Equipment): string | null {

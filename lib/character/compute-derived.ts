@@ -441,12 +441,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     baseEquippedWeaponAttack && equippedWeapon
       ? (() => {
           const weaponProps = getWeaponPropertyTags(equippedWeapon)
-          const attackBonus =
-            baseEquippedWeaponAttack.attackBonus +
-            sumAttackRollModifiers(aggregatedCharacteristics, {
-              subcategory: equippedWeapon.subcategory ?? "",
-              properties: weaponProps,
-            })
+          const modifierBonus = sumAttackRollModifiers(aggregatedCharacteristics, {
+            subcategory: equippedWeapon.subcategory ?? "",
+            properties: weaponProps,
+          })
+          const attackBonus = baseEquippedWeaponAttack.attackBonus + modifierBonus
           const damageBonus = sumDamageRollModifiers(aggregatedCharacteristics, {
             subcategory: equippedWeapon.subcategory ?? "",
             properties: weaponProps,
@@ -456,7 +455,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
             damageBonus > 0
               ? `${baseEquippedWeaponAttack.damageDisplay} + ${damageBonus}`
               : baseEquippedWeaponAttack.damageDisplay
-          return { attackBonus, damageDisplay }
+          const attackBreakdown = [...baseEquippedWeaponAttack.attackBreakdown]
+          if (modifierBonus !== 0) {
+            attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
+          }
+          return { attackBonus, damageDisplay, attackBreakdown }
         })()
       : baseEquippedWeaponAttack
 
@@ -562,6 +565,7 @@ export function buildInputsFromSavedCharacter(params: {
     equipment_ids: string[]
     feat_ids: string[]
     feat_choice_picks?: Record<string, string[]> | null
+    feature_choice_picks?: Record<string, string[]> | null
     modifier_player_picks?: Record<string, string[]> | null
     equipped_armor_id?: string | null
     equipped_shield_id?: string | null
@@ -606,7 +610,7 @@ export function buildInputsFromSavedCharacter(params: {
     classAddOrder: character.class_add_order ?? rowsToClassAddOrder(classRows),
     classSkillPicks: {},
     classToolPicks: {},
-    featureChoicePicks: {},
+    featureChoicePicks: character.feature_choice_picks ?? {},
     speciesTraitPicks: {},
     featChoicePicks: character.feat_choice_picks ?? {},
     modifierPlayerPicks: character.modifier_player_picks ?? {},

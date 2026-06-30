@@ -112,7 +112,7 @@ export function characterToBuilderState(
     classLevels,
     subclassByClassId,
     classSkillPicks,
-    featureChoicePicks: {},
+    featureChoicePicks: (character.feature_choice_picks as Record<string, string[]>) ?? {},
     featChoicePicks: (character.feat_choice_picks as Record<string, string[]>) ?? {},
     modifierPlayerPicks: (character.modifier_player_picks as Record<string, string[]>) ?? {},
     primaryClassId: character.class_id,

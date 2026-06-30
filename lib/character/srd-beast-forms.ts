@@ -4,14 +4,27 @@ import type {
 } from "@/lib/character/companion-stat-block"
 
 /**
- * Wild Shape usage directions from the 2024 Druid class description. Attached to
- * each known Beast form so the Companion / Beast Form sheet tab carries the rules
- * alongside the stat block.
+ * Wild Shape usage directions from the 2024 Druid class description. Shown once at
+ * the top of the Companion / Beast Form tab (not repeated on each form), so the
+ * rules sit alongside the known Beast stat blocks.
  */
 export const WILD_SHAPE_DIRECTIONS: CompanionNamedBlock = {
   name: "Wild Shape",
   description:
-    "As a Bonus Action, shape-shift into a Beast form you have learned. You stay in that form for a number of hours equal to half your Druid level, or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action. You have the form's stat block (using its HP) but keep your own Intelligence, Wisdom, and Charisma. You know four Beast forms (CR 1/4 or lower, no Fly Speed); the Rat, Riding Horse, Spider, and Wolf are recommended. After a Long Rest you can swap one known form for another eligible one.",
+    "As a Bonus Action, shape-shift into a Beast form you have learned. You stay in that form for a number of hours equal to half your Druid level, or until you use Wild Shape again, have the Incapacitated condition, or die. You can leave the form early as a Bonus Action. You know four Beast forms (CR 1/4 or lower, no Fly Speed); the Rat, Riding Horse, Spider, and Wolf are recommended. After a Long Rest you can swap one known form for another eligible one.",
+}
+
+/**
+ * The 2024 "Game Statistics" rule for Wild Shape: your stats are replaced by the
+ * Beast's, but you retain your creature type, Hit Points and Hit Point Dice, your
+ * Intelligence/Wisdom/Charisma scores, class features, languages, and feats. You
+ * keep your skill and saving throw proficiencies (using your Proficiency Bonus) in
+ * addition to the creature's, and use the higher modifier when they overlap.
+ */
+export const WILD_SHAPE_GAME_STATISTICS: CompanionNamedBlock = {
+  name: "Game Statistics",
+  description:
+    "Your game statistics are replaced by the Beast's stat block, but you retain your creature type; Hit Points; Hit Point Dice; Intelligence, Wisdom, and Charisma scores; class features; languages; and feats. You also keep your skill and saving throw proficiencies and use your Proficiency Bonus for them, in addition to gaining the creature's proficiencies. If a skill or saving throw modifier in the Beast's stat block is higher than yours, use the one in the stat block.",
 }
 
 const fixed = (value: number) => ({ parts: [{ type: "fixed" as const, value }] })
@@ -38,8 +51,8 @@ export const SRD_BEAST_FORMS: CompanionStatBlockTemplate[] = [
     },
     senses: "Darkvision 30 ft.; Passive Perception 10",
     cr: "0",
+    polymorph: true,
     traits: [
-      WILD_SHAPE_DIRECTIONS,
       {
         name: "Agile",
         description: "The rat doesn't provoke Opportunity Attacks when it moves out of an enemy's reach.",
@@ -69,7 +82,8 @@ export const SRD_BEAST_FORMS: CompanionStatBlockTemplate[] = [
     },
     senses: "Passive Perception 10",
     cr: "1/4",
-    traits: [WILD_SHAPE_DIRECTIONS],
+    polymorph: true,
+    traits: [],
     actions: [
       {
         name: "Hooves",
@@ -93,8 +107,8 @@ export const SRD_BEAST_FORMS: CompanionStatBlockTemplate[] = [
     },
     senses: "Darkvision 30 ft.; Passive Perception 10",
     cr: "0",
+    polymorph: true,
     traits: [
-      WILD_SHAPE_DIRECTIONS,
       {
         name: "Spider Climb",
         description:
@@ -130,8 +144,8 @@ export const SRD_BEAST_FORMS: CompanionStatBlockTemplate[] = [
     },
     senses: "Passive Perception 13",
     cr: "1/4",
+    polymorph: true,
     traits: [
-      WILD_SHAPE_DIRECTIONS,
       {
         name: "Pack Tactics",
         description:

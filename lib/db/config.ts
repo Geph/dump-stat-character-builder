@@ -52,5 +52,15 @@ export function formatDatabaseError(context: string, message: string): string {
       "Run Seed again (migrations apply automatically) or execute `pnpm db:migrate` with MYSQL_ROOT_PASSWORD set."
     )
   }
+  if (
+    message.includes("foreign key constraint") ||
+    message.includes("FOREIGN KEY") ||
+    message.includes("Cannot add or update a child row")
+  ) {
+    return (
+      `${context}: A saved reference points at compendium data that no longer exists (often after reseeding). ` +
+      "Re-select your class, subclass, species, and background in the builder, then save again."
+    )
+  }
   return `${context}: ${message}`
 }

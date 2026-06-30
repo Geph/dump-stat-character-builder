@@ -59,6 +59,12 @@ export interface FeatureChoice {
   /** Picks may be swapped out when finishing a rest (e.g. Fighting Style, Weapon Mastery). */
   swappableOnRest?: boolean
   /**
+   * Which rest unlocks a swap when `swappableOnRest` is set. Drives the wording of the
+   * functional swap control shown on the character sheet (e.g. Circle of the Land's land type
+   * is chosen "Whenever you finish a Long Rest"). Defaults to "long".
+   */
+  swapRestType?: "short" | "long" | null
+  /**
    * Links the choice to a class resource whose value scales the number of picks
    * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
    */
@@ -660,6 +666,8 @@ export interface Character {
   spell_ids: string[]
   feat_ids: string[]
   feat_choice_picks?: Record<string, string[]> | null
+  /** Player picks for in-feature option choices (e.g. Circle of the Land type), keyed by feature choice key. */
+  feature_choice_picks?: Record<string, string[]> | null
   modifier_player_picks?: Record<string, string[]> | null
   /** Per-companion HP overrides keyed by companion key. */
   companion_state?: import("@/lib/character/companion-stat-block").CharacterCompanionState[] | null

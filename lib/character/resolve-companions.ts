@@ -11,6 +11,7 @@ import {
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
+import { SRD_FAMILIAR, isFamiliarFeature } from "@/lib/character/srd-familiar"
 import type { CustomAbility, Feature } from "@/lib/types"
 
 type FeatureCarrier = {
@@ -48,6 +49,11 @@ function scanFeatures(
     const forms: CompanionStatBlockTemplate[] = [...(feature.companion_stat_blocks ?? [])]
     if (!forms.length && isDruidWildShapeFeature(ctx.className, feature.name)) {
       forms.push(...SRD_BEAST_FORMS)
+    }
+    // Find Familiar reskins (Druid Wild Companion, Warlock Pact of the Chain).
+    if (!forms.length && !feature.companion_stat_block && isFamiliarFeature(ctx.className, feature.name)) {
+      into.push({ source: baseSource(feature.name, feature.level), template: SRD_FAMILIAR })
+      continue
     }
     if (forms.length) {
       for (const template of forms) {
@@ -153,11 +159,31 @@ export function resolveCharacterCompanions(params: {
   classDetails: CharacterClassDetail[]
   customAbilities?: CustomAbility[]
   ctx: CompanionResolveContext
+  /** Source for a familiar granted by the Find Familiar spell (e.g. a Wizard who knows it). */
+  findFamiliarSpellSource?: { className: string; classId: string; subclassId?: string | null } | null
 }): ResolvedCompanion[] {
   const candidates = [
     ...collectCompanionCandidatesFromClasses(params.classDetails),
     ...collectCompanionCandidatesFromAbilities(params.customAbilities ?? []),
   ]
+
+  // A caster who knows Find Familiar gets the familiar too, unless a feature
+  // (Wild Companion, Pact of the Chain) already provided one.
+  const hasFamiliar = candidates.some((row) => row.template.name === SRD_FAMILIAR.name)
+  if (params.findFamiliarSpellSource && !hasFamiliar) {
+    candidates.push({
+      source: {
+        featureName: "Find Familiar",
+        featureLevel: 1,
+        className: params.findFamiliarSpellSource.className,
+        subclassName: null,
+        classId: params.findFamiliarSpellSource.classId,
+        subclassId: params.findFamiliarSpellSource.subclassId ?? null,
+      },
+      template: SRD_FAMILIAR,
+    })
+  }
+
   const byKey = new Map<string, ResolvedCompanion>()
   for (const row of candidates) {
     const resolved = resolveCompanion(row.template, row.source, params.ctx)

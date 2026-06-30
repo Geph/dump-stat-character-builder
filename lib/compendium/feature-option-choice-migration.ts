@@ -57,6 +57,7 @@ function mergeChoice(existing: FeatureChoice | undefined, incoming: FeatureChoic
     category: existing.category?.trim() ? existing.category : incoming.category,
     count: existing.count > 0 ? existing.count : incoming.count,
     swappableOnRest: existing.swappableOnRest ?? incoming.swappableOnRest,
+    swapRestType: existing.swapRestType ?? incoming.swapRestType,
     resourceKey: existing.resourceKey ?? incoming.resourceKey,
     options: existing.options?.length ? existing.options : incoming.options,
   }
