@@ -57,6 +57,8 @@ export type CompanionSource = {
   subclassName?: string | null
   classId: string
   subclassId?: string | null
+  /** Discriminator when a single feature provides multiple forms (e.g. Druid Beast forms). */
+  formName?: string | null
 }
 
 export type ResolvedCompanion = {
@@ -100,7 +102,8 @@ const ABILITY_KEY_MAP: Record<string, AbilityScoreKey> = {
 
 export function companionKey(source: CompanionSource): string {
   const subclass = source.subclassId ?? "none"
-  return `${source.classId}:${subclass}:${slugify(source.featureName)}`
+  const base = `${source.classId}:${subclass}:${slugify(source.featureName)}`
+  return source.formName ? `${base}:${slugify(source.formName)}` : base
 }
 
 export function slugify(value: string): string {

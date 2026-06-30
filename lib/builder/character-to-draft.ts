@@ -32,6 +32,7 @@ export function characterToDraft(character: Character): CharacterDraft {
     subclass_id: character.subclass_id,
     species_id: character.species_id,
     background_id: character.background_id,
+    size: character.size ?? null,
     strength: character.strength,
     dexterity: character.dexterity,
     constitution: character.constitution,

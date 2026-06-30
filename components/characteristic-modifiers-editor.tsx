@@ -75,7 +75,7 @@ import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { ClassResource } from "@/lib/types"
 import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
 import { formatSpellOptionLabel, type SpellOption } from "@/lib/compendium/spell-options"
-import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
+import { SRD_TOOL_NAMES, SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
 import {
   SRD_LANGUAGES,
   SRD_STANDARD_LANGUAGES,
@@ -904,22 +904,57 @@ function ToolProficienciesEditor({
         />
         <span className="text-muted-foreground">Player picks tools at build time</span>
       </label>
-      {choiceEnabled && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Pick</span>
-          <input
-            type="number"
-            min={1}
-            max={18}
-            value={mod.choiceCount ?? 1}
-            onChange={(e) =>
-              onChange({ ...mod, choiceCount: Math.max(1, parseInt(e.target.value, 10) || 1) })
-            }
-            className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
-          />
-          <span className="text-muted-foreground">tool(s) from the standard list</span>
-        </div>
-      )}
+      {choiceEnabled && (() => {
+        const poolValues = mod.choiceOptions ?? []
+        const restricted = poolValues.length > 0
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Pick</span>
+              <input
+                type="number"
+                min={1}
+                max={18}
+                value={mod.choiceCount ?? 1}
+                onChange={(e) =>
+                  onChange({ ...mod, choiceCount: Math.max(1, parseInt(e.target.value, 10) || 1) })
+                }
+                className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
+              />
+              <span className="text-muted-foreground">
+                tool(s) from {restricted ? "the list below" : "the standard list"}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Restrict pick list:</span>
+              <button
+                type="button"
+                onClick={() => onChange({ ...mod, choiceOptions: [...SRD_MUSICAL_INSTRUMENTS] })}
+                className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-primary"
+              >
+                Musical instruments
+              </button>
+              {restricted && (
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...mod, choiceOptions: null })}
+                  className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-destructive text-muted-foreground"
+                >
+                  Clear (use all tools)
+                </button>
+              )}
+            </div>
+            {restricted && (
+              <TagInput
+                values={poolValues}
+                onChange={(values) => onChange({ ...mod, choiceOptions: values })}
+                suggestions={[...SRD_MUSICAL_INSTRUMENTS, ...SRD_TOOL_NAMES]}
+                placeholder="Add options to the pick list..."
+              />
+            )}
+          </div>
+        )
+      })()}
       {!choiceEnabled && (
         <TagInput
           values={mod.values}
@@ -1364,6 +1399,57 @@ function ModifierFields({
           suggestions={SAVING_THROW_NAMES}
           placeholder="Add saving throw..."
         />
+      )
+
+    case "skill_check_alternate_ability":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Allows the listed skills&apos; ability checks to use a different ability modifier. Shows
+            up as a special action on the character sheet.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Use ability modifier</label>
+            <select
+              value={mod.ability}
+              onChange={(e) =>
+                onChange({ ...mod, ability: e.target.value as typeof mod.ability })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Skills (leave empty to allow any skill)
+            </p>
+            <TagInput
+              values={mod.skills}
+              onChange={(skills) => onChange({ ...mod, skills })}
+              suggestions={[...SKILL_NAMES]}
+              placeholder="Add skill..."
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Condition (optional)
+            </label>
+            <input
+              type="text"
+              value={mod.conditionLabel ?? ""}
+              onChange={(e) =>
+                onChange({ ...mod, conditionLabel: e.target.value || undefined })
+              }
+              placeholder="e.g. While your Rage is active"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
       )
 
     case "languages":

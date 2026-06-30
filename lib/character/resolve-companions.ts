@@ -10,6 +10,7 @@ import {
 } from "@/lib/character/companion-stat-block"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
+import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
 import type { CustomAbility, Feature } from "@/lib/types"
 
 type FeatureCarrier = {
@@ -17,6 +18,7 @@ type FeatureCarrier = {
   name: string
   description: string
   companion_stat_block?: CompanionStatBlockTemplate | null
+  companion_stat_blocks?: CompanionStatBlockTemplate[] | null
 }
 
 function scanFeatures(
@@ -30,22 +32,37 @@ function scanFeatures(
   },
   into: { source: CompanionSource; template: CompanionStatBlockTemplate }[],
 ) {
+  const baseSource = (featureName: string, featureLevel: number): CompanionSource => ({
+    featureName,
+    featureLevel,
+    className: ctx.className,
+    subclassName: ctx.subclassName ?? null,
+    classId: ctx.classId,
+    subclassId: ctx.subclassId ?? null,
+  })
+
   for (const feature of features ?? []) {
     if (feature.level > ctx.maxLevel) continue
+
+    // SRD Druid Beast forms (Rat, Riding Horse, Spider, Wolf) populate from Wild Shape.
+    const forms: CompanionStatBlockTemplate[] = [...(feature.companion_stat_blocks ?? [])]
+    if (!forms.length && isDruidWildShapeFeature(ctx.className, feature.name)) {
+      forms.push(...SRD_BEAST_FORMS)
+    }
+    if (forms.length) {
+      for (const template of forms) {
+        into.push({
+          source: { ...baseSource(feature.name, feature.level), formName: template.name },
+          template,
+        })
+      }
+      continue
+    }
+
     if (!isCompanionStatBlockFeature(feature)) continue
     const template = templateFromFeature(feature)
     if (!template) continue
-    into.push({
-      source: {
-        featureName: feature.name,
-        featureLevel: feature.level,
-        className: ctx.className,
-        subclassName: ctx.subclassName ?? null,
-        classId: ctx.classId,
-        subclassId: ctx.subclassId ?? null,
-      },
-      template,
-    })
+    into.push({ source: baseSource(feature.name, feature.level), template })
   }
 }
 
@@ -83,30 +100,53 @@ export function collectCompanionCandidatesFromClasses(
 export function collectCompanionCandidatesFromAbilities(
   abilities: CustomAbility[],
 ): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
-  return abilities
-    .filter((ability) => {
-      const row = ability as CustomAbility & { companion_stat_block?: CompanionStatBlockTemplate | null }
-      return Boolean(row.companion_stat_block) || isCompanionStatBlockFeature({ name: ability.name, description: ability.description ?? "" })
-    })
-    .map((ability) => {
-      const template =
-        (ability as CustomAbility & { companion_stat_block?: CompanionStatBlockTemplate }).companion_stat_block ??
-        templateFromFeature({
-          name: ability.name,
-          description: ability.description ?? "",
-        })
-      return {
-        source: {
-          featureName: ability.name,
-          featureLevel: 1,
-          className: ability.attached_to_type === "class" ? ability.attached_to_id ?? "Custom" : "Custom Ability",
-          subclassName: null,
-          classId: ability.attached_to_id ?? ability.id,
-          subclassId: null,
-        },
-        template: template ?? { name: ability.name, ac: { parts: [{ type: "fixed", value: 10 }] }, hp: { parts: [{ type: "fixed", value: 1 }] }, traits: [], actions: [] },
+  const out: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
+
+  for (const ability of abilities) {
+    const row = ability as CustomAbility & {
+      companion_stat_block?: CompanionStatBlockTemplate | null
+      companion_stat_blocks?: CompanionStatBlockTemplate[] | null
+    }
+    const baseSource: CompanionSource = {
+      featureName: ability.name,
+      featureLevel: 1,
+      className:
+        ability.attached_to_type === "class" ? ability.attached_to_id ?? "Custom" : "Custom Ability",
+      subclassName: null,
+      classId: ability.attached_to_id ?? ability.id,
+      subclassId: null,
+    }
+
+    const forms = row.companion_stat_blocks ?? []
+    if (forms.length) {
+      for (const template of forms) {
+        out.push({ source: { ...baseSource, formName: template.name }, template })
       }
+      continue
+    }
+
+    const hasSingle =
+      Boolean(row.companion_stat_block) ||
+      isCompanionStatBlockFeature({ name: ability.name, description: ability.description ?? "" })
+    if (!hasSingle) continue
+
+    const template =
+      row.companion_stat_block ??
+      templateFromFeature({ name: ability.name, description: ability.description ?? "" })
+    out.push({
+      source: baseSource,
+      template:
+        template ?? {
+          name: ability.name,
+          ac: { parts: [{ type: "fixed", value: 10 }] },
+          hp: { parts: [{ type: "fixed", value: 1 }] },
+          traits: [],
+          actions: [],
+        },
     })
+  }
+
+  return out
 }
 
 export function resolveCharacterCompanions(params: {

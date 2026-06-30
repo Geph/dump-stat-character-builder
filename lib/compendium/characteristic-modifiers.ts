@@ -223,6 +223,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "magical_sleep_immunity", label: "Magical Sleep Immunity" },
   { value: "creature_size", label: "Change Size" },
   { value: "movement_effects", label: "Movement-Related Effects (Passive)" },
+  {
+    value: "skill_check_alternate_ability",
+    label: "Alternate Ability for Skill Checks",
+    hint: "Let certain skill checks use a different ability (e.g. Primal Knowledge: STR while raging)",
+  },
 ] as const
 
 export type CharacteristicModifierType =
@@ -264,6 +269,11 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
   entries: SkillEntry[]
   /** Player picks any skill (e.g. Skilled feat). */
   allowAnySkill?: boolean
+  /**
+   * Player picks from the granting class's level-1 skill list (e.g. Barbarian Primal Knowledge).
+   * Resolved against the class's `skill_choices.options` when slots are built.
+   */
+  fromClassSkillList?: boolean
   /** When set, player chooses this many skills from entries / any-skill pool. */
   choiceCount?: number | null
   /** When true, chosen or listed skills grant Expertise instead of proficiency. */
@@ -277,6 +287,16 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
   values?: string[]
 }
 
+export interface SkillCheckAlternateAbilityCharacteristic extends CharacteristicModifierBase {
+  type: "skill_check_alternate_ability"
+  /** Ability whose modifier may be substituted for the listed skills' ability checks. */
+  ability: AbilityScoreKey
+  /** Skills whose ability checks can be made with the alternate ability (empty = any skill). */
+  skills: string[]
+  /** Optional condition gating the substitution (e.g. "While your Rage is active"). */
+  conditionLabel?: string
+}
+
 export interface ListCharacteristic extends CharacteristicModifierBase {
   type: ListCharacteristicType
   values: string[]
@@ -288,6 +308,11 @@ export interface ListCharacteristic extends CharacteristicModifierBase {
    * custom user-defined language regardless of pool.
    */
   choicePool?: "standard" | "standard_and_rare" | null
+  /**
+   * For `tool_proficiencies` choices, the explicit pool the player picks from
+   * (e.g. specific musical instruments). When empty, all SRD tools are offered.
+   */
+  choiceOptions?: string[] | null
 }
 
 export interface WeaponProficienciesCharacteristic extends CharacteristicModifierBase {
@@ -758,6 +783,7 @@ export interface GrantFeatCharacteristic extends CharacteristicModifierBase {
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
+  | SkillCheckAlternateAbilityCharacteristic
   | ListCharacteristic
   | WeaponProficienciesCharacteristic
   | AcCharacteristic
@@ -812,6 +838,8 @@ export function createCharacteristicModifier(
       return { id, type, mode: "fixed", bonuses: {} }
     case "skills":
       return { id, type, entries: [] }
+    case "skill_check_alternate_ability":
+      return { id, type, ability: "strength", skills: [] }
     case "languages":
     case "armor_proficiencies":
     case "tool_proficiencies":

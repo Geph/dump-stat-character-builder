@@ -10,8 +10,17 @@ export function enrichFeatureWithMechanicalDetection(
   feature: Feature,
   ctx: DetectFeatureContext,
 ): Feature {
-  const detections = detectFeatureModifiers(feature.description ?? "", ctx)
+  let detections = detectFeatureModifiers(feature.description ?? "", ctx)
   if (!detections.length) return feature
+
+  // Choice features describe per-option grants in their body text. Proficiency
+  // auto-detection on the full description would apply every sub-option reward
+  // at once (e.g. Druid Primal Order → Warden martial weapons without a pick).
+  if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
+    detections = detections.filter((detection) => !detection.ruleId.startsWith("proficiency."))
+  }
+  if (!detections.length) return feature
+
   return mergeDetectionsIntoFeature(feature, detections)
 }
 

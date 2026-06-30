@@ -28,6 +28,21 @@ const SPELL_SLOTS_HALF: ClassResource = {
 export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
   Barbarian: [
     {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      description:
+        "Number of Simple or Martial Melee weapon types whose mastery properties you can use. Reassign one mastered weapon when you finish a Long Rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        atLevelTable: [
+          { level: 1, count: 2 },
+          { level: 4, count: 3 },
+          { level: 10, count: 4 },
+        ],
+      },
+    },
+    {
       id: "rage",
       name: "Rage",
       description:
@@ -93,6 +108,22 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
     SPELL_SLOTS_FULL,
   ],
   Fighter: [
+    {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      description:
+        "Number of Simple or Martial weapon types whose mastery properties you can use. Reassign one mastered weapon when you finish a Long Rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        atLevelTable: [
+          { level: 1, count: 3 },
+          { level: 4, count: 4 },
+          { level: 10, count: 5 },
+          { level: 16, count: 6 },
+        ],
+      },
+    },
     {
       id: "second_wind",
       name: "Second Wind",
@@ -185,6 +216,13 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
   ],
   Paladin: [
     {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      description:
+        "Number of proficient weapon types whose mastery properties you can use. Reassign mastered weapons when you finish a Long Rest.",
+      uses: { type: "fixed", fixedAmount: 2 },
+    },
+    {
       id: "channel_divinity",
       name: "Channel Divinity",
       description: CHANNEL_DIVINITY_DESCRIPTION,
@@ -204,8 +242,24 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
     },
     SPELL_SLOTS_HALF,
   ],
-  Ranger: [SPELL_SLOTS_HALF],
+  Ranger: [
+    {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      description:
+        "Number of proficient weapon types whose mastery properties you can use. Reassign mastered weapons when you finish a Long Rest.",
+      uses: { type: "fixed", fixedAmount: 2 },
+    },
+    SPELL_SLOTS_HALF,
+  ],
   Rogue: [
+    {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      description:
+        "Number of eligible weapon types (Simple weapons and Martial Light/Finesse weapons) whose mastery properties you can use. Reassign mastered weapons when you finish a Long Rest.",
+      uses: { type: "fixed", fixedAmount: 2 },
+    },
     {
       id: "psionic_energy_dice",
       name: "Psionic Energy Dice",

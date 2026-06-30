@@ -80,7 +80,7 @@ const WARLOCK_PACT: Record<number, { count: number; slotLevel: number }> = {
   20: { count: 4, slotLevel: 5 },
 }
 
-export type CasterSlotType = "full" | "half" | "pact"
+export type CasterSlotType = "full" | "half" | "third" | "pact"
 
 export type SpellSlotTable = {
   type: CasterSlotType
@@ -103,6 +103,10 @@ export function getCasterSlotType(
   spellcasting: DndClass["spellcasting"] | null | undefined,
 ): CasterSlotType | null {
   if (!spellcasting) return null
+  // An explicit caster_progression authored on the class always wins.
+  const explicit = (spellcasting as { caster_progression?: CasterSlotType | null })
+    .caster_progression
+  if (explicit) return explicit
   if (spellcasting.type === "pact" || spellcasting.pact_magic || className === "Warlock") {
     return "pact"
   }
@@ -151,6 +155,20 @@ export function getSpellSlotTable(
     }
   }
 
+  if (type === "third") {
+    // 1/3 casters (Eldritch Knight, Arcane Trickster) gain slots starting at class level 3.
+    if (level < 3) {
+      return { type: "third", slotsByLevel: [], className, classLevel: level }
+    }
+    const effectiveLevel = Math.ceil(level / 3)
+    return {
+      type: "third",
+      slotsByLevel: fullCasterSlotsAtLevel(effectiveLevel),
+      className,
+      classLevel: level,
+    }
+  }
+
   return {
     type: "full",
     slotsByLevel: fullCasterSlotsAtLevel(level),
@@ -169,22 +187,24 @@ export function getMulticlassSpellSlotTables(
 }
 
 /** Representative SRD class name for a caster progression type. */
-function casterTypeClassName(casterType: "full" | "half" | "pact"): string {
+function casterTypeClassName(casterType: CasterSlotType): string {
   if (casterType === "pact") return "Warlock"
   if (casterType === "half") return "Paladin"
+  if (casterType === "third") return "Arcane Trickster"
   return "Wizard"
 }
 
 /** Minimal spellcasting shape so getCasterSlotType resolves the right progression. */
-function casterTypeSpellcasting(
-  casterType: "full" | "half" | "pact",
-): DndClass["spellcasting"] {
-  return { type: casterType === "pact" ? "pact" : "spellcasting" } as DndClass["spellcasting"]
+function casterTypeSpellcasting(casterType: CasterSlotType): DndClass["spellcasting"] {
+  return {
+    type: casterType === "pact" ? "pact" : "spellcasting",
+    caster_progression: casterType,
+  } as DndClass["spellcasting"]
 }
 
 /** Spell slot table for a caster progression type at a character level (no class row needed). */
 export function spellSlotTableForCasterType(
-  casterType: "full" | "half" | "pact",
+  casterType: CasterSlotType,
   classLevel: number,
 ): SpellSlotTable | null {
   return getSpellSlotTable(
@@ -196,7 +216,7 @@ export function spellSlotTableForCasterType(
 
 /** Total spell slots (summed across spell levels) for a caster type at a level. */
 export function totalSpellSlotsForCasterType(
-  casterType: "full" | "half" | "pact",
+  casterType: CasterSlotType,
   classLevel: number,
 ): number {
   const table = spellSlotTableForCasterType(casterType, classLevel)
@@ -210,7 +230,7 @@ export function totalSpellSlotsForCasterType(
  * a single total per character level.
  */
 export function spellSlotResourceUsesForCasterType(
-  casterType: "full" | "half" | "pact",
+  casterType: CasterSlotType,
 ): import("@/lib/types").UsesConfig {
   return {
     type: "spell_slots",

@@ -39,6 +39,7 @@ interface SpeciesFormData {
   description: string
   speed: number
   size: string
+  size_options: string[]
   creature_type: string
   traits: Trait[]
   characteristics: CharacteristicModifier[]
@@ -58,6 +59,7 @@ const defaultSpecies: SpeciesFormData = {
   description: "",
   speed: 30,
   size: "Medium",
+  size_options: [],
   creature_type: "Humanoid",
   traits: [{ name: "", description: "", level: 1 }],
   characteristics: [],
@@ -109,6 +111,9 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             description: enriched.description || "",
             speed: enriched.speed || 30,
             size: enriched.size || "Medium",
+            size_options: Array.isArray((enriched as { size_options?: unknown }).size_options)
+              ? ((enriched as { size_options?: string[] }).size_options as string[])
+              : [],
             creature_type: enriched.creature_type || "Humanoid",
             traits: enriched.traits?.length ? enriched.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
             characteristics: normalizeCharacteristics(enriched.characteristics, null),
@@ -135,6 +140,8 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
     const db = createClient()
     const payload = {
       ...form,
+      // Only persist a size choice when there are 2+ distinct options.
+      size_options: form.size_options.length >= 2 ? form.size_options : null,
       traits: form.traits.filter(t => t.name.trim()),
       creator_url: normalizeCreatorUrl(form.creator_url),
     }
@@ -356,6 +363,43 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                   <option key={size} value={size}>{size}</option>
                 ))}
               </select>
+              <div className="mt-2">
+                <p className="text-xs text-muted-foreground mb-1">
+                  Size choice (check 2+ to let players pick at character creation)
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {SPECIES_SIZES.map((size) => {
+                    const checked = form.size_options.includes(size)
+                    return (
+                      <label key={size} className="flex items-center gap-1.5 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setForm((prev) => {
+                              const next = e.target.checked
+                                ? [...prev.size_options, size]
+                                : prev.size_options.filter((s) => s !== size)
+                              const ordered: string[] = SPECIES_SIZES.filter((s) =>
+                                next.includes(s),
+                              )
+                              return {
+                                ...prev,
+                                size_options: ordered,
+                                size:
+                                  ordered.length > 0 && !ordered.includes(prev.size)
+                                    ? ordered[0]
+                                    : prev.size,
+                              }
+                            })
+                          }}
+                        />
+                        {size}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">

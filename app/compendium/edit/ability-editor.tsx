@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -17,7 +16,13 @@ import {
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
-import { ModifierCatalogPicker } from "@/components/compendium/modifier-catalog-picker"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import {
+  normalizeLinkedModifiers,
+  readLinkedModifiers,
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
@@ -42,6 +47,7 @@ interface AbilityFormData {
   prerequisites: string
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
+  linked_modifiers: LinkedModifierInstance[]
   attached_to_type: string
   attached_to_id: string
   show_in_builder: boolean
@@ -58,6 +64,7 @@ const defaultAbility: AbilityFormData = {
   prerequisites: "",
   characteristics: [],
   modifier_refs: [],
+  linked_modifiers: [],
   attached_to_type: "",
   attached_to_id: "",
   show_in_builder: false,
@@ -120,6 +127,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               prerequisites: data.prerequisites || "",
               characteristics: normalizeCharacteristics(data.characteristics, data.uses),
               modifier_refs: readModifierRefs(data as Record<string, unknown>),
+              linked_modifiers: readLinkedModifiers(data as Record<string, unknown>, modifierCatalog),
               attached_to_type: data.attached_to_type || "",
               attached_to_id: data.attached_to_id || "",
               show_in_builder: data.show_in_builder ?? false,
@@ -135,7 +143,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
       }
       fetchAbility()
     }
-  }, [id, isCatalogEditor])
+  }, [id, isCatalogEditor, modifierCatalog])
 
   // Fetch attach targets when type changes (equipment uses categories, not item IDs)
   useEffect(() => {
@@ -214,6 +222,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     const payload = {
       ...form,
       attached_to_id: form.attached_to_id || null,
+      modifier_refs: syncModifierRefs({ linkedModifiers: form.linked_modifiers }).modifierRefs,
       uses: extractUsesConfig(form.characteristics),
       creator_url: normalizeCreatorUrl(form.creator_url),
     }
@@ -406,27 +415,20 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             />
           </div>
 
-          <ModifierCatalogPicker
-            value={form.modifier_refs}
-            onChange={(modifier_refs) => setForm({ ...form, modifier_refs })}
+          <LinkedModifiersEditor
+            value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
+            onChange={(linked_modifiers) =>
+              setForm((prev) => ({
+                ...prev,
+                linked_modifiers,
+                modifier_refs: syncModifierRefs({ linkedModifiers: linked_modifiers }).modifierRefs,
+              }))
+            }
             catalog={modifierCatalog}
             label="Modifier effects (from shared catalog)"
+            spellOptions={allSpells}
+            otherAbilities={otherAbilities}
           />
-
-          <details className="rounded-xl border border-border p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-foreground">
-              Legacy inline modifiers (optional)
-            </summary>
-            <p className="text-xs text-muted-foreground mt-2 mb-3">
-              Prefer the shared catalog above. Inline modifiers remain supported for older content.
-            </p>
-            <CharacteristicModifiersEditor
-              value={form.characteristics}
-              onChange={(characteristics) => setForm({ ...form, characteristics })}
-              otherAbilities={otherAbilities}
-              spellOptions={allSpells}
-            />
-          </details>
 
           {/* Show in Builder Checkbox */}
           <div className="bg-card border-2 border-border rounded-xl p-4">

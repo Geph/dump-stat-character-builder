@@ -28,3 +28,38 @@ export const SRD_TOOL_NAMES = [
   "Weaver's Tools",
   "Woodcarver's Tools",
 ] as const
+
+/** Specific artisan's tools from the SRD (the "Artisan's Tools" tool category). */
+export const SRD_ARTISANS_TOOLS = [
+  "Alchemist's Supplies",
+  "Brewer's Supplies",
+  "Calligrapher's Supplies",
+  "Carpenter's Tools",
+  "Cartographer's Tools",
+  "Cobbler's Tools",
+  "Cook's Utensils",
+  "Glassblower's Tools",
+  "Jeweler's Tools",
+  "Leatherworker's Tools",
+  "Mason's Tools",
+  "Painter's Supplies",
+  "Potter's Tools",
+  "Smith's Tools",
+  "Tinker's Tools",
+  "Weaver's Tools",
+  "Woodcarver's Tools",
+] as const
+
+/** Specific musical instruments from the SRD (the "Musical Instrument" tool category). */
+export const SRD_MUSICAL_INSTRUMENTS = [
+  "Bagpipes",
+  "Drum",
+  "Dulcimer",
+  "Flute",
+  "Horn",
+  "Lute",
+  "Lyre",
+  "Pan Flute",
+  "Shawm",
+  "Viol",
+] as const

@@ -245,6 +245,8 @@ export interface Feature {
   activation?: FeatureActivation | null
   /** Parsed companion/minion stat block for the Companions sheet tab. */
   companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
+  /** Multiple stat blocks when one feature grants several forms (e.g. Druid Beast forms). */
+  companion_stat_blocks?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate[] | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
   /** Cleared when the user edits modifier wiring in the compendium after import. */
@@ -297,6 +299,8 @@ export interface Species {
   description: string | null
   speed: number | { [key: string]: number } // e.g. { walking: 30, climbing: 30 }
   size: string | null
+  /** When the species offers a size choice (e.g. Small or Medium), the selectable sizes. */
+  size_options?: string[] | null
   creature_type: string | null
   traits: Trait[]
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
@@ -348,6 +352,8 @@ export interface DndClass {
   spellcasting: {
     ability: string
     type?: "prepared" | "pact"
+    /** Explicit spell-slot progression. Overrides name-based heuristics when set. */
+    caster_progression?: "full" | "half" | "third" | "pact"
     cantrips?: number
     spells_known?: number
     prepared?: boolean
@@ -413,7 +419,7 @@ export interface UsesConfig {
    * spell-level slot breakdown is derived from the canonical tables rather than
    * stored as a flat tier count.
    */
-  casterType?: "full" | "half" | "pact"
+  casterType?: "full" | "half" | "third" | "pact"
   fixedAmount?: number
   abilityModifier?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
   customAbilityId?: string
@@ -455,6 +461,8 @@ export interface CustomAbility {
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   modifier_catalog?: import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[] | null
   modifierRefs?: string[] | null
+  /** Configurable modifier instances (catalog reference + edited values), mirroring feats/features. */
+  linked_modifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null
   is_system?: boolean
   attached_to_type: string | null
   attached_to_id: string | null
@@ -463,6 +471,8 @@ export interface CustomAbility {
   show_in_builder: boolean
   /** Structured stat block when this ability represents a class companion. */
   companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
+  /** Multiple stat blocks when one ability grants several forms (e.g. Druid Beast forms). */
+  companion_stat_blocks?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate[] | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
@@ -609,6 +619,8 @@ export interface Character {
   class_add_order?: string[] | null
   species_id: string | null
   background_id: string | null
+  /** Chosen size when the species offers a size choice; otherwise null (defaults to species size). */
+  size?: string | null
   strength: number
   dexterity: number
   constitution: number
@@ -662,6 +674,7 @@ export interface CharacterDraft {
   subclass_id?: string | null
   species_id: string | null
   background_id: string | null
+  size?: string | null
   strength: number
   dexterity: number
   constitution: number

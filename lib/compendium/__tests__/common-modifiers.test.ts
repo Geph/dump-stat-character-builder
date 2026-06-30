@@ -179,6 +179,49 @@ describe("canonical SRD feature choices", () => {
     ])
   })
 
+  const optionExtraDamageRows = (feature: Feature, optionName: string) => {
+    const option = feature.choices?.options.find((opt) => opt.name === optionName)
+    const effects = (option?.linkedModifiers ?? []).flatMap(
+      (instance) => instance.activation?.effects ?? [],
+    )
+    const damage = effects.find((effect) => (effect as { kind?: string }).kind === "extra_damage_on_hit")
+    return (damage as { bonusByLevel?: { level: number; dieCount?: number | null; dieType?: string | null }[] })
+      ?.bonusByLevel
+  }
+
+  it("scales Divine Strike extra damage 1d8 → 2d8 at Cleric level 14", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Cleric", baseFeature("Blessed Strikes"))
+    const rows = optionExtraDamageRows(enriched, "Divine Strike")
+    expect(rows).toEqual([
+      { level: 7, mode: "dice", dieCount: 1, dieType: "d8" },
+      { level: 14, mode: "dice", dieCount: 2, dieType: "d8" },
+    ])
+  })
+
+  it("scales Primal Strike extra damage 1d8 → 2d8 at Druid level 15", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Druid", baseFeature("Elemental Fury"))
+    const rows = optionExtraDamageRows(enriched, "Primal Strike")
+    expect(rows).toEqual([
+      { level: 7, mode: "dice", dieCount: 1, dieType: "d8" },
+      { level: 15, mode: "dice", dieCount: 2, dieType: "d8" },
+    ])
+  })
+
+  it("does not offer a redundant re-pick on the Improved scaling features", () => {
+    for (const [className, featureName] of [
+      ["Cleric", "Improved Blessed Strikes"],
+      ["Druid", "Improved Elemental Fury"],
+    ] as const) {
+      const enriched = enrichClassFeatureWithModifierPresets(className, baseFeature(featureName))
+      expect(enriched.isChoice ?? false).toBe(false)
+      const characteristicTypes = (enriched.linkedModifiers ?? []).flatMap((instance) =>
+        (instance.characteristics ?? []).map((c) => c.type),
+      )
+      expect(characteristicTypes).not.toContain("feature_option_picker")
+      expect(characteristicTypes).not.toContain("bonus_damage_riders")
+    }
+  })
+
   it("wires Hunter's Prey with Colossus Slayer and Horde Breaker options", () => {
     const enriched = enrichClassFeatureWithModifierPresets("Ranger", baseFeature("Hunter's Prey"))
     expect(enriched.choices?.options.map((option) => option.name)).toEqual([
@@ -186,5 +229,77 @@ describe("canonical SRD feature choices", () => {
       "Horde Breaker",
     ])
     expect(enriched.choices?.swappableOnRest).toBe(true)
+  })
+
+  it("wires Primal Knowledge to a class-skill-list pick and a STR-while-raging skill check", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Barbarian", baseFeature("Primal Knowledge"))
+    const chars =
+      enriched.linkedModifiers?.flatMap((mod) => mod.characteristics ?? []) ?? []
+
+    const skillMod = chars.find((char) => char.type === "skills")
+    expect(skillMod?.type).toBe("skills")
+    if (skillMod?.type === "skills") {
+      expect(skillMod.fromClassSkillList).toBe(true)
+      expect(skillMod.allowAnySkill).toBeFalsy()
+      expect(skillMod.choiceCount).toBe(1)
+    }
+
+    const altMod = chars.find((char) => char.type === "skill_check_alternate_ability")
+    expect(altMod?.type).toBe("skill_check_alternate_ability")
+    if (altMod?.type === "skill_check_alternate_ability") {
+      expect(altMod.ability).toBe("strength")
+      expect(altMod.conditionLabel).toContain("Rage")
+      expect(altMod.skills).toEqual([
+        "Acrobatics",
+        "Intimidation",
+        "Perception",
+        "Stealth",
+        "Survival",
+      ])
+    }
+  })
+
+  it("wires Expertise to a 2-skill player choice that grants expertise", () => {
+    const enriched = enrichClassFeatureWithModifierPresets("Bard", baseFeature("Expertise"))
+    const chars =
+      enriched.linkedModifiers?.flatMap((mod) => mod.characteristics ?? []) ?? []
+    const skillMod = chars.find((char) => char.type === "skills")
+    expect(skillMod?.type).toBe("skills")
+    if (skillMod?.type === "skills") {
+      expect(skillMod.choiceCount).toBe(2)
+      expect(skillMod.grantExpertise).toBe(true)
+    }
+  })
+
+  it("wires Bard Magical Secrets as expanded spell-list access (not a fixed grant)", () => {
+    const enriched = enrichClassFeatureWithModifierPresets(
+      "Bard",
+      { ...baseFeature("Magical Secrets"), level: 10 },
+    )
+    const chars =
+      enriched.linkedModifiers?.flatMap((mod) => mod.characteristics ?? []) ?? []
+    const accessMod = chars.find((char) => char.type === "spell_list_access")
+    expect(accessMod?.type).toBe("spell_list_access")
+    if (accessMod?.type === "spell_list_access") {
+      expect(accessMod.classNames).toEqual(["Bard", "Cleric", "Druid", "Wizard"])
+    }
+    // It must NOT grant fixed extra spells (the old 2014 behavior).
+    expect(chars.some((char) => char.type === "spells_known")).toBe(false)
+  })
+
+  it("wires Bard Bardic Inspiration with a choose-3 musical instrument pick", () => {
+    const enriched = enrichClassFeatureWithModifierPresets(
+      "Bard",
+      baseFeature("Bardic Inspiration"),
+    )
+    const chars =
+      enriched.linkedModifiers?.flatMap((mod) => mod.characteristics ?? []) ?? []
+    const toolMod = chars.find((char) => char.type === "tool_proficiencies")
+    expect(toolMod?.type).toBe("tool_proficiencies")
+    if (toolMod?.type === "tool_proficiencies") {
+      expect(toolMod.choiceCount).toBe(3)
+      expect(toolMod.choiceOptions).toContain("Lute")
+      expect(toolMod.choiceOptions).toContain("Viol")
+    }
   })
 })

@@ -13,13 +13,14 @@ import {
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import {
   effectiveLinkedModifiers,
+  readLinkedModifiers,
   resolveLinkedModifiers,
 } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
-import type { DndClass, Feat, Feature, Spell, Subclass } from "@/lib/types"
+import type { DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
 export type ModifierPlayerChoiceKind =
   | "skill"
@@ -46,6 +47,11 @@ export type ModifierPlayerChoiceSlot = {
   sharedChoiceModIds?: string[]
   /** When true, the player may add custom free-text options (e.g. user-defined languages). */
   allowCustom?: boolean
+  /**
+   * When true, this skill choice grants Expertise on existing proficiencies, so the
+   * picker must NOT hide skills already chosen elsewhere in the build.
+   */
+  grantsExpertise?: boolean
 }
 
 const SKILL_NAME_SET = new Set<string>(SKILL_NAMES)
@@ -106,10 +112,13 @@ export function characteristicsForFeatSelection(
   return characteristicsFromLinkedModifiers(catalog, instances, refs)
 }
 
+type SlotBuildContext = { classSkillList?: string[] }
+
 function slotsFromCharacteristic(
   mod: CharacteristicModifier,
   sourceKey: string,
   sourceLabel: string,
+  context?: SlotBuildContext,
 ): ModifierPlayerChoiceSlot[] {
   const slots: ModifierPlayerChoiceSlot[] = []
 
@@ -122,9 +131,13 @@ function slotsFromCharacteristic(
     const count = skillMod.choiceCount ?? 0
     if (count <= 0) return slots
 
-    const options = skillMod.allowAnySkill
-      ? SKILL_NAMES.map((name) => ({ name }))
-      : (skillMod.entries ?? []).map((entry) => ({ name: entry.skill }))
+    const classSkillList = context?.classSkillList ?? []
+    const options =
+      skillMod.fromClassSkillList && classSkillList.length > 0
+        ? classSkillList.map((name) => ({ name }))
+        : skillMod.allowAnySkill
+          ? SKILL_NAMES.map((name) => ({ name }))
+          : (skillMod.entries ?? []).map((entry) => ({ name: entry.skill }))
 
     if (options.length === 0) return slots
 
@@ -137,6 +150,7 @@ function slotsFromCharacteristic(
       label: mod.label ?? `Choose ${count} skill${count === 1 ? "" : "s"}`,
       maxCount: count,
       options,
+      grantsExpertise: skillMod.grantExpertise ?? false,
     })
     return slots
   }
@@ -144,6 +158,9 @@ function slotsFromCharacteristic(
   if (mod.type === "tool_proficiencies") {
     const count = mod.choiceCount ?? 0
     if (count <= 0) return slots
+
+    const customPool = (mod.choiceOptions ?? []).filter((name) => name.trim().length > 0)
+    const pool = customPool.length > 0 ? customPool : [...SRD_TOOL_NAMES]
 
     slots.push({
       slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "tool"),
@@ -153,7 +170,7 @@ function slotsFromCharacteristic(
       kind: "tool",
       label: mod.label ?? `Choose ${count} tool${count === 1 ? "" : "s"}`,
       maxCount: count,
-      options: SRD_TOOL_NAMES.map((name) => ({ name })),
+      options: pool.map((name) => ({ name })),
     })
     return slots
   }
@@ -271,10 +288,11 @@ function slotsFromCharacteristics(
   mods: CharacteristicModifier[],
   sourceKey: string,
   sourceLabel: string,
+  context?: SlotBuildContext,
 ): ModifierPlayerChoiceSlot[] {
   const slots: ModifierPlayerChoiceSlot[] = []
   for (const mod of mods) {
-    slots.push(...slotsFromCharacteristic(mod, sourceKey, sourceLabel))
+    slots.push(...slotsFromCharacteristic(mod, sourceKey, sourceLabel, context))
   }
   slots.push(...slotsFromSharedChoiceGroups(mods, sourceKey, sourceLabel))
   return slots
@@ -296,9 +314,10 @@ function collectSlotsFromFeature(
   className: string,
   featureChoicePicks: Record<string, string[]>,
   catalog: ModifierCatalogEntry[],
+  context?: SlotBuildContext,
 ): ModifierPlayerChoiceSlot[] {
   const feature = migrateFeatureOptionPickers(rawFeature)
-  const sourceKey = featureChoiceKey(classId, feature.name)
+  const sourceKey = featureChoiceKey(classId, feature.name, feature.level)
   const sourceLabel = `${className}: ${feature.name}`
   const slots: ModifierPlayerChoiceSlot[] = []
 
@@ -307,7 +326,7 @@ function collectSlotsFromFeature(
     effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog),
     feature.modifierRefs,
   )
-  slots.push(...slotsFromCharacteristics(baseMods, sourceKey, sourceLabel))
+  slots.push(...slotsFromCharacteristics(baseMods, sourceKey, sourceLabel, context))
 
   if (feature.isChoice && feature.choices?.options?.length) {
     const picked = featureChoicePicks[sourceKey] ?? []
@@ -319,7 +338,7 @@ function collectSlotsFromFeature(
         effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
         option.modifierRefs,
       )
-      slots.push(...slotsFromCharacteristics(optionMods, sourceKey, sourceLabel))
+      slots.push(...slotsFromCharacteristics(optionMods, sourceKey, sourceLabel, context))
     }
   }
 
@@ -343,10 +362,19 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
     const cls = classes.find((candidate) => candidate.id === entry.classId)
     if (!cls) continue
 
+    const context: SlotBuildContext = { classSkillList: cls.skill_choices?.options ?? [] }
+
     for (const feature of cls.features ?? []) {
       if (feature.level > entry.level) continue
       slots.push(
-        ...collectSlotsFromFeature(feature, entry.classId, cls.name, featureChoicePicks, catalog),
+        ...collectSlotsFromFeature(
+          feature,
+          entry.classId,
+          cls.name,
+          featureChoicePicks,
+          catalog,
+          context,
+        ),
       )
     }
 
@@ -363,11 +391,66 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
             `${cls.name} (${subclass.name})`,
             featureChoicePicks,
             catalog,
+            context,
           ),
         )
       }
     }
   }
+
+  return slots
+}
+
+export function speciesModsSourceKey(speciesId: string): string {
+  return `species:${speciesId}:mods`
+}
+
+export function speciesTraitSourceKey(speciesId: string, traitIndex: number): string {
+  return `species:${speciesId}:trait:${traitIndex}`
+}
+
+/** Skill/tool/language/spell picks granted by a species (species-wide or per trait). */
+export function collectSpeciesModifierPlayerChoiceSlots(
+  species: Species | null | undefined,
+  speciesTraitPicks: Record<string, string[]>,
+  catalog: ModifierCatalogEntry[],
+): ModifierPlayerChoiceSlot[] {
+  if (!species) return []
+  const slots: ModifierPlayerChoiceSlot[] = []
+
+  const speciesRow = species as unknown as Record<string, unknown>
+  const speciesWide = characteristicsFromLinkedModifiers(
+    catalog,
+    readLinkedModifiers(speciesRow, catalog),
+    readModifierRefs(speciesRow),
+  )
+  slots.push(
+    ...slotsFromCharacteristics(speciesWide, speciesModsSourceKey(species.id), species.name),
+  )
+
+  species.traits?.forEach((trait, index) => {
+    const sourceKey = speciesTraitSourceKey(species.id, index)
+    const baseMods = characteristicsFromLinkedModifiers(
+      catalog,
+      effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog),
+      trait.modifierRefs,
+    )
+    slots.push(...slotsFromCharacteristics(baseMods, sourceKey, trait.name))
+
+    if (trait.isChoice && trait.choices?.options?.length) {
+      const picked = speciesTraitPicks[String(index)] ?? []
+      for (const optionName of picked) {
+        const option = trait.choices.options.find((entry) => entry.name === optionName)
+        if (!option) continue
+        const optionMods = characteristicsFromLinkedModifiers(
+          catalog,
+          effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
+          option.modifierRefs,
+        )
+        slots.push(...slotsFromCharacteristics(optionMods, sourceKey, trait.name))
+      }
+    }
+  })
 
   return slots
 }
@@ -382,6 +465,8 @@ export function collectModifierPlayerChoiceSlots(params: {
   subclasses?: Subclass[]
   subclassByClassId?: Record<string, string>
   featureChoicePicks?: Record<string, string[]>
+  species?: Species | null
+  speciesTraitPicks?: Record<string, string[]>
 }): ModifierPlayerChoiceSlot[] {
   const {
     featEntries,
@@ -393,6 +478,8 @@ export function collectModifierPlayerChoiceSlots(params: {
     subclasses = [],
     subclassByClassId = {},
     featureChoicePicks = {},
+    species = null,
+    speciesTraitPicks = {},
   } = params
   const slots: ModifierPlayerChoiceSlot[] = []
 
@@ -420,6 +507,12 @@ export function collectModifierPlayerChoiceSlots(params: {
         featureChoicePicks,
         catalog,
       }),
+    )
+  }
+
+  if (species) {
+    slots.push(
+      ...collectSpeciesModifierPlayerChoiceSlots(species, speciesTraitPicks, catalog),
     )
   }
 

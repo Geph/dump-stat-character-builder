@@ -90,7 +90,9 @@ import {
   getBackgroundStartingGold,
 } from "@/lib/compendium/background-equipment"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
+import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
 import {
   classNeedsSubclass,
@@ -102,6 +104,8 @@ import {
   validateClassStepChoices,
   validateOriginStepChoices,
 } from "@/lib/builder/choices"
+import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
+import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
 import {
   clearBuilderDraft,
   loadBuilderDraft,
@@ -134,11 +138,14 @@ import {
 } from "@/lib/builder/feat-choices"
 import { getSpeciesFeatPickSlots } from "@/lib/builder/species-feat-options"
 import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-choice-picker"
+import { ClassLevelInput } from "@/components/builder/class-level-input"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import {
   clearModifierPicksForSource,
   collectModifierPlayerChoiceSlots,
   setModifierPlayerPickValue,
+  speciesModsSourceKey,
+  speciesTraitSourceKey,
   validateModifierPlayerChoices,
 } from "@/lib/builder/modifier-player-choices"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -382,7 +389,7 @@ export default function BuilderPage() {
       snapshot.backgroundStartingEquipmentOptionIndex ?? null,
     )
     setGoldPurchasedEquipmentIds(snapshot.goldPurchasedEquipmentIds ?? [])
-    setCardViewMode(snapshot.cardViewMode ?? "cinematic")
+    setCardViewMode(snapshot.cardViewMode ?? layoutToCardViewMode(getBuilderLayout()))
     setPreviewTab(snapshot.previewTab)
     setMobilePanel(snapshot.mobilePanel)
     setEquippedArmorId(snapshot.equippedArmorId)
@@ -554,12 +561,15 @@ export default function BuilderPage() {
 
   useEffect(() => {
     if (editIdParam) {
+      setCardViewMode(layoutToCardViewMode(getBuilderLayout()))
       setDraftReady(true)
       return
     }
     const draft = loadBuilderDraft()
     if (draft) {
       applyBuilderSnapshot(draft)
+    } else {
+      setCardViewMode(layoutToCardViewMode(getBuilderLayout()))
     }
     setDraftReady(true)
   }, [editIdParam])
@@ -976,6 +986,8 @@ export default function BuilderPage() {
         subclasses,
         subclassByClassId,
         featureChoicePicks,
+        species: selectedSpecies,
+        speciesTraitPicks,
       }),
     [
       featSelectionEntries,
@@ -987,6 +999,8 @@ export default function BuilderPage() {
       subclasses,
       subclassByClassId,
       featureChoicePicks,
+      selectedSpecies,
+      speciesTraitPicks,
     ],
   )
 
@@ -1561,6 +1575,7 @@ export default function BuilderPage() {
         subclass_id: validSubclassId,
         species_id: validSpeciesId,
         background_id: validBackgroundId,
+        size: validSpeciesId ? (character.size ?? selectedSpecies?.size ?? null) : null,
         strength: snapshot.strength,
         dexterity: snapshot.dexterity,
         constitution: snapshot.constitution,
@@ -1727,6 +1742,8 @@ export default function BuilderPage() {
                 speciesFeatPickSlots.some(
                   (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
                 ) ||
+                (character.species_id != null &&
+                  slot.sourceKey.startsWith(`species:${character.species_id}:`)) ||
                 slot.sourceKey ===
                   (backgroundGrantedFeat?.id
                     ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
@@ -2029,7 +2046,25 @@ export default function BuilderPage() {
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
-                              <span className="w-6 text-center font-bold text-sm">{cl.level}</span>
+                              <ClassLevelInput
+                                value={cl.level}
+                                min={1}
+                                max={20 - (totalLevel - cl.level)}
+                                aria-label={`${cls?.name ?? "Class"} level`}
+                                onCommit={(level) => {
+                                  const newLevels = [...activeClassLevels]
+                                  newLevels[idx] = { ...newLevels[idx], level }
+                                  if (level < SUBCLASS_LEVEL) {
+                                    setSubclassByClassId((prev) => {
+                                      const next = { ...prev }
+                                      delete next[newLevels[idx].classId]
+                                      return next
+                                    })
+                                  }
+                                  setClassLevels(newLevels)
+                                }}
+                                className="w-8 text-center font-bold text-sm bg-background border border-border rounded px-0.5 py-0.5 focus:outline-none focus:border-primary"
+                              />
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2328,33 +2363,60 @@ export default function BuilderPage() {
                           )}
 
                           {eligibleFeatures.map((feature) => {
-                            const key = featureChoiceKey(entry.classId, feature.name)
+                            const key = featureChoiceKey(entry.classId, feature.name, feature.level)
+                            const choiceCount = resolveFeatureChoiceCount(
+                              feature.choices!,
+                              entry.level,
+                              cls.name,
+                            )
+                            const isWeaponMastery =
+                              feature.choices?.resourceKey === "weapon_mastery"
+                            const masteryHint = isWeaponMastery
+                              ? `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""}.`
+                              : feature.choices!.category
+                            const handleFeatureChoiceChange = (selected: string[]) => {
+                              setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
+                              setModifierPlayerPicks((prev) =>
+                                clearModifierPicksForSource(prev, key),
+                              )
+                            }
                             return (
                               <div key={key} className="space-y-2">
-                                <MultiSelectChoices
-                                  title={feature.name}
-                                  hint={feature.choices!.category}
-                                  options={feature.choices?.options ?? []}
-                                  maxCount={feature.choices!.count}
-                                  selected={featureChoicePicks[key] ?? []}
-                                  unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
-                                  showSkillInfo={
-                                    feature.choices!.category.toLowerCase().includes("skill")
-                                  }
-                                  onChange={(selected) => {
-                                    setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
-                                    setModifierPlayerPicks((prev) =>
-                                      clearModifierPicksForSource(prev, key),
-                                    )
-                                  }}
-                                  accentClass="border-accent bg-accent/10"
-                                />
+                                {isWeaponMastery ? (
+                                  <WeaponMasteryChoices
+                                    title={feature.name}
+                                    hint={masteryHint}
+                                    options={feature.choices?.options ?? []}
+                                    maxCount={choiceCount}
+                                    selected={featureChoicePicks[key] ?? []}
+                                    unavailableOptions={[
+                                      ...getTakenSkills(skillPickSources, `feature:${key}`),
+                                    ]}
+                                    onChange={handleFeatureChoiceChange}
+                                    layout={cardViewMode === "cinematic" ? "visual" : "compact"}
+                                  />
+                                ) : (
+                                  <MultiSelectChoices
+                                    title={feature.name}
+                                    hint={masteryHint}
+                                    options={feature.choices?.options ?? []}
+                                    maxCount={choiceCount}
+                                    selected={featureChoicePicks[key] ?? []}
+                                    unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
+                                    showSkillInfo={
+                                      feature.choices!.category.toLowerCase().includes("skill")
+                                    }
+                                    onChange={handleFeatureChoiceChange}
+                                    accentClass="border-accent bg-accent/10"
+                                  />
+                                )}
                                 <ModifierPlayerChoicePanel
                                   sourceKey={key}
                                   sourceLabel={`${cls.name}: ${feature.name}`}
                                   slots={modifierPlayerChoiceSlots}
                                   picks={modifierPlayerPicks}
                                   spells={spells}
+                                  unavailableOptions={[...getTakenSkills(skillPickSources)]}
                                   onChange={(slotKey, selected) => {
                                     const slot = modifierPlayerChoiceSlots.find(
                                       (entry) => entry.slotKey === slotKey,
@@ -2373,6 +2435,61 @@ export default function BuilderPage() {
                               </div>
                             )
                           })}
+
+                          {/* Passive class features (Expertise, bonus proficiencies, tool/instrument
+                              choices, etc.) that carry player-choice modifiers but aren't isChoice
+                              features. The panel renders nothing when a feature has no open slots. */}
+                          {(() => {
+                            const eligibleKeys = new Set(
+                              eligibleFeatures.map((f) =>
+                                featureChoiceKey(entry.classId, f.name, f.level),
+                              ),
+                            )
+                            const seen = new Set<string>()
+                            return (cls.features ?? [])
+                              .filter(
+                                (feature) =>
+                                  feature.level <= entry.level &&
+                                  !eligibleKeys.has(
+                                    featureChoiceKey(entry.classId, feature.name, feature.level),
+                                  ),
+                              )
+                              .map((feature) => {
+                                const key = featureChoiceKey(
+                                  entry.classId,
+                                  feature.name,
+                                  feature.level,
+                                )
+                                if (seen.has(key)) return null
+                                seen.add(key)
+                                return (
+                                  <ModifierPlayerChoicePanel
+                                    key={key}
+                                    sourceKey={key}
+                                    sourceLabel={`${cls.name}: ${feature.name}`}
+                                    slots={modifierPlayerChoiceSlots}
+                                    picks={modifierPlayerPicks}
+                                    spells={spells}
+                                    unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                                    onChange={(slotKey, selected) => {
+                                      const slot = modifierPlayerChoiceSlots.find(
+                                        (s) => s.slotKey === slotKey,
+                                      )
+                                      if (!slot) return
+                                      setModifierPlayerPicks((prev) =>
+                                        setModifierPlayerPickValue(
+                                          prev,
+                                          slot,
+                                          modifierPlayerChoiceSlots,
+                                          selected,
+                                        ),
+                                      )
+                                    }}
+                                    accentClass="border-accent bg-accent/10"
+                                  />
+                                )
+                              })
+                          })()}
                         </div>
                       )
                     })}
@@ -2436,7 +2553,13 @@ export default function BuilderPage() {
                             {slot.className ? `${slot.className}: ` : ""}
                             {slot.label}
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div
+                            className={`grid grid-cols-1 ${
+                              cardViewMode === "cinematic"
+                                ? "sm:grid-cols-2 gap-2"
+                                : "sm:grid-cols-2 lg:grid-cols-3 gap-1.5"
+                            }`}
+                          >
                             {eligible.map((feat) => {
                               const isSelected = feat.id === pickedId
                               return (
@@ -2464,18 +2587,42 @@ export default function BuilderPage() {
                                       clearModifierPicksForSource(prev, choiceKey),
                                     )
                                   }}
-                                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                  className={`rounded-lg border-2 text-left transition-all ${
+                                    cardViewMode === "cinematic" ? "p-3" : "px-2.5 py-1.5"
+                                  } ${
                                     isSelected
                                       ? "border-secondary bg-secondary/10"
                                       : "border-border bg-card hover:border-secondary/50"
                                   }`}
                                 >
-                                  <p className="font-semibold text-sm text-foreground">{feat.name}</p>
-                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                    {feat.level_requirement && feat.level_requirement > 1 && (
-                                      <span>Lvl {feat.level_requirement}+</span>
+                                  <div
+                                    className={`flex items-start ${
+                                      cardViewMode === "cinematic" ? "gap-2.5" : "gap-2"
+                                    }`}
+                                  >
+                                    {cardViewMode === "cinematic" && (
+                                      <GameIcon
+                                        name={getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>)}
+                                        className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
+                                      />
                                     )}
-                                    {feat.repeatable && <span className="text-primary">Repeatable</span>}
+                                    <div className="min-w-0">
+                                      <p
+                                        className={`font-semibold text-foreground ${
+                                          cardViewMode === "cinematic" ? "text-sm" : "text-xs"
+                                        }`}
+                                      >
+                                        {feat.name}
+                                      </p>
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                        {feat.level_requirement && feat.level_requirement > 1 && (
+                                          <span>Lvl {feat.level_requirement}+</span>
+                                        )}
+                                        {feat.repeatable && (
+                                          <span className="text-primary">Repeatable</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </button>
                               )
@@ -2523,6 +2670,7 @@ export default function BuilderPage() {
                               slots={modifierPlayerChoiceSlots}
                               picks={modifierPlayerPicks}
                               spells={spells}
+                              unavailableOptions={[...getTakenSkills(skillPickSources)]}
                               onChange={(slotKey, selected) => {
                                 const slot = modifierPlayerChoiceSlots.find(
                                   (entry) => entry.slotKey === slotKey,
@@ -2590,8 +2738,12 @@ export default function BuilderPage() {
                         const accent = getCompendiumItemAccentColor(sp as Record<string, unknown>)
                         const isSelected = character.species_id === sp.id
                         const selectSpecies = () => {
-                          const nextId = character.species_id === sp.id ? null : sp.id
-                          setCharacter({ ...character, species_id: nextId })
+                          const deselecting = character.species_id === sp.id
+                          const nextId = deselecting ? null : sp.id
+                          const nextSize = deselecting
+                            ? null
+                            : (sp.size_options?.[0] ?? sp.size ?? null)
+                          setCharacter({ ...character, species_id: nextId, size: nextSize })
                           setSpeciesTraitPicks({})
                           setFeatureChoicePicks((prev) => {
                             const next = { ...prev }
@@ -2649,9 +2801,40 @@ export default function BuilderPage() {
                     ((selectedSpecies.traits ?? []).some(
                       (t) => t.isChoice && (t.choices?.options?.length ?? 0) > 0,
                     ) ||
-                      speciesFeatPickSlots.length > 0) && (
+                      speciesFeatPickSlots.length > 0 ||
+                      (selectedSpecies.size_options?.length ?? 0) > 1 ||
+                      modifierPlayerChoiceSlots.some((s) =>
+                        s.sourceKey.startsWith(`species:${selectedSpecies.id}:`),
+                      )) && (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
                       <h3 className="text-lg font-bold text-foreground">Species Options</h3>
+                      {(selectedSpecies.size_options?.length ?? 0) > 1 && (
+                        <div className="mb-2">
+                          <p className="text-sm font-semibold text-foreground mb-1">Size</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedSpecies.size_options!.map((sizeOption) => {
+                              const isSelected =
+                                (character.size ?? selectedSpecies.size) === sizeOption
+                              return (
+                                <button
+                                  key={sizeOption}
+                                  type="button"
+                                  onClick={() =>
+                                    setCharacter((prev) => ({ ...prev, size: sizeOption }))
+                                  }
+                                  className={`px-4 py-2 rounded-lg border-2 text-sm font-semibold transition-all ${
+                                    isSelected
+                                      ? "border-secondary bg-secondary/10 text-foreground"
+                                      : "border-border bg-card text-muted-foreground hover:border-secondary/50"
+                                  }`}
+                                >
+                                  {sizeOption}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                       {(selectedSpecies.traits ?? []).map((trait, index) => {
                         if (!trait.isChoice || !(trait.choices?.options?.length ?? 0)) return null
                         return (
@@ -2672,6 +2855,53 @@ export default function BuilderPage() {
                           />
                         )
                       })}
+                      {(() => {
+                        const onSpeciesModifierChange = (slotKey: string, selected: string[]) => {
+                          const slot = modifierPlayerChoiceSlots.find(
+                            (entry) => entry.slotKey === slotKey,
+                          )
+                          if (!slot) return
+                          setModifierPlayerPicks((prev) =>
+                            setModifierPlayerPickValue(
+                              prev,
+                              slot,
+                              modifierPlayerChoiceSlots,
+                              selected,
+                            ),
+                          )
+                        }
+                        return (
+                          <>
+                            <ModifierPlayerChoicePanel
+                              sourceKey={speciesModsSourceKey(selectedSpecies.id)}
+                              sourceLabel={selectedSpecies.name}
+                              slots={modifierPlayerChoiceSlots}
+                              picks={modifierPlayerPicks}
+                              spells={spells}
+                              accentClass="border-secondary bg-secondary/10"
+                              unavailableOptions={[
+                                ...getTakenSkills(skillPickSources, "species:mods"),
+                              ]}
+                              onChange={onSpeciesModifierChange}
+                            />
+                            {(selectedSpecies.traits ?? []).map((trait, index) => (
+                              <ModifierPlayerChoicePanel
+                                key={`species-mod-${selectedSpecies.id}-${index}`}
+                                sourceKey={speciesTraitSourceKey(selectedSpecies.id, index)}
+                                sourceLabel={trait.name}
+                                slots={modifierPlayerChoiceSlots}
+                                picks={modifierPlayerPicks}
+                                spells={spells}
+                                accentClass="border-secondary bg-secondary/10"
+                                unavailableOptions={[
+                                  ...getTakenSkills(skillPickSources, `species:trait:${index}`),
+                                ]}
+                                onChange={onSpeciesModifierChange}
+                              />
+                            ))}
+                          </>
+                        )
+                      })()}
                       {speciesFeatPickSlots.map((slot) => {
                         const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
                         const picked = feats.find((f) => f.id === pickedId) ?? null
@@ -3403,12 +3633,18 @@ export default function BuilderPage() {
                         ...grantedSpellIds,
                         ...otherClassPickedIds,
                       ])
+                      // Magical Secrets / Divine Soul etc. grant access to extra class spell
+                      // lists. These expand prepared (level 1+) spells, not cantrips.
+                      const extraSpellLists = aggregatedCharacteristics.spellListAccess
                       const availableSpells = spells
-                        .filter(
-                          (s) =>
-                            s.classes?.includes(casterClass.name) &&
-                            (s.level === 0 || s.level <= maxSpellLevel),
-                        )
+                        .filter((s) => {
+                          if (s.level === 0) return s.classes?.includes(casterClass.name)
+                          if (s.level > maxSpellLevel) return false
+                          return (
+                            s.classes?.includes(casterClass.name) ||
+                            s.classes?.some((c) => extraSpellLists.includes(c))
+                          )
+                        })
                         .filter(
                           (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
                         )
@@ -3437,6 +3673,15 @@ export default function BuilderPage() {
                           <p className="font-bold text-foreground mb-1">
                             {casterClass.name} (class level {casterLevel})
                           </p>
+                          {extraSpellLists.length > 0 && (
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Expanded spell access: prepared spells may also be chosen from the{" "}
+                              {extraSpellLists
+                                .filter((c) => c !== casterClass.name)
+                                .join(", ")}{" "}
+                              spell list{extraSpellLists.filter((c) => c !== casterClass.name).length === 1 ? "" : "s"}.
+                            </p>
+                          )}
                           <div className="flex flex-wrap gap-3 mb-3 text-sm">
                             <span className="px-2 py-1 rounded bg-secondary/10 text-foreground">
                               Cantrips: {spellCounts.cantrips} / {spellLimits.cantrips}

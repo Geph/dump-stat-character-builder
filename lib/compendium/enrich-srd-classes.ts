@@ -1,5 +1,8 @@
 import { enrichClassFeatureWithResource } from "@/lib/compendium/class-resource-features"
-import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
+import {
+  enrichClassFeatureWithModifierPresets,
+  monkToolProficiencyChoice,
+} from "@/lib/compendium/enrich-srd-class-features"
 import { SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import {
@@ -7,7 +10,10 @@ import {
   grantFeatCharacteristic,
   migrateFeatureFeatChoiceToModifierRefs,
 } from "@/lib/compendium/grant-feat-catalog"
-import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
+import {
+  createModifierInstanceId,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import type { Feature } from "@/lib/types"
 
@@ -118,6 +124,38 @@ function enrichFeatures(className: string, features: unknown): Feature[] {
   return ensureMilestoneGrantFeatFeatures(mapped)
 }
 
+/**
+ * Class-level weapon proficiency overrides where the SRD wording carries a
+ * qualifier the parser flattens away (e.g. Monk's Light-only Martial weapons).
+ */
+const SRD_CLASS_WEAPON_PROFICIENCY_OVERRIDES: Record<string, string[]> = {
+  Monk: ["Simple weapons", "Martial weapons that have the Light property"],
+}
+
+function appendLinkedModifier(feature: Feature, instance: LinkedModifierInstance): Feature {
+  const existing = feature.linkedModifiers ?? []
+  if (existing.some((entry) => entry.instanceId === instance.instanceId)) return feature
+  return {
+    ...feature,
+    linkedModifiers: [...existing, instance],
+    modifierRefs: uniqueRefs([...(feature.modifierRefs ?? []), instance.catalogRefId]),
+  }
+}
+
+/** Wire class-level proficiency choices that attach to a level-1 feature. */
+function injectClassProficiencyChoices(className: string, features: Feature[]): Feature[] {
+  if (className !== "Monk") return features
+  // Monk: "Choose one type of Artisan's Tools or Musical Instrument".
+  const target =
+    features.find((feature) => feature.level === 1 && /martial arts/i.test(feature.name ?? "")) ??
+    features.find((feature) => feature.level === 1)
+  if (!target) return features
+  const toolChoice = monkToolProficiencyChoice()
+  return features.map((feature) =>
+    feature === target ? appendLinkedModifier(feature, toolChoice) : feature,
+  )
+}
+
 function normalizeSpellcasting(raw: unknown): Record<string, unknown> | null {
   if (!raw || typeof raw !== "object") return null
   const spellcasting = { ...(raw as Record<string, unknown>) }
@@ -128,17 +166,20 @@ function normalizeSpellcasting(raw: unknown): Record<string, unknown> | null {
 /** Apply SRD defaults: feat-granting modifier refs, icons, spellcasting starts_at. */
 export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, unknown> {
   const name = String(row.name ?? "")
-  const features = enrichFeatures(name, row.features)
+  const features = injectClassProficiencyChoices(name, enrichFeatures(name, row.features))
   const icon =
     typeof row.icon === "string" && row.icon.trim()
       ? row.icon.trim()
       : SRD_CLASS_ICONS_BY_NAME[name] ?? null
+
+  const weaponProficiencyOverride = SRD_CLASS_WEAPON_PROFICIENCY_OVERRIDES[name]
 
   return applySrdFlavorDescription(
     {
       ...row,
       icon,
       features,
+      ...(weaponProficiencyOverride ? { weapon_proficiencies: weaponProficiencyOverride } : {}),
       spellcasting: normalizeSpellcasting(row.spellcasting),
     },
     "class",

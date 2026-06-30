@@ -57,10 +57,23 @@ export function isFeatEligibleForCategories(
     context.selectedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
-  if (category === "Origin") return false
+  // Origin feats are only valid when the slot explicitly asks for them (e.g. species
+  // grants like Human's Versatile, or background origin-feat slots). Milestone/General
+  // slots never include "Origin" in their categories, so they are already filtered above.
+  const isOriginSlot = normalizedCategories.has("Origin")
+  if (category === "Origin" && !isOriginSlot) return false
   if (!feat.repeatable && taken.has(feat.id)) return false
 
-  const minLevel = feat.level_requirement ?? (category === "Epic Boon" ? 19 : 4)
+  // Origin and Fighting Style feats are gated by the granting source (species,
+  // background, or a class's Fighting Style feature), not by a level-4 milestone,
+  // so they default to level 1 when no explicit requirement is set.
+  const minLevel =
+    feat.level_requirement ??
+    (category === "Epic Boon"
+      ? 19
+      : category === "Origin" || category === "Fighting Style"
+        ? 1
+        : 4)
   if (minLevel > context.totalLevel || minLevel > milestoneLevel) return false
 
   if (feat.prerequisite_class_ids?.length) {

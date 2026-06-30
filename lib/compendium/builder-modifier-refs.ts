@@ -2,7 +2,11 @@ import {
   linkedModifiersForFeat,
   type FeatSelectionEntry,
 } from "@/lib/builder/feat-choices"
-import { applyModifierPlayerPicks } from "@/lib/builder/modifier-player-choices"
+import {
+  applyModifierPlayerPicks,
+  speciesModsSourceKey,
+  speciesTraitSourceKey,
+} from "@/lib/builder/modifier-player-choices"
 import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
@@ -47,7 +51,7 @@ function collectLinkedFromFeature(
   instances.push(...effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog))
 
   if (feature.isChoice && feature.choices?.options?.length) {
-    const key = featureChoiceKey(classId, feature.name)
+    const key = featureChoiceKey(classId, feature.name, feature.level)
     const picked = featureChoicePicks[key] ?? []
     for (const optionName of picked) {
       const option = feature.choices.options.find((entry) => entry.name === optionName)
@@ -165,7 +169,7 @@ function classCharacteristicsWithPlayerPicks(params: {
         const instances: LinkedModifierInstance[] = []
         collectLinkedFromFeature(rawFeature, entry.classId, featureChoicePicks, catalog, instances)
         const filtered = filterSpellsKnownByClassLevel(instances, entry.level)
-        const key = featureChoiceKey(entry.classId, rawFeature.name)
+        const key = featureChoiceKey(entry.classId, rawFeature.name, rawFeature.level)
         const chars = characteristicsFromLinkedModifiers(catalog, filtered, rawFeature.modifierRefs)
         mods.push(...applyModifierPlayerPicks(chars, key, modifierPlayerPicks))
       }
@@ -203,6 +207,53 @@ export function speciesTraitLinkedModifiers(
     }
   })
   return instances
+}
+
+/**
+ * Resolve species characteristics, applying the player's skill/tool/language/spell picks
+ * per source (species-wide and per trait) so they match the slots surfaced at Origin.
+ */
+function speciesCharacteristicsWithPlayerPicks(
+  species: Species | undefined,
+  speciesTraitPicks: Record<string, string[]>,
+  modifierPlayerPicks: Record<string, string[]>,
+  catalog: ModifierCatalogEntry[],
+): CharacteristicModifier[] {
+  if (!species) return []
+  const mods: CharacteristicModifier[] = []
+
+  const speciesRow = species as unknown as Record<string, unknown>
+  const speciesWide = characteristicsFromLinkedModifiers(
+    catalog,
+    readLinkedModifiers(speciesRow, catalog),
+    readModifierRefs(speciesRow),
+  )
+  mods.push(
+    ...applyModifierPlayerPicks(speciesWide, speciesModsSourceKey(species.id), modifierPlayerPicks),
+  )
+
+  species.traits?.forEach((trait, index) => {
+    const sourceKey = speciesTraitSourceKey(species.id, index)
+    const instances: LinkedModifierInstance[] = [
+      ...effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog),
+    ]
+    if (trait.isChoice && trait.choices?.options?.length) {
+      const picked = speciesTraitPicks[String(index)] ?? []
+      for (const optionName of picked) {
+        const option = trait.choices.options.find((entry) => entry.name === optionName)
+        if (!option) continue
+        instances.push(
+          ...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
+        )
+      }
+    }
+    const chars = instances.length
+      ? characteristicsFromLinkedModifiers(catalog, instances, trait.modifierRefs)
+      : []
+    mods.push(...applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks))
+  })
+
+  return mods
 }
 
 export function collectBuilderModifierRefIds(params: {
@@ -243,14 +294,12 @@ export function collectBuilderModifierRefIds(params: {
     customAbilities = [],
   } = params
 
-  const speciesRow = species as unknown as Record<string, unknown> | undefined
-  const speciesInstances = [
-    ...(speciesRow ? readLinkedModifiers(speciesRow, catalog) : []),
-    ...speciesTraitLinkedModifiers(species, speciesTraitPicks, catalog),
-  ]
-  const speciesResolved = speciesInstances.length
-    ? resolveLinkedModifiers(speciesInstances, catalog).characteristics
-    : []
+  const speciesResolved = speciesCharacteristicsWithPlayerPicks(
+    species,
+    speciesTraitPicks,
+    modifierPlayerPicks,
+    catalog,
+  )
 
   const classResolved = classCharacteristicsWithPlayerPicks({
     classLevels,

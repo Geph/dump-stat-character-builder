@@ -36,8 +36,8 @@ function collectFeatPickSlotsFromFeatures(params: {
     grants.forEach((grant, grantIndex) => {
       const key =
         grants.length === 1
-          ? featureChoiceKey(classId, feature.name)
-          : featureChoiceKey(classId, `${feature.name}:${grant.catalogEntryId}:${grantIndex}`)
+          ? featureChoiceKey(classId, feature.name, feature.level)
+          : featureChoiceKey(classId, `${feature.name}:${grant.catalogEntryId}:${grantIndex}`, feature.level)
 
       for (let n = 0; n < grant.count; n++) {
         slots.push({

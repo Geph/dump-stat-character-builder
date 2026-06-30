@@ -65,6 +65,7 @@ export interface ModifierCatalogEntry {
 const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGroup> = {
   ability_scores: "Ability scores & checks",
   skills: "Skills & saving throws",
+  skill_check_alternate_ability: "Skills & saving throws",
   languages: "Proficiencies",
   armor_proficiencies: "Proficiencies",
   weapon_proficiencies: "Proficiencies",

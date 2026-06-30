@@ -59,7 +59,7 @@ function collectFromFeature(
   catalog: ModifierCatalogEntry[],
   grants: AbilityScorePoolGrant[],
 ): void {
-  const featureKey = featureChoiceKey(classId, feature.name)
+  const featureKey = featureChoiceKey(classId, feature.name, feature.level)
   grants.push(
     ...grantsFromLinkedModifiers(
       feature.linkedModifiers,
