@@ -2223,7 +2223,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <p className="text-sm font-semibold text-foreground">No companions or beast forms yet</p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                     Companions and beast forms appear when a class or subclass feature includes a
-                    stat block (e.g. Steel Defender, Reanimated Companion, or the Druid's Wild Shape
+                    stat block (e.g. Steel Defender, Reanimated Companion, or the Druid&apos;s Wild Shape
                     Beast forms). Unlock the feature by level or import the subclass with a full
                     stat-block description.
                   </p>
