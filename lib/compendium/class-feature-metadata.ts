@@ -86,8 +86,8 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     value: "extra_damage_on_hit",
     label: "Extra dice on a hit",
     group: "bonus_damage",
-    hint: "Sneak Attack",
-    fields: ["bonusDice"],
+    hint: "Sneak Attack / Divine Strike",
+    fields: ["bonusDice", "bonusByLevel"],
   },
   {
     value: "bonus_damage_by_level",

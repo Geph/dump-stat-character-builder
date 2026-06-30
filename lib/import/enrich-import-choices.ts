@@ -1,7 +1,8 @@
 import { buildWeaponMasteryModifier } from "@/lib/compendium/shared-feature-modifier-builders"
+import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
-import { legacyFeatureOptionPickerCharacteristic } from "@/lib/compendium/feature-option-choice-migration"
+import { legacyFeatureOptionPickerCharacteristic, migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { createModifierInstanceId, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -118,7 +119,11 @@ function isUpgradeSelectionFeature(feature: Feature): boolean {
   return /\b(?:select|choose)\s+an?\s+upgrade\b/i.test(feature.description ?? "")
 }
 
-function enrichFeatureChoices(feature: Feature, content: ImportContent): Feature {
+function enrichFeatureChoices(
+  feature: Feature,
+  content: ImportContent,
+  className = "",
+): Feature {
   let next = feature
 
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
@@ -158,11 +163,14 @@ function enrichFeatureChoices(feature: Feature, content: ImportContent): Feature
     })
   }
 
-  if (/^weapon mastery$/i.test(feature.name.trim()) && !(next.linkedModifiers?.length ?? 0)) {
-    next = syncModifierRefs({
-      ...next,
-      linkedModifiers: [buildWeaponMasteryModifier(createModifierInstanceId())],
-    })
+  if (/^weapon mastery$/i.test(feature.name.trim())) {
+    if (!(next.linkedModifiers?.length ?? 0)) {
+      next = syncModifierRefs({
+        ...next,
+        linkedModifiers: [buildWeaponMasteryModifier(createModifierInstanceId())],
+      })
+    }
+    next = enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className)
   }
 
   if (
@@ -239,7 +247,9 @@ export function enrichImportChoiceFeatures(content: ImportContent): ImportConten
     next.classes = content.classes.map((cls) => ({
       ...cls,
       features: (cls.features ?? []).map((feature) =>
-        enrichSpellcastingFeature(enrichFeatureChoices(feature as Feature, content), {
+        enrichSpellcastingFeature(
+          enrichFeatureChoices(feature as Feature, content, cls.name),
+          {
           primary_ability: cls.primary_ability,
           spellcasting: cls.spellcasting as ClassSpellcastingContext["spellcasting"],
         }),

@@ -17,6 +17,8 @@ type ModifierPlayerChoicePanelProps = {
   onChange: (slotKey: string, selected: string[]) => void
   spells: Spell[]
   accentClass?: string
+  /** Skills/tools already chosen elsewhere in the build, hidden from skill choices here. */
+  unavailableOptions?: string[]
 }
 
 function SpellGrantPicker({
@@ -123,6 +125,7 @@ export function ModifierPlayerChoicePanel({
   onChange,
   spells,
   accentClass = "border-primary bg-primary/10",
+  unavailableOptions = [],
 }: ModifierPlayerChoicePanelProps) {
   const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
   if (relevant.length === 0) return null
@@ -146,6 +149,7 @@ export function ModifierPlayerChoicePanel({
           )
         }
 
+        const isSkillKind = slot.kind === "skill" || slot.kind === "skill_or_tool"
         return (
           <MultiSelectChoices
             key={slot.slotKey}
@@ -153,14 +157,17 @@ export function ModifierPlayerChoicePanel({
             hint={
               slot.kind === "skill_or_tool"
                 ? `Choose ${slot.maxCount} total (any mix of skills and tools)`
-                : `Choose ${slot.maxCount}`
+                : slot.grantsExpertise
+                  ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
+                  : `Choose ${slot.maxCount}`
             }
             options={slot.options ?? []}
             maxCount={slot.maxCount}
             selected={picks[slot.slotKey] ?? []}
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
-            showSkillInfo={slot.kind === "skill" || slot.kind === "skill_or_tool"}
+            showSkillInfo={isSkillKind}
+            unavailableOptions={isSkillKind && !slot.grantsExpertise ? unavailableOptions : []}
             allowCustom={slot.allowCustom ?? false}
             customPlaceholder={slot.kind === "language" ? "Add a custom language..." : undefined}
           />

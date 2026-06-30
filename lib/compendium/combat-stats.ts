@@ -119,6 +119,22 @@ function weaponNameMatchesProficiency(proficiency: string, weaponName: string): 
   return false
 }
 
+/**
+ * Whether a "martial weapons" proficiency string applies to this weapon. Honors
+ * property qualifiers such as "Martial weapons that have the Light property"
+ * (e.g. Monk) — the weapon must have at least one of the listed properties.
+ */
+function martialProficiencyAllows(weapon: Equipment, proficiency: string): boolean {
+  const qualifier = proficiency.match(/(?:have|with) the (.+?)\s+propert/i)
+  if (!qualifier) return true
+  const properties = qualifier[1]
+    .split(/\s*(?:,|\bor\b|\band\b)\s*/i)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+  if (!properties.length) return true
+  return properties.some((property) => hasWeaponProperty(weapon, property))
+}
+
 export function isWeaponProficient(
   weapon: Equipment,
   proficiencies: string[] | null | undefined,
@@ -135,7 +151,9 @@ export function isWeaponProficient(
     if (normalized.some((p) => p.includes("simple"))) return true
   }
   if (sub.includes("martial")) {
-    if (normalized.some((p) => p.includes("martial"))) return true
+    if (normalized.some((p) => p.includes("martial") && martialProficiencyAllows(weapon, p))) {
+      return true
+    }
   }
   if (normalized.some((p) => weaponNameMatchesProficiency(p, name))) {
     return true

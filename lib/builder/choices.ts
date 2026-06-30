@@ -3,6 +3,7 @@ import {
   getMulticlassToolPickRequirement,
 } from "@/lib/builder/multiclass-proficiencies"
 import { resolvePrimaryClassId } from "@/lib/builder/primary-class"
+import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import type { DndClass, Species, Subclass } from "@/lib/types"
 
@@ -72,8 +73,8 @@ export function choiceCountMet(selected: string[], required: number): boolean {
   return selected.length === required
 }
 
-export function featureChoiceKey(classId: string, featureName: string): string {
-  return `${classId}:${featureName}`
+export function featureChoiceKey(classId: string, featureName: string, level?: number): string {
+  return level == null ? `${classId}:${featureName}` : `${classId}:L${level}:${featureName}`
 }
 
 export function validateClassStepChoices(
@@ -117,9 +118,12 @@ export function validateClassStepChoices(
 
     for (const feature of cls.features ?? []) {
       if (feature.level > entry.level || !feature.isChoice || !feature.choices) continue
-      const key = featureChoiceKey(entry.classId, feature.name)
+      // Only gate on choices the UI actually renders as fillable (matches eligibleFeatures).
+      if ((feature.choices.options?.length ?? 0) === 0) continue
+      const key = featureChoiceKey(entry.classId, feature.name, feature.level)
       const picks = featureChoicePicks[key] ?? []
-      if (!choiceCountMet(picks, feature.choices.count)) return false
+      const required = resolveFeatureChoiceCount(feature.choices, entry.level, cls.name)
+      if (!choiceCountMet(picks, required)) return false
     }
   }
 

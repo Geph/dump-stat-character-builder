@@ -12,7 +12,6 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import {
   Accordion,
   AccordionContent,
@@ -591,20 +590,6 @@ export default function FeatEditorPage({ id }: { id: string }) {
               Link modifiers on each choice option above. Top-level modifiers are disabled while choice mode is on.
             </p>
           )}
-
-          <details className="rounded-xl border border-border p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-foreground">
-              Legacy inline modifiers (optional)
-            </summary>
-            <p className="text-xs text-muted-foreground mt-2 mb-3">
-              Prefer the shared catalog above. Inline modifiers remain supported for older content.
-            </p>
-            <CharacteristicModifiersEditor
-              value={form.characteristics}
-              onChange={(characteristics) => setForm({ ...form, characteristics })}
-              spellOptions={allSpells}
-            />
-          </details>
 
         </form>
       </main>

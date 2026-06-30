@@ -190,6 +190,23 @@ function gainInspiration(): LinkedModifierInstance {
   }
 }
 
+/**
+ * SRD origin languages: every character knows Common plus two languages chosen (or rolled)
+ * from the Standard Languages table (SRD pg 20). Surfaced as a species-wide language choice.
+ */
+function standardLanguages(): LinkedModifierInstance {
+  return charInstance("modinst_species_languages", "cat_char_languages", [
+    {
+      id: modId("species_languages"),
+      type: "languages",
+      values: ["Common"],
+      choiceCount: 2,
+      choicePool: "standard",
+      label: "Languages (Common + two of your choice)",
+    },
+  ])
+}
+
 function usesPool(uses: UsesConfig, label?: string) {
   return charInstance(`modinst_uses_${label ?? "pool"}`, FEAT_MODIFIER_CATALOG.uses, [
     {
@@ -737,16 +754,66 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
   })
 }
 
+/** SRD 2024 species that let the player choose their size (Medium or Small). */
+const SRD_SPECIES_SIZE_OPTIONS: Record<string, string[]> = {
+  Human: ["Small", "Medium"],
+  Tiefling: ["Small", "Medium"],
+}
+
 export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source)) return row
   const speciesName = String(row.name ?? "")
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
 
   let next = applySrdFlavorDescription(row, "species")
+
+  const sizeOptions = SRD_SPECIES_SIZE_OPTIONS[speciesName]
+  if (sizeOptions && !Array.isArray(next.size_options)) {
+    next = { ...next, size_options: sizeOptions }
+  }
+
+  // Origin languages (Common + two of your choice) — every SRD species grants these.
+  // Only add when the species doesn't already carry a language grant of its own.
+  if (!speciesHasLanguageGrant(next)) {
+    const existing = Array.isArray(next.linkedModifiers)
+      ? (next.linkedModifiers as LinkedModifierInstance[])
+      : []
+    const synced = syncModifierRefs({ linkedModifiers: [...existing, standardLanguages()] })
+    next = {
+      ...next,
+      linkedModifiers: synced.linkedModifiers,
+      modifierRefs: synced.modifierRefs,
+    }
+  }
+
   if (!traits.length) return next
 
   const enrichedTraits = traits.map((trait) => applyPresetToTrait(speciesName, trait))
   return { ...next, traits: enrichedTraits }
+}
+
+/** True when a species row already grants a language modifier (species-wide or per trait). */
+function speciesHasLanguageGrant(row: Record<string, unknown>): boolean {
+  const matches = (instances: unknown): boolean =>
+    Array.isArray(instances) &&
+    instances.some(
+      (inst) =>
+        inst &&
+        typeof inst === "object" &&
+        ((inst as LinkedModifierInstance).catalogRefId === "cat_char_languages" ||
+          (Array.isArray((inst as LinkedModifierInstance).characteristics) &&
+            (inst as LinkedModifierInstance).characteristics!.some(
+              (c) => c?.type === "languages",
+            ))),
+    )
+
+  if (matches(row.linkedModifiers)) return true
+  const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
+  return traits.some(
+    (trait) =>
+      matches(trait.linkedModifiers) ||
+      (trait.choices?.options ?? []).some((option) => matches(option.linkedModifiers)),
+  )
 }
 
 export function enrichSrdSpeciesList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

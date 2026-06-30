@@ -27,7 +27,24 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { HeroBackgroundSettings } from "@/components/settings/hero-background-settings"
+import { useBuilderLayout } from "@/components/settings/use-builder-layout"
+import { LayoutGrid, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+const BUILDER_LAYOUT_OPTIONS = [
+  {
+    id: "visual" as const,
+    label: "Visual",
+    description: "Icon grids and cards for classes, weapons, and feats.",
+    icon: Sparkles,
+  },
+  {
+    id: "compact" as const,
+    label: "Compact",
+    description: "Dense lists and dropdowns that fit more on screen.",
+    icon: LayoutGrid,
+  },
+]
 
 const EXPORT_SECTIONS = [
   { tab: "classes", table: "classes" },
@@ -42,6 +59,7 @@ const EXPORT_SECTIONS = [
 
 export function GlobalSettingsMenu() {
   const { theme, setTheme } = useAppTheme()
+  const { layout: builderLayout, setLayout: setBuilderLayout } = useBuilderLayout()
   const importInputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -225,6 +243,42 @@ export function GlobalSettingsMenu() {
                     <dt className="text-muted-foreground">Storage</dt>
                     <dd className="font-medium text-foreground">{getStorageLabel()}</dd>
                   </dl>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Builder layout</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Default presentation for the character builder. You can still toggle it per
+                    session inside the builder.
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {BUILDER_LAYOUT_OPTIONS.map((option) => {
+                      const Icon = option.icon
+                      const active = builderLayout === option.id
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setBuilderLayout(option.id)}
+                          aria-pressed={active}
+                          className={cn(
+                            "flex flex-col gap-1 rounded-xl border-2 p-3 text-left transition-colors",
+                            active
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted/60",
+                          )}
+                        >
+                          <span className="flex items-center gap-2 font-semibold text-foreground">
+                            <Icon className="h-4 w-4" />
+                            {option.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground leading-snug">
+                            {option.description}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <HeroBackgroundSettings onStatus={setStatus} disabled={busy} />

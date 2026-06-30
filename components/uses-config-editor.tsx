@@ -362,6 +362,7 @@ export function UsesConfigEditor({
             >
               <option value="full">Full caster (Bard, Cleric, Druid, Sorcerer, Wizard)</option>
               <option value="half">Half caster (Paladin, Ranger, Artificer)</option>
+              <option value="third">One-third caster (Eldritch Knight, Arcane Trickster)</option>
               <option value="pact">Pact magic (Warlock)</option>
             </select>
             <p className="text-xs text-muted-foreground mt-1">

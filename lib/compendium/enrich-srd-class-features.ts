@@ -8,12 +8,14 @@ import {
   buildEvasionModifier,
   buildWeaponMasteryModifier,
 } from "@/lib/compendium/shared-feature-modifier-builders"
+import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import {
   legacyFeatureOptionPickerCharacteristic,
   migrateFeatureOptionPickers,
 } from "@/lib/compendium/feature-option-choice-migration"
 import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
+import { SRD_ARTISANS_TOOLS, SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
 const CHECK_ROLL_MODIFIER_CATALOG_ID = "cat_fx_check_roll_modifier"
@@ -43,6 +45,7 @@ const TELEPATHY_CATALOG_ID = "cat_char_telepathy"
 const IMPOSE_DISADVANTAGE_CATALOG_ID = "cat_fx_impose_disadvantage"
 const REACTION_ATTACK_CATALOG_ID = "cat_fx_reaction_attack"
 const EXTRA_ATTACK_CATALOG_ID = "cat_fx_extra_attack"
+const SKILL_CHECK_ALTERNATE_ABILITY_CATALOG_ID = "cat_char_skill_check_alternate_ability"
 
 type ClassFeatureModifierPreset =
   | LinkedModifierInstance[]
@@ -140,6 +143,46 @@ function skillChoice(count: number, label?: string, grantExpertise = false): Lin
       allowAnySkill: true,
       choiceCount: count,
       grantExpertise,
+      label,
+    },
+  ])
+}
+
+/** Skill proficiency picked from the granting class's level-1 skill list (e.g. Primal Knowledge). */
+function classSkillListChoice(count: number, label?: string): LinkedModifierInstance {
+  return charInstance(`modinst_skills_classlist_${count}`, FEAT_MODIFIER_CATALOG.skills, [
+    {
+      id: modId(`skills_classlist_${count}`),
+      type: "skills",
+      entries: [],
+      fromClassSkillList: true,
+      choiceCount: count,
+      label,
+    },
+  ])
+}
+
+/** Lets the listed skills' ability checks be made with a different ability (optionally conditional). */
+function alternateAbilitySkillCheck(
+  key: string,
+  ability:
+    | "strength"
+    | "dexterity"
+    | "constitution"
+    | "intelligence"
+    | "wisdom"
+    | "charisma",
+  skills: string[],
+  conditionLabel?: string,
+  label?: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, SKILL_CHECK_ALTERNATE_ABILITY_CATALOG_ID, [
+    {
+      id: modId(key),
+      type: "skill_check_alternate_ability",
+      ability,
+      skills,
+      conditionLabel,
       label,
     },
   ])
@@ -427,6 +470,44 @@ function extraDamageOnHit(instanceKey: string, dice: string): LinkedModifierInst
   })
 }
 
+/** Parse "1d8" → a dice-mode BonusByLevelEntry at the given level. */
+function diceTier(level: number, dice: string): BonusByLevelEntry {
+  const match = dice.match(/^(\d+)d(\d+)$/i)
+  return {
+    level,
+    mode: "dice",
+    dieCount: match ? parseInt(match[1], 10) : 1,
+    dieType: (match ? `d${match[2]}` : "d8") as BonusByLevelEntry["dieType"],
+  }
+}
+
+/**
+ * Extra on-hit damage that grows with class level (e.g. Cleric Divine Strike or
+ * Druid Primal Strike: 1d8 that increases to 2d8 at a higher level). The lowest
+ * tier is mirrored into `bonusDice` so consumers that don't level-resolve still
+ * show the base value.
+ */
+function extraDamageOnHitByLevel(
+  instanceKey: string,
+  tiers: { level: number; dice: string }[],
+): LinkedModifierInstance {
+  const rows = tiers
+    .map((tier) => diceTier(tier.level, tier.dice))
+    .sort((a, b) => a.level - b.level)
+  const base = rows[0]
+  const baseDice = base?.dieCount && base?.dieType ? `${base.dieCount}${base.dieType}` : null
+  return fxInstance(`modinst_${instanceKey}`, "cat_fx_extra_damage_on_hit", {
+    effects: [
+      {
+        id: modId(instanceKey),
+        kind: "extra_damage_on_hit",
+        bonusDice: baseDice,
+        bonusByLevel: rows,
+      },
+    ],
+  })
+}
+
 function healSelfBonusAction(instanceKey: string): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.healSelf, {
     bonusAction: true,
@@ -643,7 +724,8 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
           },
           {
             name: "Warden",
-            description: "You gain proficiency with Martial weapons.",
+            description:
+              "You gain proficiency with Martial weapons and training with Medium armor.",
             linkedModifiers: [
               charInstance("modinst_primal_order_warden_weapons", "cat_char_weapon_proficiencies", [
                 {
@@ -652,6 +734,14 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
                   mode: "martial_weapons",
                   values: [],
                   label: "Martial weapon proficiency",
+                },
+              ]),
+              charInstance("modinst_primal_order_warden_armor", "cat_char_armor_proficiencies", [
+                {
+                  id: modId("primal_order_warden_armor"),
+                  type: "armor_proficiencies",
+                  values: ["Medium armor"],
+                  label: "Medium armor proficiency",
                 },
               ]),
             ],
@@ -672,12 +762,15 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
           {
             name: "Divine Strike",
             description:
-              "Once on each of your turns when you hit a creature with a weapon attack, you can cause the attack to deal an extra 1d8 radiant damage.",
+              "Once on each of your turns when you hit a creature with an attack roll using a weapon, you can cause the target to take an extra 1d8 Necrotic or Radiant damage (your choice). The extra damage increases to 2d8 when you reach Cleric level 14 (Improved Blessed Strikes).",
             linkedModifiers: [
               onHitTriggerPreset("blessed_divine_strike", {
                 effectCatalogRefId: "cat_fx_extra_damage_on_hit",
               }),
-              extraDamageOnHit("blessed_divine_strike_damage", "1d8"),
+              extraDamageOnHitByLevel("blessed_divine_strike_damage", [
+                { level: 7, dice: "1d8" },
+                { level: 14, dice: "2d8" },
+              ]),
             ],
           },
           {
@@ -720,12 +813,15 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
           {
             name: "Primal Strike",
             description:
-              "Once on each of your turns when you hit a creature with a weapon attack, you can cause the attack to deal an extra 1d8 elemental damage.",
+              "Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit). The extra damage increases to 2d8 when you reach Druid level 15 (Improved Elemental Fury).",
             linkedModifiers: [
               onHitTriggerPreset("elemental_fury_primal_strike", {
                 effectCatalogRefId: "cat_fx_extra_damage_on_hit",
               }),
-              extraDamageOnHit("elemental_fury_primal_strike_damage", "1d8"),
+              extraDamageOnHitByLevel("elemental_fury_primal_strike_damage", [
+                { level: 7, dice: "1d8" },
+                { level: 15, dice: "2d8" },
+              ]),
             ],
           },
         ],
@@ -1208,6 +1304,54 @@ function toolsPreset(instanceKey: string, tools: string[], label?: string): Link
   ])
 }
 
+/** Expands a prepared caster's spell pool to include other classes' spell lists. */
+function spellListAccessPreset(
+  instanceKey: string,
+  classNames: string[],
+  label?: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, "cat_char_spell_list_access", [
+    {
+      id: modId(instanceKey),
+      type: "spell_list_access",
+      classNames,
+      label,
+    },
+  ])
+}
+
+/** Player picks `count` tools/instruments from a specific pool at build time. */
+function toolChoice(
+  instanceKey: string,
+  count: number,
+  options: string[],
+  label?: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_toolchoice_${instanceKey}`, "cat_char_tool_proficiencies", [
+    {
+      id: modId(`toolchoice_${instanceKey}`),
+      type: "tool_proficiencies",
+      values: [],
+      choiceCount: count,
+      choiceOptions: options,
+      label,
+    },
+  ])
+}
+
+/**
+ * Monk core tool proficiency: "Choose one type of Artisan's Tools or Musical Instrument".
+ * Surfaced as a build-time tool-proficiency choice (one pick from the combined pool).
+ */
+export function monkToolProficiencyChoice(): LinkedModifierInstance {
+  return toolChoice(
+    "monk_tools",
+    1,
+    [...SRD_ARTISANS_TOOLS, ...SRD_MUSICAL_INSTRUMENTS],
+    "Artisan's Tools or Musical Instrument (choose 1)",
+  )
+}
+
 function battleReadyPreset(): LinkedModifierInstance[] {
   return [
     charInstance("modinst_battle_ready_weapons", "cat_char_weapon_proficiencies", [
@@ -1437,7 +1581,16 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Reckless Attack": [
     checkAdvantage("reckless_attack", { category: "attack", ability: "Strength" }),
   ],
-  "*::Primal Knowledge": [skillChoice(1, "Primal Knowledge skill")],
+  "*::Primal Knowledge": [
+    classSkillListChoice(1, "Primal Knowledge skill"),
+    alternateAbilitySkillCheck(
+      "primal_knowledge_str_checks",
+      "strength",
+      ["Acrobatics", "Intimidation", "Perception", "Stealth", "Survival"],
+      "While your Rage is active",
+      "Primal Knowledge (Strength for skill checks while raging)",
+    ),
+  ],
   "*::Fast Movement": [speedAdd(10, "+10 ft. walk (no Heavy armor)")],
   "*::Unarmored Movement": [speedAdd(10, "+10 ft. walk (unarmored)")],
   "*::Feral Instinct": [checkAdvantage("feral_instinct", { category: "initiative" })],
@@ -1456,6 +1609,14 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Expertise": [skillChoice(2, "Expertise", true)],
   "*::Bonus Proficiencies": [skillChoice(3, "Bonus skill proficiencies")],
+  "Bard::Bardic Inspiration": [
+    toolChoice(
+      "bard_instruments",
+      3,
+      [...SRD_MUSICAL_INSTRUMENTS],
+      "Musical Instruments (choose 3)",
+    ),
+  ],
   "*::Jack of All Trades": [
     checkBonus("jack_of_all_trades", {
       category: "ability",
@@ -1827,16 +1988,13 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Magical Secrets": {
     linkedModifiers: [
-      charInstance("modinst_magical_secrets", FEAT_MODIFIER_CATALOG.spellsKnown, [
-        {
-          id: modId("magical_secrets"),
-          type: "spells_known",
-          spells: [],
-          choiceGrants: [{ level: 1, count: 2, crossClassAnyList: true }],
-          playerPicksSpellList: true,
-          spellListClassOptions: ["Cleric", "Druid", "Wizard"],
-        },
-      ]),
+      // 2024 SRD: from this level on, the Bard's prepared spells can be chosen
+      // from the Bard, Cleric, Druid, and Wizard spell lists (not a fixed grant).
+      spellListAccessPreset(
+        "magical_secrets",
+        ["Bard", "Cleric", "Druid", "Wizard"],
+        "Prepare spells from the Bard, Cleric, Druid, and Wizard lists",
+      ),
     ],
   },
   "*::Magical Discoveries": {
@@ -2363,16 +2521,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       usesPool({ type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 }, "Nature's Sanctuary"),
     ],
   },
-  "*::Improved Elemental Fury": {
-    linkedModifiers: [
-      featureOptionPicker("Improved Elemental Fury", false),
-      onCastSpellChar("elemental_fury_potent", {
-        spellSchool: "Evocation",
-        effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
-        label: "Potent Spellcasting: add WIS to Evocation damage",
-      }),
-    ],
-  },
+  // Improvement follows the Elemental Fury option chosen at level 7 (Primal Strike
+  // scales to 2d8 via its bonusByLevel wiring). No separate pick is offered here.
+  "*::Improved Elemental Fury": [],
 
   // —— Monk focus upgrades ——
   "*::Uncanny Metabolism": {
@@ -2525,19 +2676,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
     ],
   },
-  "*::Improved Blessed Strikes": {
-    linkedModifiers: [
-      bonusRidersPreset(
-        "improved_blessed_strikes",
-        [
-          { name: "Divine Strike (upgraded)", costDice: "1d8", description: "Extra radiant damage on weapon attack" },
-          { name: "Potent Spellcasting (upgraded)", costDice: "0", description: "Add WIS to Cleric cantrip damage" },
-        ],
-        1,
-        "Blessed Strikes",
-      ),
-    ],
-  },
+  // Improvement follows the Blessed Strikes option chosen at level 7 (Divine Strike
+  // scales to 2d8 via its bonusByLevel wiring). No separate pick is offered here.
+  "*::Improved Blessed Strikes": [],
 
   // —— Paladin ——
   "*::Abjure Foes": {
@@ -5051,9 +5192,13 @@ export function enrichClassFeatureWithModifierPresets(
     }
   }
 
-  if (options?.skipMechanicalDetection) return next
+  if (options?.skipMechanicalDetection) {
+    return enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className)
+  }
 
-  return enrichFeatureWithMechanicalDetection(next, {
+  return enrichFeatureWithMechanicalDetection(
+    enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className),
+    {
     contentKind: subclassName ? "subclass_feature" : "class_feature",
     sourceName: subclassName ?? className,
     featureName: feature.name,

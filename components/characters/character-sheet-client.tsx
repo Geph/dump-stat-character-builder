@@ -69,6 +69,7 @@ import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-de
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -708,6 +709,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [classDetails, character?.species, character?.backgrounds?.feature],
   )
 
+  const alternateAbilityChecks = useMemo(
+    () => collectAlternateAbilityChecks({ classDetails, catalog: modifierCatalog }),
+    [classDetails, modifierCatalog],
+  )
+
   const combatActions = useMemo(
     () => sheetActions.filter((action) => action.category !== "utility"),
     [sheetActions],
@@ -1123,6 +1129,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       {character.species.name}
                     </span>
                   )}
+                  {(character.size ?? character.species?.size) && (
+                    <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
+                      {character.size ?? character.species?.size}
+                    </span>
+                  )}
                   {character.backgrounds && (
                     <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
                       {character.backgrounds.name}
@@ -1263,7 +1274,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             { id: "combat" as const, label: "Combat", icon: <Swords className="w-3.5 h-3.5" /> },
             { id: "equipment" as const, label: "Equipment", icon: <Backpack className="w-3.5 h-3.5" /> },
             { id: "features" as const, label: "Features", icon: <Sparkles className="w-3.5 h-3.5" /> },
-            { id: "companions" as const, label: "Companions", icon: <PawPrint className="w-3.5 h-3.5" /> },
+            { id: "companions" as const, label: "Companion / Beast Form", icon: <PawPrint className="w-3.5 h-3.5" /> },
             { id: "custom" as const, label: "Custom", icon: <Wand2 className="w-3.5 h-3.5" /> },
             { id: "details" as const, label: "Character Details", icon: <FileText className="w-3.5 h-3.5" /> },
           ].map((tab) => (
@@ -1471,6 +1482,77 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </p>
                 )}
               </div>
+
+              {alternateAbilityChecks.length > 0 && (
+                <div className="bg-card rounded-xl p-3 border border-border">
+                  <h2 className="text-sm font-bold text-foreground mb-1">Alternate Ability Checks</h2>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Make these skill checks with a different ability modifier.
+                  </p>
+                  <div className="space-y-3">
+                    {alternateAbilityChecks.map((entry) => {
+                      const altAbilityMod = abilityMods[entry.ability] ?? 0
+                      const skillRows =
+                        entry.skills.length > 0
+                          ? entry.skills
+                          : skillsInOrder.map((skill) => skill.name)
+                      return (
+                        <div
+                          key={entry.id}
+                          className="rounded-lg border border-border/70 bg-muted/25 p-2.5"
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                            <p className="text-xs font-bold text-foreground">
+                              {entry.featureName}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              uses {ABILITY_ABBREVIATIONS[entry.ability]}
+                              {entry.conditionLabel ? ` · ${entry.conditionLabel}` : ""}
+                            </p>
+                          </div>
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                            {skillRows.map((skillName) => {
+                              const derivedSkill = derived?.skills.find(
+                                (s) => s.name === skillName,
+                              )
+                              const isProficient =
+                                derivedSkill?.proficient ??
+                                character.skill_proficiencies?.includes(skillName) ??
+                                false
+                              const hasExpertise =
+                                derivedSkill?.expertise ??
+                                character.skill_expertise?.includes(skillName) ??
+                                false
+                              const mod =
+                                altAbilityMod +
+                                (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
+                              return (
+                                <div
+                                  key={skillName}
+                                  className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs bg-background/60"
+                                >
+                                  <span className="truncate min-w-0">
+                                    {skillName} ({ABILITY_ABBREVIATIONS[entry.ability]})
+                                  </span>
+                                  <span className="flex items-center gap-1 shrink-0">
+                                    <span className="font-bold tabular-nums w-7 text-right">
+                                      {formatMod(mod)}
+                                    </span>
+                                    <D20RollButton
+                                      modifier={mod}
+                                      title={`Roll ${skillName} (${ABILITY_ABBREVIATIONS[entry.ability]}) — ${entry.featureName}`}
+                                    />
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
@@ -1927,11 +2009,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               ) : (
                 <div className="bg-card rounded-xl p-6 border border-border text-center">
                   <PawPrint className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm font-semibold text-foreground">No companions yet</p>
+                  <p className="text-sm font-semibold text-foreground">No companions or beast forms yet</p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    Companions appear when a class or subclass feature includes a stat block (e.g.
-                    Steel Defender, Reanimated Companion). Unlock the feature by level or import the
-                    subclass with a full stat-block description.
+                    Companions and beast forms appear when a class or subclass feature includes a
+                    stat block (e.g. Steel Defender, Reanimated Companion, or the Druid's Wild Shape
+                    Beast forms). Unlock the feature by level or import the subclass with a full
+                    stat-block description.
                   </p>
                 </div>
               )}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Plus, X } from "lucide-react"
+import { Plus, X, ChevronDown } from "lucide-react"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
@@ -24,6 +24,7 @@ import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { SpellSlotProgressionTable } from "@/components/compendium/spell-slot-progression-table"
+import { getCasterSlotType, type CasterSlotType } from "@/lib/compendium/spell-slots"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
@@ -64,6 +65,7 @@ interface ClassFormData {
   spellcasting: {
     ability: string
     starts_at: number
+    caster_progression?: "full" | "half" | "third" | "pact"
   } | null
   starting_gold: number
   starting_equipment_groups: StartingEquipmentGroup[]
@@ -101,6 +103,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSpellcasting, setHasSpellcasting] = useState(false)
+  const [spellSlotsOpen, setSpellSlotsOpen] = useState(false)
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
@@ -661,17 +664,71 @@ export default function ClassEditorPage({ id }: { id: string }) {
               </div>
             )}
 
-            {hasSpellcasting && form.name.trim() && (
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-semibold text-foreground">Spell slots by level</p>
-                <p className="text-xs text-muted-foreground">
-                  SRD spell slot progression for this caster type (levels 1–20). Authoring a custom
-                  progression table on the class overrides builder spell-pick limits when present.
-                </p>
-                <SpellSlotProgressionTable
-                  className={form.name.trim()}
-                  spellcasting={form.spellcasting}
-                />
+            {hasSpellcasting && form.spellcasting && (
+              <div className="mt-4 rounded-xl border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSpellSlotsOpen((open) => !open)}
+                  aria-expanded={spellSlotsOpen}
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-foreground">Spell slots by level</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                      spellSlotsOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+                {spellSlotsOpen && (
+                  <div className="space-y-4 border-t border-border p-4">
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
+                        Caster progression
+                      </label>
+                      <select
+                        value={
+                          form.spellcasting.caster_progression ??
+                          getCasterSlotType(form.name.trim(), form.spellcasting) ??
+                          "full"
+                        }
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            spellcasting: {
+                              ...prev.spellcasting!,
+                              caster_progression: e.target.value as CasterSlotType,
+                            },
+                          }))
+                        }
+                        className="w-full md:max-w-md px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                      >
+                        <option value="full">Full caster (Bard, Cleric, Druid, Sorcerer, Wizard)</option>
+                        <option value="half">Half caster (Paladin, Ranger, Artificer)</option>
+                        <option value="third">One-third caster (Eldritch Knight, Arcane Trickster)</option>
+                        <option value="pact">Pact magic (Warlock)</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Determines the spell-slot progression. Defaults are inferred from the class
+                        name when not set explicitly.
+                      </p>
+                    </div>
+
+                    {form.name.trim() && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">
+                          SRD spell slot progression for this caster type (levels 1–20). Authoring a
+                          custom progression table on the class overrides builder spell-pick limits
+                          when present.
+                        </p>
+                        <SpellSlotProgressionTable
+                          className={form.name.trim()}
+                          spellcasting={form.spellcasting}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

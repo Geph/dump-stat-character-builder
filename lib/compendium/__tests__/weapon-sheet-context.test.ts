@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { buildWeaponMasteryModifier } from "@/lib/compendium/shared-feature-modifier-builders"
+import { featureChoiceKey } from "@/lib/builder/choices"
 import { describeWeaponProperty, describeWeaponRange } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
 import type { CharacterBuildInputs } from "@/lib/character/types"
@@ -24,12 +25,14 @@ describe("buildWeaponSheetContext", () => {
     properties: null,
   } as Equipment
 
+  const fighterWeaponMasteryKey = featureChoiceKey("fighter", "Weapon Mastery", 1)
+
   const baseInputs = {
     modifierCatalog: [],
     speciesTraitPicks: {},
     featChoicePicks: {},
-    modifierPlayerPicks: { "fighter::mod_weapon_mastery::pick": ["Mace"] },
-    featureChoicePicks: {},
+    modifierPlayerPicks: {},
+    featureChoicePicks: { [fighterWeaponMasteryKey]: ["Mace"] },
     classLevels: [{ classId: "fighter", level: 5 }],
     classes: [
       {
@@ -82,7 +85,7 @@ describe("buildWeaponSheetContext", () => {
   it("marks mastery active when weapon mastery picks include the weapon", () => {
     const context = buildWeaponSheetContext(mace, {
       ...baseInputs,
-      modifierPlayerPicks: { "fighter::mod_weapon_mastery::pick": ["Mace"] },
+      featureChoicePicks: { [fighterWeaponMasteryKey]: ["Mace"] },
     }, ["Simple weapons"])
 
     expect(context.masteryName).toBe("Sap")

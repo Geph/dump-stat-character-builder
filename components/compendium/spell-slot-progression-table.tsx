@@ -144,6 +144,12 @@ export function SpellSlotProgressionTable({
           Half-caster progression (Paladin, Ranger): spell slots begin at class level 2.
         </p>
       )}
+      {casterType === "third" && (
+        <p className="px-3 py-2 text-xs text-muted-foreground border-t border-border">
+          One-third caster progression (Eldritch Knight, Arcane Trickster): spell slots begin at
+          class level 3.
+        </p>
+      )}
     </div>
   )
 }

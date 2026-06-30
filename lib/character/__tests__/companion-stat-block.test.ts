@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import { resolveCompanionScaledValue } from "@/lib/character/companion-stat-block"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { collectCompanionCandidatesFromClasses } from "@/lib/character/resolve-companions"
+import type { CharacterClassDetail } from "@/lib/character/character-classes"
 
 const REANIMATED_COMPANION = `Reanimated Companion
 
@@ -95,5 +97,38 @@ describe("parseCompanionStatBlock", () => {
     }
     expect(resolveCompanionScaledValue(template.ac, ctx)).toBe(13)
     expect(resolveCompanionScaledValue(template.hp, ctx)).toBe(30)
+  })
+})
+
+describe("Druid Beast forms", () => {
+  const druidDetail = (level: number): CharacterClassDetail =>
+    ({
+      row: { class_id: "druid", level, subclass_id: null },
+      class: {
+        name: "Druid",
+        features: [
+          { name: "Druidic", level: 1, description: "You know Druidic." },
+          { name: "Wild Shape", level: 2, description: "Shape-shift into a Beast form." },
+        ],
+      },
+      subclass: null,
+    }) as unknown as CharacterClassDetail
+
+  it("populates the four SRD recommended forms from Wild Shape", () => {
+    const candidates = collectCompanionCandidatesFromClasses([druidDetail(5)])
+    expect(candidates.map((c) => c.template.name)).toEqual([
+      "Rat",
+      "Riding Horse",
+      "Spider",
+      "Wolf",
+    ])
+    expect(new Set(candidates.map((c) => `${c.source.featureName}:${c.source.formName}`)).size).toBe(4)
+    const wolf = candidates.find((c) => c.template.name === "Wolf")
+    expect(wolf?.template.traits.map((t) => t.name)).toContain("Pack Tactics")
+    expect(wolf?.template.traits.map((t) => t.name)).toContain("Wild Shape")
+  })
+
+  it("does not offer beast forms before Wild Shape is unlocked", () => {
+    expect(collectCompanionCandidatesFromClasses([druidDetail(1)])).toHaveLength(0)
   })
 })
