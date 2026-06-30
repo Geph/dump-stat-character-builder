@@ -1,32 +1,17 @@
+import {
+  getAllSeedLanguageNames,
+  getRareLanguageNames,
+  getStandardLanguageNames,
+} from "@/lib/compendium/language-options"
+
 /** Standard Languages table from the D&D 5.5e SRD (SRD 5.2, pg 20). */
-export const SRD_STANDARD_LANGUAGES = [
-  "Common",
-  "Common Sign Language",
-  "Draconic",
-  "Dwarvish",
-  "Elvish",
-  "Giant",
-  "Gnomish",
-  "Goblin",
-  "Halfling",
-  "Orc",
-] as const
+export const SRD_STANDARD_LANGUAGES = getStandardLanguageNames()
 
 /** Rare Languages table from the D&D 5.5e SRD (SRD 5.2, pg 20). */
-export const SRD_RARE_LANGUAGES = [
-  "Abyssal",
-  "Celestial",
-  "Deep Speech",
-  "Druidic",
-  "Infernal",
-  "Primordial",
-  "Sylvan",
-  "Thieves' Cant",
-  "Undercommon",
-] as const
+export const SRD_RARE_LANGUAGES = getRareLanguageNames()
 
 /** All SRD languages (standard + rare). */
-export const SRD_LANGUAGES = [...SRD_STANDARD_LANGUAGES, ...SRD_RARE_LANGUAGES] as const
+export const SRD_LANGUAGES = getAllSeedLanguageNames()
 
 export type LanguageChoicePool = "standard" | "standard_and_rare"
 
@@ -34,8 +19,13 @@ export type LanguageChoicePool = "standard" | "standard_and_rare"
 export function languageOptionsForPool(
   pool: LanguageChoicePool | null | undefined,
   exclude: string[] = [],
+  allLanguages: readonly string[] = SRD_LANGUAGES,
 ): string[] {
   const excludeSet = new Set(exclude.map((name) => name.toLowerCase()))
-  const source = pool === "standard_and_rare" ? SRD_LANGUAGES : SRD_STANDARD_LANGUAGES
+  const standardSet = new Set(SRD_STANDARD_LANGUAGES.map((name) => name.toLowerCase()))
+  const source =
+    pool === "standard_and_rare"
+      ? allLanguages
+      : allLanguages.filter((name) => standardSet.has(name.toLowerCase()))
   return source.filter((name) => !excludeSet.has(name.toLowerCase()))
 }

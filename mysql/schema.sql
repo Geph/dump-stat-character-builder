@@ -58,6 +58,23 @@ CREATE TABLE IF NOT EXISTS species (
   traits JSON,
   characteristics JSON,
   modifier_refs JSON,
+  linked_modifiers JSON,
+  icon VARCHAR(255),
+  accent_color VARCHAR(32),
+  card_image_url MEDIUMTEXT,
+  source VARCHAR(64) NOT NULL DEFAULT 'Custom',
+  creator_url VARCHAR(512),
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS languages (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  pool VARCHAR(32) NOT NULL DEFAULT 'standard',
+  typical_speakers TEXT,
+  script VARCHAR(128),
   icon VARCHAR(255),
   accent_color VARCHAR(32),
   card_image_url MEDIUMTEXT,

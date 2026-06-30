@@ -124,6 +124,27 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
     }
 
     const enriched = enrichSrdSpeciesRow(next as Record<string, unknown>)
-    return { ...next, traits: enriched.traits as Trait[] } as T
+    return {
+      ...next,
+      traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
+      size_options:
+        (enriched.size_options as string[] | undefined) ??
+        (next as { size_options?: string[] | null }).size_options ??
+        null,
+      linked_modifiers:
+        (enriched.linked_modifiers as LinkedModifierInstance[] | undefined) ??
+        (enriched.linkedModifiers as LinkedModifierInstance[] | undefined),
+      linkedModifiers:
+        (enriched.linkedModifiers as LinkedModifierInstance[] | undefined) ??
+        (enriched.linked_modifiers as LinkedModifierInstance[] | undefined),
+      modifier_refs:
+        (enriched.modifier_refs as string[] | undefined) ??
+        (enriched.modifierRefs as string[] | undefined) ??
+        next.modifierRefs,
+      modifierRefs:
+        (enriched.modifierRefs as string[] | undefined) ??
+        (enriched.modifier_refs as string[] | undefined) ??
+        next.modifierRefs,
+    } as T
   })
 }

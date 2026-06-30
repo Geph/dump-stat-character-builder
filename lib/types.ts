@@ -322,6 +322,24 @@ export interface Species {
   created_at: string
 }
 
+export type LanguagePool = "standard" | "rare"
+
+export interface Language {
+  id: string
+  name: string
+  description: string | null
+  pool: LanguagePool
+  typical_speakers: string | null
+  script: string | null
+  icon: string | null
+  accent_color?: string | null
+  card_image_url?: string | null
+  source: string
+  creator_url: string | null
+  enabled?: boolean
+  created_at: string
+}
+
 export interface StartingEquipmentOption {
   label: string
   items: { name: string; quantity: number }[]

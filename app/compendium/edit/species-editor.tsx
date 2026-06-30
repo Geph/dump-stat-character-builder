@@ -138,8 +138,12 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
     setError(null)
 
     const db = createClient()
+    const synced = syncModifierRefs({ linkedModifiers: form.linked_modifiers })
     const payload = {
       ...form,
+      ...synced,
+      linked_modifiers: synced.linkedModifiers,
+      modifier_refs: synced.modifierRefs,
       // Only persist a size choice when there are 2+ distinct options.
       size_options: form.size_options.length >= 2 ? form.size_options : null,
       traits: form.traits.filter(t => t.name.trim()),

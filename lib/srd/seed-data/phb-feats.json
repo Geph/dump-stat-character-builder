@@ -1,0 +1,479 @@
+[
+  {
+    "name": "Crafter",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Crafter (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Healer",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Healer (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Lucky",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Lucky (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Musician",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Musician (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Tavern Brawler",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Tavern Brawler (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Tough",
+    "category": "Origin",
+    "level_requirement": null,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Tough (Origin Feat). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Actor",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Charisma 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Actor (General Feat, Level 4+; Charisma 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Athlete",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength or Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Athlete (General Feat, Level 4+; Strength or Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Charger",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength or Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Charger (General Feat, Level 4+; Strength or Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Chef",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Chef (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Crossbow Expert",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Crossbow Expert (General Feat, Level 4+; Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Crusher",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Crusher (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Defensive Duelist",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Defensive Duelist (General Feat, Level 4+; Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Dual Wielder",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength or Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Dual Wielder (General Feat, Level 4+; Strength or Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Durable",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Durable (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Elemental Adept",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Spellcasting or Pact Magic Feature",
+    "repeatable": true,
+    "source": "Player's Handbook",
+    "description": "Elemental Adept (General Feat, Level 4+; Spellcasting or Pact Magic Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Fey Touched",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Fey Touched (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Great Weapon Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Great Weapon Master (General Feat, Level 4+; Strength 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Heavily Armored",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Medium Armor Training",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Heavily Armored (General Feat, Level 4+; Medium Armor Training). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Heavy Armor Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Heavy Armor Training",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Heavy Armor Master (General Feat, Level 4+; Heavy Armor Training). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Inspiring Leader",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Wisdom or Charisma 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Inspiring Leader (General Feat, Level 4+; Wisdom or Charisma 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Keen Mind",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Intelligence 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Keen Mind (General Feat, Level 4+; Intelligence 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Lightly Armored",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Lightly Armored (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Mage Slayer",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Mage Slayer (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Martial Weapon Training",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Martial Weapon Training (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Medium Armor Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Medium Armor Training",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Medium Armor Master (General Feat, Level 4+; Medium Armor Training). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Moderately Armored",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Light Armor Training",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Moderately Armored (General Feat, Level 4+; Light Armor Training). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Mounted Combatant",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Mounted Combatant (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Observant",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Intelligence or Wisdom 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Observant (General Feat, Level 4+; Intelligence or Wisdom 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Piercer",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Piercer (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Poisoner",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Poisoner (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Polearm Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength or Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Polearm Master (General Feat, Level 4+; Strength or Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Resilient",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Resilient (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Ritual Caster",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Intelligence, Wisdom, or Charisma 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Ritual Caster (General Feat, Level 4+; Intelligence, Wisdom, or Charisma 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Sentinel",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Strength or Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Sentinel (General Feat, Level 4+; Strength or Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Shadow Touched",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Shadow Touched (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Sharpshooter",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Sharpshooter (General Feat, Level 4+; Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Shield Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Shield Training",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Shield Master (General Feat, Level 4+; Shield Training). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Skill Expert",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Skill Expert (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Skulker",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Dexterity 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Skulker (General Feat, Level 4+; Dexterity 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Slasher",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Slasher (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Speedy",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Dexterity or Constitution 13+",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Speedy (General Feat, Level 4+; Dexterity or Constitution 13+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Spell Sniper",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Spellcasting or Pact Magic Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Spell Sniper (General Feat, Level 4+; Spellcasting or Pact Magic Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Telekinetic",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Telekinetic (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Telepathic",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Telepathic (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "War Caster",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": "Spellcasting or Pact Magic Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "War Caster (General Feat, Level 4+; Spellcasting or Pact Magic Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Weapon Master",
+    "category": "General",
+    "level_requirement": 4,
+    "prerequisite": null,
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Weapon Master (General Feat, Level 4+). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Blind Fighting",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Blind Fighting (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Dueling",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Dueling (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Interception",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Interception (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Protection",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Protection (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Thrown Weapon Fighting",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Thrown Weapon Fighting (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  },
+  {
+    "name": "Unarmed Fighting",
+    "category": "Fighting Style",
+    "level_requirement": null,
+    "prerequisite": "Fighting Style Feature",
+    "repeatable": false,
+    "source": "Player's Handbook",
+    "description": "Unarmed Fighting (Fighting Style Feat; Fighting Style Feature). See the Player's Handbook for full rules text."
+  }
+]

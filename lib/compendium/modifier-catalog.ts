@@ -151,6 +151,8 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       summary:
         option.value === "grant_feat"
           ? "Passive: choose a feat — set allowed categories below"
+          : option.value === "languages"
+            ? "Passive: grant known languages and/or player picks from the Languages compendium (Standard or Rare pool)"
           : option.value === "ability_scores"
             ? "Passive: fixed ability bonuses or ASI-style player choice"
             : option.value === "special_attack"
