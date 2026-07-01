@@ -56,9 +56,23 @@ export const ImportMechanicSchema = z.object({
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
   featCategories: z
-    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon"]))
+    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"]))
     .optional(),
   featCount: z.number().optional(),
+  languages: z.array(z.string()).optional(),
+  languageChoiceCount: z.number().optional(),
+  choicePool: z.enum(["standard", "standard_and_rare"]).optional(),
+  spellNames: z.array(z.string()).optional(),
+  spellChoiceGrants: z
+    .array(
+      z.object({
+        level: z.number(),
+        count: z.number(),
+      }),
+    )
+    .optional(),
+  spellChoiceLabel: z.string().optional(),
+  alwaysPrepared: z.boolean().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
@@ -293,18 +307,20 @@ export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the sourc
 - "Origin" for Origin Feats (1st-level background-style feats)
 - "Epic Boon" for Epic Boons (19th+ level boons)
 - "Fighting Style" for fighting style options
+- "Planar Pact" for Planar Pact feats (mutually exclusive pact feats like Fey Pact, Infernal Pact)
 - "General" for other feats (default when unclear)
-Do not embed the category name only in description — use the category field.`
+Do not embed the category name only in description — use the category field.
+When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
-- Set class_name to the exact parent class (e.g. "Druid", "Fighter", "Sorcerer", "Psion")
+- Set class_name to the exact parent class (e.g. "Druid", "Fighter", "Sorcerer", "KibblesTasty Psion")
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present`
 
 export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice, Weapon Mastery):
 - Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, Weapon Mastery, etc.)
-- Set class_name to the parent class (e.g. "Psion")
+- Set class_name to the parent class (e.g. "KibblesTasty Psion")
 - resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit")
 - name: display name from the table header (e.g. "Psi Points")
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
@@ -312,7 +328,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - Psi Limit / per-activation caps can use type "special" with atLevelTable describing the cap by level
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
-export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. Psion, Gunslinger):
+export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. KibblesTasty Psion, Gunslinger):
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
 - Put each subclass/archetype/path in subclasses[] with class_name set to the parent class
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]

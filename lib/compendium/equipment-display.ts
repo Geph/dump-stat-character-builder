@@ -92,6 +92,19 @@ export function getEquipmentDetailRows(item: Equipment): EquipmentDetailRow[] {
   return rows
 }
 
+export function splitEquipmentByKind(items: Equipment[]): {
+  mundane: Equipment[]
+  magic: Equipment[]
+} {
+  const mundane: Equipment[] = []
+  const magic: Equipment[] = []
+  for (const item of items) {
+    if (isMagicItem(item)) magic.push(item)
+    else mundane.push(item)
+  }
+  return { mundane, magic }
+}
+
 export function filterEquipmentByMagicKind(
   items: Equipment[],
   kind: "all" | "magic" | "mundane",

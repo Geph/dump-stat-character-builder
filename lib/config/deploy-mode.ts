@@ -36,6 +36,11 @@ export function canUseServerImport(): boolean {
   return isHostedDeploy()
 }
 
+/** BYO JSON import (paste LLM output) works in static mode via IndexedDB. */
+export function canUseClientByoImport(): boolean {
+  return isStaticDeploy()
+}
+
 export function canSeedFromApi(): boolean {
   return isHostedDeploy()
 }

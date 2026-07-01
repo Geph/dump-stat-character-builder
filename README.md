@@ -54,7 +54,7 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 - **Foundry VTT import** — Paste or upload Foundry `dnd5e` item exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e))
-- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
+- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
 
 See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
 
@@ -335,7 +335,7 @@ PDF text extraction tries **deterministic** parsing first, then **hybrid** or fu
 
 Many third-party classes ship as **several JSON files** (spell libraries, discipline powers, class, subclasses). Import **supporting libraries before** the class and subclass files that reference them so modifier wiring and spell links resolve correctly.
 
-On the app: **Import → Multi-file import order** (expandable panel at the top of the page) lists workflows for spellcasters, Kibbles Psion, Laserllama-style Martial Exploits, and Inventor.
+On the app: **Import → Multi-file import order** (expandable panel at the top of the page) lists workflows for spellcasters, KibblesTasty Psion, Laserllama-style Martial Exploits, and Inventor.
 
 **General rules**
 
@@ -353,7 +353,7 @@ On the app: **Import → Multi-file import order** (expandable panel at the top 
 | 4 | Subclasses JSON (always-prepared spell tables) |
 | 5 | Choice options if separate (grand hexes, invocations, …) |
 
-**Kibbles Psion**
+**KibblesTasty Psion**
 
 | Step | Content |
 |------|---------|

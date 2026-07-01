@@ -95,7 +95,7 @@ export function mergeReferencedSpellsIntoImport(content: ImportContent): ImportC
   return { ...content, spells: nextSpells }
 }
 
-function spellCatalogFromContent(content: ImportContent): { id: string; name: string }[] {
+export function spellCatalogFromContent(content: ImportContent): { id: string; name: string }[] {
   return (content.spells ?? []).map((spell) => ({
     id: `import:${normalizeSpellLookupKey(spell.name)}`,
     name: spell.name,

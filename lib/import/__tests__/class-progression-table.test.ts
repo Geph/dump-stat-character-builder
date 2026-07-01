@@ -3,7 +3,7 @@ import { parseClassProgressionTable } from "@/lib/import/parse-class-progression
 import { detectPsiPointCost, detectExploitDieCost, detectBattleDieCost } from "@/lib/import/enrich-import-classes"
 
 describe("parseClassProgressionTable", () => {
-  it("parses Psion level table with Psi Points and Psi Limit columns", () => {
+  it("parses KibblesTasty Psion level table with Psi Points and Psi Limit columns", () => {
     const text = `1st 	+2 	1 	1 	Psionic Archetype, Psionics 	—
 2nd 	+2 	2 	1 	Psionic Talents 	2
 3rd 	+2 	3 	2 	Secondary Discipline, Psionic Archetype feature 	2

@@ -17,6 +17,7 @@ export function isStandardSpellClass(name: string): boolean {
 
 export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated spell list (e.g. "Artificer Spell List"):
 - On the class object, populate spell_list with every spell name from that list (exact names as written).
+- For PHB-style tables with Spell / School / Special columns: parse level from section headers (Cantrips = level 0, "Level N … Spells"), school from the School column, concentration when Special includes C, material component when Special includes M.
 - For each spell on that list, include the class's exact name in the spell's classes array (e.g. "Artificer").
 - Custom/non-SRD classes are not among the standard eight (Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard); use the class name directly — never store the literal word "Other".
 - Spells may also appear on standard class lists; include all applicable class names in classes.

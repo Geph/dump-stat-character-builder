@@ -20,6 +20,7 @@ import type {
   DetectedModifier,
   DetectionConfidence,
 } from "@/lib/import/detect-feature-modifiers"
+import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import type { UsesConfig } from "@/lib/types"
 
 const VALID_CHARACTERISTIC_KINDS = new Set(
@@ -53,6 +54,13 @@ function usesRechargesFromImport(
 
 function aiConfidence(mechanic: ImportMechanic): DetectionConfidence {
   return mechanic.confidence ?? "medium"
+}
+
+function isReactionRechargePhrase(phrase: string): boolean {
+  return (
+    /\bonce you take this reaction\b/i.test(phrase) ||
+    /\bcan'?t use this benefit again until you finish a long rest\b/i.test(phrase)
+  )
 }
 
 function buildFromMechanic(
@@ -200,6 +208,48 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "saves")),
             type: "saving_throws",
             values: saves,
+          },
+        ]),
+      }
+    }
+    case "languages": {
+      const languages = mechanic.languages?.map(titleCaseWords).filter(Boolean) ?? []
+      const choiceCount = mechanic.languageChoiceCount ?? 0
+      if (!languages.length && choiceCount <= 0) return null
+      return {
+        ruleId: choiceCount > 0 ? "ai.languages.choice" : "ai.languages",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("languages"), [
+          {
+            id: modId(instanceKey(ctx, choiceCount > 0 ? "lang_choice" : "lang")),
+            type: "languages",
+            values: languages,
+            choiceCount: choiceCount > 0 ? choiceCount : null,
+            choicePool: mechanic.choicePool ?? (choiceCount > 0 ? "standard" : null),
+          },
+        ]),
+      }
+    }
+    case "spells_known": {
+      const spellNames = mechanic.spellNames?.map((name) => name.trim()).filter(Boolean) ?? []
+      const choiceGrants = mechanic.spellChoiceGrants ?? []
+      if (!spellNames.length && !choiceGrants.length) return null
+      return {
+        ruleId: "ai.spells_known",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("spells_known"), [
+          {
+            id: modId(instanceKey(ctx, "spells_known")),
+            type: "spells_known",
+            spells: spellNames.map((name) => ({
+              spellId: spellNamePlaceholder(name),
+              alwaysPrepared: mechanic.alwaysPrepared ?? true,
+            })),
+            choiceGrants,
+            alwaysPrepared: mechanic.alwaysPrepared ?? (spellNames.length > 0 ? true : undefined),
+            label: mechanic.spellChoiceLabel,
           },
         ]),
       }
@@ -358,6 +408,7 @@ function buildFromMechanic(
       }
     }
     case "uses": {
+      if (isReactionRechargePhrase(matchedPhrase)) return null
       const uses: UsesConfig = mechanic.usesAbility
         ? {
             type: "ability_modifier",

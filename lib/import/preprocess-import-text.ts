@@ -8,9 +8,11 @@ import {
   findClassProgressionTableRegions,
 } from "@/lib/import/strip-class-progression-tables"
 import {
+  detectClassNameFromSpellListText,
   findClassSpellListRegions,
-  parseClassSpellListFromText,
+  parseClassSpellListDocument,
 } from "@/lib/import/parse-class-spell-list"
+import { spellListDocumentToImportContent } from "@/lib/import/extract-spell-list-import"
 import { stripHtml } from "@/lib/import/normalize-equipment"
 
 export type PreprocessSubtractedRegion = {
@@ -113,9 +115,18 @@ function applyReplacements(
   return next
 }
 
-function shouldRunClassPreprocess(contentTypeHint: string | null | undefined): boolean {
+function shouldRunClassTablePreprocess(contentTypeHint: string | null | undefined): boolean {
   if (!contentTypeHint || contentTypeHint === "all") return true
   return contentTypeHint === "classes" || contentTypeHint === "subclasses"
+}
+
+function shouldRunSpellListPreprocess(contentTypeHint: string | null | undefined): boolean {
+  if (!contentTypeHint || contentTypeHint === "all") return true
+  return (
+    contentTypeHint === "classes" ||
+    contentTypeHint === "subclasses" ||
+    contentTypeHint === "spell_lists"
+  )
 }
 
 /**
@@ -133,7 +144,8 @@ export function preprocessImportText(
 
   let working = text
   const className = detectClassNameFromImportText(working)
-  const runClass = shouldRunClassPreprocess(options?.contentTypeHint)
+  const runClassTables = shouldRunClassTablePreprocess(options?.contentTypeHint)
+  const runSpellLists = shouldRunSpellListPreprocess(options?.contentTypeHint)
 
   const boilerplate = stripConservativeBoilerplate(working)
   if (boilerplate.removedChars > 0) {
@@ -145,7 +157,7 @@ export function preprocessImportText(
     })
   }
 
-  if (runClass) {
+  if (runClassTables) {
     const tableRegions = findClassProgressionTableRegions(working)
       .map((region) => ({
         start: region.start,
@@ -180,6 +192,9 @@ export function preprocessImportText(
       }
     }
 
+  }
+
+  if (runSpellLists) {
     for (const spellRegion of findClassSpellListRegions(working)) {
       replacements.push({
         start: spellRegion.start,
@@ -193,19 +208,40 @@ export function preprocessImportText(
       })
     }
 
-    const spellNames = parseClassSpellListFromText(text)
-    if (spellNames.length && className) {
-      deterministic.classes = [
-        {
-          name: className,
-          description: null,
-          hit_die: 8,
-          features: [],
-          spell_list: spellNames,
-        },
-      ]
+    const document = parseClassSpellListDocument(text)
+    if (document) {
+      const effectiveClassName =
+        options?.contentTypeHint === "spell_lists"
+          ? document.className
+          : className ?? document.className
+      const spellListContent = spellListDocumentToImportContent({
+        ...document,
+        className: effectiveClassName,
+      })
+      deterministic.classes = spellListContent.classes
+      deterministic.spells = spellListContent.spells
+    } else {
+      const namesFromRegions = findClassSpellListRegions(text).flatMap((r) => r.spellNames)
+      const mergedNames = [...new Set(namesFromRegions)]
+      const resolvedClassName = className ?? detectClassNameFromSpellListText(text)
+      if (mergedNames.length && resolvedClassName) {
+        deterministic.classes = [
+          {
+            name: resolvedClassName,
+            description: null,
+            hit_die: 8,
+            features: [],
+            spell_list: mergedNames,
+          },
+        ]
+      }
     }
   }
+
+  const resolvedClassName =
+    deterministic.classes?.[0]?.name ??
+    className ??
+    (options?.contentTypeHint === "spell_lists" ? detectClassNameFromSpellListText(text) : null)
 
   const aiText = applyReplacements(working, replacements).trim()
   const inputCharsAfter = aiText.length
@@ -227,7 +263,7 @@ export function preprocessImportText(
           ? Math.round((estimatedTokensSaved / estimatedTokensBefore) * 100)
           : 0,
       subtractedRegions,
-      detectedClassName: className,
+      detectedClassName: resolvedClassName,
     },
   }
 }

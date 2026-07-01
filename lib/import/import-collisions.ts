@@ -15,6 +15,10 @@ export type ImportCollision = {
 
 export type ImportRenameMap = Record<string, string>
 
+export type ImportCollisionResolution = "overwrite" | "rename"
+
+export type ImportCollisionResolutionMap = Record<string, ImportCollisionResolution>
+
 const COLLISION_TABLES: { kind: ImportCollisionKind; key: keyof ImportContent }[] = [
   { kind: "class", key: "classes" },
   { kind: "feat", key: "feats" },
@@ -32,7 +36,8 @@ function suggestRenamedName(name: string, kind: ImportCollisionKind): string {
   const trimmed = name.trim()
   if (kind === "class") {
     if (/^fighter$/i.test(trimmed)) return "Alternate Fighter"
-    if (/^psion$/i.test(trimmed)) return trimmed
+    if (/^psion$/i.test(trimmed)) return "KibblesTasty Psion"
+    if (/^kibblestasty psion$/i.test(trimmed)) return trimmed
     if (!/\balternate\b/i.test(trimmed) && !/\bhomebrew\b/i.test(trimmed)) {
       return `${trimmed} (Alternate)`
     }
@@ -93,9 +98,48 @@ export function buildImportCollisions(
 export function defaultRenameMap(collisions: ImportCollision[]): ImportRenameMap {
   const map: ImportRenameMap = {}
   for (const collision of collisions) {
-    map[collisionId(collision.kind, collision.incomingName)] = collision.suggestedName
+    map[collision.id] = collision.suggestedName
   }
   return map
+}
+
+export function defaultCollisionResolutionMap(
+  collisions: ImportCollision[],
+): ImportCollisionResolutionMap {
+  const map: ImportCollisionResolutionMap = {}
+  for (const collision of collisions) {
+    map[collision.id] = "rename"
+  }
+  return map
+}
+
+function effectiveRenameMap(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+  renameMap: ImportRenameMap,
+): ImportRenameMap {
+  const effective: ImportRenameMap = { ...renameMap }
+  for (const collision of collisions) {
+    if (resolutionMap[collision.id] === "overwrite") {
+      effective[collision.id] = collision.incomingName
+      continue
+    }
+    if (!effective[collision.id]) {
+      effective[collision.id] = collision.suggestedName
+    }
+  }
+  return effective
+}
+
+/** Apply collision resolutions (overwrite vs rename) before persisting. */
+export function applyImportCollisionResolutions(
+  content: ImportContent,
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+  renameMap: ImportRenameMap = {},
+): ImportContent {
+  if (!collisions.length) return content
+  return applyImportRenames(content, effectiveRenameMap(collisions, resolutionMap, renameMap))
 }
 
 function renamedName(

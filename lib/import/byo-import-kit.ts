@@ -19,7 +19,7 @@ PDF tips:
 - For long PDFs, import one chapter or page range at a time with the content-type hint set correctly
 - Homebrew class PDFs with a level table + feature sections work well; Dump Stat may parse them with zero AI when structure is clean
 
-Multi-file homebrew (spellcasters, Psion, Martial Exploits):
+Multi-file homebrew (spellcasters, KibblesTasty Psion, Martial Exploits):
 - Import supporting libraries before classes and subclasses that reference them (spell JSON, discipline powers, exploit lists, then class, then subclasses)
 - You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers
 - SRD spell names resolve from your seeded compendium; only import homebrew spell files for third-party names`
@@ -42,9 +42,11 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
   backgrounds:
     "Focus on backgrounds[] with skill_proficiencies, feat_granted, ability_bonuses, and feature.",
   spells: "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description.",
+  spell_lists:
+    "Focus on class spell list tables (Spell / School / Special columns). Populate classes[] with spell_list (all spell names) and spells[] with level, school, concentration, components (M when Special includes M), and classes set to the list's class name.",
   feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
   equipment:
-    "Focus on equipment[] with category, cost { amount, unit }, weight, and properties.",
+    "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
   abilities:
     "Focus on abilities[] (custom builder abilities, invocations, disciplines, fighting-style pickers, companion stat blocks) and class_resources[] (level-scaled pools such as Ki, Risk Dice, or Psionic Power). Set source_type and source_name on abilities to tie them to a class or subclass.",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
@@ -183,6 +185,34 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
       },
     ],
   },
+  spell_lists: {
+    classes: [
+      {
+        name: "Artificer",
+        description: null,
+        hit_die: 8,
+        spell_list: ["Acid Splash", "Cure Wounds", "Mending"],
+      },
+    ],
+    spells: [
+      {
+        name: "Acid Splash",
+        level: 0,
+        school: "Evocation",
+        concentration: false,
+        components: null,
+        classes: ["Artificer"],
+      },
+      {
+        name: "Cure Wounds",
+        level: 1,
+        school: "Abjuration",
+        concentration: false,
+        components: null,
+        classes: ["Artificer"],
+      },
+    ],
+  },
   feats: {
     feats: [
       {
@@ -204,6 +234,19 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         weight: 3,
         properties: { damage: "1d8 slashing", properties: ["Versatile"] },
       },
+      {
+        name: "Amulet of Retributive Healing",
+        category: "Other",
+        magic_item_category: "Wondrous Item",
+        rarity: "Rare",
+        requires_attunement: true,
+        subcategory: null,
+        description:
+          "This amulet has 3 charges and regains 1d3 expended charges daily at dawn. When you restore Hit Points to one other creature, you can expend 1 charge to regain the same amount of Hit Points.",
+        cost: null,
+        weight: null,
+        properties: null,
+      },
     ],
   },
   abilities: {
@@ -212,13 +255,13 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         name: "Psionic Discipline",
         description: "Choose one discipline you know. You can manifest its powers using psionic energy.",
         source_type: "class",
-        source_name: "Psion",
+        source_name: "KibblesTasty Psion",
         level_requirement: 1,
       },
     ],
     class_resources: [
       {
-        class_name: "Psion",
+        class_name: "KibblesTasty Psion",
         resource_key: "psi_points",
         name: "Psionic Power",
         description: "Psionic energy points from the class table.",

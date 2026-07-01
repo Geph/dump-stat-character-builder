@@ -17,6 +17,8 @@ export const AI_MECHANIC_KINDS = [
   "armor_proficiencies",
   "weapon_proficiencies",
   "saving_throws",
+  "languages",
+  "spells_known",
   "ac",
   "hit_points",
   "attack_roll_modifiers",
@@ -44,7 +46,7 @@ export type ModifierWiringEntry = {
 }
 
 const FEAT_CATEGORIES_FOR_IMPORT = FEAT_PICK_CATEGORIES.filter((category) =>
-  ["Origin", "General", "Fighting Style", "Epic Boon"].includes(category),
+  ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"].includes(category),
 )
 
 /** Description-phrase rules — must cover every FEATURE_MODIFIER_RULES id. */
@@ -444,6 +446,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'usesFixed: 1, usesRecharge: "both"',
   },
   {
+    ruleId: "uses.item_charges",
+    trigger: "description",
+    catalog: "cat_char_uses",
+    examples: [
+      "This amulet has 3 charges and regains 1d3 expended charges daily at dawn",
+      "This ring has 3 charges, regaining all expended charges when you finish a long rest",
+    ],
+    mechanicsKind: "uses",
+    notes: "fixed charge pool; use specialDescription for dawn or partial recharge wording",
+  },
+  {
     ruleId: "uses.fixed_rest",
     trigger: "description",
     catalog: "cat_char_uses",
@@ -468,6 +481,46 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "a number of times equal to your proficiency bonus, regaining all uses on a long rest",
     ],
     mechanicsKind: "uses",
+  },
+  {
+    ruleId: "language.known",
+    trigger: "description",
+    catalog: "cat_char_languages",
+    examples: ["You know Sylvan", "You know Common and Elvish"],
+    mechanicsKind: "languages",
+    notes: 'languages: ["Sylvan"] for fixed grants.',
+  },
+  {
+    ruleId: "language.choice",
+    trigger: "description",
+    catalog: "cat_char_languages",
+    examples: ["learn two languages of your choice"],
+    mechanicsKind: "languages",
+    notes: "languageChoiceCount N; choicePool standard | standard_and_rare",
+  },
+  {
+    ruleId: "language.choice.tables",
+    trigger: "description",
+    catalog: "cat_char_languages",
+    examples: ["learn one language of your choice from the language tables in the Player's Handbook"],
+    mechanicsKind: "languages",
+    notes: "languageChoiceCount 1; choicePool standard",
+  },
+  {
+    ruleId: "spell.know_cantrip",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: ["You know the Druidcraft cantrip"],
+    mechanicsKind: "spells_known",
+    notes: 'spellNames: ["Druidcraft"]',
+  },
+  {
+    ruleId: "spell.cantrip.choice",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: ["learn one other cantrip of your choice from the Divination or Enchantment school of magic"],
+    mechanicsKind: "spells_known",
+    notes: "spellChoiceGrants: [{ level: 0, count: 1 }]; spellChoiceLabel for school filters",
   },
   {
     ruleId: "spell.always_prepared",
@@ -640,7 +693,7 @@ export const SRD_PRESET_FEATURE_NAMES = [
   "Tactical Master",
 ] as const
 
-/** Patterns from homebrew imports (Gunslinger, Psion, Alternate Fighter, Dancer). */
+/** Patterns from homebrew imports (Gunslinger, KibblesTasty Psion, Alternate Fighter, Dancer). */
 export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Gunslinger / martial homebrew",
@@ -652,7 +705,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
     ],
   },
   {
-    source: "Psion / point-pool casters",
+    source: "KibblesTasty Psion / point-pool casters",
     guidance: [
       "Psi Points + Psi Limit as separate class_resources (pool vs per-use cap).",
       "Disciplines / talents: isChoice + choices.options[] for player picks; keep psi costs in each option description.",
@@ -693,6 +746,7 @@ export const NARRATIVE_ONLY_GUIDANCE = [
   "Transformation / polymorph stat blocks (Wild Shape forms, Draconic forms) — descriptive unless a fixed AC/speed bonus is stated in prose.",
   "Social / exploration ribbons without numeric bonuses.",
   "Reaction timing, advantage on specific story checks, or GM-adjudicated effects without standard phrasing.",
+  "Reaction rerolls or once-per-long-rest reaction riders (e.g. reroll a low Deception check) — keep in description unless a catalog trigger exists; do NOT map to uses.",
   "Maneuver / discipline / invocation option lists — use isChoice + choices, not grant_feat.",
 ]
 
@@ -716,6 +770,8 @@ function formatMechanicsCheatsheet(): string {
     "mechanics[] field cheat sheet (kind → required fields):",
     `Allowed kind values: ${AI_MECHANIC_KINDS.join(", ")}`,
     "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
+    "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
+    "- spells_known: spellNames [\"Druidcraft\"]; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters",
     "- tool_proficiencies: tools [\"Smith's Tools\"]",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
     "- weapon_proficiencies: weaponMode martial_weapons | simple_weapons",

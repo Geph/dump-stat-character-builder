@@ -17,18 +17,18 @@ describe("getMultipleClassImportBlock", () => {
     const content: ImportContent = {
       classes: [
         { name: "Fighter", features: [] },
-        { name: "Psion", features: [] },
+        { name: "KibblesTasty Psion", features: [] },
       ],
     }
     const block = getMultipleClassImportBlock(content, "pdf")
     expect(block).not.toBeNull()
-    expect(block!.classNames).toEqual(["Fighter", "Psion"])
+    expect(block!.classNames).toEqual(["Fighter", "KibblesTasty Psion"])
     expect(block!.message).toContain("page range")
-    expect(block!.message).toContain("Fighter, Psion")
+    expect(block!.message).toContain("Fighter, KibblesTasty Psion")
   })
 
   it("mentions clipboard splitting for text imports", () => {
-    const message = multipleClassImportMessage(["Fighter", "Psion", "Wizard"], "text")
+    const message = multipleClassImportMessage(["Fighter", "KibblesTasty Psion", "Wizard"], "text")
     expect(message).toContain("3 classes")
     expect(message).toContain("one class at a time")
     expect(message).toContain("page ranges")

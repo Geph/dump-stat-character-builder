@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ClipboardImportPanel } from "@/components/import/clipboard-import-panel"
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
+import { ImportContentPreviewPanel } from "@/components/import/import-content-preview-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
@@ -18,10 +19,15 @@ import {
 import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import {
+  canUseClientByoImport,
   canUseServerImport,
   getStorageLabel,
   isStaticDeploy,
 } from "@/lib/config/deploy-mode"
+import {
+  confirmClientByoJsonImport,
+  runClientByoJsonImport,
+} from "@/lib/import/client-byo-import"
 import { seedLocalSrd } from "@/lib/data/local-seed"
 import {
   importDumpStatExportItemsLocal,
@@ -44,8 +50,10 @@ import type {
   ImportProposalSet,
 } from "@/lib/import/import-proposals"
 import {
+  defaultCollisionResolutionMap,
   defaultRenameMap,
   type ImportCollision,
+  type ImportCollisionResolutionMap,
   type ImportRenameMap,
 } from "@/lib/import/import-collisions"
 import { FoundryImportGuidancePanel } from "@/components/import/foundry-import-guidance-panel"
@@ -64,11 +72,14 @@ const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Clipboard
   { id: "pdf", label: "PDF / JSON", icon: Upload },
 ]
 
-const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Upload }[] = [
+const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
+  { id: "clipboard", label: "BYO JSON", icon: ClipboardPaste },
   { id: "pack", label: "JSON pack", icon: Upload },
 ]
 
-const IMPORT_TABS = canUseServerImport() ? SERVER_IMPORT_TABS : STATIC_IMPORT_TABS
+const IMPORT_TABS = canUseServerImport()
+  ? SERVER_IMPORT_TABS
+  : STATIC_IMPORT_TABS
 
 export default function ImportPage() {
   const staticMode = isStaticDeploy()
@@ -103,7 +114,10 @@ export default function ImportPage() {
     materialSource: string
   } | null>(null)
   const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
+  const [collisionResolutionMap, setCollisionResolutionMap] =
+    useState<ImportCollisionResolutionMap>({})
   const [confirmingImport, setConfirmingImport] = useState(false)
+  const [fileInputKey, setFileInputKey] = useState(0)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
   const [importAiSettings, setImportAiSettings] = useImportAiSettings()
@@ -157,11 +171,29 @@ export default function ImportPage() {
     )
   }
 
-  const clearPendingImport = () => {
+  const resetImportForm = () => {
     setPendingImport(null)
     setRenameMap({})
+    setCollisionResolutionMap({})
+    setPdfFile(null)
+    setPackFile(null)
+    setPdfContentType("all")
+    setPdfContentTypeHint("all")
+    setPdfSpecificContent("")
+    setPdfPageScope("all")
+    setPdfPageStart("")
+    setPdfPageEnd("")
+    setTextContent("")
+    setJsonImportText("")
+    setTextContentType("all")
+    setFoundryGuidance(null)
     setPdfStatus("idle")
     setTextStatus("idle")
+    setFileInputKey((key) => key + 1)
+  }
+
+  const clearPendingImport = () => {
+    resetImportForm()
   }
 
   const formatImportError = (data: {
@@ -199,10 +231,7 @@ export default function ImportPage() {
       count?: number
       pagesParsed?: { from?: number; to?: number; total?: number }
     },
-    setStatus: (status: ImportStatus) => void,
   ) => {
-    setStatus("success")
-    setPendingImport(null)
     setImportReport(data.report ?? null)
     const breakdownText = data.breakdown
       ? Object.entries(data.breakdown)
@@ -217,6 +246,7 @@ export default function ImportPage() {
       data.report?.headline ??
         `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`,
     )
+    resetImportForm()
   }
 
   const handleConfirmImport = async (selections: ImportProposalSelections) => {
@@ -227,6 +257,20 @@ export default function ImportPage() {
     setImportReport(null)
 
     try {
+      if (staticMode) {
+        const data = await confirmClientByoJsonImport({
+          pendingContent: pendingImport.content,
+          selections,
+          materialSource: pendingImport.materialSource,
+          renameMap,
+          collisions: pendingImport.collisions,
+          collisionResolutionMap,
+        })
+        applyImportSuccess(data)
+        setTextStatus("success")
+        return
+      }
+
       const response = await fetch("/api/import/text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -235,6 +279,8 @@ export default function ImportPage() {
           pendingContent: pendingImport.content,
           proposalSelections: selections,
           renameMap,
+          collisionResolutionMap,
+          collisions: pendingImport.collisions,
           materialSource: pendingImport.materialSource,
         }),
       })
@@ -249,11 +295,7 @@ export default function ImportPage() {
       const data = parsed.data
 
       if (response.ok) {
-        if (pendingImport.source === "pdf") {
-          applyImportSuccess(data, setPdfStatus)
-        } else {
-          applyImportSuccess(data, setTextStatus)
-        }
+        applyImportSuccess(data)
       } else {
         if (pendingImport.source === "pdf") setPdfStatus("error")
         else setTextStatus("error")
@@ -327,6 +369,7 @@ export default function ImportPage() {
           setPdfStatus("review")
           const collisions = (data.collisions ?? []) as ImportCollision[]
           setRenameMap(defaultRenameMap(collisions))
+          setCollisionResolutionMap(defaultCollisionResolutionMap(collisions))
           setPendingImport({
             content: data.pendingContent,
             proposals: data.proposals,
@@ -340,7 +383,7 @@ export default function ImportPage() {
           setMessage("Review this import before writing to the compendium.")
           return
         }
-        applyImportSuccess(data, setPdfStatus)
+        applyImportSuccess(data)
       } else {
         setPdfStatus("error")
         setMessage(formatImportError(data))
@@ -362,6 +405,30 @@ export default function ImportPage() {
     setPendingImport(null)
 
     try {
+      if (staticMode && payload.importMode === "byo-json") {
+        const data = await runClientByoJsonImport(payload.text, importMaterialSource)
+        if ("needsConfirmation" in data && data.needsConfirmation) {
+          setTextStatus("review")
+          setRenameMap(defaultRenameMap(data.collisions))
+          setCollisionResolutionMap(defaultCollisionResolutionMap(data.collisions))
+          setPendingImport({
+            content: data.pendingContent,
+            proposals: data.proposals,
+            previewSummary: data.previewSummary,
+            source: "text",
+            collisions: data.collisions,
+            stages: data.stages,
+            stagingSummary: data.stagingSummary,
+            materialSource: importMaterialSource,
+          })
+          setMessage("Review this import before writing to the compendium.")
+          return
+        }
+        applyImportSuccess(data)
+        setTextStatus("success")
+        return
+      }
+
       const response = await fetch("/api/import/text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -387,6 +454,7 @@ export default function ImportPage() {
           setTextStatus("review")
           const collisions = (data.collisions ?? []) as ImportCollision[]
           setRenameMap(defaultRenameMap(collisions))
+          setCollisionResolutionMap(defaultCollisionResolutionMap(collisions))
           setPendingImport({
             content: data.pendingContent as ImportContent,
             proposals: data.proposals as ImportProposalSet,
@@ -406,7 +474,7 @@ export default function ImportPage() {
           )
           return
         }
-        applyImportSuccess(data, setTextStatus)
+        applyImportSuccess(data)
       } else {
         setTextStatus("error")
         setMessage(formatImportError(data))
@@ -591,12 +659,13 @@ export default function ImportPage() {
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className="text-muted-foreground text-lg">
             {staticMode
-              ? "Import Dump Stat JSON packs or reload the bundled SRD (data stays in your browser)."
+              ? "Import homebrew with BYO JSON (paste LLM output), share JSON packs, or reload the bundled SRD — data stays in your browser."
               : "Add new content from PDFs or pasted text and JSON"}
           </p>
           {staticMode && (
             <p className="text-sm text-muted-foreground mt-2">
-              Storage: {getStorageLabel()}. PDF and AI import require a hosted deployment with MySQL.
+              Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with MySQL.
+              Use <strong className="font-medium text-foreground">BYO JSON</strong> to copy a prompt into your own LLM and paste the result here.
             </p>
           )}
         </div>
@@ -651,6 +720,13 @@ export default function ImportPage() {
               collisions={pendingImport.collisions}
               value={renameMap}
               onChange={setRenameMap}
+              resolutionMap={collisionResolutionMap}
+              onResolutionChange={setCollisionResolutionMap}
+            />
+            <ImportContentPreviewPanel
+              content={pendingImport.content}
+              previewSummary={pendingImport.previewSummary}
+              showModifierReviewHint={modifierReviewRows.length > 0}
             />
             <ImportModifierReviewPanel
               rows={modifierReviewRows}
@@ -659,7 +735,6 @@ export default function ImportPage() {
             />
             <ImportProposalPanel
               proposals={pendingImport.proposals}
-              previewSummary={pendingImport.previewSummary}
               confirming={confirmingImport}
               onConfirm={handleConfirmImport}
               onCancel={clearPendingImport}
@@ -731,6 +806,7 @@ export default function ImportPage() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <label className="flex-1">
                       <input
+                        key={`pack-file-${fileInputKey}`}
                         type="file"
                         accept=".json,application/json"
                         onChange={(e) => setPackFile(e.target.files?.[0] || null)}
@@ -756,7 +832,7 @@ export default function ImportPage() {
                 </motion.div>
               )}
 
-              {canUseServerImport() && activeTab === "clipboard" && (
+              {(canUseServerImport() || canUseClientByoImport()) && activeTab === "clipboard" && (
                 <motion.div
                   key="clipboard"
                   role="tabpanel"
@@ -765,6 +841,12 @@ export default function ImportPage() {
                   exit={{ opacity: 0, x: 8 }}
                   transition={{ duration: 0.15 }}
                 >
+                  {staticMode ? (
+                    <p className="text-muted-foreground mb-4">
+                      Copy the extraction prompt into your own LLM, then paste the structured JSON below.
+                      No API keys or server required — content is saved to {getStorageLabel()}.
+                    </p>
+                  ) : null}
                   <ClipboardImportPanel
                     contentType={textContentType}
                     onContentTypeChange={setTextContentType}
@@ -775,11 +857,13 @@ export default function ImportPage() {
                     jsonText={jsonImportText}
                     onJsonTextChange={setJsonImportText}
                     status={textStatus}
-                    serverAiEnabled={serverAiEnabled}
+                    serverAiEnabled={!staticMode && serverAiEnabled}
                     importAiSettings={importAiSettings}
                     onImportAiSettingsChange={setImportAiSettings}
                     onImportJson={handleJsonImport}
-                    onServerAiImport={serverAiEnabled ? handleServerAiImport : undefined}
+                    onServerAiImport={
+                      !staticMode && serverAiEnabled ? handleServerAiImport : undefined
+                    }
                   />
                 </motion.div>
               )}
@@ -942,6 +1026,7 @@ export default function ImportPage() {
                     <div className="flex flex-col sm:flex-row gap-3">
                       <label className="flex-1">
                         <input
+                          key={`pdf-file-${fileInputKey}`}
                           type="file"
                           accept=".pdf,.json,application/json"
                           onChange={(e) => setPdfFile(e.target.files?.[0] || null)}

@@ -11,6 +11,8 @@ export function maxOutputTokensForImport(contentTypeHint?: string | null): numbe
       return 3072
     case "spells":
       return 8192
+    case "spell_lists":
+      return 8192
     case "equipment":
       return 4096
     default:

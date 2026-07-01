@@ -35,6 +35,11 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
         contentType: "spells",
       },
       {
+        label: "Class spell list (PHB table)",
+        hint: "Paste an \"Artificer Spell List\" section with Spell / School / Special columns — use content type Class Spell Lists for zero-AI parsing",
+        contentType: "spell_lists",
+      },
+      {
         label: "Class spell list stub (optional)",
         hint: "Spell list JSON with class name tags when split from the class PDF",
         contentType: "spells",
@@ -62,10 +67,10 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   },
   {
     id: "psion-disciplines",
-    title: "Psionic classes (Kibbles Psion)",
+    title: "Psionic classes (KibblesTasty Psion)",
     summary:
       "Discipline packages, discipline powers, and psi-point pools are often split across multiple JSON files.",
-    examples: ["Kibbles Psion", "psion-disciplines.json + psion-class.json"],
+    examples: ["KibblesTasty Psion", "psion-disciplines.json + psion-class.json"],
     steps: [
       {
         label: "Disciplines & powers",
@@ -73,7 +78,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
         contentType: "abilities",
       },
       {
-        label: "Psion class",
+        label: "KibblesTasty Psion class",
         hint: "Psi Points, Psi Limit, Psionic Disciplines feature, archetype choices",
         contentType: "classes",
       },

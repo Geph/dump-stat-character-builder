@@ -65,6 +65,7 @@ import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-gr
 import { featureChoiceKey } from "@/lib/builder/choices"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { suggestEquipmentLoadout } from "@/lib/builder/equipment-loadout"
 import { getEquipmentCostGp } from "@/lib/builder/equipment-utils"
@@ -387,14 +388,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         const { data: catalogData } = await db.from("equipment").select("*").order("name")
         if (catalogData) setEquipmentCatalog(catalogData as Equipment[])
 
-        const { data: abilitiesData } = await db
-          .from("custom_abilities")
-          .select("*")
-          .eq("show_in_builder", true)
-        if (abilitiesData) setCustomAbilities(abilitiesData)
-
         const catalog = await loadModifierCatalog(db)
         setModifierCatalog(catalog)
+        setCustomAbilities(await loadCustomAbilitiesForGameplay(db))
 
         const featIds = (data.feat_ids ?? []).filter(Boolean)
         if (featIds.length) {

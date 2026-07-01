@@ -15,6 +15,7 @@ import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/com
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers"
+import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import type { UsesConfig } from "@/lib/types"
 
@@ -169,7 +170,11 @@ function titleCaseWords(value: string): string {
 }
 
 function matchSkillName(fragment: string): string | null {
-  const normalized = titleCaseWords(fragment.replace(/\s+and\s+/gi, " "))
+  const stripped = fragment
+    .replace(/^the\s+/i, "")
+    .replace(/\s+skill$/i, "")
+    .trim()
+  const normalized = titleCaseWords(stripped.replace(/\s+and\s+/gi, " "))
   for (const skill of SKILL_NAMES) {
     if (skill.toLowerCase() === normalized.toLowerCase()) return skill
   }
@@ -1303,6 +1308,37 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "uses.item_charges",
+    confidence: "high",
+    scope: "full",
+    test: /\bhas\s+(\d+)\s+charges?\b/i,
+    build: (match, ctx, text) => {
+      const count = parseInt(match[1], 10)
+      if (!Number.isFinite(count)) return null
+      const dawnRecharge = text.match(
+        /\bregains?\s+(\d+d\d+|\d+)\s+expended\s+charges?\s+daily\s+at\s+dawn\b/i,
+      )
+      const longRestRecharge = text.match(
+        /\bregains?\s+(\d+d\d+|\d+)\s+expended\s+charges?\s+(?:daily\s+)?(?:when\s+you\s+finish\s+a\s+|on\s+a\s+)?long\s+rest\b/i,
+      )
+      const uses: UsesConfig = {
+        type: "fixed",
+        fixedAmount: count,
+      }
+      if (dawnRecharge) {
+        uses.specialDescription = `Regains ${dawnRecharge[1]} expended charges daily at dawn`
+      } else if (longRestRecharge) {
+        uses.recharges = [{ rest: "long_rest" }]
+        if (longRestRecharge[1] !== String(count)) {
+          uses.specialDescription = `Regains ${longRestRecharge[1]} expended charges on a long rest`
+        }
+      } else if (/\bregains?\s+all\s+expended\s+charges?\b/i.test(text)) {
+        uses.recharges = [{ rest: "long_rest" }]
+      }
+      return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Charges")
+    },
+  },
+  {
     id: "uses.fixed_rest",
     confidence: "high",
     test:
@@ -1490,6 +1526,101 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           id: modId(instanceKey(ctx, "telepathy")),
           type: "telepathy",
           rangeFeet,
+        },
+      ])
+    },
+  },
+  {
+    id: "language.known",
+    confidence: "high",
+    test: /\byou know (?!the )([A-Za-z]+)\b/i,
+    build: (match, ctx) => {
+      const language = titleCaseWords(match[1].trim())
+      if (!language) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
+        {
+          id: modId(instanceKey(ctx, `lang_${language}`)),
+          type: "languages",
+          values: [language],
+          label: `You know ${language}`,
+        },
+      ])
+    },
+  },
+  {
+    id: "language.choice",
+    confidence: "high",
+    test: /\blearn (one|two|three|four|\d+) languages? of your choice\b/i,
+    build: (match, ctx) => {
+      const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
+      const raw = match[1]?.toLowerCase() ?? "1"
+      const count = wordToCount[raw] ?? parseInt(raw, 10)
+      if (!Number.isFinite(count) || count < 1) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
+        {
+          id: modId(instanceKey(ctx, "lang_choice")),
+          type: "languages",
+          values: [],
+          choiceCount: count,
+          choicePool: "standard",
+          label: `Choose ${count} language${count === 1 ? "" : "s"}`,
+        },
+      ])
+    },
+  },
+  {
+    id: "language.choice.tables",
+    confidence: "high",
+    test: /\blearn one language of your choice from the language tables\b/i,
+    build: (_match, ctx) =>
+      charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
+        {
+          id: modId(instanceKey(ctx, "lang_tables")),
+          type: "languages",
+          values: [],
+          choiceCount: 1,
+          choicePool: "standard",
+          label: "Language from Player's Handbook tables",
+        },
+      ]),
+  },
+  {
+    id: "spell.know_cantrip",
+    confidence: "high",
+    test: /\byou know the ([A-Za-z' ]+?) cantrip\b/i,
+    build: (match, ctx) => {
+      const spellName = match[1].trim()
+      if (!spellName) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+        {
+          id: modId(instanceKey(ctx, `cantrip_${spellName}`)),
+          type: "spells_known",
+          spells: [{ spellId: spellNamePlaceholder(spellName), alwaysPrepared: true }],
+          alwaysPrepared: true,
+          label: `${spellName} cantrip`,
+        },
+      ])
+    },
+  },
+  {
+    id: "spell.cantrip.choice",
+    confidence: "high",
+    test:
+      /\blearn (?:one|two|three|four|\d+) other cantrips? of your choice(?: from the ([^.]+?))?(?:\.|$)/i,
+    build: (match, ctx) => {
+      const countMatch = match[0].match(/\b(one|two|three|four|\d+)\s+other cantrips?\b/i)
+      const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
+      const raw = countMatch?.[1]?.toLowerCase() ?? "1"
+      const count = wordToCount[raw] ?? parseInt(raw, 10)
+      if (!Number.isFinite(count) || count < 1) return null
+      const schoolNote = match[1]?.replace(/\s+school(?:\s+of\s+magic)?$/i, "").trim()
+      return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+        {
+          id: modId(instanceKey(ctx, "cantrip_choice")),
+          type: "spells_known",
+          spells: [],
+          choiceGrants: [{ level: 0, count }],
+          label: schoolNote ? `Cantrip choice (${schoolNote})` : "Cantrip choice",
         },
       ])
     },

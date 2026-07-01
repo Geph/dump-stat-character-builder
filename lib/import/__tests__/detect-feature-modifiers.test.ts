@@ -69,6 +69,19 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "item charge pool",
+      text: "This amulet has 3 charges and regains 1d3 expended charges daily at dawn.",
+      ruleId: "uses.item_charges",
+      assert: (detections) => {
+        const char = detections[0]?.instance.characteristics?.[0]
+        expect(char?.type).toBe("uses")
+        if (char?.type === "uses") {
+          expect(char.uses?.fixedAmount).toBe(3)
+          expect(char.uses?.specialDescription).toMatch(/1d3.*dawn/i)
+        }
+      },
+    },
+    {
       label: "fixed uses per long rest",
       text: "You can use this feature 3 times, regaining all expended uses when you finish a long rest.",
       ruleId: "uses.fixed_rest",
@@ -248,6 +261,39 @@ describe("detectFeatureModifiers", () => {
         expect(healFx?.healAbility).toBe("CON")
       },
     },
+    {
+      label: "language choice",
+      text: "You learn two languages of your choice.",
+      ruleId: "language.choice",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "language.choice")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("languages")
+        expect(char?.choiceCount).toBe(2)
+      },
+    },
+    {
+      label: "known language",
+      text: "You know Sylvan.",
+      ruleId: "language.known",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "language.known")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("languages")
+        expect(char?.values).toEqual(["Sylvan"])
+      },
+    },
+    {
+      label: "known cantrip",
+      text: "You know the Druidcraft cantrip.",
+      ruleId: "spell.know_cantrip",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "spell.know_cantrip")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("spells_known")
+        expect(char?.spells?.[0]?.spellId).toContain("Druidcraft")
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {
@@ -258,7 +304,6 @@ describe("detectFeatureModifiers", () => {
   })
 
   const negativeCases = [
-    "You learn two languages of your choice.",
     "As a bonus action, you can dash.",
     "Your spellcasting ability is Intelligence.",
     "You can cast the detect magic spell at will.",

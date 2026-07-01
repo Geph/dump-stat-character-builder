@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (authError) return authError
 
     const body = await request.json()
-    const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, materialSource } =
+    const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, collisionResolutionMap, collisions, materialSource } =
       body
     const aiOverride = parseImportAiOverride(body)
     const importMode = body.importMode as string | undefined
@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
         },
         normalizeImportMaterialSource(materialSource, "Custom"),
         renameMap ?? {},
+        (collisions ?? []) as import("@/lib/import/import-collisions").ImportCollision[],
+        collisionResolutionMap ?? {},
       )
 
       return NextResponse.json({

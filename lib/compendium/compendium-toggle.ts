@@ -1,6 +1,6 @@
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
-import type { CompendiumContentType } from "@/lib/compendium/content-types"
+import { compendiumStorageContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
 
@@ -19,13 +19,15 @@ export const COMPENDIUM_TOGGLE_LABELS: Record<CompendiumContentType, string> = {
   spells: "Spell",
   feats: "Feat",
   equipment: "Equipment",
+  magic_items: "Magic Item",
   languages: "Language",
   class_resources: "Class Resource",
   abilities: "Custom Ability",
 }
 
 export function contentTypeToTable(contentType: CompendiumContentType): CompendiumTable {
-  return contentType === "abilities" ? "custom_abilities" : contentType
+  const storageType = compendiumStorageContentType(contentType)
+  return storageType === "abilities" ? "custom_abilities" : storageType
 }
 
 export function tableToContentType(table: CompendiumTable): CompendiumContentType {

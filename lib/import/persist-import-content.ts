@@ -6,6 +6,11 @@ import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { stripFoundryMeta, type ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
 import { buildImportReport, type ImportReport } from "@/lib/import/build-import-report"
 import { enrichFeatRowWithPrerequisites } from "@/lib/import/resolve-feat-prerequisites"
+import { resolveLinkedModifierSpells } from "@/lib/import/resolve-linked-modifier-spells"
+import {
+  normalizeImportMaterialSource,
+  type ImportSourceLabel,
+} from "@/lib/import/import-material-source"
 import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
 import {
@@ -16,16 +21,11 @@ import {
   type ClassResourceImportRow,
 } from "@/lib/import/enrich-import-classes"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
-export type ImportSourceLabel = string
-
-export function normalizeImportMaterialSource(value: unknown, fallback = "Custom"): string {
-  if (typeof value !== "string") return fallback
-  const trimmed = value.trim()
-  const normalized = trimmed.length > 0 ? trimmed.slice(0, 120) : fallback
-  return sanitizeImportRowSource(normalized, fallback)
-}
+export type { ImportSourceLabel } from "@/lib/import/import-material-source"
+export { normalizeImportMaterialSource } from "@/lib/import/import-material-source"
 
 function stampSource<T extends Record<string, unknown>>(row: T, importerSource: string): T {
   const existing = "source" in row ? row.source : undefined
@@ -35,12 +35,9 @@ function stampSource<T extends Record<string, unknown>>(row: T, importerSource: 
   }
 }
 
-export type PersistImportResult = {
-  totalImported: number
-  breakdown: Record<string, number>
-  warnings: string[]
-  report?: ImportReport
-}
+import type { PersistImportResult } from "@/lib/import/persist-import-types"
+
+export type { PersistImportResult } from "@/lib/import/persist-import-types"
 
 function normalizeFeatCategory(category: string | null | undefined): string | null {
   const trimmed = category?.trim()
@@ -227,9 +224,13 @@ export async function persistImportedContent(
   }
 
   if (sanitized.feats?.length) {
+    const spellCatalog = await loadSpellCatalog()
     const featRows = sanitized.feats.map((f) => {
       const row = f as Record<string, unknown>
-      const linkedModifiers = (row.linkedModifiers ?? row.linked_modifiers) as unknown[] | undefined
+      const linkedModifiers = resolveLinkedModifierSpells(
+        (row.linkedModifiers ?? row.linked_modifiers) as import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | undefined,
+        spellCatalog,
+      )
       const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
       return {
         name: f.name,
@@ -247,7 +248,10 @@ export async function persistImportedContent(
     })
     await upsertByName("feats", featRows)
 
-    const existingFeats = await listRows<{ id: string; name: string }>("feats", "id, name")
+    const existingFeats = (await listRows("feats")).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+    }))
     for (const row of featRows) {
       const enriched = enrichFeatRowWithPrerequisites(row, existingFeats)
       if (

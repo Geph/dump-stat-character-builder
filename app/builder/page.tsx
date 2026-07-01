@@ -10,7 +10,6 @@ import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
-import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import {
@@ -158,6 +157,8 @@ import {
   validateModifierPlayerChoices,
 } from "@/lib/builder/modifier-player-choices"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
+import { isSystemOptionCatalogId } from "@/lib/compendium/system-option-catalogs"
 import {
   allAbilityScorePoolAllocationsValid,
   collectAbilityScorePoolGrants,
@@ -702,7 +703,7 @@ export default function BuilderPage() {
     const fetchContent = async () => {
       const db = createClient()
       
-      const [classesRes, subclassesRes, speciesRes, backgroundsRes, featsRes, spellsRes, equipmentRes, abilitiesRes, classResourcesRes] = await Promise.all([
+      const [classesRes, subclassesRes, speciesRes, backgroundsRes, featsRes, spellsRes, equipmentRes, classResourcesRes] = await Promise.all([
         db.from("classes").select("*").order("name"),
         db.from("subclasses").select("*").order("name"),
         db.from("species").select("*").order("name"),
@@ -710,12 +711,12 @@ export default function BuilderPage() {
         db.from("feats").select("*").order("name"),
         db.from("spells").select("*").order("level").order("name"),
         db.from("equipment").select("*").order("category").order("name"),
-        db.from("custom_abilities").select("*").eq("show_in_builder", true).order("name"),
         db.from("class_resources").select("*"),
       ])
 
       const catalog = await loadModifierCatalog(db)
       setModifierCatalog(catalog)
+      const gameplayAbilities = await loadCustomAbilitiesForGameplay(db)
 
       const classResourceRows = classResourcesRes.data || []
       const enrichedClasses = enrichClassesList(classesRes.data || []) as DndClass[]
@@ -736,11 +737,7 @@ export default function BuilderPage() {
       }
       setSpells(filterEnabled(spellsRes.data || []))
       setEquipment(filterEnabled(equipmentRes.data || []))
-      setCustomAbilities(
-        filterEnabled(enrichRowsWithModifierRefs(abilitiesRes.data || [])).filter(
-          (ability) => ability.show_in_builder !== false,
-        ) as CustomAbility[],
-      )
+      setCustomAbilities(gameplayAbilities)
       setLoading(false)
     }
 
@@ -4877,11 +4874,13 @@ export default function BuilderPage() {
               {/* Custom Abilities Tab */}
               {previewTab === "custom" && (
                 <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
-                  {customAbilities.length > 0 ? (
+                  {customAbilities.filter((ability) => !isSystemOptionCatalogId(ability.id)).length > 0 ? (
                     <>
                       <p className="text-[9px] text-magenta uppercase font-bold mb-1">Custom Abilities</p>
                       <div className="space-y-1">
-                        {customAbilities.map((ability) => {
+                        {customAbilities
+                          .filter((ability) => !isSystemOptionCatalogId(ability.id))
+                          .map((ability) => {
                           const uses = resolveUsesConfig(ability.characteristics, ability.uses)
                           return (
                           <div key={ability.id} className="p-1.5 bg-muted/30 rounded text-[10px]">

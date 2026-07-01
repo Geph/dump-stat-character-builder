@@ -568,7 +568,7 @@ export interface Spell {
   description: string | null
   higher_levels: string | null
   classes: string[] | null
-  /** Psi-point empower options parsed from homebrew psionic power text (Kibbles Psion, etc.). */
+  /** Psi-point empower options parsed from homebrew psionic power text (KibblesTasty Psion, etc.). */
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   icon: string | null
   accent_color?: string | null

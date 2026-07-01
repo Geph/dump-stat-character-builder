@@ -27,7 +27,7 @@ function unwiredNames(content: ImportContent): string[] {
     .map((row) => `${row.sourceName ?? "?"} L${row.featureLevel ?? "?"} ${row.featureName}`)
 }
 
-describe.runIf(hasHomebrewImportFixtures)("Witch / Psion homebrew import fixtures", () => {
+describe.runIf(hasHomebrewImportFixtures)("Witch / KibblesTasty Psion homebrew import fixtures", () => {
   it("loads witch-class.json with core features wired", () => {
     const content = loadFixture("witch-class.json")
     const unwired = unwiredNames(content)

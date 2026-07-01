@@ -3,6 +3,7 @@ import type { ImportConfidenceAssessment } from "@/lib/import/assess-import-conf
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import type { ImportContent } from "@/lib/import/content-schema"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { extractSpellListImportDeterministic } from "@/lib/import/extract-spell-list-import"
 import { parseClassShellFromText } from "@/lib/import/parse-class-shell"
 import { parseProgressionTableFeatures } from "@/lib/import/parse-class-progression-table"
 import {
@@ -31,6 +32,12 @@ export function extractImportContentDeterministic(
   rawText: string,
   options?: DeterministicExtractOptions,
 ): DeterministicExtractResult {
+  const hint = options?.contentTypeHint?.trim().toLowerCase()
+  if (hint === "spell_lists") {
+    const spellList = extractSpellListImportDeterministic(rawText)
+    return spellList
+  }
+
   const preprocess =
     options?.preprocess ??
     preprocessImportText(rawText, { contentTypeHint: options?.contentTypeHint })

@@ -5,6 +5,7 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "species", label: "Species" },
   { value: "backgrounds", label: "Backgrounds" },
   { value: "spells", label: "Spells" },
+  { value: "spell_lists", label: "Class Spell Lists" },
   { value: "feats", label: "Feats" },
   { value: "equipment", label: "Equipment" },
   { value: "abilities", label: "Custom Abilities / Resources" },

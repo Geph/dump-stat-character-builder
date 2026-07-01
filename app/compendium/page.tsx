@@ -23,8 +23,8 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { GameIcon } from "@/components/game-icon-picker"
 import { formatCompendiumSource } from "@/lib/srd/source"
-import { groupEquipmentByCategory } from "@/lib/compendium/equipment-categories"
-import { getEquipmentDetailRows, getMagicItemCategoryOptions } from "@/lib/compendium/equipment-display"
+import { groupEquipmentByCategory, groupMagicItemsByCategory } from "@/lib/compendium/equipment-categories"
+import { getEquipmentDetailRows, getMagicItemCategoryOptions, splitEquipmentByKind } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-exp
 import {
   getCompendiumItemIcon,
   isCompendiumContentType,
+  isEquipmentBrowserTab,
   type CompendiumContentType,
 } from "@/lib/compendium/content-types"
 import {
@@ -89,6 +90,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "spells", label: "Spells", icon: <Wand2 className="w-3.5 h-3.5" /> },
   { id: "feats", label: "Feats", icon: <Sparkles className="w-3.5 h-3.5" /> },
   { id: "equipment", label: "Equipment", icon: <Package className="w-3.5 h-3.5" /> },
+  { id: "magic_items", label: "Magic Items", icon: <Sparkles className="w-3.5 h-3.5" /> },
   { id: "languages", label: "Languages", icon: <Languages className="w-3.5 h-3.5" /> },
   { id: "class_resources", label: "Class Resources", icon: <Gauge className="w-3.5 h-3.5" /> },
   { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-3.5 h-3.5" /> },
@@ -102,6 +104,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   spells: "New Spell",
   feats: "New Feat",
   equipment: "New Item",
+  magic_items: "New Magic Item",
   languages: "New Language",
   class_resources: "New Class Resource",
   abilities: "New Custom Ability",
@@ -121,6 +124,7 @@ function CompendiumPageContent() {
     spells: [],
     feats: [],
     equipment: [],
+    magic_items: [],
     languages: [],
     class_resources: [],
     abilities: [],
@@ -144,8 +148,7 @@ function CompendiumPageContent() {
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
-  const [equipmentFilterKind, setEquipmentFilterKind] = useState<"all" | "magic" | "mundane">("all")
-  const [equipmentFilterMagicCategory, setEquipmentFilterMagicCategory] = useState<string>("all")
+  const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
   const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
@@ -157,6 +160,7 @@ function CompendiumPageContent() {
     spells: 0,
     feats: 0,
     equipment: 0,
+    magic_items: 0,
     languages: 0,
     class_resources: 0,
     abilities: 0,
@@ -180,7 +184,7 @@ function CompendiumPageContent() {
         { count: backgroundsCount },
         { count: spellsCount },
         { count: featsCount },
-        { count: equipmentCount },
+        { data: equipmentRows },
         { count: languagesCount },
         { count: classResourcesCount },
         { count: abilitiesCount },
@@ -191,11 +195,16 @@ function CompendiumPageContent() {
         db.from("backgrounds").select("*", { count: "exact", head: true }),
         db.from("spells").select("*", { count: "exact", head: true }),
         db.from("feats").select("*", { count: "exact", head: true }),
-        db.from("equipment").select("*", { count: "exact", head: true }),
+        db
+          .from("equipment")
+          .select(
+            "magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
+          ),
         db.from("languages").select("*", { count: "exact", head: true }),
         db.from("class_resources").select("*", { count: "exact", head: true }),
         db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
+      const equipmentSplit = splitEquipmentByKind((equipmentRows ?? []) as Equipment[])
       setTabCounts({
         species: speciesCount ?? 0,
         classes: classesCount ?? 0,
@@ -203,7 +212,8 @@ function CompendiumPageContent() {
         backgrounds: backgroundsCount ?? 0,
         spells: spellsCount ?? 0,
         feats: featsCount ?? 0,
-        equipment: equipmentCount ?? 0,
+        equipment: equipmentSplit.mundane.length,
+        magic_items: equipmentSplit.magic.length,
         languages: languagesCount ?? 0,
         class_resources: classResourcesCount ?? 0,
         abilities: abilitiesCount ?? 0,
@@ -221,7 +231,7 @@ function CompendiumPageContent() {
       setLoading(true)
       const db = createClient()
       
-      const tableName = activeTab === "abilities" ? "custom_abilities" : activeTab
+      const tableName = activeTab === "abilities" ? "custom_abilities" : isEquipmentBrowserTab(activeTab) ? "equipment" : activeTab
       if (activeTab === "abilities") {
         await ensureModifierCatalog(db)
       }
@@ -229,7 +239,13 @@ function CompendiumPageContent() {
         .from(tableName)
         .select("*")
         .order("name")
-        .limit(activeTab === "equipment" ? 500 : 100)
+        .limit(
+          isEquipmentBrowserTab(activeTab)
+            ? 500
+            : activeTab === "spells" || activeTab === "feats"
+              ? 5000
+              : 100,
+        )
       
       let rows = data || []
       if (activeTab === "abilities") {
@@ -240,11 +256,20 @@ function CompendiumPageContent() {
           return String(a.name).localeCompare(String(b.name))
         })
       }
-      setContent((prev) => ({
-        ...prev,
-        [activeTab]:
-          activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
-      }))
+      if (isEquipmentBrowserTab(activeTab)) {
+        const split = splitEquipmentByKind(rows as Equipment[])
+        setContent((prev) => ({
+          ...prev,
+          equipment: split.mundane,
+          magic_items: split.magic,
+        }))
+      } else {
+        setContent((prev) => ({
+          ...prev,
+          [activeTab]:
+            activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+        }))
+      }
 
       if (activeTab === "classes") {
         const { data: subclasses } = await db
@@ -279,9 +304,12 @@ function CompendiumPageContent() {
 
   // Derive unique spell filter options from loaded spell data
   const spellData = (content.spells as Spell[])
+const UNASSIGNED_SPELL_CLASS = "__unassigned__"
+
   const spellClassOptions = Array.from(
-    new Set(spellData.flatMap((s) => s.classes ?? []))
+    new Set(spellData.flatMap((s) => s.classes ?? [])),
   ).sort()
+  const hasUnassignedSpells = spellData.some((s) => !(s.classes ?? []).length)
   const spellSchoolOptions = Array.from(
     new Set(spellData.map((s) => s.school).filter(Boolean))
   ).sort()
@@ -302,7 +330,12 @@ function CompendiumPageContent() {
     if (!item.name?.toLowerCase().includes(query)) return false
     if (activeTab === "spells") {
       const spell = item as Spell
-      if (spellFilterClass !== "all" && !(spell.classes ?? []).includes(spellFilterClass)) return false
+      const spellClasses = spell.classes ?? []
+      if (spellFilterClass === UNASSIGNED_SPELL_CLASS) {
+        if (spellClasses.length > 0) return false
+      } else if (spellFilterClass !== "all" && !spellClasses.includes(spellFilterClass)) {
+        return false
+      }
       if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
       if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
     }
@@ -314,12 +347,12 @@ function CompendiumPageContent() {
     if (activeTab === "equipment") {
       const eq = item as Equipment
       if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
-      if (equipmentFilterKind === "magic" && !isMagicItem(eq)) return false
-      if (equipmentFilterKind === "mundane" && isMagicItem(eq)) return false
+    }
+    if (activeTab === "magic_items") {
+      const eq = item as Equipment
       if (
-        equipmentFilterKind === "magic" &&
-        equipmentFilterMagicCategory !== "all" &&
-        (eq.magic_item_category ?? "").toLowerCase() !== equipmentFilterMagicCategory.toLowerCase()
+        magicItemFilterCategory !== "all" &&
+        (eq.magic_item_category ?? "").toLowerCase() !== magicItemFilterCategory.toLowerCase()
       ) {
         return false
       }
@@ -332,18 +365,23 @@ function CompendiumPageContent() {
   })
 
   const equipmentData = content.equipment as Equipment[]
+  const magicItemData = content.magic_items as Equipment[]
   const equipmentCategoryOptions = useMemo(
     () =>
       Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
     [equipmentData],
   )
-  const equipmentMagicCategoryOptions = useMemo(
-    () => getMagicItemCategoryOptions(equipmentData.filter((item) => isMagicItem(item))),
-    [equipmentData],
+  const magicItemCategoryOptions = useMemo(
+    () => getMagicItemCategoryOptions(magicItemData),
+    [magicItemData],
   )
   const equipmentGroups = useMemo(() => {
     if (activeTab !== "equipment") return []
     return groupEquipmentByCategory(filteredContent as Equipment[])
+  }, [filteredContent, activeTab])
+  const magicItemGroups = useMemo(() => {
+    if (activeTab !== "magic_items") return []
+    return groupMagicItemsByCategory(filteredContent as Equipment[])
   }, [filteredContent, activeTab])
 
   const classResourceGroups = useMemo(() => {
@@ -351,7 +389,8 @@ function CompendiumPageContent() {
     return groupClassResourcesByKey(filteredContent as ClassResourceRow[], classNamesById)
   }, [filteredContent, activeTab, classNamesById])
 
-  const tableName = (tab: ContentType) => tab === "abilities" ? "custom_abilities" : tab
+  const tableName = (tab: ContentType) =>
+    tab === "abilities" ? "custom_abilities" : isEquipmentBrowserTab(tab) ? "equipment" : tab
 
   const refreshTabCounts = async () => {
     const db = createClient()
@@ -362,7 +401,7 @@ function CompendiumPageContent() {
       { count: backgroundsCount },
       { count: spellsCount },
       { count: featsCount },
-      { count: equipmentCount },
+      { data: equipmentRows },
       { count: languagesCount },
       { count: classResourcesCount },
       { count: abilitiesCount },
@@ -373,11 +412,16 @@ function CompendiumPageContent() {
       db.from("backgrounds").select("*", { count: "exact", head: true }),
       db.from("spells").select("*", { count: "exact", head: true }),
       db.from("feats").select("*", { count: "exact", head: true }),
-      db.from("equipment").select("*", { count: "exact", head: true }),
+      db
+        .from("equipment")
+        .select(
+          "magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
+        ),
       db.from("languages").select("*", { count: "exact", head: true }),
       db.from("class_resources").select("*", { count: "exact", head: true }),
       db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
+    const equipmentSplit = splitEquipmentByKind((equipmentRows ?? []) as Equipment[])
     setTabCounts({
       species: speciesCount ?? 0,
       classes: classesCount ?? 0,
@@ -385,7 +429,8 @@ function CompendiumPageContent() {
       backgrounds: backgroundsCount ?? 0,
       spells: spellsCount ?? 0,
       feats: featsCount ?? 0,
-      equipment: equipmentCount ?? 0,
+      equipment: equipmentSplit.mundane.length,
+      magic_items: equipmentSplit.magic.length,
       languages: languagesCount ?? 0,
       class_resources: classResourcesCount ?? 0,
       abilities: abilitiesCount ?? 0,
@@ -400,13 +445,43 @@ function CompendiumPageContent() {
       .from(resolvedTable)
       .select("*")
       .order("name")
-      .limit(100)
+      .limit(isEquipmentBrowserTab(activeTab) ? 500 : 100)
     const rows = data || []
+    if (isEquipmentBrowserTab(activeTab)) {
+      const split = splitEquipmentByKind(rows as Equipment[])
+      setContent((prev) => ({
+        ...prev,
+        equipment: split.mundane,
+        magic_items: split.magic,
+      }))
+    } else {
+      setContent((prev) => ({
+        ...prev,
+        [activeTab]: activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+      }))
+    }
+    setLoading(false)
+  }
+
+  const clearEquipmentSubset = async (kind: "mundane" | "magic") => {
+    const db = createClient()
+    const { data } = await db
+      .from("equipment")
+      .select(
+        "id, magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
+      )
+    const ids = ((data ?? []) as Equipment[])
+      .filter((row) => (kind === "magic" ? isMagicItem(row) : !isMagicItem(row)))
+      .map((row) => row.id)
+      .filter(Boolean)
+    if (ids.length) {
+      await db.from("equipment").delete().in("id", ids)
+    }
     setContent((prev) => ({
       ...prev,
-      [activeTab]: activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+      equipment: kind === "mundane" ? [] : prev.equipment,
+      magic_items: kind === "magic" ? [] : prev.magic_items,
     }))
-    setLoading(false)
   }
 
   const handleClearSection = async () => {
@@ -414,7 +489,11 @@ function CompendiumPageContent() {
     setClearError(null)
     
     try {
-      if (canClearCompendiumViaApi()) {
+      if (activeTab === "equipment") {
+        await clearEquipmentSubset("mundane")
+      } else if (activeTab === "magic_items") {
+        await clearEquipmentSubset("magic")
+      } else if (canClearCompendiumViaApi()) {
         const response = await fetch("/api/compendium/clear", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -475,6 +554,14 @@ function CompendiumPageContent() {
     const { data } = await db.from(resolvedTable).select("*").order("name").limit(500)
     if (!data?.length) return
 
+    let exportRows = data as Record<string, unknown>[]
+    if (activeTab === "equipment") {
+      exportRows = splitEquipmentByKind(exportRows as Equipment[]).mundane as Record<string, unknown>[]
+    } else if (activeTab === "magic_items") {
+      exportRows = splitEquipmentByKind(exportRows as Equipment[]).magic as Record<string, unknown>[]
+    }
+    if (!exportRows.length) return
+
     const classNameById = new Map<string, string>()
     if (activeTab === "subclasses" || activeTab === "class_resources") {
       const { data: classesData } = await db.from("classes").select("id, name")
@@ -483,7 +570,7 @@ function CompendiumPageContent() {
       }
     }
 
-    const items = (data as Record<string, unknown>[])
+    const items = exportRows
       .map((row) => {
         const exportRow = { ...row }
         if ((activeTab === "subclasses" || activeTab === "class_resources") && exportRow.class_id) {
@@ -724,14 +811,20 @@ function CompendiumPageContent() {
                 Concentration
               </span>
             )}
-            {((data as Spell).classes ?? []).map((cls) => (
-              <span
-                key={cls}
-                className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
-              >
-                {cls}
+            {((data as Spell).classes ?? []).length > 0 ? (
+              ((data as Spell).classes ?? []).map((cls) => (
+                <span
+                  key={cls}
+                  className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
+                >
+                  {cls}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                No class list
               </span>
-            ))}
+            )}
           </div>
         )}
         {activeTab === "feats" && (
@@ -757,11 +850,24 @@ function CompendiumPageContent() {
         )}
         {activeTab === "equipment" && (
           <div className="flex gap-2 flex-wrap">
-            {isMagicItem(data as Equipment) && (
-              <span className="text-xs px-2 py-1 bg-magenta/10 text-magenta rounded-full font-semibold">
-                Magic
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+              {(data as Equipment).category}
+            </span>
+            {(data as Equipment).subcategory && (
+              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
+                {(data as Equipment).subcategory!.replace(/\s+Weapons$/i, "")}
               </span>
             )}
+            {(data as Equipment).cost && (
+              <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
+                {((data as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
+                {((data as Equipment).cost as { amount: number; unit: string })?.unit}
+              </span>
+            )}
+          </div>
+        )}
+        {activeTab === "magic_items" && (
+          <div className="flex gap-2 flex-wrap">
             {(data as Equipment).rarity && (
               <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
                 {(data as Equipment).rarity}
@@ -777,18 +883,9 @@ function CompendiumPageContent() {
                 Attunement
               </span>
             )}
-            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {(data as Equipment).category}
-            </span>
-            {(data as Equipment).subcategory && (
-              <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
-                {(data as Equipment).subcategory!.replace(/\s+Weapons$/i, "")}
-              </span>
-            )}
-            {(data as Equipment).cost && (
-              <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                {((data as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
-                {((data as Equipment).cost as { amount: number; unit: string })?.unit}
+            {(data as Equipment).category && (data as Equipment).category !== "Other" && (
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {(data as Equipment).category}
               </span>
             )}
           </div>
@@ -1175,6 +1272,9 @@ function CompendiumPageContent() {
                 className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
               >
                 <option value="all">All Classes</option>
+                {hasUnassignedSpells ? (
+                  <option value={UNASSIGNED_SPELL_CLASS}>No class list</option>
+                ) : null}
                 {spellClassOptions.map((cls) => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
@@ -1248,49 +1348,37 @@ function CompendiumPageContent() {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide ml-2">
-              Item kind
-            </label>
-            <select
-              value={equipmentFilterKind}
-              onChange={(e) => {
-                const next = e.target.value as "all" | "magic" | "mundane"
-                setEquipmentFilterKind(next)
-                if (next !== "magic") setEquipmentFilterMagicCategory("all")
-              }}
-              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All items</option>
-              <option value="magic">Magic items</option>
-              <option value="mundane">Mundane only</option>
-            </select>
-            {equipmentFilterKind === "magic" && equipmentMagicCategoryOptions.length > 0 && (
-              <>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide ml-2">
-                  Magic type
-                </label>
-                <select
-                  value={equipmentFilterMagicCategory}
-                  onChange={(e) => setEquipmentFilterMagicCategory(e.target.value)}
-                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-                >
-                  <option value="all">All magic types</option>
-                  {equipmentMagicCategoryOptions.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            {(equipmentFilterCategory !== "all" ||
-              equipmentFilterKind !== "all" ||
-              equipmentFilterMagicCategory !== "all") && (
+            {equipmentFilterCategory !== "all" && (
               <button
                 type="button"
-                onClick={() => {
-                  setEquipmentFilterCategory("all")
-                  setEquipmentFilterKind("all")
-                  setEquipmentFilterMagicCategory("all")
-                }}
+                onClick={() => setEquipmentFilterCategory("all")}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {activeTab === "magic_items" && magicItemCategoryOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Magic type
+            </label>
+            <select
+              value={magicItemFilterCategory}
+              onChange={(e) => setMagicItemFilterCategory(e.target.value)}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All magic types</option>
+              {magicItemCategoryOptions.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {magicItemFilterCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => setMagicItemFilterCategory("all")}
                 className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
                 Clear filters
@@ -1336,9 +1424,9 @@ function CompendiumPageContent() {
               {searchQuery ? "Try a different search term" : "Import content from the Import page"}
             </p>
           </div>
-        ) : activeTab === "equipment" ? (
+        ) : activeTab === "equipment" || activeTab === "magic_items" ? (
           <div className="space-y-8">
-            {equipmentGroups.map((group) => (
+            {(activeTab === "equipment" ? equipmentGroups : magicItemGroups).map((group) => (
               <section key={group.category}>
                 <div className="flex items-center gap-3 mb-4">
                   <h2 className="text-lg font-black text-foreground">{group.category}</h2>
@@ -1399,11 +1487,10 @@ function CompendiumPageContent() {
                     label: (selectedItem as ClassResourceRow).resource_key,
                   },
                 ]
-                : activeTab === "equipment" && isMagicItem(selectedItem as Equipment)
+                : isEquipmentBrowserTab(activeTab) && activeTab === "magic_items"
                 ? [
-                    { label: "Magic", emphasis: true },
                     ...((selectedItem as Equipment).rarity
-                      ? [{ label: (selectedItem as Equipment).rarity! }]
+                      ? [{ label: (selectedItem as Equipment).rarity!, emphasis: true }]
                       : []),
                     ...((selectedItem as Equipment).magic_item_category
                       ? [{ label: (selectedItem as Equipment).magic_item_category! }]
@@ -1443,7 +1530,7 @@ function CompendiumPageContent() {
             ) : undefined
           }
         >
-          {activeTab === "equipment" && (
+          {isEquipmentBrowserTab(activeTab) && (
             <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
               {getEquipmentDetailRows(selectedItem as Equipment).map((row) => (
                 <div key={row.label} className="contents">

@@ -1,4 +1,4 @@
-/** Parsed psi-point augment options from Kibbles-style psionic power descriptions. */
+/** Parsed psi-point augment options from KibblesTasty Psion-style psionic power descriptions. */
 
 export type PsionicAugmentCost = {
   /** Fixed cost when not variable (e.g. 3 psi points). */
