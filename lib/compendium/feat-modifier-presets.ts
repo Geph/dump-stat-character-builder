@@ -499,7 +499,7 @@ function feyShadowTouchedSpells(
   ]
 }
 
-/** Player's Handbook & SRD feat name → common modifier presets. */
+/** SRD feat name → common modifier presets. */
 export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   Alert: {
     linkedModifiers: [
@@ -515,49 +515,6 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
     ],
   },
 
-  Crafter: {
-    linkedModifiers: [
-      toolsChoice("crafter_tools", 3, SRD_ARTISANS_TOOLS, "Tool Proficiency: 3 Artisan's Tools"),
-    ],
-  },
-
-  Healer: {
-    linkedModifiers: [
-      fxInstance("modinst_healer_battle_medic", FEAT_MODIFIER_CATALOG.healSelf, {
-        action: true,
-        effects: [{ id: modId("healer_battle_medic"), kind: "heal_self" }],
-      }),
-      checkFx(
-        "healer_reroll",
-        {
-          kind: "check_roll_modifier",
-          checkCategory: "other",
-          checkRerollOnNaturalOne: true,
-        },
-        {},
-      ),
-    ],
-  },
-
-  Lucky: {
-    linkedModifiers: [
-      uses("lucky_points", { type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Luck Points"),
-      d20TestReaction("lucky_advantage", {
-        modifierMode: "add",
-        targetScope: "self",
-        spendResourceKey: "luck_points",
-        spendResourceAmount: 1,
-      }),
-      d20TestReaction("lucky_disadvantage", {
-        modifierMode: "subtract",
-        targetScope: "target_creature",
-        spendResourceKey: "luck_points",
-        spendResourceAmount: 1,
-        useReaction: true,
-      }),
-    ],
-  },
-
   "Magic Initiate": {
     repeatable: true,
     linkedModifiers: [
@@ -568,6 +525,7 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
         ],
         spellListClassOptions: ["Cleric", "Druid", "Wizard"],
         playerPicksSpellList: true,
+        label: "Magic Initiate spells",
       }),
       spellAbility("magic_initiate_ability", "Spellcasting ability: INT, WIS, or CHA (chosen with feat)"),
       uses(
@@ -578,16 +536,9 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
     ],
   },
 
-  Musician: {
-    linkedModifiers: [
-      toolsChoice("musician_instruments", 3, SRD_MUSICAL_INSTRUMENTS, "Instrument Training: 3 Musical Instruments"),
-      grantTempHpFx("musician_encouraging_song"),
-    ],
-  },
-
   "Savage Attacker": {
     linkedModifiers: [
-      riderFx("savage_attacker", { bonusDice: "reroll weapon damage once per turn"}),
+      riderFx("savage_attacker", { bonusDice: "reroll weapon damage once per turn" }),
     ],
   },
 
@@ -613,411 +564,31 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
     ],
   },
 
-  "Tavern Brawler": {
-    linkedModifiers: [
-      unarmedDie("tavern_unarmed", "1d4", "Enhanced Unarmed Strike: 1d4 + STR bludgeoning"),
-      damageMod("tavern_reroll", [{ bonus: 0, target: "custom", customTarget: "Unarmed Strike damage die" }], "Damage Rerolls: reroll unarmed damage die on 1"),
-      weaponProf("tavern_improvised", "specific", ["Improvised weapons"], "Improvised Weaponry"),
-      riderFx("tavern_push", { bonusDice: "Push 5 ft on unarmed hit (once per turn)" }),
-    ],
-  },
-
-  Tough: {
-    linkedModifiers: [hitPerLevel("tough", 2, "HP maximum +2 per character level")],
-  },
-
   "Ability Score Improvement": {
     repeatable: true,
     linkedModifiers: [asiPool("modinst_asi", 2, "SRD ASI: +2 to one ability or +1 to two")],
   },
 
-  Actor: {
-    linkedModifiers: [
-      asiOne("actor_asi", "+1 Charisma"),
-      checkFx(
-        "actor_impersonation",
-        {
-          kind: "check_advantage",
-          checkCategory: "skill",
-          checkSkills: ["Deception", "Performance"],
-        },
-        {},
-      ),
-    ],
-  },
-
-  Athlete: {
-    linkedModifiers: [
-      asiOne("athlete_asi", "+1 Strength or Dexterity"),
-      speedMod("athlete_climb", "climb", "equal_to_walk", 0, "Climb Speed equal to Speed"),
-      movementEffectsPassive("athlete_hop", { movementMoveThroughLargerSpaces: false }, "Hop Up: stand from Prone with 5 ft movement"),
-      movementFx("athlete_jump", { kind: "movement_option", movementDash: false }),
-    ],
-  },
-
-  Charger: {
-    linkedModifiers: [
-      asiOne("charger_asi", "+1 Strength or Dexterity"),
-      movementFx("charger_dash", { kind: "movement_option", movementDash: true }),
-      riderFx("charger_attack", { bonusDice: "1d8 on charge melee hit or push 10 ft"}),
-    ],
-  },
-
-  Chef: {
-    linkedModifiers: [
-      asiOne("chef_asi", "+1 Constitution or Wisdom"),
-      charInstance("modinst_chef_utensils", FEAT_MODIFIER_CATALOG.toolProficiencies, [
-        { id: modId("chef_utensils"), type: "tool_proficiencies", values: ["Cook's Utensils"] },
-      ]),
-      spellHealing("chef_meal", { bonusFlat: 0 }),
-      grantTempHpFx("chef_treats", { bonusAction: true }),
-    ],
-  },
-
-  "Crossbow Expert": {
-    linkedModifiers: [
-      asiOne("crossbow_asi", "+1 Dexterity"),
-      attackMod("crossbow_ignore_loading", [{ bonus: 0, target: "custom", customTarget: "Crossbows: ignore Loading" }], "Ignore Loading on crossbows"),
-      attackMod("crossbow_melee", [{ bonus: 0, target: "ranged", customTarget: "No melee disadvantage with crossbows" }], "Firing in Melee"),
-      damageMod("crossbow_dual", [{ bonus: 0, target: "custom", customTarget: "Light crossbow extra attack: add ability mod to damage", grantAbilityModifierWhenMissing: true }], "Dual Wielding with Light crossbows"),
-    ],
-  },
-
-  Crusher: {
-    linkedModifiers: [
-      asiOne("crusher_asi", "+1 Strength or Constitution"),
-      riderFx("crusher_push", { bonusDice: "Push 5 ft on bludgeoning hit (once per turn)" }),
-      attackMod("crusher_crit", [{ bonus: 0, target: "custom", customTarget: "Advantage on attacks vs target after bludgeoning crit" }], "Enhanced Critical"),
-    ],
-  },
-
-  "Defensive Duelist": {
-    linkedModifiers: [
-      asiOne("defensive_duelist_asi", "+1 Dexterity"),
-      damageReductionFx("defensive_duelist_parry"),
-    ],
-  },
-
-  "Dual Wielder": {
-    linkedModifiers: [
-      asiOne("dual_wielder_asi", "+1 Strength or Dexterity"),
-      bonusActionAttackFx("dual_wielder_extra"),
-      movementFx("dual_wielder_draw", { kind: "movement_option" }),
-    ],
-  },
-
-  Durable: {
-    linkedModifiers: [
-      asiOne("durable_asi", "+1 Constitution"),
-      checkFx("durable_death", { kind: "check_advantage", checkCategory: "save", checkAbility: "Constitution" }),
-      checkFx("durable_recovery", { kind: "heal_self" }, { bonusAction: true }),
-    ],
-  },
-
-  "Elemental Adept": {
-    repeatable: true,
-    linkedModifiers: [
-      asiOne("elemental_adept_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      damageResistancePick("elemental_adept_energy", "Energy Mastery: choose Acid, Cold, Fire, Lightning, or Thunder"),
-      damageMod("elemental_adept_dice", [{ bonus: 0, target: "custom", customTarget: "Spell damage: treat 1s as 2s for chosen type" }], "Energy Mastery damage dice"),
-    ],
-  },
-
-  "Fey Touched": {
-    linkedModifiers: feyShadowTouchedSpells("fey_touched", "Divination or Enchantment", "Misty Step", "Fey Magic"),
-  },
-
   Grappler: {
     linkedModifiers: [
-      asiOne("grappler_asi", "+1 Strength or Dexterity"),
-      riderFx("grappler_punch_grab", { bonusDice: "Punch and Grab: Damage + Grapple on unarmed hit (once per turn)" }),
-      checkFx("grappler_advantage", { kind: "check_advantage", checkCategory: "attack" }),
-      movementFx("grappler_wrestler", { kind: "movement_option" }),
-    ],
-  },
-
-  "Great Weapon Master": {
-    linkedModifiers: [
-      asiOne("gwm_asi", "+1 Strength"),
-      riderFx("gwm_heavy", { bonusDice: "Proficiency Bonus on Heavy weapon hit"}),
-      bonusActionAttackFx("gwm_hew"),
-    ],
-  },
-
-  "Heavily Armored": {
-    linkedModifiers: [
-      asiOne("heavily_armored_asi", "+1 Constitution or Strength"),
-      armorProf("heavily_armored", ["Heavy armor"], "Armor Training: Heavy armor"),
-    ],
-  },
-
-  "Heavy Armor Master": {
-    linkedModifiers: [
-      asiOne("heavy_armor_master_asi", "+1 Constitution or Strength"),
-      damageReductionFx("heavy_armor_master"),
-    ],
-  },
-
-  "Inspiring Leader": {
-    linkedModifiers: [
-      asiOne("inspiring_leader_asi", "+1 Wisdom or Charisma"),
-      grantTempHpFx("inspiring_leader"),
-    ],
-  },
-
-  "Keen Mind": {
-    linkedModifiers: [
-      asiOne("keen_mind_asi", "+1 Intelligence"),
-      skillChoice("keen_mind_lore", {
-        count: 1,
-        entries: [
-          { skill: "Arcana", expertise: false },
-          { skill: "History", expertise: false },
-          { skill: "Investigation", expertise: false },
-          { skill: "Nature", expertise: false },
-          { skill: "Religion", expertise: false },
+      asiPool("modinst_grappler_asi", 1, "+1 Strength or Dexterity"),
+      fxInstance("modinst_grappler_advantage", FEAT_MODIFIER_CATALOG.checkAdvantage, {
+        action: true,
+        effects: [
+          {
+            id: modId("grappler_advantage"),
+            kind: "check_advantage",
+            checkCategory: "attack",
+          },
         ],
-        label: "Lore Knowledge: proficiency or Expertise in chosen skill",
       }),
-      checkFx("keen_mind_study", { kind: "extra_action" }, { bonusAction: true }),
     ],
   },
 
-  "Lightly Armored": {
-    linkedModifiers: [
-      asiOne("lightly_armored_asi", "+1 Strength or Dexterity"),
-      armorProf("lightly_armored", ["Light armor", "Shields"], "Armor Training: Light armor and Shields"),
-    ],
-  },
-
-  "Mage Slayer": {
-    linkedModifiers: [
-      asiOne("mage_slayer_asi", "+1 Strength or Dexterity"),
-      imposeDisadvantageFx("mage_slayer_concentration"),
-      failedRollTrigger("mage_slayer_guarded", {
-        triggerOn: "fail",
-        rollKind: "save",
-        ability: null,
-        targetScope: "self",
-      }),
-      uses("mage_slayer_guarded_uses", { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] }, "Guarded Mind uses"),
-    ],
-  },
-
-  "Martial Weapon Training": {
-    linkedModifiers: [
-      asiOne("martial_weapon_asi", "+1 Strength or Dexterity"),
-      weaponProf("martial_weapon", "martial_weapons", [], "Weapon Proficiency: Martial weapons"),
-    ],
-  },
-
-  "Medium Armor Master": {
-    linkedModifiers: [
-      asiOne("medium_armor_master_asi", "+1 Strength or Dexterity"),
-      acBonus("medium_armor_master", { flatBonus: 1, requiresArmor: true, label: "Dexterous Wearer: +1 AC from DEX in Medium armor (max +3 at DEX 16+)" }),
-    ],
-  },
-
-  "Moderately Armored": {
-    linkedModifiers: [
-      asiOne("moderately_armored_asi", "+1 Strength or Dexterity"),
-      armorProf("moderately_armored", ["Medium armor"], "Armor Training: Medium armor"),
-    ],
-  },
-
-  "Mounted Combatant": {
-    linkedModifiers: [
-      asiOne("mounted_combatant_asi", "+1 Strength, Dexterity, or Wisdom"),
-      checkFx("mounted_strike", { kind: "check_advantage", checkCategory: "attack" }),
-      damageHalvingReaction("mounted_leap"),
-      modifyCreatureFx("mounted_veer"),
-    ],
-  },
-
-  Observant: {
-    linkedModifiers: [
-      asiOne("observant_asi", "+1 Intelligence or Wisdom"),
-      skillChoice("observant_keen", {
-        count: 1,
-        entries: [
-          { skill: "Insight", expertise: false },
-          { skill: "Investigation", expertise: false },
-          { skill: "Perception", expertise: false },
-        ],
-        label: "Keen Observer: proficiency or Expertise in chosen skill",
-      }),
-      checkFx("observant_search", { kind: "extra_action" }, { bonusAction: true }),
-    ],
-  },
-
-  Piercer: {
-    linkedModifiers: [
-      asiOne("piercer_asi", "+1 Strength or Dexterity"),
-      riderFx("piercer_puncture", { bonusDice: "reroll one piercing damage die once per turn"}),
-      riderFx("piercer_crit", { bonusDice: "extra piercing damage die on crit"}),
-    ],
-  },
-
-  Poisoner: {
-    linkedModifiers: [
-      asiOne("poisoner_asi", "+1 Dexterity or Intelligence"),
-      damageMod("poisoner_potent", [{ bonus: 0, target: "custom", customTarget: "Poison damage ignores Resistance" }], "Potent Poison"),
-      charInstance("modinst_poisoner_kit", FEAT_MODIFIER_CATALOG.toolProficiencies, [
-        { id: modId("poisoner_kit"), type: "tool_proficiencies", values: ["Poisoner's Kit"] },
-      ]),
-    ],
-  },
-
-  "Polearm Master": {
-    linkedModifiers: [
-      asiOne("polearm_master_asi", "+1 Strength or Dexterity"),
-      bonusActionAttackFx("polearm_master_strike"),
-      reactionAttackFx("polearm_master_reactive"),
-    ],
-  },
-
-  Resilient: {
-    linkedModifiers: [
-      asiOne("resilient_asi", "+1 chosen ability (lacking save proficiency)"),
-      charInstance("modinst_resilient_save", FEAT_MODIFIER_CATALOG.savingThrows, [
-        {
-          id: modId("resilient_save"),
-          type: "saving_throws",
-          values: [],
-          choiceCount: 1,
-        },
-      ]),
-    ],
-  },
-
-  "Ritual Caster": {
-    linkedModifiers: [
-      asiOne("ritual_caster_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      spellsKnown("ritual_caster_spells", {
-        choiceGrants: [{ level: 1, count: 1 }],
-        alwaysPrepared: true,
-      }),
-      uses("ritual_caster_quick", { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Quick Ritual: cast prepared Ritual at normal casting time without slot (1/Long Rest)"),
-    ],
-  },
-
-  Sentinel: {
-    linkedModifiers: [
-      asiOne("sentinel_asi", "+1 Strength or Dexterity"),
-      reactionAttackFx("sentinel_guardian"),
-      modifyCreatureFx("sentinel_halt"),
-    ],
-  },
-
-  "Shadow Touched": {
-    linkedModifiers: feyShadowTouchedSpells("shadow_touched", "Illusion or Necromancy", "Invisibility", "Shadow Magic"),
-  },
-
-  Sharpshooter: {
-    linkedModifiers: [
-      asiOne("sharpshooter_asi", "+1 Dexterity"),
-      attackMod("sharpshooter_cover", [{ bonus: 0, target: "ranged", ignoreHalfCover: true, treatThreeQuartersCoverAsHalf: true }], "Bypass Cover"),
-      attackMod("sharpshooter_melee", [{ bonus: 0, target: "ranged", customTarget: "No melee disadvantage with ranged weapons" }], "Firing in Melee"),
-      attackMod("sharpshooter_range", [{ bonus: 0, target: "ranged", customTarget: "No long-range disadvantage" }], "Long Shots"),
-    ],
-  },
-
-  "Shield Master": {
-    linkedModifiers: [
-      asiOne("shield_master_asi", "+1 Strength"),
-      castSpellFx("shield_master_bash", { castSpellName: "Shield Bash" }),
-      damageHalvingReaction("shield_master_interpose"),
-    ],
-  },
-
-  "Skill Expert": {
-    linkedModifiers: [
-      asiOne("skill_expert_asi", "+1 to one ability score"),
-      skillChoice("skill_expert_prof", { count: 1, allowAnySkill: true, label: "Skill Proficiency: one skill" }),
-      skillChoice("skill_expert_exp", { count: 1, allowAnySkill: true, grantExpertise: true, label: "Expertise: one proficient skill lacking Expertise" }),
-    ],
-  },
-
-  Skulker: {
-    linkedModifiers: [
-      asiOne("skulker_asi", "+1 Dexterity"),
-      visionMod("skulker_blindsight", "blindsight", 10, "Blindsight 10 ft."),
-      checkFx("skulker_fog", { kind: "check_advantage", checkCategory: "skill", checkSkills: ["Stealth"] }),
-      attackMod("skulker_sniper", [{ bonus: 0, target: "custom", customTarget: "Miss while hidden does not reveal location" }], "Sniper"),
-    ],
-  },
-
-  Slasher: {
-    linkedModifiers: [
-      asiOne("slasher_asi", "+1 Strength or Dexterity"),
-      riderFx("slasher_hamstring", { bonusDice: "Hamstring: −10 ft Speed on slashing hit (once per turn)" }),
-      attackMod("slasher_crit", [{ bonus: 0, target: "custom", customTarget: "Disadvantage on attacks after slashing crit" }], "Enhanced Critical"),
-    ],
-  },
-
-  Speedy: {
-    linkedModifiers: [
-      asiOne("speedy_asi", "+1 Dexterity or Constitution"),
-      speedMod("speedy_walk", "walk", "add", 10, "Speed Increase: +10 ft."),
-      movementFx("speedy_dash", { kind: "movement_option", movementDash: true }),
-      checkFx("speedy_agile", { kind: "check_disadvantage", checkCategory: "attack" }),
-    ],
-  },
-
-  "Spell Sniper": {
-    linkedModifiers: [
-      asiOne("spell_sniper_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      attackMod("spell_sniper_cover", [{ bonus: 0, target: "spell_attack", ignoreHalfCover: true, treatThreeQuartersCoverAsHalf: true }], "Bypass Cover on spell attacks"),
-      attackMod("spell_sniper_melee", [{ bonus: 0, target: "spell_attack", customTarget: "No melee disadvantage on spell attacks" }], "Casting in Melee"),
-      attackMod("spell_sniper_range", [{ bonus: 0, target: "spell_attack", customTarget: "+60 ft range on qualifying spell attacks" }], "Increased Range"),
-    ],
-  },
-
-  Telekinetic: {
-    linkedModifiers: [
-      asiOne("telekinetic_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      spellsKnown("telekinetic_mage_hand", {
-        spells: [{ spellId: "Mage Hand", alwaysPrepared: true }],
-      }),
-      castSpellFx("telekinetic_shove", { castSpellName: "Telekinetic Shove" }, { bonusAction: true }),
-    ],
-  },
-
-  Telepathic: {
-    linkedModifiers: [
-      asiOne("telepathic_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      telepathyMod("telepathic_utterance", 60, "Telepathic Utterance"),
-      spellsKnown("telepathic_detect", {
-        spells: [{ spellId: "Detect Thoughts", alwaysPrepared: true }],
-      }),
-      uses("telepathic_detect_cast", { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Cast Detect Thoughts without slot (1/Long Rest)"),
-    ],
-  },
-
-  "War Caster": {
-    linkedModifiers: [
-      asiOne("war_caster_asi", "+1 Intelligence, Wisdom, or Charisma"),
-      checkFx("war_caster_concentration", { kind: "check_advantage", checkCategory: "save", checkAbility: "Constitution" }),
-      castSpellFx("war_caster_reactive", { castSpellCastingTime: "action" }),
-    ],
-  },
-
-  "Weapon Master": {
-    linkedModifiers: [
-      asiOne("weapon_master_asi", "+1 Strength or Dexterity"),
-      attackMod("weapon_master_mastery", [{ bonus: 0, target: "custom", customTarget: "Weapon Mastery property for one Simple or Martial weapon (change on Long Rest)" }], "Mastery Property"),
-    ],
-  },
-
-  // Fighting Style feats
   Archery: {
     linkedModifiers: [
       attackMod("archery", [{ bonus: 2, target: "ranged" }], "+2 to ranged weapon attack rolls"),
     ],
-  },
-
-  "Blind Fighting": {
-    linkedModifiers: [visionMod("blind_fighting", "blindsight", 10, "Blindsight 10 ft.")],
   },
 
   Defense: {
@@ -1026,56 +597,26 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
     ],
   },
 
-  Dueling: {
-    linkedModifiers: [
-      damageMod("dueling", [{ bonus: 2, target: "custom", customTarget: "One-handed melee weapon with no other weapons" }], "+2 damage with qualifying one-handed melee weapon"),
-    ],
-  },
-
   "Great Weapon Fighting": {
     linkedModifiers: [
-      damageMod("gwf", [{ bonus: 0, target: "custom", customTarget: "Two-handed/versatile melee: treat 1–2 on damage dice as 3" }], "Great Weapon Fighting"),
-    ],
-  },
-
-  Interception: {
-    linkedModifiers: [
-      damageReductionFx("interception"),
-    ],
-  },
-
-  Protection: {
-    linkedModifiers: [
-      imposeDisadvantageFx("protection"),
-    ],
-  },
-
-  "Thrown Weapon Fighting": {
-    linkedModifiers: [
-      damageMod("thrown_fighting", [{ bonus: 2, target: "custom", customTarget: "Thrown weapon ranged attacks" }], "+2 damage on thrown weapon hits"),
+      damageMod(
+        "gwf",
+        [{ bonus: 0, target: "custom", customTarget: "Two-handed/versatile melee: treat 1–2 on damage dice as 3" }],
+        "Great Weapon Fighting",
+      ),
     ],
   },
 
   "Two-Weapon Fighting": {
     linkedModifiers: [
-      damageMod("twf", [{ bonus: 0, target: "custom", customTarget: "Light weapon bonus-action attack", grantAbilityModifierWhenMissing: true }], "Add ability modifier to light weapon bonus-action damage"),
+      damageMod(
+        "twf",
+        [{ bonus: 0, target: "custom", customTarget: "Light weapon bonus-action attack", grantAbilityModifierWhenMissing: true }],
+        "Add ability modifier to light weapon bonus-action damage",
+      ),
     ],
   },
 
-  "Unarmed Fighting": {
-    linkedModifiers: [
-      unarmedDie("unarmed_fighting", "1d6", "Unarmed Strike: 1d6 + STR (1d8 if no weapons/Shield)"),
-      charInstance("modinst_unarmed_fighting_grapple", FEAT_MODIFIER_CATALOG.turnStartTrigger, [
-        {
-          id: modId("unarmed_fighting_grapple"),
-          type: "turn_start_trigger",
-          effect: { catalogRefId: FEAT_MODIFIER_CATALOG.riderDamage },
-        },
-      ]),
-    ],
-  },
-
-  // Epic Boons (bundled SRD seed — kept for completeness)
   "Boon of Combat Prowess": {
     linkedModifiers: [
       asiOne("boon_combat_asi", "+1 to one ability score (max 30)"),
@@ -1092,13 +633,21 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
     linkedModifiers: [
       asiOne("boon_fate_asi", "+1 to one ability score (max 30)"),
       checkFx("boon_fate", { kind: "check_bonus", checkCategory: "other" }, { reaction: true }),
-      uses("boon_fate_uses", { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] }, "Recharges when you roll Initiative or finish a rest"),
+      uses(
+        "boon_fate_uses",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Recharges when you roll Initiative or finish a rest",
+      ),
     ],
   },
   "Boon of Irresistible Offense": {
     linkedModifiers: [
       asiOne("boon_offense_asi", "+1 Strength or Dexterity (max 30)"),
-      damageMod("boon_offense_resist", [{ bonus: 0, target: "custom", customTarget: "B/P/S damage ignores resistance" }], "Overcome Defenses"),
+      damageMod(
+        "boon_offense_resist",
+        [{ bonus: 0, target: "custom", customTarget: "B/P/S damage ignores resistance" }],
+        "Overcome Defenses",
+      ),
       riderFx("boon_offense_crit", { bonusDice: "Overwhelming Strike: extra damage on nat 20" }),
     ],
   },
