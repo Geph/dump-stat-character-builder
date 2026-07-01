@@ -17,7 +17,11 @@ export type ImportConfidenceAssessment = {
 
 export function shouldAttemptDeterministicImport(contentTypeHint?: string | null): boolean {
   if (!contentTypeHint || contentTypeHint === "all") return true
-  return contentTypeHint === "classes" || contentTypeHint === "subclasses"
+  return (
+    contentTypeHint === "classes" ||
+    contentTypeHint === "subclasses" ||
+    contentTypeHint === "spell_lists"
+  )
 }
 
 export function assessDeterministicImportConfidence(input: {

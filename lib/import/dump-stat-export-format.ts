@@ -38,6 +38,7 @@ export const TAB_TO_EXPORT_TYPE: Record<string, ExportItemType> = {
   spells: "dnd-spell",
   feats: "dnd-feat",
   equipment: "dnd-equipment",
+  magic_items: "dnd-equipment",
   class_resources: "dnd-class-resource",
   abilities: "dnd-ability",
 }

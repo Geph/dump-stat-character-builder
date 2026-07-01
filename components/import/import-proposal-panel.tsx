@@ -11,7 +11,6 @@ import { Gauge, Sparkles, Loader2 } from "lucide-react"
 
 type ImportProposalPanelProps = {
   proposals: ImportProposalSet
-  previewSummary?: string
   onConfirm: (selections: ImportProposalSelections) => void | Promise<void>
   onCancel: () => void
   confirming?: boolean
@@ -26,7 +25,6 @@ const SOURCE_LABELS = {
 
 export function ImportProposalPanel({
   proposals,
-  previewSummary,
   onConfirm,
   onCancel,
   confirming = false,
@@ -65,18 +63,17 @@ export function ImportProposalPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-      <div>
-        <p className="font-semibold text-foreground">Review before import</p>
-        <p className="mt-1 text-muted-foreground">
-          {proposals.classResources.length > 0 || proposals.customAbilities.length > 0
-            ? "The import found class resources and custom abilities that need your confirmation. Uncheck anything you do not want created in the compendium."
-            : "Review auto-wired modifiers below, then confirm to write the parsed content to the compendium."}
+    <div className="space-y-4 rounded-xl border border-border bg-background/80 p-4 text-sm">
+      {proposals.classResources.length === 0 && proposals.customAbilities.length === 0 ? (
+        <p className="text-muted-foreground">
+          No class resources or custom abilities need separate approval. Confirm when the preview
+          above looks correct.
         </p>
-        {previewSummary ? (
-          <p className="mt-2 text-xs text-muted-foreground">{previewSummary}</p>
-        ) : null}
-      </div>
+      ) : (
+        <p className="text-muted-foreground">
+          Uncheck any class resources or custom abilities you do not want created in the compendium.
+        </p>
+      )}
 
       {proposals.classResources.length > 0 && (
         <section>

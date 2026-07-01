@@ -13,10 +13,12 @@ import {
   mergeReferencedSpellsIntoImport,
 } from "@/lib/import/merge-import-content"
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
+import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
+import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import type { Feature, Trait } from "@/lib/types"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
@@ -116,22 +118,23 @@ function enrichTraits(
 function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | undefined {
   if (!feats?.length) return feats
   return feats.map((feat) => {
-    const description = feat.description ?? ""
+    const inferred = inferFeatImportFields(feat)
+    const description = inferred.description ?? ""
     const enriched = enrichFeatureLike(
       {
-        ...feat,
+        ...inferred,
         description,
-        linkedModifiers: (feat as { linkedModifiers?: Feature["linkedModifiers"] }).linkedModifiers,
-        modifierRefs: (feat as { modifierRefs?: Feature["modifierRefs"] }).modifierRefs,
+        linkedModifiers: (inferred as { linkedModifiers?: Feature["linkedModifiers"] }).linkedModifiers,
+        modifierRefs: (inferred as { modifierRefs?: Feature["modifierRefs"] }).modifierRefs,
       },
       {
         contentKind: "feat",
-        sourceName: feat.name,
-        featureName: feat.name,
+        sourceName: inferred.name,
+        featureName: inferred.name,
       },
     )
     return {
-      ...feat,
+      ...inferred,
       linkedModifiers: enriched.linkedModifiers,
       modifierRefs: enriched.modifierRefs,
       importModifierMeta: enriched.importModifierMeta,
@@ -143,7 +146,10 @@ function enrichEquipmentRows(
   equipment: ImportContent["equipment"] | undefined,
 ): ImportContent["equipment"] | undefined {
   if (!equipment?.length) return equipment
-  return equipment.map((item) => {
+  const normalized = normalizeEquipmentRows(
+    equipment.map((row) => ({ ...row })) as Record<string, unknown>[],
+  ) as NonNullable<ImportContent["equipment"]>
+  return normalized.map((item) => {
     const description = item.description ?? ""
     if (!description.trim()) return item
     const enriched = enrichFeatureLike(

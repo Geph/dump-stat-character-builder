@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  applyImportCollisionResolutions,
   applyImportRenames,
   buildImportCollisions,
   defaultRenameMap,
@@ -61,5 +62,35 @@ describe("buildImportCollisions", () => {
     expect(next.classes?.[0].name).toBe("Alternate Fighter")
     expect(next.class_resources?.[0].resource_key).toBe("alternate_fighter_exploit_dice")
     expect(next.spells?.[0].classes).toEqual(["Alternate Fighter"])
+  })
+
+  it("keeps the original name when overwrite is selected", () => {
+    const content: ImportContent = {
+      spells: [
+        {
+          name: "Searing Orb",
+          level: 2,
+          school: "Evocation",
+          casting_time: "1 action",
+          range: "60 feet",
+          components: ["S"],
+          duration: "Instantaneous",
+          concentration: false,
+          description: "Updated text",
+          classes: [],
+        },
+      ],
+    }
+    const collisions = buildImportCollisions(content, {
+      spell: [{ name: "Searing Orb", source: "Homebrew" }],
+    })
+    const next = applyImportCollisionResolutions(
+      content,
+      collisions,
+      { [collisions[0].id]: "overwrite" },
+      defaultRenameMap(collisions),
+    )
+    expect(next.spells?.[0].name).toBe("Searing Orb")
+    expect(next.spells?.[0].description).toBe("Updated text")
   })
 })

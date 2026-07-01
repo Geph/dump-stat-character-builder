@@ -23,7 +23,7 @@ export function ImportWorkflowGuidancePanel() {
       >
         <span className="flex items-center gap-2">
           <ListOrdered className="h-4 w-4 text-lime" />
-          Multi-file import order (spellcasters, Psion, exploits)
+          Multi-file import order (spellcasters, KibblesTasty Psion, exploits)
         </span>
         {open ? (
           <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />

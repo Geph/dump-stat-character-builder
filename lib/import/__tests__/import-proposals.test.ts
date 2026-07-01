@@ -16,7 +16,7 @@ describe("collectImportProposals", () => {
     const content: ImportContent = {
       classes: [
         {
-          name: "Psion",
+          name: "KibblesTasty Psion",
           description: psionTableDescription,
           hit_die: 6,
           primary_ability: ["Intelligence"],
@@ -51,12 +51,12 @@ describe("collectImportProposals", () => {
 
   it("merges AI proposals with definitions", () => {
     const content: ImportContent = {
-      classes: [{ name: "Psion", description: null, hit_die: 6, primary_ability: ["Intelligence"], features: [] }],
+      classes: [{ name: "KibblesTasty Psion", description: null, hit_die: 6, primary_ability: ["Intelligence"], features: [] }],
       import_proposals: {
         class_resources: [
           {
             proposal_id: "psi_points",
-            class_name: "Psion",
+            class_name: "KibblesTasty Psion",
             resource_key: "psi_points",
             name: "Psi Points",
             definition: "Your psionic fuel used to activate disciplines and talents.",
@@ -75,7 +75,7 @@ describe("collectImportProposals", () => {
             definition: "A discipline focused on moving matter.",
             description: "Full discipline rules text.",
             source_type: "class",
-            source_name: "Psion",
+            source_name: "KibblesTasty Psion",
             level_requirement: 1,
             choices: {
               category: "Talents",
@@ -102,7 +102,7 @@ describe("applyProposalSelections", () => {
     const content: ImportContent = {
       classes: [
         {
-          name: "Psion",
+          name: "KibblesTasty Psion",
           description: psionTableDescription,
           hit_die: 6,
           primary_ability: ["Intelligence"],

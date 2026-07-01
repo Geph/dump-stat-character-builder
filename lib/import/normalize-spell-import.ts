@@ -25,6 +25,21 @@ function normalizeComponents(raw: unknown): string[] | null {
   return null
 }
 
+function splitSpellDescriptionAndMaterial(description: string | null | undefined): {
+  description: string | null
+  material: string | null
+} {
+  if (!description?.trim()) return { description: null, material: null }
+  const materialMatch = description.match(/\*\s*-\s*\(([^)]+)\)\s*$/)
+  if (!materialMatch) return { description, material: null }
+  const material = materialMatch[1].trim()
+  const cleaned = description.slice(0, materialMatch.index).trim()
+  return {
+    description: cleaned || description,
+    material: material || null,
+  }
+}
+
 /** Coerce homebrew / Valda's / Kibbles spell rows into ImportContent spell shape. */
 export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportContent["spells"]>[number] {
   const levelRaw = raw.level
@@ -38,6 +53,12 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
   const classes = Array.isArray(raw.classes)
     ? raw.classes.filter((entry): entry is string => typeof entry === "string")
     : null
+  const descriptionRaw = typeof raw.description === "string" ? raw.description : null
+  const split = splitSpellDescriptionAndMaterial(descriptionRaw)
+  const material =
+    typeof raw.material === "string" && raw.material.trim()
+      ? raw.material.trim()
+      : split.material
 
   return {
     name: String(raw.name ?? "").trim(),
@@ -48,10 +69,11 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
     components: normalizeComponents(raw.components),
     duration: typeof raw.duration === "string" ? raw.duration : null,
     concentration: raw.concentration === true,
-    description: typeof raw.description === "string" ? raw.description : null,
-    classes,
-    psionic_augments: coercePsionicAugments(raw.psionic_augments, raw.description),
-  }
+    description: split.description,
+    classes: classes?.length ? classes : [],
+    psionic_augments: coercePsionicAugments(raw.psionic_augments, descriptionRaw),
+    ...(material ? { material } : {}),
+  } as NonNullable<ImportContent["spells"]>[number]
 }
 
 function coercePsionicAugments(

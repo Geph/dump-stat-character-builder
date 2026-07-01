@@ -61,7 +61,10 @@ export function ImportModifierReviewPanel({
               </span>
             </p>
           ) : (
-            <p className="mt-2 text-xs text-muted-foreground">No class, subclass, species, or feat features in this import.</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              No class, subclass, species, feat, or background features in this import. Spell and
+              equipment previews appear above when present.
+            </p>
           )}
           <ModifierWiringRegistryCoverageLine className="mt-2" />
         </div>

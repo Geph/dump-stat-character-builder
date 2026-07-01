@@ -29,8 +29,8 @@ absorb elements
 magic missile
 `
 
-const PLAIN_PSI_TABLE = `The Psion\tThe Psion
-Psion Level Table
+const PLAIN_PSI_TABLE = `KibblesTasty Psion\tKibblesTasty Psion
+KibblesTasty Psion Level Table
 1st \t+2 \t1 \t1 \tPsionic Archetype
 2nd \t+2 \t2 \t1 \tPsionic Talents
 3rd \t+2 \t3 \t2 \tSecondary Discipline

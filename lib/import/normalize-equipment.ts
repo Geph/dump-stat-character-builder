@@ -1,3 +1,5 @@
+import { coerceMagicEquipmentImportFields } from "@/lib/import/normalize-magic-equipment-import"
+
 export type EquipmentCost = { amount: number; unit: string }
 
 export function stripHtml(text: string): string {
@@ -48,7 +50,7 @@ export function parseEquipmentWeight(raw: unknown): number | null {
   return m ? parseFloat(m[1]) : null
 }
 
-function cleanProperties(props: unknown): Record<string, unknown> {
+export function cleanProperties(props: unknown): Record<string, unknown> {
   if (!props || typeof props !== "object" || Array.isArray(props)) {
     return {}
   }
@@ -119,7 +121,7 @@ function coerceStringArray(value: unknown): string[] | null {
   return null
 }
 
-function coerceBoolean(value: unknown): boolean | null {
+export function coerceBoolean(value: unknown): boolean | null {
   if (typeof value === "boolean") return value
   if (typeof value === "number") return value !== 0
   if (typeof value === "string") {
@@ -224,14 +226,21 @@ export function normalizeEquipmentRow(
     inferWeaponSubcategory(row) ??
     (typeof row.subcategory === "string" ? row.subcategory.trim() || null : null)
 
-  return coerceMagicFields({
+  const base = coerceMagicEquipmentImportFields({
     ...row,
     name,
     subcategory,
     cost,
     weight: parseEquipmentWeight(row.weight),
-    properties: cleanProperties(row.properties),
+    properties: row.properties,
     description,
+  })
+
+  const cleanedProps = cleanProperties(base.properties)
+
+  return coerceMagicFields({
+    ...base,
+    properties: Object.keys(cleanedProps).length ? cleanedProps : null,
   })
 }
 

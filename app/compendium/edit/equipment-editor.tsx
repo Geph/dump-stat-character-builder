@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
@@ -25,9 +25,10 @@ import {
   MAGIC_ITEM_CATEGORIES,
   type BaseEquipmentFilter,
 } from "@/lib/compendium/equipment-magic"
+import type { CompendiumContentType } from "@/lib/compendium/content-types"
 
 const CATEGORIES = [
-  "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good"
+  "Weapon", "Armor", "Adventuring Gear", "Tool", "Mount", "Vehicle", "Trade Good", "Other"
 ]
 
 const SUBCATEGORIES: Record<string, string[]> = {
@@ -38,6 +39,7 @@ const SUBCATEGORIES: Record<string, string[]> = {
   "Mount": ["Common", "Exotic"],
   "Vehicle": ["Land", "Water", "Air"],
   "Trade Good": [],
+  "Other": [],
 }
 
 const DAMAGE_TYPES = [
@@ -108,6 +110,16 @@ const defaultEquipment: EquipmentFormData = {
   magic_effects: [],
 }
 
+function equipmentListTab(
+  form: EquipmentFormData,
+  magicQuery: boolean,
+): CompendiumContentType {
+  if (magicQuery || form.magic_item_category.trim() || form.rarity.trim()) {
+    return "magic_items"
+  }
+  return "equipment"
+}
+
 export default function EquipmentEditorPage({ id }: { id: string }) {
   const [form, setForm] = useState<EquipmentFormData>(defaultEquipment)
   const [loading, setLoading] = useState(false)
@@ -117,8 +129,22 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
   const [allEquipment, setAllEquipment] = useState<{ id: string; name: string; category: string }[]>([])
   const [rawProperties, setRawProperties] = useState<unknown>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const magicQuery = searchParams.get("magic") === "1"
+  const listTab = equipmentListTab(form, magicQuery)
   const { catalog: modifierCatalog } = useModifierCatalog()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("equipment", id)
+
+  useEffect(() => {
+    if (id === "new" && magicQuery) {
+      setForm((prev) => ({
+        ...prev,
+        category: "Other",
+        cost: null,
+        magic_item_category: prev.magic_item_category || "Wondrous Item",
+      }))
+    }
+  }, [id, magicQuery])
 
   useEffect(() => {
     const loadEquipmentCatalog = async () => {
@@ -166,7 +192,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             name: data.name || "",
             category: data.category || "Adventuring Gear",
             subcategory: data.subcategory || "",
-            cost: data.cost || { amount: 1, unit: "gp" },
+            cost: data.cost ?? null,
             weight: data.weight || null,
             description: data.description || "",
             source: data.source || "Custom",
@@ -266,7 +292,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
     }
     
     setSaving(false)
-    router.push("/compendium?tab=equipment")
+    router.push(`/compendium?tab=${equipmentListTab(form, magicQuery)}`)
   }
 
   const handleExport = () => {
@@ -285,7 +311,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
     
     const db = createClient()
     await db.from("equipment").delete().eq("id", id)
-    router.push("/compendium?tab=equipment")
+    router.push(`/compendium?tab=${listTab}`)
   }
 
   if (loading) {
@@ -310,7 +336,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
     <div className="min-h-screen bg-background">
       <MainNav />
       <CompendiumEditorToolbar
-        tab="equipment"
+        tab={listTab}
         title={id === "new" ? "New Equipment" : "Edit Equipment"}
         isNew={id === "new"}
         saving={saving}
@@ -379,6 +405,22 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-3">
+              <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.cost === null}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      cost: e.target.checked ? null : { amount: 1, unit: "gp" },
+                    })
+                  }
+                  className="rounded border-border"
+                />
+                Cost N/A (typical for magic items)
+              </label>
+            </div>
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
                 Cost (Amount)
@@ -386,12 +428,13 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               <input
                 type="number"
                 min={0}
-                value={form.cost?.amount || 0}
+                disabled={form.cost === null}
+                value={form.cost?.amount ?? 0}
                 onChange={(e) => setForm({ 
                   ...form, 
-                  cost: { ...form.cost!, amount: parseFloat(e.target.value) || 0 } 
+                  cost: { ...(form.cost ?? { amount: 0, unit: "gp" }), amount: parseFloat(e.target.value) || 0 } 
                 })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <div>
@@ -399,12 +442,13 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
                 Cost (Unit)
               </label>
               <select
+                disabled={form.cost === null}
                 value={form.cost?.unit || "gp"}
                 onChange={(e) => setForm({ 
                   ...form, 
-                  cost: { ...form.cost!, unit: e.target.value } 
+                  cost: { ...(form.cost ?? { amount: 0, unit: "gp" }), unit: e.target.value } 
                 })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary disabled:opacity-50"
               >
                 <option value="cp">Copper (cp)</option>
                 <option value="sp">Silver (sp)</option>

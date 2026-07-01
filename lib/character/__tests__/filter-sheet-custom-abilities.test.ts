@@ -73,7 +73,7 @@ describe("filterCustomAbilitiesForCharacterSheet", () => {
       customAbilityAppliesOnCharacterSheet(psionDiscipline, {
         ...warlockCtx,
         classIds: ["class-psion"],
-        classNames: ["Psion"],
+        classNames: ["KibblesTasty Psion"],
       }),
     ).toBe(true)
     expect(customAbilityAppliesOnCharacterSheet(psionDiscipline, warlockCtx)).toBe(false)
@@ -84,13 +84,13 @@ describe("filterCustomAbilitiesForCharacterSheet", () => {
       id: "imported-discipline",
       name: "Knowing Mind",
       source_type: "class",
-      source_name: "Psion",
+      source_name: "KibblesTasty Psion",
     } as CustomAbility & { source_type: string; source_name: string })
 
     expect(
       customAbilityAppliesOnCharacterSheet(row, {
         ...warlockCtx,
-        classNames: ["Psion"],
+        classNames: ["KibblesTasty Psion"],
       }),
     ).toBe(true)
     expect(customAbilityAppliesOnCharacterSheet(row, warlockCtx)).toBe(false)

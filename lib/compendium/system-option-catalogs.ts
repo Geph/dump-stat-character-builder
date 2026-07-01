@@ -146,6 +146,10 @@ export function isSystemCatalogEditor(id: string): boolean {
   return SYSTEM_OPTION_CATALOG_IDS.includes(id as (typeof SYSTEM_OPTION_CATALOG_IDS)[number])
 }
 
+export function isSystemOptionCatalogId(id: string): boolean {
+  return (SYSTEM_OPTION_CATALOG_IDS as readonly string[]).includes(id)
+}
+
 export function buildMetamagicOptionsCatalogRow(): Record<string, unknown> {
   return {
     id: METAMAGIC_OPTIONS_CATALOG_ID,

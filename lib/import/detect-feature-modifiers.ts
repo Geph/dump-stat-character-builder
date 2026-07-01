@@ -84,6 +84,14 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
     if (char.type === "saving_throws") {
       return `${instance.catalogRefId}:saves:${(char.values ?? []).join(",")}`
     }
+    if (char.type === "languages") {
+      return `${instance.catalogRefId}:lang:${(char.values ?? []).join(",")}:${char.choiceCount ?? ""}`
+    }
+    if (char.type === "spells_known") {
+      const spellIds = (char.spells ?? []).map((entry) => entry.spellId).join(",")
+      const grants = (char.choiceGrants ?? []).map((g) => `${g.level}x${g.count}`).join("+")
+      return `${instance.catalogRefId}:spells:${spellIds}:${grants}`
+    }
     return `${instance.catalogRefId}:${char.type}`
   }
   const kind = instance.activation?.effects?.[0]?.kind ?? "fx"

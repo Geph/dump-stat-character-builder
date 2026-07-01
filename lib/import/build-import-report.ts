@@ -315,21 +315,12 @@ function buildNextSteps(
   classReports: ImportReportClass[],
   subclassReports: ImportReportSubclass[],
   warnings: string[],
-  content: ImportContent,
 ): ImportReportNextStep[] {
   const steps: ImportReportNextStep[] = []
   const seenMissingSpells = new Set<string>()
 
   for (const warning of warnings) {
     steps.push({ severity: "warning", title: "Import warning", detail: warning })
-  }
-
-  if ((content.spells?.length ?? 0) > 0 && (breakdownSpellGap(content) ?? 0) > 0) {
-    steps.push({
-      severity: "info",
-      title: "Review imported spells",
-      detail: `${content.spells?.length} spells imported. Verify custom Psion spells are assigned to the Psion class list in the compendium.`,
-    })
   }
 
   for (const classReport of classReports) {
@@ -377,10 +368,6 @@ function buildNextSteps(
   }
 
   return steps
-}
-
-function breakdownSpellGap(content: ImportContent): number | null {
-  return content.spells?.length ?? null
 }
 
 function buildHeadline(
@@ -452,7 +439,7 @@ export function buildImportReport(params: {
     params.skippedSubclasses,
     params.spellCatalog,
   )
-  const nextSteps = buildNextSteps(classes, subclasses, params.warnings, params.content)
+  const nextSteps = buildNextSteps(classes, subclasses, params.warnings)
   const autoWiredModifiers = collectImportModifierPreviews(params.content).length
   const unmatchedFeatures = collectUnmatchedModifierFeatures(params.content)
   const modifierReview = collectImportModifierReview(params.content)

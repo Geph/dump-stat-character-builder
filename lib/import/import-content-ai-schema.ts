@@ -4,6 +4,7 @@ import { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
 import type { ImportContent, ImportMechanic } from "@/lib/import/content-schema"
 import { ImportMechanicSchema } from "@/lib/import/content-schema"
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
+import { coerceMagicEquipmentImportFields } from "@/lib/import/normalize-magic-equipment-import"
 
 /**
  * OpenAI structured output requires every object property in `required`.
@@ -256,6 +257,9 @@ const EquipmentAiSchema = z.object({
   cost: z.object({ amount: z.number(), unit: z.string() }).nullable(),
   weight: z.number().nullable(),
   properties: EquipmentPropertiesAiSchema.nullable(),
+  requires_attunement: z.boolean().nullable(),
+  magic_item_category: z.string().nullable(),
+  rarity: z.string().nullable(),
 })
 
 const ImportContentAiSchemaBase = z.object({
@@ -309,6 +313,11 @@ export function buildImportContentAiSchema(options?: {
       })
     case "spells":
       return z.object({
+        spells: z.array(SpellAiSchema).nullable(),
+      })
+    case "spell_lists":
+      return z.object({
+        classes: z.array(ClassAiSchema).nullable(),
         spells: z.array(SpellAiSchema).nullable(),
       })
     case "feats":
@@ -511,15 +520,20 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
 
   if (raw.equipment?.length) {
     content.equipment = raw.equipment.map((item) =>
-      omitNull({
-        name: item.name,
-        category: item.category,
-        subcategory: item.subcategory,
-        description: item.description,
-        cost: item.cost,
-        weight: item.weight,
-        properties: item.properties,
-      }),
+      coerceMagicEquipmentImportFields(
+        omitNull({
+          name: item.name,
+          category: item.category,
+          subcategory: item.subcategory,
+          description: item.description,
+          cost: item.cost,
+          weight: item.weight,
+          properties: item.properties,
+          requires_attunement: item.requires_attunement,
+          magic_item_category: item.magic_item_category,
+          rarity: item.rarity,
+        }) as Record<string, unknown>,
+      ),
     ) as NonNullable<ImportContent["equipment"]>
   }
 

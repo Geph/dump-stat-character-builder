@@ -6,6 +6,7 @@ export type CompendiumContentType =
   | "spells"
   | "feats"
   | "equipment"
+  | "magic_items"
   | "languages"
   | "class_resources"
   | "abilities"
@@ -18,10 +19,23 @@ const CONTENT_TYPES: CompendiumContentType[] = [
   "spells",
   "feats",
   "equipment",
+  "magic_items",
   "languages",
   "class_resources",
   "abilities",
 ]
+
+/** Browser tab that reads/writes the equipment table. */
+export function isEquipmentBrowserTab(
+  tab: CompendiumContentType,
+): tab is "equipment" | "magic_items" {
+  return tab === "equipment" || tab === "magic_items"
+}
+
+/** DB table / editor type for a compendium browser tab. */
+export function compendiumStorageContentType(tab: CompendiumContentType): CompendiumContentType {
+  return tab === "magic_items" ? "equipment" : tab
+}
 
 export function isCompendiumContentType(value: string): value is CompendiumContentType {
   return (CONTENT_TYPES as string[]).includes(value)
@@ -36,6 +50,7 @@ export const COMPENDIUM_DEFAULT_ICONS: Record<CompendiumContentType, string> = {
   spells: "bookmarklet",
   feats: "mighty-force",
   equipment: "battle-gear",
+  magic_items: "sparkles",
   languages: "conversation",
   class_resources: "energy-arrow",
   abilities: "magic-trident",
