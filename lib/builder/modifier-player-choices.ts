@@ -7,6 +7,7 @@ import {
   SKILL_NAMES,
   normalizeCharacteristics,
   type CharacteristicModifier,
+  type DamageCharacteristic,
   type SkillsCharacteristic,
   type SpellsKnownCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
@@ -29,6 +30,7 @@ export type ModifierPlayerChoiceKind =
   | "skill_or_tool"
   | "spell_list_class"
   | "spell"
+  | "damage_type"
 
 export type ModifierPlayerChoiceSlot = {
   slotKey: string
@@ -191,6 +193,29 @@ function slotsFromCharacteristic(
       maxCount: count,
       options: options.map((name) => ({ name })),
       allowCustom: true,
+    })
+    return slots
+  }
+
+  if (mod.type === "damage_resistance" || mod.type === "damage_immunity") {
+    const damageMod = mod as DamageCharacteristic
+    const count = damageMod.choiceCount ?? 0
+    if (count <= 0) return slots
+
+    const pool = (damageMod.choiceOptions ?? []).filter((name) => name.trim().length > 0)
+    if (pool.length === 0) return slots
+
+    slots.push({
+      slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "damage_type"),
+      sourceKey,
+      sourceLabel,
+      modId: mod.id,
+      kind: "damage_type",
+      label:
+        damageMod.label ??
+        `Choose ${count} damage type${count === 1 ? "" : "s"} for ${mod.type === "damage_resistance" ? "resistance" : "immunity"}`,
+      maxCount: count,
+      options: pool.map((name) => ({ name })),
     })
     return slots
   }
@@ -594,6 +619,18 @@ export function applyModifierPlayerPicks(
       // Fixed languages (e.g. Common) are granted alongside the player's picks.
       const merged = [...new Set([...mod.values, ...selected])]
       return { ...mod, values: merged, choiceCount: 0 }
+    }
+
+    if (mod.type === "damage_resistance" || mod.type === "damage_immunity") {
+      const damageMod = mod as DamageCharacteristic
+      const count = damageMod.choiceCount ?? 0
+      if (count <= 0) return mod
+
+      const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "damage_type")
+      const selected = picks[key] ?? []
+      if (selected.length === 0) return mod
+      const merged = [...new Set([...damageMod.damageTypes, ...selected])]
+      return { ...damageMod, damageTypes: merged, choiceCount: 0 }
     }
 
     if (mod.type === "spells_known") {

@@ -17,6 +17,10 @@ const MOVEMENT_EFFECTS_CATALOG_ID = "cat_char_movement_effects"
 const CHECK_ROLL_MODIFIER_CATALOG_ID = "cat_fx_check_roll_modifier"
 const FORCE_SAVE_CATALOG_ID = "cat_fx_force_save_control"
 const DAMAGE_REDUCTION_CATALOG_ID = "cat_fx_damage_reduction"
+const ON_HIT_TRIGGER_CATALOG_ID = "cat_char_on_hit_trigger"
+const EXTRA_DAMAGE_ON_HIT_CATALOG_ID = "cat_fx_extra_damage_on_hit"
+const MODIFY_CREATURE_CATALOG_ID = "cat_fx_modify_creature"
+const HEALING_DICE_POOL_CATALOG_ID = "cat_char_healing_dice_pool"
 
 function modId(key: string): string {
   return `mod_${key}`
@@ -143,18 +147,108 @@ function forceSaveBonusAction(
   })
 }
 
-function damageReductionBonusAction(instanceKey: string, label: string) {
-  return fxInstance(`modinst_${instanceKey}`, DAMAGE_REDUCTION_CATALOG_ID, {
-    bonusAction: true,
-    effects: [
-      {
-        id: modId(instanceKey),
-        kind: "damage_reduction",
-        mitigation: "reduction",
-        label,
+function onHitExtraDamage(
+  instanceKey: string,
+  dice: string,
+  damageTypes: string[],
+  options?: { oncePerTurn?: boolean; label?: string },
+) {
+  return charInstance(`modinst_${instanceKey}`, ON_HIT_TRIGGER_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "on_hit_trigger",
+      oncePerTurn: options?.oncePerTurn ?? false,
+      label: options?.label,
+      effect: {
+        catalogRefId: EXTRA_DAMAGE_ON_HIT_CATALOG_ID,
+        activation: {
+          effects: [
+            {
+              id: modId(`${instanceKey}_fx`),
+              kind: "extra_damage_on_hit",
+              bonusDice: dice,
+              effectDamageTypes: damageTypes,
+            },
+          ],
+        },
       },
-    ],
-  })
+    },
+  ])
+}
+
+function onHitApplyCondition(instanceKey: string, condition: string, label?: string) {
+  return charInstance(`modinst_${instanceKey}`, ON_HIT_TRIGGER_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "on_hit_trigger",
+      oncePerTurn: false,
+      label,
+      effect: {
+        catalogRefId: MODIFY_CREATURE_CATALOG_ID,
+        activation: {
+          effects: [
+            {
+              id: modId(`${instanceKey}_fx`),
+              kind: "modify_creature",
+              rollTarget: "enemy",
+              creatureModifyMode: "condition",
+              effectConditionTypes: [condition],
+            },
+          ],
+        },
+      },
+    },
+  ])
+}
+
+function damageReductionReaction(instanceKey: string, label: string): LinkedModifierInstance {
+  return {
+    instanceId: `modinst_${instanceKey}`,
+    catalogRefId: DAMAGE_REDUCTION_CATALOG_ID,
+    activation: {
+      reaction: true,
+      effects: [
+        {
+          id: modId(instanceKey),
+          kind: "damage_reduction",
+          mitigation: "reduction",
+          bonusDice: "1d12",
+          healAbility: "CON",
+          label,
+        },
+      ],
+    },
+  }
+}
+
+function dropToOneHp(instanceKey: string, label: string): LinkedModifierInstance {
+  return {
+    instanceId: `modinst_${instanceKey}`,
+    catalogRefId: FEAT_MODIFIER_CATALOG.healSelf,
+    activation: {
+      onDropToZeroHp: true,
+      effects: [
+        {
+          id: modId(instanceKey),
+          kind: "heal_self",
+          healMode: "fixed",
+          healFixed: 1,
+          label,
+        },
+      ],
+    },
+  }
+}
+
+function skillProficiency(skill: string, label?: string) {
+  return charInstance(`modinst_skill_${skill}`, FEAT_MODIFIER_CATALOG.skills, [
+    {
+      id: modId(`skill_${skill}`),
+      type: "skills",
+      entries: [{ skill, expertise: false }],
+      label,
+    },
+  ])
 }
 
 function skillChoice(count: number, label?: string) {
@@ -454,7 +548,7 @@ const SRD_SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
   "Dwarf::Stonecunning": {
     linkedModifiers: [
       vision(60, "tremorsense", "Stonecunning tremorsense"),
-      usesPool({ type: "unlimited" }, "Stonecunning active sense"),
+      usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Stonecunning"),
     ],
   },
 
@@ -462,7 +556,6 @@ const SRD_SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
   "Elf::Fey Ancestry": {
     linkedModifiers: [checkAdvantageSave("fey_ancestry_charmed", { conditions: ["Charmed"] })],
   },
-  "Elf::Keen Senses": { linkedModifiers: [skillChoice(1, "Keen Senses")] },
   "Elf::Trance": {
     linkedModifiers: [
       restReplacement(
@@ -470,7 +563,14 @@ const SRD_SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
         "Trance — 4-hour long rest",
         "Finish a long rest in 4 hours via trancelike meditation while retaining consciousness.",
       ),
-      magicalSleepImmunity("Trance — immune to magical sleep"),
+      charInstance("modinst_elf_trance_sleep", MAGICAL_SLEEP_IMMUNITY_CATALOG_ID, [
+        {
+          id: modId("elf_trance_sleep"),
+          type: "magical_sleep_immunity",
+          noSleepRequired: true,
+          label: "Trance — immune to magical sleep; no sleep required",
+        },
+      ]),
     ],
   },
 
@@ -517,7 +617,19 @@ const SRD_SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
   "Orc::Darkvision": { linkedModifiers: [vision(120, "darkvision", "Darkvision 120 ft.")] },
   "Orc::Adrenaline Rush": {
     linkedModifiers: [
-      movementDash("orc_adrenaline_dash"),
+      fxInstance("modinst_orc_adrenaline", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          { id: modId("orc_adrenaline_dash"), kind: "movement_option", movementDash: true },
+          {
+            id: modId("orc_adrenaline_thp"),
+            kind: "grant_temp_hp",
+            healMode: "proficiency",
+            tempHpTrigger: "bonus_action",
+            label: "Temporary HP equal to Proficiency Bonus",
+          },
+        ],
+      }),
       usesPool(
         { type: "proficiency", recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
         "Adrenaline Rush",
@@ -526,6 +638,7 @@ const SRD_SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
   },
   "Orc::Relentless Endurance": {
     linkedModifiers: [
+      dropToOneHp("relentless_endurance", "Drop to 1 HP instead of 0"),
       usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Relentless Endurance"),
     ],
   },
@@ -614,47 +727,31 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
   },
   "Goliath::Giant Ancestry::Fire's Burn (Fire Giant)": {
     linkedModifiers: [
-      specialAttack("fires_burn", {
-        attackName: "Fire's Burn",
-        attackProfile: "ranged",
-        damageDieType: "d10",
-        damageDiceCount: 1,
-        damageTypes: ["Fire"],
-        properties: ["Special"],
-        label: "Bonus Action: ranged fire attack (PB + CON to hit)",
+      onHitExtraDamage("fires_burn", "1d10", ["Fire"], {
+        label: "On hit: +1d10 Fire damage",
       }),
       usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Fire's Burn"),
     ],
   },
   "Goliath::Giant Ancestry::Frost's Chill (Frost Giant)": {
     linkedModifiers: [
-      specialAttack("frosts_chill", {
-        attackName: "Frost's Chill",
-        attackProfile: "melee",
-        damageDieType: "d6",
-        damageDiceCount: 1,
-        damageTypes: ["Cold"],
-        properties: ["Special"],
-        label: "Bonus Action: melee cold attack; target Speed −10 ft until your next turn",
+      onHitExtraDamage("frosts_chill", "1d6", ["Cold"], {
+        label: "On hit: +1d6 Cold; target Speed −10 ft until your next turn",
       }),
       usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Frost's Chill"),
     ],
   },
   "Goliath::Giant Ancestry::Hill's Tumble (Hill Giant)": {
     linkedModifiers: [
-      forceSaveBonusAction("hills_tumble", {
-        saveAbility: "STR",
-        effectConditionTypes: ["Prone"],
-        label: "Bonus Action: STR save or knocked Prone (Large or smaller)",
-      }),
+      onHitApplyCondition("hills_tumble", "Prone", "On hit vs Large or smaller: target is Prone"),
       usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Hill's Tumble"),
     ],
   },
   "Goliath::Giant Ancestry::Stone's Endurance (Stone Giant)": {
     linkedModifiers: [
-      damageReductionBonusAction(
+      damageReductionReaction(
         "stones_endurance",
-        "Bonus Action: reduce incoming damage by 1d12 + CON (reaction timing)",
+        "Reaction: reduce damage by 1d12 + CON",
       ),
       usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Stone's Endurance"),
     ],
@@ -688,6 +785,12 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
       spellsKnownChoice("infernal_spells", [{ level: 0, count: 1 }], { label: "Fire Bolt" }),
     ],
   },
+
+  "Elf::Keen Senses::Insight": { linkedModifiers: [skillProficiency("Insight", "Keen Senses — Insight")] },
+  "Elf::Keen Senses::Perception": {
+    linkedModifiers: [skillProficiency("Perception", "Keen Senses — Perception")],
+  },
+  "Elf::Keen Senses::Survival": { linkedModifiers: [skillProficiency("Survival", "Keen Senses — Survival")] },
 }
 
 /** Traits with no satisfactory common-modifier mapping (descriptive-only for now). */

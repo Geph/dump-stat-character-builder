@@ -7,7 +7,9 @@ import {
   featureHasModifierPreset,
   enrichClassFeatureWithModifierPresets,
 } from "@/lib/compendium/enrich-srd-class-features"
-import type { Feature } from "@/lib/types"
+import { enrichCustomSpeciesRow, speciesHasTraitPresetRegistry } from "@/lib/compendium/enrich-custom-species"
+import { PHB_SOURCE } from "@/lib/compendium/compendium-source"
+import type { Feature, Trait } from "@/lib/types"
 
 describe("Tier 1 common modifier types", () => {
   it("normalizes d20_test_reaction defaults", () => {
@@ -71,6 +73,182 @@ describe("Tier 1 common modifier types", () => {
     expect(normalized.type).toBe("spell_healing_modifier")
     if (normalized.type !== "spell_healing_modifier") return
     expect(normalized.maximizeOnlyAtZeroHp).toBe(true)
+  })
+
+  it("normalizes unarmed strike damage type and ability", () => {
+    const mod = createCharacteristicModifier("unarmed_strike_damage")
+    const [normalized] = normalizeCharacteristics(
+      [{ ...mod, damageType: "Piercing", ability: "strength" }],
+      null,
+    )
+    expect(normalized.type).toBe("unarmed_strike_damage")
+    if (normalized.type !== "unarmed_strike_damage") return
+    expect(normalized.damageType).toBe("Piercing")
+    expect(normalized.ability).toBe("strength")
+  })
+
+  it("normalizes damage resistance with player choice pool", () => {
+    const mod = createCharacteristicModifier("damage_resistance")
+    const [normalized] = normalizeCharacteristics(
+      [
+        {
+          ...mod,
+          damageTypes: [],
+          choiceCount: 1,
+          choiceOptions: ["Acid", "Fire"],
+        },
+      ],
+      null,
+    )
+    expect(normalized.type).toBe("damage_resistance")
+    if (normalized.type !== "damage_resistance") return
+    expect(normalized.choiceCount).toBe(1)
+    expect(normalized.choiceOptions).toEqual(["Acid", "Fire"])
+  })
+
+  it("normalizes movement spider climb with min level", () => {
+    const mod = createCharacteristicModifier("movement_effects")
+    const [normalized] = normalizeCharacteristics(
+      [{ ...mod, spiderClimb: true, spiderClimbMinLevel: 3 }],
+      null,
+    )
+    expect(normalized.type).toBe("movement_effects")
+    if (normalized.type !== "movement_effects") return
+    expect(normalized.spiderClimb).toBe(true)
+    expect(normalized.spiderClimbMinLevel).toBe(3)
+  })
+
+  it("normalizes on_hit_trigger creature type filters", () => {
+    const mod = createCharacteristicModifier("on_hit_trigger")
+    const [normalized] = normalizeCharacteristics(
+      [{ ...mod, excludeCreatureTypes: ["Construct", "Undead"] }],
+      null,
+    )
+    expect(normalized.type).toBe("on_hit_trigger")
+    if (normalized.type !== "on_hit_trigger") return
+    expect(normalized.excludeCreatureTypes).toEqual(["Construct", "Undead"])
+  })
+
+  it("normalizes telepathy with miles and token requirement", () => {
+    const mod = createCharacteristicModifier("telepathy")
+    const [normalized] = normalizeCharacteristics(
+      [{ ...mod, rangeMiles: 1, maxMessageWords: 25, requiresActiveToken: true }],
+      null,
+    )
+    expect(normalized.type).toBe("telepathy")
+    if (normalized.type !== "telepathy") return
+    expect(normalized.rangeMiles).toBe(1)
+    expect(normalized.maxMessageWords).toBe(25)
+    expect(normalized.requiresActiveToken).toBe(true)
+  })
+
+  it("normalizes healing dice pool with proficiency dice per use", () => {
+    const mod = createCharacteristicModifier("healing_dice_pool")
+    const [normalized] = normalizeCharacteristics(
+      [{ ...mod, dieType: "d4", dicePerUseSource: "proficiency", activation: "magic_action" }],
+      null,
+    )
+    expect(normalized.type).toBe("healing_dice_pool")
+    if (normalized.type !== "healing_dice_pool") return
+    expect(normalized.dicePerUseSource).toBe("proficiency")
+    expect(normalized.activation).toBe("magic_action")
+  })
+
+  it("normalizes condition immunity with exhaustion source exclusions", () => {
+    const mod = createCharacteristicModifier("condition_immunity")
+    const [normalized] = normalizeCharacteristics(
+      [
+        {
+          ...mod,
+          conditions: ["Exhaustion"],
+          exhaustionSourceExclusions: ["dehydration", "malnutrition"],
+        },
+      ],
+      null,
+    )
+    expect(normalized.type).toBe("condition_immunity")
+    if (normalized.type !== "condition_immunity") return
+    expect(normalized.exhaustionSourceExclusions).toEqual(["dehydration", "malnutrition"])
+  })
+
+  it("normalizes magical sleep immunity with no sleep required", () => {
+    const mod = createCharacteristicModifier("magical_sleep_immunity")
+    const [normalized] = normalizeCharacteristics([{ ...mod, noSleepRequired: true }], null)
+    expect(normalized.type).toBe("magical_sleep_immunity")
+    if (normalized.type !== "magical_sleep_immunity") return
+    expect(normalized.noSleepRequired).toBe(true)
+  })
+})
+
+describe("custom species modifier wiring", () => {
+  it("wires Aasimar presets by species name (no bundled stat text)", () => {
+    const enriched = enrichCustomSpeciesRow({
+      name: "Aasimar",
+      source: PHB_SOURCE,
+      traits: [
+        { name: "Celestial Resistance", description: "" },
+        { name: "Healing Hands", description: "" },
+        {
+          name: "Celestial Revelation",
+          level: 3,
+          description: "",
+          isChoice: true,
+          choices: {
+            category: "Celestial Revelation",
+            count: 1,
+            options: [{ name: "Heavenly Wings", description: "" }],
+          },
+        },
+      ],
+    })
+
+    const traits = enriched.traits as { name: string; linkedModifiers?: { catalogRefId: string }[] }[]
+    const resistance = traits.find((trait) => trait.name === "Celestial Resistance")
+    expect(
+      resistance?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_damage_resistance"),
+    ).toBe(true)
+
+    const healing = traits.find((trait) => trait.name === "Healing Hands")
+    expect(
+      healing?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_healing_dice_pool"),
+    ).toBe(true)
+
+    const revelation = traits.find((trait) => trait.name === "Celestial Revelation")
+    const wings = revelation?.choices?.options?.find((option) => option.name === "Heavenly Wings")
+    expect(wings?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_speed")).toBe(true)
+    expect(enriched.size_options).toEqual(["Small", "Medium"])
+  })
+
+  it("wires Changeling and Warforged presets without SRD seed", () => {
+    expect(speciesHasTraitPresetRegistry("Changeling")).toBe(true)
+    expect(speciesHasTraitPresetRegistry("Warforged")).toBe(true)
+
+    const changeling = enrichCustomSpeciesRow({
+      name: "Changeling",
+      source: "Eberron",
+      traits: [
+        { name: "Changeling Instincts", description: "" },
+        { name: "Shape-Shifter", description: "" },
+      ],
+    })
+    const instincts = (changeling.traits as Trait[]).find((t) => t.name === "Changeling Instincts")
+    expect(
+      instincts?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_skills"),
+    ).toBe(true)
+
+    const warforged = enrichCustomSpeciesRow({
+      name: "Warforged",
+      source: "Custom",
+      traits: [
+        { name: "Integrated Protection", description: "" },
+        { name: "Tireless", description: "" },
+      ],
+    })
+    const tireless = (warforged.traits as Trait[]).find((t) => t.name === "Tireless")
+    expect(
+      tireless?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_condition_immunity"),
+    ).toBe(true)
+    expect(warforged.size_options).toEqual(["Small", "Medium"])
   })
 })
 

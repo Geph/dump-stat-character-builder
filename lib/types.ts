@@ -133,6 +133,8 @@ export interface FeatureEffect {
   healFlatBonus?: number | null
   /** HP = character level × multiplier when healMode is character_level */
   healLevelMultiplier?: number | null
+  /** When healMode is proficiency, multiply PB by this amount (e.g. 2 for Shifter shifting). */
+  healProficiencyMultiplier?: number | null
   healAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
   /** extra_attack: attacks when taking the Attack action */
   extraAttackCount?: number | null
@@ -211,6 +213,19 @@ export interface FeatureEffect {
   /** extra_damage_on_hit / rider_damage: selectable riders (Cunning Strike, Brutal Strike). */
   bonusRiderOptions?: { id: string; name: string; costDice?: string | null; description?: string | null }[]
   maxBonusRidersPerUse?: number | null
+  /** heal_self / heal_from_pool: restore HP equal to damage dealt (Vampiric Bite Drain). */
+  healEqualToDamageDealt?: boolean
+  /** grant_temp_hp / buff: bonus equal to damage dealt, expiring after a duration (Strengthen). */
+  bonusEqualToDamageDealt?: boolean
+  bonusExpiresMinutes?: number | null
+  /** modify_creature: apply debuff to multiple roll types (Lupin Howl: attacks and saves). */
+  checkRollTargets?: ("attack" | "save" | "ability" | "skill")[]
+  /** remote_viewing: range in feet to perceive through a token. */
+  remoteViewingRangeFeet?: number | null
+  /** remote_viewing: how long the effect lasts. */
+  remoteViewingDurationMinutes?: number | null
+  /** remote_viewing: destroy the linked token when the effect ends. */
+  destroysTokenOnEnd?: boolean
 }
 
 export interface FeatureActivation {
