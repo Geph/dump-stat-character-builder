@@ -1,5 +1,6 @@
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { FoundryImportMeta } from "@/lib/import/foundry-types"
+import type { ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
 import { detectImportCollisionsSafe } from "@/lib/import/fetch-import-collisions"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
@@ -8,19 +9,22 @@ import { persistImportedContent, normalizeImportMaterialSource } from "@/lib/imp
 import { NextResponse } from "next/server"
 
 export async function runTextImportPipeline(
-  content: ImportContent,
+  content: ImportContent | ImportContentWithFoundryMeta,
   options?: {
     charLength?: number
     tokenSavings?: ImportTokenSavingsReport
     sourceLabel?: string
     materialSource?: string
+    foundryMeta?: FoundryImportMeta
   },
 ): Promise<NextResponse> {
   try {
     const charLength = options?.charLength ?? 0
     const tokenSavings = options?.tokenSavings
+    const foundryMeta =
+      options?.foundryMeta ?? (content as ImportContentWithFoundryMeta).foundryImportMeta
     const materialSource = normalizeImportMaterialSource(
-      options?.materialSource ?? options?.sourceLabel,
+      options?.materialSource ?? options?.sourceLabel ?? foundryMeta?.sourceLabel,
       "Custom",
     )
 
@@ -59,7 +63,7 @@ export async function runTextImportPipeline(
     }
 
     const { totalImported, breakdown, warnings, report } = await persistImportedContent(
-      prepared.content,
+      foundryMeta ? { ...prepared.content, foundryImportMeta: foundryMeta } : prepared.content,
       materialSource,
     )
 

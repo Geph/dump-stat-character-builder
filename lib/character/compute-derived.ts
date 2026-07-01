@@ -23,6 +23,8 @@ import {
   applyAcCharacteristics,
   applyHpCharacteristics,
   computeInitiative,
+  resolveAggregatedAcFormula,
+  type SheetToggleKey,
   sumAttackRollModifiers,
   sumDamageRollModifiers,
   type AbilityScoreKey,
@@ -278,10 +280,10 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     modifierCatalog: inputs.modifierCatalog,
   })
 
-  const aggregatedCharacteristics = aggregateCharacteristics([
-    ...builderCharacteristicMods,
-    ...equipmentMagicMods,
-  ])
+  const aggregatedCharacteristics = aggregateCharacteristics(
+    [...builderCharacteristicMods, ...equipmentMagicMods],
+    { activeSheetToggles: inputs.activeSheetToggles },
+  )
   // Source IDs the character currently has, used to discard orphaned ability-score
   // pool allocations left behind after a class/feat/species change.
   const validAsiSourceIds = new Set<string>(
@@ -391,6 +393,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   const wearingArmor = Boolean(equippedArmor)
   const shieldBonus = getShieldBonus(equippedShield)
   const baseArmorClass = calculateArmorClass(abilityMods.dexterity, equippedArmor, equippedShield)
+  resolveAggregatedAcFormula(aggregatedCharacteristics, {
+    selectedFormulaId: inputs.modifierPlayerPicks.ac_formula?.[0] ?? null,
+    abilityMods,
+    proficiencyBonus,
+  })
   const armorClass = applyAcCharacteristics(
     baseArmorClass,
     aggregatedCharacteristics,
@@ -471,6 +478,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     totalLevel,
     armorClass,
     acBreakdown,
+    acFormulaOptions: aggregatedCharacteristics.acFormulaOptions,
     maxHp,
     initiative,
     speed,

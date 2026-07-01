@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getPool } from "@/lib/db/index"
-import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
+import { ensureMigrationsApplied } from "@/lib/db/migrate"
 import {
   clearTable,
   countRows,
@@ -57,7 +58,7 @@ export async function GET(
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const { table: raw } = await params
     const table = resolveTable(raw)
@@ -101,10 +102,13 @@ export async function POST(
   { params }: { params: Promise<{ table: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const { table: raw } = await params
     const table = resolveTable(raw)
@@ -136,10 +140,13 @@ export async function DELETE(
   { params }: { params: Promise<{ table: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const { table: raw } = await params
     const table = resolveTable(raw)

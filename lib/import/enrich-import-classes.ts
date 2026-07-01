@@ -188,6 +188,7 @@ export function mergeUsesFromProgressionTable(
     atLevelTable: fromTable.atLevelTable,
     atLevelMode: fromTable.atLevelMode ?? explicit.atLevelMode,
     dieType: fromTable.dieType ?? explicit.dieType,
+    dieSidesByLevel: fromTable.dieSidesByLevel ?? explicit.dieSidesByLevel,
     recharges: fromTable.recharges?.length ? fromTable.recharges : explicit.recharges,
     specialDescription: explicit.specialDescription ?? fromTable.specialDescription,
   }

@@ -255,9 +255,58 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
     })
   }
 
-  const columns = columnData.filter((col) => col.valuesByLevel.length > 0)
+  const columns = mergeExploitDiceColumns(
+    columnData.filter((col) => col.valuesByLevel.length > 0 || (col.dieSidesByLevel?.length ?? 0) > 0),
+  )
   if (columns.length === 0) return null
   return { columns }
+}
+
+/** Merge separate Exploit Die (size) and Exploit Dice (pool) columns into one resource. */
+function mergeExploitDiceColumns(columns: ClassProgressionColumn[]): ClassProgressionColumn[] {
+  const dieSizeIdx = columns.findIndex(
+    (col) =>
+      col.resourceKey === "exploit_die_size" || /exploit\s*die(?!\s*dice)/i.test(col.header),
+  )
+  if (dieSizeIdx < 0) return columns
+
+  const dieSizeCol = columns[dieSizeIdx]
+  const diceIdx = columns.findIndex(
+    (col, index) =>
+      index !== dieSizeIdx &&
+      (col.resourceKey === "exploit_dice" || /exploit\s*dice/i.test(col.header)),
+  )
+
+  if (diceIdx < 0) {
+    return columns
+      .filter((_, index) => index !== dieSizeIdx)
+      .map((col) =>
+        col.resourceKey === "exploit_die_size"
+          ? {
+              ...col,
+              resourceKey: "exploit_dice",
+              resourceName: /exploit/i.test(col.resourceName) ? "Exploit Dice" : col.resourceName,
+              dieSidesByLevel: dieSizeCol.valuesByLevel.map((row) => ({
+                level: row.level,
+                count: row.count,
+              })),
+              valuesByLevel: [],
+            }
+          : col,
+      )
+      .filter((col) => col.valuesByLevel.length > 0 || (col.dieSidesByLevel?.length ?? 0) > 0)
+  }
+
+  const next = columns.filter((_, index) => index !== dieSizeIdx)
+  const adjustedDiceIdx = diceIdx > dieSizeIdx ? diceIdx - 1 : diceIdx
+  const diceCol = next[adjustedDiceIdx]
+  diceCol.dieSidesByLevel = [
+    ...(diceCol.dieSidesByLevel ?? []),
+    ...dieSizeCol.valuesByLevel.map((row) => ({ level: row.level, count: row.count })),
+  ]
+  diceCol.resourceKey = "exploit_dice"
+  if (/exploit/i.test(diceCol.resourceName)) diceCol.resourceName = "Exploit Dice"
+  return next
 }
 
 function parseHtmlTableRows(tableHtml: string): string[][] {
@@ -367,19 +416,6 @@ export function usesConfigForProgressionColumn(
     }
   }
 
-  if (column.resourceKey === "exploit_die_size" || /exploit\s*die(?!\s*dice)/i.test(column.header)) {
-    const dieLabel = sorted.length
-      ? `d${sorted[sorted.length - 1].count}`
-      : "d6"
-    return {
-      type: "special",
-      specialDescription: `Exploit die size at each ${className} level (e.g. ${dieLabel}). Not a spendable pool — pairs with Exploit Dice.`,
-      atLevelTable: sorted,
-      atLevelMode: "tier",
-      dieType: dieLabel as UsesConfig["dieType"],
-    }
-  }
-
   if (/risk\s*dice/i.test(column.header) || column.resourceKey === "risk_dice") {
     const dieSides = column.dieSidesByLevel?.length
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
@@ -462,10 +498,17 @@ export function usesConfigForProgressionColumn(
   }
 
   if (column.resourceKey === "exploit_dice" || /exploit\s*dice/i.test(column.header)) {
+    const dieSides = column.dieSidesByLevel?.length
+      ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
+      : []
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
     return {
       type: "at_level",
       atLevelMode: "tier",
       atLevelTable: sorted,
+      dieSidesByLevel: dieSides.length ? dieSides : undefined,
+      dieType: dieLabel,
       recharges: [{ rest: "short_rest" }],
       ...(pattern?.defaultUses ?? {}),
     }

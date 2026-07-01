@@ -1,5 +1,28 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import { combineImportContents } from "@/lib/import/merge-import-content"
+import {
+  buildFoundryUuidIndex,
+  extractFoundrySourceLabel,
+  mapStandaloneFeatureItem,
+  mergeSourceLabels,
+  parseFoundryAdvancements,
+} from "@/lib/import/foundry-advancements"
+import {
+  attachFoundryMeta,
+  buildFoundryNoImportableResult,
+  detectFoundryBinaryFormat,
+  parseFoundryManifest,
+} from "@/lib/import/foundry-manifest"
+import { recordSkippedDocuments } from "@/lib/import/foundry-import-report"
+import { attachFoundryEffectsToRow } from "@/lib/import/map-foundry-active-effects"
+import {
+  emptyFoundryImportMeta,
+  type FoundryImportMeta,
+  type FoundryParseResult,
+} from "@/lib/import/foundry-types"
+import { cleanFoundryHtml } from "@/lib/import/foundry-html"
+
+export { cleanFoundryHtml } from "@/lib/import/foundry-html"
 
 /**
  * Parses Foundry VTT dnd5e system item exports into the internal ImportContent shape.
@@ -30,6 +53,8 @@ const FOUNDRY_ITEM_TYPES = new Set([
   "race",
   "background",
 ])
+
+const FOUNDRY_ACTOR_TYPES = new Set(["character", "npc", "vehicle", "group"])
 
 const SPELL_SCHOOLS: Record<string, string> = {
   abj: "Abjuration",
@@ -189,29 +214,6 @@ function capitalize(value: string): string {
 
 function abilityName(code: string): string {
   return ABILITY_NAMES[code.toLowerCase()] ?? (code ? titleCase(code) : "")
-}
-
-/**
- * Removes Foundry-specific enrichers from HTML/markdown so descriptions render
- * cleanly: @UUID/@Compendium/@Check/@Damage links, &Reference blocks, and
- * inline roll syntax like [[/r 1d6]].
- */
-export function cleanFoundryHtml(raw: unknown): string {
-  let text = asString(raw)
-  if (!text) return ""
-
-  // @Enricher[args]{Label} and &Enricher[args]{Label} → keep the label
-  text = text.replace(/[@&][A-Za-z]+\[[^\]]*\]\{([^}]*)\}/g, "$1")
-  // @Enricher[args] / &Enricher[args] with no label → drop entirely
-  text = text.replace(/[@&][A-Za-z]+\[[^\]]*\]/g, "")
-  // [[ ... ]]{Label} inline rolls with label
-  text = text.replace(/\[\[[^\]]*\]\]\{([^}]*)\}/g, "$1")
-  // [[/r 1d6]] / [[/save dex 15]] → keep the inner expression
-  text = text.replace(/\[\[\s*\/?[a-z]*\s*([^\]]*?)\s*\]\]/gi, "$1")
-  // Collapse whitespace introduced by removals
-  text = text.replace(/[ \t]{2,}/g, " ").replace(/\s+\n/g, "\n")
-
-  return text.trim()
 }
 
 // ---------------------------------------------------------------------------
@@ -391,6 +393,12 @@ function mapFeat(item: FoundryItem): FeatImport | null {
   }
 }
 
+function mapFeatItem(item: FoundryItem, meta: FoundryImportMeta): FeatImport | null {
+  const mapped = mapFeat(item)
+  if (!mapped) return null
+  return attachFoundryEffectsToRow(mapped, asArray(item.effects), meta)
+}
+
 function equipmentCategoryInfo(
   type: string,
   system: Record<string, unknown>,
@@ -485,7 +493,7 @@ function buildEquipmentProperties(
   return out
 }
 
-function mapEquipment(item: FoundryItem): EquipmentImport | null {
+function mapEquipment(item: FoundryItem, meta: FoundryImportMeta): EquipmentImport | null {
   const name = asString(item.name).trim()
   if (!name) return null
   const type = asString(item.type)
@@ -508,18 +516,22 @@ function mapEquipment(item: FoundryItem): EquipmentImport | null {
   const requiresAttunement =
     attunement === "required" ? true : rarity || attunement === "optional" ? false : null
 
-  return {
-    name,
-    category,
-    subcategory,
-    description: description || null,
-    cost,
-    weight,
-    properties: buildEquipmentProperties(type, system),
-    requires_attunement: requiresAttunement,
-    magic_item_category: rarity ? magicItemCategory(type, system) : null,
-    rarity,
-  }
+  return attachFoundryEffectsToRow(
+    {
+      name,
+      category,
+      subcategory,
+      description: description || null,
+      cost,
+      weight,
+      properties: buildEquipmentProperties(type, system),
+      requires_attunement: requiresAttunement,
+      magic_item_category: rarity ? magicItemCategory(type, system) : null,
+      rarity,
+    },
+    asArray(item.effects),
+    meta,
+  )
 }
 
 // --- Class / subclass / species / background advancement parsing -----------
@@ -587,7 +599,7 @@ function parseHitDie(system: Record<string, unknown>): number {
   return direct ?? 8
 }
 
-function mapClass(item: FoundryItem): ClassImport | null {
+function mapClass(item: FoundryItem, uuidIndex: Map<string, FoundryItem>, meta: FoundryImportMeta): ClassImport | null {
   const name = asString(item.name).trim()
   if (!name) return null
   const system = asRecord(item.system)
@@ -603,32 +615,43 @@ function mapClass(item: FoundryItem): ClassImport | null {
   const spellcasting =
     progression && progression !== "none" && spellAbility ? { ability: spellAbility } : null
 
-  return {
-    name,
-    description: cleanFoundryHtml(asRecord(system.description).value) || null,
-    hit_die: parseHitDie(system),
-    primary_ability: primary.length > 0 ? primary : null,
-    saving_throws: traits.saves.length > 0 ? traits.saves : null,
-    armor_proficiencies: traits.armor.length > 0 ? traits.armor : null,
-    weapon_proficiencies: traits.weapons.length > 0 ? traits.weapons : null,
-    skill_choices: traits.skillChoice,
-    spellcasting,
-    features: [],
-  }
+  const advancement = parseFoundryAdvancements(item, uuidIndex, meta)
+
+  return attachFoundryEffectsToRow(
+    {
+      name,
+      description: cleanFoundryHtml(asRecord(system.description).value) || null,
+      hit_die: parseHitDie(system),
+      primary_ability: primary.length > 0 ? primary : null,
+      saving_throws: traits.saves.length > 0 ? traits.saves : null,
+      armor_proficiencies: traits.armor.length > 0 ? traits.armor : null,
+      weapon_proficiencies: traits.weapons.length > 0 ? traits.weapons : null,
+      skill_choices: traits.skillChoice,
+      spellcasting,
+      features: advancement.classFeatures,
+    },
+    asArray(item.effects),
+    meta,
+  )
 }
 
-function mapSubclass(item: FoundryItem): SubclassImport | null {
+function mapSubclass(item: FoundryItem, uuidIndex: Map<string, FoundryItem>, meta: FoundryImportMeta): SubclassImport | null {
   const name = asString(item.name).trim()
   if (!name) return null
   const system = asRecord(item.system)
   const classIdentifier = asString(system.classIdentifier)
+  const advancement = parseFoundryAdvancements(item, uuidIndex, meta)
 
-  return {
-    name,
-    class_name: classIdentifier ? titleCase(classIdentifier) : "Unknown",
-    description: cleanFoundryHtml(asRecord(system.description).value) || null,
-    features: [],
-  }
+  return attachFoundryEffectsToRow(
+    {
+      name,
+      class_name: classIdentifier ? titleCase(classIdentifier) : "Unknown",
+      description: cleanFoundryHtml(asRecord(system.description).value) || null,
+      features: advancement.subclassFeatures,
+    },
+    asArray(item.effects),
+    meta,
+  )
 }
 
 function parseRaceSize(system: Record<string, unknown>): string | null {
@@ -685,53 +708,83 @@ function isFoundryItemShape(value: unknown): value is FoundryItem {
   return "system" in record && typeof record.name === "string"
 }
 
-function collectFoundryItems(value: unknown, out: FoundryItem[]): void {
+function isFoundryActorShape(value: unknown): value is FoundryItem {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  if (asString(record.documentName) === "Actor") return true
+  const type = asString(record.type).toLowerCase()
+  return FOUNDRY_ACTOR_TYPES.has(type) && "system" in record && typeof record.name === "string"
+}
+
+function collectFoundryDocuments(
+  value: unknown,
+  items: FoundryItem[],
+  actors: FoundryItem[],
+): void {
   if (Array.isArray(value)) {
-    for (const entry of value) collectFoundryItems(entry, out)
+    for (const entry of value) collectFoundryDocuments(entry, items, actors)
+    return
+  }
+  if (isFoundryActorShape(value)) {
+    actors.push(value)
+    const record = asRecord(value)
+    if (Array.isArray(record.items)) {
+      for (const entry of record.items) collectFoundryDocuments(entry, items, actors)
+    }
     return
   }
   if (isFoundryItemShape(value)) {
-    out.push(value)
+    items.push(value)
     return
   }
   const record = asRecord(value)
-  // `{ items: [...] }` actor/pack wrapper, or object-map of items.
   if (Array.isArray(record.items)) {
-    for (const entry of record.items) collectFoundryItems(entry, out)
+    for (const entry of record.items) collectFoundryDocuments(entry, items, actors)
     return
   }
   if (Array.isArray(record.entries)) {
-    for (const entry of record.entries) collectFoundryItems(entry, out)
+    for (const entry of record.entries) collectFoundryDocuments(entry, items, actors)
   }
 }
 
-/** Parse plain JSON, JSON array, wrapper objects, or newline-delimited NeDB packs. */
-function coerceFoundryItems(raw: string): FoundryItem[] {
-  const trimmed = raw.trim()
-  if (!trimmed) return []
+type CoercedFoundryDocuments = {
+  items: FoundryItem[]
+  actors: FoundryItem[]
+}
 
+/** Parse plain JSON, JSON array, wrapper objects, or newline-delimited NeDB packs. */
+function coerceFoundryDocuments(raw: string): CoercedFoundryDocuments {
+  const trimmed = raw.trim()
   const items: FoundryItem[] = []
+  const actors: FoundryItem[] = []
+  if (!trimmed) return { items, actors }
+
   try {
-    collectFoundryItems(JSON.parse(trimmed), items)
-    if (items.length > 0) return items
+    collectFoundryDocuments(JSON.parse(trimmed), items, actors)
+    if (items.length > 0 || actors.length > 0) return { items, actors }
   } catch {
     // Not a single JSON document — fall through to NeDB line parsing.
   }
 
-  if (items.length === 0 && /\n/.test(trimmed)) {
+  if (/\n/.test(trimmed)) {
     for (const line of trimmed.split(/\r?\n/)) {
       const lineTrimmed = line.trim()
       if (!lineTrimmed || lineTrimmed === "{}") continue
       try {
         const parsed = JSON.parse(lineTrimmed)
-        if (isFoundryItemShape(parsed)) items.push(parsed)
+        if (isFoundryActorShape(parsed)) actors.push(parsed)
+        else if (isFoundryItemShape(parsed)) items.push(parsed)
       } catch {
         // skip malformed line
       }
     }
   }
 
-  return items
+  return { items, actors }
+}
+
+function coerceFoundryItems(raw: string): FoundryItem[] {
+  return coerceFoundryDocuments(raw).items
 }
 
 /** True when the raw text looks like a Foundry VTT dnd5e item export. */
@@ -740,7 +793,10 @@ export function isFoundryDnd5eJson(raw: string): boolean {
 }
 
 /** Map a list of Foundry items into ImportContent (no DB access). */
-export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent | null {
+export function foundryItemsToImportContent(
+  items: FoundryItem[],
+  meta: FoundryImportMeta = emptyFoundryImportMeta(),
+): ImportContent | null {
   const spells: SpellImport[] = []
   const feats: FeatImport[] = []
   const equipment: EquipmentImport[] = []
@@ -748,18 +804,47 @@ export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent
   const subclasses: SubclassImport[] = []
   const species: SpeciesImport[] = []
   const backgrounds: BackgroundImport[] = []
+  const orphanClassFeatures: ClassImport["features"] = []
+  const orphanSubclassFeatures: SubclassImport["features"] = []
+
+  const uuidIndex = buildFoundryUuidIndex(items)
 
   for (const item of items) {
+    meta.sourceLabel = mergeSourceLabels(
+      meta.sourceLabel,
+      extractFoundrySourceLabel(item, meta.sourceLabel),
+    )
+
     switch (asString(item.type)) {
       case "spell": {
         const mapped = mapSpell(item)
         if (mapped) spells.push(mapped)
         break
       }
-      case "feat":
-      case "feature": {
-        const mapped = mapFeat(item)
+      case "feat": {
+        const mapped = mapFeatItem(item, meta)
         if (mapped) feats.push(mapped)
+        break
+      }
+      case "feature": {
+        const standalone = mapStandaloneFeatureItem(item, meta)
+        if (standalone.feat) feats.push(standalone.feat)
+        else if (standalone.classFeature) orphanClassFeatures.push(standalone.classFeature)
+        else if (standalone.subclassFeature) orphanSubclassFeatures.push(standalone.subclassFeature)
+        else if (standalone.speciesTrait) {
+          const existing = species.find((row) => row.name === asString(item.name))
+          if (existing) {
+            existing.traits = [...(existing.traits ?? []), standalone.speciesTrait]
+          } else {
+            species.push({
+              name: `${asString(item.name)} Traits`,
+              description: null,
+              speed: null,
+              size: null,
+              traits: [standalone.speciesTrait],
+            })
+          }
+        }
         break
       }
       case "weapon":
@@ -769,17 +854,17 @@ export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent
       case "loot":
       case "container":
       case "backpack": {
-        const mapped = mapEquipment(item)
+        const mapped = mapEquipment(item, meta)
         if (mapped) equipment.push(mapped)
         break
       }
       case "class": {
-        const mapped = mapClass(item)
+        const mapped = mapClass(item, uuidIndex, meta)
         if (mapped) classes.push(mapped)
         break
       }
       case "subclass": {
-        const mapped = mapSubclass(item)
+        const mapped = mapSubclass(item, uuidIndex, meta)
         if (mapped) subclasses.push(mapped)
         break
       }
@@ -798,6 +883,40 @@ export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent
     }
   }
 
+  if (orphanClassFeatures.length) {
+    meta.review.push({
+      label: "Standalone class features",
+      detail: `${orphanClassFeatures.length} class feature(s) exported without a parent class — imported as feats where possible`,
+    })
+    for (const feature of orphanClassFeatures) {
+      const staged = feature as ClassImport["features"][number] & {
+        linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[]
+        modifierRefs?: string[]
+        importModifierMeta?: import("@/lib/import/detect-feature-modifiers").ImportModifierMeta[]
+      }
+      feats.push({
+        name: staged.name,
+        description: staged.description,
+        prerequisite: `Class level ${staged.level}`,
+        category: "General",
+        linkedModifiers: staged.linkedModifiers,
+        modifierRefs: staged.modifierRefs,
+        importModifierMeta: staged.importModifierMeta,
+      } as FeatImport & {
+        linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[]
+        modifierRefs?: string[]
+        importModifierMeta?: import("@/lib/import/detect-feature-modifiers").ImportModifierMeta[]
+      })
+    }
+  }
+
+  if (orphanSubclassFeatures.length) {
+    meta.review.push({
+      label: "Standalone subclass features",
+      detail: `${orphanSubclassFeatures.length} subclass feature(s) without parent subclass document`,
+    })
+  }
+
   const total =
     spells.length +
     feats.length +
@@ -807,6 +926,7 @@ export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent
     species.length +
     backgrounds.length
 
+  meta.mapped.items = total
   if (total === 0) return null
 
   const content: ImportContent = {}
@@ -818,13 +938,65 @@ export function foundryItemsToImportContent(items: FoundryItem[]): ImportContent
   if (species.length) content.species = species
   if (backgrounds.length) content.backgrounds = backgrounds
 
-  // Round-trip through the combiner to dedupe spell libraries / merge cleanly.
   return combineImportContents([content])
+}
+
+/** Full Foundry parse with manifest/binary detection and actor skip reporting. */
+export function parseFoundryInput(raw: string): FoundryParseResult {
+  const trimmed = raw.trim()
+  if (!trimmed) return { kind: "not_foundry" }
+
+  const binary = detectFoundryBinaryFormat(trimmed)
+  if (binary) return binary
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    const manifest = parseFoundryManifest(parsed)
+    if (manifest) return { kind: "manifest", manifest }
+  } catch {
+    // continue
+  }
+
+  const { items, actors } = coerceFoundryDocuments(trimmed)
+  const meta = emptyFoundryImportMeta()
+
+  if (actors.length) {
+    recordSkippedDocuments(
+      meta,
+      "Actors are not imported (compendium items only)",
+      actors.map((actor) => asString(actor.name) || "Unnamed actor"),
+    )
+  }
+
+  if (!items.length) {
+    if (actors.length) {
+      return buildFoundryNoImportableResult(
+        meta,
+        "Foundry actor data detected. Export compendium items as JSON instead of actor sheets.",
+      )
+    }
+    return { kind: "not_foundry" }
+  }
+
+  const content = foundryItemsToImportContent(items, meta)
+  if (!content) {
+    if (actors.length) {
+      return buildFoundryNoImportableResult(meta, "Only actor documents were found — no compendium items to import.")
+    }
+    return { kind: "not_foundry" }
+  }
+
+  return {
+    kind: "content",
+    content: attachFoundryMeta(content, meta),
+    meta,
+  }
 }
 
 /** Parse a Foundry VTT dnd5e JSON export into ImportContent, or null if not Foundry data. */
 export function parseFoundryDnd5eJson(raw: string): ImportContent | null {
-  const items = coerceFoundryItems(raw)
-  if (items.length === 0) return null
-  return foundryItemsToImportContent(items)
+  const result = parseFoundryInput(raw)
+  if (result.kind !== "content") return null
+  const { foundryImportMeta: _meta, ...content } = result.content
+  return content
 }

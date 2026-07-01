@@ -524,6 +524,27 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'featCategories: ["General"]',
   },
   {
+    ruleId: "ac.bonus.while_armored",
+    trigger: "description",
+    catalog: "cat_char_ac",
+    examples: ["+1 AC while wearing armor"],
+    notes: "Sets requiresArmor on flat AC bonus.",
+  },
+  {
+    ruleId: "ac.bonus.while_raging",
+    trigger: "description",
+    catalog: "cat_char_ac",
+    examples: ["+1 AC while raging"],
+    notes: "Requires sheet Rage toggle (requiresSheetToggle: while_raging).",
+  },
+  {
+    ruleId: "damage.scaling.die_by_level",
+    trigger: "description",
+    catalog: "cat_char_unarmed_strike_damage",
+    examples: ["at 3rd level the die becomes 1d8", "at 5th level ... 2d6"],
+    notes: "Parses multiple at-level die tiers into dieByLevel.",
+  },
+  {
     ruleId: "defensive.evasion",
     trigger: "description",
     catalog: "cat_fx_damage_reduction",

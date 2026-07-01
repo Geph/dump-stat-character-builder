@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
-  cleanFoundryHtml,
   isFoundryDnd5eJson,
   parseFoundryDnd5eJson,
+  parseFoundryInput,
 } from "@/lib/import/parse-foundry-dnd5e"
+import kcllFeature from "@/lib/import/__tests__/fixtures/kcll-feature-item.json"
+import { cleanFoundryHtml } from "@/lib/import/foundry-html"
 
 const fireball = {
   name: "Fireball",
@@ -223,5 +225,103 @@ describe("parseFoundryDnd5eJson — mixed pack", () => {
     expect(content?.feats?.length).toBe(1)
     expect(content?.classes?.length).toBe(1)
     expect(parseFoundryDnd5eJson(JSON.stringify([{ type: "spell", system: {} }]))).toBeNull()
+  })
+})
+
+describe("parseFoundryInput — manifest and actors", () => {
+  it("detects a module manifest", () => {
+    const result = parseFoundryInput(
+      JSON.stringify({
+        id: "my-module",
+        title: "Kobold Caves",
+        packs: [{ name: "features", label: "Features", type: "Item", path: "packs/features" }],
+      }),
+    )
+    expect(result.kind).toBe("manifest")
+    if (result.kind === "manifest") {
+      expect(result.manifest.title).toBe("Kobold Caves")
+      expect(result.manifest.packs).toHaveLength(1)
+    }
+  })
+
+  it("skips actors with a clear report", () => {
+    const result = parseFoundryInput(
+      JSON.stringify({
+        name: "Goblin",
+        type: "npc",
+        system: { details: { type: { value: "humanoid" } } },
+        items: [],
+      }),
+    )
+    expect(result.kind).toBe("no_importable")
+    if (result.kind === "no_importable") {
+      expect(result.meta.skipped[0]?.reason).toContain("Actors are not imported")
+      expect(result.meta.skipped[0]?.count).toBe(1)
+    }
+  })
+
+  it("imports nested actor items but skips the actor shell", () => {
+    const result = parseFoundryInput(
+      JSON.stringify({
+        name: "Hero",
+        type: "character",
+        system: {},
+        items: [fireball],
+      }),
+    )
+    expect(result.kind).toBe("content")
+    if (result.kind === "content") {
+      expect(result.content.spells?.length).toBe(1)
+      expect(result.meta.skipped[0]?.count).toBe(1)
+    }
+  })
+})
+
+describe("parseFoundryInput — active effects and feature routing", () => {
+  it("maps class features separately from feats and wires active effects", () => {
+    const result = parseFoundryInput(JSON.stringify(kcllFeature))
+    expect(result.kind).toBe("content")
+    if (result.kind !== "content") return
+
+    const featRow = result.content.feats?.find((row) => row.name === "Sneak Attack") as
+      | (typeof result.content.feats extends (infer T)[] | undefined ? T : never & {
+          linkedModifiers?: unknown[]
+        })
+      | undefined
+    expect(featRow).toBeTruthy()
+    expect((featRow as { linkedModifiers?: unknown[] })?.linkedModifiers?.length).toBeGreaterThan(0)
+    expect(result.meta.mapped.effects).toBeGreaterThan(0)
+    expect(result.meta.sourceLabel).toContain("KCLL")
+  })
+
+  it("maps ItemGrant advancements onto classes", () => {
+    const featureItem = {
+      ...kcllFeature,
+      _id: "sneakattack0001",
+    }
+    const classWithGrant = {
+      name: "Rogue",
+      type: "class",
+      system: {
+        description: { value: "<p>A sneaky class.</p>" },
+        hd: { denomination: "d8" },
+        advancement: [
+          {
+            type: "ItemGrant",
+            level: 1,
+            configuration: {
+              items: [{ uuid: "Compendium.custom.features.Item.sneakattack0001" }],
+            },
+          },
+        ],
+      },
+    }
+    const result = parseFoundryInput(JSON.stringify([classWithGrant, featureItem]))
+    expect(result.kind).toBe("content")
+    if (result.kind !== "content") return
+    const cls = result.content.classes?.[0]
+    expect(cls?.features?.length).toBe(1)
+    expect(cls?.features?.[0]?.name).toBe("Sneak Attack")
+    expect(result.meta.mapped.advancements).toBeGreaterThan(0)
   })
 })

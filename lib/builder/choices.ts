@@ -137,6 +137,7 @@ export function validateOriginStepChoices(
   speciesTraitPicks: Record<string, string[]>,
   speciesFeatPickKeys: string[] = [],
   featureChoicePicks: Record<string, string[]> = {},
+  backgroundFeatPickKeys: string[] = [],
 ): boolean {
   if (!speciesId || !backgroundId || !selectedSpecies) return false
 
@@ -148,6 +149,10 @@ export function validateOriginStepChoices(
   }
 
   for (const key of speciesFeatPickKeys) {
+    if (!(featureChoicePicks[key]?.[0] ?? "")) return false
+  }
+
+  for (const key of backgroundFeatPickKeys) {
     if (!(featureChoicePicks[key]?.[0] ?? "")) return false
   }
 

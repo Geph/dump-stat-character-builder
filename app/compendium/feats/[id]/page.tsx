@@ -25,7 +25,7 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 
-const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
+const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 interface FeatFormData {

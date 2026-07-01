@@ -1,6 +1,7 @@
 import type { AsiAllocationsByFeatId } from "@/lib/builder/asi-allocation"
 import type { FeatSelectionEntry } from "@/lib/builder/feat-choices"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import type { SheetToggleKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type {
   Background,
@@ -50,6 +51,8 @@ export type CharacterBuildInputs = {
   modifierCatalog: ModifierCatalogEntry[]
   feats: Feat[]
   customAbilities?: CustomAbility[]
+  /** Sheet toggles for gated modifiers (Rage, below half HP, etc.). */
+  activeSheetToggles?: ReadonlySet<SheetToggleKey>
 }
 
 export type SkillBonus = {
@@ -88,6 +91,8 @@ export type DerivedCharacter = {
   armorClass: number
   /** Itemized contributions whose values sum to `armorClass`. */
   acBreakdown: StatBreakdownPart[]
+  /** Competing base AC formulas when multiclass or magic items apply. */
+  acFormulaOptions: import("@/lib/compendium/characteristic-modifiers").AcFormulaOption[]
   maxHp: number
   initiative: number
   speed: number

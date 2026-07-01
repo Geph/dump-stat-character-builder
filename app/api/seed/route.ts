@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { getPool } from "@/lib/db/index"
-import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
+import { ensureMigrationsApplied } from "@/lib/db/migrate"
 import { createClient } from "@/lib/db/client"
 import {
   deleteWhere,
@@ -20,14 +21,17 @@ import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) {
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
-    const appliedMigrations = await runPendingMigrationsOnPool(getPool())
+    const appliedMigrations = await ensureMigrationsApplied(getPool())
 
     const { classes, subclasses, species, backgrounds, spells, feats, languages } = getSrdSeedData()
 

@@ -52,6 +52,11 @@ export const FEAT_MODIFIER_CATALOG = {
   modifyCreature: "cat_fx_modify_creature",
   forceSave: "cat_fx_force_save_control",
   castSpell: "cat_fx_cast_spell",
+  onHitTrigger: "cat_char_on_hit_trigger",
+  savingThrowTrigger: "cat_char_saving_throw_trigger",
+  healingDicePool: "cat_char_healing_dice_pool",
+  specialAttack: "cat_char_special_attack",
+  equipmentAndMagicItems: "cat_char_equipment_and_magic_items",
 } as const
 
 export type FeatModifierPreset = {
@@ -61,7 +66,7 @@ export type FeatModifierPreset = {
   choices?: import("@/lib/types").FeatureChoice
 }
 
-function asiPool(instanceId: string, points = 2, label?: string): LinkedModifierInstance {
+export function asiPool(instanceId: string, points = 2, label?: string): LinkedModifierInstance {
   return charInstance(instanceId, FEAT_MODIFIER_CATALOG.abilityScores, [
     {
       id: modId(`${instanceId}_asi`),
@@ -74,11 +79,11 @@ function asiPool(instanceId: string, points = 2, label?: string): LinkedModifier
   ])
 }
 
-function asiOne(key: string, label: string): LinkedModifierInstance {
+export function asiOne(key: string, label: string): LinkedModifierInstance {
   return asiPool(`modinst_${key}`, 1, label)
 }
 
-function toolsChoice(
+export function toolsChoice(
   key: string,
   count: number,
   choiceOptions: readonly string[],
@@ -96,7 +101,7 @@ function toolsChoice(
   ])
 }
 
-function skillChoice(
+export function skillChoice(
   key: string,
   config: {
     count?: number
@@ -123,13 +128,13 @@ function skillChoice(
   ])
 }
 
-function armorProf(key: string, values: string[], label: string): LinkedModifierInstance {
+export function armorProf(key: string, values: string[], label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.armorProficiencies, [
     { id: modId(key), type: "armor_proficiencies", values, label },
   ])
 }
 
-function weaponProf(
+export function weaponProf(
   key: string,
   mode: "martial_weapons" | "specific",
   values: string[] = [],
@@ -140,19 +145,19 @@ function weaponProf(
   ])
 }
 
-function savingThrowProf(key: string, values: string[], label: string): LinkedModifierInstance {
+export function savingThrowProf(key: string, values: string[], label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.savingThrows, [
     { id: modId(key), type: "saving_throws", values, label },
   ])
 }
 
-function hitPerLevel(key: string, value: number, label: string): LinkedModifierInstance {
+export function hitPerLevel(key: string, value: number, label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.hitPoints, [
     { id: modId(key), type: "hit_points", mode: "per_level", value, label },
   ])
 }
 
-function speedMod(
+export function speedMod(
   key: string,
   speedType: "walk" | "climb" | "fly" | "swim",
   mode: "add" | "equal_to_walk",
@@ -164,7 +169,7 @@ function speedMod(
   ])
 }
 
-function visionMod(
+export function visionMod(
   key: string,
   visionType: "darkvision" | "blindsight" | "truesight" | "tremorsense",
   rangeFeet: number,
@@ -175,7 +180,7 @@ function visionMod(
   ])
 }
 
-function acBonus(
+export function acBonus(
   key: string,
   config: {
     flatBonus: number
@@ -195,7 +200,7 @@ function acBonus(
   ])
 }
 
-function attackMod(
+export function attackMod(
   key: string,
   entries: import("@/lib/compendium/characteristic-modifiers").RollModifierEntry[],
   label: string,
@@ -212,7 +217,7 @@ function attackMod(
   ])
 }
 
-function damageMod(
+export function damageMod(
   key: string,
   entries: import("@/lib/compendium/characteristic-modifiers").RollModifierEntry[],
   label: string,
@@ -222,13 +227,13 @@ function damageMod(
   ])
 }
 
-function unarmedDie(key: string, die: "1d4" | "1d6" | "1d8", label: string): LinkedModifierInstance {
+export function unarmedDie(key: string, die: "1d4" | "1d6" | "1d8", label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.unarmedStrikeDamage, [
     { id: modId(key), type: "unarmed_strike_damage", die, label },
   ])
 }
 
-function spellsKnown(
+export function spellsKnown(
   key: string,
   config: Partial<Extract<CharacteristicModifier, { type: "spells_known" }>>,
 ): LinkedModifierInstance {
@@ -244,7 +249,7 @@ function spellsKnown(
   ])
 }
 
-function spellAbility(key: string, label: string): LinkedModifierInstance {
+export function spellAbility(key: string, label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.spellcastingAbility, [
     {
       id: modId(key),
@@ -255,7 +260,7 @@ function spellAbility(key: string, label: string): LinkedModifierInstance {
   ])
 }
 
-function spellHealing(
+export function spellHealing(
   key: string,
   config: Partial<Extract<CharacteristicModifier, { type: "spell_healing_modifier" }>>,
 ): LinkedModifierInstance {
@@ -264,11 +269,11 @@ function spellHealing(
   ])
 }
 
-function uses(key: string, usesConfig: UsesConfig, label: string): LinkedModifierInstance {
+export function uses(key: string, usesConfig: UsesConfig, label: string): LinkedModifierInstance {
   return usesInstance(`modinst_${key}`, usesConfig, label)
 }
 
-function checkFx(
+export function checkFx(
   key: string,
   effect: Omit<FeatureEffect, "id">,
   activation: Partial<FeatureActivation> = {},
@@ -279,7 +284,7 @@ function checkFx(
   })
 }
 
-function movementFx(
+export function movementFx(
   key: string,
   effect: Omit<FeatureEffect, "id">,
   activation: Partial<FeatureActivation> = {},
@@ -290,7 +295,7 @@ function movementFx(
   })
 }
 
-function movementEffectsPassive(
+export function movementEffectsPassive(
   key: string,
   flags: Partial<Extract<CharacteristicModifier, { type: "movement_effects" }>>,
   label: string,
@@ -310,13 +315,13 @@ function movementEffectsPassive(
   ])
 }
 
-function telepathyMod(key: string, rangeFeet: number, label: string): LinkedModifierInstance {
+export function telepathyMod(key: string, rangeFeet: number, label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.telepathy, [
     { id: modId(key), type: "telepathy", rangeFeet, canInitiate: true, label },
   ])
 }
 
-function damageResistancePick(key: string, label: string): LinkedModifierInstance {
+export function damageResistancePick(key: string, label: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageResistance, [
     {
       id: modId(key),
@@ -327,7 +332,7 @@ function damageResistancePick(key: string, label: string): LinkedModifierInstanc
   ])
 }
 
-function d20TestReaction(
+export function d20TestReaction(
   key: string,
   config: Partial<Extract<CharacteristicModifier, { type: "d20_test_reaction" }>>,
 ): LinkedModifierInstance {
@@ -342,7 +347,7 @@ function d20TestReaction(
   ])
 }
 
-function failedRollTrigger(
+export function failedRollTrigger(
   key: string,
   config: Partial<Extract<CharacteristicModifier, { type: "failed_roll_trigger" }>>,
 ): LinkedModifierInstance {
@@ -358,7 +363,7 @@ function failedRollTrigger(
   ])
 }
 
-function damageHalvingReaction(key: string, label?: string): LinkedModifierInstance {
+export function damageHalvingReaction(key: string, label?: string): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageHalvingReaction, [
     {
       id: modId(key),
@@ -369,7 +374,7 @@ function damageHalvingReaction(key: string, label?: string): LinkedModifierInsta
   ])
 }
 
-function turnStartFx(
+export function turnStartFx(
   key: string,
   effect: FeatureEffect,
   config?: Partial<Extract<CharacteristicModifier, { type: "turn_start_trigger" }>>,
@@ -384,7 +389,7 @@ function turnStartFx(
   ])
 }
 
-function riderFx(
+export function riderFx(
   key: string,
   config: { bonusDice?: string },
   activation: Partial<FeatureActivation> = { action: true },
@@ -401,7 +406,7 @@ function riderFx(
   })
 }
 
-function damageReductionFx(
+export function damageReductionFx(
   key: string,
   activation: Partial<FeatureActivation> = { reaction: true },
 ): LinkedModifierInstance {
@@ -417,7 +422,7 @@ function damageReductionFx(
   })
 }
 
-function grantTempHpFx(
+export function grantTempHpFx(
   key: string,
   activation: Partial<FeatureActivation> = {},
 ): LinkedModifierInstance {
@@ -427,28 +432,28 @@ function grantTempHpFx(
   })
 }
 
-function bonusActionAttackFx(key: string): LinkedModifierInstance {
+export function bonusActionAttackFx(key: string): LinkedModifierInstance {
   return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.bonusActionAttack, {
     bonusAction: true,
     effects: [{ id: modId(key), kind: "bonus_action_attack" }],
   })
 }
 
-function reactionAttackFx(key: string): LinkedModifierInstance {
+export function reactionAttackFx(key: string): LinkedModifierInstance {
   return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.reactionAttack, {
     reaction: true,
     effects: [{ id: modId(key), kind: "reaction_attack" }],
   })
 }
 
-function imposeDisadvantageFx(key: string): LinkedModifierInstance {
+export function imposeDisadvantageFx(key: string): LinkedModifierInstance {
   return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.imposeDisadvantage, {
     reaction: true,
     effects: [{ id: modId(key), kind: "impose_disadvantage" }],
   })
 }
 
-function modifyCreatureFx(
+export function modifyCreatureFx(
   key: string,
   activation: Partial<FeatureActivation> = { reaction: true },
 ): LinkedModifierInstance {
@@ -458,7 +463,7 @@ function modifyCreatureFx(
   })
 }
 
-function castSpellFx(
+export function castSpellFx(
   key: string,
   config: Partial<FeatureEffect>,
   activation: Partial<FeatureActivation> = { reaction: true },
@@ -478,7 +483,7 @@ function castSpellFx(
   })
 }
 
-function feyShadowTouchedSpells(
+export function feyShadowTouchedSpells(
   key: string,
   schoolLabel: string,
   fixedSpell: string,
@@ -497,6 +502,96 @@ function feyShadowTouchedSpells(
     uses(`${key}_free`, { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, `Free cast each spell without a slot (1/Long Rest each)`),
     spellAbility(`${key}_ability`, "Spellcasting ability: ability increased by this feat"),
   ]
+}
+
+export function onHitTrigger(
+  key: string,
+  config: Partial<Extract<CharacteristicModifier, { type: "on_hit_trigger" }>>,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.onHitTrigger, [
+    {
+      id: modId(key),
+      type: "on_hit_trigger",
+      oncePerTurn: true,
+      ...config,
+    },
+  ])
+}
+
+export function savingThrowTrigger(
+  key: string,
+  config: Partial<Extract<CharacteristicModifier, { type: "saving_throw_trigger" }>>,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.savingThrowTrigger, [
+    {
+      id: modId(key),
+      type: "saving_throw_trigger",
+      triggerOn: "fail",
+      targetScope: "self",
+      ...config,
+    },
+  ])
+}
+
+export function damageResistanceChoice(
+  key: string,
+  choiceOptions: string[],
+  label: string,
+  choiceCount = 1,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageResistance, [
+    {
+      id: modId(key),
+      type: "damage_resistance",
+      damageTypes: [],
+      choiceCount,
+      choiceOptions,
+      label,
+    },
+  ])
+}
+
+export function savingThrowChoice(key: string, label: string): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.savingThrows, [
+    {
+      id: modId(key),
+      type: "saving_throws",
+      values: ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"],
+      choiceCount: 1,
+      label,
+    },
+  ])
+}
+
+export function toolProf(key: string, tool: string, label: string): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.toolProficiencies, [
+    { id: modId(key), type: "tool_proficiencies", values: [tool], label },
+  ])
+}
+
+export function healingDicePool(
+  key: string,
+  config: Partial<Extract<CharacteristicModifier, { type: "healing_dice_pool" }>>,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.healingDicePool, [
+    {
+      id: modId(key),
+      type: "healing_dice_pool",
+      dieType: "d8",
+      activation: "bonus_action",
+      ...config,
+    },
+  ])
+}
+
+export function forceSaveFx(
+  key: string,
+  activation: Partial<FeatureActivation> = { action: true },
+): LinkedModifierInstance {
+  return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.forceSave, {
+    ...activation,
+    effects: [{ id: modId(key), kind: "force_save_control" }],
+  })
 }
 
 /** SRD feat name → common modifier presets. */
@@ -572,15 +667,20 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   Grappler: {
     linkedModifiers: [
       asiPool("modinst_grappler_asi", 1, "+1 Strength or Dexterity"),
-      fxInstance("modinst_grappler_advantage", FEAT_MODIFIER_CATALOG.checkAdvantage, {
-        action: true,
-        effects: [
-          {
-            id: modId("grappler_advantage"),
-            kind: "check_advantage",
-            checkCategory: "attack",
-          },
-        ],
+      onHitTrigger("grappler_punch_grab", {
+        appliesTo: "unarmed",
+        label: "Punch and Grab: damage + grapple on unarmed hit (once/turn)",
+      }),
+      checkFx(
+        "grappler_advantage",
+        {
+          kind: "check_advantage",
+          checkCategory: "attack",
+        },
+        {},
+      ),
+      movementEffectsPassive("grappler_fast_wrestler", {
+        label: "Fast Wrestler: no extra movement dragging grappled creature your size or smaller",
       }),
     ],
   },

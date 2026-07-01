@@ -30,7 +30,7 @@ export type ImportModifierMeta = {
   ruleId: string
   confidence: DetectionConfidence
   matchedPhrase: string
-  source: "ai" | "detector"
+  source: "ai" | "detector" | "foundry_effect"
 }
 
 function normalizeText(text: string): string {

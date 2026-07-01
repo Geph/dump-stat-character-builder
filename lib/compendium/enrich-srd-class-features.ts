@@ -1541,6 +1541,74 @@ function fontOfMagicMenu(): LinkedModifierInstance {
   ])
 }
 
+function magicalTinkeringPreset(): LinkedModifierInstance[] {
+  return [
+    charInstance("modinst_magical_tinkering", FEAT_MODIFIER_CATALOG.equipmentAndMagicItems, [
+      {
+        id: modId("magical_tinkering"),
+        type: "equipment_and_magic_items",
+        mode: "create_mundane",
+        itemOptions: [
+          "Ball Bearings",
+          "Flask",
+          "Pouch",
+          "Basket",
+          "Grappling Hook",
+          "Rope",
+          "Bedroll",
+          "Hunting Trap",
+          "Sack",
+          "Bell",
+          "Jug",
+          "Shovel",
+          "Blanket",
+          "Lamp",
+          "Spikes, Iron",
+          "Block and Tackle",
+          "Manacles",
+          "String",
+          "Bottle, Glass",
+          "Net",
+          "Tinderbox",
+          "Bucket",
+          "Oil",
+          "Torch",
+          "Caltrops",
+          "Paper",
+          "Vial",
+          "Candle",
+          "Parchment",
+          "Crowbar",
+          "Pole",
+        ],
+        usesPerLongRest: "ability_modifier",
+        usesAbility: "intelligence",
+        label: "Magical Tinkering",
+      },
+    ]),
+  ]
+}
+
+function replicateMagicItemPreset(): LinkedModifierInstance[] {
+  return [
+    charInstance("modinst_replicate_magic_item", FEAT_MODIFIER_CATALOG.equipmentAndMagicItems, [
+      {
+        id: modId("replicate_magic_item"),
+        type: "equipment_and_magic_items",
+        mode: "replicate_magic_item",
+        planTables: [
+          { minArtificerLevel: 2, label: "Magic Item Plans (Artificer Level 2+)" },
+          { minArtificerLevel: 6, label: "Magic Item Plans (Artificer Level 6+)" },
+          { minArtificerLevel: 10, label: "Magic Item Plans (Artificer Level 10+)" },
+          { minArtificerLevel: 14, label: "Magic Item Plans (Artificer Level 14+)" },
+        ],
+        choiceCount: 4,
+        label: "Replicate Magic Item",
+      },
+    ]),
+  ]
+}
+
 function mysticArcanumPreset(): LinkedModifierInstance[] {
   return [
     usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Mystic Arcanum"),
@@ -2807,6 +2875,14 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         { action: true },
       ),
     ],
+  },
+
+  // —— Artificer ——
+  "*::Magical Tinkering": {
+    linkedModifiers: magicalTinkeringPreset(),
+  },
+  "*::Replicate Magic Item": {
+    linkedModifiers: replicateMagicItemPreset(),
   },
 
   // —— Warlock ——

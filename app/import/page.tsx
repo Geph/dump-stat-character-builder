@@ -48,7 +48,8 @@ import {
   type ImportCollision,
   type ImportRenameMap,
 } from "@/lib/import/import-collisions"
-import type { ImportStage } from "@/lib/import/import-staging"
+import { FoundryImportGuidancePanel } from "@/components/import/foundry-import-guidance-panel"
+import type { FoundryManifestInfo } from "@/lib/import/foundry-types"
 import { readImportApiJson } from "@/lib/import/read-import-api-response"
 import {
   collectImportModifierReview,
@@ -107,6 +108,13 @@ export default function ImportPage() {
   const [showSeedInfo, setShowSeedInfo] = useState(false)
   const [importAiSettings, setImportAiSettings] = useImportAiSettings()
   const [serverAiEnabled, setServerAiEnabled] = useState(false)
+  const [foundryGuidance, setFoundryGuidance] = useState<{
+    manifest?: FoundryManifestInfo | null
+    skippedPayload?: {
+      skipped?: { reason: string; count: number; examples: string[] }[]
+      review?: { label: string; detail: string; documentName?: string }[]
+    } | null
+  } | null>(null)
   const reviewRef = useRef<HTMLDivElement>(null)
   const reportRef = useRef<HTMLDivElement>(null)
 
@@ -161,7 +169,19 @@ export default function ImportPage() {
     code?: string
     completedChunks?: number
     totalChunks?: number
+    manifest?: FoundryManifestInfo
+    foundry?: {
+      skipped?: { reason: string; count: number; examples: string[] }[]
+      review?: { label: string; detail: string; documentName?: string }[]
+    }
   }) => {
+    if (data.code === "foundry_manifest" && data.manifest) {
+      setFoundryGuidance({ manifest: data.manifest })
+    } else if (data.code === "foundry_no_importable" || data.code === "foundry_unsupported") {
+      setFoundryGuidance({ skippedPayload: data.foundry ?? null })
+    } else {
+      setFoundryGuidance(null)
+    }
     let message = data.error || "Import failed"
     if (data.completedChunks != null && data.totalChunks != null && data.totalChunks > 0) {
       message += ` (${data.completedChunks}/${data.totalChunks} sections completed before failure)`
@@ -254,6 +274,7 @@ export default function ImportPage() {
     setPdfStatus("uploading")
     setMessage("")
     setImportReport(null)
+    setFoundryGuidance(null)
     setPendingImport(null)
 
     if (pdfPageScope === "range") {
@@ -337,6 +358,7 @@ export default function ImportPage() {
     setTextStatus("processing")
     setMessage("")
     setImportReport(null)
+    setFoundryGuidance(null)
     setPendingImport(null)
 
     try {
@@ -582,6 +604,15 @@ export default function ImportPage() {
         <div className="mb-6">
           <ImportWorkflowGuidancePanel />
         </div>
+
+        {foundryGuidance ? (
+          <div className="mb-6">
+            <FoundryImportGuidancePanel
+              manifest={foundryGuidance.manifest}
+              skippedPayload={foundryGuidance.skippedPayload ?? undefined}
+            />
+          </div>
+        ) : null}
 
         {message && !importReport && (
           <motion.div

@@ -7,19 +7,11 @@ import { createClient } from "@/lib/db/client"
 import {
   ArrowLeft,
   User,
-  Heart,
-  Swords,
   Sparkles,
-  Wand2,
-  UserCircle,
   ChevronDown,
   X,
   Pencil,
-  FileText,
   Plus,
-  PawPrint,
-  Backpack,
-  Info,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -55,7 +47,6 @@ import {
   deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
-import type { StatBreakdownPart } from "@/lib/character/types"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
@@ -65,7 +56,7 @@ import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipmen
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
 import { RollHistoryTrigger } from "@/components/character-sheet/roll-history-trigger"
-import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
+import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
@@ -98,6 +89,9 @@ import {
 } from "@/lib/character/resolve-companions"
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
+import { SheetPersistentStatsBar } from "@/components/character-sheet/sheet-persistent-stats-bar"
+import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
+import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
 
 interface CharacterWithRelations extends Character {
@@ -125,8 +119,6 @@ const ABILITY_LABELS: Record<string, string> = {
   wisdom: "WIS",
   charisma: "CHA",
 }
-
-type SheetTab = "abilities" | "details" | "combat" | "equipment" | "features" | "companions" | "custom"
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
   if (character.class_list?.length) return character.class_list
@@ -311,68 +303,6 @@ function RestSwappableChoiceControl({
   )
 }
 
-function formatSignedValue(value: number) {
-  return value >= 0 ? `+${value}` : `${value}`
-}
-
-function StatBreakdownPopover({
-  title,
-  total,
-  parts,
-}: {
-  title: string
-  total: number
-  parts: StatBreakdownPart[]
-}) {
-  const [open, setOpen] = useState(false)
-  if (!parts.length) return null
-  return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-          setOpen((value) => !value)
-        }}
-        className="text-muted-foreground hover:text-foreground transition-colors"
-        aria-label={`How ${title} is calculated`}
-        aria-expanded={open}
-      >
-        <Info className="w-3.5 h-3.5" />
-      </button>
-      {open ? (
-        <>
-          <span
-            className="fixed inset-0 z-[99]"
-            aria-hidden
-            onClick={() => setOpen(false)}
-          />
-          <span className="absolute left-0 top-5 z-[100] block w-52 rounded-lg border border-border bg-card p-2 text-left shadow-xl">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              {title}
-            </span>
-            <span className="block space-y-0.5">
-              {parts.map((part, index) => (
-                <span
-                  key={`${part.label}-${index}`}
-                  className="flex items-center justify-between gap-2 text-xs"
-                >
-                  <span className="text-muted-foreground">{part.label}</span>
-                  <span className="font-medium tabular-nums">{formatSignedValue(part.value)}</span>
-                </span>
-              ))}
-            </span>
-            <span className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-1 text-xs font-bold">
-              <span>Total</span>
-              <span className="tabular-nums">{total}</span>
-            </span>
-          </span>
-        </>
-      ) : null}
-    </span>
-  )
-}
-
 export default function CharacterSheetClient({ id }: { id: string }) {
   const [character, setCharacter] = useState<CharacterWithRelations | null>(null)
   const [spells, setSpells] = useState<Spell[]>([])
@@ -389,6 +319,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [currentHp, setCurrentHp] = useState(0)
   const [tempHp, setTempHp] = useState(0)
   const [activeConditions, setActiveConditions] = useState<string[]>([])
+  const [sheetToggles, setSheetToggles] = useState<{ while_raging: boolean }>({
+    while_raging: false,
+  })
+  const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
@@ -514,8 +448,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       modifierCatalog,
     })
     if (!inputs) return null
+    const savedAcPick = character.modifier_player_picks?.ac_formula?.[0] ?? null
     return {
       ...inputs,
+      modifierPlayerPicks: {
+        ...inputs.modifierPlayerPicks,
+        ...(acFormulaPick ?? savedAcPick
+          ? { ac_formula: [acFormulaPick ?? savedAcPick!] }
+          : {}),
+      },
       featureChoicePicks,
       equipmentCatalog,
       equippedArmorId,
@@ -523,6 +464,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedWeaponId,
       attunedItemIds,
       equipmentBaseSelections,
+      activeSheetToggles: new Set(
+        Object.entries(sheetToggles)
+          .filter(([, active]) => active)
+          .map(([key]) => key as import("@/lib/compendium/characteristic-modifiers").SheetToggleKey),
+      ),
     }
   }, [
     character,
@@ -536,6 +482,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equippedWeaponId,
     attunedItemIds,
     equipmentBaseSelections,
+    sheetToggles,
+    acFormulaPick,
   ])
 
   const derived = useMemo(() => {
@@ -787,8 +735,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const entries: ResourceTrackerEntry[] = []
     for (const entry of classDetails) {
       const className = entry.class?.name
-      if (!className) continue
-      const resources = SRD_CLASS_RESOURCES_BY_NAME[className] ?? []
+      if (!className || !entry.class) continue
+      const resources = resolveClassResourcesForClass(entry.class)
       for (const resource of resources) {
         if (resource.uses.type === "unlimited" || resource.uses.type === "class_resource") continue
         if (resource.id === "spell_slots") continue
@@ -1310,7 +1258,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     ref={conditionButtonRef}
                     type="button"
                     onClick={openConditionMenu}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-card/80 border border-border rounded-md text-xs hover:border-primary transition-colors"
+                    className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm hover:border-primary transition-colors"
                   >
                     Conditions
                     <ChevronDown className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`} />
@@ -1329,13 +1277,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       {SRD_CONDITIONS.map((condition) => (
                         <label
                           key={condition.name}
-                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted cursor-pointer text-xs"
+                          className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm"
                         >
                           <input
                             type="checkbox"
                             checked={activeConditions.includes(condition.name)}
                             onChange={() => toggleCondition(condition.name)}
-                            className="w-3.5 h-3.5 rounded accent-destructive shrink-0"
+                            className="h-4 w-4 rounded accent-destructive shrink-0"
                           />
                           <span className="flex-1 min-w-0">{condition.name}</span>
                           <ConditionInfoTip description={condition.description} />
@@ -1355,7 +1303,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         return (
                           <span
                             key={condName}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                               isConcentrationCondition(condName)
                                 ? "bg-purple-500/20 text-purple-800 dark:text-purple-300"
                                 : "bg-destructive/20 text-destructive"
@@ -1365,8 +1313,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             {condDescription ? (
                               <ConditionInfoTip description={condDescription} />
                             ) : null}
-                            <button type="button" onClick={() => toggleCondition(condName)}>
-                              <X className="w-2.5 h-2.5" />
+                            <button
+                              type="button"
+                              onClick={() => toggleCondition(condName)}
+                              className="inline-flex h-8 w-8 -mr-1 items-center justify-center rounded-full hover:bg-background/60"
+                              aria-label={`Remove ${condName}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </span>
                         )
@@ -1383,7 +1336,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   onClick={() => setHasInspiration((value) => !value)}
                   title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
                   aria-pressed={hasInspiration}
-                  className={`mt-1 flex h-10 w-10 items-center justify-center rounded-lg border-2 transition-colors ${
+                  className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${
                     hasInspiration
                       ? "border-amber-500/60 bg-amber-500/20 text-amber-700 dark:text-amber-300"
                       : "border-border/70 bg-card/80 text-muted-foreground hover:border-amber-500/40 hover:text-amber-600"
@@ -1391,71 +1344,69 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 >
                   <Sparkles className="w-5 h-5" />
                 </button>
-                <div className="flex flex-col gap-1.5 shrink-0">
-                  <div className="bg-card/90 rounded-lg p-2 text-center min-w-[88px]">
-                    <Heart className="w-4 h-4 text-destructive mx-auto mb-0.5" />
-                    <p className="text-[10px] text-muted-foreground">HP</p>
-                    <div className="flex items-center justify-center gap-0.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={maxHp + tempHp}
-                        value={currentHp}
-                        onChange={(e) => {
-                          const next = parseInt(e.target.value, 10)
-                          setCurrentHp(
-                            Number.isNaN(next) ? 0 : Math.max(0, Math.min(maxHp + tempHp, next)),
-                          )
-                        }}
-                        className="w-10 text-center bg-background border border-border rounded px-0.5 py-0.5 text-base font-black [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <span className="text-xs text-muted-foreground">/ {maxHp}</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1 mt-1">
-                      <span className="text-[10px] text-cyan">Temp</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={tempHp}
-                        onChange={(e) => {
-                          const next = parseInt(e.target.value, 10)
-                          setTempHp(Number.isNaN(next) ? 0 : Math.max(0, next))
-                        }}
-                        className="w-8 text-center bg-background border border-cyan/30 rounded text-xs font-bold text-cyan [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </div>
-                  <SheetRestButtons onRest={handleRest} compact />
-                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <SheetPersistentStatsBar
+                armorClass={armorClass}
+                acBreakdown={derived?.acBreakdown ?? []}
+                initiative={initiative}
+                speed={speed}
+                maxHp={maxHp}
+                currentHp={currentHp}
+                tempHp={tempHp}
+                onCurrentHpChange={setCurrentHp}
+                onTempHpChange={setTempHp}
+                onInitiativeRoll={handleInitiativeRoll}
+                formatMod={formatMod}
+              />
+              <div className="flex flex-col gap-2 items-stretch sm:items-end">
+                {(derived?.acFormulaOptions.length ?? 0) > 1 ? (
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-semibold text-muted-foreground">AC formula</span>
+                    <select
+                      value={
+                        acFormulaPick ??
+                        character.modifier_player_picks?.ac_formula?.[0] ??
+                        derived?.acFormulaOptions[0]?.id ??
+                        ""
+                      }
+                      onChange={(event) => setAcFormulaPick(event.target.value)}
+                      className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm"
+                    >
+                      {derived?.acFormulaOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  aria-pressed={sheetToggles.while_raging}
+                  onClick={() =>
+                    setSheetToggles((current) => ({
+                      ...current,
+                      while_raging: !current.while_raging,
+                    }))
+                  }
+                  className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+                    sheetToggles.while_raging
+                      ? "border-destructive/50 bg-destructive/15 text-destructive"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {sheetToggles.while_raging ? "Raging" : "Not raging"}
+                </button>
+                <SheetRestButtons onRest={handleRest} compact />
               </div>
             </div>
           </div>
         </motion.div>
 
-        <div className="flex gap-1.5 mb-3 overflow-x-auto">
-          {[
-            { id: "abilities" as const, label: "Abilities & Skills", icon: <UserCircle className="w-3.5 h-3.5" /> },
-            { id: "combat" as const, label: "Combat", icon: <Swords className="w-3.5 h-3.5" /> },
-            { id: "equipment" as const, label: "Equipment", icon: <Backpack className="w-3.5 h-3.5" /> },
-            { id: "features" as const, label: "Features", icon: <Sparkles className="w-3.5 h-3.5" /> },
-            { id: "companions" as const, label: "Companion / Beast Form", icon: <PawPrint className="w-3.5 h-3.5" /> },
-            { id: "custom" as const, label: "Custom", icon: <Wand2 className="w-3.5 h-3.5" /> },
-            { id: "details" as const, label: "Character Details", icon: <FileText className="w-3.5 h-3.5" /> },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-                activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <SheetTabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
         <motion.div
           key={activeTab}
@@ -1850,34 +1801,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
                 <div className="space-y-3">
                   <div className="bg-card rounded-xl p-3 border border-border">
-                    <h2 className="text-sm font-bold text-foreground mb-2 text-left">Combat Stats</h2>
+                    <h2 className="text-sm font-bold text-foreground mb-2 text-left">
+                      {hasSpellcasting ? "Spellcasting & Resources" : "Resources"}
+                    </h2>
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                        <span className="flex items-center gap-1.5">
-                          Armor Class
-                          <StatBreakdownPopover
-                            title="Armor Class"
-                            total={armorClass}
-                            parts={derived?.acBreakdown ?? []}
-                          />
-                        </span>
-                        <span className="font-bold tabular-nums">{armorClass}</span>
-                      </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                        <span>Speed</span>
-                        <span className="font-bold tabular-nums">{speed} ft</span>
-                      </div>
-                      <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
-                        <span>Initiative</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold tabular-nums">{formatMod(initiative)}</span>
-                          <D20RollButton
-                            modifier={initiative}
-                            title="Roll initiative"
-                            onRoll={handleInitiativeRoll}
-                          />
-                        </div>
-                      </div>
                       {hasSpellcasting && spellSaveDc != null && Number.isFinite(spellSaveDc) && (
                         <>
                           <div className="flex justify-between items-center px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
@@ -1893,10 +1820,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                         </>
                       )}
-                      <div className="pt-2 mt-1 border-t border-border/60">
-                        <h3 className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">
-                          Resources
-                        </h3>
+                      <div className={hasSpellcasting ? "pt-2 mt-1 border-t border-border/60" : ""}>
                         {spellSlotTables.length > 0 && (
                           <div className="space-y-3">
                             {spellSlotTables.map((table) => {
@@ -2366,6 +2290,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           </motion.div>
         ) : null}
       </AnimatePresence>
+      <SiteFooter />
     </div>
     </SheetRollHistoryProvider>
   )

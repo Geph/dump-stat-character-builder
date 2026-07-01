@@ -10,6 +10,7 @@ import {
   upsertByName,
 } from "@/lib/db/repository"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 import type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
 
 export type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
@@ -66,7 +67,7 @@ function rowForTable(
 
   const row: Record<string, unknown> = {
     ...cleaned,
-    source: cleaned.source || source,
+    source: sanitizeImportRowSource(cleaned.source, source),
   }
 
   if (exportType === "dnd-feat") {

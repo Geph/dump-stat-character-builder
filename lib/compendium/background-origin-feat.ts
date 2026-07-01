@@ -34,6 +34,15 @@ export function magicInitiateListFromFeatGranted(
   return parseBackgroundOriginFeat(featGranted)?.spellList ?? null
 }
 
+/** e.g. "Choose one Planar Pact feat" → "Planar Pact". */
+export function parseBackgroundFeatGrantChoiceCategory(
+  featGranted: string | null | undefined,
+): string | null {
+  const text = featGranted?.trim() ?? ""
+  const match = text.match(/choose\s+(?:one|a)\s+(.+?)\s+feat\b/i)
+  return match ? match[1].trim() : null
+}
+
 export function formatMagicInitiateOriginFeat(spellList: MagicInitiateSpellList): string {
   return `Magic Initiate (${spellList})`
 }

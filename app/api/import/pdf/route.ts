@@ -18,7 +18,8 @@ import {
   SUBCLASS_IMPORT_HINT,
 } from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
-import { parseFoundryDnd5eJson } from "@/lib/import/parse-foundry-dnd5e"
+import { parseFoundryInput } from "@/lib/import/parse-foundry-dnd5e"
+import { respondToFoundryParseResult } from "@/lib/import/foundry-import-route"
 import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
 import { prepareImportedContent } from "@/lib/import/finalize-import"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
@@ -26,6 +27,11 @@ import { detectImportCollisions } from "@/lib/import/fetch-import-collisions"
 import { persistImportedContent } from "@/lib/import/persist-import-content"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { extractTextFromPdfBuffer, parseImportPageRange } from "@/lib/import/parse-pdf-text"
+import {
+  PDF_IMPORT_MAX_BYTES,
+  withPdfParseTimeout,
+} from "@/lib/import/pdf-import-limits"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
@@ -68,6 +74,9 @@ ${CLASS_SPELL_LIST_IMPORT_HINT}`
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const formData = await request.formData()
     const file = formData.get("pdf") as File
     const contentType = formData.get("contentType") as string | null
@@ -84,6 +93,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
+    if (file.size > PDF_IMPORT_MAX_BYTES) {
+      return NextResponse.json(
+        { error: `PDF too large. Maximum size is ${Math.floor(PDF_IMPORT_MAX_BYTES / (1024 * 1024))} MB.` },
+        { status: 413 },
+      )
+    }
+
     const fileName = file.name.toLowerCase()
     const isJsonFile = fileName.endsWith(".json") || file.type === "application/json"
 
@@ -92,12 +108,10 @@ export async function POST(request: NextRequest) {
       const trimmedJson = jsonText.trim()
       const dumpStatItems = parseDumpStatExportJson(trimmedJson)
       if (!dumpStatItems) {
-        const foundryContent = parseFoundryDnd5eJson(trimmedJson)
-        if (foundryContent) {
-          return await runTextImportPipeline(foundryContent, {
-            charLength: trimmedJson.length,
-            materialSource: "Foundry VTT Import",
-          })
+        const foundryResult = parseFoundryInput(trimmedJson)
+        if (foundryResult.kind !== "not_foundry") {
+          const response = await respondToFoundryParseResult(foundryResult, trimmedJson.length)
+          if (response) return response
         }
         return NextResponse.json(
           {
@@ -144,7 +158,7 @@ export async function POST(request: NextRequest) {
     let text: string
     let totalPages: number
     try {
-      const pdfData = await extractTextFromPdfBuffer(buffer, pageRange)
+      const pdfData = await withPdfParseTimeout(extractTextFromPdfBuffer(buffer, pageRange))
       text = pdfData.text
       totalPages = pdfData.totalPages
       if (pageRange && pageRange.last > totalPages) {

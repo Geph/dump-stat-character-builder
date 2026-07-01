@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { getPool } from "@/lib/db/index"
-import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
+import { ensureMigrationsApplied } from "@/lib/db/migrate"
 import { getCharacterWithRelations, updateCharacter } from "@/lib/db/characters"
 import { deleteRowById } from "@/lib/db/repository"
 
@@ -13,7 +14,7 @@ export async function GET(
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const { id } = await params
     const data = await getCharacterWithRelations(id)
@@ -33,10 +34,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const { id } = await params
     const body = await request.json()
@@ -60,12 +64,17 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
+
+    await ensureMigrationsApplied(getPool())
 
     const { id } = await params
     await deleteRowById("characters", id)

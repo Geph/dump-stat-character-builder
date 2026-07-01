@@ -22,7 +22,7 @@ import {
   maxOutputTokensForImport,
 } from "@/lib/import/import-ai-limits"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
-import { mergeImportContent } from "@/lib/import/merge-import-content"
+import { combineImportContents } from "@/lib/import/merge-import-content"
 import {
   preprocessImportText,
   type ImportPreprocessStats,
@@ -151,7 +151,7 @@ export async function extractImportContentFromText(
       outputs.push(normalized)
     } catch (error) {
       const partial =
-        outputs.length > 0 ? mergeImportContent(outputs) : preprocess.deterministic
+        outputs.length > 0 ? combineImportContents(outputs) : preprocess.deterministic
       throw toImportExtractionError(error, {
         partialContent: partial,
         completedChunks: outputs.length,
@@ -164,7 +164,7 @@ export async function extractImportContentFromText(
     deterministicAttempt.confidence.level === "partial" ? "hybrid" : "ai"
 
   return {
-    content: mergeImportContent(outputs),
+    content: combineImportContents(outputs),
     preprocessStats: preprocess.stats,
     chunkCount: chunks.length,
     aiProvider,

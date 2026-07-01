@@ -476,6 +476,8 @@ export interface UsesConfig {
   recharges?: RechargeRule[]
   dieCount?: number
   dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
+  /** Die sides (e.g. 8 for d8) at each class level — pairs with atLevelTable pool counts. */
+  dieSidesByLevel?: UsesAtLevel[]
   /**
    * Restore uses when rolling initiative. true = full pool; number = partial restore.
    * Used by homebrew resources such as Relentless (regain all Exploit Dice).

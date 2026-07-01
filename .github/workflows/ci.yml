@@ -24,6 +24,7 @@ jobs:
       - run: pnpm lint
       - run: node node_modules/vitest/vitest.mjs run
       - run: pnpm dlx tsx scripts/audit-srd-class-features.ts
+      - run: pnpm dlx tsx scripts/audit-modifier-wiring-registry.ts
 
   static-export:
     runs-on: ubuntu-latest

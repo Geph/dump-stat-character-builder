@@ -17,6 +17,10 @@ type ModifierPlayerChoicePanelProps = {
   onChange: (slotKey: string, selected: string[]) => void
   spells: Spell[]
   accentClass?: string
+  /** When set, only render slots whose kind is in this list. */
+  kinds?: ModifierPlayerChoiceKind[]
+  /** When set, exclude slots with these kinds. */
+  excludeKinds?: ModifierPlayerChoiceKind[]
   /** Skills/tools already chosen elsewhere in the build, hidden from skill choices here. */
   unavailableOptions?: string[]
 }
@@ -125,9 +129,15 @@ export function ModifierPlayerChoicePanel({
   onChange,
   spells,
   accentClass = "border-primary bg-primary/10",
+  kinds,
+  excludeKinds,
   unavailableOptions = [],
 }: ModifierPlayerChoicePanelProps) {
-  const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
+  const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey).filter((slot) => {
+    if (kinds?.length && !kinds.includes(slot.kind)) return false
+    if (excludeKinds?.includes(slot.kind)) return false
+    return true
+  })
   if (relevant.length === 0) return null
 
   return (

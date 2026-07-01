@@ -2,8 +2,11 @@ import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { deleteWhere, insertRows, listRows, upsertByName } from "@/lib/db/repository"
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { FoundryImportMeta } from "@/lib/import/foundry-types"
+import { stripFoundryMeta, type ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
 import { buildImportReport, type ImportReport } from "@/lib/import/build-import-report"
+import { enrichFeatRowWithPrerequisites } from "@/lib/import/resolve-feat-prerequisites"
+import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
 import {
   buildClassResourceRowsForClass,
@@ -20,7 +23,16 @@ export type ImportSourceLabel = string
 export function normalizeImportMaterialSource(value: unknown, fallback = "Custom"): string {
   if (typeof value !== "string") return fallback
   const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed.slice(0, 120) : fallback
+  const normalized = trimmed.length > 0 ? trimmed.slice(0, 120) : fallback
+  return sanitizeImportRowSource(normalized, fallback)
+}
+
+function stampSource<T extends Record<string, unknown>>(row: T, importerSource: string): T {
+  const existing = "source" in row ? row.source : undefined
+  return {
+    ...row,
+    source: sanitizeImportRowSource(existing, importerSource),
+  }
 }
 
 export type PersistImportResult = {
@@ -30,20 +42,9 @@ export type PersistImportResult = {
   report?: ImportReport
 }
 
-function normalizeFeatCategory(
-  category: string | null | undefined,
-): "Origin" | "General" | "Fighting Style" | "Epic Boon" | null {
-  if (!category) return null
-  const normalized = category.trim()
-  if (
-    normalized === "Origin" ||
-    normalized === "General" ||
-    normalized === "Fighting Style" ||
-    normalized === "Epic Boon"
-  ) {
-    return normalized
-  }
-  return null
+function normalizeFeatCategory(category: string | null | undefined): string | null {
+  const trimmed = category?.trim()
+  return trimmed ? trimmed : null
 }
 
 async function loadSpellCatalog(): Promise<{ id: string; name: string }[]> {
@@ -59,10 +60,11 @@ function asClassResourceImports(content: ImportContent): ClassResourceImportRow[
 }
 
 export async function persistImportedContent(
-  content: ImportContent,
+  content: ImportContent | ImportContentWithFoundryMeta,
   source: ImportSourceLabel,
 ): Promise<PersistImportResult> {
-  const sanitized = sanitizeImportContentForPersist(content)
+  const foundryMeta = (content as ImportContentWithFoundryMeta).foundryImportMeta
+  const sanitized = sanitizeImportContentForPersist(stripFoundryMeta(content as ImportContentWithFoundryMeta))
   let totalImported = 0
   const breakdown: Record<string, number> = {}
   const warnings: string[] = []
@@ -74,14 +76,14 @@ export async function persistImportedContent(
   const explicitResources = asClassResourceImports(sanitized)
 
   if (sanitized.species?.length) {
-    await upsertByName("species", sanitized.species.map((s) => ({ ...s, source })))
+    await upsertByName("species", sanitized.species.map((s) => stampSource({ ...s }, source)))
     breakdown.species = sanitized.species.length
     totalImported += sanitized.species.length
   }
 
   if (sanitized.classes?.length) {
     enrichedClasses = enrichImportedClassList(
-      sanitized.classes.map((c) => ({ ...c, source })),
+      sanitized.classes.map((c) => stampSource({ ...c }, source)),
       explicitResources,
     )
     await upsertByName("classes", enrichedClasses)
@@ -139,7 +141,7 @@ export async function persistImportedContent(
   }
 
   if (sanitized.spells?.length) {
-    await upsertByName("spells", sanitized.spells.map((s) => ({ ...s, source })))
+    await upsertByName("spells", sanitized.spells.map((s) => stampSource({ ...s }, source)))
     breakdown.spells = sanitized.spells.length
     totalImported += sanitized.spells.length
     spellCatalog = await loadSpellCatalog()
@@ -171,6 +173,7 @@ export async function persistImportedContent(
         class_id: classIdMap.get(sc.class_name) || null,
         class_name: sc.class_name,
       }))
+      .map((sc) => stampSource(sc, source))
       .filter((sc) => sc.class_id !== null) as Array<
       Record<string, unknown> & { class_id: string; class_name: string }
     >
@@ -217,37 +220,57 @@ export async function persistImportedContent(
   if (sanitized.backgrounds?.length) {
     await upsertByName(
       "backgrounds",
-      normalizeBackgroundRows(sanitized.backgrounds.map((b) => ({ ...b, source }))),
+      normalizeBackgroundRows(sanitized.backgrounds.map((b) => stampSource({ ...b }, source))),
     )
     breakdown.backgrounds = sanitized.backgrounds.length
     totalImported += sanitized.backgrounds.length
   }
 
   if (sanitized.feats?.length) {
-    await upsertByName(
-      "feats",
-      sanitized.feats.map((f) => {
-        const row = f as Record<string, unknown>
-        const linkedModifiers = (row.linkedModifiers ?? row.linked_modifiers) as unknown[] | undefined
-        const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
-        return {
-          name: f.name,
-          description: f.description ? formatFeatDescription(f.description) : null,
-          prerequisite: f.prerequisite ?? null,
-          category: normalizeFeatCategory(f.category),
-          linked_modifiers: linkedModifiers ?? [],
-          modifier_refs: modifierRefs ?? [],
-          source,
-        }
-      }),
-    )
+    const featRows = sanitized.feats.map((f) => {
+      const row = f as Record<string, unknown>
+      const linkedModifiers = (row.linkedModifiers ?? row.linked_modifiers) as unknown[] | undefined
+      const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
+      return {
+        name: f.name,
+        description: f.description ? formatFeatDescription(f.description) : null,
+        prerequisite: f.prerequisite ?? null,
+        category: normalizeFeatCategory(f.category) ?? "General",
+        level_requirement:
+          typeof (f as { level_requirement?: unknown }).level_requirement === "number"
+            ? (f as { level_requirement: number }).level_requirement
+            : null,
+        linked_modifiers: linkedModifiers ?? [],
+        modifier_refs: modifierRefs ?? [],
+        source: sanitizeImportRowSource(f.source, source),
+      }
+    })
+    await upsertByName("feats", featRows)
+
+    const existingFeats = await listRows<{ id: string; name: string }>("feats", "id, name")
+    for (const row of featRows) {
+      const enriched = enrichFeatRowWithPrerequisites(row, existingFeats)
+      if (
+        enriched.level_requirement !== row.level_requirement ||
+        (enriched.prerequisite_feat_ids?.length ?? 0) > 0
+      ) {
+        await upsertByName("feats", [
+          {
+            name: enriched.name,
+            level_requirement: enriched.level_requirement,
+            prerequisite_feat_ids: enriched.prerequisite_feat_ids ?? [],
+          },
+        ])
+      }
+    }
+
     breakdown.feats = sanitized.feats.length
     totalImported += sanitized.feats.length
   }
 
   if (sanitized.equipment?.length) {
     const equipment = normalizeEquipmentRows(
-      sanitized.equipment.map((e) => ({ ...e, source })) as Record<string, unknown>[],
+      sanitized.equipment.map((e) => stampSource({ ...e }, source)) as Record<string, unknown>[],
     )
     await upsertByName("equipment", equipment)
     breakdown.equipment = sanitized.equipment.length
@@ -257,7 +280,7 @@ export async function persistImportedContent(
   if (sanitized.abilities?.length) {
     await upsertByName(
       "custom_abilities",
-      sanitized.abilities.map((a) => ({ ...a, source, show_in_builder: true })),
+      sanitized.abilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
     )
     breakdown.abilities = sanitized.abilities.length
     totalImported += sanitized.abilities.length
@@ -274,6 +297,7 @@ export async function persistImportedContent(
     breakdown,
     warnings,
     explicitResources,
+    foundryMeta,
   })
 
   return { totalImported, breakdown, warnings, report }

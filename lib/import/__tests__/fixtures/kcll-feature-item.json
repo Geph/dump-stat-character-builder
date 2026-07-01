@@ -1,0 +1,28 @@
+{
+  "name": "Sneak Attack",
+  "type": "feature",
+  "system": {
+    "type": { "value": "class" },
+    "description": { "value": "<p>Extra damage when you have advantage.</p>" },
+    "level": 1,
+    "source": { "book": "KCLL", "label": "Kobold Caves" }
+  },
+  "effects": [
+    {
+      "name": "Sneak Attack Bonus",
+      "disabled": false,
+      "changes": [
+        {
+          "key": "system.bonuses.mwak.damage",
+          "mode": 2,
+          "value": "1d6"
+        }
+      ]
+    }
+  ],
+  "flags": {
+    "dnd5e": {
+      "sourceBooks": ["KCLL"]
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { clearTable } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
@@ -9,6 +10,9 @@ const VALID_TABLES = ["classes", "subclasses", "species", "backgrounds", "spells
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) {
       return NextResponse.json({ error: configError }, { status: 503 })

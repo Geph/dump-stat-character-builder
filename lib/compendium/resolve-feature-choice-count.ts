@@ -1,10 +1,15 @@
-import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
-import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import type { ClassResource, FeatureChoice } from "@/lib/types"
+import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
+import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 
-function resourcesForClassName(className: string, classResources?: ClassResource[]): ClassResource[] {
+function resourcesForClassName(
+  className: string,
+  classResources?: ClassResource[],
+  classRow?: { id: string; name: string; class_resources?: ClassResource[] | null },
+): ClassResource[] {
   if (classResources?.length) return classResources
-  return SRD_CLASS_RESOURCES_BY_NAME[className] ?? []
+  if (classRow) return resolveClassResourcesForClass(classRow)
+  return resolveClassResourcesForClass({ id: "", name: className, class_resources: null })
 }
 
 /** Resolve how many picks a FeatureChoice grants at a given class level. */
