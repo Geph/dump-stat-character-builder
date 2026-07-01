@@ -628,6 +628,118 @@ function EffectRow({
         <HealAmountEditor effect={effect} onChange={onChange} label={effect.kind === "grant_temp_hp" ? "Temporary HP amount" : "Healing amount"} />
       )}
 
+      {fields.includes("damageLinkedHeal") && (
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(effect.healEqualToDamageDealt)}
+              onChange={(e) => onChange({ healEqualToDamageDealt: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Heal HP equal to damage dealt</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(effect.bonusEqualToDamageDealt)}
+              onChange={(e) => onChange({ bonusEqualToDamageDealt: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Grant bonus equal to damage dealt</span>
+          </label>
+          {effect.bonusEqualToDamageDealt ? (
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">Bonus expires (minutes)</label>
+              <input
+                type="number"
+                min={1}
+                value={effect.bonusExpiresMinutes ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    bonusExpiresMinutes: e.target.value ? parseInt(e.target.value, 10) : null,
+                  })
+                }
+                placeholder="e.g. 10"
+                className="w-24 px-3 py-2 bg-card border border-border rounded-lg text-sm"
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {fields.includes("checkRollTargets") && (
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">Affected roll types</label>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {(["attack", "save", "ability", "skill"] as const).map((target) => {
+              const selected = effect.checkRollTargets ?? []
+              const checked = selected.includes(target)
+              return (
+                <label key={target} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                        ? [...selected, target]
+                        : selected.filter((value) => value !== target)
+                      onChange({ checkRollTargets: next.length ? next : undefined })
+                    }}
+                    className="accent-primary"
+                  />
+                  <span className="text-muted-foreground capitalize">{target}</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {fields.includes("remoteViewing") && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Viewing range (ft.)</label>
+            <input
+              type="number"
+              min={0}
+              value={effect.remoteViewingRangeFeet ?? ""}
+              onChange={(e) =>
+                onChange({
+                  remoteViewingRangeFeet: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              placeholder="e.g. 60"
+              className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Duration (minutes)</label>
+            <input
+              type="number"
+              min={1}
+              value={effect.remoteViewingDurationMinutes ?? ""}
+              onChange={(e) =>
+                onChange({
+                  remoteViewingDurationMinutes: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+              placeholder="e.g. 10"
+              className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer md:col-span-2">
+            <input
+              type="checkbox"
+              checked={Boolean(effect.destroysTokenOnEnd)}
+              onChange={(e) => onChange({ destroysTokenOnEnd: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Destroy linked token when effect ends</span>
+          </label>
+        </div>
+      )}
+
       {fields.includes("tempHpTrigger") && (
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">When granted</label>
@@ -1034,6 +1146,23 @@ function HealAmountEditor({
             onChange={(e) =>
               onChange({
                 healLevelMultiplier: e.target.value ? parseInt(e.target.value, 10) : 1,
+              })
+            }
+            className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      )}
+
+      {mode === "proficiency" && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Proficiency multiplier</label>
+          <input
+            type="number"
+            min={1}
+            value={effect.healProficiencyMultiplier ?? 1}
+            onChange={(e) =>
+              onChange({
+                healProficiencyMultiplier: e.target.value ? parseInt(e.target.value, 10) : 1,
               })
             }
             className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"

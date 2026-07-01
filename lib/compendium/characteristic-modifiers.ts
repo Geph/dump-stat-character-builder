@@ -422,6 +422,10 @@ export interface UnarmedStrikeDamageCharacteristic extends CharacteristicModifie
   die?: UnarmedStrikeDie
   /** Martial Arts-style die progression by character level. */
   dieByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  /** Damage type for natural weapons (default Bludgeoning). */
+  damageType?: string | null
+  /** Ability modifier added to damage (default strength). */
+  ability?: AbilityScoreKey | null
 }
 
 export interface SpecialAttackCharacteristic extends CharacteristicModifierBase {
@@ -460,6 +464,10 @@ export interface RestReplacementCharacteristic extends CharacteristicModifierBas
 
 export interface MagicalSleepImmunityCharacteristic extends CharacteristicModifierBase {
   type: "magical_sleep_immunity"
+  /** When true, the creature does not need sleep (Elf Trance, Reborn). */
+  noSleepRequired?: boolean
+  /** Named spells that can't target this creature (e.g. Dream). */
+  immuneToNamedSpells?: string[]
 }
 
 export interface CreatureSizeCharacteristic extends CharacteristicModifierBase {
@@ -477,6 +485,10 @@ export interface MovementEffectsCharacteristic extends CharacteristicModifierBas
   movementHide?: boolean
   movementMoveThroughLargerSpaces?: boolean
   movementHideBehindLargerCreatures?: boolean
+  /** Climb speed equal to walking speed (Dhampir Spider Climb). */
+  spiderClimb?: boolean
+  /** Minimum character level before spider climb applies. */
+  spiderClimbMinLevel?: number | null
   /** When set, movement bonuses apply only to these types (empty = all). */
   movementTypes?: import("@/lib/types").MovementType[]
 }
@@ -484,11 +496,16 @@ export interface MovementEffectsCharacteristic extends CharacteristicModifierBas
 export interface DamageCharacteristic extends CharacteristicModifierBase {
   type: "damage_resistance" | "damage_immunity"
   damageTypes: string[]
+  /** Player picks this many damage types from choiceOptions when damageTypes is empty. */
+  choiceCount?: number | null
+  choiceOptions?: string[] | null
 }
 
 export interface ConditionImmunityCharacteristic extends CharacteristicModifierBase {
   type: "condition_immunity"
   conditions: string[]
+  /** Exhaustion from these sources does not apply (Reborn Everlasting). */
+  exhaustionSourceExclusions?: string[]
 }
 
 export interface AttunementSlotsCharacteristic extends CharacteristicModifierBase {
@@ -630,6 +647,10 @@ export interface OnHitTriggerCharacteristic extends CharacteristicModifierBase {
   spendResourceKey?: string | null
   spendResourceAmount?: number | null
   appliesTo?: string | null
+  /** Skip targets with these creature types (Vampiric Bite: not Construct or Undead). */
+  excludeCreatureTypes?: string[]
+  /** Only affect targets with these creature types when set. */
+  includeCreatureTypes?: string[]
   /** Maximize weapon damage dice instead of rolling (optional level gate). */
   maximizeWeaponDamage?: boolean
   maximizeWeaponDamageAtLevel?: number | null
@@ -682,6 +703,8 @@ export interface HealingDicePoolCharacteristic extends CharacteristicModifierBas
   poolSize?: number | null
   poolSizeByLevel?: BonusByLevelEntry[]
   maxDicePerUse?: { type: "ability_modifier"; ability: AbilityScoreKey } | null
+  /** Roll this many dice per use (e.g. proficiency bonus for Healing Hands). */
+  dicePerUseSource?: "proficiency" | null
   activation: "bonus_action" | "action" | "magic_action"
   recharges?: import("@/lib/types").RechargeRule[]
 }
@@ -706,6 +729,14 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
 export interface TelepathyCharacteristic extends CharacteristicModifierBase {
   type: "telepathy"
   rangeFeet: number
+  /** Telepathy range in miles (overrides rangeFeet when set). */
+  rangeMiles?: number | null
+  /** Maximum words per telepathic message. */
+  maxMessageWords?: number | null
+  /** Requires an active token or similar link to communicate (Hexblood). */
+  requiresActiveToken?: boolean
+  /** Range in feet = this value × character level (Kalashtar Mind Link). */
+  rangeFeetPerLevel?: number | null
   canInitiate?: boolean
 }
 
@@ -870,7 +901,7 @@ export function createCharacteristicModifier(
     case "damage_roll_modifiers":
       return { id, type, entries: [{ bonus: 2, target: "one_handed_melee" }] }
     case "unarmed_strike_damage":
-      return { id, type, die: "1d6", dieByLevel: [] }
+      return { id, type, die: "1d6", dieByLevel: [], damageType: null, ability: null }
     case "special_attack":
       return {
         id,
@@ -886,14 +917,14 @@ export function createCharacteristicModifier(
     case "rest_replacement":
       return { id, type, restHours: 4, replacesLongRest: true, description: "" }
     case "magical_sleep_immunity":
-      return { id, type }
+      return { id, type, noSleepRequired: false, immuneToNamedSpells: [] }
     case "creature_size":
       return { id, type, size: "Large", mode: "activatable", durationMinutes: 10 }
     case "movement_effects":
       return { id, type }
     case "damage_resistance":
     case "damage_immunity":
-      return { id, type, damageTypes: [] }
+      return { id, type, damageTypes: [], choiceCount: null, choiceOptions: null }
     case "damage_reduction":
       return { id, type, amount: 3, damageTypes: ["Bludgeoning", "Piercing", "Slashing"] }
     case "spells":
@@ -1092,6 +1123,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       triggerOn: raw.triggerOn ?? "hit",
       oncePerTurn: raw.oncePerTurn ?? true,
+      excludeCreatureTypes: coerceStringArray(raw.excludeCreatureTypes),
+      includeCreatureTypes: coerceStringArray(raw.includeCreatureTypes),
       maximizeWeaponDamage: raw.maximizeWeaponDamage ?? false,
       maximizeWeaponDamageAtLevel: raw.maximizeWeaponDamageAtLevel ?? null,
       effect: raw.effect ?? null,
@@ -1145,6 +1178,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       activation: raw.activation ?? "bonus_action",
       recharges: raw.recharges ?? [{ rest: "long_rest" }],
       poolSizeByLevel: raw.poolSizeByLevel ?? [],
+      dicePerUseSource: raw.dicePerUseSource ?? null,
     }
   }
 
@@ -1164,6 +1198,10 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     return {
       ...raw,
       rangeFeet: raw.rangeFeet ?? 60,
+      rangeMiles: raw.rangeMiles ?? null,
+      maxMessageWords: raw.maxMessageWords ?? null,
+      requiresActiveToken: raw.requiresActiveToken ?? false,
+      rangeFeetPerLevel: raw.rangeFeetPerLevel ?? null,
       canInitiate: raw.canInitiate ?? true,
     }
   }
@@ -1236,6 +1274,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     return {
       ...raw,
       damageTypes: coerceStringArray(raw.damageTypes ?? raw.values),
+      choiceCount: raw.choiceCount ?? null,
+      choiceOptions: raw.choiceOptions ? coerceStringArray(raw.choiceOptions) : null,
     }
   }
 
@@ -1245,6 +1285,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       die: raw.die ?? "1d6",
       dieByLevel: normalizeBonusByLevel(raw.dieByLevel),
+      damageType: raw.damageType ?? null,
+      ability: raw.ability ?? null,
     }
   }
 
@@ -1275,7 +1317,12 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
   }
 
   if (value.type === "magical_sleep_immunity") {
-    return value as MagicalSleepImmunityCharacteristic
+    const raw = value as MagicalSleepImmunityCharacteristic
+    return {
+      ...raw,
+      noSleepRequired: raw.noSleepRequired ?? false,
+      immuneToNamedSpells: coerceStringArray(raw.immuneToNamedSpells),
+    }
   }
 
   if (value.type === "creature_size") {
@@ -1289,7 +1336,12 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
 
   if (value.type === "movement_effects") {
     const raw = value as MovementEffectsCharacteristic
-    return { ...raw, movementTypes: raw.movementTypes ?? [] }
+    return {
+      ...raw,
+      movementTypes: raw.movementTypes ?? [],
+      spiderClimb: raw.spiderClimb ?? false,
+      spiderClimbMinLevel: raw.spiderClimbMinLevel ?? null,
+    }
   }
 
   if (value.type === "condition_immunity") {
@@ -1297,6 +1349,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     return {
       ...raw,
       conditions: coerceStringArray(raw.conditions ?? raw.values),
+      exhaustionSourceExclusions: coerceStringArray(raw.exhaustionSourceExclusions),
     }
   }
 
@@ -1431,6 +1484,8 @@ export type AggregatedCharacteristics = {
   damageRollModifiers: AggregatedRollModifier[]
   unarmedStrikeDie: UnarmedStrikeDie | null
   unarmedStrikeDieByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  unarmedStrikeDamageType: string | null
+  unarmedStrikeAbility: AbilityScoreKey | null
   resistances: string[]
   immunities: string[]
   conditionImmunities: string[]
@@ -1454,6 +1509,7 @@ export type AggregatedCharacteristics = {
   specialAttacks: SpecialAttackCharacteristic[]
   restReplacement: { restHours: number; replacesLongRest: boolean; description: string } | null
   magicalSleepImmunity: boolean
+  noSleepRequired: boolean
   creatureSize: CreatureSizeCharacteristic | null
   movementEffects: {
     movementDash: boolean
@@ -1461,6 +1517,8 @@ export type AggregatedCharacteristics = {
     movementHide: boolean
     movementMoveThroughLargerSpaces: boolean
     movementHideBehindLargerCreatures: boolean
+    spiderClimb: boolean
+    spiderClimbMinLevel: number | null
   }
 }
 
@@ -1501,6 +1559,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   damageRollModifiers: [],
   unarmedStrikeDie: null,
   unarmedStrikeDieByLevel: [],
+  unarmedStrikeDamageType: null,
+  unarmedStrikeAbility: null,
   resistances: [],
   immunities: [],
   conditionImmunities: [],
@@ -1524,6 +1584,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   specialAttacks: [],
   restReplacement: null,
   magicalSleepImmunity: false,
+  noSleepRequired: false,
   creatureSize: null,
   movementEffects: {
     movementDash: false,
@@ -1531,6 +1592,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
     movementHide: false,
     movementMoveThroughLargerSpaces: false,
     movementHideBehindLargerCreatures: false,
+    spiderClimb: false,
+    spiderClimbMinLevel: null,
   },
 })
 
@@ -1669,6 +1732,12 @@ export function aggregateCharacteristics(
         if (mod.die) {
           result.unarmedStrikeDie = pickHigherUnarmedDie(result.unarmedStrikeDie, mod.die)
         }
+        if (mod.damageType) {
+          result.unarmedStrikeDamageType = mod.damageType
+        }
+        if (mod.ability) {
+          result.unarmedStrikeAbility = mod.ability
+        }
         break
       case "special_attack":
         result.specialAttacks.push(mod)
@@ -1682,6 +1751,7 @@ export function aggregateCharacteristics(
         break
       case "magical_sleep_immunity":
         result.magicalSleepImmunity = true
+        if (mod.noSleepRequired) result.noSleepRequired = true
         break
       case "creature_size":
         result.creatureSize = mod
@@ -1695,6 +1765,12 @@ export function aggregateCharacteristics(
         }
         if (mod.movementHideBehindLargerCreatures) {
           result.movementEffects.movementHideBehindLargerCreatures = true
+        }
+        if (mod.spiderClimb) {
+          result.movementEffects.spiderClimb = true
+          if (mod.spiderClimbMinLevel != null) {
+            result.movementEffects.spiderClimbMinLevel = mod.spiderClimbMinLevel
+          }
         }
         break
       case "damage_resistance":

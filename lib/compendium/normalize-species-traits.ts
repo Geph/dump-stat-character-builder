@@ -1,4 +1,5 @@
 import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
+import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { FeatureChoice, Trait } from "@/lib/types"
 import bundledSpecies from "@/lib/srd/seed-data/species.json"
@@ -100,7 +101,7 @@ function speciesHasChoiceTraits(traits: Trait[]): boolean {
   return traits.some((trait) => trait.isChoice && (trait.choices?.options?.length ?? 0) > 0)
 }
 
-/** Normalize stored species rows, fill missing choice traits from bundled SRD seed, and apply modifier presets. */
+/** Normalize stored species rows, fill missing SRD choice traits from bundled seed, and apply modifier presets. */
 export function enrichSpeciesList<T extends { name: string; traits?: unknown; source?: string | null }>(
   rows: T[],
 ): T[] {
@@ -108,22 +109,44 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
     let traits = normalizeSpeciesTraits(row.traits)
     let next = { ...withModifierRefs(row), traits } as T & { modifierRefs: string[]; traits: Trait[] }
 
-    if (!isSrdSource(row.source)) {
-      return next as T
-    }
-
-    if (!speciesHasChoiceTraits(traits)) {
-      const seed = bundledSpeciesByName.get(row.name)
-      if (seed) {
-        const seedTraits = normalizeSpeciesTraits(seed.traits)
-        if (speciesHasChoiceTraits(seedTraits)) {
-          traits = seedTraits
-          next = { ...next, traits } as typeof next
+    if (isSrdSource(row.source)) {
+      if (!speciesHasChoiceTraits(traits)) {
+        const seed = bundledSpeciesByName.get(row.name)
+        if (seed) {
+          const seedTraits = normalizeSpeciesTraits(seed.traits)
+          if (speciesHasChoiceTraits(seedTraits)) {
+            traits = seedTraits
+            next = { ...next, traits } as typeof next
+          }
         }
       }
+
+      const enriched = enrichSrdSpeciesRow(next as Record<string, unknown>)
+      return {
+        ...next,
+        traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
+        size_options:
+          (enriched.size_options as string[] | undefined) ??
+          (next as { size_options?: string[] | null }).size_options ??
+          null,
+        linked_modifiers:
+          (enriched.linked_modifiers as LinkedModifierInstance[] | undefined) ??
+          (enriched.linkedModifiers as LinkedModifierInstance[] | undefined),
+        linkedModifiers:
+          (enriched.linkedModifiers as LinkedModifierInstance[] | undefined) ??
+          (enriched.linked_modifiers as LinkedModifierInstance[] | undefined),
+        modifier_refs:
+          (enriched.modifier_refs as string[] | undefined) ??
+          (enriched.modifierRefs as string[] | undefined) ??
+          next.modifierRefs,
+        modifierRefs:
+          (enriched.modifierRefs as string[] | undefined) ??
+          (enriched.modifier_refs as string[] | undefined) ??
+          next.modifierRefs,
+      } as T
     }
 
-    const enriched = enrichSrdSpeciesRow(next as Record<string, unknown>)
+    const enriched = enrichCustomSpeciesRow(next as Record<string, unknown>)
     return {
       ...next,
       traits: (enriched.traits as Trait[] | undefined) ?? next.traits,

@@ -1823,9 +1823,25 @@ function ModifierFields({
 
     case "magical_sleep_immunity":
       return (
-        <p className="text-sm text-muted-foreground">
-          The character cannot be put to sleep by magic.
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            The character cannot be put to sleep by magic.
+          </p>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.noSleepRequired)}
+              onChange={(e) => onChange({ ...mod, noSleepRequired: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Does not need sleep</span>
+          </label>
+          <TagInput
+            values={mod.immuneToNamedSpells ?? []}
+            onChange={(immuneToNamedSpells) => onChange({ ...mod, immuneToNamedSpells })}
+            placeholder="Immune to named spells (e.g. Dream)..."
+          />
+        </div>
       )
 
     case "creature_size":
@@ -1841,22 +1857,32 @@ function ModifierFields({
     case "damage_resistance":
     case "damage_immunity":
       return (
-        <TagInput
-          values={mod.damageTypes}
-          onChange={(damageTypes) => onChange({ ...mod, damageTypes })}
-          suggestions={DAMAGE_TYPES}
-          placeholder={`Add ${mod.type === "damage_resistance" ? "resistance" : "immunity"}...`}
-        />
+        <DamageCharacteristicEditor mod={mod} onChange={onChange} />
       )
 
     case "condition_immunity":
       return (
-        <TagInput
-          values={mod.conditions}
-          onChange={(conditions) => onChange({ ...mod, conditions })}
-          suggestions={SRD_CONDITIONS.map((entry) => entry.name)}
-          placeholder="Add condition immunity..."
-        />
+        <div className="space-y-3">
+          <TagInput
+            values={mod.conditions}
+            onChange={(conditions) => onChange({ ...mod, conditions })}
+            suggestions={SRD_CONDITIONS.map((entry) => entry.name)}
+            placeholder="Add condition immunity..."
+          />
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">
+              Exhaustion source exclusions (optional)
+            </label>
+            <TagInput
+              values={mod.exhaustionSourceExclusions ?? []}
+              onChange={(exhaustionSourceExclusions) =>
+                onChange({ ...mod, exhaustionSourceExclusions })
+              }
+              suggestions={["dehydration", "malnutrition", "suffocation"]}
+              placeholder="Sources that do not cause exhaustion..."
+            />
+          </div>
+        </div>
       )
 
     case "attunement_slots":
@@ -2569,6 +2595,34 @@ function MovementEffectsEditor({
           </label>
         ))}
       </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(mod.spiderClimb)}
+          onChange={(e) => onChange({ ...mod, spiderClimb: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Spider climb (climb speed equal to walk)</span>
+      </label>
+      {mod.spiderClimb ? (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Available from level</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={mod.spiderClimbMinLevel ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                spiderClimbMinLevel: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
+            className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
+            placeholder="1"
+          />
+        </div>
+      ) : null}
       <MovementTypesCheckboxGroup
         value={mod.movementTypes ?? []}
         onChange={(movementTypes) => onChange({ ...mod, movementTypes })}
@@ -2732,8 +2786,98 @@ function UnarmedStrikeDamageEditor({
               </option>
             ))}
           </select>
+          <label className="text-sm text-muted-foreground">Damage type</label>
+          <select
+            value={mod.damageType ?? ""}
+            onChange={(e) => onChange({ ...mod, damageType: e.target.value || null })}
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">Bludgeoning (default)</option>
+            {DAMAGE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          <label className="text-sm text-muted-foreground">Ability</label>
+          <select
+            value={mod.ability ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                ability: (e.target.value || null) as typeof mod.ability,
+              })
+            }
+            className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">Strength (default)</option>
+            {ABILITY_SCORE_KEYS.map((ability) => (
+              <option key={ability} value={ability}>
+                {ability.charAt(0).toUpperCase() + ability.slice(1)}
+              </option>
+            ))}
+          </select>
         </div>
       )}
+    </div>
+  )
+}
+
+function DamageCharacteristicEditor({
+  mod,
+  onChange,
+}: {
+  mod: import("@/lib/compendium/characteristic-modifiers").DamageCharacteristic
+  onChange: (next: import("@/lib/compendium/characteristic-modifiers").DamageCharacteristic) => void
+}) {
+  const choiceEnabled = (mod.choiceCount ?? 0) > 0
+
+  return (
+    <div className="space-y-3">
+      <TagInput
+        values={mod.damageTypes}
+        onChange={(damageTypes) => onChange({ ...mod, damageTypes })}
+        suggestions={DAMAGE_TYPES}
+        placeholder={`Add fixed ${mod.type === "damage_resistance" ? "resistance" : "immunity"}...`}
+      />
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={choiceEnabled}
+          onChange={(e) =>
+            onChange({
+              ...mod,
+              choiceCount: e.target.checked ? Math.max(1, mod.choiceCount ?? 1) : null,
+            })
+          }
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Player picks damage type(s) at build time</span>
+      </label>
+      {choiceEnabled ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Pick</span>
+            <input
+              type="number"
+              min={1}
+              max={13}
+              value={mod.choiceCount ?? 1}
+              onChange={(e) =>
+                onChange({ ...mod, choiceCount: Math.max(1, parseInt(e.target.value, 10) || 1) })
+              }
+              className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
+            />
+            <span className="text-muted-foreground">from the list below</span>
+          </div>
+          <TagInput
+            values={mod.choiceOptions ?? []}
+            onChange={(choiceOptions) => onChange({ ...mod, choiceOptions })}
+            suggestions={DAMAGE_TYPES}
+            placeholder="Damage type options..."
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

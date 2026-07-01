@@ -21,6 +21,7 @@ import {
   type RollTriggerKind,
   type TelepathyCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { CREATURE_TYPES } from "@/lib/compendium/constants"
 import { NestedModifierEffectEditor } from "@/components/compendium/nested-modifier-effect-editor"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { ClassResource } from "@/lib/types"
@@ -233,6 +234,26 @@ export function OnHitTriggerEditor({
         placeholder="Applies to (e.g. weapon attacks)"
         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
       />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Exclude creature types</label>
+          <TagInput
+            values={mod.excludeCreatureTypes ?? []}
+            onChange={(excludeCreatureTypes) => onChange({ ...mod, excludeCreatureTypes })}
+            suggestions={[...CREATURE_TYPES]}
+            placeholder="Construct, Undead..."
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Include only creature types</label>
+          <TagInput
+            values={mod.includeCreatureTypes ?? []}
+            onChange={(includeCreatureTypes) => onChange({ ...mod, includeCreatureTypes })}
+            suggestions={[...CREATURE_TYPES]}
+            placeholder="Optional filter..."
+          />
+        </div>
+      </div>
       <NestedModifierEffectEditor
         value={mod.effect}
         onChange={(effect) => onChange({ ...mod, effect })}
@@ -724,6 +745,22 @@ export function HealingDicePoolEditor({
             ))}
           </select>
         </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Dice per use</label>
+          <select
+            value={mod.dicePerUseSource ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                dicePerUseSource: e.target.value === "proficiency" ? "proficiency" : null,
+              })
+            }
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">From pool / max dice setting</option>
+            <option value="proficiency">Proficiency Bonus dice</option>
+          </select>
+        </div>
       </div>
     </div>
   )
@@ -842,14 +879,69 @@ export function TelepathyEditor({
 }) {
   return (
     <div className="space-y-3">
-      <input
-        type="number"
-        min={0}
-        value={mod.rangeFeet}
-        onChange={(e) => onChange({ ...mod, rangeFeet: parseInt(e.target.value, 10) || 0 })}
-        placeholder="Range (ft.)"
-        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Range (ft.)</label>
+          <input
+            type="number"
+            min={0}
+            value={mod.rangeFeet}
+            onChange={(e) => onChange({ ...mod, rangeFeet: parseInt(e.target.value, 10) || 0 })}
+            placeholder="Range (ft.)"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Range (feet per level)</label>
+          <input
+            type="number"
+            min={0}
+            value={mod.rangeFeetPerLevel ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                rangeFeetPerLevel: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
+            placeholder="e.g. 10"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Range (miles)</label>
+          <input
+            type="number"
+            min={0}
+            value={mod.rangeMiles ?? ""}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                rangeMiles: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
+            placeholder="Optional"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">Max words per message</label>
+        <input
+          type="number"
+          min={1}
+          value={mod.maxMessageWords ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...mod,
+              maxMessageWords: e.target.value ? parseInt(e.target.value, 10) : null,
+            })
+          }
+          placeholder="Optional"
+          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input
           type="checkbox"
@@ -858,6 +950,15 @@ export function TelepathyEditor({
           className="accent-primary"
         />
         <span className="text-muted-foreground">Can initiate telepathic contact</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(mod.requiresActiveToken)}
+          onChange={(e) => onChange({ ...mod, requiresActiveToken: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Requires an active token or link</span>
       </label>
     </div>
   )

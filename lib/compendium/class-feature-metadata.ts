@@ -47,6 +47,9 @@ export type EffectInputField =
   | "casterBuffLabel"
   | "castSpell"
   | "movementTypes"
+  | "remoteViewing"
+  | "checkRollTargets"
+  | "damageLinkedHeal"
 
 export type ActionEffectOption = {
   value: string
@@ -75,7 +78,7 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     hint: "Lay on Hands",
     fields: ["classResourceKey", "classResourceChange"],
   },
-  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind", fields: ["healAmount"] },
+  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind", fields: ["healAmount", "damageLinkedHeal"] },
   {
     value: "grant_temp_hp",
     label: "Grant temporary HP",
@@ -87,7 +90,7 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     label: "Extra dice on a hit",
     group: "bonus_damage",
     hint: "Sneak Attack / Divine Strike",
-    fields: ["bonusDice", "bonusByLevel"],
+    fields: ["bonusDice", "bonusByLevel", "damageLinkedHeal"],
   },
   {
     value: "bonus_damage_by_level",
@@ -147,9 +150,16 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     label: "Modify another creature",
     group: "buff_debuff",
     hint: "Rolls, speed, movement, disadvantage, action restrictions (Cutting Words, Open Hand, Sentinel)",
-    fields: ["modifyCreatureRoll", "checkCategory", "checkAbility", "checkSkills"],
+    fields: ["modifyCreatureRoll", "checkCategory", "checkAbility", "checkSkills", "checkRollTargets"],
   },
   { value: "force_save_control", label: "Force save / control", group: "buff_debuff" },
+  {
+    value: "remote_viewing",
+    label: "Remote viewing (token)",
+    group: "buff_debuff",
+    hint: "Perceive through a linked token (Hexblood Eerie Token)",
+    fields: ["remoteViewing"],
+  },
   {
     value: "movement_option",
     label: "Dash / Disengage / Hide / Related Effects",

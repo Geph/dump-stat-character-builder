@@ -2,6 +2,8 @@
 
 The **Seed SRD 5.2.1 Content** button loads structured data from `seed-data/*.json`, built from **SRD 5.2.1** (the Wizards/D&D Beyond System Reference Document).
 
+**This directory must contain only SRD-licensed seed material.** Non-SRD compendium content (e.g. Player's Handbook species) is entered in the app or kept locally; modifier wiring for those sources lives under `lib/compendium/`, not here.
+
 ## Rebuild seed files
 
 ```bash
