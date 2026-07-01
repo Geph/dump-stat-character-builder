@@ -4,10 +4,11 @@ import {
   type CharacterClassDetail,
   type CharacterClassRow,
 } from "@/lib/character/character-classes"
+import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import { loadCharacterClassRows, replaceCharacterClassRows } from "@/lib/db/character-class-rows"
 import { getDb, schema } from "./index"
 import { serializeRow } from "./serialize"
-import { eq } from "drizzle-orm"
+import { eq, inArray } from "drizzle-orm"
 
 export type { CharacterClassRow, CharacterClassDetail }
 
@@ -92,16 +93,30 @@ export async function attachMulticlassRelations(
     if (sub) allSubclasses.push(serializeRow(sub as Record<string, unknown>))
   }
 
+  const resourceRows =
+    classIds.length > 0
+      ? (
+          await db
+            .select()
+            .from(schema.classResources)
+            .where(inArray(schema.classResources.class_id, classIds))
+        ).map((row) => serializeRow(row as Record<string, unknown>))
+      : []
+
+  const classesWithResources = allClasses.map((cls) =>
+    attachClassResourcesToClass(cls as never, resourceRows as never),
+  )
+
   const classList = attachClassDetails(
     classRows,
-    allClasses as never,
+    classesWithResources as never,
     allSubclasses as never,
   )
   out.class_list = classList
 
   const primaryId = (character.class_id as string | null) ?? classRows[0]?.class_id
   if (primaryId) {
-    out.classes = allClasses.find((cls) => cls.id === primaryId) ?? out.classes
+    out.classes = classesWithResources.find((cls) => cls.id === primaryId) ?? out.classes
     const primaryRow = classRows.find((row) => row.class_id === primaryId)
     if (primaryRow?.subclass_id) {
       out.subclasses =

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
+import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language } from "@/lib/types"
@@ -58,6 +59,7 @@ import {
   COMMON_MODIFIERS_CATALOG_ID,
   isCommonModifiersCatalogAbility,
   MODIFIER_CATALOG_INFO,
+  normalizeModifierCatalog,
 } from "@/lib/compendium/modifier-catalog"
 import {
   getSystemCatalogMeta,
@@ -837,6 +839,12 @@ function CompendiumPageContent() {
                 {(data as { description?: string }).description}
               </p>
             )}
+            {activeTab === "abilities" &&
+              isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {getSystemCatalogMeta(data.id as string)?.info ?? MODIFIER_CATALOG_INFO}
+                </p>
+              )}
             {(data as { attached_to_type?: string; attached_to_id?: string }).attached_to_type && (
               <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
                 {(data as { attached_to_type: string; attached_to_id?: string }).attached_to_type === "equipment" &&
@@ -1464,6 +1472,48 @@ function CompendiumPageContent() {
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
           )}
+          {activeTab === "abilities" &&
+          isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) ? (
+            <div className="space-y-4">
+              <RichTextContent
+                html={
+                  (selectedItem as { description?: string }).description ??
+                  `<p>${getSystemCatalogMeta(selectedItem.id as string)?.info ?? MODIFIER_CATALOG_INFO}</p>`
+                }
+              />
+              {(() => {
+                const entries = normalizeModifierCatalog(
+                  (selectedItem as { modifier_catalog?: unknown }).modifier_catalog,
+                )
+                if (!entries.length) return null
+                return (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-white/80">
+                      {entries.length} option{entries.length === 1 ? "" : "s"}
+                    </h3>
+                    <ul className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                      {entries.map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="rounded-lg border border-white/10 bg-white/5 p-3"
+                        >
+                          <p className="font-semibold text-white">{entry.name}</p>
+                          {entry.summary ? (
+                            <p className="text-sm text-white/70 mt-1">{entry.summary}</p>
+                          ) : null}
+                          {entry.description ? (
+                            <div className="text-sm text-white/60 mt-2 prose prose-invert prose-sm max-w-none">
+                              <RichTextContent html={entry.description} />
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })()}
+            </div>
+          ) : null}
           {(selectedItem as { creator_url?: string | null }).creator_url && (
             <p className="mt-4 text-sm">
               <span className="text-white/50">Source link: </span>
@@ -1479,6 +1529,7 @@ function CompendiumPageContent() {
           )}
         </CompendiumDetailOverlay>
       )}
+      <SiteFooter />
     </div>
   )
 }

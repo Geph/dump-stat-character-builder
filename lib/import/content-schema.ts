@@ -102,10 +102,8 @@ export const FeatImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   prerequisite: z.string().nullable().optional(),
-  category: z
-    .enum(["Origin", "General", "Fighting Style", "Epic Boon"])
-    .nullable()
-    .optional(),
+  category: z.string().nullable().optional(),
+  level_requirement: z.number().nullable().optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
 })
 

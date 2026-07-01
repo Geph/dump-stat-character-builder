@@ -1,4 +1,5 @@
 import { FEAT_MILESTONES } from "@/lib/builder/feat-selection"
+import { scaledClassFeatGrantCount } from "@/lib/builder/scaled-feat-grant-counts"
 import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import {
   featureGrantsFeats,
@@ -39,15 +40,22 @@ function collectFeatPickSlotsFromFeatures(params: {
           ? featureChoiceKey(classId, feature.name, feature.level)
           : featureChoiceKey(classId, `${feature.name}:${grant.catalogEntryId}:${grantIndex}`, feature.level)
 
-      for (let n = 0; n < grant.count; n++) {
+      const grantCount = scaledClassFeatGrantCount(
+        className,
+        feature.name,
+        maxLevel,
+        grant.count,
+      )
+
+      for (let n = 0; n < grantCount; n++) {
         slots.push({
-          key: grant.count === 1 ? key : `${key}:${n}`,
+          key: grantCount === 1 ? key : `${key}:${n}`,
           classId,
           className,
           feature,
           milestoneLevel: feature.level,
           featCategories: grant.featCategories,
-          label: grant.count === 1 ? grant.label : `${grant.label} (${n + 1}/${grant.count})`,
+          label: grantCount === 1 ? grant.label : `${grant.label} (${n + 1}/${grantCount})`,
         })
       }
     })

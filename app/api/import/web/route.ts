@@ -19,6 +19,9 @@ import {
 } from "@/lib/import/background-parse"
 import { parseBackgroundAbilityScoresLine } from "@/lib/compendium/background-utils"
 import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
+import { assertPublicFetchHostname } from "@/lib/network/ssrf-guard"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
+import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
@@ -341,16 +344,21 @@ function parseFromUrl(path: string, html: string, url: string): { result: Record
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const { url, contentType } = await request.json()
     
     if (!url) {
       return NextResponse.json({ error: "No URL provided" }, { status: 400 })
     }
 
-    // Validate URL
+    // Web-import allowlist — do not expand without license review (third-party/homebrew only).
     const parsedUrl = new URL(url)
     const allowedHosts = ["dnd2024.wikidot.com", "www.dnd2024.wikidot.com"]
-    
+
+    assertPublicFetchHostname(parsedUrl.hostname)
+
     if (!allowedHosts.includes(parsedUrl.hostname)) {
       return NextResponse.json(
         { error: "URL not from a supported source. Supported: dnd2024.wikidot.com" },
@@ -412,7 +420,12 @@ export async function POST(request: NextRequest) {
       row = normalizeBackgroundRow(finalizeBackgroundImportRow(row, spells) as Record<string, unknown>)
     }
 
-    await upsertByName(tableName, [row])
+    await upsertByName(tableName, [
+      {
+        ...row,
+        source: sanitizeImportRowSource(row.source, parsedUrl.hostname),
+      },
+    ])
 
     return NextResponse.json({
       success: true,

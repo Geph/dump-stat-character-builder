@@ -7,7 +7,7 @@ import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-his
 type D20RollButtonProps = {
   modifier: number
   title?: string
-  size?: "sm" | "md"
+  size?: "sm" | "md" | "lg"
   breakdown?: { label: string; value: number }[]
   onRoll?: () => void
 }
@@ -34,9 +34,11 @@ export function D20RollButton({ modifier, title, size = "sm", breakdown, onRoll 
   const history = useSheetRollHistory()
 
   const sizeClass =
-    size === "md"
-      ? "h-7 min-w-[2.75rem] px-2 text-sm gap-1.5"
-      : "h-6 min-w-[2.25rem] px-1.5 text-xs gap-1"
+    size === "lg"
+      ? "h-11 min-w-11 px-2 text-sm gap-1.5"
+      : size === "md"
+        ? "h-9 min-w-9 px-2 text-sm gap-1.5"
+        : "h-6 min-w-[2.25rem] px-1.5 text-xs gap-1"
 
   const modLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`
 

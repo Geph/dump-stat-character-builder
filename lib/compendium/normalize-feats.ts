@@ -1,3 +1,4 @@
+import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
 import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -19,7 +20,7 @@ export function normalizeFeatRow(
 ): Feat {
   const enriched = isSrdSource(row.source as string | null | undefined)
     ? enrichSrdFeatRow(row)
-    : row
+    : enrichCustomFeatRow(row)
   return {
     ...(enriched as unknown as Feat),
     isChoice: Boolean(enriched.is_choice ?? enriched.isChoice),

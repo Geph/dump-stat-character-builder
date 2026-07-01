@@ -203,9 +203,8 @@ const FeatAiSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   prerequisite: z.string().nullable(),
-  category: z
-    .enum(["Origin", "General", "Fighting Style", "Epic Boon"])
-    .nullable(),
+  category: z.string().nullable(),
+  level_requirement: z.number().nullable().optional(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 

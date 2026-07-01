@@ -60,7 +60,7 @@ describe("preprocessImportText", () => {
     const resourceKeys = (result.deterministic.class_resources ?? []).map((row) => row.resource_key)
     expect(resourceKeys.length).toBeGreaterThan(0)
     expect(resourceKeys).toContain("exploit_dice")
-    expect(resourceKeys).toContain("exploit_die_size")
+    expect(resourceKeys).not.toContain("exploit_die_size")
   })
 
   it("strips plain-text progression table runs", () => {

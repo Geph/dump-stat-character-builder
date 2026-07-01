@@ -68,13 +68,6 @@ describe("SRD species enrichment — languages & size", () => {
 })
 
 describe("isFeatEligibleForCategories — Origin slots", () => {
-  const ctx: FeatSlotContext = {
-    totalLevel: 1,
-    classIds: [],
-    selectedFeatIds: [],
-    speciesId: "species_human",
-    backgroundId: null,
-  }
   const originFeat: Feat = {
     id: "feat_skilled",
     name: "Skilled",
@@ -86,6 +79,14 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
     category: "General",
     level_requirement: 4,
   } as Feat
+  const ctx: FeatSlotContext = {
+    totalLevel: 1,
+    classIds: [],
+    feats: [originFeat, generalFeat],
+    ownedFeatIds: [],
+    speciesId: "species_human",
+    backgroundId: null,
+  }
 
   it("allows an Origin feat for an Origin-grant slot (Human Versatile)", () => {
     expect(isFeatEligibleForCategories(originFeat, ["Origin"], 1, ctx)).toBe(true)
@@ -109,16 +110,20 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
       category: "Fighting Style",
       level_requirement: null,
     } as Feat
+    const fightingCtx: FeatSlotContext = {
+      ...ctx,
+      feats: [...ctx.feats, fightingStyleFeat],
+    }
     // milestoneLevel = 2 (Paladin grants Fighting Style at level 2)
     expect(
       isFeatEligibleForCategories(fightingStyleFeat, ["Fighting Style"], 2, {
-        ...ctx,
+        ...fightingCtx,
         totalLevel: 2,
       }),
     ).toBe(true)
     // Also valid for Fighter's level-1 Fighting Style.
     expect(
-      isFeatEligibleForCategories(fightingStyleFeat, ["Fighting Style"], 1, ctx),
+      isFeatEligibleForCategories(fightingStyleFeat, ["Fighting Style"], 1, fightingCtx),
     ).toBe(true)
   })
 })

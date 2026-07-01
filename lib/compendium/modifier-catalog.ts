@@ -106,6 +106,8 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   resource_ability_menu: "Resources & uses",
   extra_turn: "Active abilities",
   grant_feat: "Feats & choices",
+  equipment_and_magic_items: "Equipment & items",
+  catalog_option: "Feats & choices",
   rest_replacement: "Resources & uses",
   creature_size: "Movement & senses",
   magical_sleep_immunity: "Damage mitigation",

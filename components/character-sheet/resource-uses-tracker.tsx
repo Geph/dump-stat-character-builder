@@ -1,7 +1,7 @@
 "use client"
 
 import { RotateCcw } from "lucide-react"
-import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
+import { resolveUsesAtLevel, formatResourceDieLabel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import type { UsesConfig } from "@/lib/types"
 
 export type ResourceTrackerEntry = {
@@ -68,10 +68,12 @@ export function ResourceUsesTracker({
       </div>
       {trackable.map(({ entry, max }) => {
         const used = usedById[entry.id] ?? 0
+        const dieLabel = formatResourceDieLabel(entry.uses, entry.classLevel)
+        const displayName = dieLabel ? `${entry.name} (${dieLabel})` : entry.name
         return (
           <div key={entry.id} className="rounded-lg border border-border/70 bg-muted/25 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <p className="text-xs font-bold text-foreground">{entry.name}</p>
+              <p className="text-xs font-bold text-foreground">{displayName}</p>
               <span className="text-[10px] tabular-nums text-muted-foreground">
                 {max - used} / {max}
               </span>

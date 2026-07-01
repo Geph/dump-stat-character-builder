@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
 import { Plus, User, Trash2, Search, Pencil } from "lucide-react"
 import Link from "next/link"
@@ -397,6 +398,7 @@ export default function CharactersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <SiteFooter />
     </div>
   )
 }

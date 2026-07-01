@@ -46,6 +46,18 @@ describe("enrichSrdFeatRow SRD presets", () => {
     expect(row.linked_modifiers).toEqual(existing)
   })
 
+  it("wires Grappler with punch-and-grab on-hit trigger", () => {
+    const row = enrichSrdFeatRow({
+      name: "Grappler",
+      source: SRD_SOURCE,
+      description: "Punch and Grab",
+    })
+    const linked = (row.linked_modifiers ?? []) as { characteristics?: { type: string }[] }[]
+    expect(linked.flatMap((inst) => inst.characteristics ?? []).some((c) => c.type === "on_hit_trigger")).toBe(
+      true,
+    )
+  })
+
   it("exposes presets only for bundled SRD feats", () => {
     for (const name of ["Alert", "Skilled", "Archery", "Boon of Truesight"]) {
       expect(presetForFeatName(name)?.linkedModifiers?.length).toBeGreaterThan(0)

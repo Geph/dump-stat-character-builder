@@ -219,6 +219,16 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "resource_ability_menu", label: "Resource Ability Menu" },
   { value: "extra_turn", label: "Extra Turn" },
   { value: "grant_feat", label: "Gain a Feat" },
+  {
+    value: "equipment_and_magic_items",
+    label: "Equipment & Magic Items",
+    hint: "Create mundane gear or replicate magic item plans (Artificer)",
+  },
+  {
+    value: "catalog_option",
+    label: "Catalog Option",
+    hint: "Selected entry from a system option catalog (Metamagic, Eldritch Invocation)",
+  },
   { value: "rest_replacement", label: "Alternate Rest Duration" },
   { value: "magical_sleep_immunity", label: "Magical Sleep Immunity" },
   { value: "creature_size", label: "Change Size" },
@@ -246,6 +256,25 @@ export interface CharacteristicModifierBase {
   sharedChoiceGroup?: string
   /** Total picks allowed across all modifiers in the group. */
   sharedChoiceCount?: number
+  /** Bonus only applies while the matching sheet toggle is active. */
+  requiresSheetToggle?: SheetToggleKey
+}
+
+export type SheetToggleKey = "while_raging" | "below_half_hp"
+
+export type AcFormulaOption = {
+  id: string
+  label: string
+  kind: "ability_modifiers" | "set_fixed"
+  base?: number
+  abilities?: AbilityModifierKey[]
+  fixedAc?: number
+  includeProficiency?: boolean
+}
+
+export type AggregateCharacteristicsOptions = {
+  activeSheetToggles?: ReadonlySet<SheetToggleKey>
+  selectedAcFormulaId?: string | null
 }
 
 export type AbilityScoresMode = "fixed" | "asi_pool"
@@ -811,6 +840,25 @@ export interface GrantFeatCharacteristic extends CharacteristicModifierBase {
   count: number
 }
 
+export type EquipmentMagicItemsMode = "create_mundane" | "replicate_magic_item"
+
+export interface EquipmentAndMagicItemsCharacteristic extends CharacteristicModifierBase {
+  type: "equipment_and_magic_items"
+  mode: EquipmentMagicItemsMode
+  /** Named mundane items or magic item plan labels. */
+  itemOptions?: string[]
+  choiceCount?: number
+  usesPerLongRest?: number | "ability_modifier"
+  usesAbility?: AbilityScoreKey
+  planTables?: { minArtificerLevel: number; label: string }[]
+}
+
+export interface CatalogOptionCharacteristic extends CharacteristicModifierBase {
+  type: "catalog_option"
+  catalogAbilityId: string
+  catalogEntryId: string
+}
+
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
@@ -855,6 +903,8 @@ export type CharacteristicModifier =
   | SpellcastingAbilityCharacteristic
   | UsesCharacteristic
   | GrantFeatCharacteristic
+  | EquipmentAndMagicItemsCharacteristic
+  | CatalogOptionCharacteristic
 
 export function createModifierId(): string {
   return `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -985,6 +1035,10 @@ export function createCharacteristicModifier(
       return { id, type, firstRoundOnly: true, turnCount: 1 }
     case "grant_feat":
       return { id, type, featCategories: ["General"], count: 1 }
+    case "equipment_and_magic_items":
+      return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
+    case "catalog_option":
+      return { id, type, catalogAbilityId: "", catalogEntryId: "" }
   }
 }
 
@@ -1470,6 +1524,8 @@ export type AggregatedCharacteristics = {
   acAbilityMods: AbilityModifierKey[]
   acBase: number
   acIncludeProficiency: boolean
+  /** Competing base AC formulas (multiclass UD, magic items) — player picks one. */
+  acFormulaOptions: AcFormulaOption[]
   hpFlatBonus: number
   hpPerLevel: number
   initiativeFlatBonus: number
@@ -1520,6 +1576,8 @@ export type AggregatedCharacteristics = {
     spiderClimb: boolean
     spiderClimbMinLevel: number | null
   }
+  catalogOptions: CatalogOptionCharacteristic[]
+  equipmentMagicItems: EquipmentAndMagicItemsCharacteristic[]
 }
 
 const UNARMED_DIE_RANK: Record<UnarmedStrikeDie, number> = {
@@ -1546,6 +1604,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   acAbilityMods: [],
   acBase: 10,
   acIncludeProficiency: false,
+  acFormulaOptions: [],
   hpFlatBonus: 0,
   hpPerLevel: 0,
   initiativeFlatBonus: 0,
@@ -1595,6 +1654,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
     spiderClimb: false,
     spiderClimbMinLevel: null,
   },
+  catalogOptions: [],
+  equipmentMagicItems: [],
 })
 
 function pushUnique(list: string[], values: string[] | null | undefined) {
@@ -1611,12 +1672,81 @@ function pickHigherUnarmedDie(
   return UNARMED_DIE_RANK[next] > UNARMED_DIE_RANK[current] ? next : current
 }
 
+function isModifierActive(
+  mod: CharacteristicModifier,
+  toggles?: ReadonlySet<SheetToggleKey>,
+): boolean {
+  const gate = mod.requiresSheetToggle
+  if (!gate) return true
+  return toggles?.has(gate) ?? false
+}
+
+function evaluateAcFormulaScore(
+  option: AcFormulaOption,
+  abilityMods: Record<AbilityScoreKey, number>,
+  proficiencyBonus: number,
+): number {
+  if (option.kind === "set_fixed") {
+    let ac = option.fixedAc ?? 0
+    if (option.includeProficiency) ac += proficiencyBonus
+    return ac
+  }
+  let ac = option.base ?? 10
+  for (const key of option.abilities ?? []) {
+    ac += abilityMods[abilityModifierKeyToScoreKey(key)]
+  }
+  if (option.includeProficiency) ac += proficiencyBonus
+  return ac
+}
+
+export function resolveAggregatedAcFormula(
+  aggregated: AggregatedCharacteristics,
+  params: {
+    selectedFormulaId?: string | null
+    abilityMods: Record<AbilityScoreKey, number>
+    proficiencyBonus: number
+  },
+): void {
+  const { selectedFormulaId, abilityMods, proficiencyBonus } = params
+  if (!aggregated.acFormulaOptions.length) return
+
+  const byId = new Map(aggregated.acFormulaOptions.map((option) => [option.id, option]))
+  let chosen =
+    (selectedFormulaId ? byId.get(selectedFormulaId) : null) ??
+  null
+
+  if (!chosen) {
+    chosen = aggregated.acFormulaOptions.reduce((best, option) => {
+      if (!best) return option
+      const bestScore = evaluateAcFormulaScore(best, abilityMods, proficiencyBonus)
+      const optionScore = evaluateAcFormulaScore(option, abilityMods, proficiencyBonus)
+      return optionScore > bestScore ? option : best
+    }, null as AcFormulaOption | null)
+  }
+
+  if (!chosen) return
+
+  if (chosen.kind === "set_fixed") {
+    aggregated.acFixed = chosen.fixedAc ?? null
+    aggregated.acAbilityMods = []
+    aggregated.acBase = 10
+  } else {
+    aggregated.acFixed = null
+    aggregated.acBase = chosen.base ?? 10
+    aggregated.acAbilityMods = (chosen.abilities ?? []).slice(0, 2)
+  }
+  aggregated.acIncludeProficiency = chosen.includeProficiency ?? false
+}
+
 export function aggregateCharacteristics(
   mods: CharacteristicModifier[],
+  options?: AggregateCharacteristicsOptions,
 ): AggregatedCharacteristics {
   const result = emptyAggregated()
+  const toggles = options?.activeSheetToggles
 
   for (const mod of mods) {
+    if (!isModifierActive(mod, toggles)) continue
     switch (mod.type) {
       case "ability_scores":
         if (mod.mode === "asi_pool") break
@@ -1660,10 +1790,22 @@ export function aggregateCharacteristics(
             result.acFlatBonus += mod.flatBonus ?? 0
           }
         } else if (mod.mode === "set_fixed") {
-          result.acFixed = Math.max(result.acFixed ?? 0, mod.fixedAc ?? 0)
+          result.acFormulaOptions.push({
+            id: mod.id,
+            label: mod.label ?? "Fixed AC",
+            kind: "set_fixed",
+            fixedAc: mod.fixedAc ?? 0,
+            includeProficiency: mod.includeProficiency ?? false,
+          })
         } else if (mod.mode === "ability_modifiers") {
-          result.acBase = mod.base ?? 10
-          result.acAbilityMods = (mod.abilities ?? []).slice(0, 2)
+          result.acFormulaOptions.push({
+            id: mod.id,
+            label: mod.label ?? "Unarmored Defense",
+            kind: "ability_modifiers",
+            base: mod.base ?? 10,
+            abilities: (mod.abilities ?? []).slice(0, 2),
+            includeProficiency: mod.includeProficiency ?? false,
+          })
         } else if (mod.mode === "add_proficiency") {
           result.acIncludeProficiency = true
         }
@@ -1860,6 +2002,12 @@ export function aggregateCharacteristics(
         pushUnique(result.spellListAccess, mod.classNames)
         break
       case "uses":
+        break
+      case "catalog_option":
+        result.catalogOptions.push(mod)
+        break
+      case "equipment_and_magic_items":
+        result.equipmentMagicItems.push(mod)
         break
     }
   }

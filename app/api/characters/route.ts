@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { getPool } from "@/lib/db/index"
-import { runPendingMigrationsOnPool } from "@/lib/db/migrate"
+import { ensureMigrationsApplied } from "@/lib/db/migrate"
 import { insertCharacter, listCharactersWithRelations } from "@/lib/db/characters"
 
 export async function GET() {
@@ -9,7 +10,7 @@ export async function GET() {
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const data = await listCharactersWithRelations()
     return NextResponse.json({ data })
@@ -24,10 +25,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
-    await runPendingMigrationsOnPool(getPool())
+    await ensureMigrationsApplied(getPool())
 
     const body = await request.json()
     const row = Array.isArray(body) ? body[0] : body.rows?.[0] ?? body

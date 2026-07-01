@@ -199,7 +199,7 @@ describe("detectFeatureModifiers", () => {
         expect(effects).toHaveLength(3)
         expect(effects.every((e) => e.checkRollMode === "bonus")).toBe(true)
         expect(effects[0]?.bonusConfig?.dieScaling).toBe("class_resource")
-        expect(effects[0]?.bonusConfig?.classResourceKey).toBe("exploit_die_size")
+        expect(effects[0]?.bonusConfig?.classResourceKey).toBe("exploit_dice")
       },
     },
     {

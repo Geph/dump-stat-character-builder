@@ -30,13 +30,15 @@ describe("parseClassProgressionTable", () => {
     expect(parsed).not.toBeNull()
     const keys = parsed!.columns.map((col) => col.resourceKey)
     expect(keys).toContain("exploit_dice")
-    expect(keys).toContain("exploit_die_size")
+    expect(keys).not.toContain("exploit_die_size")
     expect(keys).not.toContain("exploits_known")
     expect(keys).not.toContain("fighting_styles")
 
-    const dieSize = parsed!.columns.find((col) => col.resourceKey === "exploit_die_size")
-    expect(dieSize?.valuesByLevel).toContainEqual({ level: 2, count: 6 })
-    expect(dieSize?.valuesByLevel).toContainEqual({ level: 5, count: 8 })
+    const exploitDice = parsed!.columns.find((col) => col.resourceKey === "exploit_dice")
+    expect(exploitDice?.valuesByLevel).toContainEqual({ level: 2, count: 2 })
+    expect(exploitDice?.valuesByLevel).toContainEqual({ level: 5, count: 3 })
+    expect(exploitDice?.dieSidesByLevel).toContainEqual({ level: 2, count: 6 })
+    expect(exploitDice?.dieSidesByLevel).toContainEqual({ level: 5, count: 8 })
   })
 
   it("parses Captain Battle Dice column with NdM pool notation", () => {

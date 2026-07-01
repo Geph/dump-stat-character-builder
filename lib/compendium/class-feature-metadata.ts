@@ -5,6 +5,7 @@ export const FEAT_PICK_CATEGORIES = [
   "Origin",
   "Metamagic",
   "Eldritch Invocation",
+  "Planar Pact",
 ] as const
 
 export type FeatPickCategory = (typeof FEAT_PICK_CATEGORIES)[number]

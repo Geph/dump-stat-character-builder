@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
 import { deleteRowById, getRowById, updateRowById } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
@@ -34,6 +35,9 @@ export async function PATCH(
   { params }: { params: Promise<{ table: string; id: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 
@@ -57,10 +61,13 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ table: string; id: string }> },
 ) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const configError = getDatabaseConfigError()
     if (configError) return NextResponse.json({ error: configError }, { status: 503 })
 

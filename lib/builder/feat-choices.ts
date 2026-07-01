@@ -19,6 +19,7 @@ export function grantedFeatChoicePickKey(featId: string): string {
 export function buildFeatSelectionEntries(params: {
   featPickSlots: { key: string }[]
   speciesFeatPickSlots: { key: string }[]
+  backgroundFeatPickSlots?: { key: string }[]
   featureChoicePicks: Record<string, string[]>
   grantedFeatIds: string[]
 }): FeatSelectionEntry[] {
@@ -30,6 +31,11 @@ export function buildFeatSelectionEntries(params: {
   }
 
   for (const slot of params.speciesFeatPickSlots) {
+    const featId = params.featureChoicePicks[slot.key]?.[0]
+    if (featId) entries.push({ featId, choicePickKey: featChoicePickKey(slot.key) })
+  }
+
+  for (const slot of params.backgroundFeatPickSlots ?? []) {
     const featId = params.featureChoicePicks[slot.key]?.[0]
     if (featId) entries.push({ featId, choicePickKey: featChoicePickKey(slot.key) })
   }

@@ -61,7 +61,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /exploit\s*dice/i,
     displayName: "Exploit Dice",
     definition:
-      "Pool of dice spent to fuel Martial Exploits and similar techniques. Die size scales by level; pool recharges on a short rest.",
+      "Pool of Exploit Dice spent to fuel Martial Exploits. Die size and pool count scale on the class level table; recharges on a short rest.",
     defaultUses: {
       type: "at_level",
       atLevelMode: "tier",
@@ -79,7 +79,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /exploit\s*die(?!\s*dice)/i,
     displayName: "Exploit Die",
     definition:
-      "Die type (d6, d8, d10, d12) rolled when spending Exploit Dice — scales on the class level table, not a spendable pool.",
+      "Legacy table column for exploit die size — merged into Exploit Dice at import (not a separate pool).",
     spendPatterns: [],
   },
   {

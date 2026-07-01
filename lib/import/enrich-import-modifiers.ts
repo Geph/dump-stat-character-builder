@@ -139,6 +139,41 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
   })
 }
 
+function enrichEquipmentRows(
+  equipment: ImportContent["equipment"] | undefined,
+): ImportContent["equipment"] | undefined {
+  if (!equipment?.length) return equipment
+  return equipment.map((item) => {
+    const description = item.description ?? ""
+    if (!description.trim()) return item
+    const enriched = enrichFeatureLike(
+      {
+        name: item.name,
+        description,
+        linkedModifiers: (item as { linkedModifiers?: Feature["linkedModifiers"] }).linkedModifiers,
+        modifierRefs: (item as { modifierRefs?: Feature["modifierRefs"] }).modifierRefs,
+        magic_effects: (item as { magic_effects?: Feature["linkedModifiers"] }).magic_effects,
+      },
+      {
+        contentKind: "class_feature",
+        sourceName: item.name,
+        featureName: item.name,
+      },
+    )
+    const magicEffects =
+      enriched.linkedModifiers ??
+      (item as { magic_effects?: Feature["linkedModifiers"] }).magic_effects ??
+      []
+    return {
+      ...item,
+      magic_effects: magicEffects,
+      linkedModifiers: enriched.linkedModifiers,
+      modifierRefs: enriched.modifierRefs,
+      importModifierMeta: enriched.importModifierMeta,
+    }
+  }) as ImportContent["equipment"]
+}
+
 /** Run AI mechanics parsing + mechanical phrase detection on importable features. */
 export function enrichImportContentModifiers(content: ImportContent): ImportContent {
   const next: ImportContent = { ...content }
@@ -192,6 +227,10 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
 
   if (content.feats?.length) {
     next.feats = enrichFeats(content.feats)
+  }
+
+  if (content.equipment?.length) {
+    next.equipment = enrichEquipmentRows(content.equipment)
   }
 
   const withSpells = attachReferencedSpellsFromSupplements(

@@ -737,6 +737,38 @@ export function modifierPlayerChoiceSlotsForSource(
   return slots.filter((slot) => slot.sourceKey === sourceKey)
 }
 
+/** Spell-grant picks from class/subclass features (Mystic Arcanum, Contact Patron, etc.). */
+export function classFeatureSpellGrantSlots(
+  slots: ModifierPlayerChoiceSlot[],
+  classLevels: { classId: string; level: number }[],
+  classes: DndClass[],
+  subclasses: Subclass[],
+  subclassByClassId: Record<string, string>,
+): ModifierPlayerChoiceSlot[] {
+  const activeSourceKeys = new Set<string>()
+
+  for (const entry of classLevels) {
+    const cls = classes.find((row) => row.id === entry.classId)
+    if (!cls) continue
+    for (const feature of cls.features ?? []) {
+      if (feature.level <= entry.level) {
+        activeSourceKeys.add(featureChoiceKey(entry.classId, feature.name, feature.level))
+      }
+    }
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+      const subclass = subclasses.find((row) => row.id === subclassId)
+      for (const feature of subclass?.features ?? []) {
+        if (feature.level <= entry.level) {
+          activeSourceKeys.add(featureChoiceKey(entry.classId, feature.name, feature.level))
+        }
+      }
+    }
+  }
+
+  return slots.filter((slot) => slot.kind === "spell" && activeSourceKeys.has(slot.sourceKey))
+}
+
 export function isSkillOrToolOptionName(name: string): boolean {
   return SKILL_NAME_SET.has(name) || TOOL_NAME_SET.has(name)
 }

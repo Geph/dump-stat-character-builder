@@ -7,19 +7,24 @@ import {
 } from "@/lib/import/import-route-utils"
 import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
-import { parseFoundryDnd5eJson } from "@/lib/import/parse-foundry-dnd5e"
+import { parseFoundryInput } from "@/lib/import/parse-foundry-dnd5e"
+import { respondToFoundryParseResult } from "@/lib/import/foundry-import-route"
 import { finalizeImportedContent } from "@/lib/import/finalize-import"
 import { normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
+import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = requireMutationAuth(request)
+    if (authError) return authError
+
     const body = await request.json()
     const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, materialSource } =
       body
@@ -79,12 +84,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const foundryContent = trimmedText ? parseFoundryDnd5eJson(trimmedText) : null
-    if (foundryContent) {
-      return await runTextImportPipeline(foundryContent, {
-        charLength: trimmedText.length,
-        materialSource: materialSource ?? "Foundry VTT Import",
-      })
+    const foundryResult = trimmedText ? parseFoundryInput(trimmedText) : { kind: "not_foundry" as const }
+    if (foundryResult.kind !== "not_foundry") {
+      const response = await respondToFoundryParseResult(foundryResult, trimmedText.length)
+      if (response) return response
     }
 
     if (importMode === "byo-json" || importMode === "structured-json") {

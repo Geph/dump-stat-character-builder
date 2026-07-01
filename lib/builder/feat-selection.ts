@@ -1,15 +1,32 @@
+import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
 import type { Feat } from "@/lib/types"
 
 export const FEAT_MILESTONES = [4, 8, 12, 16, 19] as const
 
+/** Feat categories where a character may only own one feat at a time. */
+export const MUTUALLY_EXCLUSIVE_FEAT_CATEGORIES = new Set<string>(["Planar Pact"])
+
 export type FeatSlotContext = {
   totalLevel: number
   classIds: string[]
-  selectedFeatIds: string[]
+  feats: Feat[]
+  /** All feat ids the character currently owns (picks + fixed grants). */
+  ownedFeatIds: string[]
   speciesId: string | null
   backgroundId: string | null
-  /** Feat id already chosen for this slot (excluded from taken set). */
+  /** Feat id already chosen for this slot (excluded from taken / exclusivity checks). */
   currentSlotFeatId?: string | null
+}
+
+export function buildOwnedFeatIds(params: {
+  featureChoicePicks: Record<string, string[]>
+  pickSlotKeys: string[]
+  grantedFeatIds: string[]
+}): string[] {
+  const picked = params.pickSlotKeys
+    .map((key) => params.featureChoicePicks[key]?.[0])
+    .filter((id): id is string => Boolean(id))
+  return [...new Set([...picked, ...params.grantedFeatIds])]
 }
 
 export function normalizeFeatCategory(category: string | null | undefined): string {
@@ -19,7 +36,28 @@ export function normalizeFeatCategory(category: string | null | undefined): stri
   if (lower.includes("fighting style")) return "Fighting Style"
   if (lower.includes("origin")) return "Origin"
   if (lower.includes("general")) return "General"
-  return category
+  if (lower.includes("planar pact")) return "Planar Pact"
+  return category.trim()
+}
+
+export function isMutuallyExclusiveFeatCategory(category: string): boolean {
+  return MUTUALLY_EXCLUSIVE_FEAT_CATEGORIES.has(normalizeFeatCategory(category))
+}
+
+function featById(feats: Feat[], id: string): Feat | undefined {
+  return feats.find((feat) => feat.id === id)
+}
+
+function hasExclusiveCategoryConflict(feat: Feat, context: FeatSlotContext): boolean {
+  const category = normalizeFeatCategory(feat.category)
+  if (!isMutuallyExclusiveFeatCategory(category)) return false
+
+  return context.ownedFeatIds
+    .filter((id) => id && id !== context.currentSlotFeatId)
+    .some((id) => {
+      const other = featById(context.feats, id)
+      return other != null && normalizeFeatCategory(other.category) === category
+    })
 }
 
 export function isEpicBoonFeat(feat: Feat): boolean {
@@ -54,24 +92,22 @@ export function isFeatEligibleForCategories(
   if (!normalizedCategories.has(category)) return false
 
   const taken = new Set(
-    context.selectedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
+    context.ownedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
-  // Origin feats are only valid when the slot explicitly asks for them (e.g. species
-  // grants like Human's Versatile, or background origin-feat slots). Milestone/General
-  // slots never include "Origin" in their categories, so they are already filtered above.
   const isOriginSlot = normalizedCategories.has("Origin")
   if (category === "Origin" && !isOriginSlot) return false
   if (!feat.repeatable && taken.has(feat.id)) return false
+  if (hasExclusiveCategoryConflict(feat, context)) return false
 
-  // Origin and Fighting Style feats are gated by the granting source (species,
-  // background, or a class's Fighting Style feature), not by a level-4 milestone,
-  // so they default to level 1 when no explicit requirement is set.
   const minLevel =
     feat.level_requirement ??
     (category === "Epic Boon"
       ? 19
-      : category === "Origin" || category === "Fighting Style"
+      : category === "Origin" ||
+          category === "Fighting Style" ||
+          category === "Planar Pact" ||
+          slotUsesCatalogFeatPicks(categories.map(normalizeFeatCategory))
         ? 1
         : 4)
   if (minLevel > context.totalLevel || minLevel > milestoneLevel) return false
@@ -88,7 +124,7 @@ export function isFeatEligibleForCategories(
     }
   }
   if (feat.prerequisite_feat_ids?.length) {
-    if (!feat.prerequisite_feat_ids.every((id) => context.selectedFeatIds.includes(id))) return false
+    if (!feat.prerequisite_feat_ids.every((id) => context.ownedFeatIds.includes(id))) return false
   }
 
   return true

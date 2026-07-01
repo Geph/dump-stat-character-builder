@@ -16,6 +16,30 @@ function tierCount(table: { level: number; count: number }[], characterLevel: nu
   return count
 }
 
+function parseDieSidesFromType(dieType: UsesConfig["dieType"]): number | null {
+  if (!dieType) return null
+  const match = dieType.match(/^d(\d+)$/i)
+  if (!match) return null
+  const sides = parseInt(match[1], 10)
+  return Number.isFinite(sides) ? sides : null
+}
+
+/** Resolve die sides for a level-scaled dice pool (e.g. Exploit Dice d8 at level 5). */
+export function resolveDieSidesAtLevel(
+  uses: UsesConfig,
+  characterLevel: number,
+): number | null {
+  const table = uses.dieSidesByLevel ?? []
+  if (table.length) return tierCount(table, characterLevel) || null
+  return parseDieSidesFromType(uses.dieType)
+}
+
+/** Human-readable die label for a dice pool resource at a given level. */
+export function formatResourceDieLabel(uses: UsesConfig, characterLevel: number): string | null {
+  const sides = resolveDieSidesAtLevel(uses, characterLevel)
+  return sides != null ? `d${sides}` : uses.dieType ?? null
+}
+
 /** Resolve maximum uses for a UsesConfig at a given character level. */
 export function resolveUsesAtLevel(
   uses: UsesConfig,

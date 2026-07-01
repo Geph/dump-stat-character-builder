@@ -16,6 +16,8 @@ import {
   parseSubclassSpellTable,
   resolveSpellNamesToIds,
 } from "@/lib/import/subclass-spell-table"
+import type { FoundryImportMeta } from "@/lib/import/foundry-types"
+import { mergeFoundryIntoImportReport } from "@/lib/import/foundry-import-report"
 import type { Feature } from "@/lib/types"
 
 export type ImportReportNextStep = {
@@ -89,6 +91,7 @@ export type ImportReport = {
   unmatchedFeatures: ImportUnmatchedFeatureEntry[]
   modifierReview: ImportModifierReviewRow[]
   headline: string
+  foundry?: import("@/lib/import/foundry-import-report").ImportReportFoundrySection
 }
 
 function collectClassText(row: Record<string, unknown>): string {
@@ -428,6 +431,7 @@ export function buildImportReport(params: {
   breakdown: Record<string, number>
   warnings: string[]
   explicitResources?: ClassResourceImportRow[]
+  foundryMeta?: FoundryImportMeta
 }): ImportReport | undefined {
   const hasDetail =
     (params.content.classes?.length ?? 0) > 0 ||
@@ -462,7 +466,7 @@ export function buildImportReport(params: {
     })
   }
 
-  return {
+  const baseReport: ImportReport = {
     summary: {
       totalImported: params.totalImported,
       breakdown: params.breakdown,
@@ -482,6 +486,8 @@ export function buildImportReport(params: {
       autoWiredModifiers,
     ),
   }
+
+  return mergeFoundryIntoImportReport(baseReport, params.foundryMeta)
 }
 
 export function importReportHasDetail(report: ImportReport): boolean {

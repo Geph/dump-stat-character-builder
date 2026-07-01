@@ -6,6 +6,10 @@ import {
   normalizeBackgroundAbilityBonuses,
   parseBackgroundAbilityScoresLine,
 } from "@/lib/compendium/background-utils"
+import { parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/background-origin-feat"
+import { grantFeatCharacteristic, GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
+import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
+import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 
 const bundledBackgroundByName = new Map(
   (bundledBackgrounds as unknown as {
@@ -26,6 +30,38 @@ function parseStoredAbilityBonuses(raw: unknown): Record<string, number> {
     }
   }
   return normalizeBackgroundAbilityBonuses(raw as Record<string, number> | null | undefined)
+}
+
+function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<string, unknown> {
+  const category = parseBackgroundFeatGrantChoiceCategory(
+    typeof row.feat_granted === "string" ? row.feat_granted : null,
+  )
+  if (!category) return row
+
+  const feature = (row.feature ?? null) as Record<string, unknown> | null
+  const linked = (feature?.linkedModifiers ?? feature?.linked_modifiers) as unknown[] | undefined
+  if (linked?.length) return row
+
+  const linkedModifiers = [
+    {
+      instanceId: createModifierInstanceId(),
+      catalogRefId: GRANT_FEAT_CATALOG_ID,
+      characteristics: [grantFeatCharacteristic([category as FeatPickCategory], 1)],
+    },
+  ]
+
+  return {
+    ...row,
+    feat_granted: null,
+    feature: feature
+      ? { ...feature, linkedModifiers, linked_modifiers: linkedModifiers }
+      : {
+          name: "Background Feature",
+          description: "",
+          linkedModifiers,
+          linked_modifiers: linkedModifiers,
+        },
+  }
 }
 
 /** Normalize a background row before save or after load. */
@@ -52,10 +88,10 @@ export function normalizeBackgroundRow(row: Record<string, unknown>): Record<str
     )
   }
 
-  return {
+  return wireBackgroundFeatGrantChoice({
     ...row,
     ability_bonuses: Object.keys(ability_bonuses).length ? ability_bonuses : null,
-  }
+  })
 }
 
 /** Fill missing SRD background fields from bundled seed data. */

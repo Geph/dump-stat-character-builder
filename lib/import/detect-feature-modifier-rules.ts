@@ -1,4 +1,4 @@
-import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import type { AbilityScoreKey, UnarmedStrikeDie } from "@/lib/compendium/characteristic-modifiers"
 import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
 import {
   characteristicCatalogRefId,
@@ -415,10 +415,12 @@ function parseResourceDieKey(text: string): string | null {
   const phrase = match[1].trim()
   for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
     if (pattern.namePattern.test(`${phrase} Die`) || pattern.namePattern.test(phrase)) {
+      if (pattern.resourceKey === "exploit_die_size") return "exploit_dice"
       return pattern.resourceKey
     }
   }
-  return `${phrase.toLowerCase().replace(/\s+/g, "_")}_die_size`
+  if (/^exploit$/i.test(phrase)) return "exploit_dice"
+  return `${phrase.toLowerCase().replace(/\s+/g, "_")}_dice`
 }
 
 function buildResourceDieCheckBonus(
@@ -581,6 +583,34 @@ function buildTurnStartLowHpHealModifier(
         },
       },
       label: `Regain ${healFixed} + ${healAbility} at turn start below half HP`,
+    },
+  ])
+}
+
+function buildDamageDieScalingByLevelModifier(
+  ctx: DetectFeatureContext,
+  text: string,
+): LinkedModifierInstance | null {
+  const tiers: BonusByLevelEntry[] = []
+  const regex = /at\s+(\d+)(?:st|nd|rd|th)?\s+level[\s\S]{0,120}?(\d+)d(\d+)/gi
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(text)) !== null) {
+    const level = parseInt(match[1], 10)
+    const dieCount = parseInt(match[2], 10)
+    const dieSides = parseInt(match[3], 10)
+    if (!Number.isFinite(level) || !Number.isFinite(dieCount) || !Number.isFinite(dieSides)) continue
+    tiers.push({ level, dieCount, dieType: `d${dieSides}` })
+  }
+  if (tiers.length < 2) return null
+
+  const sorted = [...tiers].sort((a, b) => a.level - b.level)
+  return charInstance(newInstanceId(), characteristicCatalogRefId("unarmed_strike_damage"), [
+    {
+      id: modId(instanceKey(ctx, "damage_die_scaling")),
+      type: "unarmed_strike_damage",
+      die: `${sorted[0].dieCount ?? 1}${sorted[0].dieType ?? "d6"}` as UnarmedStrikeDie,
+      dieByLevel: sorted,
+      label: "Scaling damage die by level",
     },
   ])
 }
@@ -1492,6 +1522,53 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: "Cast without a spell slot",
         },
       ]),
+  },
+  {
+    id: "ac.bonus.while_armored",
+    confidence: "high",
+    test:
+      /\+\s*(\d+)\s+(?:bonus\s+)?to\s+(?:your\s+)?(?:AC|Armor\s+Class)\s+while\s+(?:you\s+are\s+)?wearing\s+armor\b/i,
+    build: (match, ctx) => {
+      const bonus = parseInt(match[1], 10)
+      if (!Number.isFinite(bonus)) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("ac"), [
+        {
+          id: modId(instanceKey(ctx, "ac_armored")),
+          type: "ac",
+          mode: "flat_bonus",
+          flatBonus: bonus,
+          requiresArmor: true,
+          label: `+${bonus} AC while wearing armor`,
+        },
+      ])
+    },
+  },
+  {
+    id: "ac.bonus.while_raging",
+    confidence: "high",
+    test:
+      /\+\s*(\d+)\s+(?:bonus\s+)?to\s+(?:your\s+)?(?:AC|Armor\s+Class)\s+while\s+(?:you\s+are\s+)?raging\b/i,
+    build: (match, ctx) => {
+      const bonus = parseInt(match[1], 10)
+      if (!Number.isFinite(bonus)) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("ac"), [
+        {
+          id: modId(instanceKey(ctx, "ac_raging")),
+          type: "ac",
+          mode: "flat_bonus",
+          flatBonus: bonus,
+          requiresSheetToggle: "while_raging",
+          label: `+${bonus} AC while raging`,
+        },
+      ])
+    },
+  },
+  {
+    id: "damage.scaling.die_by_level",
+    confidence: "medium",
+    scope: "full",
+    test: /at\s+(\d+)(?:st|nd|rd|th)?\s+level[\s\S]{0,120}?(\d+)d(\d+)/i,
+    build: (_match, ctx, text) => buildDamageDieScalingByLevelModifier(ctx, text),
   },
   {
     id: "resource.expend_psi_points",

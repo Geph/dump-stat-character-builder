@@ -1,4 +1,8 @@
 import {
+  isCatalogFeatPickId,
+  resolveCatalogFeatPickCharacteristics,
+} from "@/lib/builder/catalog-feat-options"
+import {
   linkedModifiersForFeat,
   type FeatSelectionEntry,
 } from "@/lib/builder/feat-choices"
@@ -333,6 +337,13 @@ export function collectBuilderModifierRefIds(params: {
         }))
 
   const featMods = featEntries.flatMap(({ featId, choicePickKey }) => {
+    if (isCatalogFeatPickId(featId)) {
+      return applyModifierPlayerPicks(
+        resolveCatalogFeatPickCharacteristics(featId, customAbilities, catalog),
+        choicePickKey,
+        modifierPlayerPicks,
+      )
+    }
     const feat = feats.find((entry) => entry.id === featId)
     if (!feat) return []
     const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)

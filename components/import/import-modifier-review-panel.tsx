@@ -20,6 +20,7 @@ const CONFIDENCE_STYLES = {
 const SOURCE_LABELS = {
   ai: "AI",
   detector: "Phrase match",
+  foundry_effect: "Foundry Active Effect",
 } as const
 
 export function ImportModifierReviewPanel({
