@@ -1,9 +1,6 @@
 /** Source label stored on compendium rows seeded from SRD 5.2.1. */
 export const SRD_SOURCE = "D&D 5.5e SRD"
 
-/** 2024 Player's Handbook — receives the same feat modifier presets as SRD rows. */
-export const PHB_SOURCE = "Player's Handbook"
-
 export const SRD_CREATOR_URL = "https://www.dndbeyond.com/srd"
 
 /** Prior seed runs used a shorter label; include when replacing SRD subclasses. */
@@ -18,12 +15,6 @@ export function formatCompendiumSource(source: string | null | undefined): strin
 export function isSrdSource(source: string | null | undefined): boolean {
   if (!source) return false
   return (LEGACY_SRD_SOURCES as readonly string[]).includes(source)
-}
-
-/** SRD and PHB rows share bundled modifier presets and enrichment. */
-export function isOfficialFeatSource(source: string | null | undefined): boolean {
-  if (!source) return false
-  return isSrdSource(source) || source === PHB_SOURCE
 }
 
 /** Attach default D&D Beyond SRD link to seeded rows when missing. */

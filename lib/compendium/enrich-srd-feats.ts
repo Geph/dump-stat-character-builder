@@ -6,7 +6,7 @@ import {
 export { FEAT_MODIFIER_CATALOG, SRD_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { Feature } from "@/lib/types"
-import { isOfficialFeatSource } from "@/lib/srd/source"
+import { isSrdSource } from "@/lib/srd/source"
 
 function featHasLinkedModifiers(row: Record<string, unknown>): boolean {
   const linked = row.linkedModifiers ?? row.linked_modifiers
@@ -88,7 +88,7 @@ function applyFeatMechanicalDetection(row: Record<string, unknown>): Record<stri
 
 /** Apply bundled feat modifier presets when not already configured. */
 export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, unknown> {
-  if (!isOfficialFeatSource(row.source as string | null | undefined)) return row
+  if (!isSrdSource(row.source as string | null | undefined)) return row
   const name = String(row.name ?? "")
   const preset = FEAT_MODIFIER_PRESETS[name]
 

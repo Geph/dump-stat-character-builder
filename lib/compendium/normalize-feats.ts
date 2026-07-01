@@ -2,7 +2,7 @@ import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-import { isOfficialFeatSource } from "@/lib/srd/source"
+import { isSrdSource } from "@/lib/srd/source"
 import type { Feat, FeatureChoice } from "@/lib/types"
 
 function parseFeatChoices(raw: unknown): FeatureChoice | undefined {
@@ -17,7 +17,7 @@ export function normalizeFeatRow(
   row: Record<string, unknown>,
   catalog: ModifierCatalogEntry[] = [],
 ): Feat {
-  const enriched = isOfficialFeatSource(row.source as string | null | undefined)
+  const enriched = isSrdSource(row.source as string | null | undefined)
     ? enrichSrdFeatRow(row)
     : row
   return {
