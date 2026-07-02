@@ -4,6 +4,11 @@ import {
   type FeatSelectionEntry,
 } from "@/lib/builder/feat-choices"
 import {
+  isCatalogFeatPickId,
+  resolveCatalogFeatPickCharacteristics,
+  resolveCatalogFeatPickLabel,
+} from "@/lib/builder/catalog-feat-options"
+import {
   SKILL_NAMES,
   normalizeCharacteristics,
   type CharacteristicModifier,
@@ -21,7 +26,7 @@ import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
-import type { DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
+import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
 export type ModifierPlayerChoiceKind =
   | "skill"
@@ -485,6 +490,7 @@ export function collectModifierPlayerChoiceSlots(params: {
   feats: Feat[]
   featChoicePicks: Record<string, string[]>
   catalog: ModifierCatalogEntry[]
+  customAbilities?: CustomAbility[]
   classLevels?: { classId: string; level: number }[]
   classes?: DndClass[]
   subclasses?: Subclass[]
@@ -498,6 +504,7 @@ export function collectModifierPlayerChoiceSlots(params: {
     feats,
     featChoicePicks,
     catalog,
+    customAbilities = [],
     classLevels = [],
     classes = [],
     subclasses = [],
@@ -510,16 +517,26 @@ export function collectModifierPlayerChoiceSlots(params: {
 
   for (const entry of featEntries) {
     const feat = feats.find((candidate) => candidate.id === entry.featId)
-    if (!feat) continue
+    if (feat) {
+      const characteristics = characteristicsForFeatSelection(
+        feat,
+        entry.choicePickKey,
+        featChoicePicks,
+        catalog,
+      )
+      slots.push(...slotsFromCharacteristics(characteristics, entry.choicePickKey, feat.name))
+      continue
+    }
 
-    const characteristics = characteristicsForFeatSelection(
-      feat,
-      entry.choicePickKey,
-      featChoicePicks,
-      catalog,
-    )
-
-    slots.push(...slotsFromCharacteristics(characteristics, entry.choicePickKey, feat.name))
+    if (isCatalogFeatPickId(entry.featId) && customAbilities.length > 0) {
+      const label = resolveCatalogFeatPickLabel(entry.featId, customAbilities) ?? "Catalog option"
+      const characteristics = resolveCatalogFeatPickCharacteristics(
+        entry.featId,
+        customAbilities,
+        catalog,
+      )
+      slots.push(...slotsFromCharacteristics(characteristics, entry.choicePickKey, label))
+    }
   }
 
   if (classLevels.length > 0) {
@@ -691,20 +708,51 @@ export function spellOptionsForModifierSlot(
   )
 }
 
+export function isSpellRelatedModifierSlot(slot: ModifierPlayerChoiceSlot): boolean {
+  return slot.kind === "spell" || slot.kind === "spell_list_class"
+}
+
+export function spellModifierPlayerChoiceSlots(
+  slots: ModifierPlayerChoiceSlot[],
+): ModifierPlayerChoiceSlot[] {
+  return slots.filter(isSpellRelatedModifierSlot)
+}
+
+export function nonSpellModifierPlayerChoiceSlots(
+  slots: ModifierPlayerChoiceSlot[],
+): ModifierPlayerChoiceSlot[] {
+  return slots.filter((slot) => !isSpellRelatedModifierSlot(slot))
+}
+
+export function collectModifierPlayerChoiceBlockers(
+  slots: ModifierPlayerChoiceSlot[],
+  picks: Record<string, string[]>,
+): string[] {
+  const blockers: string[] = []
+  for (const slot of slots) {
+    const selected = picks[slot.slotKey] ?? []
+    if (!choiceCountMet(selected, slot.maxCount)) {
+      const stepHint = isSpellRelatedModifierSlot(slot) ? " (Spells step)" : ""
+      blockers.push(
+        `${slot.sourceLabel}: ${slot.label} (${selected.length}/${slot.maxCount})${stepHint}.`,
+      )
+    }
+
+    if (slot.kind === "spell" && slot.requiresSpellListPick && slot.spellListSlotKey) {
+      const listPick = picks[slot.spellListSlotKey]?.[0]
+      if (!listPick) {
+        blockers.push(`${slot.sourceLabel}: choose a spell list before selecting spells.`)
+      }
+    }
+  }
+  return blockers
+}
+
 export function validateModifierPlayerChoices(
   slots: ModifierPlayerChoiceSlot[],
   picks: Record<string, string[]>,
 ): boolean {
-  for (const slot of slots) {
-    const selected = picks[slot.slotKey] ?? []
-    if (!choiceCountMet(selected, slot.maxCount)) return false
-
-    if (slot.kind === "spell" && slot.requiresSpellListPick && slot.spellListSlotKey) {
-      const listPick = picks[slot.spellListSlotKey]?.[0]
-      if (!listPick) return false
-    }
-  }
-  return true
+  return collectModifierPlayerChoiceBlockers(slots, picks).length === 0
 }
 
 export function setModifierPlayerPickValue(

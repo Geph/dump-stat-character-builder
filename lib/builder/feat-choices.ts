@@ -69,18 +69,33 @@ export function linkedModifiersForFeat(
   return effectiveLinkedModifiers(feat.linkedModifiers, feat.modifierRefs, catalog)
 }
 
+export function collectFeatModifierChoiceBlockers(
+  feats: Feat[],
+  entries: FeatSelectionEntry[],
+  featChoicePicks: Record<string, string[]>,
+): string[] {
+  const blockers: string[] = []
+  for (const entry of entries) {
+    const feat = feats.find((f) => f.id === entry.featId)
+    if (!feat?.isChoice || !feat.choices) continue
+    const picks = featChoicePicks[entry.choicePickKey] ?? []
+    if (!choiceCountMet(picks, feat.choices.count)) {
+      blockers.push(
+        `${feat.name}: choose ${feat.choices.count} option${feat.choices.count === 1 ? "" : "s"} (${picks.length}/${feat.choices.count}).`,
+      )
+    }
+  }
+  return blockers
+}
+
 export function validateFeatModifierChoices(
   feats: Feat[],
   entries: FeatSelectionEntry[],
   featChoicePicks: Record<string, string[]>,
 ): boolean {
-  for (const entry of entries) {
-    const feat = feats.find((f) => f.id === entry.featId)
-    if (!feat?.isChoice || !feat.choices) continue
-    const picks = featChoicePicks[entry.choicePickKey] ?? []
-    if (!choiceCountMet(picks, feat.choices.count)) return false
-  }
-  return true
+  return (
+    collectFeatModifierChoiceBlockers(feats, entries, featChoicePicks).length === 0
+  )
 }
 
 export function featsRequiringModifierChoices(
