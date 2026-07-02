@@ -72,6 +72,7 @@ import {
 } from "@/lib/compendium/combat-stats"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
+import { ProceedBlockerBanner } from "@/components/builder/proceed-blocker-banner"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
@@ -104,6 +105,8 @@ import {
   SUBCLASS_LEVEL,
   validateClassStepChoices,
   validateOriginStepChoices,
+  collectClassStepBlockers,
+  collectOriginStepBlockers,
 } from "@/lib/builder/choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
@@ -141,6 +144,7 @@ import {
   featChoicePickKey,
   grantedFeatChoicePickKey,
   validateFeatModifierChoices,
+  collectFeatModifierChoiceBlockers,
 } from "@/lib/builder/feat-choices"
 import { getSpeciesFeatPickSlots } from "@/lib/builder/species-feat-options"
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
@@ -149,12 +153,14 @@ import { ClassLevelInput } from "@/components/builder/class-level-input"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import {
   clearModifierPicksForSource,
-  classFeatureSpellGrantSlots,
   collectModifierPlayerChoiceSlots,
   setModifierPlayerPickValue,
   speciesModsSourceKey,
   speciesTraitSourceKey,
   validateModifierPlayerChoices,
+  collectModifierPlayerChoiceBlockers,
+  nonSpellModifierPlayerChoiceSlots,
+  spellModifierPlayerChoiceSlots,
 } from "@/lib/builder/modifier-player-choices"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -1019,6 +1025,7 @@ export default function BuilderPage() {
         feats,
         featChoicePicks,
         catalog: modifierCatalog,
+        customAbilities,
         classLevels: activeClassLevels,
         classes,
         subclasses,
@@ -1032,6 +1039,7 @@ export default function BuilderPage() {
       feats,
       featChoicePicks,
       modifierCatalog,
+      customAbilities,
       activeClassLevels,
       classes,
       subclasses,
@@ -1039,24 +1047,6 @@ export default function BuilderPage() {
       featureChoicePicks,
       selectedSpecies,
       speciesTraitPicks,
-    ],
-  )
-
-  const classSpellGrantSlots = useMemo(
-    () =>
-      classFeatureSpellGrantSlots(
-        modifierPlayerChoiceSlots,
-        activeClassLevels,
-        classes,
-        subclasses,
-        subclassByClassId,
-      ),
-    [
-      modifierPlayerChoiceSlots,
-      activeClassLevels,
-      classes,
-      subclasses,
-      subclassByClassId,
     ],
   )
 
@@ -1745,6 +1735,108 @@ export default function BuilderPage() {
     { name: "Survival", ability: "wisdom" },
   ]
   
+  const classStepFeatModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter((slot) =>
+          featPickSlots.some(
+            (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+          ),
+        ),
+      ),
+    [modifierPlayerChoiceSlots, featPickSlots],
+  )
+
+  const classStepClassFeatureModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter(
+          (slot) =>
+            activeClassLevels.some((entry) =>
+              slot.sourceKey.startsWith(`${entry.classId}:`),
+            ) &&
+            !featPickSlots.some(
+              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+            ),
+        ),
+      ),
+    [modifierPlayerChoiceSlots, activeClassLevels, featPickSlots],
+  )
+
+  const classStepAllModifierSlots = useMemo(
+    () => [...classStepFeatModifierSlots, ...classStepClassFeatureModifierSlots],
+    [classStepFeatModifierSlots, classStepClassFeatureModifierSlots],
+  )
+
+  const originStepModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter(
+          (slot) =>
+            speciesFeatPickSlots.some(
+              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+            ) ||
+            backgroundFeatPickSlots.some(
+              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+            ) ||
+            (character.species_id != null &&
+              slot.sourceKey.startsWith(`species:${character.species_id}:`)) ||
+            slot.sourceKey ===
+              (backgroundGrantedFeat?.id
+                ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+                : ""),
+        ),
+      ),
+    [
+      modifierPlayerChoiceSlots,
+      speciesFeatPickSlots,
+      backgroundFeatPickSlots,
+      character.species_id,
+      backgroundGrantedFeat?.id,
+    ],
+  )
+
+  const spellGrantModifierSlots = useMemo(
+    () => spellModifierPlayerChoiceSlots(modifierPlayerChoiceSlots),
+    [modifierPlayerChoiceSlots],
+  )
+
+  const spellGrantSourceKeys = useMemo(
+    () => [...new Set(spellGrantModifierSlots.map((slot) => slot.sourceKey))],
+    [spellGrantModifierSlots],
+  )
+
+  const classStepFeatSelectionEntries = useMemo(
+    () =>
+      featSelectionEntries.filter((entry) =>
+        featPickSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
+      ),
+    [featSelectionEntries, featPickSlots],
+  )
+
+  const originStepFeatSelectionEntries = useMemo(
+    () =>
+      featSelectionEntries.filter(
+        (entry) =>
+          speciesFeatPickSlots.some(
+            (slot) => featChoicePickKey(slot.key) === entry.choicePickKey,
+          ) ||
+          backgroundFeatPickSlots.some(
+            (slot) => featChoicePickKey(slot.key) === entry.choicePickKey,
+          ) ||
+          entry.choicePickKey ===
+            (backgroundGrantedFeat?.id
+              ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+              : ""),
+      ),
+    [
+      featSelectionEntries,
+      speciesFeatPickSlots,
+      backgroundFeatPickSlots,
+      backgroundGrantedFeat?.id,
+    ],
+  )
+
   const canProceed = () => {
     switch (currentStep) {
       case 1:
@@ -1763,19 +1855,10 @@ export default function BuilderPage() {
           selectedFeatCount === requiredFeatSlots &&
           validateFeatModifierChoices(
             feats,
-            featSelectionEntries.filter((entry) =>
-              featPickSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
-            ),
+            classStepFeatSelectionEntries,
             featChoicePicks,
           ) &&
-          validateModifierPlayerChoices(
-            modifierPlayerChoiceSlots.filter((slot) =>
-              featPickSlots.some(
-                (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-              ),
-            ),
-            modifierPlayerPicks,
-          )
+          validateModifierPlayerChoices(classStepAllModifierSlots, modifierPlayerPicks)
         )
       case 2:
         return (
@@ -1790,39 +1873,10 @@ export default function BuilderPage() {
           ) &&
           validateFeatModifierChoices(
             feats,
-            featSelectionEntries.filter(
-              (entry) =>
-                speciesFeatPickSlots.some(
-                  (slot) => featChoicePickKey(slot.key) === entry.choicePickKey,
-                ) ||
-                backgroundFeatPickSlots.some(
-                  (slot) => featChoicePickKey(slot.key) === entry.choicePickKey,
-                ) ||
-                entry.choicePickKey ===
-                  (backgroundGrantedFeat?.id
-                    ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
-                    : ""),
-            ),
+            originStepFeatSelectionEntries,
             featChoicePicks,
           ) &&
-          validateModifierPlayerChoices(
-            modifierPlayerChoiceSlots.filter(
-              (slot) =>
-                speciesFeatPickSlots.some(
-                  (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-                ) ||
-                backgroundFeatPickSlots.some(
-                  (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-                ) ||
-                (character.species_id != null &&
-                  slot.sourceKey.startsWith(`species:${character.species_id}:`)) ||
-                slot.sourceKey ===
-                  (backgroundGrantedFeat?.id
-                    ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
-                    : ""),
-            ),
-            modifierPlayerPicks,
-          )
+          validateModifierPlayerChoices(originStepModifierSlots, modifierPlayerPicks)
         )
       case 3:
         return (
@@ -1839,12 +1893,150 @@ export default function BuilderPage() {
         )
       case BUILDER_STEP_IDS.GEAR: return true
       case BUILDER_STEP_IDS.SPELLS:
-        return validateModifierPlayerChoices(classSpellGrantSlots, modifierPlayerPicks)
+        return validateModifierPlayerChoices(spellGrantModifierSlots, modifierPlayerPicks)
       case BUILDER_STEP_IDS.DETAILS: return character.name.trim().length > 0
       case BUILDER_STEP_IDS.REVIEW: return character.name.trim().length > 0
       default: return false
     }
   }
+
+  const proceedBlockers = useMemo(() => {
+    const blockers: string[] = []
+    switch (currentStep) {
+      case 1:
+        blockers.push(
+          ...collectClassStepBlockers(
+            activeClassLevels,
+            classes,
+            subclasses,
+            classSkillPicks,
+            subclassByClassId,
+            featureChoicePicks,
+            resolvedPrimaryClassId,
+            activeClassAddOrder,
+            classToolPicks,
+          ),
+        )
+        if (selectedFeatCount < requiredFeatSlots) {
+          blockers.push(
+            `Choose ${requiredFeatSlots - selectedFeatCount} more class feat${
+              requiredFeatSlots - selectedFeatCount === 1 ? "" : "s"
+            } (${selectedFeatCount}/${requiredFeatSlots}).`,
+          )
+        }
+        blockers.push(
+          ...collectFeatModifierChoiceBlockers(
+            feats,
+            classStepFeatSelectionEntries,
+            featChoicePicks,
+          ),
+        )
+        blockers.push(
+          ...collectModifierPlayerChoiceBlockers(
+            classStepAllModifierSlots,
+            modifierPlayerPicks,
+          ),
+        )
+        break
+      case 2:
+        blockers.push(
+          ...collectOriginStepBlockers(
+            character.species_id,
+            character.background_id,
+            selectedSpecies,
+            speciesTraitPicks,
+            speciesFeatPickSlots.map((slot) => slot.key),
+            featureChoicePicks,
+            backgroundFeatPickSlots.map((slot) => slot.key),
+          ),
+        )
+        blockers.push(
+          ...collectFeatModifierChoiceBlockers(
+            feats,
+            originStepFeatSelectionEntries,
+            featChoicePicks,
+          ),
+        )
+        blockers.push(
+          ...collectModifierPlayerChoiceBlockers(originStepModifierSlots, modifierPlayerPicks),
+        )
+        break
+      case 3:
+        if (
+          showLegacyMilestoneAsi &&
+          !allSelectedAsiAllocationsValid(selectedFeatIds, asiAllocationsByFeatId, feats)
+        ) {
+          blockers.push("Finish allocating Ability Score Improvement points from feats.")
+        }
+        if (!allAbilityScorePoolAllocationsValid(abilityScorePoolGrants, asiAllocationsByFeatId)) {
+          blockers.push("Finish allocating ability score bonuses from species, background, or feats.")
+        }
+        if (
+          backgroundAbilityGrant.needsChoice &&
+          !isValidBackgroundAsiAllocation(
+            asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {},
+            backgroundAbilityGrant.eligible,
+          )
+        ) {
+          blockers.push("Complete background ability score increases.")
+        }
+        if (abilityMethod === "standard" && !isStandardArrayComplete(standardArrayAssignments)) {
+          blockers.push("Assign every standard array score to an ability.")
+        }
+        break
+      case BUILDER_STEP_IDS.SPELLS:
+        blockers.push(
+          ...collectModifierPlayerChoiceBlockers(spellGrantModifierSlots, modifierPlayerPicks),
+        )
+        break
+      case BUILDER_STEP_IDS.DETAILS:
+      case BUILDER_STEP_IDS.REVIEW:
+        if (character.name.trim().length === 0) {
+          blockers.push("Enter a character name on the Details step.")
+        }
+        break
+      default:
+        break
+    }
+    return blockers
+  }, [
+    currentStep,
+    activeClassLevels,
+    classes,
+    subclasses,
+    classSkillPicks,
+    subclassByClassId,
+    featureChoicePicks,
+    resolvedPrimaryClassId,
+    activeClassAddOrder,
+    classToolPicks,
+    selectedFeatCount,
+    requiredFeatSlots,
+    feats,
+    classStepFeatSelectionEntries,
+    featChoicePicks,
+    classStepFeatModifierSlots,
+    classStepClassFeatureModifierSlots,
+    classStepAllModifierSlots,
+    modifierPlayerPicks,
+    character.species_id,
+    character.background_id,
+    character.name,
+    selectedSpecies,
+    speciesTraitPicks,
+    speciesFeatPickSlots,
+    backgroundFeatPickSlots,
+    originStepFeatSelectionEntries,
+    originStepModifierSlots,
+    showLegacyMilestoneAsi,
+    selectedFeatIds,
+    asiAllocationsByFeatId,
+    abilityScorePoolGrants,
+    backgroundAbilityGrant,
+    abilityMethod,
+    standardArrayAssignments,
+    spellGrantModifierSlots,
+  ])
 
   const canSaveCharacter = () =>
     character.name.trim().length > 0 &&
@@ -2039,17 +2231,20 @@ export default function BuilderPage() {
                 </div>
               </div>
 
-              <BuilderStepNav
-                currentStep={currentStep}
-                canProceed={canProceed()}
-                canSave={canSaveCharacter()}
-                saving={saving}
-                onBack={goBackStep}
-                onContinue={advanceStep}
-                onSave={saveCharacter}
-                saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
-                lastStep={BUILDER_STEP_IDS.REVIEW}
-              />
+              <div className="flex flex-col items-end gap-2">
+                {!canProceed() ? <ProceedBlockerBanner blockers={proceedBlockers} /> : null}
+                <BuilderStepNav
+                  currentStep={currentStep}
+                  canProceed={canProceed()}
+                  canSave={canSaveCharacter()}
+                  saving={saving}
+                  onBack={goBackStep}
+                  onContinue={advanceStep}
+                  onSave={saveCharacter}
+                  saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
+                  lastStep={BUILDER_STEP_IDS.REVIEW}
+                />
+              </div>
             </div>
 
             {editingCharacterId && (
@@ -2805,10 +3000,10 @@ export default function BuilderPage() {
                               />
                             </div>
                           ) : null}
-                          {picked ? (
+                          {pickedId && (picked || pickedLabel) ? (
                             <ModifierPlayerChoicePanel
                               sourceKey={featChoicePickKey(slot.key)}
-                              sourceLabel={picked.name}
+                              sourceLabel={picked?.name ?? pickedLabel ?? "Selected feat"}
                               slots={modifierPlayerChoiceSlots}
                               picks={modifierPlayerPicks}
                               spells={spells}
@@ -3152,6 +3347,7 @@ export default function BuilderPage() {
                                 slots={modifierPlayerChoiceSlots}
                                 picks={modifierPlayerPicks}
                                 spells={spells}
+                                excludeKinds={["spell"]}
                                 onChange={(slotKey, selected) => {
                                   const slot = modifierPlayerChoiceSlots.find(
                                     (entry) => entry.slotKey === slotKey,
@@ -3304,6 +3500,7 @@ export default function BuilderPage() {
                       <h3 className="text-lg font-bold text-foreground">Background Feat</h3>
                       {backgroundFeatPickSlots.map((slot) => {
                         const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
+                        const picked = feats.find((f) => f.id === pickedId) ?? null
                         const featContext = {
                           totalLevel,
                           classIds: activeClassLevels.map((cl) => cl.classId),
@@ -3364,6 +3561,64 @@ export default function BuilderPage() {
                                 )
                               })}
                             </div>
+                            {eligible.length === 0 && feats.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                No eligible feats for this choice.
+                              </p>
+                            )}
+                            {picked && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Selected:{" "}
+                                <span className="font-semibold text-foreground">{picked.name}</span>
+                              </p>
+                            )}
+                            {picked?.isChoice && picked.choices?.options?.length ? (
+                              <div className="mt-3">
+                                <FeatModifierChoicePicker
+                                  entry={{
+                                    featId: picked.id,
+                                    choicePickKey: featChoicePickKey(slot.key),
+                                  }}
+                                  feat={picked}
+                                  selected={featChoicePicks[featChoicePickKey(slot.key)] ?? []}
+                                  onChange={(selected) => {
+                                    const choiceKey = featChoicePickKey(slot.key)
+                                    setFeatChoicePicks((prev) => ({
+                                      ...prev,
+                                      [choiceKey]: selected,
+                                    }))
+                                    setModifierPlayerPicks((prev) =>
+                                      clearModifierPicksForSource(prev, choiceKey),
+                                    )
+                                  }}
+                                />
+                              </div>
+                            ) : null}
+                            {picked ? (
+                              <ModifierPlayerChoicePanel
+                                sourceKey={featChoicePickKey(slot.key)}
+                                sourceLabel={picked.name}
+                                slots={modifierPlayerChoiceSlots}
+                                picks={modifierPlayerPicks}
+                                spells={spells}
+                                excludeKinds={["spell"]}
+                                unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                                onChange={(slotKey, selected) => {
+                                  const slot = modifierPlayerChoiceSlots.find(
+                                    (entry) => entry.slotKey === slotKey,
+                                  )
+                                  if (!slot) return
+                                  setModifierPlayerPicks((prev) =>
+                                    setModifierPlayerPickValue(
+                                      prev,
+                                      slot,
+                                      modifierPlayerChoiceSlots,
+                                      selected,
+                                    ),
+                                  )
+                                }}
+                              />
+                            ) : null}
                           </div>
                         )
                       })}
@@ -3401,6 +3656,8 @@ export default function BuilderPage() {
                       slots={modifierPlayerChoiceSlots}
                       picks={modifierPlayerPicks}
                       spells={spells}
+                      excludeKinds={["spell"]}
+                      unavailableOptions={[...getTakenSkills(skillPickSources)]}
                       onChange={(slotKey, selected) => {
                         const slot = modifierPlayerChoiceSlots.find(
                           (entry) => entry.slotKey === slotKey,
@@ -3823,45 +4080,43 @@ export default function BuilderPage() {
                   <div className="space-y-8">
                     <h2 className="text-2xl font-black text-foreground mb-2">Select Spells</h2>
 
-                    {classSpellGrantSlots.length > 0 ? (
+                    {spellGrantSourceKeys.length > 0 ? (
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                          Class features that grant specific spells (Mystic Arcanum, Contact Patron,
-                          etc.).
+                          Feats and class features that grant specific spells (Magic Initiate,
+                          Mystic Arcanum, Contact Patron, etc.).
                         </p>
-                        {Array.from(new Set(classSpellGrantSlots.map((slot) => slot.sourceKey))).map(
-                          (sourceKey) => {
-                            const slot = classSpellGrantSlots.find(
-                              (entry) => entry.sourceKey === sourceKey,
-                            )
-                            if (!slot) return null
-                            return (
-                              <ModifierPlayerChoicePanel
-                                key={sourceKey}
-                                sourceKey={sourceKey}
-                                sourceLabel={slot.sourceLabel}
-                                slots={modifierPlayerChoiceSlots}
-                                picks={modifierPlayerPicks}
-                                spells={spells}
-                                kinds={["spell", "spell_list_class"]}
-                                onChange={(slotKey, selected) => {
-                                  const target = modifierPlayerChoiceSlots.find(
-                                    (entry) => entry.slotKey === slotKey,
-                                  )
-                                  if (!target) return
-                                  setModifierPlayerPicks((prev) =>
-                                    setModifierPlayerPickValue(
-                                      prev,
-                                      target,
-                                      modifierPlayerChoiceSlots,
-                                      selected,
-                                    ),
-                                  )
-                                }}
-                              />
-                            )
-                          },
-                        )}
+                        {spellGrantSourceKeys.map((sourceKey) => {
+                          const slot = spellGrantModifierSlots.find(
+                            (entry) => entry.sourceKey === sourceKey,
+                          )
+                          if (!slot) return null
+                          return (
+                            <ModifierPlayerChoicePanel
+                              key={sourceKey}
+                              sourceKey={sourceKey}
+                              sourceLabel={slot.sourceLabel}
+                              slots={modifierPlayerChoiceSlots}
+                              picks={modifierPlayerPicks}
+                              spells={spells}
+                              kinds={["spell", "spell_list_class"]}
+                              onChange={(slotKey, selected) => {
+                                const target = modifierPlayerChoiceSlots.find(
+                                  (entry) => entry.slotKey === slotKey,
+                                )
+                                if (!target) return
+                                setModifierPlayerPicks((prev) =>
+                                  setModifierPlayerPickValue(
+                                    prev,
+                                    target,
+                                    modifierPlayerChoiceSlots,
+                                    selected,
+                                  ),
+                                )
+                              }}
+                            />
+                          )
+                        })}
                       </div>
                     ) : null}
 
@@ -4343,7 +4598,8 @@ export default function BuilderPage() {
           </motion.div>
         </AnimatePresence>
 
-            <div className="flex justify-end mt-6 pt-4 border-t border-border">
+            <div className="flex flex-col items-end gap-2 mt-6 pt-4 border-t border-border">
+              {!canProceed() ? <ProceedBlockerBanner blockers={proceedBlockers} /> : null}
               <BuilderStepNav
                 currentStep={currentStep}
                 canProceed={canProceed()}

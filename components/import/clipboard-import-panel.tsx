@@ -115,24 +115,6 @@ export function ClipboardImportPanel({
 
   return (
     <div className="space-y-8">
-      <div className="rounded-xl border border-lime/25 bg-lime/5 p-4 space-y-2">
-        <p className="text-sm font-semibold text-foreground">How it works</p>
-        <ol className="text-sm text-muted-foreground space-y-2">
-          <li className="flex gap-2">
-            <span className="font-bold text-lime shrink-0">1.</span>
-            <span>
-              Send an extraction prompt to your LLM — attach a PDF{" "}
-              <span className="font-medium text-foreground">or</span> paste source text and copy
-              prompt + text. Ask the model to return JSON only.
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="font-bold text-lime shrink-0">2.</span>
-            <span>Paste the model&apos;s JSON output below and import into your compendium.</span>
-          </li>
-        </ol>
-      </div>
-
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <ImportContentTypeHintSelect

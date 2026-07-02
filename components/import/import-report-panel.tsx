@@ -4,7 +4,7 @@ import { ImportModifierReviewPanel } from "@/components/import/import-modifier-r
 import { ImportUnmatchedFeaturesPanel } from "@/components/import/import-unmatched-features-panel"
 import type { ImportReport } from "@/lib/import/build-import-report"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
-import { AlertCircle, CheckCircle2, Info, ListChecks, Sparkles } from "lucide-react"
+import { AlertCircle, Check, CheckCircle2, Info, ListChecks, Sparkles } from "lucide-react"
 
 const STATUS_LABELS = {
   linked: { label: "Modifiers linked", className: "text-success" },
@@ -26,6 +26,7 @@ const STEP_STYLES = {
 
 type ImportReportPanelProps = {
   report: ImportReport
+  onDismiss?: () => void
 }
 
 export function ImportTokenSavingsSummary({
@@ -97,7 +98,7 @@ export function ImportTokenSavingsSummary({
   )
 }
 
-export function ImportReportPanel({ report }: ImportReportPanelProps) {
+export function ImportReportPanel({ report, onDismiss }: ImportReportPanelProps) {
   const hasClassDetail = report.classes.length > 0
   const hasSubclassDetail = report.subclasses.length > 0
   const hasNextSteps = report.nextSteps.length > 0
@@ -106,7 +107,7 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
     <div className="space-y-4 rounded-xl border border-success/20 bg-success/5 p-4 text-sm">
       <div className="flex items-start gap-3">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-semibold text-success">{report.headline}</p>
           {report.summary.autoWiredModifiers > 0 ? (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -122,6 +123,18 @@ export function ImportReportPanel({ report }: ImportReportPanelProps) {
             </ul>
           )}
         </div>
+        {onDismiss ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/20 transition-colors"
+            aria-label="Dismiss import report"
+            title="Dismiss"
+          >
+            <Check className="h-4 w-4" />
+            Done
+          </button>
+        ) : null}
       </div>
 
       {report.tokenSavings ? <ImportTokenSavingsSummary savings={report.tokenSavings} /> : null}

@@ -750,7 +750,10 @@ export default function ImportPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-6 scroll-mt-24"
           >
-            <ImportReportPanel report={importReport} />
+            <ImportReportPanel
+              report={importReport}
+              onDismiss={() => setImportReport(null)}
+            />
           </motion.div>
         )}
 
