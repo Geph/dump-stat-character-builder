@@ -51,7 +51,18 @@ export function parseStartingEquipmentFromText(
     const m = chunk.trim().match(/^\(([A-Z])\)\s*(.+)$/is)
     if (!m) continue
     const letter = m[1]
-    const content = m[2].trim().replace(/^or\s+/i, "")
+    let content = m[2].trim().replace(/^or\s+/i, "")
+
+    const goldDiceMatch = content.match(/^(\d+d\d+)\s*[×x]\s*(\d+)\s*gp\b/i)
+    if (goldDiceMatch) {
+      options.push({
+        label: `(${letter}) ${goldDiceMatch[1]} × ${goldDiceMatch[2]} GP`,
+        items: [],
+        goldDice: `${goldDiceMatch[1]} × ${goldDiceMatch[2]}`,
+      })
+      continue
+    }
+
     const gpOnly = content.match(/^(\d+)\s*GP\s*$/i)
     if (gpOnly) {
       const amount = parseInt(gpOnly[1], 10)
@@ -60,12 +71,24 @@ export function parseStartingEquipmentFromText(
         label: `(${letter}) ${amount} GP`,
         items: [{ name: "Gold Pieces", quantity: amount }],
       })
-    } else {
-      options.push({
-        label: `(${letter}) ${content}`,
-        items: parseEquipmentItemList(content),
-      })
+      continue
     }
+
+    const conditionalMatch = content.match(/^(.+?)\s*\(if\s+proficient\)\s*$/i)
+    if (conditionalMatch) {
+      content = conditionalMatch[1].trim()
+      options.push({
+        label: `(${letter}) ${content} (if proficient)`,
+        items: parseEquipmentItemList(content),
+        requiresProficiency: "armor",
+      })
+      continue
+    }
+
+    options.push({
+      label: `(${letter}) ${content}`,
+      items: parseEquipmentItemList(content),
+    })
   }
 
   return {

@@ -6,13 +6,16 @@ import {
 } from "@/lib/character/compute-derived"
 import {
   barbarianShieldFixture,
+  baseInputs,
   chainMailEquipment,
   fighterArcheryBackgroundFixture,
   fighterClass,
+  linked,
   rogueExpertiseFixture,
   shieldEquipment,
+  toolExpertise,
 } from "@/lib/character/__tests__/fixtures"
-import type { Equipment } from "@/lib/types"
+import type { Equipment, Feat } from "@/lib/types"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 
@@ -383,5 +386,47 @@ describe("save vs preview invariant", () => {
     expect(exhausted.maxHp).toBe(Math.max(1, Math.floor(normal.maxHp / 2)))
     expect(exhausted.speed).toBe(Math.floor(normal.speed / 2))
     expect(immobile.speed).toBe(0)
+  })
+
+  it("doubles proficiency bonus on tool checks with tool expertise", () => {
+    const toolExpertiseFeat: Feat = {
+      id: "tool-expertise-feat",
+      name: "Tool Expertise",
+      description: "Double PB on tool checks.",
+      linkedModifiers: linked([toolExpertise("tool_expertise")]),
+      modifierRefs: [],
+      prerequisite: null,
+      prerequisite_feat_ids: null,
+      prerequisite_class_ids: null,
+      prerequisite_species_ids: null,
+      prerequisite_background_ids: null,
+      benefits: null,
+      is_choice: false,
+      choices: null,
+      repeatable: false,
+      icon: null,
+      source: "test",
+      creator_url: null,
+      created_at: "",
+    }
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 10,
+          dexterity: 14,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: "inventor", level: 10 }],
+        extraToolProficiencies: ["Thieves' Tools"],
+        grantedFeatIds: [toolExpertiseFeat.id],
+        feats: [toolExpertiseFeat],
+      }),
+    )
+    const thieves = derived.tools.find((tool) => /thieves/i.test(tool.name))
+    expect(thieves?.expertise).toBe(true)
+    expect(thieves?.bonus).toBe(derived.abilityMods.dexterity + derived.proficiencyBonus * 2)
   })
 })

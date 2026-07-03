@@ -17,7 +17,7 @@ function acAbilityMod(
   }
 }
 
-function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
+export function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
   return [
     {
       instanceId: `modinst_${chars[0]?.id ?? "test"}`,
@@ -40,6 +40,15 @@ function expertiseSkills(id: string, skills: string[]): CharacteristicModifier {
     id,
     type: "skills",
     entries: skills.map((skill) => ({ skill, expertise: true })),
+    grantExpertise: true,
+  }
+}
+
+export function toolExpertise(id: string): CharacteristicModifier {
+  return {
+    id,
+    type: "tool_proficiencies",
+    values: [],
     grantExpertise: true,
   }
 }
@@ -204,7 +213,7 @@ const soldierBackground: Background = {
   enabled: true,
 }
 
-function baseInputs(partial: Partial<CharacterBuildInputs>): CharacterBuildInputs {
+export function baseInputs(partial: Partial<CharacterBuildInputs>): CharacterBuildInputs {
   return {
     baseAbilityScores: {
       strength: 10,

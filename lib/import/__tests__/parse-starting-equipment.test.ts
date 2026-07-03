@@ -22,4 +22,16 @@ You start with the following equipment, in addition to the equipment granted by 
     expect(parsed.starting_gold).toBe(10)
     expect(parsed.starting_equipment_groups[0]?.options).toHaveLength(2)
   })
+
+  it("parses gold dice alternatives and conditional proficiency options", () => {
+    const parsed = parseStartingEquipmentFromText(`
+Starting Equipment
+(a) a mace and a shield; or (b) 4d4 × 10 gp; or (c) chain mail (if proficient)
+`)
+    const options = parsed.starting_equipment_groups[0]?.options ?? []
+    expect(options).toHaveLength(3)
+    expect(options[1]?.goldDice).toBe("4d4 × 10")
+    expect(options[2]?.requiresProficiency).toBe("armor")
+    expect(options[2]?.label).toMatch(/if proficient/i)
+  })
 })

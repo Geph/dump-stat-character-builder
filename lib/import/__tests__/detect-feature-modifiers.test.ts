@@ -471,4 +471,28 @@ describe("detectFeatureModifiers by feature name", () => {
     expect(feature.isChoice).toBe(true)
     expect(feature.choices?.resourceKey).toBe("weapon_mastery")
   })
+
+  it("wires attunement slot increases from description", () => {
+    const detections = detectFeatureModifiers(
+      "You can attune to up to four magic items at once.",
+      { ...classCtx, featureName: "Wondrous Item Proficiency", level: 7 },
+    )
+    const attune = detections.find((entry) => entry.ruleId === "attunement.slots.total")
+    expect(attune?.instance.characteristics?.[0]).toMatchObject({
+      type: "attunement_slots",
+      totalSlots: 4,
+    })
+  })
+
+  it("wires tool expertise from doubled proficiency phrasing", () => {
+    const detections = detectFeatureModifiers(
+      "Your proficiency bonus is doubled for any ability check you make that uses any of the tool proficiencies you gained from this class.",
+      { ...classCtx, featureName: "Tool Expertise", level: 10 },
+    )
+    const tools = detections.find((entry) => entry.ruleId === "proficiency.tools.expertise")
+    expect(tools?.instance.characteristics?.[0]).toMatchObject({
+      type: "tool_proficiencies",
+      grantExpertise: true,
+    })
+  })
 })

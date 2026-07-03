@@ -56,6 +56,7 @@ import type {
   SaveBonus,
   SkillBonus,
   StatBreakdownPart,
+  ToolBonus,
 } from "@/lib/character/types"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 
@@ -159,6 +160,45 @@ function buildSkillBonuses(
     const bonus =
       abilityMods[ability] +
       (proficient ? proficiencyBonus * (expertise ? 2 : 1) : 0)
+    return { name, ability, proficient, expertise, bonus }
+  })
+}
+
+function toolCheckAbility(toolName: string): AbilityScoreKey {
+  const normalized = toolName.toLowerCase()
+  if (normalized.includes("thieves")) return "dexterity"
+  if (
+    normalized.includes("herbalism") ||
+    normalized.includes("healer") ||
+    normalized.includes("poisoner")
+  ) {
+    return "wisdom"
+  }
+  if (
+    normalized.includes("smith") ||
+    normalized.includes("mason") ||
+    normalized.includes("carpenter") ||
+    normalized.includes("cobbler") ||
+    normalized.includes("cook")
+  ) {
+    return "strength"
+  }
+  return "intelligence"
+}
+
+function buildToolBonuses(
+  proficiencyBonus: number,
+  abilityMods: Record<AbilityScoreKey, number>,
+  toolProficiencies: string[],
+  toolExpertise: string[],
+  toolExpertiseAll: boolean,
+): ToolBonus[] {
+  const uniqueTools = [...new Set(toolProficiencies.map((tool) => tool.trim()).filter(Boolean))]
+  return uniqueTools.map((name) => {
+    const ability = toolCheckAbility(name)
+    const proficient = true
+    const expertise = toolExpertiseAll || toolExpertise.some((tool) => tool.toLowerCase() === name.toLowerCase())
+    const bonus = abilityMods[ability] + proficiencyBonus * (expertise ? 2 : 1)
     return { name, ability, proficient, expertise, bonus }
   })
 }
@@ -501,6 +541,13 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     savingThrowProficiencies,
     languages,
     skills: buildSkillBonuses(proficiencyBonus, abilityMods, skillProficiencies, skillExpertise),
+    tools: buildToolBonuses(
+      proficiencyBonus,
+      abilityMods,
+      toolProficiencies,
+      aggregatedCharacteristics.toolExpertise,
+      aggregatedCharacteristics.toolExpertiseAll,
+    ),
     saves: buildSaveBonuses(proficiencyBonus, abilityMods, savingThrowProficiencies),
     equippedWeaponAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,

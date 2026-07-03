@@ -72,7 +72,7 @@ export interface FeatureChoice {
    * When set, builder aggregates options dynamically instead of using the static `options` array.
    * `known_discipline_talents` — union of talent lists from disciplines the character knows.
    */
-  optionsSource?: "known_discipline_talents" | "fusion_talents" | "class_knacks" | null
+  optionsSource?: "known_discipline_talents" | "fusion_talents" | "class_knacks" | "class_upgrades" | null
   /**
    * Links the choice to a class resource whose value scales the number of picks
    * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
@@ -367,6 +367,10 @@ export interface Language {
 export interface StartingEquipmentOption {
   label: string
   items: { name: string; quantity: number }[]
+  /** When set, option is only offered if the character has this proficiency (e.g. "Heavy armor"). */
+  requiresProficiency?: string | null
+  /** Gold from dice expression instead of fixed items (e.g. "4d4 × 10"). */
+  goldDice?: string | null
 }
 
 export interface StartingEquipmentGroup {
@@ -567,7 +571,7 @@ export interface CustomAbility {
   choices?: FeatureChoice | null
   level_requirement?: number | null
   /** discipline | psionic_power | talent_pool | knack — guides builder aggregation. */
-  ability_role?: "discipline" | "psionic_power" | "talent_pool" | "knack" | null
+  ability_role?: "discipline" | "psionic_power" | "talent_pool" | "knack" | "upgrade" | null
   /** When true, the character may learn this knack more than once. */
   repeatable?: boolean | null
   icon: string | null

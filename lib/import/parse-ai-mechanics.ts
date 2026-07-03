@@ -150,9 +150,9 @@ function buildFromMechanic(
     }
     case "tool_proficiencies": {
       const tools = mechanic.tools?.map(titleCaseWords).filter(Boolean) ?? []
-      if (!tools.length) return null
+      if (!tools.length && !mechanic.grantExpertise) return null
       return {
-        ruleId: "ai.tools",
+        ruleId: mechanic.grantExpertise ? "ai.tools.expertise" : "ai.tools",
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, characteristicCatalogRefId("tool_proficiencies"), [
@@ -160,6 +160,7 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "tools")),
             type: "tool_proficiencies",
             values: tools,
+            ...(mechanic.grantExpertise ? { grantExpertise: true } : {}),
           },
         ]),
       }
@@ -458,6 +459,26 @@ function buildFromMechanic(
             ability,
             label: mechanic.spellChoiceLabel ?? `${ability} spellcasting`,
             ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+          },
+        ]),
+      }
+    }
+    case "attunement_slots": {
+      if (mechanic.attunementTotal == null && mechanic.attunementBonus == null) return null
+      return {
+        ruleId: "ai.attunement_slots",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, "cat_char_attunement_slots", [
+          {
+            id: modId(instanceKey(ctx, "attune")),
+            type: "attunement_slots",
+            ...(mechanic.attunementTotal != null ? { totalSlots: mechanic.attunementTotal } : {}),
+            ...(mechanic.attunementBonus != null ? { bonusSlots: mechanic.attunementBonus } : {}),
+            label:
+              mechanic.attunementTotal != null
+                ? `Attune to ${mechanic.attunementTotal} magic items`
+                : `+${mechanic.attunementBonus} attunement slots`,
           },
         ]),
       }

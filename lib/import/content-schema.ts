@@ -86,6 +86,8 @@ export const ImportMechanicSchema = z.object({
   spellChoiceLabel: z.string().optional(),
   alwaysPrepared: z.boolean().optional(),
   spellcastingAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
+  attunementTotal: z.number().optional(),
+  attunementBonus: z.number().optional(),
   targetCreatureTypes: z.array(z.string()).optional(),
   requiresSheetToggle: z.string().optional(),
   sheetToggleLabel: z.string().optional(),
@@ -105,7 +107,7 @@ export const ChoiceOptionsSchema = z.object({
     }),
   ),
   optionsSource: z
-    .enum(["known_discipline_talents", "fusion_talents", "class_knacks"])
+    .enum(["known_discipline_talents", "fusion_talents", "class_knacks", "class_upgrades"])
     .optional(),
   resourceKey: z.string().nullable().optional(),
   swappableOnRest: z.boolean().optional(),
@@ -482,5 +484,6 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
+- For Inventor-style upgrades, put generic unrestricted upgrades as one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred.
 - For disciplines with talents, include choices { category, count, options: [{ name, description, prerequisite?, repeatable? }] } and mention talent count in definition
 - Do NOT also duplicate the same entries in class_resources[] or abilities[] — proposals are reviewed first; omit level tables from class description`

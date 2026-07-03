@@ -1,4 +1,5 @@
 import { aggregateKnackOptions } from "@/lib/builder/knack-choices"
+import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
 import type { CustomAbility, Feature, FeatureChoice } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -91,6 +92,16 @@ export function resolveFeatureChoiceOptions(
       classNames: params.classNames,
       classLevel: params.classLevel ?? 20,
       selectedKnackNames: selected,
+    })
+  }
+  if (choices.optionsSource === "class_upgrades") {
+    const upgradeKey = Object.keys(params.featureChoicePicks).find((key) => /upgrade/i.test(key))
+    const selected = upgradeKey ? (params.featureChoicePicks[upgradeKey] ?? []) : []
+    return aggregateUpgradeOptions({
+      customAbilities: params.customAbilities,
+      classNames: params.classNames,
+      classLevel: params.classLevel ?? 20,
+      selectedUpgradeNames: selected,
     })
   }
   return choices.options ?? []

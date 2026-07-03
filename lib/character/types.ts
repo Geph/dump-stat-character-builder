@@ -84,6 +84,14 @@ export type StatBreakdownPart = {
   value: number
 }
 
+export type ToolBonus = {
+  name: string
+  ability: AbilityScoreKey
+  proficient: boolean
+  expertise: boolean
+  bonus: number
+}
+
 export type DerivedCharacter = {
   abilityScores: Record<AbilityScoreKey, number>
   abilityMods: Record<AbilityScoreKey, number>
@@ -107,6 +115,7 @@ export type DerivedCharacter = {
   savingThrowProficiencies: string[]
   languages: string[]
   skills: SkillBonus[]
+  tools: ToolBonus[]
   saves: SaveBonus[]
   equippedWeaponAttack: WeaponAttackDerived | null
   attunementSlots: number
