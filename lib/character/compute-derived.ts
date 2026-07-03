@@ -57,6 +57,7 @@ import type {
   SkillBonus,
   StatBreakdownPart,
 } from "@/lib/character/types"
+import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Acrobatics", ability: "dexterity" },
@@ -372,11 +373,16 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     ...new Set([...inputs.languages, ...aggregatedCharacteristics.languages]),
   ]
 
-  const maxHp = applyHpCharacteristics(
+  const maxHpBase = applyHpCharacteristics(
     calculateBaseMaxHp(inputs, abilityMods.constitution),
     aggregatedCharacteristics,
     totalLevel,
   )
+  const exhaustionFx = getExhaustionDerivedEffects(inputs.exhaustionLevel ?? 0)
+  const maxHp =
+    exhaustionFx.hpMaxMultiplier < 1
+      ? Math.max(1, Math.floor(maxHpBase * exhaustionFx.hpMaxMultiplier))
+      : maxHpBase
 
   const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon } =
     resolveEquippedItems(
@@ -416,7 +422,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     wearingArmor,
   })
 
-  const speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
+  let speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
+  if (exhaustionFx.speedMultiplier < 1) {
+    speed = Math.floor(speed * exhaustionFx.speedMultiplier)
+  }
+  if (exhaustionFx.speedZero) speed = 0
 
   const initiative = computeInitiative(
     abilityMods.dexterity,

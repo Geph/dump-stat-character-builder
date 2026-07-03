@@ -322,23 +322,28 @@ function buildFromMechanic(
       const dice = mechanic.bonusDice?.trim()
       if (!dice) return null
       const damageType = mechanic.damageType ? titleCaseWords(mechanic.damageType) : undefined
+      const creatureTypes = mechanic.targetCreatureTypes?.map(titleCaseWords).filter(Boolean)
+      const entry = {
+        bonus: 0,
+        target: "all",
+        customTarget: `${dice}${damageType ? ` ${damageType}` : ""}`,
+        ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
+      }
+      const characteristic = {
+        id: modId(instanceKey(ctx, "damage")),
+        type: "damage_roll_modifiers" as const,
+        entries: [entry],
+        label: creatureTypes?.length
+          ? `Extra ${dice}${damageType ? ` ${damageType}` : ""} vs ${creatureTypes.join(", ")}`
+          : `Extra ${dice}${damageType ? ` ${damageType}` : ""} damage`,
+        ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+      }
       return {
-        ruleId: "ai.damage",
+        ruleId: creatureTypes?.length ? "ai.damage.creature_type" : "ai.damage",
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, characteristicCatalogRefId("damage_roll_modifiers"), [
-          {
-            id: modId(instanceKey(ctx, "damage")),
-            type: "damage_roll_modifiers",
-            entries: [
-              {
-                bonus: 0,
-                target: "all",
-                customTarget: `${dice}${damageType ? ` ${damageType}` : ""}`,
-              },
-            ],
-            label: `Extra ${dice}${damageType ? ` ${damageType}` : ""} damage`,
-          },
+          characteristic,
         ]),
       }
     }
@@ -437,6 +442,24 @@ function buildFromMechanic(
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, GRANT_FEAT_CATALOG_ID, [characteristic]),
+      }
+    }
+    case "spellcasting_ability": {
+      const ability = mechanic.spellcastingAbility
+      if (!ability) return null
+      return {
+        ruleId: "ai.spellcasting_ability",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("spellcasting_ability"), [
+          {
+            id: modId(instanceKey(ctx, "spell_ability")),
+            type: "spellcasting_ability",
+            ability,
+            label: mechanic.spellChoiceLabel ?? `${ability} spellcasting`,
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+          },
+        ]),
       }
     }
     default:

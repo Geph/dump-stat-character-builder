@@ -56,7 +56,18 @@ export const ImportMechanicSchema = z.object({
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
   featCategories: z
-    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"]))
+    .array(
+      z.enum([
+        "Origin",
+        "General",
+        "Fighting Style",
+        "Epic Boon",
+        "Planar Pact",
+        "Metamagic",
+        "Mystic Technique",
+        "Eldritch Invocation",
+      ]),
+    )
     .optional(),
   featCount: z.number().optional(),
   languages: z.array(z.string()).optional(),
@@ -68,11 +79,16 @@ export const ImportMechanicSchema = z.object({
       z.object({
         level: z.number(),
         count: z.number(),
+        unlocksAtClassLevel: z.number().optional(),
       }),
     )
     .optional(),
   spellChoiceLabel: z.string().optional(),
   alwaysPrepared: z.boolean().optional(),
+  spellcastingAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
+  targetCreatureTypes: z.array(z.string()).optional(),
+  requiresSheetToggle: z.string().optional(),
+  sheetToggleLabel: z.string().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
@@ -84,8 +100,16 @@ export const ChoiceOptionsSchema = z.object({
     z.object({
       name: z.string(),
       description: z.string(),
+      prerequisite: z.string().nullable().optional(),
+      repeatable: z.boolean().optional(),
     }),
   ),
+  optionsSource: z
+    .enum(["known_discipline_talents", "fusion_talents", "class_knacks"])
+    .optional(),
+  resourceKey: z.string().nullable().optional(),
+  swappableOnRest: z.boolean().optional(),
+  swapRestType: z.enum(["short", "long"]).optional(),
 })
 
 export const SpeciesTraitSchema = z.object({
@@ -103,6 +127,7 @@ export const ClassFeatureSchema = z.object({
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
+  psionic_augments: z.unknown().optional(),
 })
 
 export const SubclassImportSchema = z.object({
@@ -157,11 +182,91 @@ export const ClassImportSchema = z.object({
       cantrips: z.number().optional(),
       spells_known: z.number().optional(),
       prepared: z.boolean().optional(),
+      progression: z
+        .array(
+          z.object({
+            level: z.number(),
+            cantrips: z.number(),
+            prepared: z.number(),
+            max_spell_level: z.number(),
+          }),
+        )
+        .optional(),
+      caster_progression: z.enum(["full", "half", "third", "pact"]).optional(),
+      explicit_slot_progression: z
+        .array(
+          z.object({
+            level: z.number(),
+            slots: z.array(z.number()),
+          }),
+        )
+        .nullable()
+        .optional(),
+      point_pool: z
+        .object({
+          resource_key: z.string(),
+          cost_by_level: z.record(z.string(), z.number()),
+          base_cost_cap_resource_key: z.string().optional(),
+          metamagic_cost_cap: z.enum(["proficiency_bonus"]).optional(),
+          replaces_spell_slots: z.boolean(),
+        })
+        .optional(),
     })
     .nullable()
     .optional(),
   features: z.array(ClassFeatureSchema),
   spell_list: z.array(z.string()).nullable().optional(),
+  starting_equipment_groups: z
+    .array(
+      z.object({
+        description: z.string(),
+        options: z.array(
+          z.object({
+            label: z.string(),
+            items: z.array(
+              z.object({
+                name: z.string(),
+                quantity: z.number(),
+              }),
+            ),
+          }),
+        ),
+      }),
+    )
+    .nullable()
+    .optional(),
+  starting_gold: z.number().nullable().optional(),
+  multiclass_prerequisites: z
+    .array(
+      z.object({
+        ability: z.string(),
+        minimum: z.number(),
+      }),
+    )
+    .nullable()
+    .optional(),
+  multiclass_prerequisite_groups: z
+    .array(
+      z.object({
+        options: z.array(
+          z.object({
+            ability: z.string(),
+            minimum: z.number(),
+          }),
+        ),
+      }),
+    )
+    .nullable()
+    .optional(),
+  multiclass_proficiencies_gained: z.array(z.string()).nullable().optional(),
+  special_ability: z
+    .object({
+      save_dc_ability: z.string(),
+      label: z.string().nullable().optional(),
+      dc_formula: z.enum(["8_plus_prof_plus_ability_mod"]).optional(),
+    })
+    .nullable()
+    .optional(),
 })
 
 export const BackgroundImportSchema = z.object({
@@ -196,10 +301,22 @@ export const EquipmentImportSchema = z.object({
 export const AbilityImportSchema = z.object({
   name: z.string(),
   description: z.string(),
+  prerequisite: z.string().nullable().optional(),
+  repeatable: z.boolean().optional(),
   source_type: z.enum(["class", "subclass", "species", "background", "feat", "item"]).nullable(),
   source_name: z.string().nullable(),
   level_requirement: z.number().nullable(),
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
+  psionic_augments: z.unknown().optional(),
+  casting_time: z.string().nullable().optional(),
+  range: z.string().nullable().optional(),
+  components: z.array(z.string()).nullable().optional(),
+  duration: z.string().nullable().optional(),
+  concentration: z.boolean().optional(),
+  isChoice: z.boolean().optional(),
+  choices: ChoiceOptionsSchema.optional(),
+  ability_role: z.enum(["discipline", "psionic_power", "talent_pool", "knack"]).optional(),
+  mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
 const UsesAtLevelImportSchema = z.object({
@@ -228,8 +345,31 @@ const UsesConfigImportSchema = z.object({
       z.object({
         rest: z.enum(["short_rest", "long_rest"]),
         amount: z.number().nullable().optional(),
+        amountFormula: z.enum(["half_class_level_round_up"]).nullable().optional(),
+        maxPerLongRest: z.number().nullable().optional(),
       }),
     )
+    .optional(),
+  rechargeOverrides: z
+    .array(
+      z.object({
+        atClassLevel: z.number(),
+        recharges: z.array(
+          z.object({
+            rest: z.enum(["short_rest", "long_rest"]),
+            amount: z.number().nullable().optional(),
+            amountFormula: z.enum(["half_class_level_round_up"]).nullable().optional(),
+            maxPerLongRest: z.number().nullable().optional(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  restoreBySpellSlot: z
+    .object({
+      minSpellLevel: z.number(),
+      restores: z.number(),
+    })
     .optional(),
 })
 
@@ -340,6 +480,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Put each in import_proposals.class_resources[] with proposal_id (snake_case), class_name, resource_key, name, uses, and definition
 - definition: 1–3 sentences explaining what the pool is, how it is spent, and typical recharge — shown to the user before import
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
-- Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement
-- For disciplines with talents, include choices { category, count, options: [{ name, description }] } and mention talent count in definition
+- Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)
+- For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
+- For disciplines with talents, include choices { category, count, options: [{ name, description, prerequisite?, repeatable? }] } and mention talent count in definition
 - Do NOT also duplicate the same entries in class_resources[] or abilities[] — proposals are reviewed first; omit level tables from class description`

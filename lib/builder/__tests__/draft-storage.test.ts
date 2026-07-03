@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   normalizeDraftClassLevels,
+  normalizeBuilderStepId,
   type BuilderDraftSnapshot,
 } from "@/lib/builder/draft-storage"
 
@@ -24,5 +25,12 @@ describe("builder draft class level migration", () => {
         character: { class_id: null, level: 1 } as BuilderDraftSnapshot["character"],
       }),
     ).toEqual([])
+  })
+})
+
+describe("normalizeBuilderStepId", () => {
+  it("maps removed review step 7 to details", () => {
+    expect(normalizeBuilderStepId(7)).toBe(6)
+    expect(normalizeBuilderStepId(6)).toBe(6)
   })
 })

@@ -14,8 +14,8 @@ export function ProceedBlockerBanner({ blockers }: ProceedBlockerBannerProps) {
     >
       <p className="font-semibold text-destructive mb-1.5">Complete these to continue:</p>
       <ul className="list-disc pl-5 space-y-1 text-foreground">
-        {blockers.map((message) => (
-          <li key={message}>{message}</li>
+        {blockers.map((message, index) => (
+          <li key={index}>{message}</li>
         ))}
       </ul>
     </div>

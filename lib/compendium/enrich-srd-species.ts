@@ -375,6 +375,40 @@ function spellsKnownChoice(
   ])
 }
 
+/** Fixed always-prepared lineage / trait spells (no player spell picks). */
+function spellsKnownFixed(
+  instanceKey: string,
+  entries: { name: string; unlocksAtLevel?: number }[],
+  label?: string,
+) {
+  return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.spellsKnown, [
+    {
+      id: modId(instanceKey),
+      type: "spells_known",
+      spells: entries.map((entry) => ({
+        spellId: entry.name,
+        alwaysPrepared: true,
+        prepared: true,
+        unlocksAtClassLevel: entry.unlocksAtLevel,
+      })),
+      alwaysPrepared: true,
+      label,
+    },
+  ])
+}
+
+function spellcastingAbilityChoice(instanceKey: string, label?: string) {
+  return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.spellcastingAbility, [
+    {
+      id: modId(instanceKey),
+      type: "spellcasting_ability",
+      ability: "intelligence",
+      abilityOptions: ["intelligence", "wisdom", "charisma"],
+      label: label ?? "Spellcasting ability (Intelligence, Wisdom, or Charisma)",
+    },
+  ])
+}
+
 function movementDash(instanceKey: string) {
   return fxInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.movementOption, {
     bonusAction: true,
@@ -665,41 +699,44 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
   "Elf::Elven Lineage::Drow": {
     linkedModifiers: [
       vision(120, "darkvision", "Drow darkvision 120 ft."),
-      spellsKnownChoice(
+      spellcastingAbilityChoice("drow_lineage_ability"),
+      spellsKnownFixed(
         "drow_spells",
         [
-          { level: 0, count: 1 },
-          { level: 3, count: 1 },
-          { level: 5, count: 1 },
+          { name: "Dancing Lights", unlocksAtLevel: 1 },
+          { name: "Faerie Fire", unlocksAtLevel: 3 },
+          { name: "Darkness", unlocksAtLevel: 5 },
         ],
-        { label: "Drow lineage spells" },
+        "Drow lineage spells",
       ),
     ],
   },
   "Elf::Elven Lineage::High Elf": {
     linkedModifiers: [
-      spellsKnownChoice(
+      spellcastingAbilityChoice("high_elf_lineage_ability"),
+      spellsKnownFixed(
         "high_elf_spells",
         [
-          { level: 0, count: 1 },
-          { level: 3, count: 1 },
-          { level: 5, count: 1 },
+          { name: "Prestidigitation", unlocksAtLevel: 1 },
+          { name: "Detect Magic", unlocksAtLevel: 3 },
+          { name: "Misty Step", unlocksAtLevel: 5 },
         ],
-        { label: "High Elf lineage spells", spellListClassOptions: ["Wizard"] },
+        "High Elf lineage spells",
       ),
     ],
   },
   "Elf::Elven Lineage::Wood Elf": {
     linkedModifiers: [
       speedAdd(5, "Wood Elf speed"),
-      spellsKnownChoice(
+      spellcastingAbilityChoice("wood_elf_lineage_ability"),
+      spellsKnownFixed(
         "wood_elf_spells",
         [
-          { level: 0, count: 1 },
-          { level: 3, count: 1 },
-          { level: 5, count: 1 },
+          { name: "Druidcraft", unlocksAtLevel: 1 },
+          { name: "Longstrider", unlocksAtLevel: 3 },
+          { name: "Pass without Trace", unlocksAtLevel: 5 },
         ],
-        { label: "Wood Elf lineage spells" },
+        "Wood Elf lineage spells",
       ),
     ],
   },
@@ -877,7 +914,7 @@ export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string
 
   // Origin languages (Common + two of your choice) — every SRD species grants these.
   // Only add when the species doesn't already carry a language grant of its own.
-  if (!speciesHasLanguageGrant(next)) {
+  if (!speciesRowHasLanguageGrant(next)) {
     const existing = Array.isArray(next.linkedModifiers)
       ? (next.linkedModifiers as LinkedModifierInstance[])
       : Array.isArray(next.linked_modifiers)
@@ -899,9 +936,8 @@ export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string
   return { ...next, traits: enrichedTraits }
 }
 
-/** True when a species row already grants a language modifier (species-wide or per trait). */
-function speciesHasLanguageGrant(row: Record<string, unknown>): boolean {
-  const matches = (instances: unknown): boolean =>
+function linkedModifiersHaveLanguageGrant(instances: unknown): boolean {
+  return (
     Array.isArray(instances) &&
     instances.some(
       (inst) =>
@@ -913,14 +949,35 @@ function speciesHasLanguageGrant(row: Record<string, unknown>): boolean {
               (c) => c?.type === "languages",
             ))),
     )
-
-  if (matches(row.linkedModifiers)) return true
-  const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
-  return traits.some(
-    (trait) =>
-      matches(trait.linkedModifiers) ||
-      (trait.choices?.options ?? []).some((option) => matches(option.linkedModifiers)),
   )
+}
+
+function recordLinkedModifiers(row: Record<string, unknown>): unknown[] {
+  const linked = row.linkedModifiers ?? row.linked_modifiers
+  return Array.isArray(linked) ? linked : []
+}
+
+/** True when a species row already grants a language modifier (species-wide or per trait). */
+export function speciesRowHasLanguageGrant(row: Record<string, unknown>): boolean {
+  if (linkedModifiersHaveLanguageGrant(recordLinkedModifiers(row))) return true
+
+  const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
+  return traits.some((trait) => {
+    const traitRow = trait as unknown as Record<string, unknown>
+    if (
+      linkedModifiersHaveLanguageGrant(trait.linkedModifiers) ||
+      linkedModifiersHaveLanguageGrant(traitRow.linked_modifiers)
+    ) {
+      return true
+    }
+    return (trait.choices?.options ?? []).some((option) => {
+      const optionRow = option as unknown as Record<string, unknown>
+      return (
+        linkedModifiersHaveLanguageGrant(option.linkedModifiers) ||
+        linkedModifiersHaveLanguageGrant(optionRow.linked_modifiers)
+      )
+    })
+  })
 }
 
 export function enrichSrdSpeciesList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

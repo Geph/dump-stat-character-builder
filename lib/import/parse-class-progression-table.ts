@@ -14,13 +14,102 @@ export type ClassProgressionColumn = {
   dieSidesByLevel?: UsesAtLevel[]
 }
 
+export type SpellSlotProgression = {
+  casterType: "half" | "full"
+  byLevel: { level: number; slots: number[] }[]
+}
+
 export type ParsedClassProgressionTable = {
   columns: ClassProgressionColumn[]
+  spellSlotProgression?: SpellSlotProgression | null
 }
+
+const ORDINAL_SPELL_HEADER_RE = /^(\d+)(?:st|nd|rd|th)$/i
 
 export type ProgressionTableFeature = {
   level: number
   name: string
+}
+
+function parseOrdinalSpellLevelHeader(header: string): number | null {
+  const match = header.trim().match(ORDINAL_SPELL_HEADER_RE)
+  if (!match) return null
+  const level = parseInt(match[1], 10)
+  return level >= 1 && level <= 9 ? level : null
+}
+
+function identifySpellSlotColumns(
+  headers: string[],
+): { indices: { index: number; spellLevel: number }[]; casterType: "half" | "full" } | null {
+  const indices: { index: number; spellLevel: number }[] = []
+  for (let index = 0; index < headers.length; index++) {
+    const spellLevel = parseOrdinalSpellLevelHeader(headers[index] ?? "")
+    if (spellLevel != null) indices.push({ index, spellLevel })
+  }
+  if (indices.length < 3) return null
+  const levels = [...new Set(indices.map((entry) => entry.spellLevel))].sort((a, b) => a - b)
+  if (levels[0] !== 1) return null
+  for (let i = 1; i < levels.length; i++) {
+    if (levels[i] !== levels[i - 1] + 1) return null
+  }
+  const casterType: "half" | "full" = levels[levels.length - 1] <= 5 ? "half" : "full"
+  return { indices, casterType }
+}
+
+function isGenericKnownCountHeader(header: string): boolean {
+  return /\b\w+\s+known$/i.test(header.trim())
+}
+
+function isGenericDieSizeHeader(header: string): boolean {
+  const normalized = header.trim()
+  if (/risk\s+dice|battle\s+dice|exploit\s+dice|endurance\s+dice/i.test(normalized)) return false
+  if (/exploit\s*die(?!\s*dice)/i.test(normalized)) return false
+  if (/endurance\s*die\s*size/i.test(normalized)) return false
+  if (/\bdice$/i.test(normalized) && !/\bdie\s+size$/i.test(normalized)) return false
+  return /\bdie(?:\s+size)?$/i.test(normalized)
+}
+
+function columnMostlyDieSizes(rows: string[][], colIndex: number, headerRowIndex: number): boolean {
+  let dieCells = 0
+  let total = 0
+  for (let r = headerRowIndex + 1; r < rows.length; r++) {
+    const cell = rows[r]?.[colIndex] ?? ""
+    if (!stripHtml(cell).trim() || /^[-—─]$/.test(stripHtml(cell).trim())) continue
+    total++
+    if (parseDieSizeCell(cell) != null) dieCells++
+  }
+  return total > 0 && dieCells / total >= 0.6
+}
+
+function parseSpellSlotProgression(
+  rows: string[][],
+  headers: string[],
+  headerRowIndex: number,
+  levelCol: number,
+  spellCols: { index: number; spellLevel: number }[],
+  casterType: "half" | "full",
+): SpellSlotProgression {
+  const byLevel: { level: number; slots: number[] }[] = []
+  const maxSpellLevel = spellCols[spellCols.length - 1]?.spellLevel ?? 5
+  const slotsWidth = maxSpellLevel
+
+  for (let r = headerRowIndex + 1; r < rows.length; r++) {
+    const row = rows[r]
+    const level = parseLevelCell(row[levelCol] ?? "")
+    if (level == null) continue
+    const slots = Array(slotsWidth).fill(0)
+    for (const col of spellCols) {
+      const count = parseCountCell(row[col.index] ?? "")
+      if (count != null && col.spellLevel >= 1 && col.spellLevel <= slotsWidth) {
+        slots[col.spellLevel - 1] = count
+      }
+    }
+    if (slots.some((value) => value > 0)) {
+      byLevel.push({ level, slots })
+    }
+  }
+
+  return { casterType, byLevel }
 }
 
 const LEVEL_CELL_RE = /^(\d{1,2})(?:st|nd|rd|th)?$/i
@@ -87,6 +176,7 @@ function parseResourceCell(header: string, cell: string): number | null {
     if (pool) return pool.dieSides
     return parseDieSizeCell(cell)
   }
+  if (isGenericDieSizeHeader(header)) return parseDieSizeCell(cell)
   return parseCountCell(cell)
 }
 
@@ -109,6 +199,8 @@ function isResourceHeader(cell: string): boolean {
   if (/^weapon\s+mastery$/i.test(normalized)) return true
   if (/^risk\s+dice$/i.test(normalized)) return true
   if (/^battle\s+dice$/i.test(normalized)) return true
+  if (isGenericKnownCountHeader(normalized)) return true
+  if (isGenericDieSizeHeader(normalized)) return true
 
   const thirdParty = matchThirdPartyResourceHeader(normalized)
   if (thirdParty && thirdParty.resourceKey !== "exploits_known") return true
@@ -215,14 +307,18 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
   const levelCol = headers.findIndex((header) => isLevelHeader(header))
   if (levelCol < 0) return null
 
+  const spellSlotInfo = identifySpellSlotColumns(headers)
+  const spellSlotIndexSet = new Set(spellSlotInfo?.indices.map((entry) => entry.index) ?? [])
+
   const resourceCols: { index: number; header: string }[] = []
   headers.forEach((header, index) => {
     if (index === levelCol) return
+    if (spellSlotIndexSet.has(index)) return
+    if (parseOrdinalSpellLevelHeader(header) != null) return
     if (isResourceHeader(header)) {
       resourceCols.push({ index, header })
     }
   })
-  if (resourceCols.length === 0) return null
 
   const columnData = resourceCols.map((col) => ({
     header: col.header,
@@ -239,6 +335,19 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
 
     resourceCols.forEach((col, colIndex) => {
       const cell = row[col.index] ?? ""
+      const useDieOnlyColumn =
+        !/exploit\s*die(?!\s*dice)/i.test(col.header) &&
+        !/endurance\s*die\s*size/i.test(col.header) &&
+        (isGenericDieSizeHeader(col.header) || columnMostlyDieSizes(rows, col.index, headerRowIndex))
+      if (useDieOnlyColumn) {
+        const sides = parseDieSizeCell(cell)
+        if (sides == null) return
+        const existingDie = columnData[colIndex].dieSidesByLevel.find((entry) => entry.level === level)
+        if (!existingDie) {
+          columnData[colIndex].dieSidesByLevel.push({ level, count: sides })
+        }
+        return
+      }
       const dicePool = headerUsesDicePool(col.header) ? parseDicePoolCell(cell) : null
       const count = dicePool?.count ?? parseResourceCell(col.header, cell)
       if (count == null) return
@@ -258,8 +367,21 @@ function parseTableRows(rows: string[][]): ParsedClassProgressionTable | null {
   const columns = mergeExploitDiceColumns(
     columnData.filter((col) => col.valuesByLevel.length > 0 || (col.dieSidesByLevel?.length ?? 0) > 0),
   )
-  if (columns.length === 0) return null
-  return { columns }
+
+  const spellSlotProgression =
+    spellSlotInfo && spellSlotInfo.indices.length
+      ? parseSpellSlotProgression(
+          rows,
+          headers,
+          headerRowIndex,
+          levelCol,
+          spellSlotInfo.indices,
+          spellSlotInfo.casterType,
+        )
+      : null
+
+  if (columns.length === 0 && !spellSlotProgression?.byLevel.length) return null
+  return { columns, spellSlotProgression }
 }
 
 /** Merge separate Exploit Die (size) and Exploit Dice (pool) columns into one resource. */
@@ -494,6 +616,36 @@ export function usesConfigForProgressionColumn(
       }. A choice count, not a spendable pool.`,
       atLevelTable: sorted,
       atLevelMode: "tier",
+    }
+  }
+
+  if (/_known$/.test(column.resourceKey) || isGenericKnownCountHeader(column.header)) {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Number of ${column.resourceName} at each ${className} level${
+        latest ? ` (up to ${latest.count})` : ""
+      }. A choice count, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
+  if (
+    (column.dieSidesByLevel?.length ?? 0) > 0 &&
+    column.valuesByLevel.length === 0 &&
+    !/exploit/i.test(column.header)
+  ) {
+    const dieSides = [...(column.dieSidesByLevel ?? [])].sort((a, b) => a.level - b.level)
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
+    return {
+      type: "special",
+      specialDescription: `${column.resourceName} die size at each ${className} level (e.g. ${dieLabel}). Pairs with on-hit or spend riders — not a spendable pool count.`,
+      atLevelTable: dieSides,
+      atLevelMode: "tier",
+      dieType: dieLabel,
+      dieSidesByLevel: dieSides,
     }
   }
 

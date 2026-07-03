@@ -2,6 +2,23 @@ import type { CharacterDraft } from "@/lib/types"
 
 const STORAGE_KEY = "dump-stat-builder-draft"
 
+export type BuilderPreviewTab = "summary" | "features"
+
+export function normalizePreviewTab(value: unknown): BuilderPreviewTab {
+  if (value === "proficiencies") return "features"
+  if (value === "combat" || value === "equipment") return "summary"
+  if (value === "summary" || value === "features") {
+    return value
+  }
+  return "summary"
+}
+
+/** Legacy builder had a removed Review step at id 7. */
+export function normalizeBuilderStepId(step: number): number {
+  if (step >= 7) return 6
+  return step >= 1 ? step : 1
+}
+
 export type BuilderDraftSnapshot = {
   version: 1
   savedAt: string
@@ -18,7 +35,7 @@ export type BuilderDraftSnapshot = {
   equipmentFilterCategory?: string
   spellFilterLevelByClassId?: Record<string, string>
   spellLevelPages?: Record<string, number>
-  previewTab: "summary" | "combat" | "features" | "custom"
+  previewTab: BuilderPreviewTab
   mobilePanel: "steps" | "preview"
   equippedArmorId: string | null
   equippedShieldId: string | null
@@ -79,12 +96,15 @@ export function loadBuilderDraft(): BuilderDraftSnapshot | null {
     return {
       ...parsed,
       classLevels,
+      currentStep: normalizeBuilderStepId(parsed.currentStep),
+      maxStepReached: normalizeBuilderStepId(parsed.maxStepReached),
       classAddOrder:
         Array.isArray(parsed.classAddOrder) && parsed.classAddOrder.length > 0
           ? parsed.classAddOrder
           : classLevels.map((entry) => entry.classId),
       primaryClassId:
         parsed.primaryClassId ?? parsed.character.class_id ?? classLevels[0]?.classId ?? null,
+      previewTab: normalizePreviewTab(parsed.previewTab),
     }
   } catch {
     return null

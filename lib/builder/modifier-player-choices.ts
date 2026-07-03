@@ -14,6 +14,7 @@ import {
   type CharacteristicModifier,
   type DamageCharacteristic,
   type SkillsCharacteristic,
+  type SpellcastingAbilityCharacteristic,
   type SpellsKnownCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
@@ -22,6 +23,7 @@ import {
   readLinkedModifiers,
   resolveLinkedModifiers,
 } from "@/lib/compendium/linked-modifiers"
+import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
@@ -35,6 +37,7 @@ export type ModifierPlayerChoiceKind =
   | "skill_or_tool"
   | "spell_list_class"
   | "spell"
+  | "spellcasting_ability"
   | "damage_type"
 
 export type ModifierPlayerChoiceSlot = {
@@ -119,7 +122,7 @@ export function characteristicsForFeatSelection(
   return characteristicsFromLinkedModifiers(catalog, instances, refs)
 }
 
-type SlotBuildContext = { classSkillList?: string[] }
+type SlotBuildContext = { classSkillList?: string[]; classLevel?: number }
 
 function slotsFromCharacteristic(
   mod: CharacteristicModifier,
@@ -232,7 +235,7 @@ function slotsFromCharacteristic(
 
     const spellListSlotKey = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spell_list_class")
 
-    if (spellMod.playerPicksSpellList && (spellMod.spellListClassOptions?.length ?? 0) > 0) {
+    if (spellMod.playerPicksSpellList && (spellMod.spellListClassOptions?.length ?? 0) > 1) {
       slots.push({
         slotKey: spellListSlotKey,
         sourceKey,
@@ -247,6 +250,7 @@ function slotsFromCharacteristic(
 
     grants.forEach((grant, index) => {
       if (grant.count <= 0) return
+      if (grant.unlocksAtClassLevel != null && grant.unlocksAtClassLevel > (context?.classLevel ?? 99)) return
       slots.push({
         slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spell", index),
         sourceKey,
@@ -263,6 +267,25 @@ function slotsFromCharacteristic(
         requiresSpellListPick: spellMod.playerPicksSpellList ?? false,
         spellListSlotKey,
       })
+    })
+  }
+
+  if (mod.type === "spellcasting_ability") {
+    const abilityMod = mod as SpellcastingAbilityCharacteristic
+    const options = abilityMod.abilityOptions ?? []
+    if (options.length <= 1) return slots
+
+    slots.push({
+      slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spellcasting_ability"),
+      sourceKey,
+      sourceLabel,
+      modId: mod.id,
+      kind: "spellcasting_ability",
+      label: abilityMod.label ?? "Choose spellcasting ability",
+      maxCount: 1,
+      options: options.map((ability) => ({
+        name: ability.charAt(0).toUpperCase() + ability.slice(1),
+      })),
     })
   }
 
@@ -392,7 +415,10 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
     const cls = classes.find((candidate) => candidate.id === entry.classId)
     if (!cls) continue
 
-    const context: SlotBuildContext = { classSkillList: cls.skill_choices?.options ?? [] }
+    const context: SlotBuildContext = {
+      classSkillList: cls.skill_choices?.options ?? [],
+      classLevel: entry.level,
+    }
 
     for (const feature of cls.features ?? []) {
       if (feature.level > entry.level) continue
@@ -482,7 +508,7 @@ export function collectSpeciesModifierPlayerChoiceSlots(
     }
   })
 
-  return slots
+  return dedupeModifierPlayerChoiceSlots(slots)
 }
 
 export function collectModifierPlayerChoiceSlots(params: {
@@ -558,7 +584,7 @@ export function collectModifierPlayerChoiceSlots(params: {
     )
   }
 
-  return slots
+  return dedupeModifierPlayerChoiceSlots(slots)
 }
 
 export function applyModifierPlayerPicks(
@@ -672,6 +698,19 @@ export function applyModifierPlayerPicks(
       return { ...spellMod, spells: pickedSpells }
     }
 
+    if (mod.type === "spellcasting_ability") {
+      const abilityMod = mod as SpellcastingAbilityCharacteristic
+      const options = abilityMod.abilityOptions ?? []
+      if (options.length <= 1) return mod
+
+      const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spellcasting_ability")
+      const selected = picks[key]?.[0]
+      if (!selected) return mod
+      const ability = resolveSpellcastingAbilityKey(selected)
+      if (!ability) return mod
+      return { ...abilityMod, ability }
+    }
+
     return mod
   })
 }
@@ -722,6 +761,20 @@ export function nonSpellModifierPlayerChoiceSlots(
   slots: ModifierPlayerChoiceSlot[],
 ): ModifierPlayerChoiceSlot[] {
   return slots.filter((slot) => !isSpellRelatedModifierSlot(slot))
+}
+
+export function dedupeModifierPlayerChoiceSlots(
+  slots: ModifierPlayerChoiceSlot[],
+): ModifierPlayerChoiceSlot[] {
+  const seen = new Set<string>()
+  const deduped: ModifierPlayerChoiceSlot[] = []
+  for (const slot of slots) {
+    const key = `${slot.sourceKey}\0${slot.kind}\0${slot.label}\0${slot.maxCount}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(slot)
+  }
+  return deduped
 }
 
 export function collectModifierPlayerChoiceBlockers(

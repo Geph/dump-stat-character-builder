@@ -28,7 +28,6 @@ import {
   Search,
   Info,
   Heart,
-  Swords,
   Sparkles,
   Plus,
   Minus,
@@ -43,7 +42,6 @@ import {
 import {
   aggregateCharacteristics,
   normalizeCharacteristics,
-  resolveUsesConfig,
   ABILITY_SCORE_KEYS,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
@@ -64,7 +62,6 @@ import {
   getEffectiveWeaponProficiencies,
   mergeProficiencyLists,
 } from "@/lib/compendium/background-proficiencies"
-import { formatUsesRecharges, getRechargeRules } from "@/lib/compendium/normalize-uses-config"
 import {
   isArmorItem,
   isShieldItem,
@@ -80,7 +77,6 @@ import { ClampedRichText } from "@/components/character-sheet/expandable-descrip
 import { CompendiumSelectionCard } from "@/components/compendium/compendium-selection-card"
 import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
-import { EquippedGearPanel } from "@/components/character-sheet/equipped-gear-panel"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { compendiumCardBlurb, getCompendiumCardBlurb } from "@/lib/compendium/card-image"
 import { getClassDetailFeatures } from "@/lib/builder/class-detail-features"
@@ -113,8 +109,10 @@ import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/buil
 import {
   clearBuilderDraft,
   loadBuilderDraft,
+  normalizePreviewTab,
   saveBuilderDraft,
   type BuilderDraftSnapshot,
+  type BuilderPreviewTab,
 } from "@/lib/builder/draft-storage"
 import { characterToBuilderState } from "@/lib/builder/character-to-draft"
 import {
@@ -164,7 +162,6 @@ import {
 } from "@/lib/builder/modifier-player-choices"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
-import { isSystemOptionCatalogId } from "@/lib/compendium/system-option-catalogs"
 import {
   allAbilityScorePoolAllocationsValid,
   collectAbilityScorePoolGrants,
@@ -218,6 +215,8 @@ import {
   getMulticlassToolPickRequirement,
   multiclassProficiencySummary,
 } from "@/lib/builder/multiclass-proficiencies"
+import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
+import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import {
   MAX_PORTRAIT_FILE_BYTES,
@@ -345,7 +344,7 @@ export default function BuilderPage() {
   }>({ type: null, item: null })
   
   // Preview tabs
-  const [previewTab, setPreviewTab] = useState<"summary" | "combat" | "features" | "custom">("summary")
+  const [previewTab, setPreviewTab] = useState<BuilderPreviewTab>("summary")
   const [mobilePanel, setMobilePanel] = useState<"steps" | "preview">("steps")
   const [equippedArmorId, setEquippedArmorId] = useState<string | null>(null)
   const [equippedShieldId, setEquippedShieldId] = useState<string | null>(null)
@@ -407,7 +406,7 @@ export default function BuilderPage() {
     )
     setGoldPurchasedEquipmentIds(snapshot.goldPurchasedEquipmentIds ?? [])
     setCardViewMode(snapshot.cardViewMode ?? layoutToCardViewMode(getBuilderLayout()))
-    setPreviewTab(snapshot.previewTab)
+    setPreviewTab(normalizePreviewTab(snapshot.previewTab))
     setMobilePanel(snapshot.mobilePanel)
     setEquippedArmorId(snapshot.equippedArmorId)
     setEquippedShieldId(snapshot.equippedShieldId)
@@ -1263,14 +1262,6 @@ export default function BuilderPage() {
   )
   const goldRemaining = totalGoldBudget - goldSpent
 
-  const ownedEquipmentItems = useMemo(
-    () =>
-      (character.equipment_ids ?? [])
-        .map((id) => equipment.find((item) => item.id === id))
-        .filter((item): item is Equipment => !!item),
-    [character.equipment_ids, equipment],
-  )
-
   useEffect(() => {
     if (!inGoldShoppingMode && goldPurchasedEquipmentIds.length > 0) {
       setGoldPurchasedEquipmentIds([])
@@ -1496,10 +1487,6 @@ export default function BuilderPage() {
     abilityScores: effectiveAbilityScores,
   })
 
-  const armorOptions = useMemo(() => equipment.filter(isArmorItem), [equipment])
-  const shieldOptions = useMemo(() => equipment.filter(isShieldItem), [equipment])
-  const weaponOptions = useMemo(() => equipment.filter(isWeaponItem), [equipment])
-
   const effectiveSkillProficiencies = characterDerived.skillProficiencies
   const effectiveSkillExpertise = characterDerived.skillExpertise
   const effectiveToolProficiencies = characterDerived.toolProficiencies
@@ -1508,7 +1495,6 @@ export default function BuilderPage() {
   const savingThrowProficiencies = characterDerived.savingThrowProficiencies
   const maxHp = characterDerived.maxHp
   const armorClass = characterDerived.armorClass
-  const equippedWeaponAttack = characterDerived.equippedWeaponAttack
   const speed = characterDerived.speed
   const passivePerception = characterDerived.passivePerception
   const initiative = characterDerived.initiative
@@ -1895,7 +1881,6 @@ export default function BuilderPage() {
       case BUILDER_STEP_IDS.SPELLS:
         return validateModifierPlayerChoices(spellGrantModifierSlots, modifierPlayerPicks)
       case BUILDER_STEP_IDS.DETAILS: return character.name.trim().length > 0
-      case BUILDER_STEP_IDS.REVIEW: return character.name.trim().length > 0
       default: return false
     }
   }
@@ -1990,9 +1975,8 @@ export default function BuilderPage() {
         )
         break
       case BUILDER_STEP_IDS.DETAILS:
-      case BUILDER_STEP_IDS.REVIEW:
         if (character.name.trim().length === 0) {
-          blockers.push("Enter a character name on the Details step.")
+          blockers.push("Enter a character name.")
         }
         break
       default:
@@ -2242,14 +2226,14 @@ export default function BuilderPage() {
                   onContinue={advanceStep}
                   onSave={saveCharacter}
                   saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
-                  lastStep={BUILDER_STEP_IDS.REVIEW}
+                  lastStep={BUILDER_STEP_IDS.DETAILS}
                 />
               </div>
             </div>
 
             {editingCharacterId && (
               <p className="text-sm text-muted-foreground mb-4 -mt-2">
-                Editing an existing character. Changes are saved when you click Save Character on the review step.
+                Editing an existing character. Changes are saved when you click Save Character on the Details step.
               </p>
             )}
 
@@ -2522,7 +2506,8 @@ export default function BuilderPage() {
                           feature.level <= entry.level &&
                           feature.isChoice &&
                           feature.choices &&
-                          (feature.choices.options?.length ?? 0) > 0,
+                          ((feature.choices.options?.length ?? 0) > 0 ||
+                            feature.choices.optionsSource),
                       )
 
                       return (
@@ -2633,6 +2618,12 @@ export default function BuilderPage() {
 
                           {eligibleFeatures.map((feature) => {
                             const key = featureChoiceKey(entry.classId, feature.name, feature.level)
+                            const choiceOptions = resolveFeatureChoiceOptions(feature, {
+                              customAbilities,
+                              featureChoicePicks,
+                              classNames: [cls.name],
+                              classLevel: entry.level,
+                            })
                             const choiceCount = resolveFeatureChoiceCount(
                               feature.choices!,
                               entry.level,
@@ -2640,10 +2631,28 @@ export default function BuilderPage() {
                             )
                             const isWeaponMastery =
                               feature.choices?.resourceKey === "weapon_mastery"
+                            const isKnackPool = feature.choices?.optionsSource === "class_knacks"
                             const masteryHint = isWeaponMastery
                               ? `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""}.`
-                              : feature.choices!.category
+                              : isKnackPool
+                                ? `Choose ${choiceCount} Knack${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""}.`
+                              : feature.choices!.optionsSource === "known_discipline_talents"
+                                ? `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines.`
+                                : feature.choices!.category
                             const handleFeatureChoiceChange = (selected: string[]) => {
+                              if (isKnackPool) {
+                                const previous = featureChoicePicks[key] ?? []
+                                const validation = validateKnackSelectionChange({
+                                  previous,
+                                  next: selected,
+                                  customAbilities,
+                                  classLevel: entry.level,
+                                })
+                                if (!validation.ok) {
+                                  window.alert(validation.message)
+                                  return
+                                }
+                              }
                               setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
                               setModifierPlayerPicks((prev) =>
                                 clearModifierPicksForSource(prev, key),
@@ -2655,7 +2664,7 @@ export default function BuilderPage() {
                                   <WeaponMasteryChoices
                                     title={feature.name}
                                     hint={masteryHint}
-                                    options={feature.choices?.options ?? []}
+                                    options={choiceOptions}
                                     maxCount={choiceCount}
                                     selected={featureChoicePicks[key] ?? []}
                                     unavailableOptions={[
@@ -2668,7 +2677,7 @@ export default function BuilderPage() {
                                   <MultiSelectChoices
                                     title={feature.name}
                                     hint={masteryHint}
-                                    options={feature.choices?.options ?? []}
+                                    options={choiceOptions}
                                     maxCount={choiceCount}
                                     selected={featureChoicePicks[key] ?? []}
                                     unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
@@ -4394,6 +4403,19 @@ export default function BuilderPage() {
                   </button>
                 </div>
 
+                {multiclassAbilityIssues.length > 0 && (
+                  <div className="rounded-xl border border-warning/50 bg-warning/10 p-4">
+                    <p className="text-sm font-bold text-warning mb-2">Cannot save yet</p>
+                    <ul className="space-y-1 text-xs text-foreground">
+                      {multiclassAbilityIssues.map((issue) => (
+                        <li key={`details-${issue.classId}-${issue.role}`}>
+                          {formatMulticlassAbilityIssue(issue)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Portrait & banner uploads */}
                 <div className="flex flex-col lg:flex-row gap-6 mb-6">
                   <div className="flex items-start gap-4">
@@ -4529,72 +4551,6 @@ export default function BuilderPage() {
                 </div>
               </div>
             )}
-
-            {/* Step 7: Review */}
-            {currentStep === BUILDER_STEP_IDS.REVIEW && (
-              <div>
-                <h2 className="text-2xl font-black text-foreground mb-6">Review Your Character</h2>
-
-                {multiclassAbilityIssues.length > 0 && (
-                  <div className="mb-6 rounded-xl border border-warning/50 bg-warning/10 p-4">
-                    <p className="text-sm font-bold text-warning mb-2">Cannot save yet</p>
-                    <ul className="space-y-1 text-xs text-foreground">
-                      {multiclassAbilityIssues.map((issue) => (
-                        <li key={`review-${issue.classId}-${issue.role}`}>
-                          {formatMulticlassAbilityIssue(issue)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                
-                <div className="bg-card rounded-2xl p-6 border-2 border-border mb-6">
-                  <div className="flex items-start gap-6 mb-6">
-                    {character.portrait_url ? (
-                      <img
-                        src={character.portrait_url}
-                        alt={character.name}
-                        className="w-24 h-24 rounded-2xl object-cover"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 bg-muted rounded-2xl flex items-center justify-center">
-                        <UserCircle className="w-12 h-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="text-2xl font-black text-foreground">{character.name || "Unnamed Hero"}</h3>
-                      <p className="text-muted-foreground">
-                        Level {character.level} {selectedClass?.name || "Adventurer"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedSpecies?.name} - {selectedBackground?.name}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-6 gap-2 mb-6">
-                    {ABILITY_NAMES.map((ability) => (
-                      <div key={ability} className="text-center bg-muted rounded-lg p-2">
-                        <p className="text-xs text-muted-foreground uppercase">{ability.slice(0, 3)}</p>
-                        <p className="text-lg font-bold text-foreground">{character[ability]}</p>
-                        <p className="text-sm text-primary">{getAbilityModifier(character[ability])}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Equipment:</span>
-                      <span className="text-foreground ml-2">{character.equipment_ids.length} items</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Spells:</span>
-                      <span className="text-foreground ml-2">{allSpellIds.length} spells</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </motion.div>
         </AnimatePresence>
 
@@ -4609,7 +4565,7 @@ export default function BuilderPage() {
                 onContinue={advanceStep}
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
-                lastStep={BUILDER_STEP_IDS.REVIEW}
+                lastStep={BUILDER_STEP_IDS.DETAILS}
               />
             </div>
           </div>
@@ -4666,9 +4622,7 @@ export default function BuilderPage() {
               <div className="flex gap-1 mb-3 border-b border-border">
                 {[
                   { id: "summary", label: "Summary", icon: UserCircle },
-                  { id: "combat", label: "Combat", icon: Swords },
                   { id: "features", label: "Features", icon: Sparkles },
-                  { id: "custom", label: "Custom", icon: Wand2 },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -4827,199 +4781,39 @@ export default function BuilderPage() {
                           })}
                         </div>
                       </div>
+
+                      {primaryClass?.spellcasting &&
+                        (() => {
+                          const spellKey = resolveSpellcastingAbilityKey(primaryClass.spellcasting.ability)
+                          if (!spellKey) return null
+                          const spellMod = abilityMods[spellKey]
+                          return (
+                            <div className="p-2 bg-magenta/10 rounded-lg">
+                              <p className="text-[9px] text-magenta uppercase font-bold mb-1">
+                                Spellcasting ({primaryClass.spellcasting.ability})
+                              </p>
+                              <div className="grid grid-cols-2 gap-2 text-center">
+                                <div>
+                                  <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
+                                  <p className="text-lg font-black text-magenta">
+                                    {8 + proficiencyBonus + spellMod}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] text-muted-foreground">Spell Attack</p>
+                                  <p className="text-lg font-black text-magenta">
+                                    +{proficiencyBonus + spellMod}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
                     </div>
                   </div>
-
-                  {(effectiveWeaponProficiencies.length > 0 ||
-                    effectiveArmorProficiencies.length > 0 ||
-                    effectiveToolProficiencies.length > 0 ||
-                    (character.languages?.length ?? 0) > 0) && (
-                    <div className="p-2 bg-muted/30 rounded-lg space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <GameIcon
-                          name={PREVIEW_SECTION_ICONS.proficiencies}
-                          className="w-4 h-4 text-muted-foreground shrink-0"
-                        />
-                        <p className="text-sm text-muted-foreground uppercase font-bold">Proficiencies</p>
-                      </div>
-                      {effectiveWeaponProficiencies.length > 0 && (
-                        <p className="text-[10px] text-foreground">
-                          <span className="text-muted-foreground">Weapons: </span>
-                          {effectiveWeaponProficiencies.join(", ")}
-                        </p>
-                      )}
-                      {effectiveArmorProficiencies.length > 0 && (
-                        <p className="text-[10px] text-foreground">
-                          <span className="text-muted-foreground">Armor: </span>
-                          {effectiveArmorProficiencies.join(", ")}
-                        </p>
-                      )}
-                      {effectiveToolProficiencies.length > 0 && (
-                        <p className="text-[10px] text-foreground">
-                          <span className="text-muted-foreground">Tools: </span>
-                          {effectiveToolProficiencies.join(", ")}
-                        </p>
-                      )}
-                      {(character.languages?.length ?? 0) > 0 && (
-                        <p className="text-[10px] text-foreground">
-                          <span className="text-muted-foreground">Languages: </span>
-                          {(character.languages ?? []).join(", ")}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {ownedEquipmentItems.length > 0 && (
-                    <div className="p-2 bg-muted/30 rounded-lg">
-                      <div className="flex items-center justify-between gap-1.5 mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <Backpack className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <p className="text-sm text-muted-foreground uppercase font-bold">Equipment</p>
-                        </div>
-                        {inGoldShoppingMode && totalGoldBudget > 0 && (
-                          <span className="text-[9px] text-muted-foreground tabular-nums">
-                            {goldRemaining} GP left
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] leading-snug text-foreground">
-                        {ownedEquipmentItems.map((item) => item.name).join(", ")}
-                      </p>
-                    </div>
-                  )}
                 </div>
               )}
-              
-              {/* Combat Tab */}
-              {previewTab === "combat" && (
-                <div className="space-y-3">
-                  {/* Top combat stats row */}
-                  <div className="grid grid-cols-4 gap-1 text-center">
-                    <div className="p-2 bg-muted/50 rounded-lg">
-                      <Shield className="w-3 h-3 mx-auto text-secondary mb-0.5" />
-                      <p className="text-[8px] text-muted-foreground">AC</p>
-                      <p className="text-lg font-black text-secondary">{armorClass}</p>
-                    </div>
-                    <div className="p-2 bg-muted/50 rounded-lg">
-                      <Heart className="w-3 h-3 mx-auto text-destructive mb-0.5" />
-                      <p className="text-[8px] text-muted-foreground">HP</p>
-                      <p className="text-lg font-black text-foreground">{currentHp ?? maxHp}/{maxHp}</p>
-                    </div>
-                    <div className="p-2 bg-muted/50 rounded-lg">
-                      <p className="text-[8px] text-muted-foreground">Speed</p>
-                      <p className="text-lg font-black text-accent">{speed}</p>
-                    </div>
-                    <div className="p-2 bg-muted/50 rounded-lg">
-                      <p className="text-[8px] text-muted-foreground">Initiative</p>
-                      <p className="text-lg font-black text-lime">{initiative >= 0 ? `+${initiative}` : initiative}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Spellcasting Stats (if class has spellcasting) */}
-                  {primaryClass?.spellcasting &&
-                    (() => {
-                      const spellKey = resolveSpellcastingAbilityKey(primaryClass.spellcasting.ability)
-                      if (!spellKey) return null
-                      const spellMod = abilityMods[spellKey]
-                      return (
-                        <div className="p-2 bg-magenta/10 rounded-lg">
-                          <p className="text-[9px] text-magenta uppercase font-bold mb-1">
-                            Spellcasting ({primaryClass.spellcasting.ability})
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 text-center">
-                            <div>
-                              <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
-                              <p className="text-xl font-black text-magenta">
-                                {8 + proficiencyBonus + spellMod}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[8px] text-muted-foreground">Spell Attack</p>
-                              <p className="text-xl font-black text-magenta">
-                                +{proficiencyBonus + spellMod}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })()}
 
-                  {/* Resistances */}
-                  <div className="p-2 bg-muted/30 rounded-lg">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Resistances</p>
-                    <p className="text-[10px] text-foreground italic">
-                      {resistanceDisplay.length > 0 ? resistanceDisplay.join(", ") : "None"}
-                    </p>
-                  </div>
-                  {immunityDisplay.length > 0 && (
-                    <div className="p-2 bg-muted/30 rounded-lg">
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Immunities</p>
-                      <p className="text-[10px] text-foreground italic">{immunityDisplay.join(", ")}</p>
-                    </div>
-                  )}
-
-                  {/* Equipped Items */}
-                  <div className="p-2 bg-muted/30 rounded-lg">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-2">Equipped Items</p>
-                    <EquippedGearPanel
-                      armorOptions={armorOptions}
-                      shieldOptions={shieldOptions}
-                      weaponOptions={weaponOptions}
-                      equippedArmorId={equippedArmorId}
-                      equippedShieldId={equippedShieldId}
-                      equippedWeaponId={equippedWeaponId}
-                      onEquippedArmorChange={setEquippedArmorId}
-                      onEquippedShieldChange={setEquippedShieldId}
-                      onEquippedWeaponChange={setEquippedWeaponId}
-                      weaponAttackDisplay={
-                        equippedWeaponAttack ? (
-                          <div className="mt-1.5 px-2 py-1 bg-background/80 rounded border border-border/60 text-[9px] text-foreground">
-                            <p>
-                              <span className="text-muted-foreground">To Hit:</span>{" "}
-                              {equippedWeaponAttack.attackBonus >= 0
-                                ? `+${equippedWeaponAttack.attackBonus}`
-                                : equippedWeaponAttack.attackBonus}
-                            </p>
-                            <p>
-                              <span className="text-muted-foreground">Damage:</span>{" "}
-                              {equippedWeaponAttack.damageDisplay}
-                            </p>
-                          </div>
-                        ) : undefined
-                      }
-                    />
-                  </div>
-                  
-                  {/* Proficiencies */}
-                  <div className="p-2 bg-muted/30 rounded-lg">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Weapon Proficiencies</p>
-                    <p className="text-[10px] text-foreground italic">
-                      {effectiveWeaponProficiencies.join(", ") || "None"}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-muted/30 rounded-lg">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Armor Proficiencies</p>
-                    <p className="text-[10px] text-foreground italic">
-                      {effectiveArmorProficiencies.join(", ") || "None"}
-                    </p>
-                  </div>
-                  {(effectiveToolProficiencies.length > 0 ||
-                    (character.languages?.length ?? 0) > 0) && (
-                    <div className="p-2 bg-muted/30 rounded-lg">
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">
-                        Tools & Languages
-                      </p>
-                      <p className="text-[10px] text-foreground italic">
-                        {[
-                          ...effectiveToolProficiencies,
-                          ...(character.languages ?? []),
-                        ].join(", ") || "None"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              
               {/* Features Tab */}
               {previewTab === "features" && (
                 <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
@@ -5124,43 +4918,52 @@ export default function BuilderPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-              
-              {/* Custom Abilities Tab */}
-              {previewTab === "custom" && (
-                <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
-                  {customAbilities.filter((ability) => !isSystemOptionCatalogId(ability.id)).length > 0 ? (
-                    <>
-                      <p className="text-[9px] text-magenta uppercase font-bold mb-1">Custom Abilities</p>
-                      <div className="space-y-1">
-                        {customAbilities
-                          .filter((ability) => !isSystemOptionCatalogId(ability.id))
-                          .map((ability) => {
-                          const uses = resolveUsesConfig(ability.characteristics, ability.uses)
-                          return (
-                          <div key={ability.id} className="p-1.5 bg-muted/30 rounded text-[10px]">
-                            <p className="font-bold text-foreground">{ability.name}</p>
-                            <ClampedRichText html={ability.description} lines={2} className="text-[10px]" />
-                            {uses && uses.type !== "unlimited" && (
-                              <p className="text-[8px] text-magenta mt-0.5">
-                                Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
-                                {getRechargeRules(uses).length > 0 &&
-                                  ` (${formatUsesRecharges(uses)})`}
-                              </p>
-                            )}
-                          </div>
-                          )
-                        })}
+
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Proficiencies</p>
+                    <div className="space-y-1">
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="font-bold text-foreground">Weapons</p>
+                        <p className="text-muted-foreground italic">
+                          {effectiveWeaponProficiencies.join(", ") || "None"}
+                        </p>
                       </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-6">
-                      <Wand2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">No custom abilities available</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Custom abilities can be added in the Compendium and marked to show here.
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="font-bold text-foreground">Armor</p>
+                        <p className="text-muted-foreground italic">
+                          {effectiveArmorProficiencies.join(", ") || "None"}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="font-bold text-foreground">Tools</p>
+                        <p className="text-muted-foreground italic">
+                          {effectiveToolProficiencies.join(", ") || "None"}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="font-bold text-foreground">Languages</p>
+                        <p className="text-muted-foreground italic">
+                          {(character.languages ?? []).join(", ") || "None"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Resistances</p>
+                    <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                      <p className="text-muted-foreground italic">
+                        {resistanceDisplay.length > 0 ? resistanceDisplay.join(", ") : "None"}
                       </p>
+                    </div>
+                  </div>
+
+                  {immunityDisplay.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Immunities</p>
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
+                        <p className="text-muted-foreground italic">{immunityDisplay.join(", ")}</p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -30,6 +30,63 @@ describe("aiMechanicsToDetections", () => {
     )
     expect(detections).toEqual([])
   })
+
+  it("builds spellcasting ability from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "spellcasting_ability",
+          spellcastingAbility: "intelligence",
+          sourcePhrase: "Intelligence is your spellcasting ability for these spells.",
+        },
+      ],
+      { contentKind: "feat", featureName: "Rimekin" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.spellcasting_ability")
+    expect(detections[0]?.instance.characteristics[0]?.type).toBe("spellcasting_ability")
+  })
+
+  it("builds creature-type damage from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_roll_modifiers",
+          bonusDice: "2d10",
+          damageType: "Radiant",
+          targetCreatureTypes: ["Aberration"],
+          sourcePhrase:
+            "when you hit an Aberration with this weapon, the Aberration takes an extra 2d10 Radiant damage",
+        },
+      ],
+      { contentKind: "equipment", featureName: "Shaarat'doovol" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.damage.creature_type")
+    const mod = detections[0]?.instance.characteristics[0]
+    expect(mod?.type).toBe("damage_roll_modifiers")
+    if (mod?.type === "damage_roll_modifiers") {
+      expect(mod.entries[0]?.onlyVsCreatureTypes).toEqual(["Aberration"])
+    }
+  })
+
+  it("wires requiresSheetToggle on damage modifiers from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_roll_modifiers",
+          bonusDice: "2d6",
+          damageType: "Radiant",
+          requiresSheetToggle: "magic_item:abc:unyielding",
+          sourcePhrase: "while the item grants you benefits",
+        },
+      ],
+      { contentKind: "equipment", featureName: "Unyielding Duty" },
+    )
+    expect(detections).toHaveLength(1)
+    const mod = detections[0]?.instance.characteristics[0]
+    expect(mod?.requiresSheetToggle).toBe("magic_item:abc:unyielding")
+  })
 })
 
 describe("import modifier review helpers", () => {

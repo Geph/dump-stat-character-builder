@@ -373,4 +373,15 @@ describe("save vs preview invariant", () => {
       preview.equippedWeaponAttack?.attackBonus,
     )
   })
+
+  it("halves max HP and speed at high exhaustion levels", () => {
+    const inputs = fighterArcheryBackgroundFixture()
+    const normal = computeDerivedCharacter({ ...inputs, exhaustionLevel: 0 })
+    const exhausted = computeDerivedCharacter({ ...inputs, exhaustionLevel: 4 })
+    const immobile = computeDerivedCharacter({ ...inputs, exhaustionLevel: 5 })
+
+    expect(exhausted.maxHp).toBe(Math.max(1, Math.floor(normal.maxHp / 2)))
+    expect(exhausted.speed).toBe(Math.floor(normal.speed / 2))
+    expect(immobile.speed).toBe(0)
+  })
 })

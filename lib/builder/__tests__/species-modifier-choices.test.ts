@@ -4,6 +4,7 @@ import { isFeatEligibleForCategories, type FeatSlotContext } from "@/lib/builder
 import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
 import { SRD_SOURCE } from "@/lib/srd/source"
+import bundledSpecies from "@/lib/srd/seed-data/species.json"
 import type { Feat, Species } from "@/lib/types"
 
 const catalog = buildDefaultModifierCatalog()
@@ -23,6 +24,27 @@ function humanRow(): Record<string, unknown> {
       { name: "Versatile", description: "You gain an Origin feat of your choice." },
     ],
   }
+}
+
+function elfRow(): Record<string, unknown> {
+  const elf = bundledSpecies.find((row) => row.name === "Elf")
+  if (!elf) throw new Error("Elf species missing from seed data")
+  return {
+    id: "species_elf",
+    name: "Elf",
+    description: elf.description ?? null,
+    speed: 30,
+    size: "Medium",
+    creature_type: "Humanoid",
+    source: SRD_SOURCE,
+    traits: elf.traits,
+  }
+}
+
+function elvenLineageTraitIndex(species: Species): number {
+  const index = species.traits?.findIndex((trait) => trait.name === "Elven Lineage") ?? -1
+  if (index < 0) throw new Error("Elven Lineage trait missing")
+  return index
 }
 
 describe("SRD species enrichment — languages & size", () => {
@@ -64,6 +86,64 @@ describe("SRD species enrichment — languages & size", () => {
       name: "Dwarf",
     }) as unknown as Species
     expect(dwarf.size_options ?? null).toBeNull()
+  })
+
+  it("does not double-enrich language grants stored as linked_modifiers (snake_case)", () => {
+    const enrichedOnce = enrichSrdSpeciesRow(humanRow()) as Record<string, unknown>
+    const withSnakeCaseOnly = {
+      ...humanRow(),
+      linked_modifiers: enrichedOnce.linked_modifiers,
+      modifier_refs: enrichedOnce.modifier_refs,
+    }
+    const enrichedTwice = enrichSrdSpeciesRow(withSnakeCaseOnly) as unknown as Species
+    const slots = collectSpeciesModifierPlayerChoiceSlots(enrichedTwice, {}, catalog)
+    expect(slots.filter((s) => s.kind === "language")).toHaveLength(1)
+  })
+})
+
+describe("Elf — Elven Lineage", () => {
+  it("does not ask for a spell list when High Elf is selected (fixed lineage spells)", () => {
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const lineageIndex = elvenLineageTraitIndex(enriched)
+    const slots = collectSpeciesModifierPlayerChoiceSlots(
+      enriched,
+      { [String(lineageIndex)]: ["High Elf"] },
+      catalog,
+    )
+    expect(slots.some((slot) => slot.kind === "spell_list_class")).toBe(false)
+    expect(slots.some((slot) => slot.kind === "spell")).toBe(false)
+  })
+
+  it("asks for spellcasting ability (Int/Wis/Cha) after a lineage is selected", () => {
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const lineageIndex = elvenLineageTraitIndex(enriched)
+    const slots = collectSpeciesModifierPlayerChoiceSlots(
+      enriched,
+      { [String(lineageIndex)]: ["High Elf"] },
+      catalog,
+    )
+    const abilitySlot = slots.find((slot) => slot.kind === "spellcasting_ability")
+    expect(abilitySlot).toBeDefined()
+    expect(abilitySlot?.options?.map((option) => option.name).sort()).toEqual([
+      "Charisma",
+      "Intelligence",
+      "Wisdom",
+    ])
+  })
+
+  it("wires fixed High Elf lineage spells on the option preset", () => {
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const lineage = enriched.traits?.find((trait) => trait.name === "Elven Lineage")
+    const highElf = lineage?.choices?.options?.find((option) => option.name === "High Elf")
+    const spellMod = highElf?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "spells_known")
+    expect(spellMod?.spells?.map((entry) => entry.spellId)).toEqual([
+      "Prestidigitation",
+      "Detect Magic",
+      "Misty Step",
+    ])
+    expect(spellMod?.choiceGrants ?? []).toHaveLength(0)
   })
 })
 

@@ -12,6 +12,20 @@ export function getRechargeRules(uses: UsesConfig): RechargeRule[] {
   return []
 }
 
+/** Effective recharge rules after applying level-based overrides (e.g. Tireless). */
+export function getEffectiveRechargeRules(uses: UsesConfig, classLevel: number): RechargeRule[] {
+  const base = getRechargeRules(uses)
+  const overrides = uses.rechargeOverrides ?? []
+  if (!overrides.length) return base
+  let effective = base
+  for (const override of [...overrides].sort((a, b) => a.atClassLevel - b.atClassLevel)) {
+    if (classLevel >= override.atClassLevel) {
+      effective = override.recharges
+    }
+  }
+  return effective
+}
+
 export function normalizeUsesConfig(uses: UsesConfig): UsesConfig {
   const recharges = getRechargeRules(uses)
   if (!recharges.length) {
@@ -61,7 +75,19 @@ export function isRestRechargeEnabled(uses: UsesConfig, rest: RestType): boolean
 
 export function getRechargeAmount(uses: UsesConfig, rest: RestType): number | null {
   const rule = getRechargeRules(uses).find((entry) => entry.rest === rest)
-  if (!rule || rule.amount == null || rule.amount <= 0) return null
+  if (!rule) return null
+  return resolveRechargeRuleAmount(rule, null)
+}
+
+/** Resolve how many uses a recharge rule restores (null = full pool). */
+export function resolveRechargeRuleAmount(
+  rule: RechargeRule,
+  classLevel: number | null,
+): number | null {
+  if (rule.amountFormula === "half_class_level_round_up" && classLevel != null) {
+    return Math.max(1, Math.ceil(classLevel / 2))
+  }
+  if (rule.amount == null || rule.amount <= 0) return null
   return rule.amount
 }
 

@@ -4,6 +4,7 @@ export const FEAT_PICK_CATEGORIES = [
   "Fighting Style",
   "Origin",
   "Metamagic",
+  "Mystic Technique",
   "Eldritch Invocation",
   "Planar Pact",
 ] as const

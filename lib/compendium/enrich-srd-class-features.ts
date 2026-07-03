@@ -1610,23 +1610,45 @@ function replicateMagicItemPreset(): LinkedModifierInstance[] {
 }
 
 function mysticArcanumPreset(): LinkedModifierInstance[] {
+  return innateArcanumPresetForClass("Warlock", [
+    { spellLevel: 6, classLevel: 11 },
+    { spellLevel: 7, classLevel: 11 },
+    { spellLevel: 8, classLevel: 11 },
+    { spellLevel: 9, classLevel: 11 },
+  ])
+}
+
+/** Staggered arcanum tiers (Alternate Sorcerer) or bundled (Warlock). */
+export function innateArcanumPresetForClass(
+  className: string,
+  tiers: { spellLevel: number; classLevel: number }[],
+): LinkedModifierInstance[] {
   return [
-    usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Mystic Arcanum"),
-    charInstance("modinst_mystic_arcanum", FEAT_MODIFIER_CATALOG.spellsKnown, [
+    usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Innate Arcanum"),
+    charInstance("modinst_innate_arcanum", FEAT_MODIFIER_CATALOG.spellsKnown, [
       {
-        id: modId("mystic_arcanum"),
+        id: modId("innate_arcanum"),
         type: "spells_known",
         spells: [],
-        choiceGrants: [
-          { level: 6, count: 1 },
-          { level: 7, count: 1 },
-          { level: 8, count: 1 },
-          { level: 9, count: 1 },
-        ],
-        spellListClassOptions: ["Warlock"],
-        label: "Mystic Arcanum",
+        choiceGrants: tiers.map((tier) => ({
+          level: tier.spellLevel,
+          count: 1,
+          unlocksAtClassLevel: tier.classLevel,
+        })),
+        spellListClassOptions: [className],
+        label: "Innate Arcanum",
       },
     ]),
+  ]
+}
+
+export function innateSorceryPreset(): LinkedModifierInstance[] {
+  return [
+    usesPool({ type: "fixed", fixedAmount: 2, recharges: [{ rest: "long_rest" }] }, "Innate Sorcery"),
+    fxInstance("modinst_innate_sorcery", SELF_BUFF_CASTER_CATALOG_ID, {
+      bonusAction: true,
+      effects: [{ id: modId("innate_sorcery"), kind: "self_buff_caster", casterBuffLabel: "Innate Sorcery" }],
+    }),
   ]
 }
 
@@ -1944,6 +1966,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Primal Order": [featureOptionPicker("Primal Order", false)],
   "*::Eldritch Invocations": [grantFeat(["Eldritch Invocation"], "Eldritch Invocation")],
   "*::Metamagic": [grantFeat(["Metamagic"], "Metamagic option")],
+  "*::Mystic Techniques": [grantFeat(["Mystic Technique"], "Mystic Technique")],
   "*::Font of Magic": {
     linkedModifiers: [fontOfMagicMenu()],
   },

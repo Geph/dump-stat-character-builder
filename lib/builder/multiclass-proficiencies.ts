@@ -170,6 +170,10 @@ export function describeMulticlassProficiencyGrant(grant: MulticlassProficiencyG
 }
 
 export function multiclassProficiencySummary(cls: DndClass): string {
+  const imported = cls.multiclass_proficiencies_gained
+  if (imported?.length) {
+    return `When multiclassing: ${imported.join(", ")}.`
+  }
   const grant = multiclassGrantForClass(cls.name)
   const parts = describeMulticlassProficiencyGrant(grant)
   if (parts.length === 0) {

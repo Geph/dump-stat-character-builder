@@ -5,6 +5,10 @@ import { AnimatePresence, motion } from "framer-motion"
 import { Info, X } from "lucide-react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
+  PsionicAugmentPicker,
+  resolveAbilityPsionicAugments,
+} from "@/components/character-sheet/psionic-augment-picker"
+import {
   ACTION_KIND_LABELS,
   type ActionEconomyKind,
   type SheetActionEntry,
@@ -21,6 +25,8 @@ type SheetActionsPanelProps = {
   resourceEntries?: ResourceTrackerEntry[]
   usedResourcesById?: Record<string, number>
   onResourceUsedChange?: (next: Record<string, number>) => void
+  incapacitated?: boolean
+  psiLimit?: number | null
 }
 
 function resolveActionMax(
@@ -79,12 +85,24 @@ function UseDots({
 function ActionInfoOverlay({
   action,
   usage,
+  psiLimit,
   onClose,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
+  psiLimit?: number | null
   onClose: () => void
 }) {
+  const psionicAugments =
+    action.psionicAugments ??
+    (action.customAbilityId
+      ? resolveAbilityPsionicAugments({
+          name: action.name,
+          description: action.description,
+          psionic_augments: action.psionicAugments,
+        })
+      : null)
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -127,6 +145,46 @@ function ActionInfoOverlay({
               </span>
             </p>
           ) : null}
+          {(action.castingTime || action.range || action.duration) && (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+              {action.castingTime ? (
+                <>
+                  <dt className="text-muted-foreground">Casting Time</dt>
+                  <dd className="text-foreground">{action.castingTime}</dd>
+                </>
+              ) : null}
+              {action.range ? (
+                <>
+                  <dt className="text-muted-foreground">Range</dt>
+                  <dd className="text-foreground">{action.range}</dd>
+                </>
+              ) : null}
+              {action.components?.length ? (
+                <>
+                  <dt className="text-muted-foreground">Components</dt>
+                  <dd className="text-foreground">{action.components.join(", ")}</dd>
+                </>
+              ) : null}
+              {action.duration ? (
+                <>
+                  <dt className="text-muted-foreground">Duration</dt>
+                  <dd className="text-foreground">
+                    {action.duration}
+                    {action.concentration ? " (Concentration)" : ""}
+                  </dd>
+                </>
+              ) : null}
+            </dl>
+          )}
+          {psionicAugments ? (
+            <PsionicAugmentPicker
+              config={psionicAugments}
+              psiLimit={psiLimit}
+              selections={[]}
+              onChange={() => {}}
+              readOnly
+            />
+          ) : null}
           <RichTextContent
             html={action.description}
             className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
@@ -145,6 +203,8 @@ export function SheetActionsPanel({
   resourceEntries = [],
   usedResourcesById = {},
   onResourceUsedChange,
+  incapacitated = false,
+  psiLimit = null,
 }: SheetActionsPanelProps) {
   const [infoActionId, setInfoActionId] = useState<string | null>(null)
 
@@ -188,7 +248,7 @@ export function SheetActionsPanel({
   }
 
   const spend = (usage: ActionUsage | null) => {
-    if (!usage) return
+    if (incapacitated || !usage) return
     if (usage.used >= usage.max) return
     usage.setUsed(usage.used + 1)
   }
@@ -212,6 +272,11 @@ export function SheetActionsPanel({
 
   return (
     <div className="space-y-3">
+      {incapacitated ? (
+        <p className="text-xs text-destructive font-medium">
+          Incapacitated — you cannot take actions, bonus actions, or reactions.
+        </p>
+      ) : null}
       {(Object.keys(grouped) as ActionEconomyKind[]).map((kind) => {
         const entries = grouped[kind]
         if (!entries.length) return null
@@ -223,15 +288,15 @@ export function SheetActionsPanel({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {entries.map((entry) => {
                 const usage = usageFor(entry)
-                const spendable = usage != null && usage.used < usage.max
+                const spendable = !incapacitated && usage != null && usage.used < usage.max
                 return (
                   <div
                     key={`${kind}-${entry.id}`}
-                    role={usage ? "button" : undefined}
-                    tabIndex={usage ? 0 : undefined}
-                    onClick={usage ? () => spend(usage) : undefined}
+                    role={usage && !incapacitated ? "button" : undefined}
+                    tabIndex={usage && !incapacitated ? 0 : undefined}
+                    onClick={usage && !incapacitated ? () => spend(usage) : undefined}
                     onKeyDown={
-                      usage
+                      usage && !incapacitated
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault()
@@ -244,7 +309,9 @@ export function SheetActionsPanel({
                       spendable
                         ? "cursor-pointer hover:border-primary/50 hover:bg-muted/40 transition-colors"
                         : usage
-                          ? "opacity-80"
+                          ? incapacitated
+                            ? "opacity-50"
+                            : "opacity-80"
                           : ""
                     }`}
                   >
@@ -295,6 +362,7 @@ export function SheetActionsPanel({
             key="action-info"
             action={infoAction}
             usage={usageFor(infoAction)}
+            psiLimit={psiLimit}
             onClose={() => setInfoActionId(null)}
           />
         ) : null}

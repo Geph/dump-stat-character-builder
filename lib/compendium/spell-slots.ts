@@ -1,4 +1,5 @@
 import type { DndClass } from "@/lib/types"
+import { usesPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 /** Map SRD spellcasting ability labels (including "Dexterity and Wisdom") to a score key. */
@@ -124,10 +125,29 @@ export function getSpellSlotTable(
   classLevel: number,
   spellcasting: DndClass["spellcasting"] | null | undefined,
 ): SpellSlotTable | null {
+  if (usesPointPoolSpellcasting(spellcasting)) return null
+
   const type = getCasterSlotType(className, spellcasting)
   if (!type) return null
 
   const level = Math.max(1, Math.min(20, classLevel))
+
+  const explicitProgression = spellcasting?.explicit_slot_progression
+  if (explicitProgression?.length) {
+    const sorted = [...explicitProgression].sort((a, b) => a.level - b.level)
+    let row = sorted[0]
+    for (const entry of sorted) {
+      if (level >= entry.level) row = entry
+    }
+    const slotsByLevel = [...row.slots]
+    while (slotsByLevel.length < 9) slotsByLevel.push(0)
+    return {
+      type: type ?? "half",
+      slotsByLevel: slotsByLevel.slice(0, 9),
+      className,
+      classLevel: level,
+    }
+  }
 
   if (type === "pact") {
     const entry = WARLOCK_PACT[level] ?? WARLOCK_PACT[20]

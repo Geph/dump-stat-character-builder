@@ -19,6 +19,10 @@ export function parseFeatPrerequisite(
   if (levelMatch) {
     levelRequirement = Number.parseInt(levelMatch[1], 10)
   }
+  const classLevelMatch = text.match(/(\d+)(?:st|nd|rd|th)?-level\s+[A-Za-z\s]+/i)
+  if (!levelRequirement && classLevelMatch) {
+    levelRequirement = Number.parseInt(classLevelMatch[1], 10)
+  }
 
   const prerequisiteFeatNames: string[] = []
   const segments = text.split(/[,;]/).map((segment) => segment.trim()).filter(Boolean)

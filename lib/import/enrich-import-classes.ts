@@ -2,7 +2,19 @@ import {
   parseClassProgressionTable,
   usesConfigForProgressionColumn,
 } from "@/lib/import/parse-class-progression-table"
+import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
+import { detectPointPoolSpellcastingFromText } from "@/lib/import/detect-point-pool-spellcasting"
+import { detectSpecialAbilityFromText } from "@/lib/import/detect-special-ability"
+import { parseStartingEquipmentFromText } from "@/lib/import/parse-starting-equipment"
+import { enrichAlternateSorcererFeatures } from "@/lib/import/enrich-alternate-sorcerer-features"
+import {
+  enrichAlternateRangerFeatures,
+  mergeAlternateRangerClassResources,
+} from "@/lib/import/enrich-alternate-ranger-features"
+import { enrichMonkClassFeatures, remapKiResourceKey } from "@/lib/import/enrich-monk-class-features"
+import { enrichPointPoolClassResources, remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
+import { extractMulticlassSection } from "@/lib/import/parse-multiclass-section"
 import { stripClassProgressionTablesFromText } from "@/lib/import/strip-class-progression-tables"
 import {
   detectThirdPartyResourceSpend,
@@ -16,6 +28,10 @@ export type ClassResourceImportRow = {
   name: string
   description?: string | null
   uses: UsesConfig
+}
+
+function remapImportedResourceKey(className: string, resourceKey: string): string {
+  return remapKiResourceKey(className, remapPointPoolResourceKey(className, resourceKey))
 }
 
 const PSI_COST_RE =
@@ -214,12 +230,15 @@ export function mergeTableParsedClassResources(content: {
     if (!parsed?.columns.length) continue
 
     for (const column of parsed.columns) {
-      const mapKey = `${className}::${column.resourceKey}`
+      const resourceKey = remapImportedResourceKey(className, column.resourceKey)
+      const mapKey = `${className}::${resourceKey}`
       const tableUses = usesConfigForProgressionColumn(column, className)
-      const existing = merged.get(mapKey)
+      const existing = merged.get(mapKey) ?? merged.get(`${className}::${column.resourceKey}`)
       if (existing) {
+        merged.delete(`${className}::${column.resourceKey}`)
         merged.set(mapKey, {
           ...existing,
+          resource_key: resourceKey,
           uses: mergeUsesFromProgressionTable(existing.uses, tableUses),
           description:
             existing.description ??
@@ -228,7 +247,7 @@ export function mergeTableParsedClassResources(content: {
       } else {
         merged.set(mapKey, {
           class_name: className,
-          resource_key: column.resourceKey,
+          resource_key: resourceKey,
           name: column.resourceName,
           description: `${column.resourceName} progression parsed from the ${className} level table.`,
           uses: tableUses,
@@ -237,7 +256,22 @@ export function mergeTableParsedClassResources(content: {
     }
   }
 
-  return [...merged.values()]
+  return [...merged.values()].flatMap((row) => {
+    const classRow = (content.classes ?? []).find(
+      (entry) => String((entry as Record<string, unknown>).name ?? "") === row.class_name,
+    ) as Record<string, unknown> | undefined
+    const features = Array.isArray(classRow?.features)
+      ? (classRow.features as Feature[])
+      : []
+    const withRanger = mergeAlternateRangerClassResources(row.class_name, features, [row])
+    const mergedRow = withRanger[withRanger.length - 1] ?? row
+    return enrichPointPoolClassResources(
+      mergedRow.class_name,
+      classRow?.spellcasting,
+      features,
+      [mergedRow],
+    )
+  })
 }
 
 /** Build class_resources rows from explicit import data or parsed progression tables. */
@@ -256,7 +290,7 @@ export function buildClassResourceRowsForClass(
   for (const resource of explicit) {
     rows.push({
       class_id: classId,
-      resource_key: resource.resource_key,
+      resource_key: remapImportedResourceKey(className, resource.resource_key),
       name: resource.name,
       description: resource.description ?? null,
       uses: resource.uses,
@@ -277,7 +311,7 @@ export function buildClassResourceRowsForClass(
     }
     rows.push({
       class_id: classId,
-      resource_key: column.resourceKey,
+      resource_key: remapImportedResourceKey(className, column.resourceKey),
       name: column.resourceName,
       description: `${column.resourceName} for ${className} (imported from class progression table).`,
       uses: usesConfigForProgressionColumn(column, className),
@@ -306,17 +340,84 @@ export function enrichImportedClassRow(
     resourceKeys.endurance ||
     explicitResources?.some((resource) => resource.class_name === className)
 
-  const nextFeatures = shouldLink
-    ? linkResourceCostsOnFeatures(features, resourceKeys)
-    : features.map((feature) => normalizeFeatureRow(feature))
+  const nextFeatures = enrichAlternateRangerFeatures(
+    enrichMonkClassFeatures(
+      enrichAlternateSorcererFeatures(
+        enrichPsionicTalentGrantFeatures(
+          shouldLink
+            ? linkResourceCostsOnFeatures(features, resourceKeys)
+            : features.map((feature) => normalizeFeatureRow(feature)),
+        ),
+        className,
+        row.spellcasting,
+      ),
+      className,
+    ),
+    className,
+  )
 
   let description = typeof row.description === "string" ? row.description : null
+  let multiclassFields: Record<string, unknown> = {}
   if (description) {
-    const stripped = stripClassProgressionTablesFromText(description)
+    const { classText, multiclass } = extractMulticlassSection(description)
+    const stripped = stripClassProgressionTablesFromText(classText)
     description = stripped.length > 0 ? stripped : null
+    if (multiclass) {
+      multiclassFields = {
+        multiclass_prerequisites: multiclass.multiclass_prerequisites,
+        multiclass_prerequisite_groups: multiclass.multiclass_prerequisite_groups,
+        multiclass_proficiencies_gained: multiclass.multiclass_proficiencies_gained,
+      }
+    }
   }
 
-  return { ...row, description, features: nextFeatures }
+  let spellcasting = row.spellcasting as import("@/lib/types").DndClass["spellcasting"] | null | undefined
+  const featuresText = features.map((feature) => feature.description ?? "").join("\n")
+  const detectedPool = detectPointPoolSpellcastingFromText(className, description, featuresText)
+  if (detectedPool && !spellcasting?.point_pool) {
+    spellcasting = {
+      ...(spellcasting ?? { ability: "Charisma" }),
+      point_pool: detectedPool,
+      progression: spellcasting?.progression,
+    }
+  }
+
+  const specialAbility = detectSpecialAbilityFromText(description, featuresText)
+
+  const parsedProgression = parseClassProgressionTable(progressionText)
+  if (parsedProgression?.spellSlotProgression?.byLevel.length) {
+    const slotProg = parsedProgression.spellSlotProgression
+    spellcasting = {
+      ...(spellcasting ?? { ability: "Wisdom" }),
+      caster_progression: slotProg.casterType,
+      explicit_slot_progression: slotProg.byLevel,
+      progression: spellcasting?.progression,
+    }
+  }
+
+  let starting_equipment_groups = row.starting_equipment_groups as
+    | import("@/lib/types").StartingEquipmentGroup[]
+    | null
+    | undefined
+  let starting_gold = row.starting_gold as number | null | undefined
+  if (!starting_equipment_groups?.length && description) {
+    const parsedEquipment = parseStartingEquipmentFromText(description)
+    if (parsedEquipment.starting_equipment_groups.length) {
+      starting_equipment_groups = parsedEquipment.starting_equipment_groups
+      starting_gold = parsedEquipment.starting_gold ?? starting_gold
+    }
+  }
+
+  return {
+    ...row,
+    description,
+    features: nextFeatures,
+    spellcasting,
+    special_ability: specialAbility ?? row.special_ability,
+    starting_equipment_groups,
+    starting_gold,
+    ...multiclassFields,
+  }
 }
 
 export function enrichSubclassFeaturesWithPsiCosts(

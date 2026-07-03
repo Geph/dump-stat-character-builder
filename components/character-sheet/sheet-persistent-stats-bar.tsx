@@ -1,9 +1,15 @@
 "use client"
 
 import { useState, type ReactNode } from "react"
-import { Heart, Info } from "lucide-react"
+import { Heart, Info, Minus, Plus } from "lucide-react"
 import type { StatBreakdownPart } from "@/lib/character/types"
+import type { IncomingAttackNote } from "@/lib/character/incoming-attack-notes"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
+import {
+  clampExhaustionLevel,
+  EXHAUSTION_MAX_LEVEL,
+  getExhaustionEffectSummary,
+} from "@/lib/srd/exhaustion-effects"
 
 function formatSignedValue(value: number) {
   return value >= 0 ? `+${value}` : `${value}`
@@ -66,6 +72,9 @@ function StatBreakdownButton({
 type SheetPersistentStatsBarProps = {
   armorClass: number
   acBreakdown: StatBreakdownPart[]
+  incomingAttackNotes?: IncomingAttackNote[]
+  exhaustionLevel?: number
+  onExhaustionLevelChange?: (level: number) => void
   initiative: number
   speed: number
   maxHp: number
@@ -102,6 +111,9 @@ function CoreStatTile({
 export function SheetPersistentStatsBar({
   armorClass,
   acBreakdown,
+  incomingAttackNotes = [],
+  exhaustionLevel = 0,
+  onExhaustionLevelChange,
   initiative,
   speed,
   maxHp,
@@ -112,17 +124,33 @@ export function SheetPersistentStatsBar({
   onInitiativeRoll,
   formatMod,
 }: SheetPersistentStatsBarProps) {
+  const clampedExhaustion = clampExhaustionLevel(exhaustionLevel)
+
   return (
     <div className="mt-3 -mx-1 overflow-x-auto overscroll-x-contain">
       <div className="flex items-stretch gap-2 px-1 min-w-max sm:min-w-0 sm:flex-wrap sm:justify-end">
-        <CoreStatTile
-          label="AC"
-          trailing={
+        <div className="bg-card/90 rounded-lg border border-border/80 px-3 py-2 min-h-11 flex flex-col justify-center min-w-[4.5rem]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
+            AC
+          </p>
+          <div className="mt-1 flex items-center justify-between gap-1.5">
+            <div className="font-black text-base tabular-nums leading-none">{armorClass}</div>
             <StatBreakdownButton title="Armor Class" total={armorClass} parts={acBreakdown} />
-          }
-        >
-          {armorClass}
-        </CoreStatTile>
+          </div>
+          {incomingAttackNotes.length > 0 ? (
+            <div className="mt-1 space-y-0.5">
+              {incomingAttackNotes.map((note) => (
+                <p
+                  key={note.label}
+                  className="text-[10px] leading-tight text-amber-800 dark:text-amber-300"
+                  title={note.detail}
+                >
+                  {note.detail}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         <CoreStatTile
           label="Init"
@@ -131,6 +159,7 @@ export function SheetPersistentStatsBar({
               modifier={initiative}
               title="Roll initiative"
               size="lg"
+              rollContext={{ kind: "initiative", ability: "dexterity" }}
               onRoll={onInitiativeRoll}
             />
           }
@@ -177,6 +206,44 @@ export function SheetPersistentStatsBar({
             />
           </div>
         </div>
+
+        {onExhaustionLevelChange ? (
+          <div className="bg-card/90 rounded-lg border border-border/80 px-3 py-2 min-h-11 min-w-[5.5rem]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
+              Exhaustion
+            </p>
+            <div className="mt-1 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() =>
+                  onExhaustionLevelChange(clampExhaustionLevel(clampedExhaustion - 1))
+                }
+                disabled={clampedExhaustion <= 0}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-border bg-background disabled:opacity-40"
+                aria-label="Decrease exhaustion"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <span
+                className="min-w-[1.25rem] text-center text-base font-black tabular-nums"
+                title={getExhaustionEffectSummary(clampedExhaustion)}
+              >
+                {clampedExhaustion}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  onExhaustionLevelChange(clampExhaustionLevel(clampedExhaustion + 1))
+                }
+                disabled={clampedExhaustion >= EXHAUSTION_MAX_LEVEL}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-border bg-background disabled:opacity-40"
+                aria-label="Increase exhaustion"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )

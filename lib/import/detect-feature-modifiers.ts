@@ -126,15 +126,25 @@ function runRulesOnSegment(
   return results
 }
 
-function detectFeatureModifiersByName(ctx: DetectFeatureContext): DetectedModifier[] {
+function detectFeatureModifiersByName(
+  ctx: DetectFeatureContext,
+  description?: string,
+): DetectedModifier[] {
   const featureName = ctx.featureName?.trim()
   if (!featureName) return []
 
   const results: DetectedModifier[] = []
   const seenFingerprints = new Set<string>()
+  const desc = description?.trim() ?? ""
 
   for (const rule of FEATURE_NAME_MODIFIER_RULES) {
     if (!rule.test(featureName, ctx)) continue
+    if (
+      desc &&
+      rule.suppressWhenDescriptionMatches?.some((pattern) => pattern.test(desc))
+    ) {
+      continue
+    }
     const instance = rule.build(ctx)
     if (!instance) continue
     const fingerprint = modifierInstanceFingerprint(instance)
@@ -157,7 +167,7 @@ export function detectFeatureModifiers(text: string, ctx: DetectFeatureContext):
   const all: DetectedModifier[] = []
   const globalFingerprints = new Set<string>()
 
-  for (const detection of detectFeatureModifiersByName(ctx)) {
+  for (const detection of detectFeatureModifiersByName(ctx, normalized)) {
     const fp = modifierInstanceFingerprint(detection.instance)
     if (globalFingerprints.has(fp)) continue
     globalFingerprints.add(fp)
