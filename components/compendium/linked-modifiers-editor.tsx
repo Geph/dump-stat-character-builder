@@ -6,6 +6,7 @@ import {
   MODIFIER_CATALOG_GROUPS,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
+import { filterModifierCatalogEntries } from "@/lib/compendium/modifier-catalog-search"
 import { createLinkedModifierFromCatalog, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import { FeatureEffectList } from "@/components/compendium/feature-effect-list"
@@ -61,6 +62,7 @@ export function LinkedModifiersEditor({
   otherAbilities = [],
 }: LinkedModifiersEditorProps) {
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
 
   const grouped = useMemo(() => {
     const map = new Map<string, ModifierCatalogEntry[]>()
@@ -75,8 +77,13 @@ export function LinkedModifiersEditor({
       map.get(key)!.push(entry)
     }
 
-    return [...map.entries()].filter(([, entries]) => entries.length > 0)
-  }, [catalog])
+    return [...map.entries()]
+      .map(([group, entries]) => {
+        const visible = search.trim() ? filterModifierCatalogEntries(entries, search) : entries
+        return [group, visible] as const
+      })
+      .filter(([, entries]) => entries.length > 0)
+  }, [catalog, search])
 
   const emitChange = (next: LinkedModifierInstance[]) => {
     onChange(next)
@@ -191,8 +198,12 @@ export function LinkedModifiersEditor({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[min(100vw-2rem,28rem)] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search by name or summary…" />
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Search by name or summary…"
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList className="max-h-72">
               <CommandEmpty>No matching modifiers.</CommandEmpty>
               {grouped.map(([group, entries]) => (

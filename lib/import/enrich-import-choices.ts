@@ -130,9 +130,35 @@ function buildUpgradesResourcePicker(feature: Feature): LinkedModifierInstance {
       choiceCount: 1,
       swappableOnRest: /\bexchange\b/i.test(feature.description ?? ""),
       resourceKey: "upgrades",
-      label: "Subclass upgrades (count scales on class table)",
+      optionsSource: "class_upgrades",
+      label: "Upgrades (count scales on class table)",
     }),
   ])
+}
+
+function enrichUpgradesFeature(feature: Feature): Feature {
+  if (!isUpgradeSelectionFeature(feature)) return feature
+  if ((feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; resourceKey?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.resourceKey === "upgrades"
+    }),
+  )) {
+    return feature
+  }
+  return syncModifierRefs({
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Upgrade",
+      count: 1,
+      options: [],
+      resourceKey: "upgrades",
+      optionsSource: "class_upgrades",
+      swappableOnRest: /\bexchange\b/i.test(feature.description ?? ""),
+    },
+    linkedModifiers: [...(feature.linkedModifiers ?? []), buildUpgradesResourcePicker(feature)],
+  })
 }
 
 function buildInventorSpecializationPicker(description: string): LinkedModifierInstance | null {
@@ -167,6 +193,7 @@ function enrichFeatureChoices(
   className = "",
 ): Feature {
   let next = enrichKnacksFeature(feature)
+  next = enrichUpgradesFeature(next)
 
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
     const picker = buildChoiceOptionPicker(feature)
@@ -213,22 +240,6 @@ function enrichFeatureChoices(
       })
     }
     next = enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className)
-  }
-
-  if (
-    isUpgradeSelectionFeature(feature) &&
-    !(next.linkedModifiers ?? []).some((mod) =>
-      mod.characteristics?.some((char) => {
-        const legacy = char as { type?: string; resourceKey?: string | null }
-        return legacy.type === "feature_option_picker" && legacy.resourceKey === "upgrades"
-      }),
-    ) &&
-    !(next.isChoice && next.choices?.resourceKey === "upgrades")
-  ) {
-    next = syncModifierRefs({
-      ...next,
-      linkedModifiers: [...(next.linkedModifiers ?? []), buildUpgradesResourcePicker(feature)],
-    })
   }
 
   if (/^inventor specialization$/i.test(feature.name.trim()) && !(feature.isChoice && feature.choices?.options?.length)) {

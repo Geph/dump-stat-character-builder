@@ -343,6 +343,8 @@ export interface ListCharacteristic extends CharacteristicModifierBase {
    * (e.g. specific musical instruments). When empty, all SRD tools are offered.
    */
   choiceOptions?: string[] | null
+  /** When true, listed tools (or all class-granted tools when values empty) grant expertise. */
+  grantExpertise?: boolean
 }
 
 export interface WeaponProficienciesCharacteristic extends CharacteristicModifierBase {
@@ -1532,6 +1534,8 @@ export type AggregatedCharacteristics = {
   armorProficiencies: string[]
   weaponProficiencies: string[]
   toolProficiencies: string[]
+  toolExpertise: string[]
+  toolExpertiseAll: boolean
   savingThrows: string[]
   acFlatBonus: number
   acFlatBonusWhileArmored: number
@@ -1612,6 +1616,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   armorProficiencies: [],
   weaponProficiencies: [],
   toolProficiencies: [],
+  toolExpertise: [],
+  toolExpertiseAll: false,
   savingThrows: [],
   acFlatBonus: 0,
   acFlatBonusWhileArmored: 0,
@@ -1781,15 +1787,20 @@ export function aggregateCharacteristics(
         break
       case "languages":
       case "armor_proficiencies":
-      case "tool_proficiencies":
         pushUnique(
-          mod.type === "languages"
-            ? result.languages
-            : mod.type === "armor_proficiencies"
-              ? result.armorProficiencies
-              : result.toolProficiencies,
+          mod.type === "languages" ? result.languages : result.armorProficiencies,
           mod.values,
         )
+        break
+      case "tool_proficiencies":
+        pushUnique(result.toolProficiencies, mod.values)
+        if (mod.grantExpertise) {
+          if (!mod.values.length) {
+            result.toolExpertiseAll = true
+          } else {
+            pushUnique(result.toolExpertise, mod.values)
+          }
+        }
         break
       case "weapon_proficiencies":
         pushUnique(result.weaponProficiencies, getWeaponProficiencyValues(mod))

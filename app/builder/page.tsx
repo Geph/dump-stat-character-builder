@@ -217,6 +217,7 @@ import {
 } from "@/lib/builder/multiclass-proficiencies"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
+import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import {
   MAX_PORTRAIT_FILE_BYTES,
@@ -2632,10 +2633,13 @@ export default function BuilderPage() {
                             const isWeaponMastery =
                               feature.choices?.resourceKey === "weapon_mastery"
                             const isKnackPool = feature.choices?.optionsSource === "class_knacks"
+                            const isUpgradePool = feature.choices?.optionsSource === "class_upgrades"
                             const masteryHint = isWeaponMastery
                               ? `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""}.`
                               : isKnackPool
                                 ? `Choose ${choiceCount} Knack${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""}.`
+                                : isUpgradePool
+                                  ? `Choose ${choiceCount} Upgrade${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (exchange on level-up per feature rules)" : ""}.`
                               : feature.choices!.optionsSource === "known_discipline_talents"
                                 ? `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines.`
                                 : feature.choices!.category
@@ -2644,6 +2648,17 @@ export default function BuilderPage() {
                                 const previous = featureChoicePicks[key] ?? []
                                 const validation = validateKnackSelectionChange({
                                   previous,
+                                  next: selected,
+                                  customAbilities,
+                                  classLevel: entry.level,
+                                })
+                                if (!validation.ok) {
+                                  window.alert(validation.message)
+                                  return
+                                }
+                              }
+                              if (isUpgradePool) {
+                                const validation = validateUpgradeSelectionChange({
                                   next: selected,
                                   customAbilities,
                                   classLevel: entry.level,

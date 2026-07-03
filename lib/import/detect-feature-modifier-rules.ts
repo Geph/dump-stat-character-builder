@@ -868,6 +868,36 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       ]),
   },
   {
+    id: "attunement.slots.total",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\b(?:can\s+(?:now\s+)?)?attune to up to (three|four|five|six|seven|eight|nine|ten|\d+) magic items?\b/i,
+    build: (match, ctx) => {
+      const WORD_NUMBERS: Record<string, number> = {
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7,
+        eight: 8,
+        nine: 9,
+        ten: 10,
+      }
+      const raw = match[1].toLowerCase()
+      const total = WORD_NUMBERS[raw] ?? parseInt(raw, 10)
+      if (!Number.isFinite(total) || total < 1) return null
+      return charInstance(newInstanceId(), "cat_char_attunement_slots", [
+        {
+          id: modId(instanceKey(ctx, "attune")),
+          type: "attunement_slots",
+          totalSlots: total,
+          label: `Attune to ${total} magic items`,
+        },
+      ])
+    },
+  },
+  {
     id: "proficiency.tools",
     confidence: "high",
     test: /\bproficien(?:cy|t)\s+(?:with|in)\s+(?:the\s+)?([^.;\n]+?(?:'s|’s)?\s+(?:supplies|tools|kit|kits|instruments?))/i,

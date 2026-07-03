@@ -79,6 +79,8 @@ const ImportMechanicAiSchema = z.object({
   spellcastingAbility: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),
+  attunementTotal: z.number().nullable(),
+  attunementBonus: z.number().nullable(),
   targetCreatureTypes: z.array(z.string()).nullable(),
   requiresSheetToggle: z.string().nullable(),
   sheetToggleLabel: z.string().nullable(),

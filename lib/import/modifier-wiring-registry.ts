@@ -32,6 +32,7 @@ export const AI_MECHANIC_KINDS = [
   "extra_attack",
   "grant_feat",
   "spellcasting_ability",
+  "attunement_slots",
 ] as const
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
@@ -95,7 +96,18 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "your proficiency bonus is doubled for any ability check you make that uses any of the tool proficiencies you gained from this class",
     ],
     mechanicsKind: "tool_proficiencies",
-    notes: "grantExpertise: true on class tools",
+    notes: "grantExpertise: true on class tools (empty tools[] = all class-granted tools).",
+  },
+  {
+    ruleId: "attunement.slots.total",
+    trigger: "description",
+    catalog: "cat_char_attunement_slots",
+    examples: [
+      "you can attune to up to four magic items at once",
+      "you can now attune to up to five magic items",
+    ],
+    mechanicsKind: "attunement_slots",
+    notes: "attunementTotal N sets totalSlots (not bonusSlots).",
   },
   {
     ruleId: "proficiency.weapons.martial",
@@ -843,7 +855,8 @@ function formatMechanicsCheatsheet(): string {
     "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
     "- spells_known: spellNames [\"Druidcraft\"]; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters",
-    "- tool_proficiencies: tools [\"Smith's Tools\"]",
+    "- tool_proficiencies: tools [\"Smith's Tools\"]; grantExpertise true for doubled tool checks",
+    "- attunement_slots: attunementTotal 4 (sets cap) OR attunementBonus 1 (adds to default 3)",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
     "- weapon_proficiencies: weaponMode martial_weapons | simple_weapons",
     "- saving_throws: savingThrows [\"Strength\", \"Constitution\"]",
