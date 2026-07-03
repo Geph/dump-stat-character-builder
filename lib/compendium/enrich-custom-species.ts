@@ -717,26 +717,7 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
   })
 }
 
-function speciesHasLanguageGrant(row: Record<string, unknown>): boolean {
-  const matches = (instances: unknown): boolean =>
-    Array.isArray(instances) &&
-    instances.some(
-      (inst) =>
-        inst &&
-        typeof inst === "object" &&
-        ((inst as LinkedModifierInstance).catalogRefId === "cat_char_languages" ||
-          (Array.isArray((inst as LinkedModifierInstance).characteristics) &&
-            (inst as LinkedModifierInstance).characteristics!.some((c) => c?.type === "languages"))),
-    )
-
-  if (matches(row.linkedModifiers)) return true
-  const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
-  return traits.some(
-    (trait) =>
-      matches(trait.linkedModifiers) ||
-      (trait.choices?.options ?? []).some((option) => matches(option.linkedModifiers)),
-  )
-}
+import { speciesRowHasLanguageGrant } from "@/lib/compendium/enrich-srd-species"
 
 /** Apply non-SRD species modifier presets when the species name matches the registry. */
 export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {
@@ -752,7 +733,7 @@ export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<str
     next = { ...next, size_options: sizeOptions }
   }
 
-  if (SPECIES_WITH_STANDARD_LANGUAGES.has(speciesName) && !speciesHasLanguageGrant(next)) {
+  if (SPECIES_WITH_STANDARD_LANGUAGES.has(speciesName) && !speciesRowHasLanguageGrant(next)) {
     const existing = Array.isArray(next.linkedModifiers)
       ? (next.linkedModifiers as LinkedModifierInstance[])
       : Array.isArray(next.linked_modifiers)

@@ -79,6 +79,48 @@ function buildHexesResourcePicker(feature: Feature): LinkedModifierInstance {
   ])
 }
 
+function buildKnacksKnownPicker(feature: Feature): LinkedModifierInstance {
+  const instanceId = createModifierInstanceId()
+  return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
+    legacyFeatureOptionPickerCharacteristic({
+      id: modId("knacks_known"),
+      category: "Knack",
+      choiceCount: 1,
+      swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
+      swapRestType: /\bshort\s+rest\b/i.test(feature.description ?? "") ? "short" : "long",
+      resourceKey: "knacks_known",
+      optionsSource: "class_knacks",
+      label: "Knacks known (count scales on class table)",
+    }),
+  ])
+}
+
+function enrichKnacksFeature(feature: Feature): Feature {
+  if (!/^knacks?$/i.test(feature.name.trim())) return feature
+  if ((feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; resourceKey?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.resourceKey === "knacks_known"
+    }),
+  )) {
+    return feature
+  }
+  return syncModifierRefs({
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Knack",
+      count: 1,
+      options: [],
+      resourceKey: "knacks_known",
+      optionsSource: "class_knacks",
+      swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
+      swapRestType: /\bshort\s+rest\b/i.test(feature.description ?? "") ? "short" : "long",
+    },
+    linkedModifiers: [...(feature.linkedModifiers ?? []), buildKnacksKnownPicker(feature)],
+  })
+}
+
 function buildUpgradesResourcePicker(feature: Feature): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
@@ -124,7 +166,7 @@ function enrichFeatureChoices(
   content: ImportContent,
   className = "",
 ): Feature {
-  let next = feature
+  let next = enrichKnacksFeature(feature)
 
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
     const picker = buildChoiceOptionPicker(feature)

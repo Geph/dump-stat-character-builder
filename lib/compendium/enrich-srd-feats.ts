@@ -5,6 +5,7 @@ import {
 } from "@/lib/compendium/feat-modifier-presets"
 export { FEAT_MODIFIER_CATALOG, SRD_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { shouldSkipFeatPreset } from "@/lib/import/resolve-feat-preset-conflict"
 import type { Feature } from "@/lib/types"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -97,6 +98,10 @@ export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, u
   }
 
   if (preset && !featHasModifierConfig(row)) {
+    const description = typeof row.description === "string" ? row.description : ""
+    if (shouldSkipFeatPreset(name, description, preset)) {
+      return applyFeatMechanicalDetection(row)
+    }
     if (preset.isChoice && preset.choices) {
       return {
         ...row,

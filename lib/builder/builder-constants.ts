@@ -1,5 +1,4 @@
 import {
-  ClipboardCheck,
   Dices,
   Package,
   Shield,
@@ -16,7 +15,6 @@ export const BUILDER_STEP_IDS = {
   GEAR: 4,
   SPELLS: 5,
   DETAILS: 6,
-  REVIEW: 7,
 } as const
 
 export const BUILDER_STEPS = [
@@ -26,7 +24,6 @@ export const BUILDER_STEPS = [
   { id: BUILDER_STEP_IDS.GEAR, label: "Gear", icon: Package },
   { id: BUILDER_STEP_IDS.SPELLS, label: "Spells", icon: Sparkles },
   { id: BUILDER_STEP_IDS.DETAILS, label: "Details", icon: UserCircle },
-  { id: BUILDER_STEP_IDS.REVIEW, label: "Review", icon: ClipboardCheck },
 ] as const
 
 export const BUILDER_ABILITY_NAMES = [

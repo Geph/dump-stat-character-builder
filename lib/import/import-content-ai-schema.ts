@@ -62,9 +62,26 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   checkSkills: z.array(z.string()).nullable(),
   featCategories: z
-    .array(z.enum(["Origin", "General", "Fighting Style", "Epic Boon"]))
+    .array(
+      z.enum([
+        "Origin",
+        "General",
+        "Fighting Style",
+        "Epic Boon",
+        "Planar Pact",
+        "Metamagic",
+        "Mystic Technique",
+        "Eldritch Invocation",
+      ]),
+    )
     .nullable(),
   featCount: z.number().nullable(),
+  spellcastingAbility: z
+    .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+    .nullable(),
+  targetCreatureTypes: z.array(z.string()).nullable(),
+  requiresSheetToggle: z.string().nullable(),
+  sheetToggleLabel: z.string().nullable(),
 })
 
 const ClassFeatureAiSchema = z.object({

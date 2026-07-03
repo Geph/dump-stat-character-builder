@@ -40,6 +40,62 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     spendPatterns: [],
   },
   {
+    resourceKey: "spell_limit",
+    namePattern: /spell\s*limit/i,
+    displayName: "Spell Limit",
+    definition:
+      "Maximum Sorcery Points spendable on a single spell's base casting cost (excludes Metamagic add-ons).",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "sorcery_points",
+    namePattern: /sorcery\s*points?/i,
+    displayName: "Sorcery Points",
+    definition:
+      "Pool spent to cast leveled spells and fuel Metamagic. Recharges on a long rest for point-pool sorcerers.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\b(?:expend|spend|costs?|pay|use)\s+(?:up\s+to\s+)?(\d+)\s+sorcery\s+points?\b/i,
+      /\b(\d+)\s+sorcery\s+points?\b[^.]{0,40}\b(?:to|when|per)\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+  },
+  {
+    resourceKey: "ki_points",
+    namePattern: /\bki\s*points?\b/i,
+    displayName: "Ki Points",
+    definition:
+      "Monk energy pool spent on Techniques and class features. Recharges on a short or long rest (often after meditation).",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\b(?:expend|spend|costs?|pay|use)\s+(?:up\s+to\s+)?(\d+)\s+ki\b/i,
+      /\b(\d+)\s+ki\b[^.]{0,40}\b(?:to|when|per)\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
+  },
+  {
     resourceKey: "battle_dice",
     namePattern: /battle\s*dice/i,
     displayName: "Battle Dice",

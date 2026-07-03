@@ -50,8 +50,8 @@ describe("shouldResetSpellSlotsOnRest", () => {
 describe("applyUsesRest", () => {
   it("fully restores when recharge has no amount", () => {
     const uses = { type: "fixed" as const, fixedAmount: 2, recharges: [{ rest: "short_rest" as const }] }
-    expect(applyUsesRest(2, uses, "short_rest", 2)).toBe(0)
-    expect(applyUsesRest(2, uses, "long_rest", 2)).toBe(2)
+    expect(applyUsesRest(2, uses, "short_rest", 2).used).toBe(0)
+    expect(applyUsesRest(2, uses, "long_rest", 2).used).toBe(2)
   })
 
   it("partially restores when recharge amount is set", () => {
@@ -60,7 +60,7 @@ describe("applyUsesRest", () => {
       fixedAmount: 4,
       recharges: [{ rest: "short_rest" as const, amount: 2 }],
     }
-    expect(applyUsesRest(4, uses, "short_rest", 4)).toBe(2)
+    expect(applyUsesRest(4, uses, "short_rest", 4).used).toBe(2)
   })
 
   it("restores on initiative when rechargeOnInitiative is set", () => {
@@ -69,14 +69,38 @@ describe("applyUsesRest", () => {
       fixedAmount: 3,
       rechargeOnInitiative: true,
     }
-    expect(applyUsesRest(3, full, "initiative", 3)).toBe(0)
+    expect(applyUsesRest(3, full, "initiative", 3).used).toBe(0)
 
     const partial = {
       type: "fixed" as const,
       fixedAmount: 4,
       rechargeOnInitiative: 2,
     }
-    expect(applyUsesRest(4, partial, "initiative", 4)).toBe(2)
+    expect(applyUsesRest(4, partial, "initiative", 4).used).toBe(2)
+  })
+
+  it("applies formula recharge with long-rest cadence cap", () => {
+    const uses = {
+      type: "fixed" as const,
+      fixedAmount: 8,
+      recharges: [
+        {
+          rest: "short_rest" as const,
+          amountFormula: "half_class_level_round_up" as const,
+          maxPerLongRest: 1,
+        },
+      ],
+    }
+    const first = applyUsesRest(8, uses, "short_rest", 8, { classLevel: 5, rechargeCapsUsed: 0 })
+    expect(first.used).toBe(5)
+    expect(first.rechargeCapsUsed).toBe(1)
+
+    const blocked = applyUsesRest(first.used, uses, "short_rest", 8, {
+      classLevel: 5,
+      rechargeCapsUsed: 1,
+    })
+    expect(blocked.used).toBe(5)
+    expect(blocked.rechargeCapsUsed).toBeUndefined()
   })
 })
 

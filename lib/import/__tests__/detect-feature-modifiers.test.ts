@@ -407,6 +407,40 @@ describe("detectFeatureModifiers by feature name", () => {
     expect(detections[0]?.instance.catalogRefId).toBe("cat_char_grant_feat")
   })
 
+  it("wires classic-phrased ASI as asi_pool, not grant_feat", () => {
+    const classic =
+      "When you reach 4th level, you can increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1."
+    const detections = detectFeatureModifiers(classic, {
+      ...classCtx,
+      featureName: "Ability Score Improvement",
+      level: 4,
+    })
+    expect(detections.some((entry) => entry.ruleId === "grant.asi_by_name")).toBe(false)
+    const asi = detections.find((entry) => entry.ruleId === "grant.asi_classic")
+    expect(asi?.instance.catalogRefId).toBe("cat_char_ability_scores")
+    expect(asi?.instance.characteristics?.[0]?.type).toBe("ability_scores")
+    expect(
+      (asi?.instance.characteristics?.[0] as { mode?: string }).mode,
+    ).toBe("asi_pool")
+  })
+
+  it("keeps 2024 ASI phrasing on grant_feat", () => {
+    const modern =
+      "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify."
+    const detections = detectFeatureModifiers(modern, {
+      ...classCtx,
+      featureName: "Ability Score Improvement",
+      level: 4,
+    })
+    expect(
+      detections.some(
+        (entry) =>
+          entry.ruleId === "grant.asi_by_name" || entry.ruleId === "grant.asi_2024",
+      ),
+    ).toBe(true)
+    expect(detections.some((entry) => entry.ruleId === "grant.asi_classic")).toBe(false)
+  })
+
   it("wires Evasion by name and from SRD description text", () => {
     const byName = detectFeatureModifiers("", { ...classCtx, featureName: "Evasion", level: 7 })
     expect(byName.some((entry) => entry.ruleId === "defensive.evasion_by_name")).toBe(true)

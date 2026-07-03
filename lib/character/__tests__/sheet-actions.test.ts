@@ -263,4 +263,54 @@ describe("collectSheetActions", () => {
     expect(breath?.kinds).toEqual(["action"])
     expect(breath?.sourceLabel).toBe("Dragonborn")
   })
+
+  it("surfaces psionic custom abilities with casting headers in the Actions panel", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 5)],
+      species: null,
+      customAbilities: [
+        {
+          id: "power-1",
+          name: "Enhancing Surge",
+          description: "<p>Empower yourself.</p>",
+          prerequisites: null,
+          characteristics: null,
+          attached_to_type: "class",
+          attached_to_id: "class-1",
+          uses: {
+            type: "class_resource",
+            classResourceKey: "psi_points",
+            classResourceAmount: 2,
+          },
+          show_in_builder: true,
+          ability_role: "psionic_power",
+          casting_time: "1 bonus action",
+          range: "Self",
+          duration: "1 minute",
+          psionic_augments: {
+            resourceKey: "psi_points",
+            allowMultiple: false,
+            augments: [
+              {
+                id: "extend",
+                name: "Extend",
+                description: "Double duration.",
+                cost: { fixed: 2 },
+              },
+            ],
+          },
+          icon: null,
+          source: "KibblesTasty Psion",
+          creator_url: null,
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    })
+    const surge = actions.find((a) => a.name === "Enhancing Surge")
+    expect(surge?.kinds).toEqual(["bonus"])
+    expect(surge?.castingTime).toBe("1 bonus action")
+    expect(surge?.psionicAugments?.augments).toHaveLength(1)
+    expect(surge?.classResourceKey).toBe("psi_points")
+  })
 })

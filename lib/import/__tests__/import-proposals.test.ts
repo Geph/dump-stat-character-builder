@@ -172,6 +172,39 @@ describe("Battle Master maneuvers", () => {
   })
 })
 
+describe("innate psionics", () => {
+  it("proposes innate psionic features for user confirmation", () => {
+    const content: ImportContent = {
+      classes: [
+        {
+          name: "KibblesTasty Psion",
+          description: "",
+          hit_die: 6,
+          features: [
+            {
+              level: 1,
+              name: "Innate Psionics",
+              description: "You know minor psionic tricks.",
+              isChoice: true,
+              choices: {
+                category: "Innate Psionics",
+                count: 2,
+                options: [{ name: "Mind Thrust", description: "Deal psychic damage." }],
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    const proposals = collectImportProposals(content)
+    const innate = proposals.customAbilities.find((row) => row.name === "Innate Psionics")
+    expect(innate).toBeDefined()
+    expect(innate?.abilityRole).toBe("talent_pool")
+    expect(innate?.definition).toMatch(/deferred/i)
+  })
+})
+
 describe("companion stat blocks", () => {
   it("proposes companion features as custom abilities with companionStatBlock flag", () => {
     const content: ImportContent = {

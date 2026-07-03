@@ -15,6 +15,7 @@ import {
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
+import { enrichMonkClassFeatures, remapKiKeysOnFeatRows } from "@/lib/import/enrich-monk-class-features"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
@@ -232,7 +233,10 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   }
 
   if (content.feats?.length) {
-    next.feats = enrichFeats(content.feats)
+    next.feats = remapKiKeysOnFeatRows(
+      enrichFeats(content.feats),
+      (content.classes ?? []).map((cls) => cls.name),
+    )
   }
 
   if (content.equipment?.length) {

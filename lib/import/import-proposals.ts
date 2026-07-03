@@ -6,6 +6,7 @@ import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-bl
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
+import { remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
 import type { UsesConfig } from "@/lib/types"
 
 export type ImportProposalSource = "ai" | "table" | "explicit" | "feature"
@@ -45,10 +46,20 @@ export type ImportProposalCustomAbility = {
   name: string
   definition: string
   description: string
+  prerequisite?: string | null
+  repeatable?: boolean
   sourceType: "class" | "subclass" | "species" | "background" | "feat" | "item" | null
   sourceName: string | null
   levelRequirement: number | null
   talentCount?: number
+  choices?: import("@/lib/types").FeatureChoice | null
+  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "knack" | null
+  psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
+  casting_time?: string | null
+  range?: string | null
+  components?: string[] | null
+  duration?: string | null
+  concentration?: boolean
   /** Class resource spent when activating (e.g. superiority_dice for maneuvers). */
   resourceKey?: string | null
   /** Parsed stat block for the Companions sheet tab. */
@@ -81,13 +92,16 @@ type AiProposalAbility = {
   name: string
   definition?: string
   description: string
+  prerequisite?: string | null
+  repeatable?: boolean
   source_type?: ImportProposalCustomAbility["sourceType"]
   source_name?: string | null
   level_requirement?: number | null
+  ability_role?: ImportProposalCustomAbility["abilityRole"]
   choices?: {
     category?: string
     count?: number
-    options?: { name: string; description: string }[]
+    options?: { name: string; description: string; prerequisite?: string | null; repeatable?: boolean }[]
   }
 }
 
@@ -227,6 +241,20 @@ function disciplineDefinition(
   return `Psionic discipline option for ${className}. Disciplines are player-chosen ability packages with point-cost talents.${talentNote}`
 }
 
+function innatePsionicsDefinition(name: string, className: string): string {
+  return `${name} for ${className}. Innate psionic options detected from class features — import as a custom ability placeholder; full builder wiring is deferred until confirmed.`
+}
+
+function isInnatePsionicsFeature(feature: {
+  name?: string
+  description?: string
+}): boolean {
+  const name = feature.name ?? ""
+  if (/\binnate\s+psionic/i.test(name)) return true
+  if (/\binnate\s+psionic/i.test(feature.description ?? "")) return true
+  return false
+}
+
 function pushResource(
   list: ImportProposalClassResource[],
   seen: Set<string>,
@@ -280,6 +308,32 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
   }
 
   for (const ability of raw?.custom_abilities ?? []) {
+    if (
+      (ability.ability_role === "knack" || /\bknack/i.test(ability.choices?.category ?? "")) &&
+      ability.choices?.options?.length
+    ) {
+      for (const option of ability.choices.options) {
+        pushAbility(customAbilities, seenAbilities, {
+          id: ability.proposal_id
+            ? `ability:${slugId(ability.proposal_id)}:${slugId(option.name)}`
+            : undefined,
+          name: option.name,
+          definition:
+            ability.definition?.trim() ||
+            `${option.name} knack for ${ability.source_name ?? "this class"}.`,
+          description: option.description,
+          prerequisite: option.prerequisite ?? ability.prerequisite ?? null,
+          repeatable: option.repeatable ?? ability.repeatable ?? false,
+          sourceType: normalizeProposalSourceType(ability.source_type),
+          sourceName: ability.source_name ?? null,
+          levelRequirement: ability.level_requirement ?? null,
+          abilityRole: "knack",
+          source: "ai",
+        })
+      }
+      continue
+    }
+
     const talentCount = ability.choices?.options?.length
     pushAbility(customAbilities, seenAbilities, {
       id: ability.proposal_id ? `ability:${slugId(ability.proposal_id)}` : undefined,
@@ -288,10 +342,22 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
         ability.definition?.trim() ||
         disciplineDefinition(ability.name, ability.source_name ?? "this class", talentCount),
       description: ability.description,
+      prerequisite: ability.prerequisite ?? null,
+      repeatable: ability.repeatable ?? false,
       sourceType: normalizeProposalSourceType(ability.source_type),
       sourceName: ability.source_name ?? null,
       levelRequirement: ability.level_requirement ?? null,
       talentCount,
+      choices: ability.choices as import("@/lib/types").FeatureChoice | undefined,
+      abilityRole:
+        ability.ability_role ??
+        (/\bknack\b/i.test(ability.choices?.category ?? ability.name)
+          ? "knack"
+          : /\bpower\b/i.test(ability.name)
+            ? "psionic_power"
+            : /\btalent/i.test(ability.choices?.category ?? ability.name)
+              ? "talent_pool"
+              : "discipline"),
       source: "ai",
     })
   }
@@ -332,7 +398,7 @@ function collectTableResources(
     for (const column of parsed.columns) {
       pushResource(into.classResources, seenResources, {
         className,
-        resourceKey: column.resourceKey,
+        resourceKey: remapPointPoolResourceKey(className, column.resourceKey),
         name: column.resourceName,
         definition: defaultResourceDefinition(column.resourceName, className),
         description: `${column.resourceName} progression parsed from the ${className} level table.`,
@@ -357,7 +423,7 @@ function collectTextDerivedResources(
       if (!pattern.namePattern.test(text)) continue
       pushResource(into.classResources, seenResources, {
         className,
-        resourceKey: pattern.resourceKey,
+        resourceKey: remapPointPoolResourceKey(className, pattern.resourceKey),
         name: pattern.displayName,
         definition: pattern.definition,
         description: `${pattern.displayName} for ${className} (detected from class description).`,
@@ -389,6 +455,8 @@ function collectDisciplineFeatures(
         sourceName,
         levelRequirement: feature.level,
         talentCount,
+        choices: feature.choices as import("@/lib/types").FeatureChoice | undefined,
+        abilityRole: "discipline",
         source: "feature",
       })
     }
@@ -520,6 +588,40 @@ function collectCompanionStatBlockFeatures(
   }
 }
 
+function collectInnatePsionicsFeatures(
+  content: ImportContent,
+  into: ImportProposalSet,
+  seenAbilities: Set<string>,
+) {
+  const scanFeatures = (
+    features: { level: number; name: string; description: string; isChoice?: boolean; choices?: { category?: string; options?: { name: string; description: string }[] } }[] | undefined,
+    sourceType: ImportProposalCustomAbility["sourceType"],
+    sourceName: string,
+  ) => {
+    for (const feature of features ?? []) {
+      if (!isInnatePsionicsFeature(feature)) continue
+      pushAbility(into.customAbilities, seenAbilities, {
+        name: feature.name,
+        definition: innatePsionicsDefinition(feature.name, sourceName),
+        description: feature.description,
+        sourceType,
+        sourceName,
+        levelRequirement: feature.level,
+        choices: feature.choices as import("@/lib/types").FeatureChoice | undefined,
+        abilityRole: "talent_pool",
+        source: "feature",
+      })
+    }
+  }
+
+  for (const classRow of content.classes ?? []) {
+    scanFeatures(classRow.features, "class", classRow.name)
+  }
+  for (const subclass of content.subclasses ?? []) {
+    scanFeatures(subclass.features, "subclass", subclass.name)
+  }
+}
+
 function collectExplicitAbilities(
   content: ImportContent,
   into: ImportProposalSet,
@@ -559,6 +661,7 @@ export function collectImportProposals(content: ImportContent): ImportProposalSe
   }
 
   collectDisciplineFeatures(content, result, seenAbilities)
+  collectInnatePsionicsFeatures(content, result, seenAbilities)
   collectMartialExploitFeatures(content, result, seenAbilities)
   collectBattleMasterManeuverFeatures(content, result, seenAbilities)
   collectCompanionStatBlockFeatures(content, result, seenAbilities)
@@ -608,10 +711,20 @@ export function applyProposalSelections(
   const abilities = selectedAbilities.map((row) => ({
     name: row.name,
     description: row.description,
+    prerequisite: row.prerequisite ?? null,
+    repeatable: row.repeatable ?? false,
     source_type: row.sourceType,
     source_name: row.sourceName,
     level_requirement: row.levelRequirement,
     companion_stat_block: row.companionStatBlock ?? null,
+    ...(row.choices ? { isChoice: true, choices: row.choices } : {}),
+    ...(row.abilityRole ? { ability_role: row.abilityRole } : {}),
+    ...(row.psionic_augments ? { psionic_augments: row.psionic_augments } : {}),
+    ...(row.casting_time ? { casting_time: row.casting_time } : {}),
+    ...(row.range ? { range: row.range } : {}),
+    ...(row.components ? { components: row.components } : {}),
+    ...(row.duration ? { duration: row.duration } : {}),
+    ...(row.concentration ? { concentration: row.concentration } : {}),
   }))
 
   const base = stripProposalBackedContent(content)

@@ -21,6 +21,9 @@ export function inferFeatImportFields<T extends FeatImportLike>(feat: T): T {
     if (/planar\s+pact\s+feat/i.test(header) || /can'?t have another planar pact feat/i.test(header)) {
       category = "Planar Pact"
     }
+    if (/\bmystic\s+technique\b/i.test(header)) {
+      category = "Mystic Technique"
+    }
   }
 
   return {

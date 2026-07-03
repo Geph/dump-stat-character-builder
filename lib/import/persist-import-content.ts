@@ -21,6 +21,9 @@ import {
   type ClassResourceImportRow,
 } from "@/lib/import/enrich-import-classes"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
+import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
+import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
@@ -282,10 +285,36 @@ export async function persistImportedContent(
   }
 
   if (sanitized.abilities?.length) {
-    await upsertByName(
-      "custom_abilities",
-      sanitized.abilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
+    const classIdByName = new Map(
+      (await listRows("classes")).map((row) => [row.name as string, row.id as string]),
     )
+    const subclassIdByName = new Map(
+      (await listRows("subclasses")).map((row) => [row.name as string, row.id as string]),
+    )
+    const speciesIdByName = new Map(
+      (await listRows("species")).map((row) => [row.name as string, row.id as string]),
+    )
+    const backgroundIdByName = new Map(
+      (await listRows("backgrounds")).map((row) => [row.name as string, row.id as string]),
+    )
+    const featIdByName = new Map(
+      (await listRows("feats")).map((row) => [row.name as string, row.id as string]),
+    )
+    const attachmentMaps = {
+      classIdByName,
+      subclassIdByName,
+      speciesIdByName,
+      backgroundIdByName,
+      featIdByName,
+    }
+
+    const abilityRows = enrichAbilityImportRows(
+      normalizeAbilityImportRows(
+        sanitized.abilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
+      ),
+    ).map((row) => resolveAbilityAttachmentRow(row, attachmentMaps))
+
+    await upsertByName("custom_abilities", abilityRows)
     breakdown.abilities = sanitized.abilities.length
     totalImported += sanitized.abilities.length
   }

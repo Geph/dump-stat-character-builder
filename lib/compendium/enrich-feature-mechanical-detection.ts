@@ -17,7 +17,10 @@ export function enrichFeatureWithMechanicalDetection(
   // auto-detection on the full description would apply every sub-option reward
   // at once (e.g. Druid Primal Order → Warden martial weapons without a pick).
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
-    detections = detections.filter((detection) => !detection.ruleId.startsWith("proficiency."))
+    detections = detections.filter(
+      (detection) =>
+        !detection.ruleId.startsWith("proficiency.") && !detection.ruleId.startsWith("spell."),
+    )
   }
   if (!detections.length) return feature
 

@@ -12,6 +12,7 @@ import {
   X,
   Pencil,
   Plus,
+  PawPrint,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -29,6 +30,8 @@ import type {
 import { resolveUsesConfig, ABILITY_SCORE_KEYS } from "@/lib/compendium/characteristic-modifiers"
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
+import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
+import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-powers-panel"
 import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
 import { SpellDetailOverlay } from "@/components/character-sheet/spell-detail-overlay"
 import { EquipmentDetailOverlay } from "@/components/character-sheet/equipment-detail-overlay"
@@ -49,6 +52,17 @@ import {
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
+import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
+import {
+  applyTurnStartTriggers,
+  collectTurnStartTriggers,
+} from "@/lib/character/collect-turn-start-triggers"
+import { getPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
+import {
+  metamagicOptionsFromFeats,
+  resolveSpellCastCost,
+} from "@/lib/character/resolve-spell-cast-cost"
+import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
 import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-panel"
 import { SheetEquippedWeaponsPanel } from "@/components/character-sheet/sheet-equipped-weapons-panel"
@@ -60,6 +74,7 @@ import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-re
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
@@ -74,6 +89,16 @@ import {
   getEffectiveWeaponProficiencies,
 } from "@/lib/compendium/background-proficiencies"
 import { SRD_CONDITIONS, getConditionDescription } from "@/lib/srd/condition-descriptions"
+import { isIncapacitatedByConditions } from "@/lib/srd/condition-roll-effects"
+import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
+import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
+import {
+  loadSheetSessionState,
+  saveSheetSessionState,
+} from "@/lib/character/sheet-session-state"
+import { collectMagicItemPowers } from "@/lib/character/magic-item-powers"
+import { BUILTIN_SHEET_TOGGLES } from "@/lib/compendium/sheet-toggle-registry"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 import {
   DefaultActionsButton,
@@ -120,6 +145,14 @@ const ABILITY_LABELS: Record<string, string> = {
   wisdom: "WIS",
   charisma: "CHA",
 }
+
+const SHEET_SELECTABLE_CONDITIONS = SRD_CONDITIONS.filter(
+  (condition) => condition.name !== "Exhaustion",
+)
+
+const MANUAL_SHEET_TOGGLES = BUILTIN_SHEET_TOGGLES.filter(
+  (toggle) => toggle.id !== "below_half_hp",
+)
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
   if (character.class_list?.length) return character.class_list
@@ -320,9 +353,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [currentHp, setCurrentHp] = useState(0)
   const [tempHp, setTempHp] = useState(0)
   const [activeConditions, setActiveConditions] = useState<string[]>([])
-  const [sheetToggles, setSheetToggles] = useState<{ while_raging: boolean }>({
-    while_raging: false,
-  })
+  const [exhaustionLevel, setExhaustionLevel] = useState(0)
+  const [activeSheetToggleIds, setActiveSheetToggleIds] = useState<string[]>([])
+  const [sessionHydrated, setSessionHydrated] = useState(false)
   const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
@@ -337,6 +370,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [equippedWeaponId, setEquippedWeaponId] = useState<string | null>(null)
   const [usedSpellSlotsByKey, setUsedSpellSlotsByKey] = useState<Record<string, number[]>>({})
   const [usedResourcesById, setUsedResourcesById] = useState<Record<string, number>>({})
+  const [rechargeCapsByResourceId, setRechargeCapsByResourceId] = useState<Record<string, number>>({})
+  const [selectedMetamagicIds, setSelectedMetamagicIds] = useState<string[]>([])
   const [hasInspiration, setHasInspiration] = useState(false)
   const [deathSaves, setDeathSaves] = useState({ successes: 0, failures: 0 })
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
@@ -421,6 +456,55 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     fetchCharacter()
   }, [id])
 
+  useEffect(() => {
+    const saved = loadSheetSessionState(id)
+    if (saved) {
+      setActiveConditions(saved.activeConditions)
+      setExhaustionLevel(saved.exhaustionLevel)
+      setActiveSheetToggleIds(saved.activeSheetToggleIds)
+    }
+    setSessionHydrated(true)
+  }, [id])
+
+  useEffect(() => {
+    if (!sessionHydrated) return
+    saveSheetSessionState(id, {
+      activeConditions,
+      exhaustionLevel,
+      activeSheetToggleIds,
+    })
+  }, [id, sessionHydrated, activeConditions, exhaustionLevel, activeSheetToggleIds])
+
+  const toggleSheetToggle = useCallback((toggleId: string) => {
+    setActiveSheetToggleIds((prev) =>
+      prev.includes(toggleId) ? prev.filter((entry) => entry !== toggleId) : [...prev, toggleId],
+    )
+  }, [])
+
+  const equipmentMagicContext = useMemo(
+    () => ({
+      equipment,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      attunedItemIds,
+      modifierCatalog,
+    }),
+    [
+      equipment,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      attunedItemIds,
+      modifierCatalog,
+    ],
+  )
+
+  const magicItemPowers = useMemo(
+    () => collectMagicItemPowers(equipmentMagicContext),
+    [equipmentMagicContext],
+  )
+
   const characterBuildInputs = useMemo(() => {
     if (!character) return null
     const classList = character.class_list ?? []
@@ -445,8 +529,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
     if (!inputs) return null
     const savedAcPick = character.modifier_player_picks?.ac_formula?.[0] ?? null
+    const baseMaxHp = character.hit_point_max ?? 0
+    const exhaustionFx = getExhaustionDerivedEffects(exhaustionLevel)
+    const maxHpForHalf =
+      exhaustionFx.hpMaxMultiplier < 1
+        ? Math.max(1, Math.floor(baseMaxHp * exhaustionFx.hpMaxMultiplier))
+        : baseMaxHp
+    const effectiveSheetToggles = new Set(activeSheetToggleIds)
+    if (maxHpForHalf > 0 && currentHp <= Math.floor(maxHpForHalf / 2)) {
+      effectiveSheetToggles.add("below_half_hp")
+    }
     return {
       ...inputs,
+      exhaustionLevel,
       modifierPlayerPicks: {
         ...inputs.modifierPlayerPicks,
         ...(acFormulaPick ?? savedAcPick
@@ -460,11 +555,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedWeaponId,
       attunedItemIds,
       equipmentBaseSelections,
-      activeSheetToggles: new Set(
-        Object.entries(sheetToggles)
-          .filter(([, active]) => active)
-          .map(([key]) => key as import("@/lib/compendium/characteristic-modifiers").SheetToggleKey),
-      ),
+      activeSheetToggles: effectiveSheetToggles,
     }
   }, [
     character,
@@ -478,7 +569,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equippedWeaponId,
     attunedItemIds,
     equipmentBaseSelections,
-    sheetToggles,
+    activeSheetToggleIds,
+    exhaustionLevel,
+    currentHp,
     acFormulaPick,
   ])
 
@@ -747,8 +840,125 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         })
       }
     }
-    return entries
+    return [...entries, ...collectFeatureUsesResources(classDetails)]
   }, [classDetails])
+
+  const sheetCustomAbilities = useMemo(() => {
+    if (!character) return []
+    return filterCustomAbilitiesForCharacterSheet(customAbilities, {
+      classIds: classDetails.map((entry) => entry.row.class_id),
+      classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
+      subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
+      subclassNames: classDetails.map((entry) => entry.subclass?.name).filter(Boolean) as string[],
+      speciesId: character.species_id ?? null,
+      speciesName: character.species?.name ?? null,
+      backgroundId: character.background_id ?? null,
+      backgroundName: character.backgrounds?.name ?? null,
+      featIds: [
+        ...(character.feat_ids ?? []),
+        ...characterFeats.map((feat) => feat.id),
+        ...(originFeat ? [originFeat.id] : []),
+      ],
+      featNames: [
+        ...characterFeats.map((feat) => feat.name),
+        ...(originFeat ? [originFeat.name] : []),
+      ],
+      equipmentIds: character.equipment_ids ?? [],
+      equipmentCategories: equipment.map((item) => item.category),
+      spellIds: character.spell_ids ?? [],
+    })
+  }, [customAbilities, character, classDetails, characterFeats, originFeat, equipment])
+
+  const usesResolveContext = useMemo(
+    () => ({
+      proficiencyBonus: derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2,
+      abilityModifiers: {
+        STR: derived?.abilityMods.strength ?? 0,
+        DEX: derived?.abilityMods.dexterity ?? 0,
+        CON: derived?.abilityMods.constitution ?? 0,
+        INT: derived?.abilityMods.intelligence ?? 0,
+        WIS: derived?.abilityMods.wisdom ?? 0,
+        CHA: derived?.abilityMods.charisma ?? 0,
+      },
+    }),
+    [derived, character?.level],
+  )
+
+  const psiLimit = useMemo(
+    () => resolvePsiLimit(classDetails, usesResolveContext),
+    [classDetails, usesResolveContext],
+  )
+
+  const pointPoolClassDetail = useMemo(() => {
+    for (const entry of classDetails) {
+      if (entry.class && getPointPoolSpellcasting(entry.class.spellcasting)) return entry
+    }
+    return null
+  }, [classDetails])
+
+  const metamagicOptions = useMemo(
+    () => metamagicOptionsFromFeats(characterFeats),
+    [characterFeats],
+  )
+
+  const selectedMetamagic = useMemo(
+    () => metamagicOptions.filter((option) => selectedMetamagicIds.includes(option.id)),
+    [metamagicOptions, selectedMetamagicIds],
+  )
+
+  const spellCastCost = useMemo(() => {
+    if (!selectedSpell || !pointPoolClassDetail?.class) return null
+    const pool = getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
+    if (!pool) return null
+
+    const resourceId = `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
+    const resourceEntry = resourceEntries.find((entry) => entry.id === resourceId)
+    const maxPoints = resourceEntry
+      ? resolveUsesAtLevel(resourceEntry.uses, resourceEntry.classLevel, usesResolveContext) ?? 0
+      : 0
+    const usedPoints = usedResourcesById[resourceId] ?? 0
+    const availablePoints = Math.max(0, maxPoints - usedPoints)
+
+    let arcanumAvailable: boolean | undefined
+    const poolMaxLevel = Math.max(
+      0,
+      ...Object.keys(pool.cost_by_level)
+        .map((key) => parseInt(key, 10))
+        .filter((level) => !Number.isNaN(level) && level > 0),
+    )
+    if (selectedSpell.level > poolMaxLevel) {
+      const arcanumEntry = resourceEntries.find((entry) => /innate arcanum/i.test(entry.name))
+      if (arcanumEntry) {
+        const arcanumMax =
+          resolveUsesAtLevel(arcanumEntry.uses, arcanumEntry.classLevel, usesResolveContext) ?? 0
+        arcanumAvailable = (usedResourcesById[arcanumEntry.id] ?? 0) < arcanumMax
+      } else {
+        arcanumAvailable = true
+      }
+    }
+
+    return resolveSpellCastCost({
+      spellLevel: selectedSpell.level,
+      spellcasting: pointPoolClassDetail.class.spellcasting,
+      classRow: pointPoolClassDetail.class,
+      classLevel: pointPoolClassDetail.row.level,
+      availablePoints,
+      selectedMetamagic,
+      ctx: usesResolveContext,
+      arcanumAvailable,
+    })
+  }, [
+    selectedSpell,
+    pointPoolClassDetail,
+    resourceEntries,
+    usedResourcesById,
+    selectedMetamagic,
+    usesResolveContext,
+  ])
+
+  useEffect(() => {
+    setSelectedMetamagicIds([])
+  }, [selectedSpell?.id])
 
   const sheetActions = useMemo(
     () =>
@@ -756,8 +966,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         classDetails,
         species: character?.species ?? null,
         backgroundFeature: character?.backgrounds?.feature ?? null,
+        customAbilities: sheetCustomAbilities,
       }),
-    [classDetails, character?.species, character?.backgrounds?.feature],
+    [classDetails, character?.species, character?.backgrounds?.feature, sheetCustomAbilities],
   )
 
   const alternateAbilityChecks = useMemo(
@@ -809,32 +1020,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [equipment, proficientToolEquipment],
   )
 
-  const sheetCustomAbilities = useMemo(() => {
-    if (!character) return []
-    return filterCustomAbilitiesForCharacterSheet(customAbilities, {
-      classIds: classDetails.map((entry) => entry.row.class_id),
-      classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
-      subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
-      subclassNames: classDetails.map((entry) => entry.subclass?.name).filter(Boolean) as string[],
-      speciesId: character.species_id ?? null,
-      speciesName: character.species?.name ?? null,
-      backgroundId: character.background_id ?? null,
-      backgroundName: character.backgrounds?.name ?? null,
-      featIds: [
-        ...(character.feat_ids ?? []),
-        ...characterFeats.map((feat) => feat.id),
-        ...(originFeat ? [originFeat.id] : []),
-      ],
-      featNames: [
-        ...characterFeats.map((feat) => feat.name),
-        ...(originFeat ? [originFeat.name] : []),
-      ],
-      equipmentIds: character.equipment_ids ?? [],
-      equipmentCategories: equipment.map((item) => item.category),
-      spellIds: character.spell_ids ?? [],
-    })
-  }, [customAbilities, character, classDetails, characterFeats, originFeat, equipment])
-
   /** General/epic feats for display — excludes the background origin feat when it is also in feat_ids. */
   const characterFeatsForDisplay = useMemo(() => {
     const originName =
@@ -846,21 +1031,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       return true
     })
   }, [characterFeats, originFeat, character?.backgrounds?.feat_granted])
-
-  const usesResolveContext = useMemo(
-    () => ({
-      proficiencyBonus: derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2,
-      abilityModifiers: {
-        STR: derived?.abilityMods.strength ?? 0,
-        DEX: derived?.abilityMods.dexterity ?? 0,
-        CON: derived?.abilityMods.constitution ?? 0,
-        INT: derived?.abilityMods.intelligence ?? 0,
-        WIS: derived?.abilityMods.wisdom ?? 0,
-        CHA: derived?.abilityMods.charisma ?? 0,
-      },
-    }),
-    [derived, character?.level],
-  )
 
   const effectiveScores = derived?.abilityScores ?? null
 
@@ -883,6 +1053,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     )
   }, [resourceEntries, usesResolveContext])
 
+  const turnStartTriggers = useMemo(
+    () => collectTurnStartTriggers(classDetails),
+    [classDetails],
+  )
+
+  const handleTurnStart = useCallback(() => {
+    if (!turnStartTriggers.length) return
+    setUsedResourcesById((prev) =>
+      applyTurnStartTriggers({
+        triggers: turnStartTriggers,
+        usedResourcesById: prev,
+        resourceEntries,
+        resolveContext: usesResolveContext,
+        currentHp,
+        maxHp: derived?.maxHp ?? character?.hit_point_max ?? 0,
+        activeConditions,
+      }),
+    )
+  }, [
+    turnStartTriggers,
+    resourceEntries,
+    usesResolveContext,
+    currentHp,
+    derived?.maxHp,
+    character?.hit_point_max,
+    activeConditions,
+  ])
+
   const handleRest = useCallback(
     (rest: RestType) => {
       const result = applySheetRest({
@@ -896,10 +1094,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         usedActionUsesById,
         sheetActions,
         resolveContext: usesResolveContext,
+        rechargeCapsByResourceId,
       })
       setUsedSpellSlotsByKey(result.usedSpellSlotsByKey)
       setUsedResourcesById(result.usedResourcesById)
       setUsedActionUsesById(result.usedActionUsesById)
+      if (result.rechargeCapsByResourceId) {
+        setRechargeCapsByResourceId(result.rechargeCapsByResourceId)
+      }
       if (result.currentHp != null) setCurrentHp(result.currentHp)
       if (result.tempHp != null) setTempHp(result.tempHp)
       if (result.deathSaves) setDeathSaves(result.deathSaves)
@@ -916,6 +1118,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       usedActionUsesById,
       sheetActions,
       usesResolveContext,
+      rechargeCapsByResourceId,
     ],
   )
 
@@ -1165,8 +1368,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }))
   })()
 
+  const incapacitated = isIncapacitatedByConditions(activeConditions)
+  const incomingAttackNotes = buildIncomingAttackNotes(activeConditions)
+  const belowHalfHpActive = maxHp > 0 && currentHp <= Math.floor(maxHp / 2)
+  const activeSheetToggleSet = new Set(activeSheetToggleIds)
+
   return (
     <SheetRollHistoryProvider characterId={id}>
+      <SheetRollProvider
+        value={{
+          activeConditions,
+          exhaustionLevel,
+          incapacitated,
+        }}
+      >
     <div className="min-h-screen bg-background">
       <MainNav />
 
@@ -1270,7 +1485,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-48 overflow-y-auto"
                         style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
                       >
-                      {SRD_CONDITIONS.map((condition) => (
+                      {SHEET_SELECTABLE_CONDITIONS.map((condition) => (
                         <label
                           key={condition.name}
                           className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm"
@@ -1347,6 +1562,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <SheetPersistentStatsBar
                 armorClass={armorClass}
                 acBreakdown={derived?.acBreakdown ?? []}
+                incomingAttackNotes={incomingAttackNotes}
+                exhaustionLevel={exhaustionLevel}
+                onExhaustionLevelChange={setExhaustionLevel}
                 initiative={initiative}
                 speed={speed}
                 maxHp={maxHp}
@@ -1379,24 +1597,36 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </select>
                   </label>
                 ) : null}
-                <button
-                  type="button"
-                  aria-pressed={sheetToggles.while_raging}
-                  onClick={() =>
-                    setSheetToggles((current) => ({
-                      ...current,
-                      while_raging: !current.while_raging,
-                    }))
-                  }
-                  className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
-                    sheetToggles.while_raging
-                      ? "border-destructive/50 bg-destructive/15 text-destructive"
-                      : "border-border bg-card text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {sheetToggles.while_raging ? "Raging" : "Not raging"}
-                </button>
-                <SheetRestButtons onRest={handleRest} compact />
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {MANUAL_SHEET_TOGGLES.map((toggle) => {
+                    const active = activeSheetToggleIds.includes(toggle.id)
+                    return (
+                      <button
+                        key={toggle.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => toggleSheetToggle(toggle.id)}
+                        className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+                          active
+                            ? "border-destructive/50 bg-destructive/15 text-destructive"
+                            : "border-border bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {active ? toggle.label : `Not ${toggle.label.toLowerCase()}`}
+                      </button>
+                    )
+                  })}
+                  {belowHalfHpActive ? (
+                    <span className="min-h-11 inline-flex items-center rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      Below half HP
+                    </span>
+                  ) : null}
+                </div>
+                <SheetRestButtons
+                  onRest={handleRest}
+                  onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
+                  compact
+                />
               </div>
             </div>
           </div>
@@ -1448,7 +1678,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               </span>
                             )}
                             <span className="font-bold tabular-nums w-7 text-right">{formatMod(mod)}</span>
-                            <D20RollButton modifier={mod} title={`Roll ${skill.name}`} />
+                            <D20RollButton
+                              modifier={mod}
+                              title={`Roll ${skill.name}`}
+                              rollContext={{
+                                kind: "skill",
+                                skillName: skill.name,
+                                ability: skill.ability as AbilityScoreKey,
+                              }}
+                            />
                           </span>
                         </div>
                       )
@@ -1479,6 +1717,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <D20RollButton
                               modifier={mod}
                               title={`${ABILITY_LABELS[key]} ability check`}
+                              rollContext={{ kind: "ability", ability: key }}
                             />
                           </div>
                         </div>
@@ -1585,6 +1824,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     resourceEntries={resourceEntries}
                     usedResourcesById={usedResourcesById}
                     onResourceUsedChange={setUsedResourcesById}
+                    incapacitated={incapacitated}
+                    psiLimit={psiLimit}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
@@ -1652,6 +1893,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     <D20RollButton
                                       modifier={mod}
                                       title={`Roll ${skillName} (${ABILITY_ABBREVIATIONS[entry.ability]}) — ${entry.featureName}`}
+                                      rollContext={{
+                                        kind: "skill",
+                                        skillName,
+                                        ability: entry.ability,
+                                      }}
                                     />
                                   </span>
                                 </div>
@@ -1735,6 +1981,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     resourceEntries={resourceEntries}
                     usedResourcesById={usedResourcesById}
                     onResourceUsedChange={setUsedResourcesById}
+                    incapacitated={incapacitated}
+                    psiLimit={psiLimit}
                   />
                   {!equippedWeapon && !combatActions.length ? (
                     <p className="text-xs text-muted-foreground italic">
@@ -1811,7 +2059,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <span>Spell Attack</span>
                             <div className="flex items-center gap-2">
                               <span className="font-bold tabular-nums">{formatMod(spellAttackMod!)}</span>
-                              <D20RollButton modifier={spellAttackMod!} title="Roll spell attack" />
+                              <D20RollButton
+                                modifier={spellAttackMod!}
+                                title="Roll spell attack"
+                                rollContext={{ kind: "attack" }}
+                              />
                             </div>
                           </div>
                         </>
@@ -1870,7 +2122,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               <span>{ability}</span>
                               <div className="flex items-center gap-2">
                                 <span className="font-bold tabular-nums">{formatMod(mod)}</span>
-                                <D20RollButton modifier={mod} title={`Roll ${ability} save`} />
+                                <D20RollButton
+                                  modifier={mod}
+                                  title={`Roll ${ability} save`}
+                                  rollContext={{
+                                    kind: "save",
+                                    ability: ability.toLowerCase() as AbilityScoreKey,
+                                  }}
+                                />
                               </div>
                             </div>
                           )
@@ -1978,6 +2237,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "features" && (
             <div className="columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid">
+              {magicItemPowers.length > 0 ? (
+                <MagicItemPowersPanel
+                  powers={magicItemPowers}
+                  activeToggleIds={activeSheetToggleSet}
+                  onTogglePower={toggleSheetToggle}
+                />
+              ) : null}
               {classDetails.map((entry) => {
                 const classFeatures = ((entry.class?.features as
                   | import("@/lib/types").Feature[]
@@ -2227,9 +2493,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             spellAttackMod={spellAttackMod}
             activeConcentration={getActiveConcentration(activeConditions)}
             onClose={() => setSelectedSpell(null)}
+            psiLimit={psiLimit}
+            castCost={spellCastCost}
+            metamagicOptions={spellCastCost?.castKind === "pool" ? metamagicOptions : []}
+            selectedMetamagicIds={selectedMetamagicIds}
+            onMetamagicChange={setSelectedMetamagicIds}
             onCast={(result) => {
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
+              }
+              if (result.psiPointsSpent && pointPoolClassDetail?.class) {
+                const pool = getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
+                if (pool) {
+                  const resourceId = `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
+                  setUsedResourcesById((prev) => ({
+                    ...prev,
+                    [resourceId]: (prev[resourceId] ?? 0) + result.psiPointsSpent!,
+                  }))
+                }
+              }
+              if (result.arcanumUsed) {
+                const arcanumEntry = resourceEntries.find((entry) =>
+                  /innate arcanum/i.test(entry.name),
+                )
+                if (arcanumEntry) {
+                  setUsedResourcesById((prev) => ({
+                    ...prev,
+                    [arcanumEntry.id]: (prev[arcanumEntry.id] ?? 0) + 1,
+                  }))
+                }
               }
               if (result.slotUsed && primarySpellSlotTable) {
                 const key = spellSlotTableKey(primarySpellSlotTable)
@@ -2246,6 +2538,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             }}
             canUseSlot={
               selectedSpell.level === 0 ||
+              spellCastCost?.mode === "point_pool" ||
               (primarySpellSlotTable != null &&
                 (() => {
                   const key = spellSlotTableKey(primarySpellSlotTable)
@@ -2288,6 +2581,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       </AnimatePresence>
       <SiteFooter />
     </div>
+      </SheetRollProvider>
     </SheetRollHistoryProvider>
   )
 }

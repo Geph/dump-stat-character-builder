@@ -2,6 +2,7 @@ import type { UsesConfig } from "@/lib/types"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { normalizeBonusByLevel } from "@/lib/compendium/bonus-by-level"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
+import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import {
   MARTIAL_WEAPONS_LABEL,
   type WeaponProficiencyMode,
@@ -260,7 +261,7 @@ export interface CharacteristicModifierBase {
   requiresSheetToggle?: SheetToggleKey
 }
 
-export type SheetToggleKey = "while_raging" | "below_half_hp"
+export type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 
 export type AcFormulaOption = {
   id: string
@@ -411,6 +412,8 @@ export interface RollModifierEntry {
   bonus: number
   target: string
   customTarget?: string
+  /** Bonus applies only when the target creature has one of these types. */
+  onlyVsCreatureTypes?: string[]
   /** Lowest d20 total that counts as a critical hit for this attack type (default 20). */
   criticalHitMinimum?: number | null
   /** Level-scaled critical hit minimum (fixed = lowest d20 that crits). */
@@ -569,6 +572,8 @@ export interface SpellsKnownChoiceGrant {
   level: number
   /** How many spells the player chooses at this level. */
   count: number
+  /** Class level when this grant becomes available (Innate Arcanum tiers). */
+  unlocksAtClassLevel?: number
   /** Optional per-grant class list override; otherwise uses spellListClassOptions + player pick. */
   classNames?: string[]
   /** Player may pick from any prepared-caster class list (Magical Secrets). */
@@ -752,6 +757,11 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
   hpBelowFraction?: number | null
   /** Minimum HP required (e.g. 1 = not at 0). */
   hpAtLeast?: number | null
+  /** Restore uses from this class resource pool (reduce used count). */
+  restoreResourceKey?: string | null
+  restoreResourceAmount?: number | null
+  /** Skip when any of these conditions are active (e.g. Incapacitated). */
+  blockedByConditions?: string[]
   effect?: NestedModifierEffect | null
 }
 
@@ -825,6 +835,8 @@ export interface SpellListAccessCharacteristic extends CharacteristicModifierBas
 export interface SpellcastingAbilityCharacteristic extends CharacteristicModifierBase {
   type: "spellcasting_ability"
   ability: AbilityScoreKey
+  /** Player picks one of these abilities at build time (e.g. Elven Lineage Int/Wis/Cha). */
+  abilityOptions?: AbilityScoreKey[]
 }
 
 export interface UsesCharacteristic extends CharacteristicModifierBase {
@@ -1300,6 +1312,9 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       hpBelowFraction: raw.hpBelowFraction ?? null,
       hpAtLeast: raw.hpAtLeast ?? null,
+      restoreResourceKey: raw.restoreResourceKey ?? null,
+      restoreResourceAmount: raw.restoreResourceAmount ?? null,
+      blockedByConditions: raw.blockedByConditions ?? [],
       effect: raw.effect ?? null,
     }
   }
@@ -2119,12 +2134,28 @@ function weaponMatchesAttackTarget(
   }
 }
 
+function creatureTypeMatches(
+  entry: RollModifierEntry,
+  targetCreatureType?: string,
+): boolean {
+  if (!entry.onlyVsCreatureTypes?.length) return true
+  const needle = targetCreatureType?.trim().toLowerCase()
+  if (!needle) return false
+  return entry.onlyVsCreatureTypes.some((type) => type.trim().toLowerCase() === needle)
+}
+
 export function sumAttackRollModifiers(
   aggregated: AggregatedCharacteristics,
-  options?: { subcategory?: string; properties?: string[]; unarmed?: boolean },
+  options?: {
+    subcategory?: string
+    properties?: string[]
+    unarmed?: boolean
+    targetCreatureType?: string
+  },
 ): number {
   let bonus = 0
   for (const entry of aggregated.attackRollModifiers) {
+    if (!creatureTypeMatches(entry, options?.targetCreatureType)) continue
     const target = resolveRollModifierTarget(entry)
     if (options?.unarmed) {
       if (target === "all" || target === "unarmed" || target.includes("unarmed")) {
@@ -2141,11 +2172,18 @@ export function sumAttackRollModifiers(
 
 export function sumDamageRollModifiers(
   aggregated: AggregatedCharacteristics,
-  options?: { subcategory?: string; properties?: string[]; damageType?: string; unarmed?: boolean },
+  options?: {
+    subcategory?: string
+    properties?: string[]
+    damageType?: string
+    unarmed?: boolean
+    targetCreatureType?: string
+  },
 ): number {
   let bonus = 0
   const damageType = options?.damageType?.toLowerCase() ?? ""
   for (const entry of aggregated.damageRollModifiers) {
+    if (!creatureTypeMatches(entry, options?.targetCreatureType)) continue
     const target = resolveRollModifierTarget(entry)
     if (options?.unarmed) {
       if (target === "all" || target === "unarmed" || target.includes("unarmed")) {

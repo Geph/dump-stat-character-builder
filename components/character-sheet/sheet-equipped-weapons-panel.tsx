@@ -68,6 +68,7 @@ function WeaponAttackCard({
               modifier={attack.attackBonus}
               title={`${weapon.name} attack`}
               breakdown={attack.attackBreakdown}
+              rollContext={{ kind: "attack" }}
             />
           </div>
           {damageExpression ? (

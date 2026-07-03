@@ -39,9 +39,16 @@ export const classes = mysqlTable("classes", {
   starting_equipment: json("starting_equipment"),
   starting_equipment_groups: json("starting_equipment_groups"),
   starting_gold: int("starting_gold").default(0),
+  multiclass_prerequisites: json("multiclass_prerequisites").$type<
+    { ability: string; minimum: number }[]
+  >(),
+  multiclass_proficiencies_gained: json("multiclass_proficiencies_gained").$type<string[]>(),
   features: json("features").$type<unknown[]>().default([]),
   class_resources: json("class_resources").$type<unknown[]>().default([]),
   spellcasting: json("spellcasting"),
+  special_ability: json("special_ability").$type<
+    import("@/lib/types").DndClass["special_ability"]
+  >(),
   ...compendiumMeta,
 })
 
@@ -187,6 +194,18 @@ export const customAbilities = mysqlTable("custom_abilities", {
   companion_stat_block: json("companion_stat_block").$type<
     import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
   >(),
+  psionic_augments: json("psionic_augments").$type<
+    import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig
+  >(),
+  casting_time: varchar("casting_time", { length: 128 }),
+  range: varchar("range", { length: 255 }),
+  components: json("components").$type<string[]>(),
+  duration: varchar("duration", { length: 255 }),
+  concentration: boolean("concentration"),
+  is_choice: boolean("is_choice"),
+  choices: json("choices").$type<import("@/lib/types").FeatureChoice>(),
+  level_requirement: int("level_requirement"),
+  ability_role: varchar("ability_role", { length: 32 }),
   is_system: boolean("is_system").notNull().default(false),
   modifier_catalog: json("modifier_catalog").$type<import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[]>().default([]),
   icon: varchar("icon", { length: 255 }),

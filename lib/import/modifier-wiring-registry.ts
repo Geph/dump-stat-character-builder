@@ -31,6 +31,7 @@ export const AI_MECHANIC_KINDS = [
   "check_roll_modifier",
   "extra_attack",
   "grant_feat",
+  "spellcasting_ability",
 ] as const
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
@@ -46,7 +47,9 @@ export type ModifierWiringEntry = {
 }
 
 const FEAT_CATEGORIES_FOR_IMPORT = FEAT_PICK_CATEGORIES.filter((category) =>
-  ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"].includes(category),
+  ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact", "Metamagic", "Mystic Technique", "Eldritch Invocation"].includes(
+    category,
+  ),
 )
 
 /** Description-phrase rules — must cover every FEATURE_MODIFIER_RULES id. */
@@ -280,6 +283,22 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "If you begin your turn with less than half of your hit points remaining, but at least 1 hit point, you regain hit points equal to 5 + your Constitution modifier.",
     ],
     notes: "hpBelowFraction: 0.5, nested heal_self fixed + ability modifier",
+  },
+  {
+    ruleId: "resource.turn_start_regain_ki",
+    trigger: "description",
+    catalog: "cat_char_turn_start_trigger",
+    examples: [
+      "regain 1 Ki at the start of each of your turns in combat, so long as you are not Incapacitated",
+    ],
+    notes: "restoreResourceKey + restoreResourceAmount; blockedByConditions when Incapacitated mentioned",
+  },
+  {
+    ruleId: "technique.on_hit_once_per_turn",
+    trigger: "description",
+    catalog: "cat_char_on_hit_trigger",
+    examples: ["once per turn when you hit a creature with an attack, you can spend 1 Ki to deal extra damage"],
+    notes: "oncePerTurn: true, spendResourceKey: ki_points",
   },
   {
     ruleId: "check.advantage.initiative",
@@ -577,6 +596,25 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'featCategories: ["General"]',
   },
   {
+    ruleId: "grant.asi_classic",
+    trigger: "description",
+    catalog: "cat_char_ability_scores",
+    examples: [
+      "increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1",
+    ],
+    notes: "mode: asi_pool, points: 2 — overrides grant.asi_by_name when description disagrees",
+  },
+  {
+    ruleId: "grant.asi_2024",
+    trigger: "description",
+    catalog: "cat_char_grant_feat",
+    examples: [
+      "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify",
+    ],
+    mechanicsKind: "grant_feat",
+    notes: 'featCategories: ["General"] — explicit 2024 ASI phrasing',
+  },
+  {
     ruleId: "ac.bonus.while_armored",
     trigger: "description",
     catalog: "cat_char_ac",
@@ -614,6 +652,38 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: ["you can reduce the damage taken by 2"],
     notes:
       "Flat damage reduction (e.g. Warden Mystic Bulwark). Defaults to Bludgeoning/Piercing/Slashing; widen damageTypes for all-damage variants. Requires a numeric amount — phrasing like 'reduce the damage by the amount rolled' is intentionally ignored.",
+  },
+  {
+    ruleId: "spellcasting.ability",
+    trigger: "description",
+    catalog: "cat_char_spellcasting_ability",
+    examples: [
+      "Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose when you select this feat)",
+      "Wisdom is your spellcasting ability for this spell",
+    ],
+    mechanicsKind: "spellcasting_ability",
+    notes: "spellcastingAbility: intelligence | wisdom | charisma",
+  },
+  {
+    ruleId: "damage.creature_type",
+    trigger: "description",
+    catalog: "cat_char_damage_roll_modifiers",
+    examples: [
+      "when you hit an Aberration with this weapon, the Aberration takes an extra 2d10 Radiant damage",
+    ],
+    mechanicsKind: "damage_roll_modifiers",
+    notes: "bonusDice + damageType + targetCreatureTypes",
+  },
+  {
+    ruleId: "toggle.conditional_grant",
+    trigger: "description",
+    catalog: "cat_char_*",
+    examples: [
+      "it can choose to grant you the following benefits",
+      "while raging",
+      "while below half hit points",
+    ],
+    notes: 'requiresSheetToggle on mechanics[] — medium confidence; confirm in import review.',
   },
 ]
 
@@ -689,6 +759,7 @@ export const SRD_PRESET_FEATURE_NAMES = [
   "Danger Sense",
   "Fast Movement",
   "Martial Arts",
+  "Mystic Techniques",
   "Improved Critical",
   "Tactical Master",
 ] as const

@@ -6,6 +6,7 @@ import {
 } from "@/lib/compendium/modifier-catalog-refs"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { charInstance, fxInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
+import { asiPool } from "@/lib/compendium/feat-modifier-presets"
 import {
   buildEvasionModifier,
   buildGrantFeatModifier,
@@ -35,7 +36,15 @@ export type FeatureNameModifierRule = {
   confidence: DetectionConfidence
   test: (featureName: string, ctx: DetectFeatureContext) => boolean
   build: (ctx: DetectFeatureContext) => LinkedModifierInstance | null
+  /** When description matches, skip this name rule (phrase rules win). */
+  suppressWhenDescriptionMatches?: RegExp[]
 }
+
+export const CLASSIC_ASI_PHRASE =
+  /increase one ability score of your choice by 2,?\s+or you can increase two ability scores of your choice by 1/i
+
+export const FEAT_ASI_2024_PHRASE =
+  /gain the Ability Score Improvement feat or another feat of your choice for which you qualify/i
 
 const ABILITY_WORD_TO_KEY: Record<string, AbilityScoreKey> = {
   strength: "strength",
@@ -126,6 +135,7 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
     confidence: "high",
     test: (featureName) => /ability score improvement/i.test(featureName),
     build: () => grantFeatInstance(["General"], "General feat"),
+    suppressWhenDescriptionMatches: [CLASSIC_ASI_PHRASE],
   },
   {
     id: "grant.epic_boon_by_name",
@@ -548,6 +558,50 @@ function parseAbilityScoreKeyFromWord(word: string): "STR" | "DEX" | "CON" | "IN
     charisma: "CHA",
   }
   return map[normalized] ?? null
+}
+
+function buildWarriorSpiritTurnStartModifier(
+  ctx: DetectFeatureContext,
+  text: string,
+): LinkedModifierInstance | null {
+  const match = text.match(
+    /regain\s+(\d+)\s+ki\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
+  )
+  if (!match) return null
+  const amount = parseInt(match[1], 10) || 1
+  const blockedByConditions = /incapacitated/i.test(text) ? ["Incapacitated"] : []
+
+  return charInstance(newInstanceId(), characteristicCatalogRefId("turn_start_trigger"), [
+    {
+      id: modId(instanceKey(ctx, "warriors_spirit")),
+      type: "turn_start_trigger",
+      restoreResourceKey: "ki_points",
+      restoreResourceAmount: amount,
+      blockedByConditions,
+      label: `Regain ${amount} Ki at turn start`,
+    },
+  ])
+}
+
+function buildTechniqueOnHitModifier(
+  ctx: DetectFeatureContext,
+  text: string,
+): LinkedModifierInstance | null {
+  const match = text.match(
+    /once per turn when you hit[\s\S]{0,200}?\b(?:spend|expend)\s+(\d+)\s+ki\b/i,
+  )
+  if (!match) return null
+  const amount = parseInt(match[1], 10) || 1
+  return charInstance(newInstanceId(), characteristicCatalogRefId("on_hit_trigger"), [
+    {
+      id: modId(instanceKey(ctx, "technique_on_hit")),
+      type: "on_hit_trigger",
+      oncePerTurn: true,
+      spendResourceKey: "ki_points",
+      spendResourceAmount: amount,
+      label: "Mystic Technique (on hit)",
+    },
+  ])
 }
 
 function buildTurnStartLowHpHealModifier(
@@ -1719,5 +1773,87 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: "Spend psi points",
         },
       ]),
+  },
+  {
+    id: "spellcasting.ability",
+    confidence: "high",
+    test:
+      /\b(Intelligence|Wisdom|Charisma)(?:,\s*(?:Intelligence|Wisdom|Charisma))*\s+is your spellcasting ability\b/i,
+    build: (match, ctx) => {
+      const ability = parseAbilityWord(match[1])
+      if (!ability) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("spellcasting_ability"), [
+        {
+          id: modId(instanceKey(ctx, "spellcasting")),
+          type: "spellcasting_ability",
+          ability,
+          label: `${match[1]} spellcasting`,
+        },
+      ])
+    },
+  },
+  {
+    id: "damage.creature_type",
+    confidence: "high",
+    test:
+      /when you hit an?\s+([A-Za-z]+)\s+with this weapon,?\s+the\s+\1\s+takes\s+an extra\s+(\d+d\d+)\s+([A-Za-z]+)\s+damage/i,
+    build: (match, ctx) => {
+      const creatureType = titleCaseWords(match[1])
+      const dice = match[2]
+      const damageType = titleCaseWords(match[3])
+      return charInstance(newInstanceId(), characteristicCatalogRefId("damage_roll_modifiers"), [
+        {
+          id: modId(instanceKey(ctx, "creature_damage")),
+          type: "damage_roll_modifiers",
+          entries: [
+            {
+              bonus: 0,
+              target: "all",
+              onlyVsCreatureTypes: [creatureType],
+              bonusDiceWhenModifierIncluded: dice,
+            },
+          ],
+          label: `Extra ${dice} ${damageType} vs ${creatureType}`,
+        },
+      ])
+    },
+  },
+  {
+    id: "toggle.conditional_grant",
+    confidence: "medium",
+    scope: "full",
+    test:
+      /\b(?:it can choose to grant you the following benefits|while raging|while below half hit points)\b/i,
+    build: () => null,
+  },
+  {
+    id: "grant.asi_classic",
+    confidence: "high",
+    scope: "full",
+    test: CLASSIC_ASI_PHRASE,
+    build: (ctx) =>
+      asiPool(`modinst_${instanceKey(ctx, "asi_classic")}`, 2, "Ability Score Improvement (+2 or +1/+1)"),
+  },
+  {
+    id: "grant.asi_2024",
+    confidence: "high",
+    scope: "full",
+    test: FEAT_ASI_2024_PHRASE,
+    build: (ctx) =>
+      grantFeatInstance(["General"], `General feat (${instanceKey(ctx, "asi_2024")})`),
+  },
+  {
+    id: "technique.on_hit_once_per_turn",
+    confidence: "high",
+    scope: "full",
+    test: /once per turn when you hit[\s\S]{0,200}?\b(?:spend|expend)\s+\d+\s+ki\b/i,
+    build: (_match, ctx, text) => buildTechniqueOnHitModifier(ctx, text),
+  },
+  {
+    id: "resource.turn_start_regain_ki",
+    confidence: "high",
+    scope: "full",
+    test: /regain\s+\d+\s+ki\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
+    build: (_match, ctx, text) => buildWarriorSpiritTurnStartModifier(ctx, text),
   },
 ]

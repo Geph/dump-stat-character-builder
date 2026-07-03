@@ -54,6 +54,10 @@ export interface FeatureChoice {
     linkedModifiers?: LinkedModifierInstance[]
     /** Optional resource cost to select/use this option (e.g. spend a point). */
     resourceCost?: number | null
+    /** Freeform prerequisite text (feat-style), e.g. "Slayer I". */
+    prerequisite?: string | null
+    /** When true, the same option may be selected more than once. */
+    repeatable?: boolean | null
   }[]
   count: number // how many to choose
   /** Picks may be swapped out when finishing a rest (e.g. Fighting Style, Weapon Mastery). */
@@ -64,6 +68,11 @@ export interface FeatureChoice {
    * is chosen "Whenever you finish a Long Rest"). Defaults to "long".
    */
   swapRestType?: "short" | "long" | null
+  /**
+   * When set, builder aggregates options dynamically instead of using the static `options` array.
+   * `known_discipline_talents` — union of talent lists from disciplines the character knows.
+   */
+  optionsSource?: "known_discipline_talents" | "fusion_talents" | "class_knacks" | null
   /**
    * Links the choice to a class resource whose value scales the number of picks
    * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
@@ -386,6 +395,20 @@ export interface DndClass {
   starting_equipment: unknown
   starting_equipment_groups: StartingEquipmentGroup[] | null
   starting_gold: number | null
+  /** Multiclass ability minimums (flat AND — legacy). */
+  multiclass_prerequisites?: { ability: string; minimum: number }[] | null
+  /** Multiclass prerequisites as AND-of-OR groups (e.g. WIS 13 AND (DEX 13 OR STR 13)). */
+  multiclass_prerequisite_groups?: {
+    options: { ability: string; minimum: number }[]
+  }[] | null
+  /** Proficiencies gained when multiclassing into this class. */
+  multiclass_proficiencies_gained?: string[] | null
+  /** Class-wide save DC governing stat for non-spell subsystems (Techniques, Psionics). */
+  special_ability?: {
+    save_dc_ability: string
+    label?: string | null
+    dc_formula?: "8_plus_prof_plus_ability_mod"
+  } | null
   features: Feature[]
   class_resources?: ClassResource[] | null
   spellcasting: {
@@ -400,6 +423,16 @@ export interface DndClass {
     pact_magic?: boolean
     starts_at?: number
     progression?: SpellProgressionEntry[]
+    /** Per-level spell slot counts from a class table (overrides SRD tables when set). */
+    explicit_slot_progression?: { level: number; slots: number[] }[] | null
+    /** Point-pool casting (e.g. Alternate Sorcerer) — spends class resource instead of slots. */
+    point_pool?: {
+      resource_key: string
+      cost_by_level: Record<number, number>
+      base_cost_cap_resource_key?: string
+      metamagic_cost_cap?: "proficiency_bonus"
+      replaces_spell_slots: boolean
+    } | null
   } | null
   icon: string | null
   accent_color?: string | null
@@ -440,6 +473,10 @@ export interface RechargeRule {
   rest: RestType
   /** Uses restored on this rest; omit for full pool. */
   amount?: number | null
+  /** Formula-based restore when amount is not a fixed literal. */
+  amountFormula?: "half_class_level_round_up" | null
+  /** Cap how many times this recharge fires per long rest (e.g. once per long rest on short rest). */
+  maxPerLongRest?: number | null
 }
 
 export interface UsesConfig {
@@ -492,6 +529,11 @@ export interface UsesConfig {
   restoreBySpellSlot?: { minSpellLevel: number; restores: number }
   /** Spend a class resource (no action) to restore uses from this pool. */
   restoreByResource?: { resourceKey: string; resourceAmount?: number; restores: number }
+  /** Replace recharge rules at or above a class level (e.g. Tireless upgrades Quarry). */
+  rechargeOverrides?: {
+    atClassLevel: number
+    recharges: RechargeRule[]
+  }[]
 }
 
 export interface CustomAbility {
@@ -514,6 +556,20 @@ export interface CustomAbility {
   companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
   /** Multiple stat blocks when one ability grants several forms (e.g. Druid Beast forms). */
   companion_stat_blocks?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate[] | null
+  /** Psi-point empower options (KibblesTasty Psion psionic powers). */
+  psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
+  casting_time?: string | null
+  range?: string | null
+  components?: string[] | null
+  duration?: string | null
+  concentration?: boolean
+  isChoice?: boolean
+  choices?: FeatureChoice | null
+  level_requirement?: number | null
+  /** discipline | psionic_power | talent_pool | knack — guides builder aggregation. */
+  ability_role?: "discipline" | "psionic_power" | "talent_pool" | "knack" | null
+  /** When true, the character may learn this knack more than once. */
+  repeatable?: boolean | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null

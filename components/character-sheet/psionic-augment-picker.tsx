@@ -5,16 +5,21 @@ import {
   augmentPointsCost,
   formatPsionicAugmentCost,
   formatPsionicAugmentSelectionSummary,
-  parsePsionicAugmentsFromDescription,
   totalPsionicAugmentCost,
   type PsionicAugmentSelection,
   type PsionicAugmentsConfig,
 } from "@/lib/compendium/parse-psionic-augments"
-import type { Spell } from "@/lib/types"
+import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
+import type { CustomAbility, Spell } from "@/lib/types"
 
 export function resolveSpellPsionicAugments(spell: Spell): PsionicAugmentsConfig | null {
-  if (spell.psionic_augments?.augments?.length) return spell.psionic_augments
-  return parsePsionicAugmentsFromDescription(spell.description, { powerName: spell.name })
+  return resolvePsionicAugments(spell)
+}
+
+export function resolveAbilityPsionicAugments(
+  ability: Pick<CustomAbility, "name" | "description" | "psionic_augments">,
+): PsionicAugmentsConfig | null {
+  return resolvePsionicAugments(ability)
 }
 
 type PsionicAugmentPickerProps = {
@@ -22,6 +27,7 @@ type PsionicAugmentPickerProps = {
   selections: PsionicAugmentSelection[]
   onChange: (next: PsionicAugmentSelection[]) => void
   psiLimit?: number | null
+  readOnly?: boolean
 }
 
 function defaultPointsForAugment(config: PsionicAugmentsConfig, augmentId: string): number {
@@ -36,6 +42,7 @@ export function PsionicAugmentPicker({
   selections,
   onChange,
   psiLimit,
+  readOnly = false,
 }: PsionicAugmentPickerProps) {
   const selectedIds = useMemo(() => new Set(selections.map((row) => row.augmentId)), [selections])
   const totalCost = totalPsionicAugmentCost(config, selections)
@@ -69,9 +76,11 @@ export function PsionicAugmentPicker({
             Psi Augments
           </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            {config.allowMultiple
-              ? "Select one or more empower options before casting."
-              : "Select one empower option before casting."}
+            {readOnly
+              ? "Optional psi-point empower options for this power."
+              : config.allowMultiple
+                ? "Select one or more empower options before casting."
+                : "Select one empower option before casting."}
           </p>
         </div>
         {selections.length ? (
@@ -100,11 +109,12 @@ export function PsionicAugmentPicker({
                   : "border-border/70 bg-background/60"
               }`}
             >
-              <label className="flex items-start gap-2 cursor-pointer">
+              <label className={`flex items-start gap-2 ${readOnly ? "" : "cursor-pointer"}`}>
                 <input
                   type={config.allowMultiple ? "checkbox" : "radio"}
                   name={`psionic-augment-${config.resourceKey}`}
                   checked={isSelected}
+                  disabled={readOnly}
                   onChange={() => toggleAugment(augment.id)}
                   className="mt-1 accent-violet-500"
                 />
@@ -129,6 +139,7 @@ export function PsionicAugmentPicker({
                     min={min}
                     max={max}
                     value={selected?.pointsSpent ?? min}
+                    disabled={readOnly}
                     onChange={(event) =>
                       setPoints(augment.id, parseInt(event.target.value, 10) || min)
                     }

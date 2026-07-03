@@ -5,6 +5,7 @@ import {
 } from "@/lib/compendium/custom-feat-modifier-presets"
 import type { FeatModifierPreset } from "@/lib/compendium/feat-modifier-presets"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { shouldSkipFeatPreset } from "@/lib/import/resolve-feat-preset-conflict"
 import type { Feature } from "@/lib/types"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -64,6 +65,10 @@ export function enrichCustomFeatRow(row: Record<string, unknown>): Record<string
   const preset: FeatModifierPreset | undefined = CUSTOM_FEAT_MODIFIER_PRESETS[name]
 
   if (preset && !featHasModifierConfig(row)) {
+    const description = typeof row.description === "string" ? row.description : ""
+    if (shouldSkipFeatPreset(name, description, preset)) {
+      return applyFeatMechanicalDetection(row)
+    }
     if (preset.isChoice && preset.choices) {
       return {
         ...row,

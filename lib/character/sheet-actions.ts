@@ -1,7 +1,9 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import type { Feature, FeatureActivation, Species, UsesConfig } from "@/lib/types"
+import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
+import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
+import type { CustomAbility, Feature, FeatureActivation, Species, UsesConfig } from "@/lib/types"
 
 export type ActionEconomyKind = "action" | "bonus" | "reaction"
 
@@ -21,6 +23,14 @@ export type SheetActionEntry = {
   classId?: string | null
   /** Class resource key consumed when the action is used, if any. */
   classResourceKey?: string | null
+  /** Custom ability backing this action, when surfaced from the compendium. */
+  customAbilityId?: string | null
+  psionicAugments?: PsionicAugmentsConfig | null
+  castingTime?: string | null
+  range?: string | null
+  components?: string[] | null
+  duration?: string | null
+  concentration?: boolean
 }
 
 /** Trigger characteristics that represent a player-elected reaction when `useReaction` is set. */
@@ -68,6 +78,16 @@ const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
   { re: /\bas a reaction\b/i, kind: "reaction" },
   { re: /\bas an? (?:magic )?action\b/i, kind: "action" },
 ]
+
+function kindsFromCastingTime(castingTime: string | null | undefined): ActionEconomyKind[] {
+  if (!castingTime) return []
+  const text = castingTime.toLowerCase()
+  const kinds = new Set<ActionEconomyKind>()
+  if (/\bbonus\s+action\b/.test(text)) kinds.add("bonus")
+  if (/\breaction\b/.test(text)) kinds.add("reaction")
+  if (/\b(?:magic\s+)?action\b/.test(text) && !/\bbonus\s+action\b/.test(text)) kinds.add("action")
+  return [...kinds]
+}
 
 function stripHtml(text: string): string {
   return text.replace(/<[^>]+>/g, " ")
@@ -193,10 +213,86 @@ function pushFeatureActions(
   }
 }
 
+function isCustomAbilityAction(ability: CustomAbility): boolean {
+  if (ability.ability_role === "discipline" || ability.ability_role === "talent_pool") {
+    return false
+  }
+  if (ability.ability_role === "psionic_power") return true
+  if (ability.psionic_augments?.augments?.length) return true
+  if (ability.casting_time) return true
+  const item: ActivatableItem = {
+    name: ability.name,
+    description: ability.description,
+    limitedUses: ability.uses,
+    linkedModifiers: ability.linked_modifiers ?? undefined,
+  }
+  if (kindsFromLinkedModifiers(item.linkedModifiers).length) return true
+  if (kindsFromText(item.description).length) return true
+  return false
+}
+
+function customAbilitySourceLabel(ability: CustomAbility): string {
+  if (ability.attached_to_type === "class" && ability.source) return ability.source
+  return ability.source?.trim() || "Custom Ability"
+}
+
+function pushCustomAbilityActions(
+  actions: SheetActionEntry[],
+  abilities: CustomAbility[] | undefined,
+  levelCap: number,
+  classId: string | null,
+) {
+  for (const ability of abilities ?? []) {
+    if (!isCustomAbilityAction(ability)) continue
+    if (ability.level_requirement != null && ability.level_requirement > levelCap) continue
+
+    const item: ActivatableItem = {
+      name: ability.name,
+      description: ability.description,
+      limitedUses: ability.uses,
+      linkedModifiers: ability.linked_modifiers ?? undefined,
+    }
+
+    const castingKinds = kindsFromCastingTime(ability.casting_time)
+    const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
+    const kinds = castingKinds.length
+      ? castingKinds
+      : linkedKinds.length
+        ? linkedKinds
+        : kindsFromText(item.description)
+
+    if (!kinds.length && ability.ability_role === "psionic_power") {
+      kinds.push("action")
+    }
+    if (!kinds.length) continue
+
+    actions.push({
+      id: `ability:${ability.id}`,
+      name: ability.name,
+      sourceLabel: customAbilitySourceLabel(ability),
+      kinds,
+      category: classifyActionCategory(item),
+      limitedUses: ability.uses,
+      classLevel: levelCap,
+      description: ability.description ?? null,
+      classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
+      classResourceKey: resolveActionResourceKey(item),
+      customAbilityId: ability.id,
+      psionicAugments: resolvePsionicAugments(ability),
+      castingTime: ability.casting_time ?? null,
+      range: ability.range ?? null,
+      components: ability.components ?? null,
+      duration: ability.duration ?? null,
+      concentration: ability.concentration,
+    })
+  }
+}
+
 export function collectSheetActions(params: {
   classDetails: CharacterClassDetail[]
   species: Species | null
   backgroundFeature?: ActivatableItem | null
+  customAbilities?: CustomAbility[]
 }): SheetActionEntry[] {
   const actions: SheetActionEntry[] = []
 
@@ -244,6 +340,10 @@ export function collectSheetActions(params: {
       "background",
       null,
     )
+  }
+
+  if (params.customAbilities?.length) {
+    pushCustomAbilityActions(actions, params.customAbilities, Math.max(totalLevel, 1), null)
   }
 
   return actions

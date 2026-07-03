@@ -95,7 +95,7 @@ export function characterToBuilderState(
 
   return {
     currentStep: 1,
-    maxStepReached: BUILDER_STEP_IDS.REVIEW,
+    maxStepReached: BUILDER_STEP_IDS.DETAILS,
     character: characterToDraft(character),
     abilityMethod: "pointbuy",
     pointsRemaining: 27,
