@@ -72,7 +72,14 @@ export interface FeatureChoice {
    * When set, builder aggregates options dynamically instead of using the static `options` array.
    * `known_discipline_talents` — union of talent lists from disciplines the character knows.
    */
-  optionsSource?: "known_discipline_talents" | "fusion_talents" | "class_knacks" | "class_upgrades" | null
+  optionsSource?:
+    | "known_discipline_talents"
+    | "fusion_talents"
+    | "class_knacks"
+    | "class_upgrades"
+    | "class_bomb_formulas"
+    | "class_discoveries"
+    | null
   /**
    * Links the choice to a class resource whose value scales the number of picks
    * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
@@ -479,7 +486,9 @@ export interface RestRechargeRule {
   /** Uses restored on this rest; omit for full pool. */
   amount?: number | null
   /** Formula-based restore when amount is not a fixed literal. */
-  amountFormula?: "half_class_level_round_up" | null
+  amountFormula?: "half_class_level_round_up" | "ability_modifier" | null
+  /** Ability whose modifier is used when amountFormula is ability_modifier. */
+  amountFormulaAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
   /** Cap how many times this recharge fires per long rest (e.g. once per long rest on short rest). */
   maxPerLongRest?: number | null
 }
@@ -548,6 +557,10 @@ export interface UsesConfig {
   restoreBySpellSlot?: { minSpellLevel: number; restores: number }
   /** Spend a class resource (no action) to restore uses from this pool. */
   restoreByResource?: { resourceKey: string; resourceAmount?: number; restores: number }
+  /** When set, some spends from this pool are restricted (e.g. brewing potions only). */
+  spendPurpose?: string | null
+  /** Cross-resource conversions (Hit Dice → Reagents, Reagents → refresh uses, etc.). */
+  resourceConversions?: import("@/lib/character/resource-conversion").ResourceConversionRule[] | null
   /** Replace recharge rules at or above a class level (e.g. Tireless upgrades Quarry). */
   rechargeOverrides?: {
     atClassLevel: number
@@ -585,8 +598,17 @@ export interface CustomAbility {
   isChoice?: boolean
   choices?: FeatureChoice | null
   level_requirement?: number | null
-  /** discipline | psionic_power | talent_pool | knack — guides builder aggregation. */
-  ability_role?: "discipline" | "psionic_power" | "talent_pool" | "knack" | "upgrade" | null
+  /** discipline | psionic_power | talent_pool | knack | bomb_formula | discovery | alchemist_bomb — guides builder aggregation. */
+  ability_role?:
+    | "discipline"
+    | "psionic_power"
+    | "talent_pool"
+    | "knack"
+    | "upgrade"
+    | "bomb_formula"
+    | "discovery"
+    | "alchemist_bomb"
+    | null
   /** When true, the character may learn this knack more than once. */
   repeatable?: boolean | null
   icon: string | null

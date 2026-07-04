@@ -29,6 +29,7 @@ export function applyUsesRest(
   options?: {
     classLevel?: number
     rechargeCapsUsed?: number
+    abilityModifiers?: Partial<Record<string, number>> | null
   },
 ): { used: number; rechargeCapsUsed?: number } {
   if (!uses || max <= 0) return { used: currentUsed }
@@ -44,14 +45,22 @@ export function applyUsesRest(
   if (rule?.maxPerLongRest != null && rule.maxPerLongRest > 0) {
     const usedCaps = options?.rechargeCapsUsed ?? 0
     if (usedCaps >= rule.maxPerLongRest) return { used: currentUsed }
-    const rechargeAmount = resolveRechargeRuleAmount(rule, options?.classLevel ?? null)
+    const rechargeAmount = resolveRechargeRuleAmount(
+      rule,
+      options?.classLevel ?? null,
+      options?.abilityModifiers ?? null,
+    )
     const nextUsed =
       rechargeAmount == null ? 0 : Math.max(0, currentUsed - rechargeAmount)
     return { used: nextUsed, rechargeCapsUsed: usedCaps + 1 }
   }
 
   const rechargeAmount = rule
-    ? resolveRechargeRuleAmount(rule, options?.classLevel ?? null)
+    ? resolveRechargeRuleAmount(
+        rule,
+        options?.classLevel ?? null,
+        options?.abilityModifiers ?? null,
+      )
     : getRechargeAmount(uses, rest)
   if (rechargeAmount == null) return { used: 0 }
   return { used: Math.max(0, currentUsed - rechargeAmount) }
@@ -130,6 +139,7 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     const applied = applyUsesRest(current, entry.uses, rest, max, {
       classLevel: entry.classLevel,
       rechargeCapsUsed: nextRechargeCaps[entry.id] ?? 0,
+      abilityModifiers: resolveContext.abilityModifiers,
     })
     nextResources[entry.id] = applied.used
     if (applied.rechargeCapsUsed != null) {

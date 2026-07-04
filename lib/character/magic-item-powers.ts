@@ -6,9 +6,10 @@ import {
 } from "@/lib/compendium/equipment-magic-modifiers"
 import type { SheetToggleDefinition } from "@/lib/compendium/sheet-toggle-registry"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
-import type { Equipment, FeatureActivation } from "@/lib/types"
+import { readActivationUsesFromInstances } from "@/lib/character/magic-item-activation"
+import type { Equipment, FeatureActivation, UsesConfig } from "@/lib/types"
 
-export type MagicItemPowerKind = "passive" | "conditional" | "uses"
+export type MagicItemPowerKind = "passive" | "conditional" | "uses" | "activation"
 
 export type MagicItemPower = {
   itemId: string
@@ -18,6 +19,7 @@ export type MagicItemPower = {
   kind: MagicItemPowerKind
   toggleId?: string
   activation?: FeatureActivation | null
+  activationUses?: UsesConfig | null
   characteristics: CharacteristicModifier[]
 }
 
@@ -30,11 +32,32 @@ export function collectMagicItemPowers(context: EquipmentMagicContext): MagicIte
   const powers: MagicItemPower[] = []
 
   for (const item of items) {
+    const instances = readMagicEffects(item)
+    const activationUses = readActivationUsesFromInstances(instances)
     const characteristics = characteristicsFromLinkedModifiers(
       context.modifierCatalog,
-      readMagicEffects(item),
+      instances,
       null,
     )
+
+    for (const instance of instances) {
+      if (instance.activation?.action || instance.activation?.bonusAction || instance.activation?.reaction) {
+        const effectLabel =
+          instance.activation.effects?.[0]?.label ??
+          instance.activation.effects?.[0]?.kind ??
+          item.name
+        powers.push({
+          itemId: item.id,
+          itemName: item.name,
+          powerId: instance.instanceId,
+          label: String(effectLabel),
+          kind: "activation",
+          activation: instance.activation,
+          activationUses,
+          characteristics: [],
+        })
+      }
+    }
 
     for (const mod of characteristics) {
       const label = mod.label ?? item.name
@@ -46,6 +69,7 @@ export function collectMagicItemPowers(context: EquipmentMagicContext): MagicIte
           label,
           kind: "conditional",
           toggleId: mod.requiresSheetToggle,
+          activationUses,
           characteristics: [mod],
         })
         continue
@@ -57,6 +81,7 @@ export function collectMagicItemPowers(context: EquipmentMagicContext): MagicIte
           powerId: mod.id,
           label,
           kind: "uses",
+          activationUses: activationUses ?? (mod as { uses?: UsesConfig }).uses ?? null,
           characteristics: [mod],
         })
         continue
@@ -67,6 +92,7 @@ export function collectMagicItemPowers(context: EquipmentMagicContext): MagicIte
         powerId: mod.id,
         label,
         kind: "passive",
+        activationUses,
         characteristics: [mod],
       })
     }

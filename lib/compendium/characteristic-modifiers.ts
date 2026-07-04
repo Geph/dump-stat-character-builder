@@ -172,6 +172,8 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "damage_reduction", label: "Damage Reduction" },
   { value: "spells", label: "Spells per Level (Spell Slots)" },
   { value: "spells_known", label: "Spells Known / Prepared" },
+  { value: "craftable_items", label: "Craftable Items Known" },
+  { value: "held_items_cap", label: "Held Craftable Items Cap" },
   { value: "spell_list_access", label: "Access to Class Spell List" },
   { value: "spellcasting_ability", label: "Spellcasting Ability Modifier" },
   { value: "uses", label: "Uses (Limited Ability / Resource)" },
@@ -416,6 +418,10 @@ export interface RollModifierEntry {
   customTarget?: string
   /** Bonus applies only when the target creature has one of these types. */
   onlyVsCreatureTypes?: string[]
+  /** Target must be at or below half its hit point maximum (Bloodied). */
+  onlyIfTargetBelowHalfHp?: boolean
+  /** Target must be at least this size (Large+ prone riders, etc.). */
+  onlyIfTargetMinSize?: import("@/lib/compendium/characteristic-modifiers").CreatureSizeValue | null
   /** Lowest d20 total that counts as a critical hit for this attack type (default 20). */
   criticalHitMinimum?: number | null
   /** Level-scaled critical hit minimum (fixed = lowest d20 that crits). */
@@ -487,6 +493,18 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   /** On a successful save, target takes half damage (area exploits). */
   saveHalfDamage?: boolean
   rangeFeet?: number | null
+  /** attack vs explode variant when one ability has multiple special_attack modes (Bomb). */
+  attackVariant?: "attack" | "explode" | null
+  /** Linear Prime Bomb scaling: +Nd10 (or formula dice) per resource spent. */
+  resourceScaleKey?: string | null
+  bonusDicePerResource?: string | null
+  maxResourcesSpent?: number | null
+  maxResourcesSpentByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  radiusIncreaseFeetPerResource?: number | null
+  /** Explode save DC uses higher of STR or DEX mod when set. */
+  saveDCAbilityChoice?: "STR" | "DEX" | "higher_str_dex" | null
+  /** Omit positive ability modifier from damage (Explode). */
+  omitPositiveAbilityModFromDamage?: boolean
 }
 
 export interface RestReplacementCharacteristic extends CharacteristicModifierBase {
@@ -597,8 +615,6 @@ export interface SpellsKnownCharacteristic extends CharacteristicModifierBase {
   spells: SpellsKnownEntry[]
   /** Player chooses spells at runtime (e.g. Magic Initiate cantrips / level-1 spell). */
   choiceGrants?: SpellsKnownChoiceGrant[]
-  /** Class spell lists the player may choose from when playerPicksSpellList is true. */
-  spellListClassOptions?: string[]
   /** Player picks one class list before choosing spells from choiceGrants. */
   playerPicksSpellList?: boolean
   castingAbility?: AbilityScoreKey
@@ -612,6 +628,32 @@ export interface SpellsKnownCharacteristic extends CharacteristicModifierBase {
   concentrationImmuneForSpell?: string | null
   /** Foe Slayer: Hunter's Mark damage die override. */
   markDamageDie?: string | null
+  /** Class spell lists the player may choose from when playerPicksSpellList is true. */
+  spellListClassOptions?: string[]
+}
+
+export type CraftableItemEntry = {
+  itemName: string
+  resourceCost: number
+  unlocksAtClassLevel: number
+  /** Uses per crafted item (e.g. Double Dose healing potions = 2). */
+  usesPerItem?: number | null
+  category?: string | null
+}
+
+/** Known/craftable items with level gates and resource costs (Alchemist potions, etc.). */
+export interface CraftableItemsCharacteristic extends CharacteristicModifierBase {
+  type: "craftable_items"
+  items: CraftableItemEntry[]
+  category?: string | null
+}
+
+/** Aggregatable cap on held craftable items (distinct from resource pool size). */
+export interface HeldItemsCapCharacteristic extends CharacteristicModifierBase {
+  type: "held_items_cap"
+  /** Default held cap = this ability modifier (typically INT). */
+  baseAbility?: AbilityScoreKey | null
+  flatBonus?: number
 }
 
 export interface AuraCharacteristic extends CharacteristicModifierBase {
@@ -687,6 +729,10 @@ export interface OnHitTriggerCharacteristic extends CharacteristicModifierBase {
   excludeCreatureTypes?: string[]
   /** Only affect targets with these creature types when set. */
   includeCreatureTypes?: string[]
+  /** Target must be at or below half its hit point maximum (Bloodied). */
+  onlyIfTargetBelowHalfHp?: boolean
+  /** Target must be at least this size. */
+  onlyIfTargetMinSize?: CreatureSizeValue | null
   /** Maximize weapon damage dice instead of rolling (optional level gate). */
   maximizeWeaponDamage?: boolean
   maximizeWeaponDamageAtLevel?: number | null
@@ -922,6 +968,8 @@ export type CharacteristicModifier =
   | DamageReductionCharacteristic
   | SpellGrantCharacteristic
   | SpellsKnownCharacteristic
+  | CraftableItemsCharacteristic
+  | HeldItemsCapCharacteristic
   | SpellListAccessCharacteristic
   | SpellcastingAbilityCharacteristic
   | UsesCharacteristic
@@ -1202,6 +1250,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       oncePerTurn: raw.oncePerTurn ?? true,
       excludeCreatureTypes: coerceStringArray(raw.excludeCreatureTypes),
       includeCreatureTypes: coerceStringArray(raw.includeCreatureTypes),
+      onlyIfTargetBelowHalfHp: raw.onlyIfTargetBelowHalfHp ?? false,
+      onlyIfTargetMinSize: raw.onlyIfTargetMinSize ?? null,
       maximizeWeaponDamage: raw.maximizeWeaponDamage ?? false,
       maximizeWeaponDamageAtLevel: raw.maximizeWeaponDamageAtLevel ?? null,
       effect: raw.effect ?? null,
@@ -1590,6 +1640,9 @@ export type AggregatedCharacteristics = {
   spellsKnown: AggregatedSpellsKnown[]
   spellListAccess: string[]
   spellcastingAbility: AbilityScoreKey | null
+  craftableItems: CraftableItemEntry[]
+  heldItemsCapBonus: number
+  heldItemsCapAbility: AbilityScoreKey | null
   specialAttacks: SpecialAttackCharacteristic[]
   restReplacement: { restHours: number; replacesLongRest: boolean; description: string } | null
   magicalSleepImmunity: boolean
@@ -1670,6 +1723,9 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   spellsKnown: [],
   spellListAccess: [],
   spellcastingAbility: null,
+  craftableItems: [],
+  heldItemsCapBonus: 0,
+  heldItemsCapAbility: null,
   specialAttacks: [],
   restReplacement: null,
   magicalSleepImmunity: false,
@@ -2030,6 +2086,13 @@ export function aggregateCharacteristics(
           result.spellcastingAbility = mod.castingAbility
         }
         break
+      case "craftable_items":
+        result.craftableItems.push(...mod.items)
+        break
+      case "held_items_cap":
+        if (mod.baseAbility) result.heldItemsCapAbility = mod.baseAbility
+        result.heldItemsCapBonus += mod.flatBonus ?? 0
+        break
       case "spellcasting_ability":
         result.spellcastingAbility = mod.ability
         break
@@ -2164,9 +2227,58 @@ function creatureTypeMatches(
   return entry.onlyVsCreatureTypes.some((type) => type.trim().toLowerCase() === needle)
 }
 
+export type TargetConditionContext = {
+  targetCreatureType?: string
+  targetBelowHalfHp?: boolean
+  targetSize?: CreatureSizeValue | null
+}
+
+const SIZE_ORDER: CreatureSizeValue[] = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
+
+function sizeAtLeast(actual: CreatureSizeValue | null | undefined, minimum: CreatureSizeValue): boolean {
+  if (!actual) return false
+  return SIZE_ORDER.indexOf(actual) >= SIZE_ORDER.indexOf(minimum)
+}
+
+export function targetConditionMatches(
+  entry: {
+    onlyVsCreatureTypes?: string[]
+    onlyIfTargetBelowHalfHp?: boolean
+    onlyIfTargetMinSize?: CreatureSizeValue | null
+  },
+  ctx?: TargetConditionContext,
+): boolean {
+  if (!creatureTypeMatches(entry as RollModifierEntry, ctx?.targetCreatureType)) return false
+  if (entry.onlyIfTargetBelowHalfHp && !ctx?.targetBelowHalfHp) return false
+  if (entry.onlyIfTargetMinSize && !sizeAtLeast(ctx?.targetSize ?? null, entry.onlyIfTargetMinSize)) {
+    return false
+  }
+  return true
+}
+
+export function onHitTriggerMatchesTarget(
+  trigger: OnHitTriggerCharacteristic,
+  ctx?: TargetConditionContext,
+): boolean {
+  if (trigger.includeCreatureTypes?.length) {
+    const needle = ctx?.targetCreatureType?.trim().toLowerCase()
+    if (!needle) return false
+    if (!trigger.includeCreatureTypes.some((type) => type.trim().toLowerCase() === needle)) {
+      return false
+    }
+  }
+  if (trigger.excludeCreatureTypes?.length && ctx?.targetCreatureType) {
+    const needle = ctx.targetCreatureType.trim().toLowerCase()
+    if (trigger.excludeCreatureTypes.some((type) => type.trim().toLowerCase() === needle)) {
+      return false
+    }
+  }
+  return targetConditionMatches(trigger, ctx)
+}
+
 export function sumAttackRollModifiers(
   aggregated: AggregatedCharacteristics,
-  options?: {
+  options?: TargetConditionContext & {
     subcategory?: string
     properties?: string[]
     unarmed?: boolean
@@ -2175,7 +2287,7 @@ export function sumAttackRollModifiers(
 ): number {
   let bonus = 0
   for (const entry of aggregated.attackRollModifiers) {
-    if (!creatureTypeMatches(entry, options?.targetCreatureType)) continue
+    if (!targetConditionMatches(entry, options)) continue
     const target = resolveRollModifierTarget(entry)
     if (options?.unarmed) {
       if (target === "all" || target === "unarmed" || target.includes("unarmed")) {
@@ -2192,7 +2304,7 @@ export function sumAttackRollModifiers(
 
 export function sumDamageRollModifiers(
   aggregated: AggregatedCharacteristics,
-  options?: {
+  options?: TargetConditionContext & {
     subcategory?: string
     properties?: string[]
     damageType?: string
@@ -2203,7 +2315,7 @@ export function sumDamageRollModifiers(
   let bonus = 0
   const damageType = options?.damageType?.toLowerCase() ?? ""
   for (const entry of aggregated.damageRollModifiers) {
-    if (!creatureTypeMatches(entry, options?.targetCreatureType)) continue
+    if (!targetConditionMatches(entry, options)) continue
     const target = resolveRollModifierTarget(entry)
     if (options?.unarmed) {
       if (target === "all" || target === "unarmed" || target.includes("unarmed")) {

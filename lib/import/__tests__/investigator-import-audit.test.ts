@@ -117,16 +117,11 @@ describe("Investigator class import wiring", () => {
     expect(finisher?.uses.dieType).toBe("d8")
   })
 
-  it("links the Holy Trinkets feature to the Trinkets resource", () => {
-    const content = loadInvestigatorFixture()
-    const [enriched] = enrichImportedClassList(
-      content.classes as unknown as Record<string, unknown>[],
-      undefined,
-    )
-    const features = enriched.features as Feature[]
-    const holy = features.find((f) => f.name === "Holy Trinkets")
-    expect(holy?.limitedUses?.type).toBe("class_resource")
-    expect(holy?.limitedUses?.classResourceKey).toBe("trinkets")
+  it("links Holy Trinkets to descriptive text; pool spend is on magic items", () => {
+    const content = enrichImportContentModifiers(loadInvestigatorFixture())
+    const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets")
+    expect(holy?.limitedUses).toBeUndefined()
+    expect(content.equipment?.some((row) => row.name === "Restorative Ankh")).toBe(true)
   })
 
   it("detects trinket spend phrasing", () => {

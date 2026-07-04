@@ -170,6 +170,52 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     spendPatterns: [/\bexpend\s+(\d+)\s+alchemy\s+points?\b/i],
   },
   {
+    resourceKey: "reagents",
+    namePattern: /\breagents?\b/i,
+    displayName: "Reagents",
+    definition:
+      "Alchemist pool spent to throw Bombs, brew potions, and fuel class features. Recharges on a long rest; Reagent Synthesis restores on short rest (INT mod, once per long rest).",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 2 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\b(?:expend|spend|costs?|pay|use)\s+(?:up\s+to\s+)?(\d+)\s+reagents?\b/i,
+      /\b(\d+)\s+reagents?\b[^.]{0,40}\b(?:to|when|per)\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 2 }],
+      recharges: [
+        {
+          rest: "short_rest",
+          amountFormula: "ability_modifier",
+          amountFormulaAbility: "INT",
+          maxPerLongRest: 1,
+        },
+        { rest: "long_rest" },
+      ],
+    },
+  },
+  {
+    resourceKey: "bomb_formulas_known",
+    namePattern: /bomb\s*formulas?\s*known/i,
+    displayName: "Bomb Formulas Known",
+    definition: "Bomb formulas the Alchemist knows — chosen from the formula list; swappable on a long rest.",
+    spendPatterns: [],
+  },
+  {
+    resourceKey: "discoveries_known",
+    namePattern: /discoveries?\s*known/i,
+    displayName: "Discoveries Known",
+    definition: "Alchemist Discoveries chosen at 5th, 9th, 13th, and 17th level.",
+    spendPatterns: [],
+  },
+  {
     resourceKey: "upgrades",
     namePattern: /upgrades?/i,
     displayName: "Upgrades",

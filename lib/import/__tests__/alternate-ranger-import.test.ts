@@ -101,8 +101,7 @@ describe("Alternate Ranger class enrich", () => {
     const knacks = content.classes?.[0]?.features.find((feature) => feature.name === "Knacks")
     expect(knacks?.choices?.resourceKey).toBe("knacks_known")
     expect(knacks?.choices?.optionsSource).toBe("class_knacks")
-    expect(row.spellcasting).toMatchObject({ caster_progression: "half" })
-    expect(row.special_ability).toMatchObject({ save_dc_ability: "wisdom" })
+    expect(row.spellcasting).toMatchObject({ caster_progression: "half", ability: "Wisdom" })
   })
 
   it("parses multiclass OR prerequisites", () => {

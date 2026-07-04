@@ -1,17 +1,34 @@
 "use client"
 
 import type { MagicItemPower } from "@/lib/character/magic-item-powers"
+import {
+  activationCostAmount,
+  canSpendActivationUses,
+} from "@/lib/character/magic-item-activation"
+import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
+import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import type { ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 
 type MagicItemPowersPanelProps = {
   powers: MagicItemPower[]
   activeToggleIds: ReadonlySet<string>
   onTogglePower: (toggleId: string, active: boolean) => void
+  resourceEntries?: ResourceTrackerEntry[]
+  usedResourcesById?: Record<string, number>
+  resolveContext?: ResolveUsesContext
+  classDetails?: CharacterClassDetail[]
+  onActivatePower?: (power: MagicItemPower) => void
 }
 
 export function MagicItemPowersPanel({
   powers,
   activeToggleIds,
   onTogglePower,
+  resourceEntries = [],
+  usedResourcesById = {},
+  resolveContext = {},
+  classDetails = [],
+  onActivatePower,
 }: MagicItemPowersPanelProps) {
   if (!powers.length) return null
 
@@ -42,6 +59,44 @@ export function MagicItemPowersPanel({
                   </span>
                 </span>
               </label>
+            )
+          }
+
+          if (power.kind === "activation" || (power.kind === "uses" && power.activationUses)) {
+            const canActivate = canSpendActivationUses({
+              uses: power.activationUses,
+              resourceEntries,
+              usedResourcesById,
+              resolveContext,
+              classDetails,
+            })
+            const cost = activationCostAmount(power.activationUses)
+            return (
+              <div
+                key={`${power.itemId}-${power.powerId}`}
+                className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm flex items-start justify-between gap-2"
+              >
+                <span>
+                  <span className="font-semibold text-foreground">{power.itemName}</span>
+                  <span className="text-muted-foreground"> — </span>
+                  <span>{power.label}</span>
+                  {power.activationUses?.type === "class_resource" ? (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      Costs {cost} from {power.activationUses.classResourceKey} pool
+                    </span>
+                  ) : null}
+                </span>
+                {onActivatePower ? (
+                  <button
+                    type="button"
+                    disabled={!canActivate}
+                    onClick={() => onActivatePower(power)}
+                    className="shrink-0 rounded-md border border-border bg-background px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                  >
+                    Use
+                  </button>
+                ) : null}
+              </div>
             )
           }
 
