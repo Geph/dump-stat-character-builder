@@ -121,6 +121,86 @@ function enrichKnacksFeature(feature: Feature): Feature {
   })
 }
 
+function buildBombFormulasPicker(feature: Feature): LinkedModifierInstance {
+  const instanceId = createModifierInstanceId()
+  return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
+    legacyFeatureOptionPickerCharacteristic({
+      id: modId("bomb_formulas_known"),
+      category: "Bomb Formula",
+      choiceCount: 1,
+      swappableOnRest: true,
+      swapRestType: "long",
+      resourceKey: "bomb_formulas_known",
+      optionsSource: "class_bomb_formulas",
+      label: "Bomb formulas known (count scales on class table)",
+    }),
+  ])
+}
+
+function enrichBombFormulasFeature(feature: Feature): Feature {
+  if (!/^bomb formulas?$/i.test(feature.name.trim())) return feature
+  if ((feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; resourceKey?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.resourceKey === "bomb_formulas_known"
+    }),
+  )) {
+    return feature
+  }
+  return syncModifierRefs({
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Bomb Formula",
+      count: 1,
+      options: [],
+      resourceKey: "bomb_formulas_known",
+      optionsSource: "class_bomb_formulas",
+      swappableOnRest: true,
+      swapRestType: "long",
+    },
+    linkedModifiers: [...(feature.linkedModifiers ?? []), buildBombFormulasPicker(feature)],
+  })
+}
+
+function buildDiscoveriesPicker(feature: Feature): LinkedModifierInstance {
+  const instanceId = createModifierInstanceId()
+  return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
+    legacyFeatureOptionPickerCharacteristic({
+      id: modId("discoveries_known"),
+      category: "Discovery",
+      choiceCount: 1,
+      resourceKey: "discoveries_known",
+      optionsSource: "class_discoveries",
+      label: "Discoveries known (count scales on class table)",
+    }),
+  ])
+}
+
+function enrichDiscoveriesFeature(feature: Feature): Feature {
+  if (!/^discoveries$/i.test(feature.name.trim())) return feature
+  if ((feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; resourceKey?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.resourceKey === "discoveries_known"
+    }),
+  )) {
+    return feature
+  }
+  return syncModifierRefs({
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Discovery",
+      count: 1,
+      options: [],
+      resourceKey: "discoveries_known",
+      optionsSource: "class_discoveries",
+    },
+    linkedModifiers: [...(feature.linkedModifiers ?? []), buildDiscoveriesPicker(feature)],
+  })
+}
+
 function buildUpgradesResourcePicker(feature: Feature): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
@@ -194,6 +274,8 @@ function enrichFeatureChoices(
 ): Feature {
   let next = enrichKnacksFeature(feature)
   next = enrichUpgradesFeature(next)
+  next = enrichBombFormulasFeature(next)
+  next = enrichDiscoveriesFeature(next)
 
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
     const picker = buildChoiceOptionPicker(feature)

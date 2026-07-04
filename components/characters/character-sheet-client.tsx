@@ -114,6 +114,7 @@ import { resolveSpecializedElement } from "@/lib/character/resolve-specialized-e
 import type { RealTimeCooldownState } from "@/lib/character/real-time-recharge"
 import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
 import { collectMagicItemPowers } from "@/lib/character/magic-item-powers"
+import { applyActivationUsesSpend } from "@/lib/character/magic-item-activation"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 import {
@@ -2465,6 +2466,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   powers={magicItemPowers}
                   activeToggleIds={activeSheetToggleSet}
                   onTogglePower={toggleSheetToggle}
+                  resourceEntries={resourceEntries}
+                  usedResourcesById={usedResourcesById}
+                  resolveContext={usesResolveContext}
+                  classDetails={classDetails}
+                  onActivatePower={(power) => {
+                    if (!power.activationUses) return
+                    const next = applyActivationUsesSpend({
+                      uses: power.activationUses,
+                      resourceEntries,
+                      usedResourcesById,
+                      classDetails,
+                    })
+                    if (next) setUsedResourcesById(next)
+                  }}
                 />
               ) : null}
               {classDetails.map((entry) => {

@@ -53,7 +53,7 @@ export type ImportProposalCustomAbility = {
   levelRequirement: number | null
   talentCount?: number
   choices?: import("@/lib/types").FeatureChoice | null
-  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "knack" | "upgrade" | null
+  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "knack" | "upgrade" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
   range?: string | null
@@ -354,6 +354,59 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
           sourceName: ability.source_name ?? null,
           levelRequirement: ability.level_requirement ?? null,
           abilityRole: "upgrade",
+          source: "ai",
+        })
+      }
+      continue
+    }
+
+    if (
+      (ability.ability_role === "bomb_formula" ||
+        /\bbomb formula\b/i.test(ability.choices?.category ?? "")) &&
+      ability.choices?.options?.length
+    ) {
+      for (const option of ability.choices.options) {
+        pushAbility(customAbilities, seenAbilities, {
+          id: ability.proposal_id
+            ? `ability:${slugId(ability.proposal_id)}:${slugId(option.name)}`
+            : undefined,
+          name: option.name,
+          definition:
+            ability.definition?.trim() ||
+            `${option.name} bomb formula for ${ability.source_name ?? "this class"}.`,
+          description: option.description,
+          prerequisite: option.prerequisite ?? ability.prerequisite ?? null,
+          repeatable: option.repeatable ?? ability.repeatable ?? false,
+          sourceType: normalizeProposalSourceType(ability.source_type),
+          sourceName: ability.source_name ?? null,
+          levelRequirement: ability.level_requirement ?? null,
+          abilityRole: "bomb_formula",
+          source: "ai",
+        })
+      }
+      continue
+    }
+
+    if (
+      (ability.ability_role === "discovery" || /\bdiscovery\b/i.test(ability.choices?.category ?? "")) &&
+      ability.choices?.options?.length
+    ) {
+      for (const option of ability.choices.options) {
+        pushAbility(customAbilities, seenAbilities, {
+          id: ability.proposal_id
+            ? `ability:${slugId(ability.proposal_id)}:${slugId(option.name)}`
+            : undefined,
+          name: option.name,
+          definition:
+            ability.definition?.trim() ||
+            `${option.name} discovery for ${ability.source_name ?? "this class"}.`,
+          description: option.description,
+          prerequisite: option.prerequisite ?? ability.prerequisite ?? null,
+          repeatable: option.repeatable ?? ability.repeatable ?? false,
+          sourceType: normalizeProposalSourceType(ability.source_type),
+          sourceName: ability.source_name ?? null,
+          levelRequirement: ability.level_requirement ?? null,
+          abilityRole: "discovery",
           source: "ai",
         })
       }

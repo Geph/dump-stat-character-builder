@@ -102,10 +102,15 @@ export function getRechargeAmount(uses: UsesConfig, rest: RestType): number | nu
 export function resolveRechargeRuleAmount(
   rule: RechargeRule,
   classLevel: number | null,
+  abilityModifiers?: Partial<Record<string, number>> | null,
 ): number | null {
   if (isRealTimeRechargeRule(rule)) return null
   if (rule.amountFormula === "half_class_level_round_up" && classLevel != null) {
     return Math.max(1, Math.ceil(classLevel / 2))
+  }
+  if (rule.amountFormula === "ability_modifier" && rule.amountFormulaAbility && abilityModifiers) {
+    const key = rule.amountFormulaAbility.toLowerCase()
+    return Math.max(0, abilityModifiers[key] ?? 0)
   }
   if (rule.amount == null || rule.amount <= 0) return null
   return rule.amount

@@ -218,6 +218,7 @@ function isCustomAbilityAction(ability: CustomAbility): boolean {
     return false
   }
   if (ability.ability_role === "psionic_power") return true
+  if (ability.ability_role === "alchemist_bomb") return true
   if (ability.psionic_augments?.augments?.length) return true
   if (ability.casting_time) return true
   const item: ActivatableItem = {
@@ -262,6 +263,9 @@ function pushCustomAbilityActions(
         : kindsFromText(item.description)
 
     if (!kinds.length && ability.ability_role === "psionic_power") {
+      kinds.push("action")
+    }
+    if (!kinds.length && ability.ability_role === "alchemist_bomb") {
       kinds.push("action")
     }
     if (!kinds.length) continue

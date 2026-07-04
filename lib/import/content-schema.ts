@@ -107,7 +107,14 @@ export const ChoiceOptionsSchema = z.object({
     }),
   ),
   optionsSource: z
-    .enum(["known_discipline_talents", "fusion_talents", "class_knacks", "class_upgrades"])
+    .enum([
+      "known_discipline_talents",
+      "fusion_talents",
+      "class_knacks",
+      "class_upgrades",
+      "class_bomb_formulas",
+      "class_discoveries",
+    ])
     .optional(),
   resourceKey: z.string().nullable().optional(),
   swappableOnRest: z.boolean().optional(),
@@ -317,7 +324,18 @@ export const AbilityImportSchema = z.object({
   concentration: z.boolean().optional(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
-  ability_role: z.enum(["discipline", "psionic_power", "talent_pool", "knack"]).optional(),
+  ability_role: z
+    .enum([
+      "discipline",
+      "psionic_power",
+      "talent_pool",
+      "knack",
+      "upgrade",
+      "bomb_formula",
+      "discovery",
+      "alchemist_bomb",
+    ])
+    .optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
@@ -347,7 +365,8 @@ const UsesConfigImportSchema = z.object({
       z.object({
         rest: z.enum(["short_rest", "long_rest"]),
         amount: z.number().nullable().optional(),
-        amountFormula: z.enum(["half_class_level_round_up"]).nullable().optional(),
+        amountFormula: z.enum(["half_class_level_round_up", "ability_modifier"]).nullable().optional(),
+        amountFormulaAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable().optional(),
         maxPerLongRest: z.number().nullable().optional(),
       }),
     )
@@ -360,7 +379,8 @@ const UsesConfigImportSchema = z.object({
           z.object({
             rest: z.enum(["short_rest", "long_rest"]),
             amount: z.number().nullable().optional(),
-            amountFormula: z.enum(["half_class_level_round_up"]).nullable().optional(),
+            amountFormula: z.enum(["half_class_level_round_up", "ability_modifier"]).nullable().optional(),
+        amountFormulaAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable().optional(),
             maxPerLongRest: z.number().nullable().optional(),
           }),
         ),

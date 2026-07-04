@@ -671,6 +671,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_spellcasting_ability",
     examples: [
       "Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose when you select this feat)",
+      "Intelligence is your spellcasting ability for your Investigator spells",
       "Wisdom is your spellcasting ability for this spell",
     ],
     mechanicsKind: "spellcasting_ability",

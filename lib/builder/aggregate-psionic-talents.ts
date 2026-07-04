@@ -1,3 +1,5 @@
+import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formulas"
+import { aggregateDiscoveryOptions } from "@/lib/builder/aggregate-discoveries"
 import { aggregateKnackOptions } from "@/lib/builder/knack-choices"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
 import type { CustomAbility, Feature, FeatureChoice } from "@/lib/types"
@@ -102,6 +104,22 @@ export function resolveFeatureChoiceOptions(
       classNames: params.classNames,
       classLevel: params.classLevel ?? 20,
       selectedUpgradeNames: selected,
+    })
+  }
+  if (choices.optionsSource === "class_bomb_formulas") {
+    return aggregateBombFormulaOptions({
+      customAbilities: params.customAbilities,
+      classNames: params.classNames,
+    })
+  }
+  if (choices.optionsSource === "class_discoveries") {
+    const discoveryKey = Object.keys(params.featureChoicePicks).find((key) => /discover/i.test(key))
+    const selected = discoveryKey ? (params.featureChoicePicks[discoveryKey] ?? []) : []
+    return aggregateDiscoveryOptions({
+      customAbilities: params.customAbilities,
+      classNames: params.classNames,
+      classLevel: params.classLevel ?? 20,
+      selectedDiscoveryNames: selected,
     })
   }
   return choices.options ?? []
