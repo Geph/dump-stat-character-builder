@@ -9,6 +9,11 @@ import {
   buildWeaponMasteryModifier,
 } from "@/lib/compendium/shared-feature-modifier-builders"
 import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
+import {
+  blockedWhenConditionLimitation,
+  notWearingArmorLimitation,
+  type ModifierLimitation,
+} from "@/lib/compendium/modifier-limitations"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import {
   legacyFeatureOptionPickerCharacteristic,
@@ -104,7 +109,11 @@ function draconicAc(instanceKey: string): LinkedModifierInstance {
   ])
 }
 
-function speedAdd(feet: number, label?: string): LinkedModifierInstance {
+function speedAdd(
+  feet: number,
+  label?: string,
+  limitations?: ModifierLimitation[],
+): LinkedModifierInstance {
   return charInstance(`modinst_speed_walk_${feet}`, "cat_char_speed", [
     {
       id: modId(`speed_walk_${feet}`),
@@ -113,6 +122,7 @@ function speedAdd(feet: number, label?: string): LinkedModifierInstance {
       mode: "add",
       value: feet,
       label,
+      limitations,
     },
   ])
 }
@@ -354,8 +364,14 @@ function checkAdvantage(
     ability?: string | null
     skills?: string[]
     conditions?: string[]
+    disabledWhenConditions?: string[]
+    limitations?: ModifierLimitation[]
   },
 ): LinkedModifierInstance {
+  const limitations = options.limitations ?? []
+  for (const condition of options.disabledWhenConditions ?? []) {
+    limitations.push(blockedWhenConditionLimitation(condition))
+  }
   return fxInstance(`modinst_${instanceKey}`, CHECK_ROLL_MODIFIER_CATALOG_ID, {
     effects: [
       {
@@ -366,6 +382,7 @@ function checkAdvantage(
         checkAbility: options.ability ?? null,
         checkSkills: options.skills,
         checkConditionTypes: options.conditions ?? [],
+        limitations: limitations.length ? limitations : undefined,
       },
     ],
   })
@@ -1716,7 +1733,13 @@ const ALL_SAVES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wis
 const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPreset> = {
   "Barbarian::Unarmored Defense": [unarmoredDefense("barb_uac", ["DEX", "CON"], "Unarmored Defense")],
   "Monk::Unarmored Defense": [unarmoredDefense("monk_uac", ["DEX", "WIS"], "Unarmored Defense")],
-  "*::Danger Sense": [checkAdvantage("danger_sense", { category: "save", ability: "Dexterity" })],
+  "*::Danger Sense": [
+    checkAdvantage("danger_sense", {
+      category: "save",
+      ability: "Dexterity",
+      limitations: [blockedWhenConditionLimitation("Incapacitated")],
+    }),
+  ],
   "*::Reckless Attack": [
     checkAdvantage("reckless_attack", { category: "attack", ability: "Strength" }),
   ],
@@ -1730,8 +1753,15 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       "Primal Knowledge (Strength for skill checks while raging)",
     ),
   ],
-  "*::Fast Movement": [speedAdd(10, "+10 ft. walk (no Heavy armor)")],
-  "*::Unarmored Movement": [speedAdd(10, "+10 ft. walk (unarmored)")],
+  "*::Fast Movement": [
+    speedAdd(10, "+10 ft. walk", [notWearingArmorLimitation("Heavy armor")]),
+  ],
+  "*::Unarmored Movement": [
+    speedAdd(10, "+10 ft. walk", [
+      notWearingArmorLimitation("Any armor"),
+      notWearingArmorLimitation("Shield"),
+    ]),
+  ],
   "*::Feral Instinct": [checkAdvantage("feral_instinct", { category: "initiative" })],
   "*::Mindless Rage": [
     conditionImmunity(["Charmed", "Frightened"], "While Rage is active"),
@@ -1836,7 +1866,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     conditionImmunity(["Frightened"], "Allies in Aura of Protection"),
   ],
   "*::Roving": [
-    speedAdd(10, "+10 ft. walk (no Heavy armor)"),
+    speedAdd(10, "+10 ft. walk", [notWearingArmorLimitation("Heavy armor")]),
     speedTypeAdd("climb", 0, "Climb Speed equal to Speed"),
     speedTypeAdd("swim", 0, "Swim Speed equal to Speed"),
   ],
@@ -5344,15 +5374,15 @@ export function enrichClassFeatureWithModifierPresets(
     return enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className)
   }
 
-  return enrichFeatureWithMechanicalDetection(
-    enrichWeaponMasteryFeature(migrateFeatureOptionPickers(next), className),
-    {
+  next = enrichFeatureWithMechanicalDetection(migrateFeatureOptionPickers(next), {
     contentKind: subclassName ? "subclass_feature" : "class_feature",
     sourceName: subclassName ?? className,
     featureName: feature.name,
     level: feature.level,
     classPrefix: className,
   })
+
+  return enrichWeaponMasteryFeature(next, className)
 }
 
 export function enrichClassFeaturesWithModifierPresets(

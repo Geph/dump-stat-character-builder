@@ -1,0 +1,113 @@
+import type { RollContext } from "@/lib/character/roll-context"
+import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
+import { combineRollModes, type D20RollMode } from "@/lib/dice/d20-roll"
+import type { Feature, FeatureEffect } from "@/lib/types"
+
+const ABILITY_FULL_NAMES: Record<string, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+  charisma: "Charisma",
+}
+
+function abilityNamesMatch(
+  effectAbility: string | null | undefined,
+  contextAbility: string | undefined,
+): boolean {
+  if (!effectAbility || !contextAbility) return !effectAbility
+  const normalizedEffect = effectAbility.toLowerCase()
+  const normalizedContext = contextAbility.toLowerCase()
+  return (
+    normalizedEffect === normalizedContext ||
+    normalizedEffect.startsWith(normalizedContext.slice(0, 3)) ||
+    normalizedContext.startsWith(normalizedEffect.slice(0, 3))
+  )
+}
+
+export function featureEffectMatchesRollContext(
+  effect: FeatureEffect,
+  context: RollContext,
+): boolean {
+  const category = effect.checkCategory
+  if (!category || category === "other") return false
+
+  if (category === "initiative") return context.kind === "initiative"
+  if (category === "attack") return context.kind === "attack"
+
+  if (category === "ability") {
+    if (context.kind !== "ability") return false
+    return abilityNamesMatch(effect.checkAbility, context.ability)
+  }
+
+  if (category === "save") {
+    if (context.kind !== "save") return false
+    return abilityNamesMatch(effect.checkAbility, context.ability)
+  }
+
+  if (category === "skill") {
+    if (context.kind !== "skill" || !context.skillName) return false
+    if (!effect.checkSkills?.length) return true
+    return effect.checkSkills.includes(context.skillName)
+  }
+
+  return false
+}
+
+export function isFeatureRollModifierBlocked(
+  effect: FeatureEffect,
+  limitationCtx: LimitationEvaluationContext = {},
+): boolean {
+  return !modifierLimitationsMet(effect, limitationCtx)
+}
+
+export function collectFeatureRollModes(
+  features: Feature[],
+  context: RollContext,
+  limitationCtx: LimitationEvaluationContext = {},
+): { mode: D20RollMode; sources: string[] } {
+  const modes: D20RollMode[] = []
+  const sources: string[] = []
+
+  for (const feature of features) {
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const effect of instance.activation?.effects ?? []) {
+        const rollMode = resolveCheckRollMode(effect)
+        if (rollMode !== "advantage" && rollMode !== "disadvantage") continue
+        if (!featureEffectMatchesRollContext(effect, context)) continue
+        if (isFeatureRollModifierBlocked(effect, {
+          ...limitationCtx,
+          activeConditions: limitationCtx.activeConditions ?? [],
+        })) {
+          continue
+        }
+        modes.push(rollMode)
+        sources.push(feature.name ?? "Feature")
+      }
+    }
+  }
+
+  return { mode: combineRollModes(modes), sources }
+}
+
+export function featureAlreadyGrantsCheckRoll(
+  feature: Feature,
+  category: FeatureEffect["checkCategory"],
+  ability?: string | null,
+): boolean {
+  for (const instance of feature.linkedModifiers ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      const rollMode = resolveCheckRollMode(effect)
+      if (rollMode !== "advantage" && rollMode !== "disadvantage") continue
+      if (effect.checkCategory !== category) continue
+      if (ability && !abilityNamesMatch(effect.checkAbility, ability.toLowerCase())) continue
+      return true
+    }
+  }
+  return false
+}
+
+export { ABILITY_FULL_NAMES }

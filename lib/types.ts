@@ -109,6 +109,10 @@ export interface FeatureEffect {
   checkSkills?: string[]
   /** Conditions avoided or ended (typically with saving throws or ability checks). */
   checkConditionTypes?: string[]
+  /** When the character has any of these conditions, this roll modifier does not apply. */
+  disabledWhenConditions?: string[]
+  /** Gating rules (conditions, armor, sheet toggles) — see modifier-limitations. */
+  limitations?: import("@/lib/compendium/modifier-limitations").ModifierLimitation[]
   /** check_roll_modifier: bonus, advantage, disadvantage, or replace a failed save */
   checkRollMode?: "bonus" | "advantage" | "disadvantage" | "replace_failure" | null
   /** Reroll when the d20 shows a natural 1 (e.g. Halfling Luck on D20 Tests). */

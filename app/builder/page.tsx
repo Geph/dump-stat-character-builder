@@ -2624,6 +2624,7 @@ export default function BuilderPage() {
                               featureChoicePicks,
                               classNames: [cls.name],
                               classLevel: entry.level,
+                              equipmentCatalog: equipment,
                             })
                             const choiceCount = resolveFeatureChoiceCount(
                               feature.choices!,

@@ -1,7 +1,10 @@
 import type { RollContext } from "@/lib/character/roll-context"
 import { collectConditionRollModes } from "@/lib/srd/condition-roll-effects"
 import { collectExhaustionRollModes } from "@/lib/srd/exhaustion-effects"
+import { collectFeatureRollModes } from "@/lib/character/collect-feature-roll-modes"
+import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
 import { combineRollModes, type D20RollMode } from "@/lib/dice/d20-roll"
+import type { Feature } from "@/lib/types"
 
 export type ManualRollOverride = "normal" | "advantage" | "disadvantage"
 
@@ -10,6 +13,8 @@ export type ResolveRollModeInput = {
   activeConditions: string[]
   exhaustionLevel: number
   manualOverride?: ManualRollOverride
+  classFeatures?: Feature[]
+  limitationContext?: LimitationEvaluationContext
 }
 
 export type ResolvedRollMode = {
@@ -18,7 +23,14 @@ export type ResolvedRollMode = {
 }
 
 export function resolveRollMode(input: ResolveRollModeInput): ResolvedRollMode {
-  const { context, activeConditions, exhaustionLevel, manualOverride = "normal" } = input
+  const {
+    context,
+    activeConditions,
+    exhaustionLevel,
+    manualOverride = "normal",
+    classFeatures = [],
+    limitationContext = {},
+  } = input
   const modes: D20RollMode[] = []
   const sources: string[] = []
 
@@ -29,6 +41,17 @@ export function resolveRollMode(input: ResolveRollModeInput): ResolvedRollMode {
   for (const mode of collectExhaustionRollModes(context, exhaustionLevel)) {
     modes.push(mode)
     sources.push("exhaustion")
+  }
+
+  if (classFeatures.length) {
+    const featureRoll = collectFeatureRollModes(classFeatures, context, {
+      ...limitationContext,
+      activeConditions: limitationContext.activeConditions ?? activeConditions,
+    })
+    if (featureRoll.mode !== "normal") {
+      modes.push(featureRoll.mode)
+      sources.push(...featureRoll.sources)
+    }
   }
 
   if (manualOverride === "advantage") {

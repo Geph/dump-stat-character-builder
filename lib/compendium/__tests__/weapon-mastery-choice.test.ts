@@ -45,6 +45,13 @@ describe("weapon mastery choices", () => {
     expect(enriched.linkedModifiers ?? []).toHaveLength(0)
   })
 
+  it("includes Weapon Mastery in the common modifier catalog", async () => {
+    const { buildDefaultModifierCatalog } = await import("@/lib/compendium/modifier-catalog")
+    const { WEAPON_MASTERY_CATALOG_ID } = await import("@/lib/compendium/weapon-mastery-catalog")
+    const catalog = buildDefaultModifierCatalog()
+    expect(catalog.some((entry) => entry.id === WEAPON_MASTERY_CATALOG_ID)).toBe(true)
+  })
+
   it("scales Barbarian weapon mastery picks from class resources", () => {
     const choices = enrichWeaponMasteryFeature(
       { level: 1, name: "Weapon Mastery", description: "" },

@@ -53,6 +53,8 @@ export type CharacterBuildInputs = {
   customAbilities?: CustomAbility[]
   /** Sheet toggles for gated modifiers (Rage, below half HP, etc.). */
   activeSheetToggles?: ReadonlySet<SheetToggleKey>
+  /** Active conditions on the sheet (Incapacitated, Poisoned, etc.). */
+  activeConditions?: string[]
   /** Per-session exhaustion level (0–6). */
   exhaustionLevel?: number
 }

@@ -19,6 +19,11 @@ import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import type { UsesConfig } from "@/lib/types"
+import {
+  blockedWhenConditionLimitation,
+  notWearingArmorLimitation,
+  type ModifierLimitation,
+} from "@/lib/compendium/modifier-limitations"
 
 export type DetectionConfidence = "high" | "medium" | "low"
 
@@ -207,6 +212,26 @@ function parseSkillList(fragment: string): string[] {
   return skills
 }
 
+function parseLimitationsFromText(text: string): ModifierLimitation[] {
+  const limitations: ModifierLimitation[] = []
+  if (/unless you have the incapacitated condition/i.test(text)) {
+    limitations.push(blockedWhenConditionLimitation("Incapacitated"))
+  }
+  if (/while you don'?t have the incapacitated condition/i.test(text)) {
+    limitations.push(blockedWhenConditionLimitation("Incapacitated"))
+  }
+  if (/while you aren'?t wearing heavy armor/i.test(text) || /while not wearing heavy armor/i.test(text)) {
+    limitations.push(notWearingArmorLimitation("Heavy armor"))
+  }
+  if (/while you aren'?t wearing armor/i.test(text) && !/heavy armor/i.test(text)) {
+    limitations.push(notWearingArmorLimitation("Any armor"))
+  }
+  if (/not wielding a shield/i.test(text) || /without a shield/i.test(text)) {
+    limitations.push(notWearingArmorLimitation("Shield"))
+  }
+  return limitations
+}
+
 function buildCheckRollModifier(
   ctx: DetectFeatureContext,
   ruleSuffix: string,
@@ -216,6 +241,7 @@ function buildCheckRollModifier(
     checkAbility?: string | null
     checkSkills?: string[]
   },
+  sourceText?: string,
 ): LinkedModifierInstance {
   return fxInstance(newInstanceId(), effectCatalogRefId("check_roll_modifier"), {
     effects: [
@@ -226,6 +252,7 @@ function buildCheckRollModifier(
         checkCategory: options.checkCategory,
         checkAbility: options.checkAbility ?? null,
         checkSkills: options.checkSkills,
+        limitations: sourceText ? parseLimitationsFromText(sourceText) : [],
       },
     ],
   })
@@ -1128,11 +1155,16 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "check.advantage.initiative",
     confidence: "high",
     test: /\b(?:have|gain|get)\s+advantage\s+on\s+initiative(?:\s+rolls?)?\b|\badvantage\s+on\s+(?:your\s+)?initiative(?:\s+rolls?)?\b/i,
-    build: (_match, ctx) =>
-      buildCheckRollModifier(ctx, "init_adv", {
-        checkRollMode: "advantage",
-        checkCategory: "initiative",
-      }),
+    build: (_match, ctx, text) =>
+      buildCheckRollModifier(
+        ctx,
+        "init_adv",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "initiative",
+        },
+        text,
+      ),
   },
   {
     id: "check.advantage.attack.ranged",
@@ -1168,14 +1200,19 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "check.advantage.ability",
     confidence: "high",
     test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+checks?\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
       const ability = parseSaveAbility(match[1])
       if (!ability) return null
-      return buildCheckRollModifier(ctx, "ability_adv", {
-        checkRollMode: "advantage",
-        checkCategory: "ability",
-        checkAbility: ability,
-      })
+      return buildCheckRollModifier(
+        ctx,
+        "ability_adv",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "ability",
+          checkAbility: ability,
+        },
+        text,
+      )
     },
   },
   {
@@ -1193,14 +1230,19 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "save.advantage",
     confidence: "high",
     test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving\s+throws?\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
       const ability = parseSaveAbility(match[1])
       if (!ability) return null
-      return buildCheckRollModifier(ctx, "save_adv", {
-        checkRollMode: "advantage",
-        checkCategory: "save",
-        checkAbility: ability,
-      })
+      return buildCheckRollModifier(
+        ctx,
+        "save_adv",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "save",
+          checkAbility: ability,
+        },
+        text,
+      )
     },
   },
   {

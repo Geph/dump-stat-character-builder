@@ -101,6 +101,13 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
 
   const aggregated = aggregateCharacteristics(allMods, {
     activeSheetToggles: inputs.activeSheetToggles,
+    activeConditions: inputs.activeConditions,
+    equippedArmor: inputs.equippedArmorId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedArmorId) ?? null
+      : null,
+    equippedShield: inputs.equippedShieldId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedShieldId) ?? null
+      : null,
   })
 
   const conMod = derived.abilityMods.constitution

@@ -16,6 +16,10 @@ import {
   GRANT_FEAT_CATALOG_ID,
   LEGACY_GRANT_FEAT_CATALOG_IDS,
 } from "@/lib/compendium/grant-feat-catalog"
+import {
+  buildWeaponMasteryCatalogEntry,
+  WEAPON_MASTERY_CATALOG_ID,
+} from "@/lib/compendium/weapon-mastery-catalog"
 
 /** Fixed id for the system-owned common modifiers custom ability. */
 export const COMMON_MODIFIERS_CATALOG_ID = "00000000-0000-4000-8000-000000000001"
@@ -29,6 +33,8 @@ export const SYSTEM_MODIFIER_CATALOG_IDS = [
 
 /** Catalog entry id for the shared Special Attack passive template. */
 export const SPECIAL_ATTACK_CATALOG_ID = "cat_char_special_attack"
+
+export { WEAPON_MASTERY_CATALOG_ID } from "@/lib/compendium/weapon-mastery-catalog"
 
 export const COMMON_MODIFIERS_CATALOG_NAME = "Common Modifier Effects"
 
@@ -203,6 +209,8 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
     description:
       "<p>The character gains Heroic Inspiration. Configure when inspiration is granted in the linked feature or trait description (e.g. after a long rest, or when rolling a natural 1 on a d20).</p>",
   })
+
+  entries.push(buildWeaponMasteryCatalogEntry())
 
   return entries
 }

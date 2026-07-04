@@ -94,8 +94,18 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
     }
     return `${instance.catalogRefId}:${char.type}`
   }
-  const kind = instance.activation?.effects?.[0]?.kind ?? "fx"
-  return `${instance.catalogRefId}:${kind}`
+  const effects = instance.activation?.effects ?? []
+  if (effects.length) {
+    const fx = effects[0]
+    const category = fx.checkCategory ?? ""
+    const ability = fx.checkAbility ?? ""
+    const mode = fx.checkRollMode ?? fx.kind ?? "fx"
+    if (fx.kind === "check_roll_modifier" || fx.kind?.startsWith("check_")) {
+      return `${instance.catalogRefId}:${category}:${ability}:${mode}`
+    }
+    return `${instance.catalogRefId}:${fx.kind ?? "fx"}`
+  }
+  return `${instance.catalogRefId}:fx`
 }
 
 function runRulesOnSegment(
