@@ -130,7 +130,7 @@ import {
 } from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
-import type { RestType } from "@/lib/types"
+import type { Feature, RestType } from "@/lib/types"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
   companionStateFromResolved,
@@ -613,9 +613,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (maxHpForHalf > 0 && currentHp <= Math.floor(maxHpForHalf / 2)) {
       effectiveSheetToggles.add("below_half_hp")
     }
+    const resolvedFeatures: Feature[] = []
+    for (const entry of classList) {
+      const classLevel = entry.level ?? 1
+      for (const feature of entry.class?.features ?? []) {
+        if ((feature.level ?? 1) <= classLevel) resolvedFeatures.push(feature as Feature)
+      }
+      for (const feature of entry.subclass?.features ?? []) {
+        if ((feature.level ?? 1) <= classLevel) resolvedFeatures.push(feature as Feature)
+      }
+    }
     return {
       ...inputs,
       exhaustionLevel,
+      currentHp,
+      resolvedFeatures,
       modifierPlayerPicks: {
         ...inputs.modifierPlayerPicks,
         ...(acFormulaPick ?? savedAcPick
@@ -1156,11 +1168,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [classDetails, character?.species, character?.backgrounds?.feature, sheetCustomAbilities],
   )
 
-  const alternateAbilityChecks = useMemo(
-    () => collectAlternateAbilityChecks({ classDetails, catalog: modifierCatalog }),
-    [classDetails, modifierCatalog],
-  )
-
   const combatActions = useMemo(
     () => sheetActions.filter((action) => action.category !== "utility"),
     [sheetActions],
@@ -1483,6 +1490,29 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     ],
   )
 
+  const alternateAbilityChecksGated = useMemo(
+    () =>
+      collectAlternateAbilityChecks({
+        classDetails,
+        catalog: modifierCatalog,
+        limitationContext: {
+          activeConditions,
+          activeSheetToggles: activeSheetToggleSet,
+          equippedArmor: limitationEquipment.armor,
+          equippedShield: limitationEquipment.shield,
+          currentHp,
+        },
+      }),
+    [
+      classDetails,
+      modifierCatalog,
+      activeConditions,
+      activeSheetToggleSet,
+      limitationEquipment,
+      currentHp,
+    ],
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1633,7 +1663,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   })()
 
   const incapacitated = isIncapacitatedByConditions(activeConditions)
-  const incomingAttackNotes = buildIncomingAttackNotes(activeConditions)
+  const incomingAttackNotes = buildIncomingAttackNotes({
+    activeConditions,
+    classFeatures: sheetClassFeatures,
+    limitationContext: {
+      activeConditions,
+      activeSheetToggles: activeSheetToggleSet,
+      equippedArmor: limitationEquipment.armor,
+      equippedShield: limitationEquipment.shield,
+      currentHp,
+    },
+  })
   const influencePointCount = currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
   const influencePointCap = Math.max(0, abilityMods.intelligence)
 
@@ -1648,6 +1688,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           activeSheetToggles: activeSheetToggleSet,
           equippedArmor: limitationEquipment.armor,
           equippedShield: limitationEquipment.shield,
+          currentHp,
+          featureEffectContext: {
+            proficiencyBonus: derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2,
+            abilityMods: derived?.abilityMods ?? {
+              strength: 0,
+              dexterity: 0,
+              constitution: 0,
+              intelligence: 0,
+              wisdom: 0,
+              charisma: 0,
+            },
+            characterLevel: character?.level ?? 1,
+            currentHp,
+          },
         }}
       >
     <div className="min-h-screen bg-background">
@@ -2010,6 +2064,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <D20RollButton
                               modifier={mod}
                               title={`Roll ${skill.name}`}
+                              skillProficient={isProficient}
+                              featureBonusesIncluded={Boolean(derivedSkill)}
                               rollContext={{
                                 kind: "skill",
                                 skillName: skill.name,
@@ -2164,14 +2220,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 )}
               </div>
 
-              {alternateAbilityChecks.length > 0 && (
+              {alternateAbilityChecksGated.length > 0 && (
                 <div className="bg-card rounded-xl p-3 border border-border">
                   <h2 className="text-sm font-bold text-foreground mb-1">Alternate Ability Checks</h2>
                   <p className="text-xs text-muted-foreground mb-3">
                     Make these skill checks with a different ability modifier.
                   </p>
                   <div className="space-y-3">
-                    {alternateAbilityChecks.map((entry) => {
+                    {alternateAbilityChecksGated.map((entry) => {
                       const altAbilityMod = abilityMods[entry.ability] ?? 0
                       const skillRows =
                         entry.skills.length > 0

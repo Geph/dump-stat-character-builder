@@ -1,5 +1,6 @@
 import type { UsesConfig } from "@/lib/types"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
+import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { normalizeBonusByLevel } from "@/lib/compendium/bonus-by-level"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
@@ -286,6 +287,7 @@ export type AcFormulaOption = {
 
 export type AggregateCharacteristicsOptions = LimitationEvaluationContext & {
   selectedAcFormulaId?: string | null
+  characterLevel?: number
 }
 
 export type AbilityScoresMode = "fixed" | "asi_pool"
@@ -417,6 +419,7 @@ export interface SpeedCharacteristic extends CharacteristicModifierBase {
   speedType: (typeof SPEED_TYPES)[number]["value"]
   mode: "set" | "add" | "equal_to_walk"
   value: number
+  valueByLevel?: BonusByLevelEntry[]
   customType?: string
 }
 
@@ -1845,7 +1848,9 @@ export function aggregateCharacteristics(
     activeSheetToggles: options?.activeSheetToggles,
     equippedArmor: options?.equippedArmor,
     equippedShield: options?.equippedShield,
+    currentHp: options?.currentHp,
   }
+  const characterLevel = options?.characterLevel ?? 1
 
   for (const mod of mods) {
     if (!isModifierActive(mod, limitationCtx)) continue
@@ -1949,7 +1954,11 @@ export function aggregateCharacteristics(
           }
         } else {
           const current = result.speed[key] ?? 0
-          result.speed[key] = mod.mode === "set" ? mod.value : current + mod.value
+          const addValue =
+            mod.valueByLevel?.length
+              ? resolveFixedValueAtLevel(mod.valueByLevel, characterLevel, mod.value) ?? mod.value
+              : mod.value
+          result.speed[key] = mod.mode === "set" ? addValue : current + addValue
         }
         break
       }

@@ -58,6 +58,10 @@ import type {
   StatBreakdownPart,
   ToolBonus,
 } from "@/lib/character/types"
+import {
+  collectFeatureDamageBonuses,
+  collectFeatureRollBonuses,
+} from "@/lib/character/collect-limited-feature-effects"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
@@ -153,13 +157,32 @@ function buildSkillBonuses(
   abilityMods: Record<AbilityScoreKey, number>,
   skillProficiencies: string[],
   skillExpertise: string[],
+  featureBonusContext?: {
+    features: import("@/lib/types").Feature[]
+    limitationCtx: import("@/lib/compendium/modifier-limitations").LimitationEvaluationContext
+    characterLevel: number
+  },
 ): SkillBonus[] {
   return SKILL_ROWS.map(({ name, ability }) => {
     const proficient = skillProficiencies.includes(name)
     const expertise = skillExpertise.includes(name)
-    const bonus =
+    let bonus =
       abilityMods[ability] +
       (proficient ? proficiencyBonus * (expertise ? 2 : 1) : 0)
+    if (featureBonusContext) {
+      const { total } = collectFeatureRollBonuses(
+        featureBonusContext.features,
+        { kind: "skill", skillName: name, ability },
+        {
+          ...featureBonusContext.limitationCtx,
+          proficiencyBonus,
+          abilityMods,
+          characterLevel: featureBonusContext.characterLevel,
+          skillProficient: proficient,
+        },
+      )
+      bonus += total
+    }
     return { name, ability, proficient, expertise, bonus }
   })
 }
@@ -333,6 +356,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       inputs.equipmentCatalog,
     )
 
+  const totalLevel =
+    inputs.classLevels.length > 0
+      ? inputs.classLevels.reduce((sum, row) => sum + row.level, 0)
+      : 1
+
   const aggregatedCharacteristics = aggregateCharacteristics(
     [...builderCharacteristicMods, ...equipmentMagicMods],
     {
@@ -340,6 +368,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       activeConditions: inputs.activeConditions,
       equippedArmor,
       equippedShield,
+      currentHp: inputs.currentHp,
+      characterLevel: totalLevel,
     },
   )
   // Source IDs the character currently has, used to discard orphaned ability-score
@@ -373,10 +403,6 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
 
   const abilityMods = abilityModsFromScores(abilityScores)
 
-  const totalLevel =
-    inputs.classLevels.length > 0
-      ? inputs.classLevels.reduce((sum, row) => sum + row.level, 0)
-      : 1
   const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
 
   const skillProficiencies = mergeSkillProficiencies(
@@ -499,6 +525,22 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
         ? calculateWeaponAttack(equippedWeapon, abilityMods, proficiencyBonus, false)
         : null
 
+  const featureLimitationCtx = {
+    activeConditions: inputs.activeConditions,
+    activeSheetToggles: inputs.activeSheetToggles,
+    equippedArmor,
+    equippedShield,
+    currentHp: inputs.currentHp,
+  }
+  const resolvedFeatures = inputs.resolvedFeatures ?? []
+  const featureDamageBonus =
+    resolvedFeatures.length > 0
+      ? collectFeatureDamageBonuses(resolvedFeatures, {
+          ...featureLimitationCtx,
+          characterLevel: totalLevel,
+        }).flatBonus
+      : 0
+
   const equippedWeaponAttack =
     baseEquippedWeaponAttack && equippedWeapon
       ? (() => {
@@ -508,11 +550,12 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
             properties: weaponProps,
           })
           const attackBonus = baseEquippedWeaponAttack.attackBonus + modifierBonus
-          const damageBonus = sumDamageRollModifiers(aggregatedCharacteristics, {
-            subcategory: equippedWeapon.subcategory ?? "",
-            properties: weaponProps,
-            damageType: equippedWeapon.damage_type ?? "",
-          })
+          const damageBonus =
+            sumDamageRollModifiers(aggregatedCharacteristics, {
+              subcategory: equippedWeapon.subcategory ?? "",
+              properties: weaponProps,
+              damageType: equippedWeapon.damage_type ?? "",
+            }) + featureDamageBonus
           const damageDisplay =
             damageBonus > 0
               ? `${baseEquippedWeaponAttack.damageDisplay} + ${damageBonus}`
@@ -520,6 +563,9 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
           const attackBreakdown = [...baseEquippedWeaponAttack.attackBreakdown]
           if (modifierBonus !== 0) {
             attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
+          }
+          if (featureDamageBonus > 0) {
+            attackBreakdown.push({ label: "Feature damage", value: featureDamageBonus })
           }
           return { attackBonus, damageDisplay, attackBreakdown }
         })()
@@ -545,7 +591,19 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     armorProficiencies,
     savingThrowProficiencies,
     languages,
-    skills: buildSkillBonuses(proficiencyBonus, abilityMods, skillProficiencies, skillExpertise),
+    skills: buildSkillBonuses(
+      proficiencyBonus,
+      abilityMods,
+      skillProficiencies,
+      skillExpertise,
+      resolvedFeatures.length
+        ? {
+            features: resolvedFeatures,
+            limitationCtx: featureLimitationCtx,
+            characterLevel: totalLevel,
+          }
+        : undefined,
+    ),
     tools: buildToolBonuses(
       proficiencyBonus,
       abilityMods,

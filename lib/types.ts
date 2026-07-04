@@ -190,6 +190,8 @@ export interface FeatureEffect {
   defensiveSaveSuccess?: "none" | "half" | null
   /** modify_creature: attack rolls against this character can't have Advantage. */
   attackRollsCantHaveAdvantage?: boolean
+  /** Attacks against this character have Advantage or Disadvantage (Reckless Attack / Escape the Horde). */
+  incomingAttackMode?: "advantage" | "disadvantage" | null
   /** grant_temp_hp: when temp HP is granted. */
   tempHpTrigger?: "passive" | "on_kill" | "on_action" | "bonus_action" | null
   /** class_resource: refresh pool when rolling Initiative (etc.). */

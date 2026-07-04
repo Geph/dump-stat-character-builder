@@ -1,7 +1,7 @@
 import type { Equipment } from "@/lib/types"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 
-export type ModifierLimitationKind = "condition" | "armor_type" | "sheet_toggle"
+export type ModifierLimitationKind = "condition" | "armor_type" | "sheet_toggle" | "hp_threshold"
 
 /** How the limitation gates whether the modifier applies. */
 export type ModifierLimitationRule =
@@ -13,6 +13,10 @@ export type ModifierLimitationRule =
   | "requires_not_wearing"
   /** Modifier applies only while this sheet toggle is active. */
   | "requires_active"
+  /** Modifier applies only while current HP is at or below the value. */
+  | "requires_at_most_hp"
+  /** Modifier applies only while current HP is above the value. */
+  | "requires_above_hp"
 
 export interface ModifierLimitation {
   id: string
@@ -27,6 +31,7 @@ export type LimitationEvaluationContext = {
   activeSheetToggles?: ReadonlySet<SheetToggleKey>
   equippedArmor?: Equipment | null
   equippedShield?: Equipment | null
+  currentHp?: number
 }
 
 export const ARMOR_LIMITATION_OPTIONS = [
@@ -75,6 +80,14 @@ export function notWearingArmorLimitation(armorType: string): ModifierLimitation
     kind: "armor_type",
     rule: "requires_not_wearing",
     value: armorType,
+  })
+}
+
+export function requiresAtMostHpLimitation(hp: number): ModifierLimitation {
+  return createModifierLimitation({
+    kind: "hp_threshold",
+    rule: "requires_at_most_hp",
+    value: String(hp),
   })
 }
 
@@ -137,6 +150,14 @@ function evaluateLimitation(
     case "sheet_toggle": {
       const active = ctx.activeSheetToggles?.has(limitation.value as SheetToggleKey) ?? false
       if (limitation.rule === "requires_active") return active
+      return true
+    }
+    case "hp_threshold": {
+      const threshold = parseInt(limitation.value, 10)
+      const hp = ctx.currentHp
+      if (hp == null || !Number.isFinite(threshold)) return true
+      if (limitation.rule === "requires_at_most_hp") return hp <= threshold
+      if (limitation.rule === "requires_above_hp") return hp > threshold
       return true
     }
     default:

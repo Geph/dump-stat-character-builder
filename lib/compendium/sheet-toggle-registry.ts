@@ -12,6 +12,12 @@ export type SheetToggleDefinition = {
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "while_raging", label: "Raging", sourceType: "builtin" },
+  { id: "reckless_attack", label: "Attacking Recklessly", sourceType: "builtin" },
+  { id: "form_of_dread", label: "Form of Dread", sourceType: "builtin" },
+  { id: "vow_of_enmity", label: "Vow of Enmity", sourceType: "builtin" },
+  { id: "peerless_athlete_active", label: "Peerless Athlete", sourceType: "builtin" },
+  { id: "living_legend_active", label: "Living Legend", sourceType: "builtin" },
+  { id: "tides_of_chaos_active", label: "Tides of Chaos", sourceType: "builtin" },
   { id: "below_half_hp", label: "Below half hit points", sourceType: "builtin" },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
   { id: "in_combat_or_high_stakes", label: "In combat / high-stakes", sourceType: "builtin" },

@@ -12,6 +12,8 @@ import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choi
 import {
   blockedWhenConditionLimitation,
   notWearingArmorLimitation,
+  requiresActiveToggleLimitation,
+  requiresAtMostHpLimitation,
   type ModifierLimitation,
 } from "@/lib/compendium/modifier-limitations"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
@@ -127,6 +129,25 @@ function speedAdd(
   ])
 }
 
+function speedAddByLevel(
+  rows: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[],
+  label?: string,
+  limitations?: ModifierLimitation[],
+): LinkedModifierInstance {
+  return charInstance(`modinst_speed_walk_by_level`, "cat_char_speed", [
+    {
+      id: modId("speed_walk_by_level"),
+      type: "speed",
+      speedType: "walk",
+      mode: "add",
+      value: 0,
+      valueByLevel: rows,
+      label,
+      limitations,
+    },
+  ])
+}
+
 function speedTypeAdd(
   speedType: "climb" | "swim" | "fly",
   feet: number,
@@ -185,6 +206,7 @@ function alternateAbilitySkillCheck(
   skills: string[],
   conditionLabel?: string,
   label?: string,
+  limitations?: ModifierLimitation[],
 ): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, SKILL_CHECK_ALTERNATE_ABILITY_CATALOG_ID, [
     {
@@ -194,6 +216,7 @@ function alternateAbilitySkillCheck(
       skills,
       conditionLabel,
       label,
+      limitations,
     },
   ])
 }
@@ -269,13 +292,18 @@ function damageResistance(types: string[] = [], label?: string): LinkedModifierI
   ])
 }
 
-function conditionImmunity(conditions: string[], label?: string): LinkedModifierInstance {
+function conditionImmunity(
+  conditions: string[],
+  label?: string,
+  limitations?: ModifierLimitation[],
+): LinkedModifierInstance {
   return charInstance(`modinst_cond_imm_${conditions.join("_")}`, CONDITION_IMMUNITY_CATALOG_ID, [
     {
       id: modId(`cond_imm_${conditions.join("_")}`),
       type: "condition_immunity",
       conditions,
       label,
+      limitations,
     },
   ])
 }
@@ -388,6 +416,29 @@ function checkAdvantage(
   })
 }
 
+/** Incoming attack advantage/disadvantage against this character (Escape the Horde, Reckless Attack drawback). */
+function incomingAttackMode(
+  instanceKey: string,
+  mode: "advantage" | "disadvantage",
+  options?: {
+    conditions?: string[]
+    limitations?: ModifierLimitation[]
+  },
+): LinkedModifierInstance {
+  return fxInstance(`modinst_${instanceKey}`, CHECK_ROLL_MODIFIER_CATALOG_ID, {
+    effects: [
+      {
+        id: modId(instanceKey),
+        kind: "check_roll_modifier",
+        checkCategory: "other",
+        incomingAttackMode: mode,
+        checkConditionTypes: options?.conditions ?? [],
+        limitations: options?.limitations?.length ? options.limitations : undefined,
+      },
+    ],
+  })
+}
+
 function checkBonus(
   instanceKey: string,
   options: {
@@ -395,6 +446,7 @@ function checkBonus(
     bonusConfig: import("@/lib/compendium/roll-bonus-config").RollBonusConfig
     ability?: string | null
     skills?: string[]
+    limitations?: ModifierLimitation[]
   },
 ): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, CHECK_ROLL_MODIFIER_CATALOG_ID, {
@@ -407,6 +459,7 @@ function checkBonus(
         checkAbility: options.ability ?? null,
         checkSkills: options.skills,
         bonusConfig: options.bonusConfig,
+        limitations: options.limitations?.length ? options.limitations : undefined,
       },
     ],
   })
@@ -607,8 +660,21 @@ function auraPreset(
     halfCover?: boolean
     radiusAtLevel?: { level: number; radiusFeet: number }
     label?: string
+    saveBonusMin?: number
   },
 ): LinkedModifierInstance {
+  const saveBonusConfig = config.saveAbility
+    ? {
+        mode: "ability_modifier" as const,
+        ability: config.saveAbility,
+        resultFloor:
+          config.saveBonusMin != null
+            ? { mode: "fixed" as const, fixed: config.saveBonusMin }
+            : config.saveAbility === "CHA"
+              ? { mode: "fixed" as const, fixed: 1 }
+              : null,
+      }
+    : null
   return charInstance(`modinst_${instanceKey}`, AURA_CATALOG_ID, [
     {
       id: modId(instanceKey),
@@ -617,13 +683,12 @@ function auraPreset(
       affectsSelf: true,
       affectsAllies: true,
       halfCover: config.halfCover ?? false,
-      saveBonusConfig: config.saveAbility
-        ? { mode: "ability_modifier", ability: config.saveAbility }
-        : null,
+      saveBonusConfig,
       radiusByLevel: config.radiusAtLevel
         ? [{ level: config.radiusAtLevel.level, mode: "fixed", fixed: config.radiusAtLevel.radiusFeet }]
         : [],
       label: config.label,
+      limitations: [blockedWhenConditionLimitation("Incapacitated")],
     },
   ])
 }
@@ -951,8 +1016,7 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
             description:
               "Opportunity attacks have Disadvantage against you.",
             linkedModifiers: [
-              checkAdvantage("escape_the_horde", {
-                category: "other",
+              incomingAttackMode("escape_the_horde", "disadvantage", {
                 conditions: ["Opportunity attacks against you"],
               }),
             ],
@@ -1741,7 +1805,15 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     }),
   ],
   "*::Reckless Attack": [
-    checkAdvantage("reckless_attack", { category: "attack", ability: "Strength" }),
+    checkAdvantage("reckless_attack", {
+      category: "attack",
+      ability: "Strength",
+      limitations: [requiresActiveToggleLimitation("reckless_attack")],
+    }),
+    incomingAttackMode("reckless_attack_drawback", "advantage", {
+      conditions: ["Melee attacks against you"],
+      limitations: [requiresActiveToggleLimitation("reckless_attack")],
+    }),
   ],
   "*::Primal Knowledge": [
     classSkillListChoice(1, "Primal Knowledge skill"),
@@ -1751,20 +1823,32 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ["Acrobatics", "Intimidation", "Perception", "Stealth", "Survival"],
       "While your Rage is active",
       "Primal Knowledge (Strength for skill checks while raging)",
+      [requiresActiveToggleLimitation("while_raging")],
     ),
   ],
   "*::Fast Movement": [
     speedAdd(10, "+10 ft. walk", [notWearingArmorLimitation("Heavy armor")]),
   ],
   "*::Unarmored Movement": [
-    speedAdd(10, "+10 ft. walk", [
-      notWearingArmorLimitation("Any armor"),
-      notWearingArmorLimitation("Shield"),
-    ]),
+    speedAddByLevel(
+      [
+        { level: 5, mode: "fixed", fixed: 10 },
+        { level: 10, mode: "fixed", fixed: 15 },
+        { level: 15, mode: "fixed", fixed: 20 },
+        { level: 18, mode: "fixed", fixed: 25 },
+        { level: 20, mode: "fixed", fixed: 30 },
+      ],
+      "+10–30 ft. walk (scales by level)",
+      [notWearingArmorLimitation("Heavy armor")],
+    ),
   ],
   "*::Feral Instinct": [checkAdvantage("feral_instinct", { category: "initiative" })],
   "*::Mindless Rage": [
-    conditionImmunity(["Charmed", "Frightened"], "While Rage is active"),
+    conditionImmunity(
+      ["Charmed", "Frightened"],
+      "While Rage is active",
+      [requiresActiveToggleLimitation("while_raging")],
+    ),
   ],
   "*::Indomitable Might": [
     checkAbilityFloor("indomitable_might_ability", "ability", "Strength"),
@@ -1789,7 +1873,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Jack of All Trades": [
     checkBonus("jack_of_all_trades", {
       category: "ability",
-      bonusConfig: { mode: "proficiency", multiplier: 0.5 },
+      bonusConfig: {
+        mode: "proficiency",
+        multiplier: 0.5,
+        bonusAppliesWhen: "non_proficient_skill_only",
+      },
     }),
   ],
   "*::Druidic": [languages(["Druidic"], undefined, "Druidic")],
@@ -1848,7 +1936,12 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Heroic Warrior": [gainInspiration()],
   "*::Additional Fighting Style": [grantFeat(["Fighting Style"], "Fighting Style feat")],
-  "*::Survivor": [checkAdvantage("survivor_defy_death", { category: "other" })],
+  "*::Survivor": [
+    checkAdvantage("survivor_defy_death", {
+      category: "other",
+      limitations: [requiresAtMostHpLimitation(0)],
+    }),
+  ],
   "Sorcerer::Draconic Sorcery::Draconic Resilience": [
     hitPointsPerLevel(3, "+3 HP per Sorcerer level"),
     draconicAc("draconic_resilience_ac"),
@@ -1872,7 +1965,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Feral Senses": [vision(30, "blindsight", "Blindsight 30 ft.")],
   "*::Precise Hunter": [
-    checkAdvantage("precise_hunter", { category: "attack", ability: null }),
+    checkAdvantage("precise_hunter", {
+      category: "attack",
+      ability: null,
+      limitations: [requiresActiveToggleLimitation("quarry_marked")],
+    }),
   ],
   "*::Use Magic Device": [attunementSlots(4, "Attune to 4 magic items")],
   "*::Dark One's Own Luck": [
@@ -3121,7 +3218,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
         "Form of Dread",
       ),
-      conditionImmunity(["Frightened"], "While Form of Dread is active"),
+      conditionImmunity(
+        ["Frightened"],
+        "While Form of Dread is active",
+        [requiresActiveToggleLimitation("form_of_dread")],
+      ),
     ],
   },
 
@@ -3763,8 +3864,16 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     activation: { bonusAction: true },
     linkedModifiers: [
       usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Peerless Athlete"),
-      checkAdvantage("peerless_athlete_athletics", { category: "skill", skills: ["Athletics"] }),
-      checkAdvantage("peerless_athlete_acrobatics", { category: "skill", skills: ["Acrobatics"] }),
+      checkAdvantage("peerless_athlete_athletics", {
+        category: "skill",
+        skills: ["Athletics"],
+        limitations: [requiresActiveToggleLimitation("peerless_athlete_active")],
+      }),
+      checkAdvantage("peerless_athlete_acrobatics", {
+        category: "skill",
+        skills: ["Acrobatics"],
+        limitations: [requiresActiveToggleLimitation("peerless_athlete_active")],
+      }),
     ],
   },
   "*::Aura of Alacrity": {
@@ -3804,7 +3913,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         undefined,
         { minSpellLevel: 5, restores: 1 },
       ),
-      checkAdvantage("living_legend_charisma", { category: "ability", ability: "Charisma" }),
+      checkAdvantage("living_legend_charisma", {
+        category: "ability",
+        ability: "Charisma",
+        limitations: [requiresActiveToggleLimitation("living_legend_active")],
+      }),
       failedRollTriggerPreset("living_legend_save", {
         rollKind: "save",
         useReaction: true,
@@ -3940,7 +4053,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     activation: { action: true },
     linkedModifiers: [
       usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Vow of Enmity"),
-      checkAdvantage("vow_of_enmity", { category: "attack", ability: null }),
+      checkAdvantage("vow_of_enmity", {
+        category: "attack",
+        ability: null,
+        limitations: [requiresActiveToggleLimitation("vow_of_enmity")],
+      }),
     ],
   },
   "*::Relentless Avenger": {
@@ -4731,7 +4848,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Tides of Chaos": {
     linkedModifiers: [
       usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Tides of Chaos"),
-      checkAdvantage("tides_of_chaos", { category: "other" }),
+      checkAdvantage("tides_of_chaos", {
+        category: "other",
+        limitations: [requiresActiveToggleLimitation("tides_of_chaos_active")],
+      }),
     ],
   },
   "*::Bend Luck": {
