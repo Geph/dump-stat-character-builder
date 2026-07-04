@@ -7,6 +7,7 @@ import {
 } from "@/lib/import/detect-feature-modifiers"
 import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
+import { enrichPsionArchetypeFeatures } from "@/lib/import/enrich-psion-archetype-features"
 import {
   attachReferencedSpellsFromSupplements,
   enrichSubclassSpellTablesOnImport,
@@ -249,5 +250,5 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   )
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 
-  return enrichImportChoiceFeatures(withSubclassSpells)
+  return enrichPsionArchetypeFeatures(enrichImportChoiceFeatures(withSubclassSpells))
 }

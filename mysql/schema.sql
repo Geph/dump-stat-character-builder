@@ -296,6 +296,7 @@ CREATE TABLE IF NOT EXISTS characters (
   modifier_player_picks JSON,
   asi_allocations JSON,
   companion_state JSON,
+  sheet_state JSON,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,

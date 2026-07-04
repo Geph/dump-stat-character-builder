@@ -2,7 +2,7 @@ import type { RestType, UsesConfig } from "@/lib/types"
 import {
   getRechargeAmount,
   getRechargeAmountOnInitiative,
-  getRechargeRules,
+  getRestRechargeRules,
   hasInitiativeRecharge,
   isRestRechargeEnabled,
   resolveRechargeRuleAmount,
@@ -40,7 +40,7 @@ export function applyUsesRest(
   }
   if (!isRestRechargeEnabled(uses, rest)) return { used: currentUsed }
 
-  const rule = getRechargeRules(uses).find((entry) => entry.rest === rest)
+  const rule = getRestRechargeRules(uses).find((entry) => entry.rest === rest)
   if (rule?.maxPerLongRest != null && rule.maxPerLongRest > 0) {
     const usedCaps = options?.rechargeCapsUsed ?? 0
     if (usedCaps >= rule.maxPerLongRest) return { used: currentUsed }
