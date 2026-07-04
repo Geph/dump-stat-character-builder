@@ -24,7 +24,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - name: Static export
@@ -40,7 +40,22 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry_action.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Retry GitHub Pages deploy
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+      - name: Deploy to GitHub Pages (retry)
+        id: deployment_retry_action
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+      - name: Verify deployment succeeded
+        if: steps.deployment.outcome == 'failure' && steps.deployment_retry_action.outcome == 'failure'
+        run: |
+          echo "GitHub Pages deployment failed after retry."
+          exit 1

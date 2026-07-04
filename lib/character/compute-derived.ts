@@ -99,7 +99,7 @@ function resolvePrimaryClass(
   return inputs.classes.find((cls) => cls.id === primaryId) ?? null
 }
 
-function classesForHp(inputs: CharacterBuildInputs): { cls: DndClass; level: number }[] {
+export function classesForHp(inputs: CharacterBuildInputs): { cls: DndClass; level: number }[] {
   if (inputs.classLevels.length > 0) {
     return inputs.classLevels
       .map((entry) => ({
@@ -114,7 +114,7 @@ function classesForHp(inputs: CharacterBuildInputs): { cls: DndClass; level: num
   return [{ cls: primary, level: totalLevel }]
 }
 
-function calculateBaseMaxHp(
+export function calculateBaseMaxHp(
   inputs: CharacterBuildInputs,
   conMod: number,
 ): number {

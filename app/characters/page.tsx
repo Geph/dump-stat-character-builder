@@ -1,14 +1,20 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil } from "lucide-react"
+import { Plus, User, Trash2, Search, Pencil, Download, Upload } from "lucide-react"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
+import {
+  characterRowToExportItem,
+  downloadCharacterExport,
+  parseCharacterExportJson,
+  prepareCharacterImportRow,
+} from "@/lib/character/character-export-format"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,28 +44,31 @@ export default function CharactersPage() {
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest")
   const [loadError, setLoadError] = useState<string | null>(null)
   const [characterToDelete, setCharacterToDelete] = useState<CharacterWithRelations | null>(null)
+  const [importStatus, setImportStatus] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchCharacters = async () => {
+    setLoadError(null)
+    const db = createClient()
+
+    const { data, error } = await db.from("characters").select("*")
+
+    if (error) {
+      const message = error.message || "Could not load characters from the database."
+      setLoadError(message)
+      console.error("Failed to load characters:", message)
+    } else if (data) {
+      const sorted = [...data].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      setCharacters(sorted)
+    }
+    setLoading(false)
+  }
 
   useEffect(() => {
-    const fetchCharacters = async () => {
-      setLoadError(null)
-      const db = createClient()
-
-      const { data, error } = await db.from("characters").select("*")
-
-      if (error) {
-        const message = error.message || "Could not load characters from the database."
-        setLoadError(message)
-        console.error("Failed to load characters:", message)
-      } else if (data) {
-        const sorted = [...data].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
-        setCharacters(sorted)
-      }
-      setLoading(false)
-    }
-
-    fetchCharacters()
+    void fetchCharacters()
   }, [])
 
   const classOptions = useMemo(
@@ -130,6 +139,52 @@ export default function CharactersPage() {
     setCharacterToDelete(null)
   }
 
+  const handleExportCharacter = (character: CharacterWithRelations) => {
+    downloadCharacterExport(
+      characterRowToExportItem(character as unknown as Record<string, unknown>),
+    )
+  }
+
+  const handleExportAll = () => {
+    if (!characters.length) return
+    downloadCharacterExport(
+      characters.map((character) =>
+        characterRowToExportItem(character as unknown as Record<string, unknown>),
+      ),
+    )
+  }
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true)
+    setImportStatus(null)
+    try {
+      const items = parseCharacterExportJson(await file.text())
+      if (!items?.length) {
+        setImportStatus("Invalid character JSON. Expected a dnd-character export file.")
+        return
+      }
+
+      const db = createClient()
+      let imported = 0
+      for (const item of items) {
+        const row = prepareCharacterImportRow(item)
+        const { error } = await db.from("characters").insert([row])
+        if (error) throw new Error(error.message)
+        imported++
+      }
+
+      await fetchCharacters()
+      setImportStatus(
+        imported === 1 ? "Imported 1 character." : `Imported ${imported} characters.`,
+      )
+    } catch (error) {
+      setImportStatus(error instanceof Error ? error.message : "Character import failed.")
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ""
+    }
+  }
+
   const formatCreated = (iso: string) =>
     new Date(iso).toLocaleDateString(undefined, {
       year: "numeric",
@@ -153,14 +208,54 @@ export default function CharactersPage() {
                   : `${characters.length} ${characters.length === 1 ? "character" : "characters"}`}
             </p>
           </div>
-          <Link
-            href="/builder"
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            New Character
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void handleImportFile(file)
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors disabled:opacity-60"
+            >
+              <Upload className="w-5 h-5" />
+              {importing ? "Importing…" : "Import JSON"}
+            </button>
+            {characters.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportAll}
+                className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                Export all
+              </button>
+            )}
+            <Link
+              href="/builder"
+              className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              New Character
+            </Link>
+          </div>
         </div>
+
+        {importStatus && (
+          <div
+            role="status"
+            className="mb-6 rounded-xl border-2 border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground"
+          >
+            {importStatus}
+          </div>
+        )}
 
         {loadError && (
           <div
@@ -337,13 +432,23 @@ export default function CharactersPage() {
                         {character.name}
                       </h3>
                     </Link>
-                    <Link
-                      href={`/builder?edit=${character.id}`}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
-                      title="Edit character"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Link>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleExportCharacter(character)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Export character JSON"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <Link
+                        href={`/builder?edit=${character.id}`}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Edit character"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                    </div>
                   </div>
                   <div className="mt-1 space-y-0.5">
                     <p className="text-sm text-primary font-medium">

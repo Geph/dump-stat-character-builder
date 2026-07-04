@@ -3,13 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { Users, BookOpen, Upload, Sparkles, Home } from "lucide-react"
+import { Users, BookOpen, Upload, Sparkles, Home, LayoutDashboard } from "lucide-react"
 import { GlobalSettingsMenu } from "@/components/settings/global-settings-menu"
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/builder", label: "Builder", icon: Sparkles },
   { href: "/characters", label: "Characters", icon: Users },
+  { href: "/dashboard", label: "GM Dashboard", icon: LayoutDashboard },
   { href: "/compendium", label: "Compendium", icon: BookOpen },
   { href: "/import", label: "Import", icon: Upload },
 ]

@@ -1,5 +1,6 @@
 import { characteristicsFromLinkedModifiers } from "@/lib/compendium/builder-modifier-refs"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import { tagModifierSource } from "@/lib/character/tag-modifier-source"
 import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
 import {
   equipmentRequiresAttunement,
@@ -52,7 +53,15 @@ export function collectEquipmentMagicCharacteristics(
   context: EquipmentMagicContext,
 ): CharacteristicModifier[] {
   return collectActiveMagicItems(context).flatMap((item) =>
-    characteristicsFromLinkedModifiers(context.modifierCatalog, readMagicEffects(item), null),
+    tagModifierSource(
+      characteristicsFromLinkedModifiers(context.modifierCatalog, readMagicEffects(item), null),
+      {
+        sourceType: "item",
+        source: item.name,
+        label: item.name,
+        sourceId: item.id,
+      },
+    ),
   )
 }
 

@@ -1,0 +1,44 @@
+@media print {
+  header nav,
+  .no-print,
+  [data-print-hide="true"],
+  button:not([data-print-show="true"]),
+  .sheet-tab-nav {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-break-before {
+    break-before: page;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    color: #444;
+  }
+
+  .print-qr-footer {
+    position: fixed;
+    bottom: 0.5in;
+    left: 0.5in;
+    right: 0.5in;
+    border-top: 1px solid #ccc;
+    padding-top: 0.25in;
+    font-size: 9pt;
+  }
+}

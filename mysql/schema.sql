@@ -223,7 +223,7 @@ CREATE TABLE IF NOT EXISTS custom_abilities (
   companion_stat_block JSON,
   psionic_augments JSON,
   casting_time VARCHAR(128),
-  range VARCHAR(255),
+  `range` VARCHAR(255),
   components JSON,
   duration VARCHAR(255),
   concentration TINYINT(1),

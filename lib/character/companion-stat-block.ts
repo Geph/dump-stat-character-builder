@@ -90,6 +90,10 @@ export type CharacterCompanionState = {
   key: string
   currentHp: number | null
   customName?: string | null
+  /** Active conditions tracked on the companion sub-sheet. */
+  activeConditions?: string[] | null
+  /** When true for a polymorph form, owner physical stats use this form on the main sheet. */
+  polymorphActive?: boolean | null
 }
 
 export type CompanionResolveContext = {
