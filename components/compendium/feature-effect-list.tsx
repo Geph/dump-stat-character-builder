@@ -19,6 +19,7 @@ import { normalizeFeatureEffects } from "@/lib/compendium/normalize-feature-acti
 import { defaultRollBonusConfig, rollBonusFromLegacy } from "@/lib/compendium/roll-bonus-config"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
+import { RollBonusEditor } from "@/components/compendium/roll-bonus-editor"
 import {
   defaultBonusByLevelEntry,
   normalizeBonusByLevel,
