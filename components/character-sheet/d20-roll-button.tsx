@@ -5,6 +5,7 @@ import { Dices } from "lucide-react"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
 import type { RollContext } from "@/lib/character/roll-context"
+import { collectFeatureRollBonuses } from "@/lib/character/collect-limited-feature-effects"
 import {
   resolveRollMode,
   rollModeBadgeLabel,
@@ -21,6 +22,10 @@ type D20RollButtonProps = {
   rollContext?: RollContext
   activeConditions?: string[]
   exhaustionLevel?: number
+  /** When false, Jack of All Trades and similar bonuses are skipped for this roll. */
+  skillProficient?: boolean
+  /** Set when `modifier` already includes feature roll bonuses (e.g. derived skill totals). */
+  featureBonusesIncluded?: boolean
   disabled?: boolean
   disabledReason?: string
 }
@@ -58,6 +63,8 @@ export function D20RollButton({
   rollContext,
   activeConditions = [],
   exhaustionLevel = 0,
+  skillProficient,
+  featureBonusesIncluded = false,
   disabled = false,
   disabledReason,
 }: D20RollButtonProps) {
@@ -84,12 +91,33 @@ export function D20RollButton({
           activeSheetToggles: rollCtx.activeSheetToggles,
           equippedArmor: rollCtx.equippedArmor,
           equippedShield: rollCtx.equippedShield,
+          currentHp: rollCtx.featureEffectContext?.currentHp ?? rollCtx.currentHp,
         },
       })
     : {
         mode: (manualOverride === "normal" ? "normal" : manualOverride) as D20RollMode,
         sources: [] as string[],
       }
+
+  const featureRollBonus =
+    !featureBonusesIncluded &&
+    rollContext &&
+    rollCtx.classFeatures.length &&
+    rollCtx.featureEffectContext
+      ? collectFeatureRollBonuses(rollCtx.classFeatures, rollContext, {
+          activeConditions: conditions,
+          activeSheetToggles: rollCtx.activeSheetToggles,
+          equippedArmor: rollCtx.equippedArmor,
+          equippedShield: rollCtx.equippedShield,
+          currentHp: rollCtx.featureEffectContext.currentHp,
+          proficiencyBonus: rollCtx.featureEffectContext.proficiencyBonus,
+          abilityMods: rollCtx.featureEffectContext.abilityMods,
+          characterLevel: rollCtx.featureEffectContext.characterLevel,
+          skillProficient,
+        }).total
+      : 0
+
+  const effectiveModifier = modifier + featureRollBonus
 
   const effectiveMode = resolved.mode
   const sizeClass =
@@ -99,17 +127,19 @@ export function D20RollButton({
         ? "h-9 min-w-9 px-2 text-sm gap-1.5"
         : "h-6 min-w-[2.25rem] px-1.5 text-xs gap-1"
 
-  const modLabel = modifier >= 0 ? `+${modifier}` : `${modifier}`
+  const modLabel = effectiveModifier >= 0 ? `+${effectiveModifier}` : `${effectiveModifier}`
   const modeBadge = rollModeBadgeLabel(effectiveMode)
 
   const formatSigned = (value: number) => (value >= 0 ? `+${value}` : `${value}`)
   const tooltip = (() => {
     const header = title ? `${title} (${modLabel})` : `Roll d20 ${modLabel}`
     const lines = (breakdown ?? []).filter((part) => part.value !== 0)
+    const featureBonusLine =
+      featureRollBonus !== 0 ? `  Feature bonus: ${formatSigned(featureRollBonus)}` : null
     const modeLine = modeBadge ? `Mode: ${modeBadge}` : null
     const manualLine =
       manualOverride !== "normal" ? `Manual override: ${manualOverride}` : null
-    return [header, modeLine, manualLine, ...lines.map((part) => `  ${part.label}: ${formatSigned(part.value)}`)]
+    return [header, modeLine, manualLine, featureBonusLine, ...lines.map((part) => `  ${part.label}: ${formatSigned(part.value)}`)]
       .filter(Boolean)
       .join("\n")
   })()
@@ -117,7 +147,7 @@ export function D20RollButton({
   const handleRoll = () => {
     if (disabled) return
     if (effectiveMode === "auto_fail") {
-      setResult({ natural: 1, total: 1 + modifier, mode: "auto_fail" })
+      setResult({ natural: 1, total: 1 + effectiveModifier, mode: "auto_fail" })
       history?.logRoll({
         kind: "d20",
         label: title ?? `d20 ${modLabel}`,
@@ -128,14 +158,14 @@ export function D20RollButton({
       return
     }
 
-    const rolled = rollD20WithMode(effectiveMode, modifier)
+    const rolled = rollD20WithMode(effectiveMode, effectiveModifier)
     setResult({ natural: rolled.natural, total: rolled.total, mode: rolled.mode })
     const modeSuffix =
       rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
     history?.logRoll({
       kind: "d20",
       label: title ?? `d20 ${modLabel}`,
-      summary: `${rolled.natural}${modifier >= 0 ? ` + ${modifier}` : ` − ${Math.abs(modifier)}`} = ${rolled.total}${modeSuffix}${d20CriticalSuffix(rolled.natural)}`,
+      summary: `${rolled.natural}${effectiveModifier >= 0 ? ` + ${effectiveModifier}` : ` − ${Math.abs(effectiveModifier)}`} = ${rolled.total}${modeSuffix}${d20CriticalSuffix(rolled.natural)}`,
       natural: rolled.natural,
     })
     onRoll?.()

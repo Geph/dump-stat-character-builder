@@ -1,5 +1,7 @@
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
+import type { ModifierLimitation } from "@/lib/compendium/modifier-limitations"
+import { blockedWhenConditionLimitation } from "@/lib/compendium/modifier-limitations"
 import { charInstance, fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { buildWeaponMasteryModifierInstance } from "@/lib/compendium/weapon-mastery-catalog"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
@@ -28,6 +30,7 @@ export function buildEvasionModifier(instanceId = "modinst_evasion"): LinkedModi
         checkCategory: "save",
         checkAbility: "Dexterity",
         defensiveSaveSuccess: "none",
+        limitations: [blockedWhenConditionLimitation("Incapacitated")],
       },
     ],
   })

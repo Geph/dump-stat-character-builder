@@ -1,7 +1,8 @@
 import type { RollContext } from "@/lib/character/roll-context"
-import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
-import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import { collectActiveFeatureEffects } from "@/lib/character/collect-limited-feature-effects"
 import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
 import { combineRollModes, type D20RollMode } from "@/lib/dice/d20-roll"
 import type { Feature, FeatureEffect } from "@/lib/types"
 
@@ -72,22 +73,25 @@ export function collectFeatureRollModes(
   const modes: D20RollMode[] = []
   const sources: string[] = []
 
-  for (const feature of features) {
-    for (const instance of feature.linkedModifiers ?? []) {
-      for (const effect of instance.activation?.effects ?? []) {
-        const rollMode = resolveCheckRollMode(effect)
-        if (rollMode !== "advantage" && rollMode !== "disadvantage") continue
-        if (!featureEffectMatchesRollContext(effect, context)) continue
-        if (isFeatureRollModifierBlocked(effect, {
-          ...limitationCtx,
-          activeConditions: limitationCtx.activeConditions ?? [],
-        })) {
-          continue
-        }
-        modes.push(rollMode)
-        sources.push(feature.name ?? "Feature")
-      }
-    }
+  const active = collectActiveFeatureEffects(
+    features,
+    {
+      ...limitationCtx,
+      rollContext: context,
+      rollTags: context.rollTags,
+    },
+    (effect) => {
+      const rollMode = resolveCheckRollMode(effect)
+      return rollMode === "advantage" || rollMode === "disadvantage"
+    },
+  )
+
+  for (const { featureName, effect } of active) {
+    const rollMode = resolveCheckRollMode(effect)
+    if (rollMode !== "advantage" && rollMode !== "disadvantage") continue
+    if (!featureEffectMatchesRollContext(effect, context)) continue
+    modes.push(rollMode)
+    sources.push(featureName)
   }
 
   return { mode: combineRollModes(modes), sources }

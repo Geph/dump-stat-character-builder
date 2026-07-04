@@ -29,8 +29,10 @@ export interface RollBonusConfig {
   dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
   dieScaling?: RollBonusDieScaling | null
   classResourceKey?: string | null
-  /** Minimum result after applying the bonus (e.g. Reliable Talent). */
+  /** Minimum result after applying the bonus (e.g. Reliable Talent, Aura of Protection). */
   resultFloor?: RollBonusResultFloor | null
+  /** When set, limits which rolls receive this bonus (e.g. Jack of All Trades). */
+  bonusAppliesWhen?: "always" | "non_proficient_skill_only"
 }
 
 export type BuffAllyMode = "advantage" | "bonus"

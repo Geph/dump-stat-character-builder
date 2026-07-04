@@ -8,6 +8,8 @@ export type RollContext = {
   ability?: AbilityScoreKey
   /** Skill name for skill checks. */
   skillName?: string
+  /** Optional scope tags (e.g. "spell", "Frightened") for conditional advantages. */
+  rollTags?: string[]
 }
 
 export function rollContextLabel(context: RollContext): string {

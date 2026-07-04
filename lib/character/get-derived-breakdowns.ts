@@ -108,6 +108,8 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     equippedShield: inputs.equippedShieldId
       ? inputs.equipment.find((item) => item.id === inputs.equippedShieldId) ?? null
       : null,
+    currentHp: inputs.currentHp,
+    characterLevel: derived.totalLevel,
   })
 
   const conMod = derived.abilityMods.constitution

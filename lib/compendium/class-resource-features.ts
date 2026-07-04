@@ -1,4 +1,5 @@
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { defaultRollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { Feature, FeatureActivation, FeatureEffect, UsesConfig } from "@/lib/types"
 
@@ -60,12 +61,15 @@ function extraAttackPreset(featureName: string, count: number): ResourceFeatureP
   }
 }
 
+const RAGE_WHILE_ACTIVE = [requiresActiveToggleLimitation("while_raging")]
+
 const RAGE_MODIFIERS: LinkedModifierInstance[] = [
   modInstance("modinst_rage_resist", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
     fx("fx_rage_resist", {
       kind: "damage_reduction",
       mitigation: "resistance",
       damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+      limitations: RAGE_WHILE_ACTIVE,
     }),
   ]),
   modInstance("modinst_rage_damage", CLASS_RESOURCE_FX_CATALOG.bonusDamageByLevel, [
@@ -76,6 +80,7 @@ const RAGE_MODIFIERS: LinkedModifierInstance[] = [
         { level: 9, bonus: "+3" },
         { level: 16, bonus: "+4" },
       ],
+      limitations: RAGE_WHILE_ACTIVE,
     }),
   ]),
   modInstance("modinst_rage_str_checks", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
@@ -84,6 +89,7 @@ const RAGE_MODIFIERS: LinkedModifierInstance[] = [
       checkRollMode: "advantage",
       checkCategory: "ability",
       checkAbility: "Strength",
+      limitations: RAGE_WHILE_ACTIVE,
     }),
   ]),
   modInstance("modinst_rage_str_saves", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
@@ -92,6 +98,7 @@ const RAGE_MODIFIERS: LinkedModifierInstance[] = [
       checkRollMode: "advantage",
       checkCategory: "save",
       checkAbility: "Strength",
+      limitations: RAGE_WHILE_ACTIVE,
     }),
   ]),
 ]
@@ -105,16 +112,6 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       activation: { bonusAction: true },
       linkedModifiers: RAGE_MODIFIERS,
     },
-    {
-      featureName: "Retaliation",
-      activation: { reaction: true },
-      linkedModifiers: [
-        modInstance("modinst_retaliation", CLASS_RESOURCE_FX_CATALOG.reactionAttack, [
-          fx("fx_retaliation", { kind: "reaction_attack" }),
-        ]),
-      ],
-    },
-    extraAttackPreset("Extra Attack", 2),
   ],
   Bard: [
     {

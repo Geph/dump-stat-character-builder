@@ -9,6 +9,7 @@ import type {
   DndClass,
   Equipment,
   Feat,
+  Feature,
   Species,
   Subclass,
 } from "@/lib/types"
@@ -57,6 +58,10 @@ export type CharacterBuildInputs = {
   activeConditions?: string[]
   /** Per-session exhaustion level (0–6). */
   exhaustionLevel?: number
+  /** Current HP for hp_threshold limitations (Survivor, etc.). */
+  currentHp?: number
+  /** Enriched class/subclass features for gated FeatureEffect consumers (Rage damage, JoAT, etc.). */
+  resolvedFeatures?: Feature[]
 }
 
 export type SkillBonus = {

@@ -6,6 +6,8 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { effectiveLinkedModifiers, resolveLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
 import type { Feature } from "@/lib/types"
 
 /** A feature that lets certain skill checks be made with an alternate ability. */
@@ -21,6 +23,7 @@ export type AlternateAbilityCheckEntry = {
 function characteristicsForFeature(
   feature: Feature,
   catalog: ModifierCatalogEntry[],
+  limitationCtx: LimitationEvaluationContext,
 ): SkillCheckAlternateAbilityCharacteristic[] {
   const instances = effectiveLinkedModifiers(
     feature.linkedModifiers,
@@ -31,7 +34,7 @@ function characteristicsForFeature(
   const { characteristics } = resolveLinkedModifiers(instances, catalog)
   return normalizeCharacteristics(characteristics, null).filter(
     (mod): mod is SkillCheckAlternateAbilityCharacteristic =>
-      mod.type === "skill_check_alternate_ability",
+      mod.type === "skill_check_alternate_ability" && modifierLimitationsMet(mod, limitationCtx),
   )
 }
 
@@ -42,10 +45,11 @@ function pushFeatureEntries(
   sourceLabel: string,
   idPrefix: string,
   catalog: ModifierCatalogEntry[],
+  limitationCtx: LimitationEvaluationContext,
 ): void {
   for (const feature of features ?? []) {
     if ((feature.level ?? 1) > levelCap) continue
-    for (const mod of characteristicsForFeature(feature, catalog)) {
+    for (const mod of characteristicsForFeature(feature, catalog, limitationCtx)) {
       out.push({
         id: `${idPrefix}:${feature.level ?? 1}:${feature.name}:${mod.id}`,
         featureName: feature.name,
@@ -62,8 +66,9 @@ function pushFeatureEntries(
 export function collectAlternateAbilityChecks(params: {
   classDetails: CharacterClassDetail[]
   catalog: ModifierCatalogEntry[]
+  limitationContext?: LimitationEvaluationContext
 }): AlternateAbilityCheckEntry[] {
-  const { classDetails, catalog } = params
+  const { classDetails, catalog, limitationContext = {} } = params
   const entries: AlternateAbilityCheckEntry[] = []
 
   for (const detail of classDetails) {
@@ -74,6 +79,7 @@ export function collectAlternateAbilityChecks(params: {
       detail.class?.name ?? "Class",
       detail.row.class_id,
       catalog,
+      limitationContext,
     )
     if (detail.subclass) {
       pushFeatureEntries(
@@ -83,6 +89,7 @@ export function collectAlternateAbilityChecks(params: {
         detail.subclass.name,
         `sub-${detail.subclass.id}`,
         catalog,
+        limitationContext,
       )
     }
   }
