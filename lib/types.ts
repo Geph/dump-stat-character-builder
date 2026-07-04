@@ -473,7 +473,8 @@ export interface UsesAtLevel {
 
 export type RestType = "short_rest" | "long_rest" | "initiative"
 
-export interface RechargeRule {
+export interface RestRechargeRule {
+  kind?: "rest"
   rest: RestType
   /** Uses restored on this rest; omit for full pool. */
   amount?: number | null
@@ -482,6 +483,20 @@ export interface RechargeRule {
   /** Cap how many times this recharge fires per long rest (e.g. once per long rest on short rest). */
   maxPerLongRest?: number | null
 }
+
+/** Wall-clock cooldown or accumulated-value decay — independent of rests. */
+export interface RealTimeRechargeRule {
+  kind: "real_time"
+  /** cooldown = block reuse; decay = banked value expires to zero. */
+  mode: "cooldown" | "decay"
+  minutes: number
+  /** Per-target cooldown (e.g. Shattered Husks). Default global. */
+  scope?: "global" | "per_target"
+  /** calendar_day = once per local calendar day; rolling = N minutes from last use. */
+  period?: "rolling" | "calendar_day"
+}
+
+export type RechargeRule = RestRechargeRule | RealTimeRechargeRule
 
 export interface UsesConfig {
   type:
@@ -766,6 +781,8 @@ export interface Character {
   modifier_player_picks?: Record<string, string[]> | null
   /** Per-companion HP overrides keyed by companion key. */
   companion_state?: import("@/lib/character/companion-stat-block").CharacterCompanionState[] | null
+  /** Saved combat/play state (explicit save from character sheet). */
+  sheet_state?: import("@/lib/character/sheet-play-state").CharacterSheetPlayState | null
   created_at: string
   updated_at: string
 }

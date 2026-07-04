@@ -1,7 +1,9 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
-import type { TurnStartTriggerCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import type { AbilityScoreKey, TurnStartTriggerCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
+import { accrueResource, tickAccumulatedResources } from "@/lib/character/real-time-recharge"
+import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
 import type { Feature, UsesConfig } from "@/lib/types"
 
@@ -21,6 +23,35 @@ function resolveResourceKeyForClass(className: string, resourceKey: string): str
   return resourceKey
 }
 
+function scanFeatureList(
+  features: Feature[] | undefined,
+  ctx: { className: string; classId: string; classLevel: number },
+  into: TurnStartTriggerEntry[],
+) {
+  for (const feature of features ?? []) {
+    if ((feature.level ?? 1) > ctx.classLevel) continue
+    for (const instance of readLinkedModifiers(feature)) {
+      for (const characteristic of instance.characteristics ?? []) {
+        if (characteristic.type !== "turn_start_trigger") continue
+        const trigger = characteristic as TurnStartTriggerCharacteristic
+        const restoreKey = trigger.restoreResourceKey
+          ? resolveResourceKeyForClass(ctx.className, trigger.restoreResourceKey)
+          : trigger.restoreResourceKey
+        into.push({
+          id: `${ctx.classId}:${feature.level ?? 1}:${feature.name}:${trigger.id ?? instance.instanceId}`,
+          name: trigger.label ?? feature.name,
+          classId: ctx.classId,
+          classLevel: ctx.classLevel,
+          trigger: {
+            ...trigger,
+            restoreResourceKey: restoreKey,
+          },
+        })
+      }
+    }
+  }
+}
+
 export function collectTurnStartTriggers(
   classDetails: CharacterClassDetail[],
 ): TurnStartTriggerEntry[] {
@@ -31,31 +62,38 @@ export function collectTurnStartTriggers(
     const classId = entry.row.class_id
     if (!className || !classId || !entry.class) continue
 
-    for (const feature of entry.class.features ?? []) {
-      if ((feature.level ?? 1) > entry.row.level) continue
-      for (const instance of readLinkedModifiers(feature)) {
-        for (const characteristic of instance.characteristics ?? []) {
-          if (characteristic.type !== "turn_start_trigger") continue
-          const trigger = characteristic as TurnStartTriggerCharacteristic
-          const restoreKey = trigger.restoreResourceKey
-            ? resolveResourceKeyForClass(className, trigger.restoreResourceKey)
-            : trigger.restoreResourceKey
-          entries.push({
-            id: `${classId}:${feature.level ?? 1}:${feature.name}:${trigger.id ?? instance.instanceId}`,
-            name: trigger.label ?? feature.name,
-            classId,
-            classLevel: entry.row.level,
-            trigger: {
-              ...trigger,
-              restoreResourceKey: restoreKey,
-            },
-          })
-        }
-      }
+    scanFeatureList(entry.class.features, {
+      className,
+      classId,
+      classLevel: entry.row.level,
+    }, entries)
+
+    if (entry.subclass) {
+      scanFeatureList(entry.subclass.features as Feature[] | undefined, {
+        className,
+        classId,
+        classLevel: entry.row.level,
+      }, entries)
     }
   }
 
   return entries
+}
+
+function abilityModForKey(
+  key: AbilityScoreKey | null | undefined,
+  abilityMods: Record<string, number>,
+): number {
+  if (!key) return 0
+  const map: Record<AbilityScoreKey, string> = {
+    STR: "strength",
+    DEX: "dexterity",
+    CON: "constitution",
+    INT: "intelligence",
+    WIS: "wisdom",
+    CHA: "charisma",
+  }
+  return abilityMods[map[key]] ?? 0
 }
 
 export function applyTurnStartTriggers(params: {
@@ -66,11 +104,23 @@ export function applyTurnStartTriggers(params: {
   currentHp: number
   maxHp: number
   activeConditions: string[]
-}): Record<string, number> {
+  activeSheetToggleIds?: readonly string[]
+  accumulatedResources?: Record<string, AccumulatedResourceState>
+  abilityMods?: Record<string, number>
+}): {
+  usedResourcesById: Record<string, number>
+  accumulatedResources: Record<string, AccumulatedResourceState>
+} {
   const next = { ...params.usedResourcesById }
+  let accumulated = tickAccumulatedResources(params.accumulatedResources ?? {})
+  const toggles = params.activeSheetToggleIds ?? []
+  const abilityMods = params.abilityMods ?? {}
 
   for (const entry of params.triggers) {
     const trigger = entry.trigger
+    if (trigger.requiresSheetToggle && !toggles.includes(trigger.requiresSheetToggle)) {
+      continue
+    }
     if (
       trigger.blockedByConditions?.some((condition) =>
         params.activeConditions.some((active) =>
@@ -86,6 +136,23 @@ export function applyTurnStartTriggers(params: {
       if (params.currentHp >= threshold) continue
     }
     if (trigger.hpAtLeast != null && params.currentHp < trigger.hpAtLeast) continue
+
+    if (
+      trigger.accrueResourceKey &&
+      trigger.accrueResourceAmount != null &&
+      trigger.accrueResourceMaxAbility
+    ) {
+      const cap = Math.max(0, abilityModForKey(trigger.accrueResourceMaxAbility, abilityMods))
+      if (cap <= 0) continue
+      accumulated = accrueResource({
+        accumulated,
+        resourceKey: trigger.accrueResourceKey,
+        amount: trigger.accrueResourceAmount,
+        max: cap,
+        decayMinutes: trigger.accrueDecayMinutes ?? 1,
+      })
+      continue
+    }
 
     if (trigger.restoreResourceKey && trigger.restoreResourceAmount != null) {
       const resourceEntry = params.resourceEntries.find((row) =>
@@ -103,5 +170,5 @@ export function applyTurnStartTriggers(params: {
     }
   }
 
-  return next
+  return { usedResourcesById: next, accumulatedResources: accumulated }
 }

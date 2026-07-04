@@ -762,6 +762,13 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
   /** Restore uses from this class resource pool (reduce used count). */
   restoreResourceKey?: string | null
   restoreResourceAmount?: number | null
+  /** Accrue a banked resource (e.g. Influence points) instead of restoring a pool. */
+  accrueResourceKey?: string | null
+  accrueResourceAmount?: number | null
+  accrueResourceMaxAbility?: AbilityScoreKey | null
+  accrueDecayMinutes?: number | null
+  /** Skip when toggle is off (e.g. in-combat gate). */
+  requiresSheetToggle?: SheetToggleKey | null
   /** Skip when any of these conditions are active (e.g. Incapacitated). */
   blockedByConditions?: string[]
   effect?: NestedModifierEffect | null
@@ -807,6 +814,8 @@ export interface ResourceAbilityMenuOption {
   name: string
   description?: string
   resourceCost?: number
+  /** Waive resourceCost when character's element specialization matches. */
+  waiveWhenSpecializedElement?: "cold" | "fire" | "lightning" | null
   effect?: NestedModifierEffect | null
 }
 

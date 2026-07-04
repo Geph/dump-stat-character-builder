@@ -6,12 +6,36 @@ export type SheetToggleDefinition = {
   sourceType: SheetToggleSourceType
   sourceId?: string
   defaultActive?: boolean
+  /** When set, activating this toggle deactivates other toggles in the same group. */
+  exclusiveGroup?: string
 }
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "while_raging", label: "Raging", sourceType: "builtin" },
   { id: "below_half_hp", label: "Below half hit points", sourceType: "builtin" },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
+  { id: "in_combat_or_high_stakes", label: "In combat / high-stakes", sourceType: "builtin" },
+]
+
+export const PRIMORDIAL_ASPECT_TOGGLES: SheetToggleDefinition[] = [
+  {
+    id: "primordial_aspect_cold",
+    label: "Primordial Aspect: Cold",
+    sourceType: "class_feature",
+    exclusiveGroup: "primordial_aspect",
+  },
+  {
+    id: "primordial_aspect_fire",
+    label: "Primordial Aspect: Fire",
+    sourceType: "class_feature",
+    exclusiveGroup: "primordial_aspect",
+  },
+  {
+    id: "primordial_aspect_lightning",
+    label: "Primordial Aspect: Lightning",
+    sourceType: "class_feature",
+    exclusiveGroup: "primordial_aspect",
+  },
 ]
 
 const builtinById = new Map(BUILTIN_SHEET_TOGGLES.map((entry) => [entry.id, entry]))
@@ -53,4 +77,35 @@ export function mergeSheetToggleDefinitions(
     merged.push(entry)
   }
   return merged
+}
+
+const definitionIndex = (definitions: SheetToggleDefinition[]): Map<string, SheetToggleDefinition> =>
+  new Map(definitions.map((entry) => [entry.id, entry]))
+
+/**
+ * Toggle on/off with optional exclusive-group deactivation.
+ * Returns the next active toggle id list.
+ */
+export function applySheetToggleChange(
+  activeIds: readonly string[],
+  toggleId: string,
+  definitions: SheetToggleDefinition[],
+): string[] {
+  const byId = definitionIndex(definitions)
+  const def = byId.get(toggleId)
+  const isActive = activeIds.includes(toggleId)
+
+  if (isActive) {
+    return activeIds.filter((id) => id !== toggleId)
+  }
+
+  let next = [...activeIds, toggleId]
+  const group = def?.exclusiveGroup
+  if (group) {
+    next = next.filter((id) => {
+      if (id === toggleId) return true
+      return byId.get(id)?.exclusiveGroup !== group
+    })
+  }
+  return next
 }

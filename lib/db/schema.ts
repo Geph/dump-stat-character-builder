@@ -275,6 +275,9 @@ export const characters = mysqlTable("characters", {
   companion_state: json("companion_state").$type<
     import("@/lib/character/companion-stat-block").CharacterCompanionState[]
   >(),
+  sheet_state: json("sheet_state").$type<
+    import("@/lib/character/sheet-play-state").CharacterSheetPlayState
+  >(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 })

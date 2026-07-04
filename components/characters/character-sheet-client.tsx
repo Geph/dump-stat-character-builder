@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   PawPrint,
+  Save,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -93,11 +94,26 @@ import { isIncapacitatedByConditions } from "@/lib/srd/condition-roll-effects"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
 import {
+  buildSheetPlayStateFromSheet,
   loadSheetSessionState,
+  normalizeSheetPlayState,
   saveSheetSessionState,
 } from "@/lib/character/sheet-session-state"
+import {
+  applySheetToggleChange,
+  mergeSheetToggleDefinitions,
+  PRIMORDIAL_ASPECT_TOGGLES,
+  type SheetToggleDefinition,
+} from "@/lib/compendium/sheet-toggle-registry"
+import {
+  currentInfluencePoints,
+  INFLUENCE_POINTS_KEY,
+  spendInfluencePoints,
+} from "@/lib/character/influence-points"
+import { resolveSpecializedElement } from "@/lib/character/resolve-specialized-element"
+import type { RealTimeCooldownState } from "@/lib/character/real-time-recharge"
+import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
 import { collectMagicItemPowers } from "@/lib/character/magic-item-powers"
-import { BUILTIN_SHEET_TOGGLES } from "@/lib/compendium/sheet-toggle-registry"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 import {
@@ -115,6 +131,7 @@ import {
 } from "@/lib/character/resolve-companions"
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
+import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
 import { SheetPersistentStatsBar } from "@/components/character-sheet/sheet-persistent-stats-bar"
 import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
 import { SiteFooter } from "@/components/site-footer"
@@ -150,9 +167,15 @@ const SHEET_SELECTABLE_CONDITIONS = SRD_CONDITIONS.filter(
   (condition) => condition.name !== "Exhaustion",
 )
 
-const MANUAL_SHEET_TOGGLES = BUILTIN_SHEET_TOGGLES.filter(
-  (toggle) => toggle.id !== "below_half_hp",
-)
+function pickInitialPlayState(
+  dbState: import("@/lib/character/sheet-play-state").CharacterSheetPlayState | null | undefined,
+  sessionState: ReturnType<typeof loadSheetSessionState>,
+) {
+  const normalizedDb = normalizeSheetPlayState(dbState)
+  if (normalizedDb.savedAt) return normalizedDb
+  if (sessionState) return sessionState
+  return normalizedDb
+}
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
   if (character.class_list?.length) return character.class_list
@@ -377,6 +400,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
   const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
+  const [realTimeCooldowns, setRealTimeCooldowns] = useState<RealTimeCooldownState>({})
+  const [accumulatedResources, setAccumulatedResources] = useState<
+    Record<string, AccumulatedResourceState>
+  >({})
+  const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle")
   const [defaultActionsContext, setDefaultActionsContext] = useState<"abilities" | "combat" | null>(
     null,
   )
@@ -406,6 +436,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
         setCompanionState((data as Character).companion_state ?? [])
         setFeatureChoicePicks((data as Character).feature_choice_picks ?? {})
+
+        const playState = pickInitialPlayState(
+          (data as Character).sheet_state,
+          loadSheetSessionState(id),
+        )
+        setActiveConditions(playState.activeConditions)
+        setExhaustionLevel(playState.exhaustionLevel)
+        setActiveSheetToggleIds(playState.activeSheetToggleIds)
+        setUsedResourcesById(playState.usedResourcesById)
+        setUsedActionUsesById(playState.usedActionUsesById)
+        setUsedSpellSlotsByKey(playState.usedSpellSlotsByKey)
+        setRechargeCapsByResourceId(playState.rechargeCapsByResourceId)
+        if (playState.currentHp != null) setCurrentHp(playState.currentHp)
+        setTempHp(playState.tempHp)
+        setDeathSaves(playState.deathSaves)
+        setHasInspiration(playState.hasInspiration)
+        setRealTimeCooldowns(playState.realTimeCooldowns)
+        setAccumulatedResources(tickAccumulatedResources(playState.accumulatedResources))
+        setSessionHydrated(true)
 
         if (data.spell_ids?.length) {
           const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
@@ -457,29 +506,43 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [id])
 
   useEffect(() => {
-    const saved = loadSheetSessionState(id)
-    if (saved) {
-      setActiveConditions(saved.activeConditions)
-      setExhaustionLevel(saved.exhaustionLevel)
-      setActiveSheetToggleIds(saved.activeSheetToggleIds)
-    }
-    setSessionHydrated(true)
-  }, [id])
-
-  useEffect(() => {
     if (!sessionHydrated) return
-    saveSheetSessionState(id, {
-      activeConditions,
-      exhaustionLevel,
-      activeSheetToggleIds,
-    })
-  }, [id, sessionHydrated, activeConditions, exhaustionLevel, activeSheetToggleIds])
-
-  const toggleSheetToggle = useCallback((toggleId: string) => {
-    setActiveSheetToggleIds((prev) =>
-      prev.includes(toggleId) ? prev.filter((entry) => entry !== toggleId) : [...prev, toggleId],
+    saveSheetSessionState(
+      id,
+      buildSheetPlayStateFromSheet({
+        activeConditions,
+        exhaustionLevel,
+        activeSheetToggleIds,
+        usedResourcesById,
+        usedActionUsesById,
+        usedSpellSlotsByKey,
+        rechargeCapsByResourceId,
+        currentHp,
+        tempHp,
+        deathSaves,
+        hasInspiration,
+        realTimeCooldowns,
+        accumulatedResources: tickAccumulatedResources(accumulatedResources),
+        savedAt: null,
+      }),
     )
-  }, [])
+  }, [
+    id,
+    sessionHydrated,
+    activeConditions,
+    exhaustionLevel,
+    activeSheetToggleIds,
+    usedResourcesById,
+    usedActionUsesById,
+    usedSpellSlotsByKey,
+    rechargeCapsByResourceId,
+    currentHp,
+    tempHp,
+    deathSaves,
+    hasInspiration,
+    realTimeCooldowns,
+    accumulatedResources,
+  ])
 
   const equipmentMagicContext = useMemo(
     () => ({
@@ -792,6 +855,97 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character],
   )
 
+  const sheetToggleDefinitions = useMemo((): SheetToggleDefinition[] => {
+    const dynamic: SheetToggleDefinition[] = []
+    const hasElementalMind = classDetails.some((entry) =>
+      /elemental mind/i.test(entry.subclass?.name ?? ""),
+    )
+    if (hasElementalMind) dynamic.push(...PRIMORDIAL_ASPECT_TOGGLES)
+    return mergeSheetToggleDefinitions(dynamic)
+  }, [classDetails])
+
+  const manualSheetToggles = useMemo(
+    () =>
+      sheetToggleDefinitions.filter(
+        (toggle) => toggle.id !== "below_half_hp" && toggle.id !== "quarry_marked",
+      ),
+    [sheetToggleDefinitions],
+  )
+
+  const specializedElement = useMemo(
+    () => resolveSpecializedElement(featureChoicePicks),
+    [featureChoicePicks],
+  )
+
+  const toggleSheetToggle = useCallback(
+    (toggleId: string) => {
+      setActiveSheetToggleIds((prev) =>
+        applySheetToggleChange(prev, toggleId, sheetToggleDefinitions),
+      )
+    },
+    [sheetToggleDefinitions],
+  )
+
+  const buildCurrentPlayState = useCallback(
+    (savedAt: string | null = null) =>
+      buildSheetPlayStateFromSheet({
+        activeConditions,
+        exhaustionLevel,
+        activeSheetToggleIds,
+        usedResourcesById,
+        usedActionUsesById,
+        usedSpellSlotsByKey,
+        rechargeCapsByResourceId,
+        currentHp,
+        tempHp,
+        deathSaves,
+        hasInspiration,
+        realTimeCooldowns,
+        accumulatedResources: tickAccumulatedResources(accumulatedResources),
+        savedAt,
+      }),
+    [
+      activeConditions,
+      exhaustionLevel,
+      activeSheetToggleIds,
+      usedResourcesById,
+      usedActionUsesById,
+      usedSpellSlotsByKey,
+      rechargeCapsByResourceId,
+      currentHp,
+      tempHp,
+      deathSaves,
+      hasInspiration,
+      realTimeCooldowns,
+      accumulatedResources,
+    ],
+  )
+
+  const persistPlayStateToDb = useCallback(async () => {
+    if (!character) return
+    setPlayStateSaveStatus("saving")
+    const savedAt = new Date().toISOString()
+    const state = buildCurrentPlayState(savedAt)
+    const db = createClient()
+    const { data, error } = await db
+      .from("characters")
+      .update({
+        sheet_state: state,
+        hit_points: currentHp,
+      })
+      .eq("id", character.id)
+      .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+      .single()
+    if (error) {
+      setPlayStateSaveStatus("error")
+      return
+    }
+    saveSheetSessionState(character.id, state)
+    if (data) setCharacter(data)
+    setPlayStateSaveStatus("saved")
+    window.setTimeout(() => setPlayStateSaveStatus("idle"), 2500)
+  }, [character, buildCurrentPlayState, currentHp])
+
   const spellSlotTables = useMemo(() => {
     if (!classDetails.length) return []
     return getMulticlassSpellSlotTables(
@@ -1060,25 +1214,40 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const handleTurnStart = useCallback(() => {
     if (!turnStartTriggers.length) return
-    setUsedResourcesById((prev) =>
-      applyTurnStartTriggers({
-        triggers: turnStartTriggers,
-        usedResourcesById: prev,
-        resourceEntries,
-        resolveContext: usesResolveContext,
-        currentHp,
-        maxHp: derived?.maxHp ?? character?.hit_point_max ?? 0,
-        activeConditions,
-      }),
-    )
+    const abilityMods = derived?.abilityMods ?? {
+      strength: 0,
+      dexterity: 0,
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      charisma: 0,
+    }
+    const result = applyTurnStartTriggers({
+      triggers: turnStartTriggers,
+      usedResourcesById,
+      resourceEntries,
+      resolveContext: usesResolveContext,
+      currentHp,
+      maxHp: derived?.maxHp ?? character?.hit_point_max ?? 0,
+      activeConditions,
+      activeSheetToggleIds,
+      accumulatedResources,
+      abilityMods,
+    })
+    setUsedResourcesById(result.usedResourcesById)
+    setAccumulatedResources(result.accumulatedResources)
   }, [
     turnStartTriggers,
+    usedResourcesById,
     resourceEntries,
     usesResolveContext,
     currentHp,
     derived?.maxHp,
+    derived?.abilityMods,
     character?.hit_point_max,
     activeConditions,
+    activeSheetToggleIds,
+    accumulatedResources,
   ])
 
   const handleRest = useCallback(
@@ -1370,6 +1539,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const incapacitated = isIncapacitatedByConditions(activeConditions)
   const incomingAttackNotes = buildIncomingAttackNotes(activeConditions)
+  const influencePointCount = currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
+  const influencePointCap = Math.max(0, abilityMods.intelligence)
   const belowHalfHpActive = maxHp > 0 && currentHp <= Math.floor(maxHp / 2)
   const activeSheetToggleSet = new Set(activeSheetToggleIds)
 
@@ -1464,7 +1635,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )}
                 </div>
 
-                <div className="relative mt-2 z-10">
+                <div className="relative mt-2 z-10 flex flex-wrap items-start gap-2">
                   <button
                     ref={conditionButtonRef}
                     type="button"
@@ -1473,6 +1644,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   >
                     Conditions
                     <ChevronDown className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void persistPlayStateToDb()}
+                    disabled={playStateSaveStatus === "saving"}
+                    className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm font-semibold hover:border-primary transition-colors disabled:opacity-60"
+                    title="Save combat state, resources, toggles, and HP to this character (otherwise session-only)"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {playStateSaveStatus === "saving"
+                      ? "Saving…"
+                      : playStateSaveStatus === "saved"
+                        ? "Saved"
+                        : playStateSaveStatus === "error"
+                          ? "Save failed"
+                          : "Save state"}
                   </button>
                   {conditionDropdownOpen && conditionMenuPos && (
                     <>
@@ -1598,7 +1785,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </label>
                 ) : null}
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {MANUAL_SHEET_TOGGLES.map((toggle) => {
+                  {manualSheetToggles.map((toggle) => {
                     const active = activeSheetToggleIds.includes(toggle.id)
                     return (
                       <button
@@ -2094,6 +2281,42 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             resolveContext={usesResolveContext}
                           />
                         )}
+                        {(influencePointCount > 0 || influencePointCap > 0) && (
+                          <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="text-xs font-bold text-violet-800 dark:text-violet-200">
+                                Influence points
+                              </p>
+                              <span className="text-[10px] tabular-nums text-muted-foreground">
+                                {influencePointCount} / {influencePointCap}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mb-2">
+                              Generate on turn start while In combat / high-stakes is on. Decay after 1
+                              minute. Spending bypasses Psi Limit when enforced.
+                            </p>
+                            <button
+                              type="button"
+                              disabled={influencePointCount <= 0}
+                              onClick={() => {
+                                const result = spendInfluencePoints({
+                                  accumulated: accumulatedResources,
+                                  amount: 1,
+                                })
+                                setAccumulatedResources(result.accumulated)
+                              }}
+                              className="text-xs font-semibold rounded-md border border-violet-500/40 px-2 py-1 disabled:opacity-40"
+                            >
+                              Spend 1 Influence
+                            </button>
+                          </div>
+                        )}
+                        {specializedElement ? (
+                          <p className="mt-2 text-[10px] text-muted-foreground">
+                            Element specialization:{" "}
+                            <span className="font-semibold capitalize">{specializedElement}</span>
+                          </p>
+                        ) : null}
                         {!spellSlotTables.length && !resourceEntries.length && (
                           <p className="text-xs text-muted-foreground italic">
                             No class resources to track
@@ -2395,11 +2618,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                     {companionRows.map((companion) => (
-                      <CompanionStatPanel
-                        key={companion.key}
-                        companion={companion}
-                        onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
-                      />
+                      <div key={companion.key} className="space-y-2">
+                        <CompanionStatPanel
+                          companion={companion}
+                          onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
+                        />
+                        {/astral construct/i.test(companion.template.name) ? (
+                          <CompanionAttackRedirect
+                            companionName={companion.displayName}
+                            companionCurrentHp={companion.currentHp}
+                            onApply={(nextHp, overflow) => {
+                              updateCompanionHp(companion.key, nextHp)
+                              if (overflow > 0) {
+                                setCurrentHp((hp) => Math.max(0, hp - overflow))
+                              }
+                            }}
+                          />
+                        ) : null}
+                      </div>
                     ))}
                   </div>
                 </>

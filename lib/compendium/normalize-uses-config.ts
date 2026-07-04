@@ -1,4 +1,9 @@
 import type { RechargeRule, RestType, UsesConfig } from "@/lib/types"
+import {
+  formatRealTimeRechargeRule,
+  isRealTimeRechargeRule,
+  isRestRechargeRule,
+} from "@/lib/character/real-time-recharge"
 
 const REST_LABELS: Record<RestType, string> = {
   short_rest: "short rest",
@@ -10,6 +15,14 @@ export function getRechargeRules(uses: UsesConfig): RechargeRule[] {
   if (uses.recharges?.length) return uses.recharges
   if (uses.recharge) return [{ rest: uses.recharge }]
   return []
+}
+
+export function getRestRechargeRules(uses: UsesConfig): Extract<RechargeRule, { rest: RestType }>[] {
+  return getRechargeRules(uses).filter(isRestRechargeRule)
+}
+
+export function getRealTimeRechargeRules(uses: UsesConfig): RechargeRule[] {
+  return getRechargeRules(uses).filter(isRealTimeRechargeRule)
 }
 
 /** Effective recharge rules after applying level-based overrides (e.g. Tireless). */
@@ -40,6 +53,9 @@ export function normalizeUsesConfig(uses: UsesConfig): UsesConfig {
 }
 
 function formatRechargeRule(rule: RechargeRule): string {
+  if (isRealTimeRechargeRule(rule)) {
+    return formatRealTimeRechargeRule(rule)
+  }
   const label = REST_LABELS[rule.rest]
   if (rule.amount == null || rule.amount <= 0) return label
   return `${rule.amount} on ${label}`
@@ -59,8 +75,11 @@ export function formatUsesRecharges(uses: UsesConfig): string {
 
   if (!rules.length) return parts.length ? parts.join(", ") : "rest"
 
-  const allFullPool = rules.every((rule) => rule.amount == null || rule.amount <= 0)
-  if (rules.length === 2 && allFullPool) {
+  const restRules = rules.filter(isRestRechargeRule)
+  const timedRules = rules.filter(isRealTimeRechargeRule)
+
+  const allFullPool = restRules.every((rule) => rule.amount == null || rule.amount <= 0)
+  if (restRules.length === 2 && allFullPool && !timedRules.length) {
     parts.push("short or long rest")
   } else {
     parts.push(...rules.map(formatRechargeRule))
@@ -70,11 +89,11 @@ export function formatUsesRecharges(uses: UsesConfig): string {
 }
 
 export function isRestRechargeEnabled(uses: UsesConfig, rest: RestType): boolean {
-  return getRechargeRules(uses).some((rule) => rule.rest === rest)
+  return getRestRechargeRules(uses).some((rule) => rule.rest === rest)
 }
 
 export function getRechargeAmount(uses: UsesConfig, rest: RestType): number | null {
-  const rule = getRechargeRules(uses).find((entry) => entry.rest === rest)
+  const rule = getRestRechargeRules(uses).find((entry) => entry.rest === rest)
   if (!rule) return null
   return resolveRechargeRuleAmount(rule, null)
 }
@@ -84,6 +103,7 @@ export function resolveRechargeRuleAmount(
   rule: RechargeRule,
   classLevel: number | null,
 ): number | null {
+  if (isRealTimeRechargeRule(rule)) return null
   if (rule.amountFormula === "half_class_level_round_up" && classLevel != null) {
     return Math.max(1, Math.ceil(classLevel / 2))
   }
@@ -97,7 +117,7 @@ export function setRestRecharge(
   enabled: boolean,
   amount?: number | null,
 ): UsesConfig {
-  const current = getRechargeRules(uses).filter((rule) => rule.rest !== rest)
+  const current = getRechargeRules(uses).filter(isRestRechargeRule).filter((rule) => rule.rest !== rest)
   const next = enabled
     ? [
         ...current,
@@ -136,7 +156,9 @@ export function updateRestRechargeAmount(
   rest: RestType,
   amount: number | null,
 ): UsesConfig {
-  const rules = getRechargeRules(uses).map((rule) =>
+  const rules = getRechargeRules(uses)
+    .filter(isRestRechargeRule)
+    .map((rule) =>
     rule.rest === rest
       ? {
           ...rule,
