@@ -1454,6 +1454,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [patchCompanionState],
   )
 
+  const belowHalfHpActive = useMemo(() => {
+    const hpMax = derived?.maxHp ?? character?.hit_point_max ?? 0
+    return hpMax > 0 && currentHp <= Math.floor(hpMax / 2)
+  }, [derived?.maxHp, character?.hit_point_max, currentHp])
+
+  const activeSheetToggleSet = useMemo(() => {
+    const toggles = new Set<SheetToggleKey>(activeSheetToggleIds as SheetToggleKey[])
+    if (belowHalfHpActive) toggles.add("below_half_hp")
+    return toggles
+  }, [activeSheetToggleIds, belowHalfHpActive])
+
+  const limitationEquipment = useMemo(
+    () =>
+      resolveEquippedItems(
+        equipment,
+        { equippedArmorId, equippedShieldId, equippedWeaponId },
+        equipmentBaseSelections ?? {},
+        equipmentCatalog,
+      ),
+    [
+      equipment,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      equipmentBaseSelections,
+      equipmentCatalog,
+    ],
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -1607,30 +1636,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const incomingAttackNotes = buildIncomingAttackNotes(activeConditions)
   const influencePointCount = currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
   const influencePointCap = Math.max(0, abilityMods.intelligence)
-  const belowHalfHpActive = maxHp > 0 && currentHp <= Math.floor(maxHp / 2)
-  const activeSheetToggleSet = useMemo(() => {
-    const toggles = new Set<SheetToggleKey>(activeSheetToggleIds as SheetToggleKey[])
-    if (belowHalfHpActive) toggles.add("below_half_hp")
-    return toggles
-  }, [activeSheetToggleIds, belowHalfHpActive])
-
-  const limitationEquipment = useMemo(
-    () =>
-      resolveEquippedItems(
-        equipment,
-        { equippedArmorId, equippedShieldId, equippedWeaponId },
-        equipmentBaseSelections ?? {},
-        equipmentCatalog,
-      ),
-    [
-      equipment,
-      equippedArmorId,
-      equippedShieldId,
-      equippedWeaponId,
-      equipmentBaseSelections,
-      equipmentCatalog,
-    ],
-  )
 
   return (
     <SheetRollHistoryProvider characterId={id}>
