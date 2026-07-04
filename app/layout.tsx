@@ -3,6 +3,7 @@ import { Geist_Mono } from 'next/font/google'
 import { AppThemeProvider } from '@/components/providers/app-theme-provider'
 import { StaticDataProvider } from '@/components/providers/static-data-provider'
 import './globals.css'
+import '../styles/print.css'
 
 // Solbera fonts are loaded via @font-face in globals.css
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });

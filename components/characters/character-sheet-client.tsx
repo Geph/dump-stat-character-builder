@@ -14,9 +14,14 @@ import {
   Plus,
   PawPrint,
   Save,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import {
+  characterRowToExportItem,
+  downloadCharacterExport,
+} from "@/lib/character/character-export-format"
 import type {
   Character,
   DndClass,
@@ -129,7 +134,10 @@ import {
   companionStateFromResolved,
   mergeCompanionState,
   resolveCharacterCompanions,
+  activePolymorphCompanion,
 } from "@/lib/character/resolve-companions"
+import { getDerivedCharacterBreakdowns } from "@/lib/character/get-derived-breakdowns"
+import { downloadCharacterPdf } from "@/lib/character/pdf-export"
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
@@ -642,6 +650,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const derived = useMemo(() => {
     if (!characterBuildInputs) return null
     return computeDerivedCharacter(characterBuildInputs)
+  }, [characterBuildInputs])
+
+  const statBreakdowns = useMemo(() => {
+    if (!characterBuildInputs) return undefined
+    return getDerivedCharacterBreakdowns(characterBuildInputs)
   }, [characterBuildInputs])
 
   const persistEquipmentLoadout = useCallback(
@@ -1379,24 +1392,49 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character],
   )
 
-  const updateCompanionHp = useCallback(
-    (key: string, hp: number) => {
-      const next = companionRows.map((row) =>
-        row.key === key
-          ? {
-              key,
-              currentHp: hp,
-              customName: row.displayName !== row.template.name ? row.displayName : null,
-            }
-          : {
-              key: row.key,
-              currentHp: row.currentHp,
-              customName: row.displayName !== row.template.name ? row.displayName : null,
-            },
-      )
+  const patchCompanionState = useCallback(
+    (key: string, patch: Partial<CharacterCompanionState>) => {
+      const next = companionRows.map((row) => {
+        const base: CharacterCompanionState = {
+          key: row.key,
+          currentHp: row.currentHp,
+          customName: row.displayName !== row.template.name ? row.displayName : null,
+          activeConditions: row.activeConditions.length ? row.activeConditions : null,
+          polymorphActive: row.polymorphActive ? true : null,
+        }
+        if (row.key !== key) {
+          if (patch.polymorphActive && row.polymorphActive) {
+            return { ...base, polymorphActive: null }
+          }
+          return base
+        }
+        return {
+          ...base,
+          ...patch,
+          activeConditions:
+            patch.activeConditions !== undefined
+              ? patch.activeConditions?.length
+                ? patch.activeConditions
+                : null
+              : base.activeConditions,
+          polymorphActive:
+            patch.polymorphActive !== undefined
+              ? patch.polymorphActive
+                ? true
+                : null
+              : base.polymorphActive,
+        }
+      })
       void persistCompanionState(next)
     },
     [companionRows, persistCompanionState],
+  )
+
+  const updateCompanionHp = useCallback(
+    (key: string, hp: number) => {
+      patchCompanionState(key, { currentHp: hp })
+    },
+    [patchCompanionState],
   )
 
   if (loading) {
@@ -1443,8 +1481,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }
 
   const proficiencyBonus = derived?.proficiencyBonus ?? Math.floor((character.level - 1) / 4) + 2
-  const armorClass = derived?.armorClass ?? character.armor_class ?? 10
-  const speed = derived?.speed ?? character.speed ?? 30
+  const activePolymorph = activePolymorphCompanion(companionRows)
+  const parseSpeedFt = (label?: string | null) => {
+    const match = label?.match(/(\d+)/)
+    return match ? parseInt(match[1], 10) : null
+  }
+  const armorClass =
+    activePolymorph?.ac ?? derived?.armorClass ?? character.armor_class ?? 10
+  const speed =
+    (activePolymorph ? parseSpeedFt(activePolymorph.template.speed) : null) ??
+    derived?.speed ??
+    character.speed ??
+    30
   const initiative = derived?.initiative ?? character.initiative ?? abilityMods.dexterity
   const maxHp = derived?.maxHp ?? character.hit_point_max ?? 0
   const savingThrowProficiencies = derived?.savingThrowProficiencies ?? character.classes?.saving_throws ?? []
@@ -1648,6 +1696,50 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      if (!character) return
+                      downloadCharacterExport(
+                        characterRowToExportItem(character as unknown as Record<string, unknown>),
+                      )
+                    }}
+                    className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm font-semibold hover:border-primary transition-colors"
+                    title="Download character JSON"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!character || !derived) return
+                      void downloadCharacterPdf({
+                        name: character.name,
+                        level: character.level,
+                        classSummary: classLabel,
+                        derived,
+                        breakdowns: statBreakdowns,
+                        sheetUrl:
+                          typeof window !== "undefined"
+                            ? `${window.location.origin}/characters/${character.id}`
+                            : undefined,
+                      })
+                    }}
+                    className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm font-semibold hover:border-primary transition-colors no-print"
+                    title="Download character PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Export PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm font-semibold hover:border-primary transition-colors no-print"
+                    title="Print character sheet"
+                  >
+                    Print
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void persistPlayStateToDb()}
                     disabled={playStateSaveStatus === "saving"}
                     className="flex min-h-11 items-center gap-1.5 px-3 py-2 bg-card/80 border border-border rounded-lg text-sm font-semibold hover:border-primary transition-colors disabled:opacity-60"
@@ -1750,6 +1842,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <SheetPersistentStatsBar
                 armorClass={armorClass}
                 acBreakdown={derived?.acBreakdown ?? []}
+                statBreakdowns={statBreakdowns}
                 incomingAttackNotes={incomingAttackNotes}
                 exhaustionLevel={exhaustionLevel}
                 onExhaustionLevelChange={setExhaustionLevel}
@@ -2636,7 +2729,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       <div key={companion.key} className="space-y-2">
                         <CompanionStatPanel
                           companion={companion}
+                          spellAttackModifier={spellAttackMod}
                           onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
+                          onConditionsChange={(conditions) =>
+                            patchCompanionState(companion.key, { activeConditions: conditions })
+                          }
+                          onPolymorphActiveChange={(active) =>
+                            patchCompanionState(companion.key, { polymorphActive: active })
+                          }
                         />
                         {/astral construct/i.test(companion.template.name) ? (
                           <CompanionAttackRedirect

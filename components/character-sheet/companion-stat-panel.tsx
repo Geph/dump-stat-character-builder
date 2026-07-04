@@ -3,7 +3,10 @@
 import { Heart, Shield, Footprints, Sparkles } from "lucide-react"
 import { ABILITY_ORDER } from "@/lib/character/parse-companion-stat-block"
 import type { CompanionNamedBlock, ResolvedCompanion } from "@/lib/character/companion-stat-block"
+import { parseCompanionActionRoll } from "@/lib/character/parse-companion-action-roll"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
+import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
+import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 
 const ABILITY_LABEL_SHORT: Record<string, string> = {
   strength: "STR",
@@ -18,9 +21,19 @@ function formatMod(value: number): string {
   return value >= 0 ? `+${value}` : String(value)
 }
 
+export type CompanionStatPanelCompanion = ResolvedCompanion & {
+  currentHp: number
+  displayName: string
+  activeConditions: string[]
+  polymorphActive: boolean
+}
+
 type CompanionStatPanelProps = {
-  companion: ResolvedCompanion & { currentHp: number; displayName: string }
+  companion: CompanionStatPanelCompanion
+  spellAttackModifier?: number | null
   onHpChange: (hp: number) => void
+  onConditionsChange?: (conditions: string[]) => void
+  onPolymorphActiveChange?: (active: boolean) => void
 }
 
 function MetaLine({ label, value }: { label: string; value: string }) {
@@ -32,26 +45,71 @@ function MetaLine({ label, value }: { label: string; value: string }) {
   )
 }
 
-function BlockList({ title, blocks }: { title: string; blocks: CompanionNamedBlock[] }) {
+function ActionBlock({
+  block,
+  spellAttackModifier,
+}: {
+  block: CompanionNamedBlock
+  spellAttackModifier: number | null
+}) {
+  const roll = parseCompanionActionRoll(block.name, block.description, spellAttackModifier)
+  return (
+    <div className="px-2 py-1 bg-muted/30 rounded-md space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold text-foreground">{block.name}</p>
+        {roll?.attackBonus != null ? (
+          <D20RollButton
+            modifier={roll.attackBonus}
+            title={`Roll ${block.name} attack`}
+            size="sm"
+            rollContext={{ kind: "attack", ability: "dexterity" }}
+          />
+        ) : null}
+      </div>
+      <ExpandableDescription
+        text={block.description}
+        className="text-[10px] leading-snug text-muted-foreground"
+      />
+      {roll?.damageFormula ? (
+        <p className="text-[9px] text-muted-foreground">Damage: {roll.damageFormula}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function BlockList({
+  title,
+  blocks,
+  spellAttackModifier,
+}: {
+  title: string
+  blocks: CompanionNamedBlock[]
+  spellAttackModifier: number | null
+}) {
   if (!blocks.length) return null
   return (
     <div className="space-y-1">
       <p className="text-[10px] uppercase font-bold text-muted-foreground">{title}</p>
       {blocks.map((block) => (
-        <div key={block.name} className="px-2 py-1 bg-muted/30 rounded-md">
-          <p className="text-[11px] font-bold text-foreground">{block.name}</p>
-          <ExpandableDescription
-            text={block.description}
-            className="text-[10px] leading-snug text-muted-foreground"
-          />
-        </div>
+        <ActionBlock
+          key={block.name}
+          block={block}
+          spellAttackModifier={spellAttackModifier}
+        />
       ))}
     </div>
   )
 }
 
-export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanelProps) {
-  const { template, ac, maxHp, currentHp, source, polymorph } = companion
+export function CompanionStatPanel({
+  companion,
+  spellAttackModifier = null,
+  onHpChange,
+  onConditionsChange,
+  onPolymorphActiveChange,
+}: CompanionStatPanelProps) {
+  const { template, ac, maxHp, currentHp, source, polymorph, activeConditions, polymorphActive } =
+    companion
   const abilityScores = companion.abilityScores ?? template.abilityScores
   const hasAbilities = abilityScores && Object.keys(abilityScores).length > 0
 
@@ -71,9 +129,16 @@ export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanel
     (template.bonusActions?.length ?? 0) > 0 ||
     (template.reactions?.length ?? 0) > 0
 
+  const toggleCondition = (condition: string) => {
+    if (!onConditionsChange) return
+    const next = activeConditions.includes(condition)
+      ? activeConditions.filter((entry) => entry !== condition)
+      : [...activeConditions, condition]
+    onConditionsChange(next)
+  }
+
   return (
     <section className="bg-card rounded-xl border border-border overflow-hidden flex flex-col">
-      {/* Header */}
       <div className="px-3 py-2 border-b border-border bg-muted/30">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-sm font-bold text-foreground truncate">{companion.displayName}</h3>
@@ -88,9 +153,19 @@ export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanel
           {source.subclassName ? `${source.subclassName} · ` : ""}
           {source.className} · L{source.featureLevel} {source.featureName}
         </p>
+        {polymorph && onPolymorphActiveChange ? (
+          <label className="mt-2 flex items-center gap-2 text-[10px] font-semibold text-foreground">
+            <input
+              type="checkbox"
+              checked={polymorphActive}
+              onChange={(event) => onPolymorphActiveChange(event.target.checked)}
+              className="rounded border-border"
+            />
+            Active beast form (use this form&apos;s physical stats)
+          </label>
+        ) : null}
       </div>
 
-      {/* AC / HP / Speed */}
       <div className="px-3 py-2 grid grid-cols-3 gap-1.5 border-b border-border">
         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
           <Shield className="w-3 h-3 mx-auto text-primary mb-0.5" />
@@ -119,7 +194,32 @@ export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanel
         </div>
       </div>
 
-      {/* Ability scores */}
+      {onConditionsChange ? (
+        <div className="px-3 py-2 border-b border-border">
+          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Conditions</p>
+          <div className="flex flex-wrap gap-1">
+            {SRD_CONDITIONS.slice(0, 8).map((condition) => {
+              const active = activeConditions.includes(condition)
+              return (
+                <button
+                  key={condition}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleCondition(condition)}
+                  className={`rounded px-1.5 py-0.5 text-[9px] font-semibold border ${
+                    active
+                      ? "border-destructive/50 bg-destructive/15 text-destructive"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {condition}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {hasAbilities ? (
         <div className="px-3 py-2 grid grid-cols-6 gap-1 border-b border-border">
           {ABILITY_ORDER.map((key) => {
@@ -147,7 +247,6 @@ export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanel
         </div>
       ) : null}
 
-      {/* Meta + Traits + Actions in columns */}
       {(hasMeta || template.traits.length > 0 || hasActions) && (
         <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
           {hasMeta ? (
@@ -157,11 +256,19 @@ export function CompanionStatPanel({ companion, onHpChange }: CompanionStatPanel
               ))}
             </div>
           ) : null}
-          <BlockList title="Traits" blocks={template.traits} />
+          <BlockList title="Traits" blocks={template.traits} spellAttackModifier={spellAttackModifier} />
           <div className="space-y-2">
-            <BlockList title="Actions" blocks={template.actions} />
-            <BlockList title="Bonus Actions" blocks={template.bonusActions ?? []} />
-            <BlockList title="Reactions" blocks={template.reactions ?? []} />
+            <BlockList title="Actions" blocks={template.actions} spellAttackModifier={spellAttackModifier} />
+            <BlockList
+              title="Bonus Actions"
+              blocks={template.bonusActions ?? []}
+              spellAttackModifier={spellAttackModifier}
+            />
+            <BlockList
+              title="Reactions"
+              blocks={template.reactions ?? []}
+              spellAttackModifier={spellAttackModifier}
+            />
           </div>
         </div>
       )}

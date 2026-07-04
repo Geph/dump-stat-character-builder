@@ -1,8 +1,11 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
-import { Heart, Info, Minus, Plus } from "lucide-react"
+import type { ReactNode } from "react"
+import { Heart, Minus, Plus } from "lucide-react"
 import type { StatBreakdownPart } from "@/lib/character/types"
+import type { DerivedStatBreakdowns } from "@/lib/character/stat-contributions"
+import { breakdownLines } from "@/lib/character/get-derived-breakdowns"
+import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
 import type { IncomingAttackNote } from "@/lib/character/incoming-attack-notes"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import {
@@ -11,67 +14,10 @@ import {
   getExhaustionEffectSummary,
 } from "@/lib/srd/exhaustion-effects"
 
-function formatSignedValue(value: number) {
-  return value >= 0 ? `+${value}` : `${value}`
-}
-
-function StatBreakdownButton({
-  title,
-  total,
-  parts,
-}: {
-  title: string
-  total: number
-  parts: StatBreakdownPart[]
-}) {
-  const [open, setOpen] = useState(false)
-  if (!parts.length) return null
-  return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-          setOpen((value) => !value)
-        }}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-        aria-label={`How ${title} is calculated`}
-        aria-expanded={open}
-      >
-        <Info className="w-3.5 h-3.5" />
-      </button>
-      {open ? (
-        <>
-          <span className="fixed inset-0 z-[99]" aria-hidden onClick={() => setOpen(false)} />
-          <span className="absolute right-0 top-9 z-[100] block w-52 rounded-lg border border-border bg-card p-2 text-left shadow-xl">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              {title}
-            </span>
-            <span className="block space-y-0.5">
-              {parts.map((part, index) => (
-                <span
-                  key={`${part.label}-${index}`}
-                  className="flex items-center justify-between gap-2 text-xs"
-                >
-                  <span className="text-muted-foreground">{part.label}</span>
-                  <span className="font-medium tabular-nums">{formatSignedValue(part.value)}</span>
-                </span>
-              ))}
-            </span>
-            <span className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-1 text-xs font-bold">
-              <span>Total</span>
-              <span className="tabular-nums">{total}</span>
-            </span>
-          </span>
-        </>
-      ) : null}
-    </span>
-  )
-}
-
 type SheetPersistentStatsBarProps = {
   armorClass: number
   acBreakdown: StatBreakdownPart[]
+  statBreakdowns?: DerivedStatBreakdowns
   incomingAttackNotes?: IncomingAttackNote[]
   exhaustionLevel?: number
   onExhaustionLevelChange?: (level: number) => void
@@ -93,7 +39,7 @@ function CoreStatTile({
 }: {
   label: string
   children: ReactNode
-  trailing?: React.ReactNode
+  trailing?: ReactNode
 }) {
   return (
     <div className="bg-card/90 rounded-lg border border-border/80 px-3 py-2 min-h-11 flex flex-col justify-center min-w-[4.5rem]">
@@ -111,6 +57,7 @@ function CoreStatTile({
 export function SheetPersistentStatsBar({
   armorClass,
   acBreakdown,
+  statBreakdowns,
   incomingAttackNotes = [],
   exhaustionLevel = 0,
   onExhaustionLevelChange,
@@ -135,7 +82,12 @@ export function SheetPersistentStatsBar({
           </p>
           <div className="mt-1 flex items-center justify-between gap-1.5">
             <div className="font-black text-base tabular-nums leading-none">{armorClass}</div>
-            <StatBreakdownButton title="Armor Class" total={armorClass} parts={acBreakdown} />
+            <StatExplainPopover
+              title="Armor Class"
+              total={armorClass}
+              parts={acBreakdown}
+              contributions={statBreakdowns ? breakdownLines(statBreakdowns, "ac") : undefined}
+            />
           </div>
           {incomingAttackNotes.length > 0 ? (
             <div className="mt-1 space-y-0.5">
@@ -155,19 +107,39 @@ export function SheetPersistentStatsBar({
         <CoreStatTile
           label="Init"
           trailing={
-            <D20RollButton
-              modifier={initiative}
-              title="Roll initiative"
-              size="lg"
-              rollContext={{ kind: "initiative", ability: "dexterity" }}
-              onRoll={onInitiativeRoll}
-            />
+            <>
+              <StatExplainPopover
+                title="Initiative"
+                total={initiative}
+                contributions={
+                  statBreakdowns ? breakdownLines(statBreakdowns, "initiative") : undefined
+                }
+              />
+              <D20RollButton
+                modifier={initiative}
+                title="Roll initiative"
+                size="lg"
+                rollContext={{ kind: "initiative", ability: "dexterity" }}
+                onRoll={onInitiativeRoll}
+              />
+            </>
           }
         >
           {formatMod(initiative)}
         </CoreStatTile>
 
-        <CoreStatTile label="Speed">{speed} ft</CoreStatTile>
+        <CoreStatTile
+          label="Speed"
+          trailing={
+            <StatExplainPopover
+              title="Speed"
+              total={speed}
+              contributions={statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined}
+            />
+          }
+        >
+          {speed} ft
+        </CoreStatTile>
 
         <div className="bg-card/90 rounded-lg border border-border/80 px-3 py-2 min-h-11 min-w-[6.5rem]">
           <div className="flex items-center gap-1.5">

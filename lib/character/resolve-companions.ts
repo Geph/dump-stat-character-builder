@@ -195,7 +195,14 @@ export function resolveCharacterCompanions(params: {
 export function mergeCompanionState(
   companions: ResolvedCompanion[],
   saved: CharacterCompanionState[] | null | undefined,
-): Array<ResolvedCompanion & { currentHp: number; displayName: string }> {
+): Array<
+  ResolvedCompanion & {
+    currentHp: number
+    displayName: string
+    activeConditions: string[]
+    polymorphActive: boolean
+  }
+> {
   const stateByKey = new Map((saved ?? []).map((row) => [row.key, row]))
   return companions.map((companion) => {
     const state = stateByKey.get(companion.key)
@@ -204,16 +211,33 @@ export function mergeCompanionState(
       ...companion,
       currentHp: Math.min(Math.max(0, currentHp), companion.maxHp),
       displayName: state?.customName?.trim() || companion.template.name,
+      activeConditions: state?.activeConditions ?? [],
+      polymorphActive: state?.polymorphActive ?? false,
     }
   })
 }
 
 export function companionStateFromResolved(
-  companions: Array<ResolvedCompanion & { currentHp: number; displayName: string }>,
+  companions: Array<
+    ResolvedCompanion & {
+      currentHp: number
+      displayName: string
+      activeConditions?: string[]
+      polymorphActive?: boolean
+    }
+  >,
 ): CharacterCompanionState[] {
   return companions.map((c) => ({
     key: c.key,
     currentHp: c.currentHp,
     customName: c.displayName !== c.template.name ? c.displayName : null,
+    activeConditions: c.activeConditions?.length ? c.activeConditions : null,
+    polymorphActive: c.polymorphActive ? true : null,
   }))
+}
+
+export function activePolymorphCompanion<
+  T extends { polymorph: boolean; polymorphActive: boolean },
+>(companions: T[]): T | null {
+  return companions.find((row) => row.polymorph && row.polymorphActive) ?? null
 }

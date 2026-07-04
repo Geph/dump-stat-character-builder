@@ -22,6 +22,7 @@ import {
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { tagModifierSource } from "@/lib/character/tag-modifier-source"
 import type {
   Background,
   CustomAbility,
@@ -338,10 +339,13 @@ export function collectBuilderModifierRefIds(params: {
 
   const featMods = featEntries.flatMap(({ featId, choicePickKey }) => {
     if (isCatalogFeatPickId(featId)) {
-      return applyModifierPlayerPicks(
-        resolveCatalogFeatPickCharacteristics(featId, customAbilities, catalog),
-        choicePickKey,
-        modifierPlayerPicks,
+      return tagModifierSource(
+        applyModifierPlayerPicks(
+          resolveCatalogFeatPickCharacteristics(featId, customAbilities, catalog),
+          choicePickKey,
+          modifierPlayerPicks,
+        ),
+        { sourceType: "feat", source: "Feat choice", label: "Feat choice" },
       )
     }
     const feat = feats.find((entry) => entry.id === featId)
@@ -349,20 +353,47 @@ export function collectBuilderModifierRefIds(params: {
     const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
     const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
     const mods = characteristicsFromLinkedModifiers(catalog, instances, refs)
-    return applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks)
+    return tagModifierSource(applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks), {
+      sourceType: "feat",
+      source: feat.name,
+      label: feat.name,
+      sourceId: feat.id,
+    })
   })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
     const row = ability as unknown as Record<string, unknown>
     const linked = readLinkedModifiers(row, catalog)
     const refs = ability.modifierRefs ?? readModifierRefs(row)
-    return characteristicsFromLinkedModifiers(catalog, linked, refs)
+    return tagModifierSource(
+      characteristicsFromLinkedModifiers(catalog, linked, refs),
+      {
+        sourceType: "feature",
+        source: ability.name,
+        label: ability.name,
+        sourceId: ability.id,
+      },
+    )
   })
 
   return [
-    ...normalizeCharacteristics(speciesResolved, null),
-    ...normalizeCharacteristics(classResolved, null),
-    ...normalizeCharacteristics(backgroundResolved, null),
+    ...tagModifierSource(normalizeCharacteristics(speciesResolved, null), {
+      sourceType: "species",
+      source: species?.name ?? "Species",
+      label: species?.name ?? "Species traits",
+      sourceId: species?.id,
+    }),
+    ...tagModifierSource(normalizeCharacteristics(classResolved, null), {
+      sourceType: "class",
+      source: "Class features",
+      label: "Class features",
+    }),
+    ...tagModifierSource(normalizeCharacteristics(backgroundResolved, null), {
+      sourceType: "background",
+      source: background?.name ?? "Background",
+      label: background?.name ?? "Background",
+      sourceId: background?.id,
+    }),
     ...featMods,
     ...customAbilityMods,
   ]
