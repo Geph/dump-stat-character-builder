@@ -78,16 +78,18 @@ const RAGE_MODIFIERS: LinkedModifierInstance[] = [
       ],
     }),
   ]),
-  modInstance("modinst_rage_adv_attack", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
-    fx("fx_rage_adv_attack", {
-      kind: "check_advantage",
-      checkCategory: "attack",
+  modInstance("modinst_rage_str_checks", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
+    fx("fx_rage_str_checks", {
+      kind: "check_roll_modifier",
+      checkRollMode: "advantage",
+      checkCategory: "ability",
       checkAbility: "Strength",
     }),
   ]),
-  modInstance("modinst_rage_adv_save", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
-    fx("fx_rage_adv_save", {
-      kind: "check_advantage",
+  modInstance("modinst_rage_str_saves", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
+    fx("fx_rage_str_saves", {
+      kind: "check_roll_modifier",
+      checkRollMode: "advantage",
       checkCategory: "save",
       checkAbility: "Strength",
     }),

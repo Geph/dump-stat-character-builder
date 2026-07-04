@@ -18,7 +18,7 @@ import { ABILITY_MODIFIER_KEYS } from "@/lib/compendium/characteristic-modifiers
 import { normalizeFeatureEffects } from "@/lib/compendium/normalize-feature-activation"
 import { defaultRollBonusConfig, rollBonusFromLegacy } from "@/lib/compendium/roll-bonus-config"
 import { DND_SKILLS } from "@/lib/compendium/constants"
-import { RollBonusEditor } from "@/components/compendium/roll-bonus-editor"
+import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
 import {
   defaultBonusByLevelEntry,
   normalizeBonusByLevel,
@@ -1708,6 +1708,8 @@ function CheckRollModifierEditor({
           </div>
         </div>
       )}
+
+      <ModifierLimitationsEditor value={effect} onChange={onChange} />
 
       {effect.checkCategory === "skill" && (
         <div>

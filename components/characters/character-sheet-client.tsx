@@ -32,8 +32,10 @@ import type {
   CustomAbility,
   Feat,
   Subclass,
+  Feature,
 } from "@/lib/types"
-import { resolveUsesConfig, ABILITY_SCORE_KEYS } from "@/lib/compendium/characteristic-modifiers"
+import { resolveEquippedItems } from "@/lib/compendium/equipment-magic-modifiers"
+import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
@@ -628,6 +630,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       attunedItemIds,
       equipmentBaseSelections,
       activeSheetToggles: effectiveSheetToggles,
+      activeConditions,
     }
   }, [
     character,
@@ -642,6 +645,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     attunedItemIds,
     equipmentBaseSelections,
     activeSheetToggleIds,
+    activeConditions,
     exhaustionLevel,
     currentHp,
     acFormulaPick,
@@ -868,6 +872,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     () => (character ? buildClassDetailList(character) : []),
     [character],
   )
+
+  const sheetClassFeatures = useMemo(() => {
+    const features: Feature[] = []
+    for (const entry of classDetails) {
+      for (const feature of entry.class?.features ?? []) {
+        if ((feature.level ?? 1) <= entry.row.level) features.push(feature)
+      }
+      for (const feature of entry.subclass?.features ?? []) {
+        if ((feature.level ?? 1) <= entry.row.level) features.push(feature)
+      }
+    }
+    return features
+  }, [classDetails])
 
   const sheetToggleDefinitions = useMemo((): SheetToggleDefinition[] => {
     const dynamic: SheetToggleDefinition[] = []
@@ -1591,7 +1608,29 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const influencePointCount = currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
   const influencePointCap = Math.max(0, abilityMods.intelligence)
   const belowHalfHpActive = maxHp > 0 && currentHp <= Math.floor(maxHp / 2)
-  const activeSheetToggleSet = new Set(activeSheetToggleIds)
+  const activeSheetToggleSet = useMemo(() => {
+    const toggles = new Set<SheetToggleKey>(activeSheetToggleIds as SheetToggleKey[])
+    if (belowHalfHpActive) toggles.add("below_half_hp")
+    return toggles
+  }, [activeSheetToggleIds, belowHalfHpActive])
+
+  const limitationEquipment = useMemo(
+    () =>
+      resolveEquippedItems(
+        equipment,
+        { equippedArmorId, equippedShieldId, equippedWeaponId },
+        equipmentBaseSelections ?? {},
+        equipmentCatalog,
+      ),
+    [
+      equipment,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      equipmentBaseSelections,
+      equipmentCatalog,
+    ],
+  )
 
   return (
     <SheetRollHistoryProvider characterId={id}>
@@ -1600,6 +1639,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           activeConditions,
           exhaustionLevel,
           incapacitated,
+          classFeatures: sheetClassFeatures,
+          activeSheetToggles: activeSheetToggleSet,
+          equippedArmor: limitationEquipment.armor,
+          equippedShield: limitationEquipment.shield,
         }}
       >
     <div className="min-h-screen bg-background">

@@ -78,6 +78,13 @@ export function D20RollButton({
         activeConditions: conditions,
         exhaustionLevel: exhaustion,
         manualOverride,
+        classFeatures: rollCtx.classFeatures,
+        limitationContext: {
+          activeConditions: conditions,
+          activeSheetToggles: rollCtx.activeSheetToggles,
+          equippedArmor: rollCtx.equippedArmor,
+          equippedShield: rollCtx.equippedShield,
+        },
       })
     : {
         mode: (manualOverride === "normal" ? "normal" : manualOverride) as D20RollMode,

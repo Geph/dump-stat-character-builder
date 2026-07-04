@@ -91,7 +91,7 @@ import {
   defaultRollBonusConfig,
   formatRollBonusSummary,
 } from "@/lib/compendium/roll-bonus-config"
-import { SPECIES_SIZES } from "@/lib/compendium/constants"
+import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
 
 type CharacteristicModifiersEditorProps = {
   value: CharacteristicModifier[]
@@ -2350,6 +2350,10 @@ export function CharacteristicModifiersEditor({
                   spellOptions={spellOptions}
                   modifierCatalog={modifierCatalog}
                   classResources={classResources}
+                />
+                <ModifierLimitationsEditor
+                  value={mod}
+                  onChange={(patch) => onChange(updateModifier(value, mod.id, { ...mod, ...patch }))}
                 />
               </div>
             )

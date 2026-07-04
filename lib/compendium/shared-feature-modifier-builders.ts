@@ -1,11 +1,10 @@
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import { charInstance, fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
-import { legacyFeatureOptionPickerCharacteristic } from "@/lib/compendium/feature-option-choice-migration"
+import { buildWeaponMasteryModifierInstance } from "@/lib/compendium/weapon-mastery-catalog"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 const DAMAGE_REDUCTION_CATALOG_ID = "cat_fx_damage_reduction"
-const FEATURE_OPTION_PICKER_CATALOG_ID = "cat_char_feature_option_picker"
 
 export function buildGrantFeatModifier(
   categories: FeatPickCategory[],
@@ -39,16 +38,7 @@ export function buildEvasionModifier(instanceId = "modinst_evasion"): LinkedModi
  * Slot count scales via class_resources.weapon_mastery from the class table.
  */
 export function buildWeaponMasteryModifier(
-  instanceId = "modinst_weapon_mastery",
+  instanceId = createModifierInstanceId(),
 ): LinkedModifierInstance {
-  return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    legacyFeatureOptionPickerCharacteristic({
-      id: modId("weapon_mastery"),
-      category: "Weapon Mastery",
-      choiceCount: 1,
-      resourceKey: "weapon_mastery",
-      swappableOnRest: true,
-      label: "Weapon types with mastery (count scales on class table)",
-    }),
-  ])
+  return buildWeaponMasteryModifierInstance(instanceId)
 }

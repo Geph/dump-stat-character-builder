@@ -321,9 +321,26 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     modifierCatalog: inputs.modifierCatalog,
   })
 
+  const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon } =
+    resolveEquippedItems(
+      inputs.equipment,
+      {
+        equippedArmorId: inputs.equippedArmorId,
+        equippedShieldId: inputs.equippedShieldId,
+        equippedWeaponId: inputs.equippedWeaponId,
+      },
+      inputs.equipmentBaseSelections ?? {},
+      inputs.equipmentCatalog,
+    )
+
   const aggregatedCharacteristics = aggregateCharacteristics(
     [...builderCharacteristicMods, ...equipmentMagicMods],
-    { activeSheetToggles: inputs.activeSheetToggles },
+    {
+      activeSheetToggles: inputs.activeSheetToggles,
+      activeConditions: inputs.activeConditions,
+      equippedArmor,
+      equippedShield,
+    },
   )
   // Source IDs the character currently has, used to discard orphaned ability-score
   // pool allocations left behind after a class/feat/species change.
@@ -423,18 +440,6 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     exhaustionFx.hpMaxMultiplier < 1
       ? Math.max(1, Math.floor(maxHpBase * exhaustionFx.hpMaxMultiplier))
       : maxHpBase
-
-  const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon } =
-    resolveEquippedItems(
-      inputs.equipment,
-      {
-        equippedArmorId: inputs.equippedArmorId,
-        equippedShieldId: inputs.equippedShieldId,
-        equippedWeaponId: inputs.equippedWeaponId,
-      },
-      inputs.equipmentBaseSelections ?? {},
-      inputs.equipmentCatalog,
-    )
 
   const wearingArmor = Boolean(equippedArmor)
   const shieldBonus = getShieldBonus(equippedShield)

@@ -1,10 +1,17 @@
 import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
 import { describeWeaponMastery } from "@/lib/compendium/weapon-mastery"
+import { WEAPON_MASTERY_CATALOG_ID } from "@/lib/compendium/weapon-mastery-catalog"
+import { getWeaponMastery } from "@/lib/compendium/combat-stats"
+import type { Equipment } from "@/lib/types"
 import type { Feature, FeatureChoice } from "@/lib/types"
 
 type FeatureChoiceOption = FeatureChoice["options"][number]
 
 const FEATURE_OPTION_PICKER_CATALOG_ID = "cat_char_feature_option_picker"
+const WEAPON_MASTERY_PICKER_CATALOG_IDS = new Set([
+  FEATURE_OPTION_PICKER_CATALOG_ID,
+  WEAPON_MASTERY_CATALOG_ID,
+])
 
 export type WeaponMasteryPool = "melee" | "all" | "rogue"
 
@@ -32,14 +39,18 @@ type SeedWeapon = {
   category?: string
   subcategory?: string | null
   properties?: { mastery?: string; properties?: string[] } | null
+  mastery?: string | null
 }
 
-function weaponMasteryProperty(weapon: SeedWeapon): string | null {
-  const mastery = weapon.properties?.mastery?.trim()
-  return mastery || null
+function weaponMasteryProperty(weapon: SeedWeapon | Equipment): string | null {
+  const fromProps = weapon.properties && typeof weapon.properties === "object"
+    ? (weapon.properties as { mastery?: string }).mastery?.trim()
+    : null
+  const direct = "mastery" in weapon ? weapon.mastery?.trim() : null
+  return direct || fromProps || null
 }
 
-function weaponMatchesPool(weapon: SeedWeapon, pool: WeaponMasteryPool): boolean {
+function weaponMatchesPool(weapon: SeedWeapon | Equipment, pool: WeaponMasteryPool): boolean {
   if (!weaponMasteryProperty(weapon)) return false
   const sub = (weapon.subcategory ?? "").toLowerCase()
   if (pool === "melee") {
@@ -53,24 +64,41 @@ function weaponMatchesPool(weapon: SeedWeapon, pool: WeaponMasteryPool): boolean
   return true
 }
 
-function optionDescription(weapon: SeedWeapon): string {
-  const mastery = weaponMasteryProperty(weapon)
-  if (!mastery) return weapon.subcategory ?? ""
+function optionDescription(weapon: SeedWeapon | Equipment): string {
+  const mastery = weaponMasteryProperty(weapon) ?? getWeaponMastery(weapon as Equipment)
+  if (!mastery) return (weapon.subcategory ?? "") || ""
   const rules = describeWeaponMastery(mastery)
   return rules ? `${mastery} — ${rules}` : mastery
 }
 
-export function weaponMasteryOptionsForClass(className: string): FeatureChoiceOption[] {
-  const pool = WEAPON_MASTERY_POOL_BY_CLASS[className] ?? "all"
-  const weapons = (equipmentSeed as SeedWeapon[]).filter(
-    (item) => item.category === "Weapon" && weaponMatchesPool(item, pool),
-  )
+function weaponMasteryOptionsFromList(
+  weapons: Array<SeedWeapon | Equipment>,
+  pool: WeaponMasteryPool,
+): FeatureChoiceOption[] {
   return weapons
+    .filter((item) => (item.category === "Weapon" || !item.category) && weaponMatchesPool(item, pool))
     .map((weapon) => ({
       name: weapon.name,
       description: optionDescription(weapon),
     }))
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function weaponMasteryOptionsForClass(
+  className: string,
+  equipmentCatalog: Equipment[] = [],
+): FeatureChoiceOption[] {
+  const pool = WEAPON_MASTERY_POOL_BY_CLASS[className] ?? "all"
+  const seedWeapons = equipmentSeed as SeedWeapon[]
+  const fromSeed = weaponMasteryOptionsFromList(seedWeapons, pool)
+  if (!equipmentCatalog.length) return fromSeed
+
+  const fromCatalog = weaponMasteryOptionsFromList(equipmentCatalog, pool)
+  const byName = new Map<string, FeatureChoiceOption>()
+  for (const option of [...fromSeed, ...fromCatalog]) {
+    if (!byName.has(option.name)) byName.set(option.name, option)
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export function parseWeaponMasteryCountFromDescription(description: string): number | null {
@@ -120,7 +148,7 @@ export function enrichWeaponMasteryFeature(feature: Feature, className: string):
   }
 
   const linkedModifiers = (feature.linkedModifiers ?? []).filter((instance) => {
-    if (instance.catalogRefId === FEATURE_OPTION_PICKER_CATALOG_ID) return false
+    if (WEAPON_MASTERY_PICKER_CATALOG_IDS.has(instance.catalogRefId)) return false
     const characteristics = instance.characteristics ?? []
     return !characteristics.some((char) => isLegacyWeaponMasteryPicker(char))
   })

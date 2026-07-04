@@ -2,7 +2,8 @@ import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formul
 import { aggregateDiscoveryOptions } from "@/lib/builder/aggregate-discoveries"
 import { aggregateKnackOptions } from "@/lib/builder/knack-choices"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
-import type { CustomAbility, Feature, FeatureChoice } from "@/lib/types"
+import type { CustomAbility, Equipment, Feature, FeatureChoice } from "@/lib/types"
+import { weaponMasteryOptionsForClass } from "@/lib/compendium/weapon-mastery-choice"
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase()
@@ -70,10 +71,18 @@ export function resolveFeatureChoiceOptions(
     featureChoicePicks: Record<string, string[]>
     classNames: string[]
     classLevel?: number
+    equipmentCatalog?: Equipment[]
   },
 ): FeatureChoice["options"] {
   const choices = feature.choices
   if (!choices) return []
+  if (choices.resourceKey === "weapon_mastery" && params.classNames[0]) {
+    const merged = weaponMasteryOptionsForClass(
+      params.classNames[0],
+      params.equipmentCatalog ?? [],
+    )
+    if (merged.length) return merged
+  }
   if (choices.optionsSource === "known_discipline_talents") {
     return aggregatePsionicTalentOptions({
       customAbilities: params.customAbilities,

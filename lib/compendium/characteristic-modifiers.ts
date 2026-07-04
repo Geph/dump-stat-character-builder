@@ -252,14 +252,23 @@ export type ListCharacteristicType =
   | "tool_proficiencies"
   | "saving_throws"
 
-export interface CharacteristicModifierBase {
+import type {
+  LimitationEvaluationContext,
+  LimitationSource,
+  ModifierLimitation,
+} from "@/lib/compendium/modifier-limitations"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+
+export type { LimitationEvaluationContext, ModifierLimitation } from "@/lib/compendium/modifier-limitations"
+
+export interface CharacteristicModifierBase extends LimitationSource {
   id: string
   label?: string
   /** Share one pick pool across multiple modifiers on the same source (e.g. Skilled: 3 skills or tools). */
   sharedChoiceGroup?: string
   /** Total picks allowed across all modifiers in the group. */
   sharedChoiceCount?: number
-  /** Bonus only applies while the matching sheet toggle is active. */
+  /** @deprecated Use limitations with requires_active sheet_toggle rule. */
   requiresSheetToggle?: SheetToggleKey
 }
 
@@ -275,8 +284,7 @@ export type AcFormulaOption = {
   includeProficiency?: boolean
 }
 
-export type AggregateCharacteristicsOptions = {
-  activeSheetToggles?: ReadonlySet<SheetToggleKey>
+export type AggregateCharacteristicsOptions = LimitationEvaluationContext & {
   selectedAcFormulaId?: string | null
 }
 
@@ -1760,11 +1768,14 @@ function pickHigherUnarmedDie(
 
 function isModifierActive(
   mod: CharacteristicModifier,
-  toggles?: ReadonlySet<SheetToggleKey>,
+  ctx: LimitationEvaluationContext = {},
 ): boolean {
-  const gate = mod.requiresSheetToggle
-  if (!gate) return true
-  return toggles?.has(gate) ?? false
+  return modifierLimitationsMet(mod, {
+    activeConditions: ctx.activeConditions,
+    activeSheetToggles: ctx.activeSheetToggles,
+    equippedArmor: ctx.equippedArmor,
+    equippedShield: ctx.equippedShield,
+  })
 }
 
 function evaluateAcFormulaScore(
@@ -1829,10 +1840,15 @@ export function aggregateCharacteristics(
   options?: AggregateCharacteristicsOptions,
 ): AggregatedCharacteristics {
   const result = emptyAggregated()
-  const toggles = options?.activeSheetToggles
+  const limitationCtx: LimitationEvaluationContext = {
+    activeConditions: options?.activeConditions,
+    activeSheetToggles: options?.activeSheetToggles,
+    equippedArmor: options?.equippedArmor,
+    equippedShield: options?.equippedShield,
+  }
 
   for (const mod of mods) {
-    if (!isModifierActive(mod, toggles)) continue
+    if (!isModifierActive(mod, limitationCtx)) continue
     switch (mod.type) {
       case "ability_scores":
         if (mod.mode === "asi_pool") break
