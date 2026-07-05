@@ -1,4 +1,6 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import { ACTION_PANEL_CLASS_RESOURCE_IDS } from "@/lib/compendium/class-resource-display"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
@@ -45,6 +47,7 @@ const REACTION_TRIGGER_TYPES = new Set<CharacteristicModifier["type"]>([
 /** Active-effect kinds (cat_fx_*) that mark an action as combat-focused. */
 const COMBAT_EFFECT_KINDS = new Set<string>([
   "extra_attack",
+  "extra_action",
   "bonus_action_attack",
   "reaction_attack",
   "weapon_attack",
@@ -56,6 +59,7 @@ const COMBAT_EFFECT_KINDS = new Set<string>([
   "damage_reduction",
   "impose_disadvantage",
   "force_save_control",
+  "heal_self",
 ])
 
 /** Characteristic types that mark an action as combat-focused. */
@@ -141,6 +145,9 @@ function kindsFromText(description: string | null | undefined): ActionEconomyKin
 
 /** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
 function classifyActionCategory(item: ActivatableItem): SheetActionCategory {
+  const resourceKey = resolveActionResourceKey(item)
+  if (resourceKey && ACTION_PANEL_CLASS_RESOURCE_IDS.has(resourceKey)) return "combat"
+
   for (const instance of item.linkedModifiers ?? []) {
     for (const effect of instance.activation?.effects ?? []) {
       const kind = (effect as { kind?: string }).kind
@@ -178,6 +185,25 @@ type ActivatableItem = {
   activation?: FeatureActivation | null
   limitedUses?: UsesConfig | null
   linkedModifiers?: LinkedModifierInstance[]
+  sheetDisplay?: import("@/lib/types").FeatureSheetDisplay | null
+}
+
+export type { ActivatableItem }
+
+/** Derive action-economy kinds from structured activation, modifiers, or prose. */
+export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
+  const baseKinds = activationKinds(item.activation)
+  const linkedKinds = baseKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
+  return baseKinds.length
+    ? baseKinds
+    : linkedKinds.length
+      ? linkedKinds
+      : kindsFromText(item.description)
+}
+
+/** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
+export function inferActivatableActionCategory(item: ActivatableItem): SheetActionCategory {
+  return classifyActionCategory(item)
 }
 
 function pushFeatureActions(
@@ -190,20 +216,18 @@ function pushFeatureActions(
 ) {
   for (const feature of features ?? []) {
     if ((feature.level ?? 1) > levelCap) continue
-    const baseKinds = activationKinds(feature.activation)
-    const linkedKinds = baseKinds.length ? [] : kindsFromLinkedModifiers(feature.linkedModifiers)
-    const kinds = baseKinds.length
-      ? baseKinds
-      : linkedKinds.length
-        ? linkedKinds
-        : kindsFromText(feature.description)
+    const kinds = inferActivatableActionKinds(feature)
     if (!kinds.length) continue
+    const display = resolveFeatureSheetDisplay(feature as Feature)
+    const category = inferActivatableActionCategory(feature)
+    if (category === "combat" && !display.combatActions) continue
+    if (category === "utility" && !display.abilitiesActions) continue
     actions.push({
       id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
       name: feature.name,
       sourceLabel,
       kinds,
-      category: classifyActionCategory(feature),
+      category,
       limitedUses: feature.limitedUses,
       classLevel: levelCap,
       description: feature.description ?? null,
@@ -350,7 +374,12 @@ export function collectSheetActions(params: {
     pushCustomAbilityActions(actions, params.customAbilities, Math.max(totalLevel, 1), null)
   }
 
-  return actions
+  const seen = new Set<string>()
+  return actions.filter((action) => {
+    if (seen.has(action.id)) return false
+    seen.add(action.id)
+    return true
+  })
 }
 
 export const ACTION_KIND_LABELS: Record<ActionEconomyKind, string> = {

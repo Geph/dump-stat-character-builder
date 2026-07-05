@@ -11,6 +11,7 @@ import {
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { normalizeSheetPlayState } from "@/lib/character/sheet-play-state"
 import type { DerivedCharacter } from "@/lib/character/types"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import {
   getMulticlassSpellSlotTables,
@@ -51,6 +52,8 @@ export type DashboardCharacterSummary = {
   passivePerception: number
   speed: number
   conditions: string[]
+  abilityScores: Record<AbilityScoreKey, number>
+  abilityMods: Record<AbilityScoreKey, number>
   resources: DashboardResourceLine[]
   companions: DashboardCompanionSummary[]
   sheetHref: string
@@ -363,6 +366,8 @@ export function buildDashboardSummary(hydrated: DashboardHydratedCharacter): Das
     passivePerception: derived.passivePerception,
     speed: derived.speed,
     conditions: buildConditionLabels(playState.activeConditions, playState.exhaustionLevel),
+    abilityScores: derived.abilityScores,
+    abilityMods: derived.abilityMods,
     resources: buildResourceLines({
       classDetails,
       derived,

@@ -4,6 +4,7 @@ import type { ResourceTrackerEntry } from "@/components/character-sheet/resource
 import {
   deriveClassResourceDisplay,
   resolveStaticResourceLabel,
+  shouldShowClassResourceOnSheet,
 } from "@/lib/compendium/class-resource-display"
 import type { ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import type { ClassResource } from "@/lib/types"
@@ -74,6 +75,7 @@ export function partitionResourceTrackerEntries(
       spendable.push(entry)
       continue
     }
+    if (!shouldShowClassResourceOnSheet(resourceKey, spendKeys)) continue
     const mode = deriveClassResourceDisplay(resource, spendKeys)
     if (mode === "tracker") {
       spendable.push(entry)

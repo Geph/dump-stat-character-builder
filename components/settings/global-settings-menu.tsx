@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { HeroBackgroundSettings } from "@/components/settings/hero-background-settings"
+import { PageBackgroundSettings } from "@/components/settings/page-background-settings"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { LayoutGrid, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -232,6 +233,11 @@ export function GlobalSettingsMenu() {
                     </li>
                   ))}
                 </ul>
+
+                <div className="border-t border-border pt-4 space-y-4">
+                  <HeroBackgroundSettings onStatus={setStatus} disabled={busy} />
+                  <PageBackgroundSettings onStatus={setStatus} disabled={busy} />
+                </div>
               </TabsContent>
 
               <TabsContent value="general" className="mt-0 space-y-6">
@@ -280,8 +286,6 @@ export function GlobalSettingsMenu() {
                     })}
                   </div>
                 </div>
-
-                <HeroBackgroundSettings onStatus={setStatus} disabled={busy} />
 
                 <div>
                   <p className="text-sm font-semibold text-foreground">Attribution</p>

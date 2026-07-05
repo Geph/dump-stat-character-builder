@@ -313,4 +313,78 @@ describe("collectSheetActions", () => {
     expect(surge?.psionicAugments?.augments).toHaveLength(1)
     expect(surge?.classResourceKey).toBe("psi_points")
   })
+
+  it("lists Action Surge on the combat tab only", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 2,
+            name: "Action Surge",
+            description: "Take one additional action on your turn.",
+            activation: { action: true },
+            limitedUses: {
+              type: "class_resource",
+              classResourceKey: "action_surge",
+              classResourceAmount: 1,
+            },
+            linkedModifiers: [
+              {
+                instanceId: "modinst_action_surge",
+                catalogRefId: "cat_fx_extra_action",
+                activation: { action: true, effects: [{ id: "fx1", kind: "extra_action" }] },
+              },
+            ],
+          } as unknown as Feature,
+        ], 5),
+      ],
+      species: null,
+    })
+    const surge = actions.find((a) => a.name === "Action Surge")
+    expect(surge?.category).toBe("combat")
+    expect(surge?.classResourceKey).toBe("action_surge")
+  })
+
+  it("honors sheetDisplay when combat or utility actions are disabled", () => {
+    const hidden = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 2,
+            name: "Action Surge",
+            description: "Take one additional action on your turn.",
+            activation: { action: true },
+            sheetDisplay: {
+              featuresTab: true,
+              combatActions: false,
+              abilitiesActions: false,
+            },
+          },
+        ]),
+      ],
+      species: null,
+    })
+    expect(hidden.map((action) => action.name)).not.toContain("Action Surge")
+
+    const utilityOnly = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Channel Divinity",
+            description: "As a magic action, you present your holy symbol.",
+            activation: { action: true },
+            sheetDisplay: {
+              featuresTab: true,
+              combatActions: false,
+              abilitiesActions: true,
+            },
+          },
+        ]),
+      ],
+      species: null,
+    })
+    const channel = utilityOnly.find((action) => action.name === "Channel Divinity")
+    expect(channel?.category).toBe("utility")
+  })
 })

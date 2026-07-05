@@ -2,41 +2,55 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ImageIcon, Trash2 } from "lucide-react"
+import { useAppTheme } from "@/components/providers/app-theme-provider"
 import {
-  formatHeroBackgroundUploadHint,
-  getCustomHeroBackground,
-  readHeroBackgroundFile,
-  setCustomHeroBackground,
-} from "@/lib/site-settings/hero-background"
+  formatPageBackgroundUploadHint,
+  hasCustomPageBackground,
+  PAGE_BG_CHANGE_EVENT,
+  readPageBackgroundFile,
+  resolvePageBackgroundUrl,
+  setCustomPageBackground,
+} from "@/lib/site-settings/page-background"
+import { getThemePageBackgroundAsset } from "@/lib/site-settings/theme-page-backgrounds"
 import { Button } from "@/components/ui/button"
 
-export function HeroBackgroundSettings({
+export function PageBackgroundSettings({
   onStatus,
   disabled,
 }: {
   onStatus: (message: string | null) => void
   disabled?: boolean
 }) {
+  const { theme } = useAppTheme()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [usingCustom, setUsingCustom] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const refreshPreview = useCallback(() => {
-    setPreview(getCustomHeroBackground())
-  }, [])
+    setUsingCustom(hasCustomPageBackground())
+    setPreview(resolvePageBackgroundUrl(theme))
+  }, [theme])
 
   useEffect(() => {
     refreshPreview()
+  }, [refreshPreview])
+
+  useEffect(() => {
+    const onChange = () => refreshPreview()
+    window.addEventListener(PAGE_BG_CHANGE_EVENT, onChange)
+    return () => window.removeEventListener(PAGE_BG_CHANGE_EVENT, onChange)
   }, [refreshPreview])
 
   const handleFile = async (file: File) => {
     setBusy(true)
     onStatus(null)
     try {
-      const dataUrl = await readHeroBackgroundFile(file)
-      setCustomHeroBackground(dataUrl)
+      const dataUrl = await readPageBackgroundFile(file)
+      setCustomPageBackground(dataUrl)
       setPreview(dataUrl)
-      onStatus("Home page hero graphic updated")
+      setUsingCustom(true)
+      onStatus("Page background updated")
     } catch (e) {
       onStatus(e instanceof Error ? e.message : "Upload failed")
     } finally {
@@ -45,10 +59,16 @@ export function HeroBackgroundSettings({
   }
 
   const handleRemove = () => {
-    setCustomHeroBackground(null)
-    setPreview(null)
-    onStatus("Using default hero images")
+    setCustomPageBackground(null)
+    const themeDefault = getThemePageBackgroundAsset(theme)
+    setPreview(themeDefault)
+    setUsingCustom(false)
+    onStatus(
+      themeDefault ? "Using theme default page background" : "Using solid theme background",
+    )
   }
+
+  const themeHasDefault = getThemePageBackgroundAsset(theme) != null
 
   return (
     <div className="space-y-3">
@@ -64,18 +84,20 @@ export function HeroBackgroundSettings({
         }}
       />
       <div>
-        <p className="text-sm font-semibold text-foreground">Home page hero graphic</p>
+        <p className="text-sm font-semibold text-foreground">Page background</p>
         <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-          {formatHeroBackgroundUploadHint()}. One image replaces the random default hero art on this
-          browser only.
+          {formatPageBackgroundUploadHint()}. Shown behind the app on this browser only.
+          {!themeHasDefault && !usingCustom
+            ? " No default graphic is set for this theme yet."
+            : null}
         </p>
       </div>
       {preview ? (
         <div
-          className="h-24 w-full rounded-xl border border-border bg-muted bg-cover bg-center"
+          className="mx-auto aspect-[2/3] w-full max-w-[8rem] rounded-xl border border-border bg-muted bg-cover bg-center"
           style={{ backgroundImage: `url(${preview})` }}
           role="img"
-          aria-label="Custom hero graphic preview"
+          aria-label="Page background preview"
         />
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -88,9 +110,9 @@ export function HeroBackgroundSettings({
           onClick={() => inputRef.current?.click()}
         >
           <ImageIcon className="h-4 w-4" />
-          {preview ? "Replace graphic" : "Upload graphic"}
+          {usingCustom ? "Replace background" : "Upload background"}
         </Button>
-        {preview ? (
+        {usingCustom ? (
           <Button
             type="button"
             variant="outline"

@@ -13,7 +13,12 @@ import {
   type ActionEconomyKind,
   type SheetActionEntry,
 } from "@/lib/character/sheet-actions"
+import {
+  SHEET_ACTION_CARD,
+  SHEET_ACTION_USAGE_DOT,
+} from "@/lib/character/sheet-status-colors"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
+import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import type { UsesConfig } from "@/lib/types"
 
@@ -49,11 +54,14 @@ type ActionUsage = {
 function UseDots({
   usage,
   label,
+  tone = "default",
 }: {
   usage: ActionUsage
   label: string
+  tone?: keyof typeof SHEET_ACTION_USAGE_DOT
 }) {
   const { max, used, setUsed } = usage
+  const dotStyle = SHEET_ACTION_USAGE_DOT[tone]
   const toggle = (slotIndex: number) => {
     setUsed(slotIndex < used ? slotIndex : slotIndex + 1)
   }
@@ -70,9 +78,7 @@ function UseDots({
             type="button"
             onClick={() => toggle(index)}
             className={`h-3.5 w-3.5 rounded border ${
-              isUsed
-                ? "border-primary bg-primary"
-                : "border-border bg-background hover:border-primary/50"
+              isUsed ? dotStyle.spent : dotStyle.available
             }`}
             aria-label={`${label} use ${index + 1}${isUsed ? " spent" : " available"}`}
           />
@@ -289,6 +295,7 @@ export function SheetActionsPanel({
               {entries.map((entry) => {
                 const usage = usageFor(entry)
                 const spendable = !incapacitated && usage != null && usage.used < usage.max
+                const usesClassResource = Boolean(entry.classResourceKey)
                 return (
                   <div
                     key={`${kind}-${entry.id}`}
@@ -305,15 +312,21 @@ export function SheetActionsPanel({
                           }
                         : undefined
                     }
-                    className={`relative flex flex-col gap-2 rounded border border-border/70 bg-muted/25 px-2 py-1.5 ${
-                      spendable
-                        ? "cursor-pointer hover:border-primary/50 hover:bg-muted/40 transition-colors"
-                        : usage
-                          ? incapacitated
-                            ? "opacity-50"
-                            : "opacity-80"
-                          : ""
-                    }`}
+                    className={cn(
+                      "relative flex flex-col gap-2 rounded border px-2 py-1.5",
+                      usesClassResource
+                        ? SHEET_ACTION_CARD.classResource
+                        : SHEET_ACTION_CARD.default,
+                      spendable &&
+                        (usesClassResource
+                          ? cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.classResourceHover)
+                          : cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.defaultHover)),
+                      !spendable && usage
+                        ? incapacitated
+                          ? "opacity-50"
+                          : "opacity-80"
+                        : "",
+                    )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -345,7 +358,11 @@ export function SheetActionsPanel({
                             </span>
                           ) : null}
                         </span>
-                        <UseDots usage={usage} label={entry.name} />
+                        <UseDots
+                          usage={usage}
+                          label={entry.name}
+                          tone={usesClassResource ? "classResource" : "default"}
+                        />
                       </div>
                     ) : null}
                   </div>

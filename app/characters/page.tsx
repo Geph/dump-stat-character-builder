@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
 import { Plus, User, Trash2, Search, Pencil, Download, Upload } from "lucide-react"
@@ -193,20 +194,20 @@ export default function CharactersPage() {
     })
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <MainNav />
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-black text-foreground mb-2">My Characters</h1>
-            <p className="text-muted-foreground text-lg">
+            <span className={pageHeaderStatBadgeClass}>
               {loading
                 ? "Loading..."
                 : hasActiveFilters
                   ? `${filteredCharacters.length} of ${characters.length} characters`
                   : `${characters.length} ${characters.length === 1 ? "character" : "characters"}`}
-            </p>
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -331,7 +332,7 @@ export default function CharactersPage() {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+                  className={`${pageFloatingHintClass} cursor-pointer hover:bg-card transition-colors`}
                 >
                   Clear filters
                 </button>
@@ -361,7 +362,7 @@ export default function CharactersPage() {
               <User className="w-12 h-12 text-primary" />
             </div>
             <h3 className="text-2xl font-bold text-foreground mb-3">No characters yet</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            <p className={`${pageFloatingHintClass} mb-6 mx-auto`}>
               Create your first D&D character and start your adventure!
             </p>
             <Link
@@ -374,7 +375,7 @@ export default function CharactersPage() {
           </div>
         ) : filteredCharacters.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-muted-foreground mb-4">No characters match your filters.</p>
+            <p className={`${pageFloatingHintClass} mb-4`}>No characters match your filters.</p>
             <button
               type="button"
               onClick={clearFilters}

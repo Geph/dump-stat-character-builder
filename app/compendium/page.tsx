@@ -5,6 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
+import {
+  pageFloatingHintClass,
+  pageHeaderSubtitleClass,
+} from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
 import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
@@ -1003,14 +1007,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   }
 
   return (
-    <div id="compendium-root" className="min-h-screen bg-background">
+    <div id="compendium-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
       
       <main id="compendium-main" className="max-w-7xl mx-auto px-4 py-8">
         <div id="compendium-header" className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
           <div className="min-w-0">
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
-            <p className="text-muted-foreground text-lg">Browse and edit all available D&D content</p>
+            <p className={pageHeaderSubtitleClass}>Browse and edit all available D&D content</p>
           </div>
           <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
             <DropdownMenu>
@@ -1701,7 +1705,7 @@ export default function CompendiumPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <p className="text-muted-foreground">Loading compendium…</p>
+          <p className={pageFloatingHintClass}>Loading compendium…</p>
         </div>
       }
     >

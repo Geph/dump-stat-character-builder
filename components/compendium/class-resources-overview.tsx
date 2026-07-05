@@ -11,6 +11,7 @@ import {
   type ClassResourceGroup,
 } from "@/lib/compendium/class-resource-rows"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
+import { pageOverlayPanelClass } from "@/lib/compendium/editor-field-styles"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import {
   compendiumAccentColorStyles,
@@ -140,7 +141,7 @@ export function ClassResourcesOverview({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
-            className="rounded-2xl border-2 border-primary/30 bg-card/50 p-4 space-y-4"
+            className={cn(pageOverlayPanelClass, "p-4 space-y-4")}
           >
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-black text-foreground">{expandedGroup.label}</h2>

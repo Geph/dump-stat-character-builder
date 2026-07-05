@@ -19,6 +19,29 @@ export const HIDDEN_CLASS_RESOURCE_IDS = new Set([
   "weapon_mastery",
 ])
 
+/** Fighter resources surfaced on the Combat Actions panel. */
+export const ACTION_PANEL_CLASS_RESOURCE_IDS = new Set([
+  "second_wind",
+  "action_surge",
+  "indomitable",
+])
+
+/** Only show in the Resources column when subclass/content spends this pool. */
+export const SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS = new Set([
+  "superiority_dice",
+  "psionic_energy_dice",
+])
+
+export function shouldShowClassResourceOnSheet(
+  resourceId: string,
+  spendKeys: ReadonlySet<string>,
+): boolean {
+  if (SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS.has(resourceId) && !spendKeys.has(resourceId)) {
+    return false
+  }
+  return true
+}
+
 function hasRecharges(uses: UsesConfig): boolean {
   return (uses.recharges?.length ?? 0) > 0
 }

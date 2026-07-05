@@ -7,6 +7,9 @@ export type CompendiumThemeColorId =
   | "lemon"
   | "orange"
   | "magenta"
+  | "cyan"
+  | "sky"
+  | "violet"
 
 export const COMPENDIUM_THEME_COLORS: { id: CompendiumThemeColorId; label: string }[] = [
   { id: "primary", label: "Primary" },
@@ -16,6 +19,9 @@ export const COMPENDIUM_THEME_COLORS: { id: CompendiumThemeColorId; label: strin
   { id: "lemon", label: "Lemon" },
   { id: "orange", label: "Orange" },
   { id: "magenta", label: "Magenta" },
+  { id: "cyan", label: "Cyan" },
+  { id: "sky", label: "Sky" },
+  { id: "violet", label: "Violet" },
 ]
 
 const COLOR_IDS = new Set<string>(COMPENDIUM_THEME_COLORS.map((c) => c.id))
@@ -40,6 +46,9 @@ const ICON_TEXT: Record<CompendiumThemeColorId, string> = {
   lemon: "text-lemon",
   orange: "text-orange",
   magenta: "text-magenta",
+  cyan: "text-cyan",
+  sky: "text-sky",
+  violet: "text-violet",
 }
 
 const HOVER_BORDER: Record<CompendiumThemeColorId, string> = {
@@ -50,6 +59,9 @@ const HOVER_BORDER: Record<CompendiumThemeColorId, string> = {
   lemon: "hover:border-lemon",
   orange: "hover:border-orange",
   magenta: "hover:border-magenta",
+  cyan: "hover:border-cyan",
+  sky: "hover:border-sky",
+  violet: "hover:border-violet",
 }
 
 const TITLE_HOVER: Record<CompendiumThemeColorId, string> = {
@@ -60,6 +72,9 @@ const TITLE_HOVER: Record<CompendiumThemeColorId, string> = {
   lemon: "hover:text-lemon",
   orange: "hover:text-orange",
   magenta: "hover:text-magenta",
+  cyan: "hover:text-cyan",
+  sky: "hover:text-sky",
+  violet: "hover:text-violet",
 }
 
 const EDIT_HOVER: Record<CompendiumThemeColorId, string> = {
@@ -70,6 +85,9 @@ const EDIT_HOVER: Record<CompendiumThemeColorId, string> = {
   lemon: "hover:text-lemon hover:border-lemon hover:bg-lemon/10",
   orange: "hover:text-orange hover:border-orange hover:bg-orange/10",
   magenta: "hover:text-magenta hover:border-magenta hover:bg-magenta/10",
+  cyan: "hover:text-cyan hover:border-cyan hover:bg-cyan/10",
+  sky: "hover:text-sky hover:border-sky hover:bg-sky/10",
+  violet: "hover:text-violet hover:border-violet hover:bg-violet/10",
 }
 
 const SWATCH_BG: Record<CompendiumThemeColorId, string> = {
@@ -80,6 +98,9 @@ const SWATCH_BG: Record<CompendiumThemeColorId, string> = {
   lemon: "bg-lemon",
   orange: "bg-orange",
   magenta: "bg-magenta",
+  cyan: "bg-cyan",
+  sky: "bg-sky",
+  violet: "bg-violet",
 }
 
 const SWATCH_RING: Record<CompendiumThemeColorId, string> = {
@@ -90,6 +111,9 @@ const SWATCH_RING: Record<CompendiumThemeColorId, string> = {
   lemon: "ring-lemon",
   orange: "ring-orange",
   magenta: "ring-magenta",
+  cyan: "ring-cyan",
+  sky: "ring-sky",
+  violet: "ring-violet",
 }
 
 export function compendiumAccentColorStyles(colorId: CompendiumThemeColorId | null) {

@@ -178,6 +178,10 @@ export function ClassFeatureFields({
 
         siblingFeatures={siblingFeatures.filter((feat) => feat.name !== feature.name)}
 
+        feature={feature}
+
+        onSheetDisplayChange={(sheetDisplay) => onUpdate(index, { sheetDisplay })}
+
         onChange={(nextActivation) =>
 
           onUpdate(index, {

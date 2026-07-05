@@ -128,6 +128,8 @@ describe("build-dashboard-summary", () => {
     expect(summary!.currentHp).toBe(24)
     expect(summary!.armorClass).toBeGreaterThan(0)
     expect(summary!.passivePerception).toBeGreaterThan(0)
+    expect(summary!.abilityScores.strength).toBeGreaterThan(0)
+    expect(summary!.abilityMods.strength).toBeGreaterThanOrEqual(0)
     expect(summary!.conditions).toContain("Poisoned")
   })
 

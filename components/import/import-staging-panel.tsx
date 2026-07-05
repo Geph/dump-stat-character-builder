@@ -1,6 +1,12 @@
 "use client"
 
 import type { ImportStage } from "@/lib/import/import-staging"
+import {
+  pageOverlayPanelClass,
+  pageOverlayPanelHintClass,
+  pageOverlayPanelTitleClass,
+} from "@/lib/compendium/editor-field-styles"
+import { cn } from "@/lib/utils"
 import { Layers } from "lucide-react"
 
 type ImportStagingPanelProps = {
@@ -12,12 +18,12 @@ export function ImportStagingPanel({ stages, summary }: ImportStagingPanelProps)
   if (!stages.length) return null
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-card/50 p-4 text-sm">
+    <div className={cn(pageOverlayPanelClass, "space-y-3 p-4 text-sm")}>
       <div className="flex items-start gap-2">
         <Layers className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div>
-          <p className="font-semibold text-foreground">Staged import</p>
-          <p className="mt-1 text-muted-foreground">{summary}</p>
+          <p className={pageOverlayPanelTitleClass}>Staged import</p>
+          <p className={pageOverlayPanelHintClass}>{summary}</p>
         </div>
       </div>
 

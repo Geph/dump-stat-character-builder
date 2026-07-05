@@ -1,10 +1,41 @@
 "use client"
 
 import Link from "next/link"
+import { ABILITY_SCORE_KEYS } from "@/lib/compendium/characteristic-modifiers"
 import type {
   DashboardCharacterSummary,
   DashboardCompanionSummary,
 } from "@/lib/character/build-dashboard-summary"
+
+const ABILITY_LABELS: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function AbilityPill({
+  label,
+  score,
+  mod,
+}: {
+  label: string
+  score: number
+  mod: number
+}) {
+  const modLabel = mod >= 0 ? `+${mod}` : String(mod)
+  return (
+    <div className="rounded-md border border-border/70 bg-muted/20 px-1 py-1 text-center min-w-0">
+      <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
+        {label}
+      </p>
+      <p className="mt-0.5 text-xs font-black tabular-nums leading-none">{score}</p>
+      <p className="mt-0.5 text-[9px] tabular-nums text-muted-foreground leading-none">{modLabel}</p>
+    </div>
+  )
+}
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
@@ -71,6 +102,17 @@ export function DashboardCharacterCard({ summary }: DashboardCharacterCardProps)
         <StatPill label="AC" value={String(summary.armorClass)} />
         <StatPill label="PP" value={String(summary.passivePerception)} />
         <StatPill label="Spd" value={`${summary.speed} ft`} />
+      </div>
+
+      <div className="grid grid-cols-6 gap-1">
+        {ABILITY_SCORE_KEYS.map((key) => (
+          <AbilityPill
+            key={key}
+            label={ABILITY_LABELS[key]}
+            score={summary.abilityScores[key]}
+            mod={summary.abilityMods[key]}
+          />
+        ))}
       </div>
 
       {visibleConditions.length > 0 ? (

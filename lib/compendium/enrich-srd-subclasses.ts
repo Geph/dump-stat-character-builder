@@ -1,5 +1,6 @@
 import { enrichSubclassFeaturesWithResources } from "@/lib/compendium/class-resource-features"
 import { enrichSubclassFeaturesWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
+import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 
 /** Apply SRD defaults to subclass feature rows (class resource links, modifier presets). */
 export function enrichSrdSubclassRow(
@@ -14,7 +15,7 @@ export function enrichSrdSubclassRow(
       parentClassName,
       subclassName,
       features,
-    ),
+    ).map(applyFeatureSheetDisplay),
   }
 }
 

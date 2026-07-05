@@ -6,7 +6,12 @@ import {
   DASHBOARD_MIN_CHARACTERS,
   validateDashboardSelection,
 } from "@/lib/character/dashboard-url"
+import {
+  pageOverlayPanelClass,
+  pageOverlayPanelHintClass,
+} from "@/lib/compendium/editor-field-styles"
 import type { Character, DndClass, Species } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 type LibraryCharacter = Character & {
   classes?: DndClass | null
@@ -33,9 +38,10 @@ export function DashboardCharacterPicker({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border-2 border-border bg-card/60 px-4 py-3 text-sm text-muted-foreground">
-        Pick {DASHBOARD_MIN_CHARACTERS}–{DASHBOARD_MAX_CHARACTERS} characters for a compact GM view.
-        Stats reflect each character&apos;s last saved sheet state.
+      <div className={cn(pageOverlayPanelClass, "px-4 py-3 text-sm", pageOverlayPanelHintClass)}>
+        Glance at key stats for multiple characters during play. Pick {DASHBOARD_MIN_CHARACTERS}–
+        {DASHBOARD_MAX_CHARACTERS} characters for a compact GM view. Stats reflect each
+        character&apos;s last saved sheet state.
       </div>
 
       {loading ? (

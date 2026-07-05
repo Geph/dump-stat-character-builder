@@ -18,11 +18,14 @@ import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { SUBCLASS_LEVEL } from "@/lib/builder/choices"
 import type { CharacterBuildInputs } from "@/lib/character/types"
+import { readModifierSource } from "@/lib/character/tag-modifier-source"
+import type { StatContributionSourceType } from "@/lib/character/stat-contributions"
 import type { Equipment, Feature } from "@/lib/types"
 
 export type WeaponSheetAppliedModifier = {
   name: string
   description: string
+  sourceType?: StatContributionSourceType
 }
 
 export type WeaponSheetContext = {
@@ -128,6 +131,7 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "Attack modifier",
           description: extra.join(". "),
+          sourceType: readModifierSource(mod)?.sourceType,
         })
         break
       }
@@ -142,6 +146,7 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "Damage modifier",
           description,
+          sourceType: readModifierSource(mod)?.sourceType,
         })
         break
       }
@@ -160,11 +165,13 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "On-hit rider",
           description: formatRollBonusSummary(riderMod.automaticBonus) || "Bonus damage on hit",
+          sourceType: readModifierSource(mod)?.sourceType,
         })
       } else if (riderMod.riders?.length) {
         applied.push({
           name: mod.label ?? "On-hit options",
           description: riderMod.riders.map((rider) => rider.name).join(", "),
+          sourceType: readModifierSource(mod)?.sourceType,
         })
       }
     }

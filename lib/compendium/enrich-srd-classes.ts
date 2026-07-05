@@ -1,3 +1,4 @@
+import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import { enrichClassFeatureWithResource } from "@/lib/compendium/class-resource-features"
 import {
   enrichClassFeatureWithModifierPresets,
@@ -64,7 +65,7 @@ function enrichFeature(className: string, feature: Feature): Feature {
     next = applyGrantRef(next, ["Fighting Style"])
   }
 
-  return next
+  return applyFeatureSheetDisplay(next)
 }
 
 function ensureMilestoneGrantFeatFeatures(features: Feature[]): Feature[] {
@@ -115,7 +116,9 @@ function ensureMilestoneGrantFeatFeatures(features: Feature[]): Feature[] {
     })
   }
 
-  return result.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+  return result
+    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+    .map((feature) => (feature.sheetDisplay ? feature : applyFeatureSheetDisplay(feature)))
 }
 
 function enrichFeatures(className: string, features: unknown): Feature[] {

@@ -1,4 +1,4 @@
-export type AppThemeId = "arcane" | "parchment" | "stone" | "moss" | "clay"
+export type AppThemeId = "arcane" | "parchment" | "stone" | "moss" | "sands"
 
 export const APP_THEME_STORAGE_KEY = "dump-stat-app-theme"
 
@@ -36,15 +36,21 @@ export const APP_THEMES: AppThemeMeta[] = [
     swatches: ["oklch(0.55 0.1 145)", "oklch(0.72 0.12 85)", "oklch(0.18 0.03 145)"],
   },
   {
-    id: "clay",
-    label: "Clay",
-    description: "Adobe warmth with terracotta and sun-baked sand",
+    id: "sands",
+    label: "Sands",
+    description: "Desert warmth with terracotta and sun-baked sand",
     swatches: ["oklch(0.55 0.14 45)", "oklch(0.7 0.08 75)", "oklch(0.25 0.03 55)"],
   },
 ]
 
 export function isAppThemeId(value: string): value is AppThemeId {
   return APP_THEMES.some((t) => t.id === value)
+}
+
+/** Maps legacy stored theme ids (e.g. clay → sands). */
+export function normalizeAppThemeId(value: string): AppThemeId | null {
+  if (value === "clay") return "sands"
+  return isAppThemeId(value) ? value : null
 }
 
 export const DEFAULT_APP_THEME: AppThemeId = "parchment"

@@ -63,9 +63,9 @@ export function ImportCollisionPanel({
           return (
             <div
               key={collision.id}
-              className="rounded-lg border border-border bg-card/60 p-3 space-y-3"
+              className="rounded-lg border border-border/90 bg-card/88 backdrop-blur-sm p-3 space-y-3"
             >
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/75">
                 <span className="rounded bg-muted px-2 py-0.5 font-medium">
                   {KIND_LABELS[collision.kind]}
                 </span>
