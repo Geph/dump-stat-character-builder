@@ -253,6 +253,15 @@ export interface FeatureEffect {
   destroysTokenOnEnd?: boolean
 }
 
+export interface FeatureSheetDisplay {
+  /** Show as an action on the Abilities & Skills tab. */
+  abilitiesActions?: boolean
+  /** Show as an action on the Combat tab. */
+  combatActions?: boolean
+  /** Show as a reference card on the Features tab. */
+  featuresTab?: boolean
+}
+
 export interface FeatureActivation {
   action?: boolean
   bonusAction?: boolean
@@ -301,6 +310,8 @@ export interface Feature {
   modifierRefs?: string[]
   /** Per-instance catalog links with inline configuration. */
   linkedModifiers?: LinkedModifierInstance[]
+  /** Where this feature appears on the character sheet (all optional; inferred when unset). */
+  sheetDisplay?: FeatureSheetDisplay | null
 }
 
 export interface ClassResource {

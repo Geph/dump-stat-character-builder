@@ -6,6 +6,7 @@ import { Dices, History, RotateCcw, X } from "lucide-react"
 import { isNat20OrNat1 } from "@/components/character-sheet/d20-roll-button"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import { formatRollTime } from "@/lib/character/sheet-roll-history"
+import { SHEET_BANNER_BUTTON } from "@/lib/character/sheet-status-colors"
 import { cn } from "@/lib/utils"
 
 export function RollHistoryTrigger() {
@@ -24,7 +25,10 @@ export function RollHistoryTrigger() {
         onClick={() => setOpen(true)}
         title="Session roll history"
         aria-label={`Session roll history${count ? `, ${count} rolls` : ""}`}
-        className="relative mt-1 flex h-10 w-10 items-center justify-center rounded-lg border-2 border-border/70 bg-card/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        className={cn(
+          "relative mt-1 flex h-10 w-10 items-center justify-center rounded-lg border-2 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
+          SHEET_BANNER_BUTTON.icon,
+        )}
       >
         <span className="flex items-center gap-0.5" aria-hidden>
           <Dices className="w-3.5 h-3.5" />

@@ -11,10 +11,10 @@ export const HERO_BG_RECOMMENDED_WIDTH = 2560
 
 export const HERO_BG_RECOMMENDED_HEIGHT = 1080
 
-/** Keep modest for localStorage; JPEG/WebP compress well at this size. */
-export const MAX_HERO_BG_FILE_BYTES = 2 * 1024 * 1024
+/** Stored as a data URL in localStorage; JPEG/WebP compress well at this size. */
+export const MAX_HERO_BG_FILE_BYTES = 5 * 1024 * 1024
 
-export const MAX_HERO_BG_FILE_MB = 2
+export const MAX_HERO_BG_FILE_MB = 5
 
 export const MAX_HERO_BG_DATA_URL_LENGTH =
   Math.ceil(MAX_HERO_BG_FILE_BYTES * (4 / 3)) + 128

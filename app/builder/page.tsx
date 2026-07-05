@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer"
 import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
+import { pageFloatingHintClass, pageStepStripClass } from "@/lib/compendium/editor-field-styles"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
@@ -2218,7 +2219,7 @@ export default function BuilderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <MainNav />
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="animate-pulse">
@@ -2232,19 +2233,18 @@ export default function BuilderPage() {
   }
 
   return (
-    <div id="builder-root" className="min-h-screen bg-background">
+    <div id="builder-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
-      
-      <main id="builder-main" className="max-w-7xl mx-auto px-4 py-8 min-h-[calc(100vh-4rem)]">
-        {/* Step Indicator */}
-        <div id="builder-steps" className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+
+      <div id="builder-steps" className={pageStepStripClass}>
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
               const isReachable = step.id <= maxStepReached
               const isComplete = step.id < currentStep || (step.id < maxStepReached && !isActive)
-              
+
               return (
                 <div key={step.id} className="flex items-center flex-1 min-w-0">
                   <button
@@ -2264,7 +2264,7 @@ export default function BuilderPage() {
                           ? "bg-primary text-primary-foreground scale-110"
                           : isReachable
                           ? "bg-muted text-foreground hover:bg-muted/80"
-                          : "bg-muted text-muted-foreground"
+                          : "bg-muted/60 text-muted-foreground"
                       }`}
                     >
                       {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
@@ -2277,7 +2277,7 @@ export default function BuilderPage() {
                   </button>
                   {index < visibleSteps.length - 1 && (
                     <div className={`flex-1 h-1 mx-1 md:mx-2 rounded min-w-[8px] ${
-                      step.id < maxStepReached ? "bg-success" : "bg-muted"
+                      step.id < maxStepReached ? "bg-success/80" : "bg-border/80"
                     }`} />
                   )}
                 </div>
@@ -2285,6 +2285,9 @@ export default function BuilderPage() {
             })}
           </div>
         </div>
+      </div>
+      
+      <main id="builder-main" className="max-w-7xl mx-auto px-4 py-8 min-h-[calc(100vh-4rem)] flex-1 w-full">
 
         {/* Mobile: toggle between step choices and character preview */}
         <div className="lg:hidden flex gap-2 mb-4">
@@ -2379,7 +2382,7 @@ export default function BuilderPage() {
             </div>
 
             {editingCharacterId && (
-              <p className="text-sm text-muted-foreground mb-4 -mt-2">
+              <p className={`${pageFloatingHintClass} mb-4 -mt-2`}>
                 Editing an existing character. Changes are saved when you click Save Character on the Details step.
               </p>
             )}
@@ -2396,7 +2399,7 @@ export default function BuilderPage() {
             {currentStep === 1 && (
               <div>
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Class & Level</h2>
-                <p className="text-muted-foreground mb-4">Your class determines your combat abilities and special features.</p>
+                <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
                 
                 {/* Current Class Levels */}
                 {activeClassLevels.length > 0 && (
@@ -2508,7 +2511,7 @@ export default function BuilderPage() {
                   />
                 </div>
                 
-                <p className="text-xs text-muted-foreground mb-2">Click a class to add it, or increase its level if already selected.</p>
+                <p className={`${pageFloatingHintClass} text-xs mb-2`}>Click a class to add it, or increase its level if already selected.</p>
 
                 {(() => {
                   const filteredClasses = classes.filter((cls) =>
@@ -2639,7 +2642,7 @@ export default function BuilderPage() {
                 {activeClassLevels.length > 0 && (
                   <div className="mt-6 space-y-2 border-t border-border pt-6">
                     <h3 className="text-lg font-bold text-foreground">Class Options</h3>
-                    <p className="text-xs text-muted-foreground mb-2">
+                    <p className={`${pageFloatingHintClass} text-xs mb-2`}>
                       Complete choices for your selected class(es) before continuing.
                     </p>
                     {activeClassLevels.map((entry) => {
@@ -2965,7 +2968,7 @@ export default function BuilderPage() {
                       </p>
                     )}
                     {!featsLoadError && feats.length === 0 && (
-                      <p className="text-xs text-muted-foreground mb-3">
+                      <p className={`${pageFloatingHintClass} text-xs mb-3`}>
                         No feats in your compendium yet. Seed SRD content from Settings or add feats
                         in the Compendium.
                       </p>
@@ -3222,7 +3225,7 @@ export default function BuilderPage() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Species</h2>
-                  <p className="text-muted-foreground mb-3">Your species grants unique traits and abilities.</p>
+                  <p className={`${pageFloatingHintClass} mb-3`}>Your species grants unique traits and abilities.</p>
                   
                   {/* Search */}
                   <div className="relative mb-3">
@@ -3554,7 +3557,7 @@ export default function BuilderPage() {
 
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Background</h2>
-                  <p className="text-muted-foreground mb-3">Your background provides ability bonuses and a 1st-level feat.</p>
+                  <p className={`${pageFloatingHintClass} mb-3`}>Your background provides ability bonuses and a 1st-level feat.</p>
                   
                   {/* Search */}
                   <div className="relative mb-3">
@@ -3906,7 +3909,7 @@ export default function BuilderPage() {
             {currentStep === 3 && (
               <div>
                 <h2 className="text-2xl font-black text-foreground mb-2">Determine Ability Scores</h2>
-                <p className="text-muted-foreground mb-6">Set your character&apos;s core abilities.</p>
+                <p className={`${pageFloatingHintClass} mb-6`}>Set your character&apos;s core abilities.</p>
 
                 {/* Method Selection */}
                 <div className="flex flex-wrap gap-2 mb-6">
@@ -4136,7 +4139,7 @@ export default function BuilderPage() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Select Equipment</h2>
-                  <p className="text-muted-foreground mb-3">
+                  <p className={`${pageFloatingHintClass} mb-3`}>
                     Choose starting equipment from your class and background, or take gold to buy gear.
                   </p>
 
@@ -4327,7 +4330,7 @@ export default function BuilderPage() {
 
                     {spellGrantSourceKeys.length > 0 ? (
                       <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
+                        <p className={pageFloatingHintClass}>
                           Feats and class features that grant specific spells (Magic Initiate,
                           Mystic Arcanum, Contact Patron, etc.).
                         </p>
@@ -4628,7 +4631,7 @@ export default function BuilderPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="text-2xl font-black text-foreground mb-2">Character Details</h2>
-                    <p className="text-muted-foreground">Give your character a name and personality.</p>
+                    <p className={pageFloatingHintClass}>Give your character a name and personality.</p>
                   </div>
                   <button
                     type="button"

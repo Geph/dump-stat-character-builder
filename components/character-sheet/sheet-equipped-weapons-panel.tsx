@@ -16,6 +16,7 @@ import {
   describeWeaponRange,
 } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
+import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -122,7 +123,10 @@ function WeaponAttackCard({
               {(sheetContext?.appliedModifiers ?? []).map((modifier) => (
                 <span
                   key={`${modifier.name}-${modifier.description}`}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-[10px] font-medium text-foreground"
+                  className={cn(
+                    "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium",
+                    weaponModifierBadgeClass(modifier.sourceType),
+                  )}
                 >
                   {modifier.name}
                   <ConditionInfoTip

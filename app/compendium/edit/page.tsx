@@ -3,6 +3,7 @@
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
+import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { isCompendiumContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
 import dynamic from "next/dynamic"
 
@@ -32,7 +33,7 @@ function CompendiumEditInner() {
         <MainNav />
         <main className="max-w-3xl mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Editor not found</h1>
-          <p className="text-muted-foreground">Choose content from the compendium to edit.</p>
+          <p className={pageFloatingHintClass}>Choose content from the compendium to edit.</p>
         </main>
       </div>
     )
@@ -47,7 +48,7 @@ export default function CompendiumEditPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <p className="text-muted-foreground">Loading editor…</p>
+          <p className={pageFloatingHintClass}>Loading editor…</p>
         </div>
       }
     >

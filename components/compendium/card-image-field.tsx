@@ -10,6 +10,12 @@ import {
   normalizeCardImageUrl,
   type CompendiumCardImageCrop,
 } from "@/lib/compendium/card-image"
+import {
+  pageOverlayPanelClass,
+  pageOverlayPanelHintClass,
+  pageOverlayPanelMetaClass,
+  pageOverlayPanelTitleClass,
+} from "@/lib/compendium/editor-field-styles"
 import { MAX_PORTRAIT_FILE_BYTES } from "@/lib/portrait"
 import { cn } from "@/lib/utils"
 
@@ -50,10 +56,10 @@ export function CardImageField({
   }
 
   return (
-    <div className="rounded-xl border-2 border-border bg-card/50 p-4 space-y-3">
+    <div className={cn(pageOverlayPanelClass, "p-4 space-y-3")}>
       <div>
-        <label className="block text-sm font-semibold text-foreground">{label}</label>
-        <p className="text-xs text-muted-foreground mt-1">
+        <label className={cn("block", pageOverlayPanelTitleClass)}>{label}</label>
+        <p className={pageOverlayPanelHintClass}>
           Shown on compendium cards and detail overlays. {CARD_IMAGE_ASPECT_LABEL} · {CARD_IMAGE_RECOMMENDED}
         </p>
       </div>
@@ -76,7 +82,7 @@ export function CardImageField({
           type="button"
           onClick={() => inputRef.current?.click()}
           className={cn(
-            "flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors",
+            "flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-background/90 text-foreground/75 hover:border-primary/50 hover:text-foreground transition-colors",
             aspectClass,
           )}
         >
@@ -85,7 +91,7 @@ export function CardImageField({
         </button>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -93,13 +99,13 @@ export function CardImageField({
         >
           {preview ? "Replace image" : "Choose file"}
         </button>
-        <span className="text-xs text-muted-foreground">or paste URL:</span>
+        <span className={pageOverlayPanelMetaClass}>or paste URL:</span>
         <input
           type="url"
           value={value?.startsWith("data:") ? "" : value ?? ""}
           onChange={(e) => onChange(normalizeCardImageUrl(e.target.value))}
           placeholder="https://…"
-          className="flex-1 min-w-[200px] px-3 py-1.5 bg-background border border-border rounded-lg text-sm"
+          className="flex-1 min-w-[200px] px-3 py-1.5 bg-background/90 border border-border rounded-lg text-sm text-foreground"
         />
       </div>
 

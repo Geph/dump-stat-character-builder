@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { deriveClassResourceDisplay } from "@/lib/compendium/class-resource-display"
+import { deriveClassResourceDisplay, shouldShowClassResourceOnSheet } from "@/lib/compendium/class-resource-display"
 import type { ClassResource } from "@/lib/types"
 
 const emptySpendKeys = new Set<string>()
@@ -95,5 +95,20 @@ describe("deriveClassResourceDisplay", () => {
       },
     }
     expect(deriveClassResourceDisplay(pool, emptySpendKeys)).toBe("hidden")
+  })
+})
+
+describe("shouldShowClassResourceOnSheet", () => {
+  it("shows fighter class resources in the Resources column", () => {
+    expect(shouldShowClassResourceOnSheet("second_wind", emptySpendKeys)).toBe(true)
+    expect(shouldShowClassResourceOnSheet("action_surge", emptySpendKeys)).toBe(true)
+    expect(shouldShowClassResourceOnSheet("indomitable", emptySpendKeys)).toBe(true)
+  })
+
+  it("gates superiority dice to subclasses that spend them", () => {
+    expect(shouldShowClassResourceOnSheet("superiority_dice", emptySpendKeys)).toBe(false)
+    expect(shouldShowClassResourceOnSheet("superiority_dice", new Set(["superiority_dice"]))).toBe(
+      true,
+    )
   })
 })

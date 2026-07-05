@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { isStaticDeploy } from "@/lib/config/deploy-mode"
 import { ensureLocalSrdSeed } from "@/lib/data/local-seed"
+import { pageHeaderSubtitleClass } from "@/lib/compendium/editor-field-styles"
 
 const SEED_TIMEOUT_MS = 45_000
 
@@ -47,7 +48,7 @@ export function StaticDataProvider({ children }: { children: React.ReactNode }) 
   if (!ready) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-8">
-        <p className="text-muted-foreground text-lg">Loading compendium data…</p>
+        <p className={pageHeaderSubtitleClass}>Loading compendium data…</p>
       </div>
     )
   }

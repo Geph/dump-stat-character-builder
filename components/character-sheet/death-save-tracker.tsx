@@ -9,6 +9,7 @@ import {
   deathSaveRollSummary,
   type DeathSaveState,
 } from "@/lib/character/death-save-roll"
+import { SHEET_DEATH_SAVE_BOX } from "@/lib/character/sheet-status-colors"
 import { rollD20WithMode } from "@/lib/dice/d20-roll"
 
 export type { DeathSaveState }
@@ -143,7 +144,9 @@ export function DeathSaveTracker({
 
   if (variant === "inline") {
     return (
-      <div className="relative flex flex-col justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/25 px-2 py-1.5 min-h-[2.75rem] h-full">
+      <div
+        className={`relative flex flex-col justify-center gap-1.5 px-2 py-1.5 min-h-[2.75rem] h-full ${SHEET_DEATH_SAVE_BOX}`}
+      >
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-bold text-muted-foreground uppercase shrink-0">Death Saves</p>
           {rollControls}
@@ -173,7 +176,7 @@ export function DeathSaveTracker({
   }
 
   return (
-    <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5 flex flex-col gap-2 h-full">
+    <div className={`p-2.5 flex flex-col gap-2 h-full ${SHEET_DEATH_SAVE_BOX}`}>
       <div className="flex flex-col items-center gap-1.5">
         <p className="text-[10px] font-bold text-muted-foreground uppercase">Death Saves</p>
         {rollControls}

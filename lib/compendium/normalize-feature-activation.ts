@@ -1,6 +1,7 @@
 import type { Feature, FeatureActivation, FeatureChoice, FeatureEffect } from "@/lib/types"
 import { migrateFeatureFeatChoiceToModifierRefs } from "@/lib/compendium/grant-feat-catalog"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { normalizeFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 
 function newEffectId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID()
@@ -124,6 +125,11 @@ export function normalizeFeatureRow(feature: Feature): Feature {
   } else if (next.choices) {
     const normalizedChoices = normalizeFeatureChoices(next.choices)
     next = normalizedChoices ? { ...next, choices: normalizedChoices } : { ...next, choices: undefined }
+  }
+
+  next = {
+    ...next,
+    sheetDisplay: normalizeFeatureSheetDisplay(next.sheetDisplay),
   }
 
   return migrateFeatureFeatChoiceToModifierRefs(next)

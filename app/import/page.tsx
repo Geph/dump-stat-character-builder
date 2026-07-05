@@ -17,6 +17,10 @@ import {
   useImportAiSettings,
 } from "@/components/import/import-ai-settings"
 import { MainNav } from "@/components/main-nav"
+import {
+  pageFloatingHintClass,
+  pageHeaderSubtitleClass,
+} from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import {
   canUseClientByoImport,
@@ -600,7 +604,7 @@ export default function ImportPage() {
     : "Populate your database with bundled SRD 5.2.1 content: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
 
   return (
-    <div id="import-root" className="min-h-screen bg-background">
+    <div id="import-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
 
       <main id="import-main" className="relative max-w-4xl mx-auto px-4 py-8">
@@ -658,13 +662,13 @@ export default function ImportPage() {
 
         <div id="import-header" className="mb-8 sm:pr-56">
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
-          <p className="text-muted-foreground text-lg">
+          <p className={pageHeaderSubtitleClass}>
             {staticMode
               ? "Import homebrew with BYO JSON (paste LLM output), share JSON packs, or reload the bundled SRD — data stays in your browser."
               : "Add new content from PDFs or pasted text and JSON"}
           </p>
           {staticMode && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className={`${pageFloatingHintClass} mt-2`}>
               Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with MySQL.
               Use <strong className="font-medium text-foreground">BYO JSON</strong> to copy a prompt into your own LLM and paste the result here.
             </p>

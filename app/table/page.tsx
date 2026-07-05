@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { MainNav } from "@/components/main-nav"
+import { pageBackLinkClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { SheetPersistentStatsBar } from "@/components/character-sheet/sheet-persistent-stats-bar"
 import { createClient } from "@/lib/db/client"
@@ -113,7 +114,7 @@ function TableModeInner() {
   }
 
   if (loading) {
-    return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+    return <p className={`p-4 ${pageFloatingHintClass}`}>Loading…</p>
   }
 
   if (!character || !derived) {
@@ -123,10 +124,7 @@ function TableModeInner() {
   return (
     <div className="space-y-4 p-3 max-w-lg mx-auto">
       <div className="flex items-center justify-between gap-2">
-        <Link
-          href={`/characters/${character.id}`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
-        >
+        <Link href={`/characters/${character.id}`} className={pageBackLinkClass}>
           <ArrowLeft className="w-3.5 h-3.5" />
           Full sheet
         </Link>
@@ -190,7 +188,7 @@ export default function TableModePage() {
     <div className="min-h-screen bg-background flex flex-col">
       <MainNav />
       <main className="flex-1">
-        <Suspense fallback={<p className="p-4 text-sm text-muted-foreground">Loading…</p>}>
+        <Suspense fallback={<p className={`p-4 ${pageFloatingHintClass}`}>Loading…</p>}>
           <TableModeInner />
         </Suspense>
       </main>

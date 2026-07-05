@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
+import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import {
   DashboardCharacterPicker,
@@ -135,14 +136,11 @@ function DashboardPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <MainNav />
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-black text-foreground mb-2">GM Dashboard</h1>
-          <p className="text-muted-foreground text-lg">
-            Glance at key stats for multiple characters during play.
-          </p>
+          <h1 className="text-4xl font-black text-foreground">GM Dashboard</h1>
         </div>
 
         {loadError ? (
@@ -162,7 +160,7 @@ function DashboardPageInner() {
 
         {showDashboard ? (
           dashboardLoading ? (
-            <p className="text-muted-foreground">Loading dashboard…</p>
+            <p className={pageFloatingHintClass}>Loading dashboard…</p>
           ) : (
             <DashboardGrid
               summaries={summaries}
@@ -191,7 +189,7 @@ export default function DashboardPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <p className="text-muted-foreground">Loading GM Dashboard…</p>
+          <p className={pageFloatingHintClass}>Loading GM Dashboard…</p>
         </div>
       }
     >

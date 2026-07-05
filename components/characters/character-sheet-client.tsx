@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { pageBackLinkClass } from "@/lib/compendium/editor-field-styles"
 import { createClient } from "@/lib/db/client"
 import {
   Angry,
@@ -93,6 +94,9 @@ import type { ClassResource } from "@/lib/types"
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { SHEET_STATUS_BADGE, SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP } from "@/lib/character/sheet-status-colors"
+import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
+import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
@@ -1013,9 +1017,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           aria-pressed={active}
           onClick={() => toggleSheetToggle(toggle.id)}
           className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
-            active
-              ? "border-destructive/50 bg-destructive/15 text-destructive"
-              : "border-border bg-card text-muted-foreground hover:bg-muted"
+            active ? SHEET_BANNER_BUTTON.toggleActive : SHEET_BANNER_BUTTON.toggleIdle
           }`}
         >
           {isRagingToggle ? (
@@ -1736,7 +1738,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <MainNav />
         <main className="max-w-5xl xl:max-w-7xl mx-auto px-4 py-6">
           <div className="animate-pulse space-y-4">
@@ -1751,11 +1753,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   if (!character || !effectiveScores) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <MainNav />
         <main className="max-w-5xl mx-auto px-4 py-6 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Character not found</h1>
-          <Link href="/characters" className="text-primary hover:underline">
+          <Link href="/characters" className={pageBackLinkClass}>
             Back to characters
           </Link>
         </main>
@@ -1929,15 +1931,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           },
         }}
       >
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <MainNav />
 
       <main className="max-w-5xl xl:max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-4 mb-3">
-          <Link
-            href="/characters"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <Link href="/characters" className={pageBackLinkClass}>
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
@@ -1953,7 +1952,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl mb-3 min-h-[140px]"
+          className="relative rounded-2xl overflow-hidden mb-3 min-h-[140px]"
         >
           {character.banner_url && (
             <div className="absolute inset-0 overflow-hidden rounded-2xl">
@@ -1995,17 +1994,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <p className="text-sm text-muted-foreground mt-0.5">{classLabel}</p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {character.species && (
-                    <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
+                    <span className={SHEET_BANNER_BADGE.species}>
                       {character.species.name}
                     </span>
                   )}
                   {(character.size ?? character.species?.size) && (
-                    <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
+                    <span className={SHEET_BANNER_BADGE.size}>
                       {character.size ?? character.species?.size}
                     </span>
                   )}
                   {character.backgrounds && (
-                    <span className="px-2 py-0.5 bg-card/80 rounded-full text-xs font-medium">
+                    <span className={SHEET_BANNER_BADGE.background}>
                       {character.backgrounds.name}
                     </span>
                   )}
@@ -2020,7 +2019,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       ref={sheetMenuButtonRef}
                       type="button"
                       onClick={openSheetMenu}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg border-2 border-border/70 bg-card/80 text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                      className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${SHEET_BANNER_BUTTON.icon} text-muted-foreground`}
                       title="Sheet options"
                       aria-expanded={sheetMenuOpen}
                     >
@@ -2115,8 +2114,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         conditionDropdownOpen ||
                         activeConditions.length > 0 ||
                         exhaustionLevel > 0
-                          ? "border-destructive/60 bg-destructive/15 text-destructive hover:bg-destructive/20"
-                          : "border-destructive/40 bg-destructive/10 text-destructive hover:border-destructive/60 hover:bg-destructive/15"
+                          ? SHEET_BANNER_BUTTON.conditionsActive
+                          : SHEET_BANNER_BUTTON.conditionsDefault
                       }`}
                     >
                       Conditions
@@ -2192,8 +2191,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     aria-pressed={hasInspiration}
                     className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${
                       hasInspiration
-                        ? "border-amber-500/60 bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                        : "border-border/70 bg-card/80 text-muted-foreground hover:border-amber-500/40 hover:text-amber-600"
+                        ? SHEET_BANNER_BUTTON.inspirationActive
+                        : SHEET_BANNER_BUTTON.inspirationIdle
                     }`}
                   >
                     <Sparkles className="w-5 h-5" />
@@ -2211,7 +2210,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         ""
                       }
                       onChange={(event) => setAcFormulaPick(event.target.value)}
-                      className="min-h-11 rounded-lg border border-border bg-card px-3 text-sm"
+                      className={`min-h-11 rounded-lg border px-3 text-sm ${SHEET_BANNER_BUTTON.select}`}
                     >
                       {derived?.acFormulaOptions.map((option) => (
                         <option key={option.id} value={option.id}>
@@ -2233,10 +2232,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             <div className="flex w-full justify-end">
               <div className="flex max-w-2/3 flex-wrap items-center justify-end gap-1">
                 {exhaustionLevel > 0 ? (
-                  <span
-                    className="inline-flex items-center gap-0.5 rounded-md border border-amber-500/40 bg-amber-500/20 px-1.5 py-1 text-[10px] font-semibold text-amber-900 dark:text-amber-200"
-                    title={getExhaustionEffectSummary(exhaustionLevel)}
-                  >
+                  <span className={SHEET_BANNER_CHIP.exhaustion} title={getExhaustionEffectSummary(exhaustionLevel)}>
                     Exhaustion {exhaustionLevel}
                     <ConditionInfoTip
                       description={
@@ -2255,10 +2251,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </span>
                 ) : null}
                 {bloodiedActive ? (
-                  <span
-                    className="inline-flex items-center gap-0.5 rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
-                    title={BLOODIED_DESCRIPTION}
-                  >
+                  <span className={SHEET_BANNER_CHIP.bloodied} title={BLOODIED_DESCRIPTION}>
                     Bloodied
                     <ConditionInfoTip description={BLOODIED_DESCRIPTION} />
                   </span>
@@ -2274,11 +2267,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     return (
                       <span
                         key={condName}
-                        className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-1 text-[10px] font-semibold ${
+                        className={
                           isConcentrationCondition(condName)
-                            ? "border-purple-500/40 bg-purple-500/20 text-purple-800 dark:text-purple-300"
-                            : "border-destructive/40 bg-destructive/15 text-destructive"
-                        }`}
+                            ? SHEET_BANNER_CHIP.concentration
+                            : SHEET_BANNER_CHIP.condition
+                        }
                       >
                         {condName}
                         {condDescription ? (
@@ -2338,7 +2331,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         <div
                           key={skill.name}
                           className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${
-                            isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
+                            isProficient ? SHEET_STATUS_ROW.skillProficient : SHEET_STATUS_ROW.muted
                           }`}
                         >
                           <span className="truncate min-w-0">
@@ -2346,9 +2339,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </span>
                           <span className="flex items-center gap-1 shrink-0">
                             {hasExpertise && (
-                              <span className="text-[9px] font-semibold uppercase px-1 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
-                                Expertise
-                              </span>
+                              <span className={SHEET_STATUS_BADGE.expertise}>Expertise</span>
                             )}
                             <span className="font-bold tabular-nums w-7 text-right">{formatMod(mod)}</span>
                             <D20RollButton
@@ -2369,7 +2360,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     {customSkillRows.map((skill) => (
                       <div
                         key={skill.name}
-                        className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-primary/10 font-medium"
+                        className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${SHEET_STATUS_ROW.skillCustom}`}
                       >
                         <span className="truncate min-w-0">
                           {skill.name} (
@@ -2379,9 +2370,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </span>
                         <span className="flex items-center gap-1 shrink-0">
                           {skill.expertise && (
-                            <span className="text-[9px] font-semibold uppercase px-1 py-0.5 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300">
-                              Expertise
-                            </span>
+                            <span className={SHEET_STATUS_BADGE.expertise}>Expertise</span>
                           )}
                           <span className="font-bold tabular-nums w-7 text-right">{formatMod(skill.bonus)}</span>
                           <D20RollButton
@@ -2786,7 +2775,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <div
                               key={ability}
                               className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs min-h-[2.75rem] ${
-                                isProficient ? "bg-primary/10 font-medium" : "bg-muted/50 text-muted-foreground"
+                                isProficient ? SHEET_STATUS_ROW.saveProficient : SHEET_STATUS_ROW.muted
                               }`}
                             >
                               <span className="min-w-0 font-semibold tabular-nums tracking-wide">
@@ -3121,7 +3110,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               {classDetails.map((entry) => {
                 const classFeatures = ((entry.class?.features as
                   | import("@/lib/types").Feature[]
-                  | undefined)?.filter((feature) => feature.level <= entry.row.level) ?? [])
+                  | undefined)?.filter(
+                  (feature) => feature.level <= entry.row.level && featureShowsOnSheetTab(feature),
+                ) ?? [])
                 if (!classFeatures.length) return null
                 const dedupedFeatures = dedupeFeaturesByName(classFeatures)
                 return (
@@ -3159,7 +3150,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               {classDetails.map((entry) => {
                 const subclassFeatures =
                   ((entry.subclass?.features as import("@/lib/types").Feature[] | undefined)?.filter(
-                    (feature) => feature.level <= entry.row.level,
+                    (feature) => feature.level <= entry.row.level && featureShowsOnSheetTab(feature),
                   ) ?? [])
                 if (!subclassFeatures.length || !entry.subclass) return null
                 return (

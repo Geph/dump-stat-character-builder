@@ -4,6 +4,7 @@ import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import CharacterSheetClient from "@/components/characters/character-sheet-client"
 import { MainNav } from "@/components/main-nav"
+import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 
 function CharacterSheetInner() {
   const searchParams = useSearchParams()
@@ -15,7 +16,7 @@ function CharacterSheetInner() {
         <MainNav />
         <main className="max-w-3xl mx-auto px-4 py-16 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-2">Character not found</h1>
-          <p className="text-muted-foreground">Open a character from your roster.</p>
+          <p className={pageFloatingHintClass}>Open a character from your roster.</p>
         </main>
       </div>
     )
@@ -29,7 +30,7 @@ export default function CharacterSheetPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <p className="text-muted-foreground">Loading character…</p>
+          <p className={pageFloatingHintClass}>Loading character…</p>
         </div>
       }
     >

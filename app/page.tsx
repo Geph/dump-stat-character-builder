@@ -152,7 +152,7 @@ export default function HomePage() {
   ]
 
   return (
-    <div id="home-root" className="min-h-screen bg-background">
+    <div id="home-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
 
       <main id="home-main">

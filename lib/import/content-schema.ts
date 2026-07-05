@@ -137,6 +137,13 @@ export const ClassFeatureSchema = z.object({
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
   psionic_augments: z.unknown().optional(),
+  sheetDisplay: z
+    .object({
+      abilitiesActions: z.boolean().optional(),
+      combatActions: z.boolean().optional(),
+      featuresTab: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 export const SubclassImportSchema = z.object({

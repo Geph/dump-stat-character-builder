@@ -13,8 +13,9 @@ import {
   APP_THEMES,
   DEFAULT_APP_THEME,
   type AppThemeId,
-  isAppThemeId,
+  normalizeAppThemeId,
 } from "@/lib/themes/app-themes"
+import { PageBackgroundLayer } from "@/components/page-background-layer"
 
 type AppThemeContextValue = {
   theme: AppThemeId
@@ -33,7 +34,11 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(APP_THEME_STORAGE_KEY)
-    const initial = stored && isAppThemeId(stored) ? stored : DEFAULT_APP_THEME
+    const normalized = stored ? normalizeAppThemeId(stored) : null
+    const initial = normalized ?? DEFAULT_APP_THEME
+    if (stored && normalized && stored !== normalized) {
+      localStorage.setItem(APP_THEME_STORAGE_KEY, normalized)
+    }
     setThemeState(initial)
     applyThemeToDocument(initial)
     setReady(true)
@@ -57,7 +62,12 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     )
   }
 
-  return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>
+  return (
+    <AppThemeContext.Provider value={value}>
+      <PageBackgroundLayer />
+      <div className="relative z-[1] min-h-screen">{children}</div>
+    </AppThemeContext.Provider>
+  )
 }
 
 export function useAppTheme() {

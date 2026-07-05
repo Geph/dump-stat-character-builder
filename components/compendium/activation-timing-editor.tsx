@@ -1,10 +1,12 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { Plus, X } from "lucide-react"
 import { ACTIVATION_REQUIREMENT_OPTIONS } from "@/lib/compendium/activation-requirements"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 import { ABILITY_CHECK_OPTIONS } from "@/lib/compendium/class-feature-metadata"
-import type { FeatureActivation, FeatureActivationRequirement } from "@/lib/types"
+import type { Feature, FeatureActivation, FeatureActivationRequirement, FeatureSheetDisplay } from "@/lib/types"
+import { FeatureSheetDisplayEditor } from "@/components/compendium/feature-sheet-display-editor"
 
 export type SiblingClassFeatureOption = {
   name: string
@@ -17,10 +19,70 @@ type ActivationEditorProps = {
   description?: string
   /** Other features on the same class/subclass (for "existing class feature" activation). */
   siblingFeatures?: SiblingClassFeatureOption[]
+  /** When set, renders sheet visibility controls in this section. */
+  feature?: Feature
+  onSheetDisplayChange?: (sheetDisplay: FeatureSheetDisplay) => void
 }
 
 function newRequirement(): FeatureActivationRequirement {
   return { kind: "drop_to_zero_hp" }
+}
+
+const ACTION_ECONOMY_OPTIONS = [
+  ["action", "Action"],
+  ["bonusAction", "Bonus Action"],
+  ["reaction", "Reaction"],
+] as const satisfies ReadonlyArray<readonly [keyof FeatureActivation, string]>
+
+const TRIGGER_OPTIONS = [
+  ["onInitiative", "When you roll initiative"],
+  ["onDropToZeroHp", "When you drop to 0 Hit Points"],
+  ["onFailedSave", "When you fail a saving throw"],
+  ["onSuccessfulSave", "When you succeed on a saving throw"],
+] as const satisfies ReadonlyArray<readonly [keyof FeatureActivation, string]>
+
+function ActivationCheckboxGroup({
+  title,
+  children,
+  disabled = false,
+}: {
+  title: string
+  children: ReactNode
+  disabled?: boolean
+}) {
+  return (
+    <div
+      className={`rounded-lg border border-border bg-muted/20 p-3 space-y-2 ${disabled ? "opacity-50" : ""}`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function ActivationCheckbox({
+  checked,
+  disabled,
+  label,
+  onChange,
+}: {
+  checked: boolean
+  disabled?: boolean
+  label: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex items-start gap-2 cursor-pointer text-sm min-w-0">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 w-4 h-4 shrink-0 rounded border-border accent-primary"
+      />
+      <span className="text-muted-foreground leading-snug">{label}</span>
+    </label>
+  )
 }
 
 export function ActivationEditor({
@@ -28,6 +90,8 @@ export function ActivationEditor({
   onChange,
   description = "When this feature is used in play, which action economy does it consume? All linked modifier effects share this activation.",
   siblingFeatures = [],
+  feature,
+  onSheetDisplayChange,
 }: ActivationEditorProps) {
   const requirements = activation.requirements ?? []
   const inheritActivation = Boolean(activation.usesExistingClassFeature)
@@ -49,102 +113,93 @@ export function ActivationEditor({
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </div>
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        {(
-          [
-            ["action", "Action"],
-            ["bonusAction", "Bonus Action"],
-            ["reaction", "Reaction"],
-            ["onInitiative", "When you roll initiative"],
-            ["onDropToZeroHp", "When you drop to 0 Hit Points"],
-            ["onFailedSave", "When you fail a saving throw"],
-            ["onSuccessfulSave", "When you succeed on a saving throw"],
-          ] as const
-        ).map(([key, label]) => (
-          <label
-            key={key}
-            className={`flex items-center gap-2 cursor-pointer ${inheritActivation ? "opacity-50" : ""}`}
-          >
-            <input
-              type="checkbox"
+      <ActivationCheckboxGroup title="Action economy" disabled={inheritActivation}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
+          {ACTION_ECONOMY_OPTIONS.map(([key, label]) => (
+            <ActivationCheckbox
+              key={key}
               checked={!!activation[key]}
               disabled={inheritActivation}
-              onChange={(e) =>
-                onChange({
-                  ...activation,
-                  [key]: e.target.checked,
-                })
-              }
-              className="w-4 h-4 rounded border-border accent-primary"
+              label={label}
+              onChange={(checked) => onChange({ ...activation, [key]: checked })}
             />
-            <span className="text-muted-foreground">{label}</span>
-          </label>
-        ))}
-      </div>
+          ))}
+        </div>
+      </ActivationCheckboxGroup>
 
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 cursor-pointer text-sm">
-          <input
-            type="checkbox"
+      <ActivationCheckboxGroup title="Automatic triggers" disabled={inheritActivation}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+          {TRIGGER_OPTIONS.map(([key, label]) => (
+            <ActivationCheckbox
+              key={key}
+              checked={!!activation[key]}
+              disabled={inheritActivation}
+              label={label}
+              onChange={(checked) => onChange({ ...activation, [key]: checked })}
+            />
+          ))}
+        </div>
+      </ActivationCheckboxGroup>
+
+      <ActivationCheckboxGroup title="Usage rules">
+        <div className="space-y-2">
+          <ActivationCheckbox
             checked={inheritActivation}
-            onChange={(e) =>
+            label="Uses activation from an existing class feature"
+            onChange={(checked) =>
               onChange({
                 ...activation,
-                usesExistingClassFeature: e.target.checked,
-                existingClassFeatureName: e.target.checked
+                usesExistingClassFeature: checked,
+                existingClassFeatureName: checked
                   ? (activation.existingClassFeatureName ?? siblingFeatures[0]?.name ?? null)
                   : null,
               })
             }
-            className="w-4 h-4 rounded border-border accent-primary"
           />
-          <span className="text-muted-foreground">Uses activation from an existing class feature</span>
-        </label>
 
-        {inheritActivation && (
-          <div className="ml-6 space-y-1">
-            {siblingFeatures.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">
-                Add other class features to this class to select one here.
-              </p>
-            ) : (
-              <>
-                <label className="block text-xs font-semibold text-foreground">Class feature</label>
-                <select
-                  value={activation.existingClassFeatureName ?? ""}
-                  onChange={(e) =>
-                    onChange({
-                      ...activation,
-                      existingClassFeatureName: e.target.value || null,
-                    })
-                  }
-                  className="w-full max-w-md px-3 py-2 bg-background border border-border rounded-lg text-sm"
-                >
-                  <option value="">Select feature…</option>
-                  {siblingFeatures.map((feat) => (
-                    <option key={`${feat.level}-${feat.name}`} value={feat.name}>
-                      Level {feat.level}: {feat.name}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+          {inheritActivation && (
+            <div className="ml-6 space-y-1">
+              {siblingFeatures.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">
+                  Add other class features to this class to select one here.
+                </p>
+              ) : (
+                <>
+                  <label className="block text-xs font-semibold text-foreground">Class feature</label>
+                  <select
+                    value={activation.existingClassFeatureName ?? ""}
+                    onChange={(e) =>
+                      onChange({
+                        ...activation,
+                        existingClassFeatureName: e.target.value || null,
+                      })
+                    }
+                    className="w-full max-w-md px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  >
+                    <option value="">Select feature…</option>
+                    {siblingFeatures.map((feat) => (
+                      <option key={`${feat.level}-${feat.name}`} value={feat.name}>
+                        Level {feat.level}: {feat.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+          )}
 
-      <div className="flex flex-wrap gap-4 text-sm">
-        <label className={`flex items-center gap-2 cursor-pointer ${inheritActivation ? "opacity-50" : ""}`}>
-          <input
-            type="checkbox"
+          <ActivationCheckbox
             checked={!!activation.oncePerTurn}
             disabled={inheritActivation}
-            onChange={(e) => onChange({ ...activation, oncePerTurn: e.target.checked })}
-            className="w-4 h-4 rounded border-border accent-primary"
+            label="Once per turn"
+            onChange={(checked) => onChange({ ...activation, oncePerTurn: checked })}
           />
-          <span className="text-muted-foreground">Once per turn</span>
-        </label>
-      </div>
+        </div>
+      </ActivationCheckboxGroup>
+
+      {feature && onSheetDisplayChange ? (
+        <FeatureSheetDisplayEditor feature={feature} onChange={onSheetDisplayChange} />
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
