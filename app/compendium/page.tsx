@@ -302,7 +302,6 @@ function CompendiumPageContent() {
     }
     
     fetchActiveTabContent()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   const subclassesByClassId = useMemo(() => {
@@ -1446,7 +1445,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
             >
               <option value="all">All groups</option>
-              <option value="artisans">Artisan's Tools</option>
+              <option value="artisans">Artisan&apos;s Tools</option>
               <option value="musical">Musical Instrument</option>
               <option value="gaming">Gaming Set</option>
               <option value="other">Other Tools</option>
