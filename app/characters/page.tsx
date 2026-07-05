@@ -201,13 +201,13 @@ export default function CharactersPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-black text-foreground mb-2">My Characters</h1>
-            <span className={pageHeaderStatBadgeClass}>
+            <p className={pageHeaderStatBadgeClass}>
               {loading
                 ? "Loading..."
                 : hasActiveFilters
                   ? `${filteredCharacters.length} of ${characters.length} characters`
                   : `${characters.length} ${characters.length === 1 ? "character" : "characters"}`}
-            </span>
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input

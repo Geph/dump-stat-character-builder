@@ -11,6 +11,11 @@ describe("sheet-toggle-registry", () => {
     const ids = BUILTIN_SHEET_TOGGLES.map((entry) => entry.id)
     expect(ids).toContain("while_raging")
     expect(ids).toContain("below_half_hp")
+    expect(ids).not.toContain("in_combat_or_high_stakes")
+  })
+
+  it("resolves optional psion toggles by id", () => {
+    expect(getSheetToggleDefinition("in_combat_or_high_stakes")?.sourceType).toBe("class_feature")
   })
 
   it("recognizes magic item toggle ids", () => {

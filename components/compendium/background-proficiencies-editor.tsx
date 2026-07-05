@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import {
   BACKGROUND_ARMOR_OPTIONS,
   BACKGROUND_WEAPON_CATEGORY_OPTIONS,
@@ -97,14 +98,11 @@ export function BackgroundProficienciesEditor({ value, onChange, weaponOptions }
     .filter((name) => !prof.weapons.includes(name))
 
   return (
-    <div className="bg-card border-2 border-border rounded-xl p-4 space-y-5">
-      <div>
-        <label className="block text-sm font-semibold text-foreground mb-1">Proficiencies</label>
-        <p className="text-xs text-muted-foreground">
-          Tools, vehicles, weapons, armor, and languages this background grants.
-        </p>
-      </div>
-
+    <CompendiumEditorPanel
+      title="Proficiencies"
+      hint="Tools, vehicles, weapons, armor, and languages this background grants."
+      className="space-y-5"
+    >
       <div>
         <label className="block text-sm font-semibold text-foreground mb-2">Tools and Vehicles</label>
         <select
@@ -273,6 +271,6 @@ export function BackgroundProficienciesEditor({ value, onChange, weaponOptions }
         </div>
         <TagList items={prof.languages} onRemove={(l) => removeFrom("languages", l)} />
       </div>
-    </div>
+    </CompendiumEditorPanel>
   )
 }

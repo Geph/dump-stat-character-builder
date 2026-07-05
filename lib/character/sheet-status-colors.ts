@@ -1,4 +1,6 @@
 import type { StatContributionSourceType } from "@/lib/character/stat-contributions"
+import type { AppThemeId } from "@/lib/themes/app-themes"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 /** Row backgrounds for proficient saves, skills, and similar sheet tiles. */
 export const SHEET_STATUS_ROW = {
@@ -42,9 +44,9 @@ export const SHEET_BANNER_CHIP = {
 export const SHEET_BANNER_BUTTON = {
   icon: "border-border/50 bg-card/45 hover:border-primary hover:text-foreground",
   conditionsDefault:
-    "border-destructive/30 bg-destructive/8 text-destructive hover:border-destructive/45 hover:bg-destructive/12",
+    "border-destructive/70 bg-destructive/90 text-destructive-foreground hover:border-destructive/80 hover:bg-destructive/95",
   conditionsActive:
-    "border-destructive/45 bg-destructive/12 text-destructive hover:bg-destructive/16",
+    "border-destructive/80 bg-destructive/95 text-destructive-foreground hover:bg-destructive",
   inspirationActive: "border-amber-500/45 bg-amber-500/12 text-amber-700 dark:text-amber-300",
   inspirationIdle:
     "border-border/50 bg-card/45 text-muted-foreground hover:border-amber-500/30 hover:text-amber-600",
@@ -53,6 +55,74 @@ export const SHEET_BANNER_BUTTON = {
   rest: "border-border/50 bg-background/45 hover:bg-muted/35 hover:text-foreground",
   select: "border-border/50 bg-card/45",
 } as const
+
+/** Panel fill — opacity = 100% minus transparency percentage. */
+export const SHEET_PANEL = {
+  /** 35% transparent */
+  faint: "bg-card/65",
+  /** 20% transparent */
+  medium: "bg-card/80",
+  /** 10% transparent */
+  solid: "bg-card/90",
+} as const
+
+/** Abilities tab panel backgrounds. */
+export const SHEET_ABILITIES_PANEL = {
+  skills: "bg-card/75",
+  proficiencies: "bg-card/85",
+  abilityScores: SHEET_PANEL.medium,
+  actions: SHEET_PANEL.solid,
+} as const
+
+/** Combat tab panel backgrounds. */
+export const SHEET_COMBAT_PANEL = {
+  combatStats: SHEET_PANEL.faint,
+  initiative: SHEET_PANEL.faint,
+  savingThrows: SHEET_PANEL.medium,
+  spells: SHEET_PANEL.medium,
+  spellcastingResources: SHEET_PANEL.solid,
+  actions: SHEET_PANEL.solid,
+} as const
+
+export const SHEET_EQUIPMENT_PANEL = SHEET_PANEL.solid
+export const SHEET_FEATURES_PANEL = SHEET_PANEL.medium
+export const SHEET_DETAILS_PANEL = SHEET_PANEL.faint
+
+/** Sheet section tab buttons — 10% transparent. */
+export const SHEET_TAB_BUTTON = {
+  active: "bg-primary/90 text-primary-foreground",
+  idle: "bg-card/90 text-muted-foreground hover:bg-muted/90",
+} as const
+
+/** Character sheet `<main>` — consistent width on md+ across every tab. */
+export const SHEET_MAIN_CLASS =
+  "w-full min-w-0 max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 overflow-x-clip"
+
+/** Tab panel wrapper — keeps grid/flex children from widening the main column. */
+export const SHEET_TAB_CONTENT_CLASS = "w-full min-w-0"
+
+const ARCANE_ABILITY_SCORE_COLORS: Record<AbilityScoreKey, string> = {
+  strength: "bg-red-500",
+  dexterity: "bg-green-500",
+  constitution: "bg-orange-500",
+  intelligence: "bg-blue-500",
+  wisdom: "bg-purple-500",
+  charisma: "bg-pink-500",
+}
+
+export function abilityScoreBoxClass(theme: AppThemeId, ability: AbilityScoreKey): string {
+  const base = "w-10 h-10 rounded-lg flex items-center justify-center mx-auto"
+  if (theme === "arcane") {
+    return `${base} ${ARCANE_ABILITY_SCORE_COLORS[ability]}`
+  }
+  return `${base} bg-secondary`
+}
+
+export function abilityScoreValueClass(theme: AppThemeId): string {
+  return theme === "arcane"
+    ? "text-sm font-black text-white"
+    : "text-sm font-black text-secondary-foreground"
+}
 
 /** Action cards on the combat / abilities tabs. */
 export const SHEET_ACTION_CARD = {

@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
+import {
+  CompendiumEditorPanel,
+  CompendiumEditorSection,
+} from "@/components/compendium/compendium-editor-section"
 import type { DndClass, Feature, FeatureChoice, ClassResource } from "@/lib/types"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
@@ -356,20 +360,15 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             }
           />
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe the subclass theme and flavor..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Spellcasting */}
-          <div className="bg-card border-2 border-border rounded-xl p-4">
+          <CompendiumEditorPanel title="Spellcasting">
             <label className="flex items-center gap-2 cursor-pointer mb-4">
               <input
                 type="checkbox"
@@ -407,25 +406,15 @@ export default function SubclassEditorPage({ id }: { id: string }) {
                 </select>
               </div>
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Subclass Features */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <label className="text-sm font-semibold text-foreground">Subclass Features</label>
-                <p className="text-xs text-muted-foreground">Features gained at various levels</p>
-              </div>
-              <button
-                type="button"
-                onClick={addFeature}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Feature
-              </button>
-            </div>
-            
+          <CompendiumEditorSection
+            title="Subclass Features"
+            hint="Features gained at various levels"
+            addLabel="Add Feature"
+            onAdd={addFeature}
+            collapsible
+          >
             <div className="space-y-4">
               {form.features.map((feature, index) => (
                 <div
@@ -513,7 +502,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
                 </div>
               ))}
             </div>
-          </div>
+          </CompendiumEditorSection>
 
         </form>
       </main>

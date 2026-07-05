@@ -21,6 +21,7 @@ import { enrichBackgroundList, normalizeBackgroundRow } from "@/lib/compendium/n
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
+import { pageOverlayPanelClass } from "@/lib/compendium/editor-field-styles"
 import {
   emptyBackgroundProficiencies,
   normalizeBackgroundProficiencies,
@@ -388,7 +389,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* Skill Proficiencies */}
-          <div>
+          <div className={`${pageOverlayPanelClass} p-4`}>
             <label className="block text-sm font-semibold text-foreground mb-2">Skill Proficiencies</label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {SKILLS.map((skill) => (

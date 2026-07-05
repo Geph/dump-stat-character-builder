@@ -531,3 +531,13 @@ html[data-page-background="active"] .min-h-screen.bg-background {
   background-color: transparent !important;
   background-image: none !important;
 }
+
+/* Compendium list/edit headers — slightly stronger fade when art shows through */
+html[data-page-background="active"] .page-top-gradient {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--background) 97%, transparent),
+    color-mix(in oklab, var(--background) 62%, transparent),
+    transparent
+  );
+}

@@ -53,6 +53,7 @@ export function buildSheetPlayStateFromSheet(params: {
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>
   rechargeCapsByResourceId: Record<string, number>
+  usedHitDiceByClassId: Record<string, number>
   currentHp: number
   tempHp: number
   deathSaves: { successes: number; failures: number }

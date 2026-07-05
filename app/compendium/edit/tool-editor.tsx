@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
+import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import type { ToolCheckAbility, ToolGroup } from "@/lib/types"
 
@@ -53,6 +55,8 @@ const CHECK_ABILITIES: { value: ToolCheckAbility; label: string }[] = [
   { value: "wisdom", label: "Wisdom" },
   { value: "charisma", label: "Charisma" },
 ]
+
+const fieldClass = compendiumFieldClass
 
 export default function ToolEditor({ id }: { id: string }) {
   const [form, setForm] = useState<ToolFormData>(defaultTool)
@@ -128,99 +132,94 @@ export default function ToolEditor({ id }: { id: string }) {
   return (
     <div className="min-h-screen bg-background">
       <MainNav />
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <CompendiumEditorHeaderRow
-          title={id === "new" ? "New Tool" : form.name || "Edit Tool"}
-          backHref="/compendium?tab=tools"
-        />
-        <CompendiumEditorToolbar
-          formId={COMPENDIUM_EDITOR_FORM_ID}
-          saving={saving}
-          error={error}
-        />
+      <CompendiumEditorToolbar
+        tab="tools"
+        title={id === "new" ? "New Tool" : "Edit Tool"}
+        isNew={id === "new"}
+        saving={saving}
+        saveLabel="Save Tool"
+      />
 
-        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-4 mt-6">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Name</label>
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-3 py-2 bg-card border border-border rounded-lg"
-            />
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {error ? (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
+            {error}
           </div>
+        ) : null}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Group</label>
-              <select
-                value={form.tool_group}
-                onChange={(e) => setForm({ ...form, tool_group: e.target.value as ToolGroup })}
-                className="w-full px-3 py-2 bg-card border border-border rounded-lg"
-              >
-                {TOOL_GROUPS.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
+        <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-6">
+          <CompendiumEditorHeaderRow
+            nameLabel="Tool Name"
+            name={form.name}
+            onNameChange={(name) => setForm({ ...form, name })}
+            namePlaceholder="Thieves' Tools"
+            source={form.source}
+            onSourceChange={(source) => setForm({ ...form, source })}
+            creatorUrl={form.creator_url}
+            onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
+            icon={form.icon}
+            onIconChange={(icon) => setForm({ ...form, icon })}
+            accentColor={form.accent_color}
+            onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageAspect="21/9"
+          />
+
+          <CompendiumEditorPanel title="Tool details" className="space-y-4" defaultOpen>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Group</label>
+                <select
+                  value={form.tool_group}
+                  onChange={(e) => setForm({ ...form, tool_group: e.target.value as ToolGroup })}
+                  className={fieldClass}
+                >
+                  {TOOL_GROUPS.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Check ability</label>
+                <select
+                  value={form.check_ability}
+                  onChange={(e) =>
+                    setForm({ ...form, check_ability: e.target.value as ToolCheckAbility })
+                  }
+                  className={fieldClass}
+                >
+                  {CHECK_ABILITIES.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
             <div>
-              <label className="block text-sm font-semibold mb-1">Check ability</label>
-              <select
-                value={form.check_ability}
-                onChange={(e) =>
-                  setForm({ ...form, check_ability: e.target.value as ToolCheckAbility })
-                }
-                className="w-full px-3 py-2 bg-card border border-border rounded-lg"
-              >
-                {CHECK_ABILITIES.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">Subcategory</label>
-            <input
-              value={form.subcategory}
-              onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
-              placeholder="e.g. Artisan's Tools"
-              className="w-full px-3 py-2 bg-card border border-border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
-              className="w-full px-3 py-2 bg-card border border-border rounded-lg"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Source</label>
+              <label className="block text-sm font-semibold mb-1">Subcategory</label>
               <input
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                className="w-full px-3 py-2 bg-card border border-border rounded-lg"
+                value={form.subcategory}
+                onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
+                placeholder="e.g. Artisan's Tools"
+                className={fieldClass}
               />
             </div>
+
             <div>
-              <label className="block text-sm font-semibold mb-1">Creator URL</label>
-              <input
-                value={form.creator_url}
-                onChange={(e) => setForm({ ...form, creator_url: e.target.value })}
-                className="w-full px-3 py-2 bg-card border border-border rounded-lg"
+              <label className="block text-sm font-semibold mb-1">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+                className={fieldClass}
               />
             </div>
-          </div>
+          </CompendiumEditorPanel>
         </form>
       </main>
     </div>

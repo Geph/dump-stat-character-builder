@@ -11,6 +11,7 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeUsesConfig } from "@/lib/compendium/normalize-uses-config"
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
@@ -223,7 +224,8 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm((prev) => ({ ...prev, card_image_url }))}
           />
 
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
+          <CompendiumEditorPanel title="Resource details">
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Class</label>
               <select
@@ -280,14 +282,14 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
               />
             </div>
           </div>
+          </CompendiumEditorPanel>
 
-          <div className="bg-card border-2 border-border rounded-xl p-4">
-            <label className="block text-sm font-semibold text-foreground mb-4">Uses</label>
+          <CompendiumEditorPanel title="Uses">
             <UsesConfigEditor
               value={form.uses}
               onChange={(uses) => setForm((prev) => ({ ...prev, uses }))}
             />
-          </div>
+          </CompendiumEditorPanel>
         </form>
       </main>
     </div>

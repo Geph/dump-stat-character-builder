@@ -1,4 +1,4 @@
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import { applySrdItemIcon, SRD_SPECIES_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
@@ -901,6 +901,10 @@ const SRD_SPECIES_SIZE_OPTIONS: Record<string, string[]> = {
 }
 
 export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {
+  return applySrdItemIcon(enrichSrdSpeciesRowCore(row), SRD_SPECIES_ICONS_BY_NAME)
+}
+
+function enrichSrdSpeciesRowCore(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source)) return row
   const speciesName = String(row.name ?? "")
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []

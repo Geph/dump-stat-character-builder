@@ -2,6 +2,7 @@ import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import { enrichSrdSubclassList } from "@/lib/compendium/enrich-srd-subclasses"
 import { enrichSrdFeatList } from "@/lib/compendium/enrich-srd-feats"
 import { enrichSrdSpeciesList } from "@/lib/compendium/enrich-srd-species"
+import { enrichSrdToolList } from "@/lib/compendium/enrich-srd-tools"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -62,7 +63,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
   await upsertByName("languages", withSrdCreatorUrlList(languages as Record<string, unknown>[]))
-  await upsertByName("tools", withSrdCreatorUrlList(tools as Record<string, unknown>[]))
+  await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as Record<string, unknown>[])))
   await upsertByName("spells", withSrdCreatorUrlList(spells as Record<string, unknown>[]))
   await seedSrdEquipment({
     upsertByName,
@@ -109,7 +110,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
 }
 
 export async function seedLocalSrd(): Promise<LocalSeedResult> {
-  const { classes, subclasses, species, backgrounds, spells, feats, manifest } =
+  const { classes, subclasses, species, backgrounds, spells, feats, tools, manifest } =
     getSrdSeedData()
 
   await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes as Record<string, unknown>[])))
@@ -149,6 +150,7 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
   await upsertByName("spells", withSrdCreatorUrlList(spells))
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
+  await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as Record<string, unknown>[])))
   await seedSrdEquipment({
     upsertByName,
     listEquipmentByName: async () => {

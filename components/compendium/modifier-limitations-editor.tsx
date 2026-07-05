@@ -16,7 +16,7 @@ import {
   type ModifierLimitation,
   type ModifierLimitationKind,
 } from "@/lib/compendium/modifier-limitations"
-import { BUILTIN_SHEET_TOGGLES } from "@/lib/compendium/sheet-toggle-registry"
+import { EDITOR_SHEET_TOGGLE_OPTIONS } from "@/lib/compendium/sheet-toggle-registry"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 
 type ModifierLimitationsEditorProps = {
@@ -37,7 +37,7 @@ function defaultValueForKind(kind: ModifierLimitationKind): string {
     case "armor_type":
       return ARMOR_LIMITATION_OPTIONS[0].value
     case "sheet_toggle":
-      return BUILTIN_SHEET_TOGGLES[0]?.id ?? "while_raging"
+      return EDITOR_SHEET_TOGGLE_OPTIONS[0]?.id ?? "while_raging"
   }
 }
 
@@ -176,7 +176,7 @@ export function ModifierLimitationsEditor({ value, onChange }: ModifierLimitatio
                     onChange={(e) => patchLimitation(limitation.id, { value: e.target.value })}
                     className="min-w-[140px] flex-1 px-2 py-1 bg-card border border-border rounded text-xs"
                   >
-                    {BUILTIN_SHEET_TOGGLES.map((toggle) => (
+                    {EDITOR_SHEET_TOGGLE_OPTIONS.map((toggle) => (
                       <option key={toggle.id} value={toggle.id}>
                         {toggle.label}
                       </option>

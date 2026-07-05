@@ -5,6 +5,7 @@ import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import {
   modifierPlayerChoiceSlotsForSource,
   optionsForExpertiseSlot,
+  optionsForProficiencyGrantSlot,
   spellOptionsForModifierSlot,
   type ModifierPlayerChoiceKind,
   type ModifierPlayerChoiceSlot,
@@ -182,7 +183,13 @@ export function ModifierPlayerChoicePanel({
               existingExpertiseSkills,
               currentSelection,
             })
-          : (slot.options ?? [])
+          : isSkillKind
+            ? optionsForProficiencyGrantSlot(slot, {
+                proficientSkills,
+                proficientTools,
+                currentSelection,
+              })
+            : (slot.options ?? [])
         const expertiseHint =
           slot.kind === "skill_or_tool" && slot.grantsExpertise
             ? `Choose ${slot.maxCount} total (proficient skills or tools only)`

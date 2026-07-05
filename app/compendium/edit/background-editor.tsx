@@ -6,6 +6,9 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, Search, X } from "lucide-react"
 import {
+  CompendiumEditorPanel,
+} from "@/components/compendium/compendium-editor-section"
+import {
   BACKGROUND_ABILITY_KEYS,
   normalizeBackgroundAbilityBonuses,
   normalizeGrantedSpells,
@@ -409,24 +412,18 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             cardImageAspect="21/9"
           />
 
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Description</label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="You spent years learning the lore of the multiverse..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Ability Bonuses */}
-          <div className="bg-card border-2 border-border rounded-xl p-4">
-            <label className="block text-sm font-semibold text-foreground mb-1">
-              Ability Score Bonuses
-            </label>
-            <p className="text-xs text-muted-foreground mb-4">
-              Check which abilities are eligible for player choice (+2/+1 or +1/+1/+1). Use +1 or +2 for
-              fixed bonuses instead of +0.
-            </p>
+          <CompendiumEditorPanel
+            title="Ability Score Bonuses"
+            hint="Check which abilities are eligible for player choice (+2/+1 or +1/+1/+1). Use +1 or +2 for fixed bonuses instead of +0."
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {BACKGROUND_ABILITY_KEYS.map((ability) => {
                 const included = ability in form.ability_bonuses
@@ -460,11 +457,9 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                 )
               })}
             </div>
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Skill Proficiencies */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Skill Proficiencies</label>
+          <CompendiumEditorPanel title="Skill Proficiencies">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {SKILLS.map((skill) => (
                 <label key={skill} className="flex items-center gap-2 cursor-pointer text-sm">
@@ -478,7 +473,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                 </label>
               ))}
             </div>
-          </div>
+          </CompendiumEditorPanel>
 
           <BackgroundProficienciesEditor
             value={form.proficiencies}
@@ -486,14 +481,10 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             weaponOptions={weaponOptions}
           />
 
-          {/* Background feature */}
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Background Feature</label>
-              <p className="text-xs text-muted-foreground">
-                Optional special ability or benefit text (separate from the origin feat).
-              </p>
-            </div>
+          <CompendiumEditorPanel
+            title="Background Feature"
+            hint="Optional special ability or benefit text (separate from the origin feat)."
+          >
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Feature Name</label>
               <input
@@ -529,10 +520,9 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               label="Feature modifier effects"
               emptyMessage="No mechanical effects linked to this background feature."
             />
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Granted spells */}
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
+          <CompendiumEditorPanel title="Granted Spells">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -632,16 +622,12 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                 })}
               </div>
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Origin Feat (D&D 2024) */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Origin Feat Granted (D&D 2024)
-            </label>
-            <p className="text-xs text-muted-foreground mb-2">
-              Backgrounds grant a 1st-level Origin feat. Only Origin-category feats are listed.
-            </p>
+          <CompendiumEditorPanel
+            title="Origin Feat Granted (D&D 2024)"
+            hint="Backgrounds grant a 1st-level Origin feat. Only Origin-category feats are listed."
+          >
             <OriginFeatGrantedSelect
               value={form.feat_granted}
               onChange={(feat_granted) => setForm({ ...form, feat_granted })}
@@ -652,9 +638,8 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                 No Origin feats found. Add feats with the &quot;Origin&quot; category to populate this list.
               </p>
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Starting Equipment */}
           <StartingEquipmentGroupsEditor
             groups={form.starting_equipment_groups}
             startingGold={form.starting_gold}
@@ -666,13 +651,10 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             }
           />
 
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">Legacy flat equipment list</label>
-              <p className="text-xs text-muted-foreground">Optional — used when no packages are defined above.</p>
-            </div>
-
-            {/* Add item row */}
+          <CompendiumEditorPanel
+            title="Legacy flat equipment list"
+            hint="Optional — used when no packages are defined above."
+          >
             <div className="flex gap-2">
               <input
                 type="text"
@@ -713,7 +695,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
               </div>
             )}
 
-          </div>
+          </CompendiumEditorPanel>
 
           {/* Submit */}
         </form>

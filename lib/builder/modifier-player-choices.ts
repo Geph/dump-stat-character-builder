@@ -901,6 +901,50 @@ export function isSkillOrToolOptionName(name: string): boolean {
   return SKILL_NAME_SET.has(name) || TOOL_NAME_SET.has(name)
 }
 
+/** Limit proficiency-grant pickers to options the character does not already have. */
+export function optionsForProficiencyGrantSlot(
+  slot: ModifierPlayerChoiceSlot,
+  params: {
+    proficientSkills: string[]
+    proficientTools?: string[]
+    currentSelection?: string[]
+  },
+): { name: string; description?: string }[] {
+  if (slot.grantsExpertise) return slot.options ?? []
+
+  const {
+    proficientSkills,
+    proficientTools = [],
+    currentSelection = [],
+  } = params
+
+  const proficientSkillSet = new Set(proficientSkills)
+  const proficientToolSet = new Set(proficientTools)
+  const keepSelected = new Set(currentSelection)
+
+  const baseOptions =
+    slot.options ??
+    (slot.kind === "skill_or_tool"
+      ? [
+          ...SKILL_NAMES.map((name) => ({ name })),
+          ...mergeToolNameLists().map((name) => ({ name })),
+        ]
+      : slot.kind === "tool"
+        ? mergeToolNameLists().map((name) => ({ name }))
+        : SKILL_NAMES.map((name) => ({ name })))
+
+  return baseOptions.filter((option) => {
+    if (keepSelected.has(option.name)) return true
+    if (SKILL_NAME_SET.has(option.name)) {
+      return !proficientSkillSet.has(option.name)
+    }
+    if (TOOL_NAME_SET.has(option.name)) {
+      return !proficientToolSet.has(option.name)
+    }
+    return true
+  })
+}
+
 /** Limit Expertise pickers to proficiencies the character already has. */
 export function optionsForExpertiseSlot(
   slot: ModifierPlayerChoiceSlot,

@@ -14,6 +14,7 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
@@ -348,10 +349,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Prerequisites
-            </label>
+          <CompendiumEditorPanel title="Prerequisites">
             <input
               type="text"
               value={form.prerequisites}
@@ -359,8 +357,9 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               placeholder="e.g., Level 5, Strength 13 or higher"
             />
-          </div>
+          </CompendiumEditorPanel>
 
+          <CompendiumEditorPanel title="Attachment">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -409,18 +408,17 @@ export default function AbilityEditorPage({ id }: { id: string }) {
               </div>
             )}
           </div>
+          </CompendiumEditorPanel>
 
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe what this ability does..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
+          <CompendiumEditorPanel title="Modifier effects">
           <LinkedModifiersEditor
             value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
             onChange={(linked_modifiers) =>
@@ -435,9 +433,9 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             spellOptions={allSpells}
             otherAbilities={otherAbilities}
           />
+          </CompendiumEditorPanel>
 
-          {/* Show in Builder Checkbox */}
-          <div className="bg-card border-2 border-border rounded-xl p-4">
+          <CompendiumEditorPanel title="Character sheet visibility">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -452,7 +450,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
                 </p>
               </div>
             </label>
-          </div>
+          </CompendiumEditorPanel>
 
         </form>
       </main>

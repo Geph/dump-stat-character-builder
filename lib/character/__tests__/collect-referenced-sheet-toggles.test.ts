@@ -43,8 +43,17 @@ describe("collectReferencedSheetToggleIds", () => {
     expect(ids.has("form_of_dread")).toBe(false)
   })
 
-  it("buildCharacterSheetToggleDefinitions omits unreferenced builtins", () => {
+  it("buildCharacterSheetToggleDefinitions omits unreferenced builtins and optional toggles", () => {
     const defs = buildCharacterSheetToggleDefinitions(new Set(["while_raging"]), [])
     expect(defs.map((entry) => entry.id)).toEqual(["while_raging"])
+    expect(defs.some((entry) => entry.id === "in_combat_or_high_stakes")).toBe(false)
+  })
+
+  it("resolves optional psion toggles when referenced by a feature", () => {
+    const defs = buildCharacterSheetToggleDefinitions(
+      new Set(["in_combat_or_high_stakes"]),
+      [],
+    )
+    expect(defs.map((entry) => entry.id)).toEqual(["in_combat_or_high_stakes"])
   })
 })

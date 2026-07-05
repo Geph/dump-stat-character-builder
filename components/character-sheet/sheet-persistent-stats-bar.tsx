@@ -3,6 +3,8 @@
 import type { ReactNode } from "react"
 import { Footprints, Heart, Shield, ShieldPlus, Zap } from "lucide-react"
 import type { CharacterSpeedEntry } from "@/lib/character/resolve-all-speeds"
+import type { HitDicePoolEntry } from "@/lib/character/hit-dice"
+import { ShortRestHitDiceBox } from "@/components/character-sheet/short-rest-hit-dice-box"
 import type { DerivedStatBreakdowns } from "@/lib/character/stat-contributions"
 import { breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
@@ -26,6 +28,10 @@ type SheetPersistentStatsBarProps = {
   tempHp: number
   onCurrentHpChange: (value: number) => void
   onTempHpChange: (value: number) => void
+  hitDicePool?: HitDicePoolEntry[]
+  conMod?: number
+  onShortRestHeal?: (amount: number) => void
+  onSpendHitDice?: (classId: string, count: number) => void
   onInitiativeRoll: () => void
   formatMod: (mod: number) => string
 }
@@ -118,6 +124,10 @@ function CombatStatsCompactRow({
   tempHp,
   onCurrentHpChange,
   onTempHpChange,
+  hitDicePool = [],
+  conMod = 0,
+  onShortRestHeal,
+  onSpendHitDice,
 }: Omit<
   SheetPersistentStatsBarProps,
   "embedded" | "panel" | "initiative" | "onInitiativeRoll" | "formatMod"
@@ -125,6 +135,7 @@ function CombatStatsCompactRow({
   const hpPercent =
     maxHp > 0 ? Math.min(100, Math.round((currentHp / maxHp) * 100)) : 0
   const hpTone = hpBarTone(currentHp, maxHp)
+  const walkSpeed = speeds.find((entry) => entry.type === "walk")?.feet ?? speed
 
   return (
     <div className="flex flex-wrap items-stretch gap-2">
@@ -141,7 +152,7 @@ function CombatStatsCompactRow({
             contributions={statBreakdowns ? breakdownLines(statBreakdowns, "ac") : undefined}
           />
         </div>
-        <span className="text-2xl font-black tabular-nums leading-none text-primary">
+        <span className="block w-full text-center text-2xl font-black tabular-nums leading-none text-primary">
           {armorClass}
         </span>
         {incomingAttackNotes.length > 0 ? (
@@ -173,7 +184,7 @@ function CombatStatsCompactRow({
           />
         </div>
         {speeds.length > 1 ? (
-          <div className="flex flex-col gap-0.5 text-xs font-bold leading-snug tabular-nums">
+          <div className="flex w-full flex-col items-center gap-0.5 text-center text-xs font-bold leading-snug tabular-nums">
             {speeds.map((entry) => (
               <span key={entry.type}>
                 {entry.feet} ft {entry.label}
@@ -181,8 +192,8 @@ function CombatStatsCompactRow({
             ))}
           </div>
         ) : (
-          <span className="text-xl font-black tabular-nums leading-none">
-            {speed}
+          <span className="block w-full text-center text-xl font-black tabular-nums leading-none">
+            {walkSpeed}
             <span className="ml-0.5 text-xs font-bold text-muted-foreground">ft</span>
           </span>
         )}
@@ -227,6 +238,16 @@ function CombatStatsCompactRow({
               className="w-8 min-h-6 text-center bg-background/80 border border-cyan/30 rounded text-[11px] font-bold text-cyan tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
+          {onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
+            <ShortRestHitDiceBox
+              pool={hitDicePool}
+              conMod={conMod}
+              currentHp={currentHp}
+              maxHp={maxHp}
+              onHeal={onShortRestHeal}
+              onSpendDice={onSpendHitDice}
+            />
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/80">
@@ -262,6 +283,10 @@ export function SheetPersistentStatsBar({
   tempHp,
   onCurrentHpChange,
   onTempHpChange,
+  hitDicePool,
+  conMod,
+  onShortRestHeal,
+  onSpendHitDice,
   onInitiativeRoll,
   formatMod,
 }: SheetPersistentStatsBarProps) {
@@ -279,6 +304,10 @@ export function SheetPersistentStatsBar({
         tempHp={tempHp}
         onCurrentHpChange={onCurrentHpChange}
         onTempHpChange={onTempHpChange}
+        hitDicePool={hitDicePool}
+        conMod={conMod}
+        onShortRestHeal={onShortRestHeal}
+        onSpendHitDice={onSpendHitDice}
       />
     )
   }
