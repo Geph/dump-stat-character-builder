@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X } from "lucide-react"
+import {
+  CompendiumEditorPanel,
+  CompendiumEditorSection,
+} from "@/components/compendium/compendium-editor-section"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
@@ -340,19 +344,15 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             cardImageAspect="21/9"
           />
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Elves are a magical people of otherworldly grace..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Size, creature type, and speed */}
+          <CompendiumEditorPanel title="Size, creature type & speed">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -433,24 +433,15 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
               />
             </div>
           </div>
+          </CompendiumEditorPanel>
 
-          {/* Traits */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <label className="text-sm font-semibold text-foreground">Traits</label>
-                <p className="text-xs text-muted-foreground">Racial traits for this species (use Level to set when they become available)</p>
-              </div>
-              <button
-                type="button"
-                onClick={addTrait}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Trait
-              </button>
-            </div>
-            
+          <CompendiumEditorSection
+            title="Traits"
+            hint="Racial traits for this species (use Level to set when they become available)"
+            addLabel="Add Trait"
+            onAdd={addTrait}
+            collapsible
+          >
             <div className="space-y-4">
               {form.traits.map((trait, index) => (
                 <div
@@ -596,8 +587,9 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                 </div>
               ))}
             </div>
-          </div>
+          </CompendiumEditorSection>
 
+          <CompendiumEditorPanel title="Species-wide modifier effects">
           <LinkedModifiersEditor
             value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
             onChange={(linked_modifiers) =>
@@ -611,17 +603,22 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             label="Species-wide modifier effects"
             spellOptions={allSpells}
           />
+          </CompendiumEditorPanel>
 
-          <details className="rounded-xl border border-border p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-foreground">
-              Legacy inline species modifiers (optional)
-            </summary>
-            <CharacteristicModifiersEditor
-              value={form.characteristics}
-              onChange={(characteristics) => setForm({ ...form, characteristics })}
-              spellOptions={allSpells}
-            />
-          </details>
+          {form.characteristics.length > 0 ? (
+            <CompendiumEditorPanel>
+              <details className="rounded-xl border border-border p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                  Legacy inline species modifiers (optional)
+                </summary>
+                <CharacteristicModifiersEditor
+                  value={form.characteristics}
+                  onChange={(characteristics) => setForm({ ...form, characteristics })}
+                  spellOptions={allSpells}
+                />
+              </details>
+            </CompendiumEditorPanel>
+          ) : null}
 
           {/* Submit */}
         </form>

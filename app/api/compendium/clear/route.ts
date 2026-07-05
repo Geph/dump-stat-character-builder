@@ -6,8 +6,6 @@ import { resolveTable } from "@/lib/db/tables"
 import { createClient } from "@/lib/db/client"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 
-const VALID_TABLES = ["classes", "subclasses", "species", "backgrounds", "spells", "feats", "equipment", "class_resources", "custom_abilities"]
-
 export async function POST(request: NextRequest) {
   try {
     const authError = requireMutationAuth(request)
@@ -19,12 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { table } = await request.json()
-    
-    if (!table || !VALID_TABLES.includes(table)) {
-      return NextResponse.json({ error: "Invalid table name" }, { status: 400 })
-    }
 
-    const resolved = resolveTable(table)
+    const resolved = resolveTable(typeof table === "string" ? table : "")
     if (!resolved || resolved === "characters") {
       return NextResponse.json({ error: "Invalid table name" }, { status: 400 })
     }

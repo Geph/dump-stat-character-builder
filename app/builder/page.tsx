@@ -69,6 +69,8 @@ import {
   getEffectiveArmorProficiencies,
   getEffectiveWeaponProficiencies,
   mergeProficiencyLists,
+  normalizeBackgroundProficiencies,
+  type BackgroundProficiencies,
 } from "@/lib/compendium/background-proficiencies"
 import {
   isArmorItem,
@@ -361,8 +363,8 @@ export default function BuilderPage() {
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
-    type: "class" | "species" | "background" | "spell" | "equipment" | null
-    item: DndClass | Species | Background | Spell | Equipment | null
+    type: "class" | "species" | "background" | "spell" | "equipment" | "feat" | null
+    item: DndClass | Species | Background | Spell | Equipment | Feat | null
   }>({ type: null, item: null })
   
   // Preview tabs
@@ -1048,6 +1050,15 @@ export default function BuilderPage() {
   )
   const selectedFeatIds = [...classSelectedFeatIds, ...speciesSelectedFeatIds].filter(Boolean)
   const selectedFeatCount = classSelectedFeatIds.filter(Boolean).length
+  const hasCatalogFeatPickOptions = useMemo(
+    () =>
+      featPickSlots.some(
+        (slot) =>
+          slotUsesCatalogFeatPicks(slot.featCategories) &&
+          catalogFeatPickOptions(slot.featCategories, customAbilities).length > 0,
+      ),
+    [featPickSlots, customAbilities],
+  )
   const milestoneAsiFeatCount = countMilestoneAsiFeats(selectedFeatIds, feats)
   const milestoneAsiTotalPoints = milestoneAsiPointTotal(milestoneAsiFeatCount)
   const milestoneAsiAllocation = getCombinedMilestoneAsiAllocation(
@@ -1504,6 +1515,10 @@ export default function BuilderPage() {
       ...new Set([
         ...aggregatedCharacteristics.toolProficiencies,
         ...Object.values(classToolPicks).flat(),
+        ...normalizeBackgroundProficiencies(
+          selectedBackground?.proficiencies as BackgroundProficiencies | null,
+          selectedBackground?.tool_proficiencies,
+        ).tools,
       ]),
     ],
     existingExpertiseSkills: aggregatedCharacteristics.skillExpertise,
@@ -2237,8 +2252,8 @@ export default function BuilderPage() {
       <MainNav />
 
       <div id="builder-steps" className={pageStepStripClass}>
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 pt-3 pb-1">
+          <div className="flex items-center justify-center">
             {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
@@ -2246,7 +2261,7 @@ export default function BuilderPage() {
               const isComplete = step.id < currentStep || (step.id < maxStepReached && !isActive)
 
               return (
-                <div key={step.id} className="flex items-center flex-1 min-w-0">
+                <div key={step.id} className="flex items-center">
                   <button
                     type="button"
                     onClick={() => goToStep(step.id)}
@@ -2269,14 +2284,14 @@ export default function BuilderPage() {
                     >
                       {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                     </div>
-                    <span className={`text-[10px] md:text-xs mt-1 font-medium ${
+                    <span className={`text-[10px] md:text-xs mt-0.5 font-medium ${
                       isActive ? "text-primary" : isReachable ? "text-foreground" : "text-muted-foreground"
                     }`}>
                       {step.label}
                     </span>
                   </button>
                   {index < visibleSteps.length - 1 && (
-                    <div className={`flex-1 h-1 mx-1 md:mx-2 rounded min-w-[8px] ${
+                    <div className={`w-6 sm:w-10 md:w-14 h-1 mx-1 md:mx-2 rounded shrink-0 ${
                       step.id < maxStepReached ? "bg-success/80" : "bg-border/80"
                     }`} />
                   )}
@@ -2320,7 +2335,7 @@ export default function BuilderPage() {
           {/* Left Column: Step Content (choices) */}
           <div
             id="builder-step-panel"
-            className={`lg:col-span-3 bg-card rounded-2xl border-2 border-border p-6 min-h-[720px] ${
+            className={`lg:col-span-3 bg-card/80 backdrop-blur-md rounded-2xl border-2 border-border p-6 min-h-[720px] ${
               mobilePanel === "preview" ? "hidden lg:block" : ""
             }`}
           >
@@ -2753,7 +2768,7 @@ export default function BuilderPage() {
                                       }`}
                                     >
                                       <p className="font-semibold text-sm text-foreground">{subclass.name}</p>
-                                      {subclass.description && (
+                                      {cardViewMode === "cinematic" && subclass.description && (
                                         <ClampedRichText
                                           html={subclass.description}
                                           lines={2}
@@ -2967,7 +2982,7 @@ export default function BuilderPage() {
                         <code className="font-mono">npm run db:migrate</code> and refresh the page.
                       </p>
                     )}
-                    {!featsLoadError && feats.length === 0 && (
+                    {!featsLoadError && feats.length === 0 && !hasCatalogFeatPickOptions && (
                       <p className={`${pageFloatingHintClass} text-xs mb-3`}>
                         No feats in your compendium yet. Seed SRD content from Settings or add feats
                         in the Compendium.
@@ -3082,15 +3097,14 @@ export default function BuilderPage() {
                                 })
                               : eligibleFeats.map((feat) => {
                                   const isSelected = feat.id === pickedId
-                                  return (
+                                  const featCard = (
                                     <button
-                                      key={feat.id}
                                       type="button"
                                       onClick={() =>
                                         selectPick(isSelected ? null : feat.id)
                                       }
                                       className={`rounded-lg border-2 text-left transition-all ${
-                                        cardViewMode === "cinematic" ? "p-3" : "px-2.5 py-1.5"
+                                        cardViewMode === "cinematic" ? "flex-1 p-3" : "w-full px-2.5 py-1.5"
                                       } ${
                                         isSelected
                                           ? "border-secondary bg-secondary/10"
@@ -3130,6 +3144,30 @@ export default function BuilderPage() {
                                         </div>
                                       </div>
                                     </button>
+                                  )
+
+                                  if (cardViewMode !== "cinematic") {
+                                    return (
+                                      <div key={feat.id}>{featCard}</div>
+                                    )
+                                  }
+
+                                  return (
+                                    <div key={feat.id} className="flex items-stretch gap-1">
+                                      {featCard}
+                                      {feat.description?.trim() ? (
+                                        <button
+                                          type="button"
+                                          aria-label={`About ${feat.name}`}
+                                          onClick={() =>
+                                            setDetailsModal({ type: "feat", item: feat })
+                                          }
+                                          className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                                        >
+                                          <Info className="h-4 w-4" />
+                                        </button>
+                                      ) : null}
+                                    </div>
                                   )
                                 })}
                           </div>
@@ -5437,6 +5475,40 @@ export default function BuilderPage() {
               accentColor={accent}
             >
               {eq.description && <RichTextContent html={eq.description} className="text-sm" />}
+            </CompendiumDetailOverlay>
+          )
+        }
+
+        if (detailsModal.type === "feat") {
+          const feat = item as Feat
+          return (
+            <CompendiumDetailOverlay
+              open
+              onClose={close}
+              item={feat}
+              subtitle={feat.category ?? feat.source ?? "Feat"}
+              tags={[
+                ...(feat.category
+                  ? [{ label: feat.category.toUpperCase(), emphasis: true }]
+                  : []),
+                ...(feat.level_requirement && feat.level_requirement > 1
+                  ? [{ label: `LEVEL ${feat.level_requirement}+` }]
+                  : []),
+                ...(feat.repeatable ? [{ label: "REPEATABLE" }] : []),
+              ]}
+              accentColor={accent}
+            >
+              {feat.description?.trim() ? (
+                <RichTextContent html={feat.description} />
+              ) : (
+                <p className="text-sm text-white/70">No description available.</p>
+              )}
+              {feat.prerequisite?.trim() && (
+                <div className="mt-4">
+                  <p className="text-xs uppercase text-white/50 mb-1">Prerequisite</p>
+                  <p className="text-sm">{feat.prerequisite}</p>
+                </div>
+              )}
             </CompendiumDetailOverlay>
           )
         }

@@ -1,3 +1,4 @@
+import type { TurnStartTriggerEntry } from "@/lib/character/collect-turn-start-triggers"
 import {
   accrueResource,
   effectiveAccumulatedValue,
@@ -19,6 +20,13 @@ export const INFLUENCE_BYPASSES_PSI_LIMIT = true
 
 export function influenceCap(intModifier: number): number {
   return Math.max(0, intModifier)
+}
+
+/** True when a class/subclass feature accrues influence points (e.g. Knowing Mind / Climactic Moment). */
+export function characterHasInfluencePointsMechanic(
+  triggers: readonly TurnStartTriggerEntry[],
+): boolean {
+  return triggers.some((entry) => entry.trigger.accrueResourceKey === INFLUENCE_POINTS_KEY)
 }
 
 export function applyInfluenceTurnStart(params: {

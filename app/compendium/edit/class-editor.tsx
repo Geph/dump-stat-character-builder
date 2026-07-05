@@ -6,6 +6,10 @@ import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Plus, X, ChevronDown } from "lucide-react"
+import {
+  CompendiumEditorPanel,
+  CompendiumEditorSection,
+} from "@/components/compendium/compendium-editor-section"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
@@ -456,17 +460,13 @@ export default function ClassEditorPage({ id }: { id: string }) {
             cardImageCrop="top"
           />
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="A warrior who fights with great strength..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
           <CardBlurbField
             value={form.card_blurb}
@@ -474,7 +474,8 @@ export default function ClassEditorPage({ id }: { id: string }) {
             placeholder="A master of weapons and armor who adapts to any martial role…"
           />
 
-          {/* Hit Die */}
+          <CompendiumEditorPanel title="Proficiencies">
+          <div className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-foreground mb-2">
               Hit Die
@@ -569,15 +570,14 @@ export default function ClassEditorPage({ id }: { id: string }) {
               ))}
             </div>
           </div>
+          </div>
+          </CompendiumEditorPanel>
 
-          {/* Skill Choices */}
-          <div className="bg-card border-2 border-border rounded-xl p-4">
+          <CompendiumEditorPanel title="Skill Proficiency Choices">
             <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-semibold text-foreground">
-                Skill Proficiency Choices
-              </label>
+              <span className="text-sm text-muted-foreground">Choose from:</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Choose</span>
+                <span className="text-sm text-muted-foreground">Count</span>
                 <input
                   type="number"
                   min={1}
@@ -589,7 +589,6 @@ export default function ClassEditorPage({ id }: { id: string }) {
                   }))}
                   className="w-16 px-2 py-1 bg-background border-2 border-border rounded-lg text-center"
                 />
-                <span className="text-sm text-muted-foreground">from:</span>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -605,10 +604,9 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 </label>
               ))}
             </div>
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Spellcasting */}
-          <div className="bg-card border-2 border-border rounded-xl p-4">
+          <CompendiumEditorPanel title="Spellcasting">
             <label className="flex items-center gap-2 cursor-pointer mb-4">
               <input
                 type="checkbox"
@@ -732,18 +730,13 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 )}
               </div>
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Class Resources — managed in compendium tab */}
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <label className="text-sm font-semibold text-foreground">Class Resources</label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Level-scaling pools (Rage, Focus Points, etc.) live in the Class Resources compendium section.
-                </p>
-              </div>
-              {id !== "new" && (
+          <CompendiumEditorSection
+            title="Class Resources"
+            hint="Level-scaling pools (Rage, Focus Points, etc.) live in the Class Resources compendium section."
+            headerActions={
+              id !== "new" ? (
                 <Link
                   href={`${compendiumEditHref("class_resources", "new")}?class_id=${id}`}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 whitespace-nowrap"
@@ -751,8 +744,10 @@ export default function ClassEditorPage({ id }: { id: string }) {
                   <Plus className="w-4 h-4" />
                   Add Resource
                 </Link>
-              )}
-            </div>
+              ) : undefined
+            }
+            collapsible
+          >
             {id === "new" ? (
               <p className="text-sm text-muted-foreground">Save this class first, then add resources.</p>
             ) : classResources.length === 0 ? (
@@ -783,24 +778,14 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 ))}
               </ul>
             )}
-          </div>
+          </CompendiumEditorSection>
 
-          {/* Class Features */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-semibold text-foreground">
-                Class Features
-              </label>
-              <button
-                type="button"
-                onClick={addFeature}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Feature
-              </button>
-            </div>
-            
+          <CompendiumEditorSection
+            title="Class Features"
+            addLabel="Add Feature"
+            onAdd={addFeature}
+            collapsible
+          >
             <div className="space-y-4">
               {form.features.map((feature, index) => (
                 <div
@@ -876,25 +861,15 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 </div>
               ))}
             </div>
-          </div>
+          </CompendiumEditorSection>
 
-          {/* Starting Equipment */}
-          <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-semibold text-foreground">Starting Equipment</label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Define equipment choice groups. Players pick one option per group.
-                </p>
-              </div>
-              <button type="button" onClick={addEquipmentGroup}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors">
-                <Plus className="w-4 h-4" />
-                Add Choice Group
-              </button>
-            </div>
-
-            {/* Starting Gold */}
+          <CompendiumEditorSection
+            title="Starting Equipment"
+            hint="Define equipment choice groups. Players pick one option per group."
+            addLabel="Add Choice Group"
+            onAdd={addEquipmentGroup}
+            collapsible
+          >
             <div className="flex items-center gap-3">
               <label className="text-sm font-semibold text-foreground shrink-0">Starting Gold (gp):</label>
               <input
@@ -990,7 +965,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 No equipment choice groups yet. Click &quot;Add Choice Group&quot; to begin.
               </p>
             )}
-          </div>
+          </CompendiumEditorSection>
 
         </form>
       </main>

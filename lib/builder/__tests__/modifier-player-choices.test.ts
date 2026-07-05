@@ -4,6 +4,7 @@ import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-s
 import {
   collectClassFeatureModifierPlayerChoiceSlots,
   optionsForExpertiseSlot,
+  optionsForProficiencyGrantSlot,
 } from "@/lib/builder/modifier-player-choices"
 import type { DndClass, Feature } from "@/lib/types"
 
@@ -85,5 +86,43 @@ describe("expertise modifier player choices", () => {
     })
 
     expect(options.map((option) => option.name).sort()).toEqual(["Acrobatics", "Perception"])
+  })
+})
+
+describe("proficiency grant modifier player choices", () => {
+  const skilledSlot = {
+    slotKey: "feat:skilled::shared::skilled_proficiencies",
+    sourceKey: "feat:skilled",
+    sourceLabel: "Skilled",
+    modId: "skilled_skills",
+    kind: "skill_or_tool" as const,
+    label: "Choose 3 skills or tools",
+    maxCount: 3,
+    sharedChoiceGroup: "skilled_proficiencies",
+    options: [
+      { name: "Athletics" },
+      { name: "Stealth" },
+      { name: "Thieves' Tools" },
+      { name: "Lute" },
+    ],
+  }
+
+  it("hides skills and tools the character is already proficient in", () => {
+    const options = optionsForProficiencyGrantSlot(skilledSlot, {
+      proficientSkills: ["Athletics", "Stealth"],
+      proficientTools: ["Thieves' Tools"],
+    })
+
+    expect(options.map((option) => option.name)).toEqual(["Lute"])
+  })
+
+  it("keeps current selections visible even when they are already proficient", () => {
+    const options = optionsForProficiencyGrantSlot(skilledSlot, {
+      proficientSkills: ["Athletics", "Stealth"],
+      proficientTools: ["Thieves' Tools"],
+      currentSelection: ["Stealth"],
+    })
+
+    expect(options.map((option) => option.name).sort()).toEqual(["Lute", "Stealth"])
   })
 })

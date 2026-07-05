@@ -64,8 +64,18 @@ export function resolveAllSpeeds(params: {
     }))
 }
 
+/** Sheet UI: walk always; other modes only when a modifier grants a non-zero speed. */
+export function filterDisplaySpeedEntries(entries: CharacterSpeedEntry[]): CharacterSpeedEntry[] {
+  if (!entries.length) return [{ type: "walk", label: "walk", feet: 30 }]
+  const walk = entries.find((entry) => entry.type === "walk")
+  const granted = entries.filter((entry) => entry.type !== "walk" && entry.feet > 0)
+  if (!walk) return granted.length ? granted : [entries[0]!]
+  return granted.length ? [walk, ...granted] : [walk]
+}
+
 export function formatSpeedEntries(entries: CharacterSpeedEntry[]): string {
-  if (!entries.length) return "30 ft"
-  if (entries.length === 1) return `${entries[0].feet} ft`
-  return entries.map((entry) => `${entry.feet} ft ${entry.label}`).join(" · ")
+  const visible = filterDisplaySpeedEntries(entries)
+  if (!visible.length) return "30 ft"
+  if (visible.length === 1) return `${visible[0].feet} ft`
+  return visible.map((entry) => `${entry.feet} ft ${entry.label}`).join(" · ")
 }

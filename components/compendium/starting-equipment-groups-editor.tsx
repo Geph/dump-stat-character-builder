@@ -1,6 +1,7 @@
 "use client"
 
-import { Plus, X } from "lucide-react"
+import { X } from "lucide-react"
+import { CompendiumEditorSection } from "@/components/compendium/compendium-editor-section"
 import type { StartingEquipmentGroup } from "@/lib/types"
 
 type StartingEquipmentGroupsEditorProps = {
@@ -71,24 +72,13 @@ export function StartingEquipmentGroupsEditor({
   }
 
   return (
-    <div className="bg-card border-2 border-border rounded-xl p-4 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <label className="block text-sm font-semibold text-foreground">Starting Equipment Packages</label>
-          <p className="text-xs text-muted-foreground">
-            Define choice groups (A/B/C). Players pick one package in the builder.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={addEquipmentGroup}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Group
-        </button>
-      </div>
-
+    <CompendiumEditorSection
+      title="Starting Equipment Packages"
+      hint="Define choice groups (A/B/C). Players pick one package in the builder."
+      addLabel="Add Group"
+      onAdd={addEquipmentGroup}
+      collapsible
+    >
       <div className="flex items-center gap-3">
         <label className="text-sm font-semibold text-foreground shrink-0">Gold alternative (gp):</label>
         <input
@@ -184,6 +174,6 @@ export function StartingEquipmentGroupsEditor({
           No equipment packages yet. Add a group or use the legacy flat list below.
         </p>
       )}
-    </div>
+    </CompendiumEditorSection>
   )
 }

@@ -11,6 +11,7 @@ import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { DropdownOrOtherField } from "@/components/compendium/dropdown-or-other-field"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -307,11 +308,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
-          {/* Classes */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              On Class Spell List
-            </label>
+          <CompendiumEditorPanel title="On Class Spell List">
             <div className="flex flex-wrap gap-3 items-center">
               {SPELL_CLASSES.map((cls) => (
                 <label key={cls} className="flex items-center gap-2 cursor-pointer">
@@ -384,9 +381,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
                 )}
               </div>
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Level, school, ritual, concentration */}
+          <CompendiumEditorPanel title="Level, school & flags">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -438,8 +435,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
               <span className="text-foreground font-semibold text-sm">Concentration</span>
             </label>
           </div>
+          </CompendiumEditorPanel>
 
-          {/* Casting Time, Range, Duration */}
+          <CompendiumEditorPanel title="Casting time, range & duration">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DropdownOrOtherField
               label="Casting Time"
@@ -463,12 +461,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
               otherPlaceholder="e.g. 8 hours"
             />
           </div>
+          </CompendiumEditorPanel>
 
-          {/* Components */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Components
-            </label>
+          <CompendiumEditorPanel title="Components">
             <div className="flex gap-6 mb-3">
               {["V", "S", "M"].map((comp) => (
                 <label key={comp} className="flex items-center gap-2 cursor-pointer">
@@ -493,32 +488,24 @@ export default function SpellEditorPage({ id }: { id: string }) {
                 placeholder="Material components (e.g., a bit of bat guano and sulfur)"
               />
             )}
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe what the spell does..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
-          {/* At Higher Levels */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              At Higher Levels
-            </label>
+          <CompendiumEditorPanel title="At Higher Levels">
             <RichTextEditor
               value={form.higher_levels}
               onChange={(higher_levels) => setForm({ ...form, higher_levels })}
               placeholder="Effects when cast at higher levels..."
               minHeightClass="min-h-[4rem]"
             />
-          </div>
+          </CompendiumEditorPanel>
 
           {/* Submit */}
         </form>

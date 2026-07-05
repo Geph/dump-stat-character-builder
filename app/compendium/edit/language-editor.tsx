@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -121,6 +122,7 @@ export default function LanguageEditor({ id }: { id: string }) {
         />
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={handleSubmit} className="space-y-4 mt-6">
+          <CompendiumEditorPanel title="Language details" className="space-y-4" defaultOpen>
           <div>
             <label className="block text-sm font-semibold mb-1">Name</label>
             <input
@@ -182,6 +184,7 @@ export default function LanguageEditor({ id }: { id: string }) {
               />
             </div>
           </div>
+          </CompendiumEditorPanel>
         </form>
       </main>
     </div>

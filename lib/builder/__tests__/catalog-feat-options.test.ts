@@ -24,6 +24,7 @@ describe("catalog-feat-options", () => {
   it("detects Eldritch Invocation catalog slots", () => {
     expect(slotUsesCatalogFeatPicks(["Eldritch Invocation"])).toBe(true)
     expect(slotUsesCatalogFeatPicks(["General"])).toBe(false)
+    expect(slotUsesCatalogFeatPicks(["Fighting Style"])).toBe(false)
   })
 
   it("builds and parses catalog feat pick ids", () => {

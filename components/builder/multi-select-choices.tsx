@@ -97,7 +97,7 @@ export function MultiSelectChoices({
         <div
           className={
             compact
-              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
+              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5"
               : "grid grid-cols-1 sm:grid-cols-2 gap-2"
           }
         >
@@ -113,7 +113,7 @@ export function MultiSelectChoices({
                   disabled={isDisabled}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => toggle(option.name)}
-                  className={`${compact ? "w-full" : "flex-1"} p-2 rounded-lg border-2 text-left transition-all ${
+                  className={`${compact ? "w-full px-2.5 py-1.5" : "flex-1 p-2"} rounded-lg border-2 text-left transition-all ${
                     isSelected
                       ? accentClass
                       : isDisabled
@@ -121,9 +121,13 @@ export function MultiSelectChoices({
                         : "border-border bg-card hover:border-primary/40"
                   }`}
                 >
-                  <p className="font-semibold text-sm text-foreground">{option.name}</p>
+                  <p className={`font-semibold text-foreground ${compact ? "text-xs" : "text-sm"}`}>
+                    {option.name}
+                  </p>
                   {isTakenElsewhere && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Already chosen</p>
+                    <p className={`text-muted-foreground mt-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
+                      Already chosen
+                    </p>
                   )}
                   {option.description && (
                     <ClampedRichText

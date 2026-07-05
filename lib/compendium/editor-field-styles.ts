@@ -16,24 +16,18 @@ export const pageOverlayPanelHintClass = "text-xs text-foreground/80 mt-1 leadin
 
 export const pageOverlayPanelMetaClass = "text-xs text-foreground/72"
 
-/** Stat/count chip for page headers over decorative backgrounds. */
-export const pageHeaderStatBadgeClass =
-  "inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-sky/30 text-foreground border border-sky/45 backdrop-blur-sm shadow-sm"
+/** Stat/count line under page titles. */
+export const pageHeaderStatBadgeClass = "text-muted-foreground text-lg"
 
-/** Back/navigation link chip readable over decorative page backgrounds. */
+/** Back/navigation link on content pages. */
 export const pageBackLinkClass =
-  "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold text-foreground bg-card/92 border border-border/90 backdrop-blur-md shadow-sm hover:bg-card transition-colors"
-
-const pageFloatingTextBase =
-  "inline-block px-3 py-1.5 rounded-lg font-medium text-foreground bg-card/92 border border-border/90 backdrop-blur-md shadow-sm"
+  "inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
 
 /** Descriptive subtitle under top-level page titles. */
-export const pageHeaderSubtitleClass =
-  `${pageFloatingTextBase} max-w-3xl text-base sm:text-lg leading-snug`
+export const pageHeaderSubtitleClass = "text-muted-foreground text-lg max-w-3xl"
 
-/** Smaller hint/helper copy floating over decorative page backgrounds. */
-export const pageFloatingHintClass = `${pageFloatingTextBase} max-w-3xl text-sm leading-relaxed`
+/** Smaller hint/helper copy under page titles. */
+export const pageFloatingHintClass = "text-sm text-muted-foreground leading-relaxed max-w-3xl"
 
-/** Full-width horizontal strip over decorative page backgrounds (e.g. builder step nav). */
-export const pageStepStripClass =
-  "w-full bg-card/92 backdrop-blur-md border-b border-border/90 shadow-sm"
+/** Builder step nav container (no background strip). */
+export const pageStepStripClass = "mb-2"

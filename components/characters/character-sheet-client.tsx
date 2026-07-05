@@ -57,12 +57,12 @@ import {
   resolveSpellcastingAbilityKey,
   spellSlotTableKey,
 } from "@/lib/compendium/spell-slots"
-import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import {
   buildInputsFromSavedCharacter,
   computeDerivedCharacter,
   deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
+import { filterDisplaySpeedEntries } from "@/lib/character/resolve-all-speeds"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
@@ -94,7 +94,8 @@ import type { ClassResource } from "@/lib/types"
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
-import { SHEET_STATUS_BADGE, SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP } from "@/lib/character/sheet-status-colors"
+import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreBoxClass, abilityScoreValueClass } from "@/lib/character/sheet-status-colors"
+import { useAppTheme } from "@/components/providers/app-theme-provider"
 import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
@@ -138,7 +139,8 @@ import {
 } from "@/lib/character/collect-referenced-sheet-toggles"
 import {
   currentInfluencePoints,
-  INFLUENCE_POINTS_KEY,
+  characterHasInfluencePointsMechanic,
+  influenceCap,
   spendInfluencePoints,
 } from "@/lib/character/influence-points"
 import { resolveSpecializedElement } from "@/lib/character/resolve-specialized-element"
@@ -148,12 +150,14 @@ import { collectMagicItemPowers, magicItemToggleDefinitions } from "@/lib/charac
 import { applyActivationUsesSpend } from "@/lib/character/magic-item-activation"
 import { ABILITY_SCORE_KEYS, resolveUsesConfig, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
+import { SkillExpertiseIndicator } from "@/components/character-sheet/skill-expertise-indicator"
 import {
   DefaultActionsButton,
   DefaultActionsOverlay,
 } from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
+import { buildHitDicePool, recoverHitDiceOnLongRest } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
@@ -179,15 +183,6 @@ interface CharacterWithRelations extends Character {
   species?: Species
   backgrounds?: Background
   subclasses?: Subclass
-}
-
-const ABILITY_COLORS: Record<string, string> = {
-  strength: "bg-red-500",
-  dexterity: "bg-green-500",
-  constitution: "bg-orange-500",
-  intelligence: "bg-blue-500",
-  wisdom: "bg-purple-500",
-  charisma: "bg-pink-500",
 }
 
 const ABILITY_LABELS: Record<string, string> = {
@@ -247,7 +242,7 @@ function CollapsibleDetailField({
   const display = !isLong || expanded ? text : `${text.slice(0, 160)}…`
 
   return (
-    <div className="border border-border rounded-lg p-3 bg-muted/30">
+    <div className="border border-border rounded-lg p-3 bg-muted/40">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h3 className="text-sm font-bold text-foreground">{label}</h3>
         {isLong && (
@@ -401,6 +396,7 @@ function RestSwappableChoiceControl({
 }
 
 export default function CharacterSheetClient({ id }: { id: string }) {
+  const { theme } = useAppTheme()
   const [character, setCharacter] = useState<CharacterWithRelations | null>(null)
   const [spells, setSpells] = useState<Spell[]>([])
   const [spellCatalog, setSpellCatalog] = useState<Spell[]>([])
@@ -441,6 +437,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
   const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
+  const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [realTimeCooldowns, setRealTimeCooldowns] = useState<RealTimeCooldownState>({})
   const [accumulatedResources, setAccumulatedResources] = useState<
     Record<string, AccumulatedResourceState>
@@ -492,6 +489,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setUsedActionUsesById(playState.usedActionUsesById)
         setUsedSpellSlotsByKey(playState.usedSpellSlotsByKey)
         setRechargeCapsByResourceId(playState.rechargeCapsByResourceId)
+        setUsedHitDiceByClassId(playState.usedHitDiceByClassId)
         if (playState.currentHp != null) setCurrentHp(playState.currentHp)
         setTempHp(playState.tempHp)
         setDeathSaves(playState.deathSaves)
@@ -565,6 +563,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         usedActionUsesById,
         usedSpellSlotsByKey,
         rechargeCapsByResourceId,
+        usedHitDiceByClassId,
         currentHp,
         tempHp,
         deathSaves,
@@ -584,6 +583,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     usedActionUsesById,
     usedSpellSlotsByKey,
     rechargeCapsByResourceId,
+    usedHitDiceByClassId,
     currentHp,
     tempHp,
     deathSaves,
@@ -910,13 +910,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     persistEquipmentLoadout,
   ])
 
-  const asiBonuses = useMemo(
-    () =>
-      derived?.asiBonuses ??
-      aggregateAsiBonuses((character?.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {}),
-    [derived?.asiBonuses, character?.asi_allocations],
-  )
-
   const classDetails = useMemo(
     () => (character ? buildClassDetailList(character) : []),
     [character],
@@ -1044,6 +1037,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         usedActionUsesById,
         usedSpellSlotsByKey,
         rechargeCapsByResourceId,
+        usedHitDiceByClassId,
         currentHp,
         tempHp,
         deathSaves,
@@ -1060,6 +1054,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       usedActionUsesById,
       usedSpellSlotsByKey,
       rechargeCapsByResourceId,
+      usedHitDiceByClassId,
       currentHp,
       tempHp,
       deathSaves,
@@ -1399,6 +1394,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [classDetails, modifierCatalog],
   )
 
+  const hasInfluencePointsMechanic = useMemo(
+    () => characterHasInfluencePointsMechanic(turnStartTriggers),
+    [turnStartTriggers],
+  )
+
   const handleTurnStart = useCallback(() => {
     if (!turnStartTriggers.length) return
     const abilityMods = derived?.abilityMods ?? {
@@ -1462,6 +1462,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (result.tempHp != null) setTempHp(result.tempHp)
       if (result.deathSaves) setDeathSaves(result.deathSaves)
       if (result.activeConditions) setActiveConditions(result.activeConditions)
+      if (rest === "long_rest") {
+        const pool = buildHitDicePool(classDetails, usedHitDiceByClassId)
+        setUsedHitDiceByClassId(recoverHitDiceOnLongRest(usedHitDiceByClassId, pool))
+      }
     },
     [
       derived?.maxHp,
@@ -1475,6 +1479,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       sheetActions,
       usesResolveContext,
       rechargeCapsByResourceId,
+      classDetails,
+      usedHitDiceByClassId,
     ],
   )
 
@@ -1740,7 +1746,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <MainNav />
-        <main className="max-w-5xl xl:max-w-7xl mx-auto px-4 py-6">
+        <main className={`${SHEET_MAIN_CLASS} py-6`}>
           <div className="animate-pulse space-y-4">
             <div className="h-6 bg-muted rounded w-1/4" />
             <div className="h-36 bg-muted rounded-2xl" />
@@ -1755,7 +1761,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <MainNav />
-        <main className="max-w-5xl mx-auto px-4 py-6 text-center">
+        <main className={`${SHEET_MAIN_CLASS} py-6 text-center`}>
           <h1 className="text-2xl font-bold text-foreground mb-4">Character not found</h1>
           <Link href="/characters" className={pageBackLinkClass}>
             Back to characters
@@ -1792,10 +1798,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     derived?.speed ??
     character.speed ??
     30
-  const speedEntries =
-    derived?.speeds?.length ? derived.speeds : [{ type: "walk", label: "walk", feet: speed }]
+  const speedEntries = filterDisplaySpeedEntries(
+    derived?.speeds?.length ? derived.speeds : [{ type: "walk", label: "walk", feet: speed }],
+  )
   const initiative = derived?.initiative ?? character.initiative ?? abilityMods.dexterity
   const maxHp = derived?.maxHp ?? character.hit_point_max ?? 0
+  const hitDicePool = buildHitDicePool(classDetails, usedHitDiceByClassId)
   const savingThrowProficiencies = derived?.savingThrowProficiencies ?? character.classes?.saving_throws ?? []
 
   const classLabel = classDetails.length
@@ -1901,8 +1909,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       currentHp,
     },
   })
-  const influencePointCount = currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
-  const influencePointCap = Math.max(0, abilityMods.intelligence)
+  const influencePointCount = hasInfluencePointsMechanic
+    ? currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
+    : 0
+  const influencePointCap = hasInfluencePointsMechanic
+    ? influenceCap(abilityMods.intelligence)
+    : 0
 
   return (
     <SheetRollHistoryProvider characterId={id}>
@@ -1934,7 +1946,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     <div className="min-h-screen bg-background flex flex-col">
       <MainNav />
 
-      <main className="max-w-5xl xl:max-w-7xl mx-auto px-4 py-4">
+      <main className={SHEET_MAIN_CLASS}>
         <div className="flex items-center justify-between gap-4 mb-3">
           <Link href="/characters" className={pageBackLinkClass}>
             <ArrowLeft className="w-4 h-4" />
@@ -1970,7 +1982,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 : "bg-gradient-to-br from-primary/20 to-secondary/20"
             }`}
           >
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
               {character.portrait_url ? (
                 <button
                   type="button"
@@ -1980,19 +1993,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <img
                     src={character.portrait_url}
                     alt={character.name}
-                    className="w-24 h-24 object-cover"
+                    className="h-16 w-16 object-cover sm:h-24 sm:w-24"
                   />
                 </button>
               ) : (
-                <div className="w-24 h-24 bg-card rounded-xl flex items-center justify-center border-2 border-background shrink-0">
-                  <User className="w-12 h-12 text-muted-foreground" />
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-background bg-card sm:h-24 sm:w-24">
+                  <User className="h-8 w-8 text-muted-foreground sm:h-12 sm:w-12" />
                 </div>
               )}
 
-              <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-black text-foreground leading-tight">{character.name}</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">{classLabel}</p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-black leading-tight text-foreground sm:text-2xl">{character.name}</h1>
+                <p className="mt-0.5 text-sm font-bold text-muted-foreground">{classLabel}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {character.species && (
                     <span className={SHEET_BANNER_BADGE.species}>
                       {character.species.name}
@@ -2010,10 +2023,105 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )}
                 </div>
               </div>
+              </div>
 
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                <div className="flex items-start gap-2">
+              <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <RollHistoryTrigger />
+                  <button
+                    type="button"
+                    onClick={() => setHasInspiration((value) => !value)}
+                    title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
+                    aria-pressed={hasInspiration}
+                    className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${
+                      hasInspiration
+                        ? SHEET_BANNER_BUTTON.inspirationActive
+                        : SHEET_BANNER_BUTTON.inspirationIdle
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </button>
+                  <div className="relative">
+                    <button
+                      ref={conditionButtonRef}
+                      type="button"
+                      onClick={openConditionMenu}
+                      aria-expanded={conditionDropdownOpen}
+                      className={`flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-sm font-semibold transition-colors sm:px-3 ${
+                        conditionDropdownOpen ||
+                        activeConditions.length > 0 ||
+                        exhaustionLevel > 0
+                          ? SHEET_BANNER_BUTTON.conditionsActive
+                          : SHEET_BANNER_BUTTON.conditionsDefault
+                      }`}
+                    >
+                      <span className="hidden sm:inline">Conditions</span>
+                      <span className="sm:hidden">Cond.</span>
+                      <ChevronDown
+                        className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {conditionDropdownOpen && conditionMenuPos && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[99]"
+                          aria-hidden
+                          onClick={() => setConditionDropdownOpen(false)}
+                        />
+                        <div
+                          ref={conditionMenuRef}
+                          className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto overscroll-contain"
+                          style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
+                        >
+                          {SHEET_SELECTABLE_CONDITIONS.map((condition) => (
+                            <label
+                              key={condition.name}
+                              className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={activeConditions.includes(condition.name)}
+                                onChange={() => toggleCondition(condition.name)}
+                                className="h-4 w-4 rounded accent-destructive shrink-0"
+                              />
+                              <span className="flex-1 min-w-0">{condition.name}</span>
+                              <ConditionInfoTip description={condition.description} />
+                            </label>
+                          ))}
+                          <div className="border-t border-border px-3 py-2.5">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium flex-1 min-w-0">Exhaustion</span>
+                              {EXHAUSTION_CONDITION ? (
+                                <ConditionInfoTip description={EXHAUSTION_CONDITION.description} />
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {EXHAUSTION_LEVELS.map((level) => {
+                                const selected = exhaustionLevel === level
+                                return (
+                                  <button
+                                    key={level}
+                                    type="button"
+                                    aria-pressed={selected}
+                                    title={getExhaustionEffectSummary(level)}
+                                    onClick={() => setExhaustionLevel(clampExhaustionLevel(level))}
+                                    className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-2 text-sm font-bold tabular-nums transition-colors ${
+                                      selected
+                                        ? "border-amber-500/60 bg-amber-500/20 text-amber-900 dark:text-amber-200"
+                                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                                    }`}
+                                  >
+                                    {level}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {ragingSheetToggle ? renderManualToggleButton(ragingSheetToggle) : null}
                   <div className="relative">
                     <button
                       ref={sheetMenuButtonRef}
@@ -2104,99 +2212,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       </>
                     ) : null}
                   </div>
-                  <div className="relative">
-                    <button
-                      ref={conditionButtonRef}
-                      type="button"
-                      onClick={openConditionMenu}
-                      aria-expanded={conditionDropdownOpen}
-                      className={`flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors ${
-                        conditionDropdownOpen ||
-                        activeConditions.length > 0 ||
-                        exhaustionLevel > 0
-                          ? SHEET_BANNER_BUTTON.conditionsActive
-                          : SHEET_BANNER_BUTTON.conditionsDefault
-                      }`}
-                    >
-                      Conditions
-                      <ChevronDown
-                        className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-                    {conditionDropdownOpen && conditionMenuPos && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-[99]"
-                          aria-hidden
-                          onClick={() => setConditionDropdownOpen(false)}
-                        />
-                        <div
-                          ref={conditionMenuRef}
-                          className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto overscroll-contain"
-                          style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
-                        >
-                          {SHEET_SELECTABLE_CONDITIONS.map((condition) => (
-                            <label
-                              key={condition.name}
-                              className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={activeConditions.includes(condition.name)}
-                                onChange={() => toggleCondition(condition.name)}
-                                className="h-4 w-4 rounded accent-destructive shrink-0"
-                              />
-                              <span className="flex-1 min-w-0">{condition.name}</span>
-                              <ConditionInfoTip description={condition.description} />
-                            </label>
-                          ))}
-                          <div className="border-t border-border px-3 py-2.5">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-medium flex-1 min-w-0">Exhaustion</span>
-                              {EXHAUSTION_CONDITION ? (
-                                <ConditionInfoTip description={EXHAUSTION_CONDITION.description} />
-                              ) : null}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {EXHAUSTION_LEVELS.map((level) => {
-                                const selected = exhaustionLevel === level
-                                return (
-                                  <button
-                                    key={level}
-                                    type="button"
-                                    aria-pressed={selected}
-                                    title={getExhaustionEffectSummary(level)}
-                                    onClick={() => setExhaustionLevel(clampExhaustionLevel(level))}
-                                    className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-2 text-sm font-bold tabular-nums transition-colors ${
-                                      selected
-                                        ? "border-amber-500/60 bg-amber-500/20 text-amber-900 dark:text-amber-200"
-                                        : "border-border bg-background text-muted-foreground hover:bg-muted"
-                                    }`}
-                                  >
-                                    {level}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  {ragingSheetToggle ? renderManualToggleButton(ragingSheetToggle) : null}
-                  <button
-                    type="button"
-                    onClick={() => setHasInspiration((value) => !value)}
-                    title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
-                    aria-pressed={hasInspiration}
-                    className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${
-                      hasInspiration
-                        ? SHEET_BANNER_BUTTON.inspirationActive
-                        : SHEET_BANNER_BUTTON.inspirationIdle
-                    }`}
-                  >
-                    <Sparkles className="w-5 h-5" />
-                  </button>
                 </div>
 
                 {(derived?.acFormulaOptions.length ?? 0) > 1 ? (
@@ -2305,12 +2320,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
+          className={SHEET_TAB_CONTENT_CLASS}
         >
           {activeTab === "abilities" && (
             <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground">Abilities and Skills</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[11fr_5fr_4fr]">
+                <div className={`${SHEET_ABILITIES_PANEL.skills} rounded-xl p-3 border border-border min-w-0`}>
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Skills</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:min-h-[300px]">
                     {skillsInOrder.map((skill) => {
@@ -2338,9 +2353,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             {skill.name} ({ABILITY_ABBREVIATIONS[skill.ability]})
                           </span>
                           <span className="flex items-center gap-1 shrink-0">
-                            {hasExpertise && (
-                              <span className={SHEET_STATUS_BADGE.expertise}>Expertise</span>
-                            )}
+                            {hasExpertise && <SkillExpertiseIndicator />}
                             <span className="font-bold tabular-nums w-7 text-right">{formatMod(mod)}</span>
                             <D20RollButton
                               modifier={mod}
@@ -2369,9 +2382,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           )
                         </span>
                         <span className="flex items-center gap-1 shrink-0">
-                          {skill.expertise && (
-                            <span className={SHEET_STATUS_BADGE.expertise}>Expertise</span>
-                          )}
+                          {skill.expertise && <SkillExpertiseIndicator />}
                           <span className="font-bold tabular-nums w-7 text-right">{formatMod(skill.bonus)}</span>
                           <D20RollButton
                             modifier={skill.bonus}
@@ -2411,25 +2422,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
+                <div className={`${SHEET_ABILITIES_PANEL.abilityScores} rounded-xl p-3 border border-border min-w-0`}>
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {ABILITY_SCORE_KEYS.map((key) => {
                       const score = effectiveScores[key]
-                      const bonus = asiBonuses[key]
                       const mod = abilityMods[key]
                       return (
                         <div key={key} className="text-center">
-                          <div
-                            className={`w-10 h-10 ${ABILITY_COLORS[key]} rounded-lg flex items-center justify-center mx-auto`}
-                          >
-                            <span className="text-sm font-black text-white">{score}</span>
+                          <div className={abilityScoreBoxClass(theme, key)}>
+                            <span className={abilityScoreValueClass(theme)}>{score}</span>
                           </div>
                           <p className="text-[10px] font-medium text-foreground mt-0.5">{ABILITY_LABELS[key]}</p>
                           <p className="text-xs font-bold text-primary">{getAbilityModifier(score)}</p>
-                          {bonus ? (
-                            <p className="text-[9px] text-lime">+{bonus} ASI</p>
-                          ) : null}
                           <div className="mt-1 flex justify-center">
                             <D20RollButton
                               modifier={mod}
@@ -2491,7 +2496,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className="bg-card rounded-xl p-3 border border-border min-w-0 md:col-span-1">
+                <div className={`${SHEET_ABILITIES_PANEL.proficiencies} rounded-xl p-3 border border-border min-w-0`}>
                   <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Proficiencies</h3>
                   {!weaponProficiencies.length &&
                   !armorProficiencies.length &&
@@ -2501,7 +2506,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   ) : (
                     <div className="space-y-3">
                       {weaponProficiencies.length > 0 && (
-                        <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Weapons</p>
                           <div className="flex flex-wrap gap-1.5">
                             {weaponProficiencies.map((item) => (
@@ -2516,7 +2521,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </div>
                       )}
                       {armorProficiencies.length > 0 && (
-                        <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Armor</p>
                           <div className="flex flex-wrap gap-1.5">
                             {armorProficiencies.map((item) => (
@@ -2532,7 +2537,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       )}
                       {(partitionedToolProficiencies.tools.length > 0 ||
                         partitionedToolProficiencies.instruments.length > 0) && (
-                        <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5 space-y-2">
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 space-y-2">
                           {partitionedToolProficiencies.tools.length > 0 ? (
                             <div>
                               <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Tools</p>
@@ -2568,7 +2573,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </div>
                       )}
                       {(character.languages ?? []).length > 0 && (
-                        <div className="rounded-lg border border-border/70 bg-muted/25 p-2.5">
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Languages</p>
                           <div className="flex flex-wrap gap-1.5">
                             {(character.languages ?? []).map((item) => (
@@ -2587,7 +2592,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
               </div>
 
-              <div className="bg-card rounded-xl p-3 border border-border">
+              <div className={`${SHEET_ABILITIES_PANEL.actions} rounded-xl p-3 border border-border`}>
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <h2 className="text-sm font-bold text-foreground">Actions</h2>
                   <DefaultActionsButton onClick={() => setDefaultActionsContext("abilities")} />
@@ -2692,7 +2697,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           )}
 
           {activeTab === "details" && (
-            <div className="bg-card rounded-xl p-4 border border-border">
+            <div className={`${SHEET_DETAILS_PANEL} rounded-xl p-4 border border-border`}>
               <h2 className="text-sm font-bold text-foreground mb-3">Character Details</h2>
               <div className="overflow-hidden">
                 {character.portrait_url ? (
@@ -2737,9 +2742,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "combat" && (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:items-start">
-                <div className="lg:col-span-2 space-y-3">
-                <div className="bg-card rounded-xl p-3 border border-border overflow-visible">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[7fr_3fr] md:items-start">
+                <div className="space-y-3 min-w-0">
+                <div className={`${SHEET_COMBAT_PANEL.combatStats} rounded-xl p-3 border border-border min-w-0 overflow-hidden`}>
                   <h2 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
                     <Shield className="w-4 h-4 text-primary" aria-hidden />
                     Combat Stats
@@ -2758,11 +2763,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     tempHp={tempHp}
                     onCurrentHpChange={setCurrentHp}
                     onTempHpChange={setTempHp}
+                    hitDicePool={hitDicePool}
+                    conMod={abilityMods.constitution}
+                    onShortRestHeal={(amount) =>
+                      setCurrentHp((hp) => Math.min(maxHp, hp + amount))
+                    }
+                    onSpendHitDice={(classId, count) =>
+                      setUsedHitDiceByClassId((prev) => ({
+                        ...prev,
+                        [classId]: (prev[classId] ?? 0) + count,
+                      }))
+                    }
                     onInitiativeRoll={handleInitiativeRoll}
                     formatMod={formatMod}
                   />
                 </div>
-                <div className="bg-card rounded-xl p-3 border border-border">
+                <div className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
                   <div className="flex flex-col lg:flex-row gap-1 lg:gap-1.5 lg:items-stretch">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 lg:gap-1.5 flex-1 min-w-0">
                       {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
@@ -2806,7 +2822,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </div>
                   </div>
                 </div>
-                <div className="bg-card rounded-xl p-3 border border-border flex flex-col min-h-0">
+                <div className={`${SHEET_COMBAT_PANEL.actions} rounded-xl p-3 border border-border flex flex-col min-h-0`}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h2 className="text-sm font-bold text-foreground">Actions</h2>
                     <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
@@ -2836,13 +2852,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 {hasSpellcasting && (
-                  <div className="bg-card rounded-xl p-3 border border-border min-w-0">
+                  <div className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
                     <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
                     {spellsGroupedByLevel.length ? (
                       <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
                         {spellsGroupedByLevel.map((group) => (
                           <div key={group.level}>
-                            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 bg-card py-0.5 z-10">
+                            <h3 className={`text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 ${SHEET_COMBAT_PANEL.spells} py-0.5 z-10`}>
                               {group.label}
                               <span className="ml-1.5 font-medium text-muted-foreground/60 normal-case">
                                 ({group.spells.length})
@@ -2887,8 +2903,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 )}
                 </div>
 
-                <div className="space-y-3">
-                  <div className="bg-card rounded-xl p-3 border border-border">
+                <div className="space-y-3 min-w-0">
+                  <div className={`${SHEET_COMBAT_PANEL.initiative} rounded-xl p-3 border border-border`}>
                     <SheetInitiativeBlock
                       initiative={initiative}
                       statBreakdowns={statBreakdowns}
@@ -2896,7 +2912,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       formatMod={formatMod}
                     />
                   </div>
-                  <div className="bg-card rounded-xl p-3 border border-border">
+                  <div className={`${SHEET_COMBAT_PANEL.spellcastingResources} rounded-xl p-3 border border-border`}>
                     <h2 className="text-sm font-bold text-foreground mb-2 text-left">
                       {hasSpellcasting ? "Spellcasting & Resources" : "Resources"}
                     </h2>
@@ -2946,7 +2962,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             resolveContext={usesResolveContext}
                           />
                         )}
-                        {(influencePointCount > 0 || influencePointCap > 0) && (
+                        {hasInfluencePointsMechanic && (influencePointCount > 0 || influencePointCap > 0) && (
                           <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5">
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <p className="text-xs font-bold text-violet-800 dark:text-violet-200">
@@ -2999,7 +3015,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "equipment" && (
             <div className="space-y-3">
-              <div className="bg-card rounded-xl p-3 border border-border">
+              <div className={`${SHEET_EQUIPMENT_PANEL} rounded-xl p-3 border border-border`}>
                 <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
                 <SheetEquipmentPanel
                   equipment={displayedEquipment}
@@ -3085,7 +3101,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           )}
 
           {activeTab === "features" && (
-            <div className="columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid">
+            <div className={`${SHEET_TAB_CONTENT_CLASS} columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid`}>
               {magicItemPowers.length > 0 ? (
                 <MagicItemPowersPanel
                   powers={magicItemPowers}
@@ -3116,7 +3132,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 if (!classFeatures.length) return null
                 const dedupedFeatures = dedupeFeaturesByName(classFeatures)
                 return (
-                  <section key={entry.row.class_id} className="bg-card rounded-xl p-3 border border-border">
+                  <section key={entry.row.class_id} className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
                     <h2 className="text-sm font-bold mb-2">
                       {entry.class?.name} Features
                       {classDetails.length > 1 ? ` (Level ${entry.row.level})` : ""}
@@ -3156,7 +3172,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 return (
                   <section
                     key={`${entry.row.class_id}-subclass`}
-                    className="bg-card rounded-xl p-3 border border-border"
+                    className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}
                   >
                     <h2 className="text-sm font-bold mb-2">{entry.subclass.name} Features</h2>
                     <div className="space-y-2">
@@ -3185,7 +3201,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               })}
 
               {character.species?.traits && character.species.traits.length > 0 && (
-                <section className="bg-card rounded-xl p-3 border border-border">
+                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
                   <h2 className="text-sm font-bold mb-2">{character.species.name} Traits</h2>
                   <div className="space-y-2">
                     {character.species.traits.map((trait, index) => (
@@ -3200,7 +3216,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               )}
 
               {character.backgrounds?.feature && (
-                <section className="bg-card rounded-xl p-3 border border-border">
+                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
                   <h2 className="text-sm font-bold mb-2">Background Feature</h2>
                   <CollapsibleFeatureCard
                     name={character.backgrounds.feature.name}
@@ -3210,7 +3226,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               )}
 
               {(originFeat || effectiveBackgroundFeatGranted || characterFeatsForDisplay.length > 0) && (
-                <section className="bg-card rounded-xl p-3 border border-border">
+                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
                   <h2 className="text-sm font-bold mb-2">Feats &amp; Boons</h2>
                   <div className="space-y-2">
                     {(originFeat || effectiveBackgroundFeatGranted) && (

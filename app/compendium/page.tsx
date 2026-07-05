@@ -1209,9 +1209,237 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           ))}
         </div>
 
-        {/* Search (+ tab filters inline on sm+) */}
+        {copyError && (
+          <p className="mb-4 text-sm text-destructive">{copyError}</p>
+        )}
+
+        {/* Tab filters + search */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div id="compendium-search" className="relative flex-1 min-w-0">
+          <div className="flex flex-1 min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            {activeTab === "feats" && (
+              <div id="feat-filters" className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Type
+                  </label>
+                  <select
+                    value={featFilterCategory}
+                    onChange={(e) => setFeatFilterCategory(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="Origin">Origin</option>
+                    <option value="General">General</option>
+                    <option value="Epic Boon">Epic Boon</option>
+                    <option value="Fighting Style">Fighting Style</option>
+                  </select>
+                </div>
+                {featFilterCategory !== "all" && (
+                  <button
+                    onClick={() => setFeatFilterCategory("all")}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "class_resources" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Class
+                  </label>
+                  <select
+                    value={classResourceFilterClassId}
+                    onChange={(e) => setClassResourceFilterClassId(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">All Classes</option>
+                    {Object.entries(classNamesById)
+                      .sort(([, a], [, b]) => a.localeCompare(b))
+                      .map(([id, name]) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                {classResourceFilterClassId !== "all" && (
+                  <button
+                    onClick={() => setClassResourceFilterClassId("all")}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "spells" && (
+              <div id="spell-filters" className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Class
+                  </label>
+                  <select
+                    value={spellFilterClass}
+                    onChange={(e) => setSpellFilterClass(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">All Classes</option>
+                    {hasUnassignedSpells ? (
+                      <option value={UNASSIGNED_SPELL_CLASS}>No class list</option>
+                    ) : null}
+                    {spellClassOptions.map((cls) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Level
+                  </label>
+                  <select
+                    value={spellFilterLevel}
+                    onChange={(e) => setSpellFilterLevel(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">All Levels</option>
+                    {spellLevelOptions.map((lvl) => (
+                      <option key={lvl} value={lvl}>
+                        {lvl === 0 ? "Cantrip" : `Level ${lvl}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    School
+                  </label>
+                  <select
+                    value={spellFilterSchool}
+                    onChange={(e) => setSpellFilterSchool(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">All Schools</option>
+                    {spellSchoolOptions.map((school) => (
+                      <option key={school} value={school}>{school}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(spellFilterClass !== "all" || spellFilterLevel !== "all" || spellFilterSchool !== "all") && (
+                  <button
+                    onClick={() => {
+                      setSpellFilterClass("all")
+                      setSpellFilterLevel("all")
+                      setSpellFilterSchool("all")
+                    }}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Type
+                </label>
+                <select
+                  value={equipmentFilterCategory}
+                  onChange={(e) => setEquipmentFilterCategory(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="all">All types</option>
+                  {equipmentCategoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                {equipmentFilterCategory !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setEquipmentFilterCategory("all")}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "magic_items" && magicItemCategoryOptions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Magic type
+                </label>
+                <select
+                  value={magicItemFilterCategory}
+                  onChange={(e) => setMagicItemFilterCategory(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="all">All magic types</option>
+                  {magicItemCategoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                {magicItemFilterCategory !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setMagicItemFilterCategory("all")}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "languages" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Pool
+                </label>
+                <select
+                  value={languageFilterPool}
+                  onChange={(e) => setLanguageFilterPool(e.target.value as "all" | "standard" | "rare")}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="all">All pools</option>
+                  <option value="standard">Standard</option>
+                  <option value="rare">Rare</option>
+                </select>
+              </div>
+            )}
+
+            {activeTab === "tools" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Group
+                </label>
+                <select
+                  value={toolFilterGroup}
+                  onChange={(e) => setToolFilterGroup(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="all">All groups</option>
+                  <option value="artisans">Artisan&apos;s Tools</option>
+                  <option value="musical">Musical Instrument</option>
+                  <option value="gaming">Gaming Set</option>
+                  <option value="other">Other Tools</option>
+                  <option value="vehicle">Vehicle</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div id="compendium-search" className="relative w-full sm:w-1/3 shrink-0 sm:ml-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -1221,238 +1449,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               className="w-full pl-9 pr-3 py-2 text-sm bg-card border-2 border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
             />
           </div>
-
-        {copyError && (
-          <p className="mb-4 text-sm text-destructive">{copyError}</p>
-        )}
-
-          {activeTab === "feats" && (
-            <div id="feat-filters" className="flex flex-wrap items-center gap-2 sm:shrink-0">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                  Type
-                </label>
-                <select
-                  value={featFilterCategory}
-                  onChange={(e) => setFeatFilterCategory(e.target.value)}
-                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="all">All Types</option>
-                  <option value="Origin">Origin</option>
-                  <option value="General">General</option>
-                  <option value="Epic Boon">Epic Boon</option>
-                  <option value="Fighting Style">Fighting Style</option>
-                </select>
-              </div>
-              {featFilterCategory !== "all" && (
-                <button
-                  onClick={() => setFeatFilterCategory("all")}
-                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
-                >
-                  Clear filter
-                </button>
-              )}
-            </div>
-          )}
-
-          {activeTab === "class_resources" && (
-            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                  Class
-                </label>
-                <select
-                  value={classResourceFilterClassId}
-                  onChange={(e) => setClassResourceFilterClassId(e.target.value)}
-                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-                >
-                  <option value="all">All Classes</option>
-                  {Object.entries(classNamesById)
-                    .sort(([, a], [, b]) => a.localeCompare(b))
-                    .map(([id, name]) => (
-                      <option key={id} value={id}>
-                        {name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              {classResourceFilterClassId !== "all" && (
-                <button
-                  onClick={() => setClassResourceFilterClassId("all")}
-                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
-                >
-                  Clear filter
-                </button>
-              )}
-            </div>
-          )}
         </div>
-
-        {/* Spell Filters — only shown on spells tab */}
-        {activeTab === "spells" && (
-          <div id="spell-filters" className="flex flex-wrap gap-3 mb-6">
-            {/* Class filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                Class
-              </label>
-              <select
-                value={spellFilterClass}
-                onChange={(e) => setSpellFilterClass(e.target.value)}
-                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-              >
-                <option value="all">All Classes</option>
-                {hasUnassignedSpells ? (
-                  <option value={UNASSIGNED_SPELL_CLASS}>No class list</option>
-                ) : null}
-                {spellClassOptions.map((cls) => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Level filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                Level
-              </label>
-              <select
-                value={spellFilterLevel}
-                onChange={(e) => setSpellFilterLevel(e.target.value)}
-                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-              >
-                <option value="all">All Levels</option>
-                {spellLevelOptions.map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl === 0 ? "Cantrip" : `Level ${lvl}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* School filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                School
-              </label>
-              <select
-                value={spellFilterSchool}
-                onChange={(e) => setSpellFilterSchool(e.target.value)}
-                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
-              >
-                <option value="all">All Schools</option>
-                {spellSchoolOptions.map((school) => (
-                  <option key={school} value={school}>{school}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Active filter count / clear */}
-            {(spellFilterClass !== "all" || spellFilterLevel !== "all" || spellFilterSchool !== "all") && (
-              <button
-                onClick={() => {
-                  setSpellFilterClass("all")
-                  setSpellFilterLevel("all")
-                  setSpellFilterSchool("all")
-                }}
-                className="ml-auto px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {activeTab === "equipment" && equipmentCategoryOptions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Type
-            </label>
-            <select
-              value={equipmentFilterCategory}
-              onChange={(e) => setEquipmentFilterCategory(e.target.value)}
-              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All types</option>
-              {equipmentCategoryOptions.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            {equipmentFilterCategory !== "all" && (
-              <button
-                type="button"
-                onClick={() => setEquipmentFilterCategory("all")}
-                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {activeTab === "magic_items" && magicItemCategoryOptions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Magic type
-            </label>
-            <select
-              value={magicItemFilterCategory}
-              onChange={(e) => setMagicItemFilterCategory(e.target.value)}
-              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All magic types</option>
-              {magicItemCategoryOptions.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            {magicItemFilterCategory !== "all" && (
-              <button
-                type="button"
-                onClick={() => setMagicItemFilterCategory("all")}
-                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {activeTab === "languages" && (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Pool
-            </label>
-            <select
-              value={languageFilterPool}
-              onChange={(e) => setLanguageFilterPool(e.target.value as "all" | "standard" | "rare")}
-              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All pools</option>
-              <option value="standard">Standard</option>
-              <option value="rare">Rare</option>
-            </select>
-          </div>
-        )}
-
-        {activeTab === "tools" && (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Group
-            </label>
-            <select
-              value={toolFilterGroup}
-              onChange={(e) => setToolFilterGroup(e.target.value)}
-              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All groups</option>
-              <option value="artisans">Artisan&apos;s Tools</option>
-              <option value="musical">Musical Instrument</option>
-              <option value="gaming">Gaming Set</option>
-              <option value="other">Other Tools</option>
-              <option value="vehicle">Vehicle</option>
-            </select>
-          </div>
-        )}
 
         {/* Content Grid */}
         {loading ? (

@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -409,6 +410,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
+          <CompendiumEditorPanel title="Category & cost">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -512,17 +514,15 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               />
             </div>
           </div>
+          </CompendiumEditorPanel>
 
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Description
-            </label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe the item, including any special properties..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
           {/* Armor-specific fields */}
           {form.category === "Armor" && (

@@ -20,6 +20,8 @@ export type CharacterSheetPlayState = {
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>
   rechargeCapsByResourceId: Record<string, number>
+  /** Hit dice spent since the last long rest, keyed by class id. */
+  usedHitDiceByClassId: Record<string, number>
   currentHp: number | null
   tempHp: number
   deathSaves: { successes: number; failures: number }
@@ -39,6 +41,7 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     usedActionUsesById: {},
     usedSpellSlotsByKey: {},
     rechargeCapsByResourceId: {},
+    usedHitDiceByClassId: {},
     currentHp: null,
     tempHp: 0,
     deathSaves: { successes: 0, failures: 0 },
@@ -79,6 +82,10 @@ export function normalizeSheetPlayState(
       raw.rechargeCapsByResourceId && typeof raw.rechargeCapsByResourceId === "object"
         ? { ...raw.rechargeCapsByResourceId }
         : base.rechargeCapsByResourceId,
+    usedHitDiceByClassId:
+      raw.usedHitDiceByClassId && typeof raw.usedHitDiceByClassId === "object"
+        ? { ...raw.usedHitDiceByClassId }
+        : base.usedHitDiceByClassId,
     currentHp: typeof raw.currentHp === "number" ? raw.currentHp : base.currentHp,
     tempHp: typeof raw.tempHp === "number" ? raw.tempHp : base.tempHp,
     deathSaves:

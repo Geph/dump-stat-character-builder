@@ -16,6 +16,7 @@ import {
   normalizeAppThemeId,
 } from "@/lib/themes/app-themes"
 import { PageBackgroundLayer } from "@/components/page-background-layer"
+import { ConditionalPageTopGradient } from "@/components/conditional-page-top-gradient"
 
 type AppThemeContextValue = {
   theme: AppThemeId
@@ -65,7 +66,8 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppThemeContext.Provider value={value}>
       <PageBackgroundLayer />
-      <div className="relative z-[1] min-h-screen">{children}</div>
+      <ConditionalPageTopGradient />
+      <div className="relative z-[2] min-h-screen">{children}</div>
     </AppThemeContext.Provider>
   )
 }

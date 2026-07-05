@@ -1,6 +1,4 @@
-"use client"
-
-import type { MagicItemPower } from "@/lib/character/magic-item-powers"
+import { SHEET_FEATURES_PANEL } from "@/lib/character/sheet-status-colors"
 import {
   activationCostAmount,
   canSpendActivationUses,
@@ -33,7 +31,7 @@ export function MagicItemPowersPanel({
   if (!powers.length) return null
 
   return (
-    <section className="bg-card rounded-xl p-3 border border-border">
+    <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
       <h2 className="text-sm font-bold mb-2">Magic Item Powers</h2>
       <div className="space-y-2">
         {powers.map((power) => {

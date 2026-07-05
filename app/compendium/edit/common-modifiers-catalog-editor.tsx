@@ -7,6 +7,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import { ModifierCatalogAdminEditor } from "@/components/compendium/modifier-catalog-admin-editor"
 import {
   CatalogEditorFloatingNav,
@@ -90,14 +91,12 @@ export function CatalogEditor({
         )}
 
         <form id={COMPENDIUM_EDITOR_FORM_ID} onSubmit={onSubmit} className="space-y-6">
-          <section
-            id={catalogEditorSectionId("Overview")}
-            className={CATALOG_EDITOR_SECTION_CLASS}
-          >
-            <label className="block text-sm font-semibold text-foreground mb-2">Overview</label>
+          <section id={catalogEditorSectionId("Overview")} className={CATALOG_EDITOR_SECTION_CLASS}>
+          <CompendiumEditorPanel title="Overview" defaultOpen>
             <p className="rounded-xl border-2 border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground leading-relaxed">
               {catalogInfo}
             </p>
+          </CompendiumEditorPanel>
           </section>
 
           <ModifierCatalogAdminEditor

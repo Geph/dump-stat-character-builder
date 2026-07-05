@@ -1,3 +1,4 @@
+import { applySrdItemIcon, SRD_FEAT_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import {
   FEAT_MODIFIER_PRESETS,
@@ -89,6 +90,10 @@ function applyFeatMechanicalDetection(row: Record<string, unknown>): Record<stri
 
 /** Apply bundled feat modifier presets when not already configured. */
 export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, unknown> {
+  return applySrdItemIcon(enrichSrdFeatRowCore(row), SRD_FEAT_ICONS_BY_NAME)
+}
+
+function enrichSrdFeatRowCore(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source as string | null | undefined)) return row
   const name = String(row.name ?? "")
   const preset = FEAT_MODIFIER_PRESETS[name]

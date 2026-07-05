@@ -14,6 +14,7 @@ import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import { enrichSrdSubclassList } from "@/lib/compendium/enrich-srd-subclasses"
 import { enrichSrdFeatList } from "@/lib/compendium/enrich-srd-feats"
 import { enrichSrdSpeciesList } from "@/lib/compendium/enrich-srd-species"
+import { enrichSrdToolList } from "@/lib/compendium/enrich-srd-tools"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     await upsertByName("spells", withSrdCreatorUrlList(spells))
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
     await upsertByName("languages", withSrdCreatorUrlList(languages))
-    await upsertByName("tools", withSrdCreatorUrlList(tools))
+    await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools)))
     const equipmentSeed = await seedSrdEquipment({
       upsertByName,
       listEquipmentByName: async () => {

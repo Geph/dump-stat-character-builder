@@ -6,6 +6,8 @@ import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
 import { Info, X } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
+import { pageOverlayPanelClass } from "@/lib/compendium/editor-field-styles"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
@@ -381,7 +383,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
-          {/* Category, level requirement, repeatable */}
+          <CompendiumEditorPanel title="Category & requirements">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">Category</label>
@@ -443,8 +445,9 @@ export default function FeatEditorPage({ id }: { id: string }) {
               </label>
             </div>
           </div>
+          </CompendiumEditorPanel>
 
-          <Accordion type="single" collapsible className="bg-card border-2 border-border rounded-xl px-4">
+          <Accordion type="single" collapsible className={`${pageOverlayPanelClass} px-4`}>
             <AccordionItem value="prerequisites" className="border-none">
               <AccordionTrigger className="font-semibold text-foreground hover:no-underline py-4">
                 Additional prerequisites
@@ -541,15 +544,13 @@ export default function FeatEditorPage({ id }: { id: string }) {
             </AccordionItem>
           </Accordion>
 
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Description</label>
+          <CompendiumEditorPanel title="Description">
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe the feat's benefits..."
             />
-          </div>
+          </CompendiumEditorPanel>
 
           <DurationEditor
             value={form.duration}
