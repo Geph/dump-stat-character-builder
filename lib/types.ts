@@ -83,8 +83,11 @@ export interface FeatureChoice {
   /**
    * Links the choice to a class resource whose value scales the number of picks
    * (e.g. "weapon_mastery", "upgrades"). When set, `count` is a fallback default.
+   * Prefer `choiceCountByLevel` for level-scaled pick counts that are not spendable pools.
    */
   resourceKey?: string | null
+  /** Level-scaled number of picks (tier semantics match class resource at_level tier). */
+  choiceCountByLevel?: UsesAtLevel[]
   /** When "feats", builder offers compendium feats instead of static options. */
   /** @deprecated Feat picks use grant_feat modifiers from the common modifiers catalog. */
   kind?: "options" | "feats"
@@ -305,6 +308,8 @@ export interface ClassResource {
   name: string
   description?: string
   uses: UsesConfig
+  /** Override sheet display; derived from spendability when unset. */
+  display?: "tracker" | "static" | "hidden"
 }
 
 /** Row in the `class_resources` compendium table. */
@@ -350,6 +355,32 @@ export interface Species {
   /** References into the Common Modifier Effects catalog (merged with characteristics in builder). */
   modifierRefs?: string[] | null
   linkedModifiers?: LinkedModifierInstance[] | null
+  icon: string | null
+  accent_color?: string | null
+  card_image_url?: string | null
+  source: string
+  creator_url: string | null
+  enabled?: boolean
+  created_at: string
+}
+
+export type ToolGroup = "artisans" | "gaming" | "musical" | "other" | "vehicle"
+
+export type ToolCheckAbility =
+  | "strength"
+  | "dexterity"
+  | "intelligence"
+  | "wisdom"
+  | "charisma"
+
+export interface Tool {
+  id: string
+  name: string
+  description: string | null
+  tool_group: ToolGroup
+  subcategory: string | null
+  check_ability: ToolCheckAbility
+  expands_to: string[] | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
@@ -807,6 +838,8 @@ export interface Character {
   /** Player picks for in-feature option choices (e.g. Circle of the Land type), keyed by feature choice key. */
   feature_choice_picks?: Record<string, string[]> | null
   modifier_player_picks?: Record<string, string[]> | null
+  /** Builder-only pick maps for edit round-trips (class skills, spells per class, etc.). */
+  builder_picks?: import("@/lib/builder/builder-picks").CharacterBuilderPicks | null
   /** Per-companion HP overrides keyed by companion key. */
   companion_state?: import("@/lib/character/companion-stat-block").CharacterCompanionState[] | null
   /** Saved combat/play state (explicit save from character sheet). */

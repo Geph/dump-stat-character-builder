@@ -32,6 +32,8 @@ type CatalogEditorProps = {
   catalogName: string
   catalogInfo: string
   catalog: ModifierCatalogEntry[]
+  icon: string | null
+  onIconChange: (icon: string | null) => void
   spellOptions: { id: string; name: string }[]
   otherAbilities: { id: string; name: string }[]
   saving: boolean
@@ -45,6 +47,8 @@ export function CatalogEditor({
   catalogName,
   catalogInfo,
   catalog,
+  icon,
+  onIconChange,
   spellOptions,
   otherAbilities,
   saving,
@@ -75,8 +79,8 @@ export function CatalogEditor({
           onSourceChange={() => {}}
           creatorUrl=""
           onCreatorUrlChange={() => {}}
-          icon="sparkles"
-          onIconChange={() => {}}
+          icon={icon}
+          onIconChange={onIconChange}
         />
 
         {error && (
@@ -153,11 +157,13 @@ export function parseCatalogFromRow(data: Record<string, unknown>): ModifierCata
 export function buildCatalogSavePayload(
   catalog: ModifierCatalogEntry[],
   catalogInfo: string,
+  icon?: string | null,
 ): Record<string, unknown> {
   return {
     description: `<p>${catalogInfo}</p>`,
     modifier_catalog: catalog,
     creator_url: null,
+    ...(icon !== undefined ? { icon } : {}),
   }
 }
 

@@ -82,7 +82,7 @@ describe("Reckless Attack (SRD: opt-in; melee attacks against you have Advantage
       classFeatures: [reckless],
       limitationContext: { activeSheetToggles: new Set(["reckless_attack"]) },
     })
-    expect(notes.some((note) => note.detail.includes("Advantage"))).toBe(true)
+    expect(notes.some((note) => note.label.includes("advantage"))).toBe(true)
     expect(notes.some((note) => note.detail.includes("Reckless Attack"))).toBe(true)
   })
 })
@@ -120,7 +120,7 @@ describe("Escape the Horde (SRD: opportunity attacks have Disadvantage)", () => 
       activeConditions: [],
       classFeatures: [{ ...feature, linkedModifiers: escapeOption.linkedModifiers }],
     })
-    expect(notes.some((note) => note.detail.includes("Disadvantage"))).toBe(true)
+    expect(notes.some((note) => note.label.includes("disadvantage"))).toBe(true)
     expect(notes.some((note) => note.detail.includes("Opportunity attacks"))).toBe(true)
   })
 })

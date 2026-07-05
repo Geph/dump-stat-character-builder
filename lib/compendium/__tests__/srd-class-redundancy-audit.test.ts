@@ -55,7 +55,8 @@ describe("SRD class enrichment audit", () => {
       expect(cls, `${className} missing from SRD`).toBeTruthy()
       const wm = ((cls!.features ?? []) as Feature[]).find((f) => f.name === "Weapon Mastery")
       expect(wm?.isChoice).toBe(true)
-      expect(wm?.choices?.resourceKey).toBe("weapon_mastery")
+      expect(wm?.choices?.choiceCountByLevel?.length).toBeGreaterThan(0)
+      expect(wm?.choices?.resourceKey).toBeUndefined()
       expect(wm?.choices?.options?.length ?? 0).toBeGreaterThan(0)
       const hasLegacyPicker = (wm?.linkedModifiers ?? []).some((mod) =>
         mod.characteristics?.some((c) => c.type === "feature_option_picker"),

@@ -3,6 +3,9 @@ import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
+import { applyBlindsensePresetOverride } from "@/lib/import/apply-blindsense-preset-override"
+import { shouldSkipWildcardPreset } from "@/lib/import/resolve-wildcard-preset-conflict"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import {
   buildEvasionModifier,
@@ -22,7 +25,8 @@ import {
   migrateFeatureOptionPickers,
 } from "@/lib/compendium/feature-option-choice-migration"
 import type { Feature, FeatureActivation, FeatureChoice, UsesConfig } from "@/lib/types"
-import { SRD_ARTISANS_TOOLS, SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
+import type { ToolChoicePool } from "@/lib/compendium/srd-tools"
+import { toolNamesForPools } from "@/lib/compendium/tool-options"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
 const CHECK_ROLL_MODIFIER_CATALOG_ID = "cat_fx_check_roll_modifier"
@@ -264,6 +268,19 @@ function abilityBonuses(bonuses: Record<string, number>, label?: string): Linked
       mode: "fixed",
       bonuses,
       label,
+    },
+  ])
+}
+
+function blindsenseVision(label?: string): LinkedModifierInstance {
+  return charInstance("modinst_blindsense", FEAT_MODIFIER_CATALOG.vision, [
+    {
+      id: modId("blindsense"),
+      type: "vision",
+      visionType: "blindsight",
+      rangeFeet: 10,
+      rangeFeetByLevel: [],
+      label: label ?? "Blindsense (hearing)",
     },
   ])
 }
@@ -1469,6 +1486,24 @@ function toolChoice(
   ])
 }
 
+function toolChoicePool(
+  instanceKey: string,
+  count: number,
+  pool: ToolChoicePool,
+  label?: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_toolchoice_${instanceKey}`, "cat_char_tool_proficiencies", [
+    {
+      id: modId(`toolchoice_${instanceKey}`),
+      type: "tool_proficiencies",
+      values: [],
+      choiceCount: count,
+      toolChoicePool: pool,
+      label,
+    },
+  ])
+}
+
 /**
  * Monk core tool proficiency: "Choose one type of Artisan's Tools or Musical Instrument".
  * Surfaced as a build-time tool-proficiency choice (one pick from the combined pool).
@@ -1477,7 +1512,7 @@ export function monkToolProficiencyChoice(): LinkedModifierInstance {
   return toolChoice(
     "monk_tools",
     1,
-    [...SRD_ARTISANS_TOOLS, ...SRD_MUSICAL_INSTRUMENTS],
+    toolNamesForPools(["artisans", "musical"]),
     "Artisan's Tools or Musical Instrument (choose 1)",
   )
 }
@@ -1861,14 +1896,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     abilityBonuses({ dexterity: 4, wisdom: 4 }, "Body and Mind (+4 DEX/WIS)"),
   ],
   "*::Expertise": [skillChoice(2, "Expertise", true)],
+  "*::Blindsense": [blindsenseVision()],
   "*::Bonus Proficiencies": [skillChoice(3, "Bonus skill proficiencies")],
   "Bard::Bardic Inspiration": [
-    toolChoice(
-      "bard_instruments",
-      3,
-      [...SRD_MUSICAL_INSTRUMENTS],
-      "Musical Instruments (choose 3)",
-    ),
+    toolChoicePool("bard_instruments", 3, "musical", "Musical Instruments (choose 3)"),
   ],
   "*::Jack of All Trades": [
     checkBonus("jack_of_all_trades", {
@@ -5423,7 +5454,17 @@ export function enrichWildcardFeaturePresets(feature: Feature): Feature {
   const key = `*::${(feature.name ?? "").trim()}`
   const preset = SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]
   if (!preset) return feature
-  return mergePresetModifiers(feature, preset)
+  if (shouldSkipWildcardPreset(feature.name ?? "", feature.description ?? "", key)) {
+    return feature
+  }
+  let merged = mergePresetModifiers(feature, preset)
+  if (key === "*::Expertise") {
+    merged = applyExpertisePresetOverride(merged)
+  }
+  if (key === "*::Blindsense") {
+    merged = applyBlindsensePresetOverride(merged)
+  }
+  return merged
 }
 
 /** Whether a known modifier preset applies to this feature (for import reports). */

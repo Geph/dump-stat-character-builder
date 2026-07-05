@@ -476,8 +476,7 @@ describe("canonical SRD feature choices", () => {
     expect(toolMod?.type).toBe("tool_proficiencies")
     if (toolMod?.type === "tool_proficiencies") {
       expect(toolMod.choiceCount).toBe(3)
-      expect(toolMod.choiceOptions).toContain("Lute")
-      expect(toolMod.choiceOptions).toContain("Viol")
+      expect(toolMod.toolChoicePool).toBe("musical")
     }
   })
 })

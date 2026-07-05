@@ -1,4 +1,5 @@
 import { getDatabaseConfigError, formatDatabaseError } from "@/lib/db/config"
+import type { ImportContent } from "@/lib/import/content-schema"
 import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import type { ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
 import { detectImportCollisionsSafe } from "@/lib/import/fetch-import-collisions"

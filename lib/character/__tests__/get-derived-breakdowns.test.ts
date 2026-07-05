@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest"
 import { computeDerivedCharacter } from "@/lib/character/compute-derived"
 import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { sumContributions } from "@/lib/character/stat-contributions"
-import { barbarianShieldFixture } from "@/lib/character/__tests__/fixtures"
+import { barbarianShieldFixture, linked } from "@/lib/character/__tests__/fixtures"
+import type { CharacterBuildInputs } from "@/lib/character/types"
 
 describe("getDerivedCharacterBreakdowns", () => {
   const inputs = barbarianShieldFixture()
@@ -27,5 +28,43 @@ describe("getDerivedCharacterBreakdowns", () => {
     getDerivedCharacterBreakdowns(inputs)
     const after = computeDerivedCharacter(inputs)
     expect(after).toEqual(before)
+  })
+
+  it("lists species trait sources for each movement speed", () => {
+    const base = barbarianShieldFixture()
+    const speciesInputs: CharacterBuildInputs = {
+      ...base,
+      species: {
+        id: "aarakocra",
+        name: "Aarakocra",
+        speed: 30,
+        traits: [
+          {
+            name: "Flight",
+            description: "You have a flying speed.",
+            linkedModifiers: linked([
+              {
+                id: "mod_fly",
+                type: "speed",
+                speedType: "fly",
+                mode: "set",
+                value: 45,
+              },
+            ]),
+          },
+        ],
+        created_at: "",
+      },
+    }
+
+    const derived = computeDerivedCharacter(speciesInputs)
+    const breakdowns = getDerivedCharacterBreakdowns(speciesInputs)
+    const speedLines = breakdownLines(breakdowns, "speed")
+
+    expect(derived.speeds?.some((entry) => entry.type === "fly" && entry.feet === 45)).toBe(true)
+    expect(speedLines.some((line) => line.label.includes("Aarakocra") && line.amount === 30)).toBe(
+      true,
+    )
+    expect(speedLines.some((line) => line.label.includes("Flight") && line.amount === 45)).toBe(true)
   })
 })

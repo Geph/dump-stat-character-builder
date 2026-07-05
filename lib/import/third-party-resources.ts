@@ -117,11 +117,11 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /exploit\s*dice/i,
     displayName: "Exploit Dice",
     definition:
-      "Pool of Exploit Dice spent to fuel Martial Exploits. Die size and pool count scale on the class level table; recharges on a short rest.",
+      "Pool of Exploit Dice spent to fuel Martial Exploits. Die size and pool count scale on the class level table; recharges on a short or long rest.",
     defaultUses: {
       type: "at_level",
       atLevelMode: "tier",
-      recharges: [{ rest: "short_rest" }],
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
     },
     spendPatterns: [
       /\bexpend\s+(?:one|an?|up\s+to\s+(\d+))\s+exploit\s+die\b/i,

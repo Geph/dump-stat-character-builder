@@ -5,6 +5,7 @@ import { GameIconPicker } from "@/components/game-icon-picker"
 import { CompendiumThemeColorPicker } from "@/components/compendium/theme-color-picker"
 import { SourceLinkField } from "@/components/compendium/source-link-field"
 import { CardImageField } from "@/components/compendium/card-image-field"
+import type { CompendiumCardImageCrop } from "@/lib/compendium/card-image"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
@@ -27,6 +28,7 @@ type CompendiumEditorHeaderRowProps = {
   cardImageUrl?: string | null
   onCardImageUrlChange?: (url: string | null) => void
   cardImageAspect?: "3/4" | "21/9"
+  cardImageCrop?: CompendiumCardImageCrop
   /** Optional field between name and source (e.g. parent class). */
   afterName?: ReactNode
 }
@@ -47,7 +49,8 @@ export function CompendiumEditorHeaderRow({
   onAccentColorChange,
   cardImageUrl = null,
   onCardImageUrlChange,
-  cardImageAspect = "3/4",
+  cardImageAspect = "21/9",
+  cardImageCrop = "center",
   afterName,
 }: CompendiumEditorHeaderRowProps) {
   const gridCols = afterName
@@ -103,6 +106,7 @@ export function CompendiumEditorHeaderRow({
         value={cardImageUrl}
         onChange={onCardImageUrlChange}
         imageAspect={cardImageAspect}
+        imageCrop={cardImageCrop}
       />
     ) : null}
     </div>

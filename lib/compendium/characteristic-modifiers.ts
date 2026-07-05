@@ -242,6 +242,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     label: "Alternate Ability for Skill Checks",
     hint: "Let certain skill checks use a different ability (e.g. Primal Knowledge: STR while raging)",
   },
+  {
+    value: "custom_skill",
+    label: "Custom Skill",
+    hint: "Named skill with chosen ability and optional expertise (not in the SRD list)",
+  },
 ] as const
 
 export type CharacteristicModifierType =
@@ -339,6 +344,20 @@ export interface SkillCheckAlternateAbilityCharacteristic extends Characteristic
   conditionLabel?: string
 }
 
+export interface CustomSkillCharacteristic extends CharacteristicModifierBase {
+  type: "custom_skill"
+  /** Display name for the custom skill (shown on the sheet and in check modifiers). */
+  name: string
+  ability: AbilityScoreKey
+  expertise?: boolean
+}
+
+export type CustomSkillDefinition = {
+  name: string
+  ability: AbilityScoreKey
+  expertise: boolean
+}
+
 export interface ListCharacteristic extends CharacteristicModifierBase {
   type: ListCharacteristicType
   values: string[]
@@ -351,8 +370,13 @@ export interface ListCharacteristic extends CharacteristicModifierBase {
    */
   choicePool?: "standard" | "standard_and_rare" | null
   /**
+   * For `tool_proficiencies` choices, which SRD tool group the player picks from.
+   * When empty, all standard proficiency tools are offered. `choiceOptions` overrides this.
+   */
+  toolChoicePool?: "all" | "artisans" | "musical" | "gaming" | "other" | "vehicle" | null
+  /**
    * For `tool_proficiencies` choices, the explicit pool the player picks from
-   * (e.g. specific musical instruments). When empty, all SRD tools are offered.
+   * (e.g. specific musical instruments). When empty, `toolChoicePool` or all SRD tools are offered.
    */
   choiceOptions?: string[] | null
   /** When true, listed tools (or all class-granted tools when values empty) grant expertise. */
@@ -411,6 +435,8 @@ export interface VisionCharacteristic extends CharacteristicModifierBase {
   type: "vision"
   visionType: (typeof VISION_TYPES)[number]["value"]
   rangeFeet: number
+  /** Level-scaled vision range (fixed = range in feet). */
+  rangeFeetByLevel?: BonusByLevelEntry[]
   customType?: string
 }
 
@@ -943,6 +969,7 @@ export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
   | SkillCheckAlternateAbilityCharacteristic
+  | CustomSkillCharacteristic
   | ListCharacteristic
   | WeaponProficienciesCharacteristic
   | AcCharacteristic
@@ -1003,6 +1030,8 @@ export function createCharacteristicModifier(
       return { id, type, entries: [] }
     case "skill_check_alternate_ability":
       return { id, type, ability: "strength", skills: [] }
+    case "custom_skill":
+      return { id, type, name: "", ability: "intelligence", expertise: false }
     case "languages":
     case "armor_proficiencies":
     case "tool_proficiencies":
@@ -1583,6 +1612,29 @@ export function getSkillEntries(mod: SkillsCharacteristic): SkillEntry[] {
   return []
 }
 
+export function collectCustomSkillNames(
+  mods: CharacteristicModifier[] | null | undefined,
+): string[] {
+  if (!mods?.length) return []
+  const names: string[] = []
+  for (const mod of mods) {
+    if (mod.type !== "custom_skill") continue
+    const name = mod.name?.trim()
+    if (name) pushUnique(names, [name])
+  }
+  return names
+}
+
+export function skillNamesForCheckModifiers(extraSkillNames: string[] = []): string[] {
+  const srd = new Set<string>(SKILL_NAMES as readonly string[])
+  const out: string[] = [...SKILL_NAMES]
+  for (const raw of extraSkillNames) {
+    const name = raw.trim()
+    if (name && !srd.has(name)) out.push(name)
+  }
+  return out
+}
+
 export function getWeaponProficiencyValues(mod: WeaponProficienciesCharacteristic): string[] {
   if (mod.mode === "martial_weapons") return [MARTIAL_WEAPONS_LABEL]
   return mod.values ?? []
@@ -1600,6 +1652,7 @@ export type AggregatedCharacteristics = {
   abilityBonuses: Partial<Record<AbilityScoreKey, number>>
   skills: string[]
   skillExpertise: string[]
+  customSkills: CustomSkillDefinition[]
   languages: string[]
   armorProficiencies: string[]
   weaponProficiencies: string[]
@@ -1685,6 +1738,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   abilityBonuses: {},
   skills: [],
   skillExpertise: [],
+  customSkills: [],
   languages: [],
   armorProficiencies: [],
   weaponProficiencies: [],
@@ -1871,6 +1925,18 @@ export function aggregateCharacteristics(
           }
         }
         break
+      case "custom_skill": {
+        const name = mod.name?.trim()
+        if (!name) break
+        result.customSkills.push({
+          name,
+          ability: mod.ability ?? "intelligence",
+          expertise: mod.expertise ?? false,
+        })
+        pushUnique(result.skills, [name])
+        if (mod.expertise) pushUnique(result.skillExpertise, [name])
+        break
+      }
       case "languages":
       case "armor_proficiencies":
         pushUnique(
@@ -1939,12 +2005,20 @@ export function aggregateCharacteristics(
           result.initiativeAbilityBonus = mod.bonus ?? 0
         }
         break
-      case "vision":
+      case "vision": {
+        const rangeFeet = mod.rangeFeetByLevel?.length
+          ? resolveFixedValueAtLevel(
+              normalizeBonusByLevel(mod.rangeFeetByLevel),
+              characterLevel,
+              mod.rangeFeet,
+            ) ?? mod.rangeFeet
+          : mod.rangeFeet
         result.vision.push({
           type: mod.visionType === "custom" ? mod.customType || "Custom" : mod.visionType,
-          rangeFeet: mod.rangeFeet,
+          rangeFeet,
         })
         break
+      }
       case "speed": {
         const key =
           mod.speedType === "custom" ? mod.customType?.toLowerCase() || "custom" : mod.speedType

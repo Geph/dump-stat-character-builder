@@ -14,10 +14,12 @@ import {
 } from "@/lib/compendium/class-feature-metadata"
 import { DAMAGE_TYPES } from "@/lib/compendium/damage-types"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
-import { ABILITY_MODIFIER_KEYS } from "@/lib/compendium/characteristic-modifiers"
+import {
+  ABILITY_MODIFIER_KEYS,
+  skillNamesForCheckModifiers,
+} from "@/lib/compendium/characteristic-modifiers"
 import { normalizeFeatureEffects } from "@/lib/compendium/normalize-feature-activation"
 import { defaultRollBonusConfig, rollBonusFromLegacy } from "@/lib/compendium/roll-bonus-config"
-import { DND_SKILLS } from "@/lib/compendium/constants"
 import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
 import { RollBonusEditor } from "@/components/compendium/roll-bonus-editor"
 import {
@@ -37,6 +39,8 @@ type FeatureEffectListProps = {
   classResources: ClassResource[]
   onChange: (activation: FeatureActivation) => void
   otherAbilities?: { id: string; name: string }[]
+  /** Custom skill names from linked modifiers on the same source (for checkSkills pickers). */
+  extraSkillNames?: string[]
   /** Catalog admin: preview styling distinct from live feature editors. */
   templatePreview?: boolean
 }
@@ -46,9 +50,11 @@ export function FeatureEffectList({
   classResources,
   onChange,
   otherAbilities = [],
+  extraSkillNames = [],
   templatePreview = false,
 }: FeatureEffectListProps) {
   const effects = normalizeFeatureEffects(activation)
+  const skillCheckOptions = skillNamesForCheckModifiers(extraSkillNames)
 
   const setEffects = (next: FeatureEffect[]) => {
     const { effect: _legacy, ...rest } = activation
@@ -196,6 +202,7 @@ export function FeatureEffectList({
           effect={effect}
           classResources={classResources}
           otherAbilities={otherAbilities}
+          skillCheckOptions={skillCheckOptions}
           onKindChange={(kind) => changeKind(effect.id, kind)}
           onChange={(patch) => updateEffect(effect.id, patch)}
           onRemove={() => removeEffect(effect.id)}
@@ -211,6 +218,7 @@ function EffectRow({
   effect,
   classResources,
   otherAbilities,
+  skillCheckOptions,
   onKindChange,
   onChange,
   onRemove,
@@ -220,6 +228,7 @@ function EffectRow({
   effect: FeatureEffect
   classResources: ClassResource[]
   otherAbilities: { id: string; name: string }[]
+  skillCheckOptions: string[]
   onKindChange: (kind: string) => void
   onChange: (patch: Partial<FeatureEffect>) => void
   onRemove: () => void
@@ -461,6 +470,7 @@ function EffectRow({
           effect={effect}
           onChange={onChange}
           classResources={classResources}
+          skillCheckOptions={skillCheckOptions}
         />
       )}
 
@@ -546,7 +556,7 @@ function EffectRow({
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Skills</label>
           <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-            {DND_SKILLS.map((skill) => {
+            {skillCheckOptions.map((skill) => {
               const selected = effect.checkSkills?.includes(skill) ?? false
               return (
                 <label
@@ -1595,10 +1605,12 @@ function CheckRollModifierEditor({
   effect,
   onChange,
   classResources,
+  skillCheckOptions,
 }: {
   effect: FeatureEffect
   onChange: (patch: Partial<FeatureEffect>) => void
   classResources: ClassResource[]
+  skillCheckOptions: string[]
 }) {
   const rollMode = resolveCheckRollMode(effect)
 
@@ -1716,7 +1728,7 @@ function CheckRollModifierEditor({
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Skills</label>
           <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-            {DND_SKILLS.map((skill) => {
+            {skillCheckOptions.map((skill) => {
               const selected = effect.checkSkills?.includes(skill) ?? false
               return (
                 <label

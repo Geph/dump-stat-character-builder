@@ -83,6 +83,33 @@ function stripConservativeBoilerplate(text: string): {
   return { text: next, removedChars: Math.max(0, before - next.length) }
 }
 
+/** Strip running heads, page furniture, nav ribbons, and personality d6 tables from background PDF text. */
+export function stripBackgroundPdfBoilerplate(text: string): {
+  text: string
+  removedChars: number
+} {
+  let next = text
+  const before = next.length
+
+  next = next.replace(/Chapter\s+\d+\s*\|\s*[^\n]+/gi, "")
+  next = next.replace(/^\s*\d{2,4}\s*$/gm, "")
+  next = next.replace(
+    /Feats\s*\|\s*Spells\s*\|\s*Races\s*\|\s*Monsters\s*\|\s*NPCs\s*\|\s*Crafting/gi,
+    "",
+  )
+  next = next.replace(
+    /(?:^|\n)\s*(?:\*\*)?(?:d6|D6)\s+(Ideals|Bonds|Flaws|Personality Trait)(?:\*\*)?\s*\n[\s\S]*?(?=\n(?:\*\*)?[A-Z][^\n]{2,40}(?:\*\*)?(?:\n|:)|$)/gi,
+    "\n",
+  )
+
+  return { text: next.trim(), removedChars: Math.max(0, before - next.length) }
+}
+
+function shouldRunBackgroundPreprocess(contentTypeHint: string | null | undefined): boolean {
+  if (!contentTypeHint || contentTypeHint === "all") return true
+  return contentTypeHint === "backgrounds"
+}
+
 function buildClassResourcesFromTable(
   className: string,
   tableText: string,
@@ -146,6 +173,7 @@ export function preprocessImportText(
   const className = detectClassNameFromImportText(working)
   const runClassTables = shouldRunClassTablePreprocess(options?.contentTypeHint)
   const runSpellLists = shouldRunSpellListPreprocess(options?.contentTypeHint)
+  const runBackgroundStrip = shouldRunBackgroundPreprocess(options?.contentTypeHint)
 
   const boilerplate = stripConservativeBoilerplate(working)
   if (boilerplate.removedChars > 0) {
@@ -155,6 +183,18 @@ export function preprocessImportText(
       label: "Repeated headers / excess whitespace",
       charCount: boilerplate.removedChars,
     })
+  }
+
+  if (runBackgroundStrip) {
+    const backgroundNoise = stripBackgroundPdfBoilerplate(working)
+    if (backgroundNoise.removedChars > 0) {
+      working = backgroundNoise.text
+      subtractedRegions.push({
+        kind: "boilerplate",
+        label: "Background PDF running heads / personality tables",
+        charCount: backgroundNoise.removedChars,
+      })
+    }
   }
 
   if (runClassTables) {

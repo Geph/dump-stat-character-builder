@@ -40,7 +40,7 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
   backgrounds:
-    "Focus on backgrounds[] with skill_proficiencies, feat_granted, ability_bonuses, and feature.",
+    "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment, starting_gold, feat_granted, ability_bonuses, and feature. Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
   spells: "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description.",
   spell_lists:
     "Focus on class spell list tables (Spell / School / Special columns). Populate classes[] with spell_list (all spell names) and spells[] with level, school, concentration, components (M when Special includes M), and classes set to the list's class name.",
@@ -166,6 +166,21 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         feat_granted: "Savage Attacker",
         ability_bonuses: { strength: 0, constitution: 0 },
         feature: { name: "Military Rank", description: "You have a rank from your service." },
+      },
+      {
+        name: "Tinker",
+        description: "You build and repair contraptions.",
+        skill_proficiencies: ["Investigation", "Persuasion"],
+        tool_proficiencies: ["Tinker's tools"],
+        feat_granted: null,
+        ability_bonuses: null,
+        proficiencies: { languages: ["One language of your choice"] },
+        starting_gold: 10,
+        starting_equipment: [
+          { name: "Tinker's tools", quantity: 1 },
+          { name: "Pack horse", quantity: 1 },
+        ],
+        feature: { name: "Tinker", description: "You can repair devices." },
       },
     ],
   },

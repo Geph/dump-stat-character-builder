@@ -17,6 +17,7 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { DurationEditor } from "@/components/compendium/duration-editor"
 import type { FeatureDurationKey } from "@/lib/types"
 

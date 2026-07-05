@@ -1,0 +1,307 @@
+[
+  {
+    "name": "Alchemist's Supplies",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Bagpipes",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Brewer's Supplies",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Calligrapher's Supplies",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Carpenter's Tools",
+    "tool_group": "artisans",
+    "check_ability": "strength",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Cartographer's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Cobbler's Tools",
+    "tool_group": "artisans",
+    "check_ability": "strength",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Cook's Utensils",
+    "tool_group": "artisans",
+    "check_ability": "strength",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Dice Set",
+    "tool_group": "gaming",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Gaming Set"
+  },
+  {
+    "name": "Disguise Kit",
+    "tool_group": "other",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Dragonchess Set",
+    "tool_group": "gaming",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Gaming Set"
+  },
+  {
+    "name": "Drum",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Dulcimer",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Flute",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Forgery Kit",
+    "tool_group": "other",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Gaming Set",
+    "tool_group": "gaming",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Gaming Set",
+    "expands_to": [
+      "Dice Set",
+      "Dragonchess Set",
+      "Playing Card Set",
+      "Three-Dragon Ante Set"
+    ]
+  },
+  {
+    "name": "Glassblower's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Herbalism Kit",
+    "tool_group": "other",
+    "check_ability": "wisdom",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Horn",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Jeweler's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Leatherworker's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Lute",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Lyre",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Mason's Tools",
+    "tool_group": "artisans",
+    "check_ability": "strength",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Musical Instrument",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument",
+    "expands_to": [
+      "Bagpipes",
+      "Drum",
+      "Dulcimer",
+      "Flute",
+      "Horn",
+      "Lute",
+      "Lyre",
+      "Pan Flute",
+      "Shawm",
+      "Viol"
+    ]
+  },
+  {
+    "name": "Navigator's Tools",
+    "tool_group": "other",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Painter's Supplies",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Pan Flute",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Playing Card Set",
+    "tool_group": "gaming",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Gaming Set"
+  },
+  {
+    "name": "Poisoner's Kit",
+    "tool_group": "other",
+    "check_ability": "wisdom",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Potter's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Shawm",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Smith's Tools",
+    "tool_group": "artisans",
+    "check_ability": "strength",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Thieves' Tools",
+    "tool_group": "other",
+    "check_ability": "dexterity",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Other Tools"
+  },
+  {
+    "name": "Three-Dragon Ante Set",
+    "tool_group": "gaming",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Gaming Set"
+  },
+  {
+    "name": "Tinker's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Vehicles (Land)",
+    "tool_group": "vehicle",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Vehicle"
+  },
+  {
+    "name": "Vehicles (Water)",
+    "tool_group": "vehicle",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Vehicle"
+  },
+  {
+    "name": "Viol",
+    "tool_group": "musical",
+    "check_ability": "charisma",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Musical Instrument"
+  },
+  {
+    "name": "Weaver's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  },
+  {
+    "name": "Woodcarver's Tools",
+    "tool_group": "artisans",
+    "check_ability": "intelligence",
+    "source": "D&D 5.5e SRD",
+    "subcategory": "Artisan's Tools"
+  }
+]

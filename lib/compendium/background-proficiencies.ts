@@ -35,7 +35,11 @@ export function normalizeBackgroundProficiencies(
 ): BackgroundProficiencies {
   if (proficiencies && typeof proficiencies === "object") {
     return {
-      tools: mergeProficiencyLists(proficiencies.tools, proficiencies.vehicles),
+      tools: mergeProficiencyLists(
+        proficiencies.tools,
+        proficiencies.vehicles,
+        legacyToolProficiencies,
+      ),
       vehicles: [],
       weapons: [...(proficiencies.weapons ?? [])],
       armor: [...(proficiencies.armor ?? [])],

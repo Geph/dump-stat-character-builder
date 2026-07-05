@@ -1,3 +1,9 @@
+import { resolveAllSpeeds } from "@/lib/character/resolve-all-speeds"
+import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
+import {
+  inferClassSkillPicks,
+  inferSpellPicksByClassId,
+} from "@/lib/builder/infer-builder-picks"
 import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
 import { aggregateBackgroundAbilityBonuses } from "@/lib/builder/background-asi"
 import { mergeSkillProficiencies } from "@/lib/builder/choices"
@@ -157,15 +163,21 @@ function buildSkillBonuses(
   abilityMods: Record<AbilityScoreKey, number>,
   skillProficiencies: string[],
   skillExpertise: string[],
+  customSkills: import("@/lib/compendium/characteristic-modifiers").CustomSkillDefinition[],
   featureBonusContext?: {
     features: import("@/lib/types").Feature[]
     limitationCtx: import("@/lib/compendium/modifier-limitations").LimitationEvaluationContext
     characterLevel: number
   },
 ): SkillBonus[] {
-  return SKILL_ROWS.map(({ name, ability }) => {
-    const proficient = skillProficiencies.includes(name)
-    const expertise = skillExpertise.includes(name)
+  const srdSkillNames = new Set(SKILL_ROWS.map((row) => row.name))
+
+  const buildOne = (
+    name: string,
+    ability: AbilityScoreKey,
+    proficient: boolean,
+    expertise: boolean,
+  ): SkillBonus => {
     let bonus =
       abilityMods[ability] +
       (proficient ? proficiencyBonus * (expertise ? 2 : 1) : 0)
@@ -184,7 +196,19 @@ function buildSkillBonuses(
       bonus += total
     }
     return { name, ability, proficient, expertise, bonus }
+  }
+
+  const srd = SKILL_ROWS.map(({ name, ability }) => {
+    const proficient = skillProficiencies.includes(name)
+    const expertise = skillExpertise.includes(name)
+    return buildOne(name, ability, proficient, expertise)
   })
+
+  const custom = customSkills
+    .filter((entry) => entry.name.trim() && !srdSkillNames.has(entry.name.trim()))
+    .map((entry) => buildOne(entry.name.trim(), entry.ability, true, entry.expertise))
+
+  return [...srd, ...custom]
 }
 
 function toolCheckAbility(toolName: string): AbilityScoreKey {
@@ -494,10 +518,19 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   })
 
   let speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
+  const walkBeforeExhaustion = speed
   if (exhaustionFx.speedMultiplier < 1) {
     speed = Math.floor(speed * exhaustionFx.speedMultiplier)
   }
   if (exhaustionFx.speedZero) speed = 0
+
+  const speeds = resolveAllSpeeds({
+    walkSpeed: walkBeforeExhaustion,
+    aggregatedSpeed: aggregatedCharacteristics.speed,
+    speedEqualToWalk: aggregatedCharacteristics.speedEqualToWalk,
+    exhaustionMultiplier: exhaustionFx.speedMultiplier,
+    exhaustionZero: exhaustionFx.speedZero,
+  })
 
   const initiative = computeInitiative(
     abilityMods.dexterity,
@@ -583,6 +616,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     maxHp,
     initiative,
     speed,
+    speeds,
     passivePerception,
     skillProficiencies,
     skillExpertise,
@@ -596,6 +630,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       abilityMods,
       skillProficiencies,
       skillExpertise,
+      aggregatedCharacteristics.customSkills,
       resolvedFeatures.length
         ? {
             features: resolvedFeatures,
@@ -695,6 +730,8 @@ export function buildInputsFromSavedCharacter(params: {
     feat_choice_picks?: Record<string, string[]> | null
     feature_choice_picks?: Record<string, string[]> | null
     modifier_player_picks?: Record<string, string[]> | null
+    builder_picks?: import("@/lib/builder/builder-picks").CharacterBuilderPicks | null
+    spell_ids?: string[]
     equipped_armor_id?: string | null
     equipped_shield_id?: string | null
     equipped_weapon_id?: string | null
@@ -717,6 +754,7 @@ export function buildInputsFromSavedCharacter(params: {
   const classLevels = rowsToClassLevels(classRows)
   const subclassByClassId = rowsToSubclassMap(classRows)
   const primaryClassId = resolvePrimaryClassIdFromRows(classRows, character.class_id)
+  const builderPicks = normalizeBuilderPicks(character.builder_picks)
 
   return {
     baseAbilityScores: {
@@ -736,10 +774,12 @@ export function buildInputsFromSavedCharacter(params: {
     subclassByClassId,
     primaryClassId,
     classAddOrder: character.class_add_order ?? rowsToClassAddOrder(classRows),
-    classSkillPicks: {},
-    classToolPicks: {},
+    classSkillPicks:
+      builderPicks.class_skill_picks ??
+      inferClassSkillPicks(character as import("@/lib/types").Character, classes, params.background),
+    classToolPicks: builderPicks.class_tool_picks ?? {},
     featureChoicePicks: character.feature_choice_picks ?? {},
-    speciesTraitPicks: {},
+    speciesTraitPicks: builderPicks.species_trait_picks ?? {},
     featChoicePicks: character.feat_choice_picks ?? {},
     modifierPlayerPicks: character.modifier_player_picks ?? {},
     selectedFeatIds: character.feat_ids ?? [],

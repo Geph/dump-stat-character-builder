@@ -8,17 +8,22 @@ import {
   aggregateCharacteristics,
   applyHpCharacteristics,
   computeInitiative,
+  type SpeedCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import { collectEquipmentMagicCharacteristics } from "@/lib/compendium/equipment-magic-modifiers"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
 import {
   ContributionRecorder,
   type DerivedStatBreakdowns,
   type StatContribution,
+  type StatContributionSource,
 } from "@/lib/character/stat-contributions"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { readModifierSource } from "@/lib/character/tag-modifier-source"
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 
 function recordAggregatedModifierContributions(
   mods: ReturnType<typeof collectBuilderModifierRefIds>,
@@ -52,6 +57,164 @@ function recordAggregatedModifierContributions(
         break
       default:
         break
+    }
+  }
+}
+
+function speciesBaseWalkSpeed(inputs: CharacterBuildInputs): number {
+  const species = inputs.species
+  if (typeof species?.speed === "number") return species.speed
+  if (typeof species?.speed === "object" && species?.speed) {
+    return (species.speed as { walking?: number }).walking ?? 30
+  }
+  return 30
+}
+
+function speedModKey(mod: SpeedCharacteristic): string {
+  return mod.speedType === "custom" ? mod.customType?.toLowerCase() || "custom" : mod.speedType
+}
+
+function speedTypeLabel(type: string): string {
+  if (type === "walk") return "Walk"
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+function speedModsForType(mods: CharacteristicModifier[], type: string): SpeedCharacteristic[] {
+  return mods.filter((mod): mod is SpeedCharacteristic => {
+    if (mod.type !== "speed") return false
+    return speedModKey(mod) === type
+  })
+}
+
+function activeSpeedMods(
+  mods: CharacteristicModifier[],
+  ctx: Parameters<typeof modifierLimitationsMet>[1],
+): SpeedCharacteristic[] {
+  return mods.filter(
+    (mod): mod is SpeedCharacteristic =>
+      mod.type === "speed" && modifierLimitationsMet(mod, ctx),
+  )
+}
+
+function recordSpeedBreakdown(
+  inputs: CharacterBuildInputs,
+  derived: ReturnType<typeof computeDerivedCharacter>,
+  allMods: CharacteristicModifier[],
+  aggregated: ReturnType<typeof aggregateCharacteristics>,
+  recorder: ContributionRecorder,
+): void {
+  const limitationCtx = {
+    activeConditions: inputs.activeConditions,
+    activeSheetToggles: inputs.activeSheetToggles,
+    equippedArmor: inputs.equippedArmorId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedArmorId) ?? null
+      : null,
+    equippedShield: inputs.equippedShieldId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedShieldId) ?? null
+      : null,
+  }
+  const speedMods = activeSpeedMods(allMods, limitationCtx)
+  const baseWalk = speciesBaseWalkSpeed(inputs)
+  const speciesName = inputs.species?.name ?? "Species"
+  const speedEntries =
+    derived.speeds?.length ? derived.speeds : [{ type: "walk", label: "walk", feet: derived.speed }]
+  const exhaustionFx = getExhaustionDerivedEffects(inputs.exhaustionLevel ?? 0)
+
+  for (const entry of speedEntries) {
+    const relatedMods = speedModsForType(speedMods, entry.type)
+    const defaultSource: StatContributionSource = {
+      sourceType: entry.type === "walk" ? "base" : "feature",
+      source: entry.label,
+      label: `${speedTypeLabel(entry.type)} speed`,
+    }
+
+    if (entry.type === "walk") {
+      const walkMods = relatedMods.filter((mod) => mod.mode !== "equal_to_walk")
+      if (walkMods.length === 0 && aggregated.speed.walk == null) {
+        recorder.addSimple(
+          "speed",
+          {
+            sourceType: "species",
+            source: speciesName,
+            label: `${speciesName} walk speed`,
+            sourceId: inputs.species?.id,
+          },
+          entry.feet,
+        )
+        continue
+      }
+
+      recorder.addSimple(
+        "speed",
+        {
+          sourceType: "species",
+          source: speciesName,
+          label: `${speciesName} base walk speed`,
+          sourceId: inputs.species?.id,
+        },
+        baseWalk,
+      )
+
+      for (const mod of walkMods) {
+        const source = readModifierSource(mod) ?? {
+          sourceType: "feature" as const,
+          source: mod.label ?? "Feature",
+          label: mod.label ?? "Feature",
+        }
+        const value =
+          mod.valueByLevel?.length
+            ? resolveFixedValueAtLevel(mod.valueByLevel, derived.totalLevel, mod.value) ??
+              mod.value
+            : mod.value
+        recorder.addSimple(
+          "speed",
+          {
+            ...source,
+            label: `${source.label} (${mod.mode === "set" ? "set walk" : "walk bonus"})`,
+          },
+          mod.mode === "set" ? value - baseWalk : value,
+        )
+      }
+      continue
+    }
+
+    if (relatedMods.length === 0) {
+      recorder.addSimple("speed", defaultSource, entry.feet)
+      continue
+    }
+
+    for (const mod of relatedMods) {
+      const source = readModifierSource(mod) ?? defaultSource
+      const modValue =
+        mod.valueByLevel?.length
+          ? resolveFixedValueAtLevel(mod.valueByLevel, derived.totalLevel, mod.value) ??
+            mod.value
+          : mod.value
+      const amount = mod.mode === "equal_to_walk" ? entry.feet : modValue
+      const label =
+        mod.mode === "equal_to_walk"
+          ? `${source.label} (equals walk)`
+          : `${source.label} (${speedTypeLabel(entry.type)})`
+      recorder.addSimple("speed", { ...source, label }, amount)
+    }
+  }
+
+  if (exhaustionFx.speedZero || exhaustionFx.speedMultiplier < 1) {
+    const walkEntry = speedEntries.find((entry) => entry.type === "walk")
+    if (walkEntry) {
+      const beforeExhaustion =
+        exhaustionFx.speedZero
+          ? walkEntry.feet
+          : Math.round(walkEntry.feet / exhaustionFx.speedMultiplier)
+      recorder.addSimple(
+        "speed",
+        {
+          sourceType: "base",
+          source: "Exhaustion",
+          label: `Exhaustion ${inputs.exhaustionLevel ?? 0}`,
+        },
+        walkEntry.feet - beforeExhaustion,
+      )
     }
   }
 }
@@ -191,15 +354,7 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     )
   }
 
-  recorder.addSimple(
-    "speed",
-    {
-      sourceType: "base",
-      source: "Base speed",
-      label: "Walking speed",
-    },
-    derived.speed,
-  )
+  recordSpeedBreakdown(inputs, derived, allMods, aggregated, recorder)
 
   for (const skill of derived.skills) {
     const key = `skill:${skill.name}` as const

@@ -8,6 +8,7 @@ export type CompendiumContentType =
   | "equipment"
   | "magic_items"
   | "languages"
+  | "tools"
   | "class_resources"
   | "abilities"
 
@@ -21,6 +22,7 @@ const CONTENT_TYPES: CompendiumContentType[] = [
   "equipment",
   "magic_items",
   "languages",
+  "tools",
   "class_resources",
   "abilities",
 ]
@@ -52,6 +54,7 @@ export const COMPENDIUM_DEFAULT_ICONS: Record<CompendiumContentType, string> = {
   equipment: "battle-gear",
   magic_items: "sparkles",
   languages: "conversation",
+  tools: "toolbox",
   class_resources: "energy-arrow",
   abilities: "magic-trident",
 }

@@ -73,9 +73,9 @@ export function createLinkedModifierFromCatalog(entry: ModifierCatalogEntry): Li
 
 export function linkedModifiersFromRefs(
   refIds: string[] | undefined | null,
-  catalog: ModifierCatalogEntry[],
+  catalog: ModifierCatalogEntry[] | undefined | null,
 ): LinkedModifierInstance[] {
-  if (!refIds?.length) return []
+  if (!refIds?.length || !catalog?.length) return []
   return refIds
     .map((refId) => {
       const entry = catalogEntryById(catalog, refId)
@@ -87,7 +87,7 @@ export function linkedModifiersFromRefs(
 
 export function normalizeLinkedModifiers(
   raw: unknown,
-  catalog: ModifierCatalogEntry[],
+  catalog: ModifierCatalogEntry[] | undefined | null,
   legacyRefs?: string[] | null,
 ): LinkedModifierInstance[] {
   if (Array.isArray(raw) && raw.length) {
@@ -193,7 +193,7 @@ export function effectiveLinkedModifiers(
 
 export function readLinkedModifiers(
   row: Record<string, unknown> | null | undefined,
-  catalog: ModifierCatalogEntry[],
+  catalog?: ModifierCatalogEntry[] | null,
 ): LinkedModifierInstance[] {
   if (!row) return []
   const raw = row.linkedModifiers ?? row.linked_modifiers

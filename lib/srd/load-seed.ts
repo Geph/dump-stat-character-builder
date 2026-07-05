@@ -4,6 +4,7 @@ import equipment from "./seed-data/equipment.json"
 import magicItems from "./seed-data/magic-items.json"
 import feats from "./seed-data/feats.json"
 import languages from "./seed-data/languages.json"
+import tools from "./seed-data/tools.json"
 import manifest from "./seed-data/manifest.json"
 import species from "./seed-data/species.json"
 import spells from "./seed-data/spells.json"
@@ -26,6 +27,7 @@ export function getSrdSeedData() {
     equipment: equipment as Record<string, unknown>[],
     magicItems: magicItems as Record<string, unknown>[],
     languages: languages as Record<string, unknown>[],
+    tools: tools as Record<string, unknown>[],
   }
 }
 
@@ -44,6 +46,7 @@ export function getSrdSeedTotals() {
     data.equipment.length +
     data.magicItems.length +
     data.languages.length +
+    data.tools.length +
     classResourceCount
 
   return {
@@ -58,6 +61,7 @@ export function getSrdSeedTotals() {
       equipment: data.equipment.length + data.magicItems.length,
       magic_items: data.magicItems.length,
       languages: data.languages.length,
+      tools: data.tools.length,
       class_resources: classResourceCount,
     },
   }

@@ -55,7 +55,14 @@ import {
   formatBackgroundGrantedSpells,
   getBackgroundProficiencySections,
 } from "@/lib/compendium/background-display"
-import { magicInitiateListFromFeatGranted } from "@/lib/compendium/background-origin-feat"
+import {
+  getEffectiveBackgroundFeatGranted,
+  isLegacyBackground,
+  legacyBackgroundOriginFeatPickKey,
+  magicInitiateListFromFeatGranted,
+} from "@/lib/compendium/background-origin-feat"
+import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
+import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import {
   applyBackgroundProficienciesToDraft,
   getEffectiveArmorProficiencies,
@@ -69,7 +76,6 @@ import {
 } from "@/lib/compendium/combat-stats"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
-import { ProceedBlockerBanner } from "@/components/builder/proceed-blocker-banner"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
@@ -91,7 +97,13 @@ import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
+import {
+  buildWeaponMasteryDescriptionsLookup,
+  weaponMasteryCatalogEntriesFromAbilities,
+} from "@/lib/compendium/weapon-mastery"
+import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
+import { AbilityScoreCards } from "@/components/builder/ability-score-cards"
 import {
   classNeedsSubclass,
   featureChoiceKey,
@@ -103,6 +115,7 @@ import {
   validateOriginStepChoices,
   collectClassStepBlockers,
   collectOriginStepBlockers,
+  proficientSkillsInBuilder,
 } from "@/lib/builder/choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
@@ -115,6 +128,12 @@ import {
   type BuilderPreviewTab,
 } from "@/lib/builder/draft-storage"
 import { characterToBuilderState } from "@/lib/builder/character-to-draft"
+import { buildBuilderPicksFromSnapshot } from "@/lib/builder/builder-picks"
+import {
+  collectFeatPickSlotKeys,
+  collectMaxLevelFeatPickSlotKeys,
+} from "@/lib/builder/feat-pick-keys"
+import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import {
   computeStartingCharacterGold,
   findEquipmentByName,
@@ -218,7 +237,7 @@ import {
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
-import { usePickerPageSize } from "@/hooks/use-picker-page-size"
+import { usePickerPageSize, useSpellPickerPageSize } from "@/hooks/use-picker-page-size"
 import {
   MAX_PORTRAIT_FILE_BYTES,
   MAX_PORTRAIT_FILE_MB,
@@ -337,6 +356,7 @@ export default function BuilderPage() {
   const [goldPurchasedEquipmentIds, setGoldPurchasedEquipmentIds] = useState<string[]>([])
   const [cardViewMode, setCardViewMode] = useState<"dense" | "cinematic">("cinematic")
   const pickerPageSize = usePickerPageSize(cardViewMode)
+  const spellPickerPageSize = useSpellPickerPageSize()
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
@@ -374,6 +394,7 @@ export default function BuilderPage() {
   const [editingCharacterId, setEditingCharacterId] = useState<string | null>(null)
   const [editIdParam, setEditIdParam] = useState<string | null>(null)
   const editHydratedRef = useRef(false)
+  const [editHydrated, setEditHydrated] = useState(false)
 
   const activeClassLevels = Array.isArray(classLevels) ? classLevels : []
   const activeClassAddOrder = Array.isArray(classAddOrder) ? classAddOrder : []
@@ -577,9 +598,12 @@ export default function BuilderPage() {
   }, [cardViewMode, pickerPageSize])
 
   useEffect(() => {
+    setSpellLevelPages({})
+  }, [spellPickerPageSize])
+
+  useEffect(() => {
     if (editIdParam) {
       setCardViewMode(layoutToCardViewMode(getBuilderLayout()))
-      setDraftReady(true)
       return
     }
     const draft = loadBuilderDraft()
@@ -588,6 +612,7 @@ export default function BuilderPage() {
     } else {
       setCardViewMode(layoutToCardViewMode(getBuilderLayout()))
     }
+    setEditHydrated(true)
     setDraftReady(true)
   }, [editIdParam])
 
@@ -614,12 +639,19 @@ export default function BuilderPage() {
       const dndClass = classes.find((c) => c.id === saved.class_id)
       const background = backgrounds.find((b) => b.id === saved.background_id)
       applyBuilderSnapshot(
-        characterToBuilderState(saved, { dndClass, background }),
+        characterToBuilderState(saved, {
+          dndClass,
+          background,
+          allClasses: classes,
+          spells,
+        }),
       )
+      setEditHydrated(true)
+      setDraftReady(true)
     }
 
     void hydrateFromCharacter()
-  }, [loading, editIdParam, classes, backgrounds])
+  }, [loading, editIdParam, classes, backgrounds, spells])
 
   useEffect(() => {
     if (!draftReady) return
@@ -885,12 +917,24 @@ export default function BuilderPage() {
   const selectedClass = classes.find(c => c.id === character.class_id)
   const selectedSpecies = species.find(s => s.id === character.species_id)
   const selectedBackground = backgrounds.find(b => b.id === character.background_id)
+  const effectiveBackgroundFeatGranted = getEffectiveBackgroundFeatGranted(
+    selectedBackground,
+    featureChoicePicks,
+  )
   const backgroundGrantedFeat = findBackgroundGrantedFeat(
-    selectedBackground?.feat_granted,
+    effectiveBackgroundFeatGranted,
     feats,
   )
   const grantedFeatIds = backgroundGrantedFeat?.id ? [backgroundGrantedFeat.id] : []
   const backgroundAbilityGrant = getBackgroundAbilityGrant(selectedBackground)
+  const originFeats = useMemo(
+    () =>
+      feats
+        .filter((feat) => normalizeFeatCategory(feat.category) === "Origin")
+        .map((feat) => ({ id: feat.id, name: feat.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [feats],
+  )
   
   // Calculate total level from all class levels
   const totalLevel = activeClassLevels.length > 0 
@@ -921,6 +965,54 @@ export default function BuilderPage() {
     ],
     [featPickSlots, speciesFeatPickSlots, backgroundFeatPickSlots],
   )
+  const activeFeatPickSlotKeys = useMemo(
+    () =>
+      collectFeatPickSlotKeys({
+        classLevels: activeClassLevels,
+        classes,
+        catalog: modifierCatalog,
+        totalLevel,
+        subclasses,
+        subclassByClassId,
+        species: selectedSpecies,
+        speciesTraitPicks,
+        background: selectedBackground,
+      }),
+    [
+      activeClassLevels,
+      classes,
+      modifierCatalog,
+      totalLevel,
+      subclasses,
+      subclassByClassId,
+      selectedSpecies,
+      speciesTraitPicks,
+      selectedBackground,
+    ],
+  )
+  const maxLevelFeatPickSlotKeys = useMemo(
+    () =>
+      collectMaxLevelFeatPickSlotKeys({
+        classLevels: activeClassLevels,
+        classes,
+        catalog: modifierCatalog,
+        subclasses,
+        subclassByClassId,
+        species: selectedSpecies,
+        speciesTraitPicks,
+        background: selectedBackground,
+      }),
+    [
+      activeClassLevels,
+      classes,
+      modifierCatalog,
+      subclasses,
+      subclassByClassId,
+      selectedSpecies,
+      speciesTraitPicks,
+      selectedBackground,
+    ],
+  )
   const ownedFeatIds = useMemo(
     () =>
       buildOwnedFeatIds({
@@ -929,6 +1021,13 @@ export default function BuilderPage() {
         grantedFeatIds,
       }),
     [featureChoicePicks, allFeatPickSlotKeys, grantedFeatIds],
+  )
+  const weaponMasteryDescriptions = useMemo(
+    () =>
+      buildWeaponMasteryDescriptionsLookup(
+        weaponMasteryCatalogEntriesFromAbilities(customAbilities),
+      ),
+    [customAbilities],
   )
   const featSelectionEntries = useMemo(
     () =>
@@ -977,18 +1076,15 @@ export default function BuilderPage() {
     feats,
   })
 
-  // If level drops, clear feat picks that no longer apply.
+  // If level drops, clear feat picks that no longer apply (keep class feature choices).
   useEffect(() => {
-    const validKeys = new Set([
-      ...featPickSlots.map((slot) => slot.key),
-      ...speciesFeatPickSlots.map((slot) => slot.key),
-      ...backgroundFeatPickSlots.map((slot) => slot.key),
-    ])
+    if (!editHydrated) return
+    const validKeys = activeFeatPickSlotKeys
     setFeatureChoicePicks((prev) => {
       const next: Record<string, string[]> = {}
       let changed = false
       for (const [key, picks] of Object.entries(prev)) {
-        if (validKeys.has(key) || !key.includes(":")) {
+        if (validKeys.has(key) || !maxLevelFeatPickSlotKeys.has(key)) {
           next[key] = picks
         } else {
           changed = true
@@ -997,9 +1093,9 @@ export default function BuilderPage() {
       return changed ? next : prev
     })
   }, [
-    featPickSlots.map((slot) => slot.key).join("|"),
-    speciesFeatPickSlots.map((slot) => slot.key).join("|"),
-    backgroundFeatPickSlots.map((slot) => slot.key).join("|"),
+    editHydrated,
+    [...activeFeatPickSlotKeys].sort().join("|"),
+    [...maxLevelFeatPickSlotKeys].sort().join("|"),
   ])
 
   useEffect(() => {
@@ -1051,6 +1147,7 @@ export default function BuilderPage() {
   )
 
   useEffect(() => {
+    if (!editHydrated) return
     const validKeys = new Set(modifierPlayerChoiceSlots.map((slot) => slot.slotKey))
     setModifierPlayerPicks((prev) => {
       const next: Record<string, string[]> = {}
@@ -1064,10 +1161,10 @@ export default function BuilderPage() {
       }
       return changed ? next : prev
     })
-  }, [modifierPlayerChoiceSlots.map((slot) => slot.slotKey).join("|")])
+  }, [editHydrated, modifierPlayerChoiceSlots.map((slot) => slot.slotKey).join("|")])
 
   useEffect(() => {
-    const spellList = magicInitiateListFromFeatGranted(selectedBackground?.feat_granted)
+    const spellList = magicInitiateListFromFeatGranted(effectiveBackgroundFeatGranted)
     if (!spellList || !backgroundGrantedFeat?.id) return
 
     const sourceKey = grantedFeatChoicePickKey(backgroundGrantedFeat.id)
@@ -1081,7 +1178,7 @@ export default function BuilderPage() {
       return { ...prev, [listSlot.slotKey]: [spellList] }
     })
   }, [
-    selectedBackground?.feat_granted,
+    effectiveBackgroundFeatGranted,
     backgroundGrantedFeat?.id,
     modifierPlayerChoiceSlots,
   ])
@@ -1271,6 +1368,13 @@ export default function BuilderPage() {
 
   useEffect(() => {
     if (!draftReady) return
+    const preserveLoadedEquipment =
+      editingCharacterId != null &&
+      startingEquipmentOptionIndex == null &&
+      backgroundStartingEquipmentOptionIndex == null &&
+      !inGoldShoppingMode
+    if (preserveLoadedEquipment) return
+
     const merged = [
       ...new Set([
         ...packageEquipmentIds,
@@ -1286,7 +1390,15 @@ export default function BuilderPage() {
       }
       return { ...prev, equipment_ids: merged }
     })
-  }, [draftReady, packageEquipmentIds, goldPurchasedEquipmentIds, inGoldShoppingMode])
+  }, [
+    draftReady,
+    editingCharacterId,
+    startingEquipmentOptionIndex,
+    backgroundStartingEquipmentOptionIndex,
+    packageEquipmentIds,
+    goldPurchasedEquipmentIds,
+    inGoldShoppingMode,
+  ])
 
   useEffect(() => {
     if (!draftReady) return
@@ -1341,6 +1453,8 @@ export default function BuilderPage() {
       ? "grid grid-cols-1 lg:grid-cols-2 gap-4 px-1 py-2"
       : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
 
+  const compactPickerLayout = cardViewMode === "dense" ? "compact" : "default"
+
   const skillPickSources = buildSkillPickSources({
     backgroundSkills: selectedBackground?.skill_proficiencies,
     classSkillPicks,
@@ -1377,6 +1491,23 @@ export default function BuilderPage() {
     }),
   ]
   const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
+  const modifierExpertisePickerProps = {
+    proficientSkills: proficientSkillsInBuilder({
+      backgroundSkills: selectedBackground?.skill_proficiencies,
+      classSkillPicks,
+      featureChoicePicks,
+      speciesTraitPicks,
+      modifierGrantedSkills: aggregatedCharacteristics.skills,
+    }),
+    proficientTools: [
+      ...new Set([
+        ...aggregatedCharacteristics.toolProficiencies,
+        ...Object.values(classToolPicks).flat(),
+      ]),
+    ],
+    existingExpertiseSkills: aggregatedCharacteristics.skillExpertise,
+    choiceLayout: compactPickerLayout,
+  }
   const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
   const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
     activeClassLevels.map((cl) => ({
@@ -1491,6 +1622,10 @@ export default function BuilderPage() {
   const effectiveSkillProficiencies = characterDerived.skillProficiencies
   const effectiveSkillExpertise = characterDerived.skillExpertise
   const effectiveToolProficiencies = characterDerived.toolProficiencies
+  const partitionedToolProficiencies = useMemo(
+    () => partitionToolProficiencies(effectiveToolProficiencies),
+    [effectiveToolProficiencies],
+  )
   const effectiveWeaponProficiencies = characterDerived.weaponProficiencies
   const effectiveArmorProficiencies = characterDerived.armorProficiencies
   const savingThrowProficiencies = characterDerived.savingThrowProficiencies
@@ -1652,6 +1787,15 @@ export default function BuilderPage() {
         feat_choice_picks: featChoicePicks,
         feature_choice_picks: featureChoicePicks,
         modifier_player_picks: modifierPlayerPicks,
+        builder_picks: buildBuilderPicksFromSnapshot({
+          classSkillPicks,
+          classToolPicks,
+          spellPicksByClassId,
+          speciesTraitPicks,
+          startingEquipmentOptionIndex,
+          backgroundStartingEquipmentOptionIndex,
+          goldPurchasedEquipmentIds,
+        }),
         asi_allocations: asiAllocationsByFeatId,
         character_classes: snapshot.character_classes.map((row) => ({
           ...row,
@@ -1857,6 +2001,7 @@ export default function BuilderPage() {
             speciesFeatPickSlots.map((slot) => slot.key),
             featureChoicePicks,
             backgroundFeatPickSlots.map((slot) => slot.key),
+            selectedBackground,
           ) &&
           validateFeatModifierChoices(
             feats,
@@ -1934,6 +2079,7 @@ export default function BuilderPage() {
             speciesFeatPickSlots.map((slot) => slot.key),
             featureChoicePicks,
             backgroundFeatPickSlots.map((slot) => slot.key),
+            selectedBackground,
           ),
         )
         blockers.push(
@@ -2217,10 +2363,10 @@ export default function BuilderPage() {
               </div>
 
               <div className="flex flex-col items-end gap-2">
-                {!canProceed() ? <ProceedBlockerBanner blockers={proceedBlockers} /> : null}
                 <BuilderStepNav
                   currentStep={currentStep}
                   canProceed={canProceed()}
+                  proceedBlockers={proceedBlockers}
                   canSave={canSaveCharacter()}
                   saving={saving}
                   onBack={goBackStep}
@@ -2425,7 +2571,6 @@ export default function BuilderPage() {
                                 disabled={totalLevel >= 20 && !existingLevel}
                                 badge={levelBadge}
                                 onSelect={selectClass}
-                                onDetails={() => setDetailsModal({ type: "class", item: cls })}
                               />
                             )
                           }
@@ -2453,7 +2598,7 @@ export default function BuilderPage() {
                               disabled={totalLevel >= 20 && !existingLevel}
                               badge={levelBadge}
                               size="lg"
-                              imageAspect="3/4"
+                              imageCrop="top"
                               onSelect={selectClass}
                               onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
                             />
@@ -2541,6 +2686,7 @@ export default function BuilderPage() {
                                 ...getTakenSkills(skillPickSources, `class:${entry.classId}`),
                               ]}
                               showSkillInfo
+                              layout={compactPickerLayout}
                               onChange={(selected) =>
                                 setClassSkillPicks((prev) => ({
                                   ...prev,
@@ -2568,6 +2714,7 @@ export default function BuilderPage() {
                                   }))
                                 }
                                 accentClass="border-secondary bg-secondary/10"
+                                layout={compactPickerLayout}
                               />
                             )
                           })()}
@@ -2631,8 +2778,7 @@ export default function BuilderPage() {
                               entry.level,
                               cls.name,
                             )
-                            const isWeaponMastery =
-                              feature.choices?.resourceKey === "weapon_mastery"
+                            const isWeaponMastery = isWeaponMasteryFeature(feature)
                             const isKnackPool = feature.choices?.optionsSource === "class_knacks"
                             const isUpgradePool = feature.choices?.optionsSource === "class_upgrades"
                             const masteryHint = isWeaponMastery
@@ -2688,6 +2834,7 @@ export default function BuilderPage() {
                                     ]}
                                     onChange={handleFeatureChoiceChange}
                                     layout={cardViewMode === "cinematic" ? "visual" : "compact"}
+                                    masteryDescriptions={weaponMasteryDescriptions}
                                   />
                                 ) : (
                                   <MultiSelectChoices
@@ -2700,6 +2847,7 @@ export default function BuilderPage() {
                                     showSkillInfo={
                                       feature.choices!.category.toLowerCase().includes("skill")
                                     }
+                                    layout={compactPickerLayout}
                                     onChange={handleFeatureChoiceChange}
                                     accentClass="border-accent bg-accent/10"
                                   />
@@ -2712,6 +2860,7 @@ export default function BuilderPage() {
                                   spells={spells}
                                   excludeKinds={["spell"]}
                                   unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                                  {...modifierExpertisePickerProps}
                                   onChange={(slotKey, selected) => {
                                     const slot = modifierPlayerChoiceSlots.find(
                                       (entry) => entry.slotKey === slotKey,
@@ -2767,6 +2916,7 @@ export default function BuilderPage() {
                                     spells={spells}
                                     excludeKinds={["spell"]}
                                     unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                                    {...modifierExpertisePickerProps}
                                     onChange={(slotKey, selected) => {
                                       const slot = modifierPlayerChoiceSlots.find(
                                         (s) => s.slotKey === slotKey,
@@ -3022,6 +3172,7 @@ export default function BuilderPage() {
                                     clearModifierPicksForSource(prev, choiceKey),
                                   )
                                 }}
+                                layout={compactPickerLayout}
                               />
                             </div>
                           ) : null}
@@ -3034,6 +3185,7 @@ export default function BuilderPage() {
                               spells={spells}
                               excludeKinds={["spell"]}
                               unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                              {...modifierExpertisePickerProps}
                               onChange={(slotKey, selected) => {
                                 const slot = modifierPlayerChoiceSlots.find(
                                   (entry) => entry.slotKey === slotKey,
@@ -3126,7 +3278,6 @@ export default function BuilderPage() {
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectSpecies}
-                              onDetails={() => setDetailsModal({ type: "species", item: sp })}
                             />
                           )
                         }
@@ -3215,6 +3366,7 @@ export default function BuilderPage() {
                               setSpeciesTraitPicks((prev) => ({ ...prev, [String(index)]: selected }))
                             }
                             accentClass="border-secondary bg-secondary/10"
+                            layout={compactPickerLayout}
                           />
                         )
                       })}
@@ -3245,6 +3397,7 @@ export default function BuilderPage() {
                               unavailableOptions={[
                                 ...getTakenSkills(skillPickSources, "species:mods"),
                               ]}
+                              {...modifierExpertisePickerProps}
                               onChange={onSpeciesModifierChange}
                             />
                             {(selectedSpecies.traits ?? []).map((trait, index) => (
@@ -3259,6 +3412,7 @@ export default function BuilderPage() {
                                 unavailableOptions={[
                                   ...getTakenSkills(skillPickSources, `species:trait:${index}`),
                                 ]}
+                                {...modifierExpertisePickerProps}
                                 onChange={onSpeciesModifierChange}
                               />
                             ))}
@@ -3362,6 +3516,7 @@ export default function BuilderPage() {
                                       clearModifierPicksForSource(prev, choiceKey),
                                     )
                                   }}
+                                  layout={compactPickerLayout}
                                 />
                               </div>
                             ) : null}
@@ -3373,6 +3528,7 @@ export default function BuilderPage() {
                                 picks={modifierPlayerPicks}
                                 spells={spells}
                                 excludeKinds={["spell"]}
+                                {...modifierExpertisePickerProps}
                                 onChange={(slotKey, selected) => {
                                   const slot = modifierPlayerChoiceSlots.find(
                                     (entry) => entry.slotKey === slotKey,
@@ -3481,7 +3637,6 @@ export default function BuilderPage() {
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectBackground}
-                              onDetails={() => setDetailsModal({ type: "background", item: bg })}
                             />
                           )
                         }
@@ -3494,7 +3649,9 @@ export default function BuilderPage() {
                         tags={
                           grantedFeat || bg.feat_granted
                             ? [{ label: `FEAT: ${grantedFeat?.name ?? bg.feat_granted}` }]
-                            : []
+                            : isLegacyBackground(bg)
+                              ? [{ label: "ORIGIN FEAT: your choice", emphasis: true }]
+                              : []
                         }
                         accentColor={accent}
                         selected={isSelected}
@@ -3519,6 +3676,44 @@ export default function BuilderPage() {
                       </>
                     )
                   })()}
+
+                  {selectedBackground && isLegacyBackground(selectedBackground) ? (
+                    <div className="mt-4 space-y-2 border-t border-border pt-4">
+                      <h3 className="text-lg font-bold text-foreground">Background Origin Feat</h3>
+                      <p className="text-sm text-muted-foreground">
+                        This background predates fixed Origin feats — choose any 1st-level Origin feat.
+                      </p>
+                      <OriginFeatGrantedSelect
+                        value={
+                          featureChoicePicks[
+                            legacyBackgroundOriginFeatPickKey(selectedBackground.id)
+                          ]?.[0] ?? ""
+                        }
+                        originFeats={originFeats}
+                        onChange={(value) => {
+                          const pickKey = legacyBackgroundOriginFeatPickKey(selectedBackground.id)
+                          setFeatureChoicePicks((prev) => ({
+                            ...prev,
+                            [pickKey]: value ? [value] : [],
+                          }))
+                          setFeatChoicePicks((prev) => {
+                            const next = { ...prev }
+                            for (const key of Object.keys(next)) {
+                              if (key.startsWith("feat:granted:")) delete next[key]
+                            }
+                            return next
+                          })
+                          setModifierPlayerPicks((prev) => {
+                            const next = { ...prev }
+                            for (const key of Object.keys(next)) {
+                              if (key.startsWith("feat:granted:")) delete next[key]
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                    </div>
+                  ) : null}
 
                   {selectedBackground && backgroundFeatPickSlots.length > 0 ? (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
@@ -3616,6 +3811,7 @@ export default function BuilderPage() {
                                       clearModifierPicksForSource(prev, choiceKey),
                                     )
                                   }}
+                                  layout={compactPickerLayout}
                                 />
                               </div>
                             ) : null}
@@ -3628,6 +3824,7 @@ export default function BuilderPage() {
                                 spells={spells}
                                 excludeKinds={["spell"]}
                                 unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                                {...modifierExpertisePickerProps}
                                 onChange={(slotKey, selected) => {
                                   const slot = modifierPlayerChoiceSlots.find(
                                     (entry) => entry.slotKey === slotKey,
@@ -3671,6 +3868,7 @@ export default function BuilderPage() {
                             clearModifierPicksForSource(prev, choiceKey),
                           )
                         }}
+                        layout={compactPickerLayout}
                       />
                     </div>
                   ) : null}
@@ -3683,6 +3881,7 @@ export default function BuilderPage() {
                       spells={spells}
                       excludeKinds={["spell"]}
                       unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                      {...modifierExpertisePickerProps}
                       onChange={(slotKey, selected) => {
                         const slot = modifierPlayerChoiceSlots.find(
                           (entry) => entry.slotKey === slotKey,
@@ -3798,7 +3997,7 @@ export default function BuilderPage() {
                       totalPoints={BACKGROUND_ASI_TOTAL_POINTS}
                       allowedAbilities={backgroundAbilityGrant.eligible}
                       maxPerAbility={2}
-                      helpText={getBackgroundAsiHelpText()}
+                      helpText={getBackgroundAsiHelpText(backgroundAbilityGrant)}
                       onChange={(allocation) =>
                         setAsiAllocationsByFeatId((prev) => ({
                           ...prev,
@@ -3820,6 +4019,26 @@ export default function BuilderPage() {
                   </div>
                 )}
 
+                {cardViewMode === "cinematic" ? (
+                  <AbilityScoreCards
+                    method={abilityMethod}
+                    scores={{
+                      strength: character.strength,
+                      dexterity: character.dexterity,
+                      constitution: character.constitution,
+                      intelligence: character.intelligence,
+                      wisdom: character.wisdom,
+                      charisma: character.charisma,
+                    }}
+                    standardAssignments={standardArrayAssignments}
+                    standardArray={STANDARD_ARRAY}
+                    getModifierLabel={getAbilityModifier}
+                    onAdjust={updateAbilityScore}
+                    onSetCustom={setCustomAbilityScore}
+                    onAssignStandard={assignStandardArrayValue}
+                    isStandardValueUsedElsewhere={isStandardValueUsedElsewhere}
+                  />
+                ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {ABILITY_NAMES.map((ability) => (
                     <div key={ability} className="bg-card rounded-xl p-4 border-2 border-border text-center">
@@ -3908,6 +4127,7 @@ export default function BuilderPage() {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -4125,6 +4345,7 @@ export default function BuilderPage() {
                               picks={modifierPlayerPicks}
                               spells={spells}
                               kinds={["spell", "spell_list_class"]}
+                              {...modifierExpertisePickerProps}
                               onChange={(slotKey, selected) => {
                                 const target = modifierPlayerChoiceSlots.find(
                                   (entry) => entry.slotKey === slotKey,
@@ -4290,7 +4511,7 @@ export default function BuilderPage() {
                                 items: pageItems,
                                 pageCount,
                                 safePage,
-                              } = paginateList(levelSpells, page, pickerPageSize)
+                              } = paginateList(levelSpells, page, spellPickerPageSize)
 
                               return (
                                 <div key={`${casterClass.id}-${level}`}>
@@ -4571,10 +4792,10 @@ export default function BuilderPage() {
         </AnimatePresence>
 
             <div className="flex flex-col items-end gap-2 mt-6 pt-4 border-t border-border">
-              {!canProceed() ? <ProceedBlockerBanner blockers={proceedBlockers} /> : null}
               <BuilderStepNav
                 currentStep={currentStep}
                 canProceed={canProceed()}
+                proceedBlockers={proceedBlockers}
                 canSave={canSaveCharacter()}
                 saving={saving}
                 onBack={goBackStep}
@@ -4899,12 +5120,12 @@ export default function BuilderPage() {
                   )}
 
                   {/* Origin feat from background */}
-                  {selectedBackground?.feat_granted && (
+                  {effectiveBackgroundFeatGranted && (
                     <div>
                       <p className="text-[9px] text-lime uppercase font-bold mb-1">Origin Feat</p>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                         <p className="font-bold text-foreground">
-                          {backgroundGrantedFeat?.name ?? selectedBackground.feat_granted}
+                          {backgroundGrantedFeat?.name ?? effectiveBackgroundFeatGranted}
                         </p>
                         <ClampedRichText
                           html={backgroundGrantedFeat?.description}
@@ -4950,11 +5171,19 @@ export default function BuilderPage() {
                           {effectiveArmorProficiencies.join(", ") || "None"}
                         </p>
                       </div>
-                      <div className="p-1.5 bg-muted/30 rounded text-[10px]">
-                        <p className="font-bold text-foreground">Tools</p>
-                        <p className="text-muted-foreground italic">
-                          {effectiveToolProficiencies.join(", ") || "None"}
-                        </p>
+                      <div className="p-1.5 bg-muted/30 rounded text-[10px] space-y-1">
+                        <div>
+                          <p className="font-bold text-foreground">Tools</p>
+                          <p className="text-muted-foreground italic">
+                            {partitionedToolProficiencies.tools.join(", ") || "None"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-foreground">Instruments</p>
+                          <p className="text-muted-foreground italic">
+                            {partitionedToolProficiencies.instruments.join(", ") || "None"}
+                          </p>
+                        </div>
                       </div>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                         <p className="font-bold text-foreground">Languages</p>
@@ -5008,7 +5237,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={cls}
-              imageAspect="3/4"
+              imageCrop="top"
               subtitle={cls.source || "Custom"}
               tagline={getCompendiumCardBlurb(cls).toUpperCase()}
               tags={[
@@ -5081,7 +5310,6 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={sp}
-              imageAspect="21/9"
               subtitle={sp.source || "Custom"}
               tags={[
                 { label: String(sp.size || "Medium") },
@@ -5118,7 +5346,6 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={bg}
-              imageAspect="21/9"
               subtitle={bg.source || "Custom"}
               tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
               accentColor={accent}

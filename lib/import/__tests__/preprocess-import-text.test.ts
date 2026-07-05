@@ -98,6 +98,45 @@ describe("preprocessImportText", () => {
   })
 })
 
+describe("stripBackgroundPdfBoilerplate", () => {
+  it("removes chapter running heads, page numbers, and nav ribbons", () => {
+    const input = `Apothecary
+You brew potions. Chapter 3 | More Stuff continues below.
+117
+Feats | Spells | Races | Monsters | NPCs | Crafting
+Feature: Herblore`
+
+    const result = preprocessImportText(input, { contentTypeHint: "backgrounds" })
+
+    expect(result.aiText).not.toMatch(/Chapter 3 \| More Stuff/i)
+    expect(result.aiText).not.toMatch(/^\s*117\s*$/m)
+    expect(result.aiText).not.toMatch(/Feats \| Spells \| Races/i)
+    expect(result.aiText).toContain("Feature: Herblore")
+  })
+
+  it("drops d6 Ideals/Bonds/Flaws/Personality Trait tables only", () => {
+    const input = `Engineer
+Feature: Blueprints
+You read plans.
+
+d6 Ideals
+1 Honor craft.
+2 Profit.
+
+d6 Bonds
+1 My guild.
+
+Equipment: wrench`
+
+    const result = preprocessImportText(input, { contentTypeHint: "backgrounds" })
+
+    expect(result.aiText).not.toMatch(/d6 Ideals/i)
+    expect(result.aiText).not.toMatch(/d6 Bonds/i)
+    expect(result.aiText).toContain("Feature: Blueprints")
+    expect(result.aiText).toContain("Equipment: wrench")
+  })
+})
+
 describe("preprocessImportText — Alternate Fighter fixture", () => {
   const fixturePath = resolve(process.cwd(), "agent-tools-alt-fighter.txt")
 

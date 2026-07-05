@@ -1,3 +1,12 @@
+import {
+  normalizeModifierCatalog,
+  type ModifierCatalogEntry,
+} from "@/lib/compendium/modifier-catalog"
+import type { CustomAbility } from "@/lib/types"
+
+/** Must match {@link WEAPON_MASTERY_PROPERTIES_CATALOG_ID} in system-option-catalogs.ts */
+const WEAPON_MASTERY_PROPERTIES_CATALOG_LOOKUP_ID = "00000000-0000-4000-8000-000000000004"
+
 /** 2024 PHB weapon mastery property rules (short reference text). */
 export const WEAPON_MASTERY_DESCRIPTIONS: Record<string, string> = {
   Cleave:
@@ -18,9 +27,79 @@ export const WEAPON_MASTERY_DESCRIPTIONS: Record<string, string> = {
     "If you hit a creature with this weapon and deal damage to the creature, you have Advantage on your next attack roll against that creature before the end of your next turn.",
 }
 
-export function describeWeaponMastery(name: string): string | null {
+export const STANDARD_WEAPON_MASTERY_NAMES = Object.keys(WEAPON_MASTERY_DESCRIPTIONS)
+
+function stripHtml(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim()
+}
+
+export function firstClauseOfWeaponMasteryRule(text: string): string {
+  const period = text.indexOf(". ")
+  if (period > 0) return text.slice(0, period)
+  const comma = text.indexOf(", ")
+  if (comma > 0 && comma < 120) return text.slice(0, comma)
+  return text.length > 100 ? `${text.slice(0, 97)}…` : text
+}
+
+export function weaponMasteryCatalogEntriesFromAbilities(
+  customAbilities?: CustomAbility[] | null,
+): ModifierCatalogEntry[] {
+  if (!customAbilities?.length) return []
+  const ability = customAbilities.find((row) => row.id === WEAPON_MASTERY_PROPERTIES_CATALOG_LOOKUP_ID)
+  if (!ability) return []
+  return normalizeModifierCatalog(
+    (ability as unknown as Record<string, unknown>).modifier_catalog,
+  )
+}
+
+export function weaponMasteryPropertyNames(
+  catalogEntries?: ModifierCatalogEntry[] | null,
+): string[] {
+  const names = new Set(STANDARD_WEAPON_MASTERY_NAMES)
+  for (const entry of catalogEntries ?? []) {
+    const trimmed = entry.name?.trim()
+    if (trimmed) names.add(trimmed)
+  }
+  return [...names].sort((a, b) => a.localeCompare(b))
+}
+
+export function buildWeaponMasteryDescriptionsLookup(
+  catalogEntries?: ModifierCatalogEntry[] | null,
+): Record<string, string> {
+  const lookup: Record<string, string> = { ...WEAPON_MASTERY_DESCRIPTIONS }
+  for (const entry of catalogEntries ?? []) {
+    const name = entry.name?.trim()
+    if (!name) continue
+    const fromDescription = entry.description ? stripHtml(entry.description) : null
+    const fromSummary = entry.summary?.trim()
+    lookup[name] = fromDescription || fromSummary || lookup[name] || name
+  }
+  return lookup
+}
+
+export function describeWeaponMastery(
+  name: string,
+  catalogEntries?: ModifierCatalogEntry[] | null,
+): string | null {
   const trimmed = name.trim()
   if (!trimmed) return null
+
+  if (catalogEntries?.length) {
+    const fromCatalog = catalogEntries.find(
+      (entry) => entry.name.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (fromCatalog) {
+      if (fromCatalog.description) return stripHtml(fromCatalog.description)
+      if (fromCatalog.summary?.trim()) return fromCatalog.summary.trim()
+    }
+  }
+
   const exact = WEAPON_MASTERY_DESCRIPTIONS[trimmed]
   if (exact) return exact
   const match = Object.entries(WEAPON_MASTERY_DESCRIPTIONS).find(

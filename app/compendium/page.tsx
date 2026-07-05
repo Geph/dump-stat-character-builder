@@ -7,8 +7,8 @@ import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language } from "@/lib/types"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
@@ -54,7 +54,8 @@ import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
 import { CustomClassSpellListDialog } from "@/components/compendium/custom-class-spell-list-dialog"
-import { getCompendiumCardImageUrl, CLASS_CARD_ASPECT_CLASS } from "@/lib/compendium/card-image"
+import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
+import { getCompendiumCardImageUrl, compendiumCardImageCropForType } from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
@@ -92,6 +93,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "equipment", label: "Equipment", icon: <Package className="w-3.5 h-3.5" /> },
   { id: "magic_items", label: "Magic Items", icon: <Sparkles className="w-3.5 h-3.5" /> },
   { id: "languages", label: "Languages", icon: <Languages className="w-3.5 h-3.5" /> },
+  { id: "tools", label: "Tools", icon: <Wrench className="w-3.5 h-3.5" /> },
   { id: "class_resources", label: "Class Resources", icon: <Gauge className="w-3.5 h-3.5" /> },
   { id: "abilities", label: "Custom Abilities", icon: <Sparkles className="w-3.5 h-3.5" /> },
 ]
@@ -106,6 +108,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   equipment: "New Item",
   magic_items: "New Magic Item",
   languages: "New Language",
+  tools: "New Tool",
   class_resources: "New Class Resource",
   abilities: "New Custom Ability",
 }
@@ -126,6 +129,7 @@ function CompendiumPageContent() {
     equipment: [],
     magic_items: [],
     languages: [],
+    tools: [],
     class_resources: [],
     abilities: [],
   })
@@ -150,6 +154,7 @@ function CompendiumPageContent() {
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
   const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
+  const [toolFilterGroup, setToolFilterGroup] = useState<string>("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -162,6 +167,7 @@ function CompendiumPageContent() {
     equipment: 0,
     magic_items: 0,
     languages: 0,
+    tools: 0,
     class_resources: 0,
     abilities: 0,
   })
@@ -186,6 +192,7 @@ function CompendiumPageContent() {
         { count: featsCount },
         { data: equipmentRows },
         { count: languagesCount },
+        { count: toolsCount },
         { count: classResourcesCount },
         { count: abilitiesCount },
       ] = await Promise.all([
@@ -201,6 +208,7 @@ function CompendiumPageContent() {
             "magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
           ),
         db.from("languages").select("*", { count: "exact", head: true }),
+        db.from("tools").select("*", { count: "exact", head: true }),
         db.from("class_resources").select("*", { count: "exact", head: true }),
         db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
@@ -215,6 +223,7 @@ function CompendiumPageContent() {
         equipment: equipmentSplit.mundane.length,
         magic_items: equipmentSplit.magic.length,
         languages: languagesCount ?? 0,
+        tools: toolsCount ?? 0,
         class_resources: classResourcesCount ?? 0,
         abilities: abilitiesCount ?? 0,
       })
@@ -361,6 +370,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       const language = item as Language
       if (languageFilterPool !== "all" && language.pool !== languageFilterPool) return false
     }
+    if (activeTab === "tools") {
+      const tool = item as Tool
+      if (toolFilterGroup !== "all" && tool.tool_group !== toolFilterGroup) return false
+    }
     return true
   })
 
@@ -403,6 +416,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       { count: featsCount },
       { data: equipmentRows },
       { count: languagesCount },
+      { count: toolsCount },
       { count: classResourcesCount },
       { count: abilitiesCount },
     ] = await Promise.all([
@@ -418,6 +432,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           "magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
         ),
       db.from("languages").select("*", { count: "exact", head: true }),
+      db.from("tools").select("*", { count: "exact", head: true }),
       db.from("class_resources").select("*", { count: "exact", head: true }),
       db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
@@ -432,6 +447,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       equipment: equipmentSplit.mundane.length,
       magic_items: equipmentSplit.magic.length,
       languages: languagesCount ?? 0,
+      tools: toolsCount ?? 0,
       class_resources: classResourcesCount ?? 0,
       abilities: abilitiesCount ?? 0,
     })
@@ -682,15 +698,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
         {cardImage ? (
-          <div className={cn("relative w-full shrink-0 overflow-hidden", CLASS_CARD_ASPECT_CLASS)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={cardImage}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover object-top"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
-          </div>
+          <CompendiumCardHero
+            imageUrl={cardImage}
+            crop={compendiumCardImageCropForType(activeTab)}
+            variant="list"
+          />
         ) : null}
         <div className={`p-5 pb-11 ${cardImage ? "pt-3" : ""}`}>
         <div className="flex items-start justify-between mb-2 gap-2">
@@ -908,6 +920,21 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {formatCompendiumSource((data as Language).source) || "Custom"}
+            </span>
+          </div>
+        )}
+        {activeTab === "tools" && (
+          <div className="flex gap-2 flex-wrap">
+            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full capitalize">
+              {(data as Tool).tool_group.replace(/_/g, " ")}
+            </span>
+            {(data as Tool).subcategory && (
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {(data as Tool).subcategory}
+              </span>
+            )}
+            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full uppercase">
+              {(data as Tool).check_ability?.slice(0, 3)}
             </span>
           </div>
         )}
@@ -1404,6 +1431,26 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           </div>
         )}
 
+        {activeTab === "tools" && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Group
+            </label>
+            <select
+              value={toolFilterGroup}
+              onChange={(e) => setToolFilterGroup(e.target.value)}
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="all">All groups</option>
+              <option value="artisans">Artisan's Tools</option>
+              <option value="musical">Musical Instrument</option>
+              <option value="gaming">Gaming Set</option>
+              <option value="other">Other Tools</option>
+              <option value="vehicle">Vehicle</option>
+            </select>
+          </div>
+        )}
+
         {/* Content Grid */}
         {loading ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1464,9 +1511,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         <CompendiumDetailOverlay
           open
           onClose={() => setSelectedItem(null)}
-          imageAspect={
-            activeTab === "classes" || activeTab === "subclasses" ? "3/4" : "21/9"
-          }
+          imageCrop={compendiumCardImageCropForType(activeTab)}
           item={
             activeTab === "class_resources"
               ? {
@@ -1509,6 +1554,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                         ? [{ label: (selectedItem as Language).script! }]
                         : []),
                     ]
+                  : activeTab === "tools"
+                    ? [
+                        {
+                          label: (selectedItem as Tool).tool_group.replace(/_/g, " "),
+                          emphasis: true,
+                        },
+                        ...((selectedItem as Tool).subcategory
+                          ? [{ label: (selectedItem as Tool).subcategory! }]
+                          : []),
+                      ]
                 : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as Record<string, unknown>)}
@@ -1552,6 +1607,26 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 <div className="contents">
                   <dt className="text-white/50 font-semibold">Script</dt>
                   <dd className="text-white/90">{(selectedItem as Language).script}</dd>
+                </div>
+              ) : null}
+            </dl>
+          )}
+          {activeTab === "tools" && (
+            <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <div className="contents">
+                <dt className="text-white/50 font-semibold">Check ability</dt>
+                <dd className="text-white/90 capitalize">{(selectedItem as Tool).check_ability}</dd>
+              </div>
+              {(selectedItem as Tool).subcategory ? (
+                <div className="contents">
+                  <dt className="text-white/50 font-semibold">Subcategory</dt>
+                  <dd className="text-white/90">{(selectedItem as Tool).subcategory}</dd>
+                </div>
+              ) : null}
+              {(selectedItem as Tool).expands_to?.length ? (
+                <div className="contents">
+                  <dt className="text-white/50 font-semibold">Expands to</dt>
+                  <dd className="text-white/90">{(selectedItem as Tool).expands_to!.join(", ")}</dd>
                 </div>
               ) : null}
             </dl>

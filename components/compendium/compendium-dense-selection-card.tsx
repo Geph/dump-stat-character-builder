@@ -1,7 +1,6 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Info } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import {
   compendiumAccentColorStyles,
@@ -19,7 +18,6 @@ type CompendiumDenseSelectionCardProps = {
   badge?: ReactNode
   accentColor?: CompendiumThemeColorId | null
   onSelect?: () => void
-  onDetails?: (e: React.MouseEvent) => void
   className?: string
 }
 
@@ -33,7 +31,6 @@ export function CompendiumDenseSelectionCard({
   badge,
   accentColor = null,
   onSelect,
-  onDetails,
   className,
 }: CompendiumDenseSelectionCardProps) {
   const accent = compendiumAccentColorStyles(accentColor)
@@ -63,21 +60,8 @@ export function CompendiumDenseSelectionCard({
         className,
       )}
     >
-      {onDetails && (
-        <button
-          type="button"
-          aria-label={`Details for ${name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onDetails(e)
-          }}
-          className="absolute right-2 top-2 z-10 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      )}
-      {badge && <div className="absolute right-8 top-2">{badge}</div>}
-      <div className="flex items-start gap-2 pr-6">
+      {badge && <div className="absolute right-2 top-2">{badge}</div>}
+      <div className="flex items-start gap-2">
         {icon && (
           <GameIcon name={icon} className={cn("h-8 w-8 shrink-0", accent.iconText)} />
         )}

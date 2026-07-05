@@ -1,7 +1,7 @@
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 
 function entryHaystack(entry: ModifierCatalogEntry): string {
-  return `${entry.name} ${entry.summary ?? ""} ${entry.group}`.toLowerCase()
+  return `${entry.name ?? ""} ${entry.summary ?? ""} ${entry.group ?? ""}`.toLowerCase()
 }
 
 /** Higher scores rank earlier in search results. */
@@ -9,9 +9,9 @@ export function modifierCatalogSearchScore(entry: ModifierCatalogEntry, query: s
   const q = query.trim().toLowerCase()
   if (!q) return 0
 
-  const name = entry.name.toLowerCase()
+  const name = (entry.name ?? "").toLowerCase()
   const summary = (entry.summary ?? "").toLowerCase()
-  const group = entry.group.toLowerCase()
+  const group = (entry.group ?? "").toLowerCase()
 
   if (name === q) return 1000
   if (name.startsWith(q)) return 900

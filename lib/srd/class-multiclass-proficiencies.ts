@@ -1,17 +1,6 @@
 /** 2024 SRD “As a Multiclass Character” proficiency grants (Character Creation, p. 25). */
 
-const MUSICAL_INSTRUMENTS = [
-  "Bagpipes",
-  "Drum",
-  "Dulcimer",
-  "Flute",
-  "Horn",
-  "Lute",
-  "Lyre",
-  "Pan Flute",
-  "Shawm",
-  "Viol",
-] as const
+import { SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tools"
 
 export type MulticlassSkillChoice = {
   count: number
@@ -43,7 +32,7 @@ export const SRD_CLASS_MULTICLASS_PROFICIENCIES: Record<string, MulticlassProfic
   Bard: {
     armor: ["Light armor"],
     skillChoice: { count: 1, anySkill: true },
-    toolChoice: { count: 1, options: [...MUSICAL_INSTRUMENTS] },
+    toolChoice: { count: 1, options: [...SRD_MUSICAL_INSTRUMENTS] },
   },
   Cleric: {
     armor: ["Light armor", "Medium armor", "Shields"],

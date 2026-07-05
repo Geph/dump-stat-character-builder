@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
@@ -48,9 +48,12 @@ const DAMAGE_TYPES = [
 ]
 
 import { WEAPON_PROPERTIES } from "@/lib/compendium/equipment-properties"
-const WEAPON_MASTERIES = [
-  "Cleave", "Graze", "Nick", "Push", "Sap", "Slow", "Topple", "Vex"
-]
+import {
+  weaponMasteryCatalogEntriesFromAbilities,
+  weaponMasteryPropertyNames,
+} from "@/lib/compendium/weapon-mastery"
+import { WEAPON_MASTERY_PROPERTIES_CATALOG_ID } from "@/lib/compendium/system-option-catalogs"
+import { normalizeModifierCatalog } from "@/lib/compendium/modifier-catalog"
 
 interface EquipmentFormData {
   name: string
@@ -126,6 +129,9 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [customAbilities, setCustomAbilities] = useState<{ id: string; name: string }[]>([])
+  const [weaponMasteryCatalog, setWeaponMasteryCatalog] = useState<
+    ReturnType<typeof weaponMasteryCatalogEntriesFromAbilities>
+  >([])
   const [allEquipment, setAllEquipment] = useState<{ id: string; name: string; category: string }[]>([])
   const [rawProperties, setRawProperties] = useState<unknown>(null)
   const router = useRouter()
@@ -154,6 +160,37 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
     }
     void loadEquipmentCatalog()
   }, [])
+
+  useEffect(() => {
+    const loadWeaponMasteryCatalog = async () => {
+      const db = createClient()
+      const { data } = await db
+        .from("custom_abilities")
+        .select("*")
+        .eq("id", WEAPON_MASTERY_PROPERTIES_CATALOG_ID)
+        .maybeSingle()
+      if (!data) {
+        setWeaponMasteryCatalog([])
+        return
+      }
+      setWeaponMasteryCatalog(
+        weaponMasteryCatalogEntriesFromAbilities([
+          {
+            ...data,
+            modifier_catalog: normalizeModifierCatalog(
+              (data as Record<string, unknown>).modifier_catalog,
+            ),
+          } as never,
+        ]),
+      )
+    }
+    void loadWeaponMasteryCatalog()
+  }, [])
+
+  const weaponMasteryOptions = useMemo(
+    () => weaponMasteryPropertyNames(weaponMasteryCatalog),
+    [weaponMasteryCatalog],
+  )
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -581,9 +618,12 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
                     className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
                   >
                     <option value="">None</option>
-                    {WEAPON_MASTERIES.map((m) => (
+                    {weaponMasteryOptions.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
+                    {form.mastery && !weaponMasteryOptions.includes(form.mastery) ? (
+                      <option value={form.mastery}>{form.mastery}</option>
+                    ) : null}
                   </select>
                 </div>
                 <div>

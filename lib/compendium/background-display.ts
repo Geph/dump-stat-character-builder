@@ -15,6 +15,9 @@ function formatAbilityLabel(key: string): string {
 export function formatBackgroundAbilityBonuses(
   bonuses: Record<string, number> | null | undefined,
 ): string | null {
+  if (bonuses === null) {
+    return "+2/+1 or +1/+1/+1 to ability scores of your choice"
+  }
   if (!bonuses || Object.keys(bonuses).length === 0) return null
 
   const entries = Object.entries(bonuses).map(

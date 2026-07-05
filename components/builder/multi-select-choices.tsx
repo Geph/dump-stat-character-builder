@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
@@ -19,6 +19,8 @@ type MultiSelectChoicesProps = {
   unavailableOptions?: string[]
   /** When true, show an info button for D&D skill options. */
   showSkillInfo?: boolean
+  /** Compact builder layout: denser grid, no skill info buttons. */
+  layout?: "default" | "compact"
   /** When true, let the player add custom free-text entries (e.g. user-defined languages). */
   allowCustom?: boolean
   /** Placeholder for the custom-entry input. */
@@ -35,12 +37,27 @@ export function MultiSelectChoices({
   accentClass = "border-primary bg-primary/10",
   unavailableOptions = [],
   showSkillInfo = false,
+  layout = "default",
   allowCustom = false,
   customPlaceholder = "Add a custom entry...",
 }: MultiSelectChoicesProps) {
   const unavailable = new Set(unavailableOptions)
+  const compact = layout === "compact"
+  const showInfoButtons = showSkillInfo && !compact
   const [skillInfo, setSkillInfo] = useState<string | null>(null)
   const [customDraft, setCustomDraft] = useState("")
+  const pendingScrollY = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (pendingScrollY.current == null) return
+    window.scrollTo(0, pendingScrollY.current)
+    pendingScrollY.current = null
+  })
+
+  const emitChange = (next: string[]) => {
+    pendingScrollY.current = window.scrollY
+    onChange(next)
+  }
 
   // Selected entries that aren't in the option list are custom additions; show them too.
   const optionNames = new Set(options.map((option) => option.name))
@@ -51,17 +68,17 @@ export function MultiSelectChoices({
 
   const toggle = (name: string) => {
     if (selected.includes(name)) {
-      onChange(selected.filter((entry) => entry !== name))
+      emitChange(selected.filter((entry) => entry !== name))
       return
     }
     if (unavailable.has(name) || selected.length >= maxCount) return
-    onChange([...selected, name])
+    emitChange([...selected, name])
   }
 
   const addCustom = () => {
     const trimmed = customDraft.trim()
     if (!trimmed || selected.includes(trimmed) || selected.length >= maxCount) return
-    onChange([...selected, trimmed])
+    emitChange([...selected, trimmed])
     setCustomDraft("")
   }
 
@@ -77,19 +94,26 @@ export function MultiSelectChoices({
           </span>
         </div>
         {hint && <p className="text-xs text-muted-foreground mb-3">{hint}</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div
+          className={
+            compact
+              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"
+              : "grid grid-cols-1 sm:grid-cols-2 gap-2"
+          }
+        >
           {displayOptions.map((option) => {
             const isSelected = selected.includes(option.name)
             const isTakenElsewhere = !isSelected && unavailable.has(option.name)
             const isDisabled = isTakenElsewhere || (!isSelected && selected.length >= maxCount)
-            const skillDescription = showSkillInfo ? getSkillDescription(option.name) : null
+            const skillDescription = showInfoButtons ? getSkillDescription(option.name) : null
             return (
-              <div key={option.name} className="flex items-stretch gap-1">
+              <div key={option.name} className={compact ? undefined : "flex items-stretch gap-1"}>
                 <button
                   type="button"
                   disabled={isDisabled}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => toggle(option.name)}
-                  className={`flex-1 p-2 rounded-lg border-2 text-left transition-all ${
+                  className={`${compact ? "w-full" : "flex-1"} p-2 rounded-lg border-2 text-left transition-all ${
                     isSelected
                       ? accentClass
                       : isDisabled
@@ -109,7 +133,7 @@ export function MultiSelectChoices({
                     />
                   )}
                 </button>
-                {showSkillInfo && skillDescription && (
+                {showInfoButtons && skillDescription && (
                   <button
                     type="button"
                     aria-label={`About ${option.name}`}
@@ -152,7 +176,7 @@ export function MultiSelectChoices({
       </div>
 
       <AnimatePresence>
-        {skillInfo && (
+        {showInfoButtons && skillInfo && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

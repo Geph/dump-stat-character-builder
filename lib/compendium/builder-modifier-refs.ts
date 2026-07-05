@@ -234,7 +234,15 @@ function speciesCharacteristicsWithPlayerPicks(
     readModifierRefs(speciesRow),
   )
   mods.push(
-    ...applyModifierPlayerPicks(speciesWide, speciesModsSourceKey(species.id), modifierPlayerPicks),
+    ...tagModifierSource(
+      applyModifierPlayerPicks(speciesWide, speciesModsSourceKey(species.id), modifierPlayerPicks),
+      {
+        sourceType: "species",
+        source: species.name,
+        label: species.name,
+        sourceId: species.id,
+      },
+    ),
   )
 
   species.traits?.forEach((trait, index) => {
@@ -255,7 +263,14 @@ function speciesCharacteristicsWithPlayerPicks(
     const chars = instances.length
       ? characteristicsFromLinkedModifiers(catalog, instances, trait.modifierRefs)
       : []
-    mods.push(...applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks))
+    mods.push(
+      ...tagModifierSource(applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks), {
+        sourceType: "species",
+        source: trait.name,
+        label: trait.name,
+        sourceId: species.id,
+      }),
+    )
   })
 
   return mods
@@ -377,12 +392,7 @@ export function collectBuilderModifierRefIds(params: {
   })
 
   return [
-    ...tagModifierSource(normalizeCharacteristics(speciesResolved, null), {
-      sourceType: "species",
-      source: species?.name ?? "Species",
-      label: species?.name ?? "Species traits",
-      sourceId: species?.id,
-    }),
+    ...speciesResolved,
     ...tagModifierSource(normalizeCharacteristics(classResolved, null), {
       sourceType: "class",
       source: "Class features",

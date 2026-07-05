@@ -8,6 +8,7 @@ import {
   CLASS_CARD_ASPECT_CLASS,
   WIDE_CARD_ASPECT_CLASS,
   normalizeCardImageUrl,
+  type CompendiumCardImageCrop,
 } from "@/lib/compendium/card-image"
 import { MAX_PORTRAIT_FILE_BYTES } from "@/lib/portrait"
 import { cn } from "@/lib/utils"
@@ -17,17 +18,21 @@ type CardImageFieldProps = {
   onChange: (value: string | null) => void
   label?: string
   imageAspect?: "3/4" | "21/9"
+  imageCrop?: CompendiumCardImageCrop
 }
 
 export function CardImageField({
   value,
   onChange,
   label = "Card background graphic",
-  imageAspect = "3/4",
+  imageAspect = "21/9",
+  imageCrop = "center",
 }: CardImageFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const preview = normalizeCardImageUrl(value)
   const aspectClass = imageAspect === "21/9" ? WIDE_CARD_ASPECT_CLASS : CLASS_CARD_ASPECT_CLASS
+  const previewImageClass =
+    imageCrop === "top" ? "h-full w-full object-cover object-top" : "h-full w-full object-cover object-center"
 
   const onFile = (file: File | undefined) => {
     if (!file) return
@@ -56,7 +61,7 @@ export function CardImageField({
       {preview ? (
         <div className={cn("relative w-full max-w-md overflow-hidden rounded-lg border border-border", aspectClass)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="" className="h-full w-full object-cover" />
+          <img src={preview} alt="" className={previewImageClass} />
           <button
             type="button"
             onClick={() => onChange(null)}

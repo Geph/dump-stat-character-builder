@@ -4,8 +4,9 @@ import {
 } from "@/lib/builder/multiclass-proficiencies"
 import { resolvePrimaryClassId } from "@/lib/builder/primary-class"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
+import { legacyBackgroundOriginFeatPickComplete } from "@/lib/compendium/background-origin-feat"
 import { DND_SKILLS } from "@/lib/compendium/constants"
-import type { DndClass, Species, Subclass } from "@/lib/types"
+import type { Background, DndClass, Species, Subclass } from "@/lib/types"
 
 const DND_SKILL_SET = new Set<string>(DND_SKILLS)
 
@@ -180,6 +181,7 @@ export function collectOriginStepBlockers(
   speciesFeatPickKeys: string[] = [],
   featureChoicePicks: Record<string, string[]> = {},
   backgroundFeatPickKeys: string[] = [],
+  selectedBackground?: Background,
 ): string[] {
   const blockers: string[] = []
   if (!speciesId) blockers.push("Select a species.")
@@ -211,6 +213,10 @@ export function collectOriginStepBlockers(
     }
   }
 
+  if (!legacyBackgroundOriginFeatPickComplete(selectedBackground, featureChoicePicks)) {
+    blockers.push("Select an Origin feat from your background.")
+  }
+
   return blockers
 }
 
@@ -222,6 +228,7 @@ export function validateOriginStepChoices(
   speciesFeatPickKeys: string[] = [],
   featureChoicePicks: Record<string, string[]> = {},
   backgroundFeatPickKeys: string[] = [],
+  selectedBackground?: Background,
 ): boolean {
   return (
     collectOriginStepBlockers(
@@ -232,6 +239,7 @@ export function validateOriginStepChoices(
       speciesFeatPickKeys,
       featureChoicePicks,
       backgroundFeatPickKeys,
+      selectedBackground,
     ).length === 0
   )
 }
@@ -243,4 +251,21 @@ export function mergeSkillProficiencies(
 ): string[] {
   const classSkills = Object.values(classSkillPicks).flat()
   return [...new Set([...(backgroundSkills ?? []), ...classSkills, ...extraSkills])]
+}
+
+/** Skills the character is proficient in during the builder (picks + modifier grants). */
+export function proficientSkillsInBuilder(params: {
+  backgroundSkills?: string[] | null
+  classSkillPicks: Record<string, string[]>
+  featureChoicePicks?: Record<string, string[]>
+  speciesTraitPicks?: Record<string, string[]>
+  modifierGrantedSkills?: string[]
+}): string[] {
+  const fromFeatures = Object.values(params.featureChoicePicks ?? {}).flat()
+  const fromSpecies = Object.values(params.speciesTraitPicks ?? {}).flat()
+  return mergeSkillProficiencies(params.backgroundSkills, params.classSkillPicks, [
+    ...fromFeatures,
+    ...fromSpecies,
+    ...(params.modifierGrantedSkills ?? []),
+  ]).filter(isDndSkill)
 }

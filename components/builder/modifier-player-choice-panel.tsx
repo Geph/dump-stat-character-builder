@@ -4,7 +4,9 @@ import { useState } from "react"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import {
   modifierPlayerChoiceSlotsForSource,
+  optionsForExpertiseSlot,
   spellOptionsForModifierSlot,
+  type ModifierPlayerChoiceKind,
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import type { Spell } from "@/lib/types"
@@ -23,6 +25,14 @@ type ModifierPlayerChoicePanelProps = {
   excludeKinds?: ModifierPlayerChoiceKind[]
   /** Skills/tools already chosen elsewhere in the build, hidden from skill choices here. */
   unavailableOptions?: string[]
+  /** Compact builder layout: denser grid, no skill info buttons. */
+  choiceLayout?: "default" | "compact"
+  /** Skills the character is already proficient in (for Expertise pickers). */
+  proficientSkills?: string[]
+  /** Tools the character is already proficient in (for Expertise skill-or-tool pickers). */
+  proficientTools?: string[]
+  /** Skills that already have Expertise from earlier features. */
+  existingExpertiseSkills?: string[]
 }
 
 function SpellGrantPicker({
@@ -132,6 +142,10 @@ export function ModifierPlayerChoicePanel({
   kinds,
   excludeKinds,
   unavailableOptions = [],
+  choiceLayout = "default",
+  proficientSkills = [],
+  proficientTools = [],
+  existingExpertiseSkills = [],
 }: ModifierPlayerChoicePanelProps) {
   const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey).filter((slot) => {
     if (kinds?.length && !kinds.includes(slot.kind)) return false
@@ -160,23 +174,37 @@ export function ModifierPlayerChoicePanel({
         }
 
         const isSkillKind = slot.kind === "skill" || slot.kind === "skill_or_tool"
+        const currentSelection = picks[slot.slotKey] ?? []
+        const displayOptions = slot.grantsExpertise
+          ? optionsForExpertiseSlot(slot, {
+              proficientSkills,
+              proficientTools,
+              existingExpertiseSkills,
+              currentSelection,
+            })
+          : (slot.options ?? [])
+        const expertiseHint =
+          slot.kind === "skill_or_tool" && slot.grantsExpertise
+            ? `Choose ${slot.maxCount} total (proficient skills or tools only)`
+            : slot.grantsExpertise
+              ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
+              : `Choose ${slot.maxCount}`
         return (
           <MultiSelectChoices
             key={slot.slotKey}
             title={slot.label}
             hint={
-              slot.kind === "skill_or_tool"
+              slot.kind === "skill_or_tool" && !slot.grantsExpertise
                 ? `Choose ${slot.maxCount} total (any mix of skills and tools)`
-                : slot.grantsExpertise
-                  ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
-                  : `Choose ${slot.maxCount}`
+                : expertiseHint
             }
-            options={slot.options ?? []}
+            options={displayOptions}
             maxCount={slot.maxCount}
-            selected={picks[slot.slotKey] ?? []}
+            selected={currentSelection}
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
             showSkillInfo={isSkillKind}
+            layout={choiceLayout}
             unavailableOptions={isSkillKind && !slot.grantsExpertise ? unavailableOptions : []}
             allowCustom={slot.allowCustom ?? false}
             customPlaceholder={slot.kind === "language" ? "Add a custom language..." : undefined}

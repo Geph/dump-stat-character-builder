@@ -49,5 +49,5 @@ export async function loadModifierCatalog(db: CatalogDb) {
     .single()
 
   const row = data as Record<string, unknown> | null
-  return normalizeModifierCatalog(row?.modifier_catalog)
+  return mergeDefaultCatalogEntries(normalizeModifierCatalog(row?.modifier_catalog))
 }

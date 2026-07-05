@@ -6,10 +6,10 @@ import { X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import {
   getCompendiumCardImageUrl,
-  CLASS_CARD_ASPECT_CLASS,
-  WIDE_CARD_ASPECT_CLASS,
+  type CompendiumCardImageCrop,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
+import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
   compendiumAccentColorStyles,
   type CompendiumThemeColorId,
@@ -31,8 +31,8 @@ type CompendiumDetailOverlayProps = {
   accentColor?: CompendiumThemeColorId | null
   headerActions?: ReactNode
   children: ReactNode
-  /** Portrait 3:4 for classes; wide 21:9 for species and backgrounds. */
-  imageAspect?: "3/4" | "21/9"
+  /** Portrait class art uses top crop inside the landscape banner. */
+  imageCrop?: CompendiumCardImageCrop
 }
 
 export function CompendiumDetailOverlay({
@@ -45,11 +45,10 @@ export function CompendiumDetailOverlay({
   accentColor = null,
   headerActions,
   children,
-  imageAspect = "21/9",
+  imageCrop = "center",
 }: CompendiumDetailOverlayProps) {
   const imageUrl = getCompendiumCardImageUrl(item)
   const accent = compendiumAccentColorStyles(accentColor)
-  const aspectClass = imageAspect === "3/4" ? CLASS_CARD_ASPECT_CLASS : WIDE_CARD_ASPECT_CLASS
 
   return (
     <AnimatePresence>
@@ -72,20 +71,13 @@ export function CompendiumDetailOverlay({
           >
             {/* Hero band — fixed aspect so art is not stretched over full overlay height */}
             <div className="relative shrink-0 overflow-hidden">
-              <div className={cn("relative w-full", aspectClass, "min-h-[180px] max-h-[42vh]")}>
-                {imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={imageUrl}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover object-top"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-muted via-card to-background" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
-              </div>
+              <CompendiumCardHero
+                imageUrl={imageUrl}
+                crop={imageCrop}
+                variant="overlay"
+                minHeightClass="min-h-[180px]"
+                maxHeightClass="max-h-[42vh]"
+              />
 
               <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
                 <div className="flex items-center gap-3">

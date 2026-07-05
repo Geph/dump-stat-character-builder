@@ -465,11 +465,14 @@ function parseResourceDieKey(text: string): string | null {
   return `${phrase.toLowerCase().replace(/\s+/g, "_")}_dice`
 }
 
+const RESOURCE_DIE_BONUS_PHRASE =
+  /bonus to (?:the|your) roll equal to your \w+(?:\s+\w+)?\s+Die/i
+
 function buildResourceDieCheckBonus(
   ctx: DetectFeatureContext,
   text: string,
 ): LinkedModifierInstance | null {
-  if (!/bonus to the roll equal to your \w+(?:\s+\w+)?\s+Die/i.test(text)) return null
+  if (!RESOURCE_DIE_BONUS_PHRASE.test(text)) return null
   const resourceKey = parseResourceDieKey(text)
   if (!resourceKey) return null
 
@@ -1423,7 +1426,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "uses.once_short_long_rest",
     confidence: "medium",
     test:
-      /\b(?:must|you must)\s+finish\s+a\s+short\s+or\s+long\s+rest\s+before\s+you\s+can\s+use\s+this\s+(?:feature\s+)?again\b/i,
+      /\b(?:must|you must)\s+finish\s+a\s+short\s+or\s+long\s+rest\s+before\s+you\s+can\s+use\s+(?:this feature|it)\s+again\b/i,
     build: (_match, ctx) => {
       const uses: UsesConfig = {
         type: "fixed",
@@ -1581,7 +1584,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "check.bonus.resource_die",
     confidence: "high",
     scope: "full",
-    test: /bonus to the roll equal to your \w+(?:\s+\w+)?\s+Die/i,
+    test: RESOURCE_DIE_BONUS_PHRASE,
     build: (_match, ctx, text) => buildResourceDieCheckBonus(ctx, text),
   },
   {

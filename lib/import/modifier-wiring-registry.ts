@@ -266,6 +266,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_fx_check_roll_modifier",
     examples: [
       "whenever you are forced to make an Intelligence, Wisdom, or Charisma saving throw you gain a bonus to the roll equal to your Exploit Die",
+      "whenever you are forced to make an Intelligence, Wisdom, or Charisma saving throw, you gain a bonus to your roll equal to your Exploit Die",
     ],
     mechanicsKind: "check_roll_modifier",
     notes: 'bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey }',
@@ -472,7 +473,11 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "uses.once_short_long_rest",
     trigger: "description",
     catalog: "cat_char_uses",
-    examples: ["once per short or long rest"],
+    examples: [
+      "once per short or long rest",
+      "you must finish a short or long rest before you can use this feature again",
+      "After you do so, you must finish a short or long rest before you can use it again",
+    ],
     mechanicsKind: "uses",
     notes: 'usesFixed: 1, usesRecharge: "both"',
   },
@@ -738,7 +743,7 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_feature_option_picker",
     examples: ["Weapon Mastery"],
     notes:
-      "Pair with class_resources.weapon_mastery from the class table column. Weapon items use properties.mastery (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex).",
+      "Wire tier table via choices.choiceCountByLevel on the Weapon Mastery feature (not class_resources). Property names and rules come from the Weapon Mastery Properties system catalog (custom_abilities …0004), with SRD defaults as fallback.",
   },
 ]
 

@@ -16,6 +16,15 @@ function tierCount(table: { level: number; count: number }[], characterLevel: nu
   return count
 }
 
+/** Tier-table lookup shared by class resources and feature choice counts. */
+export function resolveTierCountAtLevel(
+  table: { level: number; count: number }[] | null | undefined,
+  characterLevel: number,
+): number {
+  if (!table?.length) return 0
+  return tierCount(table, characterLevel)
+}
+
 function parseDieSidesFromType(dieType: UsesConfig["dieType"]): number | null {
   if (!dieType) return null
   const match = dieType.match(/^d(\d+)$/i)

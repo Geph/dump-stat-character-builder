@@ -45,6 +45,7 @@ import {
 import type { ImportReport } from "@/lib/import/build-import-report"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportStage } from "@/lib/import/import-staging"
 import type {
   ImportProposalSelections,
   ImportProposalSet,

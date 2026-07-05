@@ -10,6 +10,7 @@ type FeatModifierChoicePickerProps = {
   selected: string[]
   onChange: (selected: string[]) => void
   accentClass?: string
+  layout?: "default" | "compact"
 }
 
 export function FeatModifierChoicePicker({
@@ -18,6 +19,7 @@ export function FeatModifierChoicePicker({
   selected,
   onChange,
   accentClass = "border-primary bg-primary/10",
+  layout = "default",
 }: FeatModifierChoicePickerProps) {
   if (!feat.choices?.options?.length) return null
 
@@ -33,6 +35,7 @@ export function FeatModifierChoicePicker({
       selected={selected}
       onChange={onChange}
       accentClass={accentClass}
+      layout={layout}
     />
   )
 }

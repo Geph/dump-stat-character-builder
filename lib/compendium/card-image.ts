@@ -2,16 +2,20 @@ import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
+import type { CompendiumContentType } from "@/lib/compendium/content-types"
+
 /** Card / detail hero art — URL or data URL. */
-export const CLASS_CARD_IMAGE_ASPECT = "3:4 portrait"
+export const CLASS_CARD_IMAGE_ASPECT = "3:4 portrait (classes — top-cropped in banner)"
 export const WIDE_CARD_IMAGE_ASPECT = "21:9 landscape"
 export const CLASS_CARD_ASPECT_CLASS = "aspect-[3/4]"
 export const WIDE_CARD_ASPECT_CLASS = "aspect-[21/9]"
-/** Hero band for wide selection cards; card body adds height below. */
+/** Hero band for compendium list cards, selection cards, and detail overlays. */
 export const WIDE_SELECTION_CARD_HERO_CLASS = "aspect-[21/9]"
 export const WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS = "min-h-[300px]"
-export const CARD_IMAGE_ASPECT_LABEL = `${CLASS_CARD_IMAGE_ASPECT} (classes) or ${WIDE_CARD_IMAGE_ASPECT} (species & backgrounds)`
-export const CARD_IMAGE_RECOMMENDED = "600×800px (classes) or 840×360px (species & backgrounds)"
+export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended); ${CLASS_CARD_IMAGE_ASPECT}`
+export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
+
+export type CompendiumCardImageCrop = "top" | "center"
 
 /** Max characters for the two-line card blurb (`line-clamp-2 text-xs`). */
 export const COMPENDIUM_CARD_BLURB_MAX_LENGTH = 120
@@ -37,6 +41,17 @@ export function normalizeCardImageUrl(url: unknown): string | null {
 
 export function getCompendiumCardImageUrl(item: CompendiumCardVisual): string | null {
   return normalizeCardImageUrl(item.card_image_url)
+}
+
+/** Portrait class art is top-cropped into the landscape banner; other types use full landscape framing. */
+export function compendiumCardImageCropForType(tab: CompendiumContentType): CompendiumCardImageCrop {
+  return tab === "classes" || tab === "subclasses" ? "top" : "center"
+}
+
+export function compendiumCardHeroImageClass(crop: CompendiumCardImageCrop = "center"): string {
+  return crop === "top"
+    ? "absolute inset-0 h-full w-full object-cover object-top"
+    : "absolute inset-0 h-full w-full object-cover object-center"
 }
 
 export function compendiumCardAccent(item: CompendiumCardVisual): CompendiumThemeColorId | null {

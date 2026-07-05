@@ -12,6 +12,7 @@ type LegacyFeatureOptionPicker = {
   id?: string
   category?: string | null
   choiceCount?: number | null
+  choiceCountByLevel?: { level: number; count: number }[] | null
   swappableOnRest?: boolean | null
   resourceKey?: string | null
   label?: string | null
@@ -39,6 +40,9 @@ function pickerToChoice(picker: LegacyFeatureOptionPicker, fallbackName: string)
     count: typeof picker.choiceCount === "number" && picker.choiceCount > 0 ? picker.choiceCount : 1,
     swappableOnRest: picker.swappableOnRest ?? undefined,
     resourceKey: picker.resourceKey ?? undefined,
+    choiceCountByLevel: Array.isArray(picker.choiceCountByLevel)
+      ? picker.choiceCountByLevel
+      : undefined,
     options: Array.isArray(picker.options)
       ? picker.options.map((option) => ({
           name: option?.name ?? "",
@@ -59,6 +63,9 @@ function mergeChoice(existing: FeatureChoice | undefined, incoming: FeatureChoic
     swappableOnRest: existing.swappableOnRest ?? incoming.swappableOnRest,
     swapRestType: existing.swapRestType ?? incoming.swapRestType,
     resourceKey: existing.resourceKey ?? incoming.resourceKey,
+    choiceCountByLevel: existing.choiceCountByLevel?.length
+      ? existing.choiceCountByLevel
+      : incoming.choiceCountByLevel,
     options: existing.options?.length ? existing.options : incoming.options,
   }
 }
