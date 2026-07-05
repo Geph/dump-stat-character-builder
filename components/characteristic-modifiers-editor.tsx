@@ -979,7 +979,7 @@ function ToolProficienciesEditor({
                 }
                 className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-primary"
               >
-                Artisan's tools
+                Artisan&apos;s tools
               </button>
               <button
                 type="button"
