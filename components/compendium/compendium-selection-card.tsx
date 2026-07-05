@@ -6,9 +6,10 @@ import { GameIcon } from "@/components/game-icon-picker"
 import {
   getCompendiumCardBlurb,
   getCompendiumCardImageUrl,
-  CLASS_CARD_ASPECT_CLASS,
+  compendiumCardHeroImageClass,
   WIDE_SELECTION_CARD_HERO_CLASS,
   WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
+  type CompendiumCardImageCrop,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
 import {
@@ -39,8 +40,9 @@ type CompendiumSelectionCardProps = {
   selectLabel?: string
   className?: string
   size?: "sm" | "md" | "lg"
-  /** Portrait 3:4 for classes; wide 21:9 hero + tall body for species and backgrounds. */
-  imageAspect?: "3/4" | "21/9"
+  /** @deprecated Always landscape; kept for call-site compatibility. */
+  imageAspect?: "21/9"
+  imageCrop?: CompendiumCardImageCrop
 }
 
 function CardContent({
@@ -156,24 +158,16 @@ export function CompendiumSelectionCard({
   selectLabel = "Select",
   className,
   size = "md",
-  imageAspect = "3/4",
+  imageAspect: _imageAspect = "21/9",
+  imageCrop = "center",
 }: CompendiumSelectionCardProps) {
   const imageUrl = getCompendiumCardImageUrl(item)
   const accent = compendiumAccentColorStyles(accentColor)
   const blurb = description ?? getCompendiumCardBlurb(item)
-  const isWideLayout = imageAspect === "21/9"
-  const contentPaddingClass = isWideLayout
-    ? size === "lg"
-      ? "p-5 pt-3"
-      : size === "md"
-        ? "p-4 pt-3"
-        : "p-3 pt-2"
-    : size === "lg"
-      ? "p-5 pt-14"
-      : size === "md"
-        ? "p-4 pt-12"
-        : "p-3 pt-10"
-  const blurbLineClamp = isWideLayout ? "line-clamp-3" : "line-clamp-2"
+  const heroImageClass = compendiumCardHeroImageClass(imageCrop)
+  const contentPaddingClass =
+    size === "lg" ? "p-5 pt-3" : size === "md" ? "p-4 pt-3" : "p-3 pt-2"
+  const blurbLineClamp = "line-clamp-3"
   const selectedBorderClass =
     selectionVariant === "secondary"
       ? "border-secondary ring-2 ring-secondary/40 shadow-secondary/20"
@@ -182,7 +176,7 @@ export function CompendiumSelectionCard({
   const cardShellClass = cn(
     "group relative flex w-full flex-col overflow-hidden rounded-lg text-left transition-shadow",
     "border-2 shadow-lg",
-    isWideLayout ? WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS : CLASS_CARD_ASPECT_CLASS,
+    WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
     selected
       ? selectedBorderClass
       : "border-primary/50 hover:border-primary/80 hover:shadow-xl",
@@ -225,53 +219,24 @@ export function CompendiumSelectionCard({
     selectLabel,
   }
 
-  if (isWideLayout) {
-    return (
-      <motion.div {...cardShellProps}>
-        <div className={cn("relative w-full shrink-0 overflow-hidden", WIDE_SELECTION_CARD_HERO_CLASS)}>
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black" />
-          {item.icon && (
-            <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
-              <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
-            </div>
-          )}
-          {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
-        </div>
-        <div className={cn("relative flex flex-1 flex-col bg-gradient-to-b from-black via-black/95 to-black", contentPaddingClass)}>
-          <CardContent {...contentProps} />
-        </div>
-      </motion.div>
-    )
-  }
-
   return (
     <motion.div {...cardShellProps}>
-      <div className="absolute inset-0">
+      <div className={cn("relative w-full shrink-0 overflow-hidden", WIDE_SELECTION_CARD_HERO_CLASS)}>
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="" className="h-full w-full object-cover object-top" />
+          <img src={imageUrl} alt="" className={heroImageClass} />
         ) : (
-          <div className="h-full w-full bg-gradient-to-br from-muted/80 via-card to-background" />
+          <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black" />
+        {item.icon && (
+          <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
+            <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
+          </div>
+        )}
+        {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
       </div>
-
-      {item.icon && (
-        <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
-          <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
-        </div>
-      )}
-
-      {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
-
-      <div className={cn("relative z-10 mt-auto flex flex-1 flex-col justify-end", contentPaddingClass)}>
+      <div className={cn("relative flex flex-1 flex-col bg-gradient-to-b from-black via-black/95 to-black", contentPaddingClass)}>
         <CardContent {...contentProps} />
       </div>
     </motion.div>

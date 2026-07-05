@@ -1,3 +1,5 @@
+import type { Background } from "@/lib/types"
+
 /** Spell lists offered by the Magic Initiate origin feat (SRD 2024). */
 export const MAGIC_INITIATE_SPELL_LISTS = ["Cleric", "Druid", "Wizard"] as const
 
@@ -72,4 +74,53 @@ export function backgroundOriginFeatSelectOptions(
   }
 
   return options
+}
+
+export function legacyBackgroundOriginFeatPickKey(backgroundId: string): string {
+  return `background:${backgroundId}:origin-feat`
+}
+
+function backgroundFeatureHasLinkedModifiers(
+  background: Pick<Background, "feature"> | null | undefined,
+): boolean {
+  const feature = background?.feature
+  if (!feature) return false
+  const linked =
+    feature.linkedModifiers ??
+    (feature as { linked_modifiers?: unknown[] }).linked_modifiers
+  return Array.isArray(linked) && linked.length > 0
+}
+
+/**
+ * Pre-2024 backgrounds: both ability_bonuses and feat_granted are null at import.
+ * null is intentional — the builder offers free ASI and an Origin feat pick.
+ */
+export function isLegacyBackground(
+  background: Pick<Background, "ability_bonuses" | "feat_granted" | "feature"> | null | undefined,
+): boolean {
+  if (!background) return false
+  if (background.ability_bonuses !== null) return false
+  if (background.feat_granted?.trim()) return false
+  if (backgroundFeatureHasLinkedModifiers(background)) return false
+  return true
+}
+
+/** Resolved feat_granted text: fixed grant, or the player's legacy Origin feat pick. */
+export function getEffectiveBackgroundFeatGranted(
+  background: Pick<Background, "id" | "feat_granted"> | null | undefined,
+  featureChoicePicks: Record<string, string[]>,
+): string | null {
+  if (!background) return null
+  const fixed = background.feat_granted?.trim()
+  if (fixed) return fixed
+  const picked = featureChoicePicks[legacyBackgroundOriginFeatPickKey(background.id)]?.[0]?.trim()
+  return picked || null
+}
+
+export function legacyBackgroundOriginFeatPickComplete(
+  background: Pick<Background, "id" | "ability_bonuses" | "feat_granted" | "feature"> | null | undefined,
+  featureChoicePicks: Record<string, string[]>,
+): boolean {
+  if (!isLegacyBackground(background)) return true
+  return Boolean(getEffectiveBackgroundFeatGranted(background, featureChoicePicks))
 }

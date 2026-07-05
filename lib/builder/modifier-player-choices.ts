@@ -26,7 +26,8 @@ import {
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
+import { mergeToolNameLists, toolNamesForPool } from "@/lib/compendium/tool-options"
+import { SRD_TOOL_NAMES, getAllSeedToolNames } from "@/lib/compendium/srd-tools"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
 import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
@@ -65,7 +66,7 @@ export type ModifierPlayerChoiceSlot = {
 }
 
 const SKILL_NAME_SET = new Set<string>(SKILL_NAMES)
-const TOOL_NAME_SET = new Set<string>(SRD_TOOL_NAMES)
+const TOOL_NAME_SET = new Set<string>(getAllSeedToolNames())
 
 export function sharedChoiceSlotKey(sourceKey: string, groupId: string): string {
   return `${sourceKey}::shared::${groupId}`
@@ -170,7 +171,13 @@ function slotsFromCharacteristic(
     if (count <= 0) return slots
 
     const customPool = (mod.choiceOptions ?? []).filter((name) => name.trim().length > 0)
-    const pool = customPool.length > 0 ? customPool : [...SRD_TOOL_NAMES]
+    const allToolNames = mergeToolNameLists()
+    const pool =
+      customPool.length > 0
+        ? customPool
+        : mod.toolChoicePool
+          ? toolNamesForPool(mod.toolChoicePool, allToolNames)
+          : [...SRD_TOOL_NAMES]
 
     slots.push({
       slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "tool"),
@@ -178,7 +185,11 @@ function slotsFromCharacteristic(
       sourceLabel,
       modId: mod.id,
       kind: "tool",
-      label: mod.label ?? `Choose ${count} tool${count === 1 ? "" : "s"}`,
+      label:
+        mod.label ??
+        (mod.toolChoicePool === "musical"
+          ? `Choose ${count} musical instrument${count === 1 ? "" : "s"}`
+          : `Choose ${count} tool${count === 1 ? "" : "s"}`),
       maxCount: count,
       options: pool.map((name) => ({ name })),
     })
@@ -292,6 +303,15 @@ function slotsFromCharacteristic(
   return slots
 }
 
+function sharedGroupGrantsExpertise(mods: CharacteristicModifier[], groupId: string): boolean {
+  return mods.some(
+    (mod) =>
+      mod.sharedChoiceGroup === groupId &&
+      (mod.type === "skills" || mod.type === "tool_proficiencies") &&
+      mod.grantExpertise,
+  )
+}
+
 function slotsFromSharedChoiceGroups(
   mods: CharacteristicModifier[],
   sourceKey: string,
@@ -315,6 +335,7 @@ function slotsFromSharedChoiceGroups(
   const slots: ModifierPlayerChoiceSlot[] = []
   for (const [groupId, group] of groups) {
     const count = group.count
+    const grantsExpertise = sharedGroupGrantsExpertise(mods, groupId)
     slots.push({
       slotKey: sharedChoiceSlotKey(sourceKey, groupId),
       sourceKey,
@@ -329,8 +350,9 @@ function slotsFromSharedChoiceGroups(
       sharedChoiceModIds: group.modIds,
       options: [
         ...SKILL_NAMES.map((name) => ({ name })),
-        ...SRD_TOOL_NAMES.map((name) => ({ name })),
+        ...mergeToolNameLists().map((name) => ({ name })),
       ],
+      grantsExpertise,
     })
   }
 
@@ -637,7 +659,12 @@ export function applyModifierPlayerPicks(
 
       const entries = selected.map((skill) => {
         const poolEntry = skillMod.entries?.find((entry) => entry.skill === skill)
-        return poolEntry ?? { skill, expertise: false }
+        return (
+          poolEntry ?? {
+            skill,
+            expertise: skillMod.grantExpertise ?? false,
+          }
+        )
       })
       return { ...skillMod, entries }
     }
@@ -872,4 +899,52 @@ export function classFeatureSpellGrantSlots(
 
 export function isSkillOrToolOptionName(name: string): boolean {
   return SKILL_NAME_SET.has(name) || TOOL_NAME_SET.has(name)
+}
+
+/** Limit Expertise pickers to proficiencies the character already has. */
+export function optionsForExpertiseSlot(
+  slot: ModifierPlayerChoiceSlot,
+  params: {
+    proficientSkills: string[]
+    proficientTools?: string[]
+    existingExpertiseSkills?: string[]
+    currentSelection?: string[]
+  },
+): { name: string; description?: string }[] {
+  if (!slot.grantsExpertise) return slot.options ?? []
+
+  const {
+    proficientSkills,
+    proficientTools = [],
+    existingExpertiseSkills = [],
+    currentSelection = [],
+  } = params
+
+  const proficientSkillSet = new Set(proficientSkills)
+  const proficientToolSet = new Set(proficientTools)
+  const alreadyExpert = new Set(
+    existingExpertiseSkills.filter((skill) => !currentSelection.includes(skill)),
+  )
+
+  const baseOptions =
+    slot.kind === "skill_or_tool"
+      ? slot.options?.length
+        ? slot.options
+        : [
+            ...SKILL_NAMES.map((name) => ({ name })),
+            ...mergeToolNameLists().map((name) => ({ name })),
+          ]
+      : slot.options?.length
+        ? slot.options
+        : SKILL_NAMES.map((name) => ({ name }))
+
+  return baseOptions.filter((option) => {
+    if (SKILL_NAME_SET.has(option.name)) {
+      return proficientSkillSet.has(option.name) && !alreadyExpert.has(option.name)
+    }
+    if (TOOL_NAME_SET.has(option.name)) {
+      return proficientToolSet.has(option.name)
+    }
+    return false
+  })
 }

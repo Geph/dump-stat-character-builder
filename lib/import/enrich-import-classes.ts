@@ -22,6 +22,7 @@ import {
   THIRD_PARTY_RESOURCE_PATTERNS,
 } from "@/lib/import/third-party-resources"
 import type { Feature, UsesConfig } from "@/lib/types"
+import { enrichImportedWeaponMasteryFromColumn } from "@/lib/compendium/weapon-mastery-choice"
 
 export type ClassResourceImportRow = {
   class_name: string
@@ -206,7 +207,7 @@ export function mergeUsesFromProgressionTable(
     atLevelMode: fromTable.atLevelMode ?? explicit.atLevelMode,
     dieType: fromTable.dieType ?? explicit.dieType,
     dieSidesByLevel: fromTable.dieSidesByLevel ?? explicit.dieSidesByLevel,
-    recharges: fromTable.recharges?.length ? fromTable.recharges : explicit.recharges,
+    recharges: explicit.recharges?.length ? explicit.recharges : fromTable.recharges,
     specialDescription: explicit.specialDescription ?? fromTable.specialDescription,
   }
 }
@@ -301,6 +302,7 @@ export function buildClassResourceRowsForClass(
 
   const parsedColumns = parsed?.columns ?? []
   for (const column of parsedColumns) {
+    if (column.resourceKey === "weapon_mastery") continue
     const tableUses = usesConfigForProgressionColumn(column, className)
     const existingRow = rows.find((row) => row.resource_key === column.resourceKey)
     if (existingRow) {
@@ -321,6 +323,17 @@ export function buildClassResourceRowsForClass(
   }
 
   return rows
+}
+
+function applyImportedWeaponMasteryColumn(
+  features: Feature[],
+  className: string,
+  progressionText: string,
+): Feature[] {
+  const parsed = parseClassProgressionTable(progressionText)
+  const column = parsed?.columns.find((entry) => entry.resourceKey === "weapon_mastery")
+  if (!column?.valuesByLevel.length) return features
+  return enrichImportedWeaponMasteryFromColumn(features, className, column.valuesByLevel)
 }
 
 /** Link resource spends and normalize features on imported class rows. */
@@ -420,7 +433,7 @@ export function enrichImportedClassRow(
   return {
     ...row,
     description,
-    features: nextFeatures,
+    features: applyImportedWeaponMasteryColumn(nextFeatures, className, progressionText),
     spellcasting,
     special_ability: specialAbility ?? row.special_ability,
     starting_equipment_groups,

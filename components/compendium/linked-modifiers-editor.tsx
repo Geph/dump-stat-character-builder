@@ -8,6 +8,7 @@ import {
 } from "@/lib/compendium/modifier-catalog"
 import { filterModifierCatalogEntries } from "@/lib/compendium/modifier-catalog-search"
 import { createLinkedModifierFromCatalog, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { collectCustomSkillNames } from "@/lib/compendium/characteristic-modifiers"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import { FeatureEffectList } from "@/components/compendium/feature-effect-list"
 import { Button } from "@/components/ui/button"
@@ -84,6 +85,14 @@ export function LinkedModifiersEditor({
       })
       .filter(([, entries]) => entries.length > 0)
   }, [catalog, search])
+
+  const extraSkillNames = useMemo(
+    () =>
+      collectCustomSkillNames(
+        value.flatMap((instance) => instance.characteristics ?? []),
+      ),
+    [value],
+  )
 
   const emitChange = (next: LinkedModifierInstance[]) => {
     onChange(next)
@@ -174,6 +183,7 @@ export function LinkedModifiersEditor({
                     <FeatureEffectList
                       activation={activation}
                       classResources={classResources}
+                      extraSkillNames={extraSkillNames}
                       onChange={(next) => updateActivation(instance.instanceId, next)}
                     />
                   </div>

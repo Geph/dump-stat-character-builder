@@ -3,6 +3,7 @@ import {
   featureLooksLikeSpellList,
 } from "@/lib/compendium/enrich-srd-class-features"
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import {
   collectImportModifierPreviews,
   collectImportModifierReview,

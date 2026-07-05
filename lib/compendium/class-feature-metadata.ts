@@ -235,7 +235,7 @@ export const EXCLUDED_ACTION_CATALOG_KINDS = new Set([
 ])
 
 /** Passive characteristic types omitted from the default common-modifiers catalog. */
-export const EXCLUDED_PASSIVE_CATALOG_TYPES = new Set(["initiative"])
+export const EXCLUDED_PASSIVE_CATALOG_TYPES = new Set(["initiative", "custom_skill"])
 
 export type CheckRollMode = "bonus" | "advantage" | "disadvantage" | "replace_failure"
 

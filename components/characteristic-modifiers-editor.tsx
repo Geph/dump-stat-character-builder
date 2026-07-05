@@ -75,7 +75,9 @@ import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { ClassResource } from "@/lib/types"
 import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
 import { formatSpellOptionLabel, type SpellOption } from "@/lib/compendium/spell-options"
-import { SRD_TOOL_NAMES, SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
+import { mergeToolNameLists } from "@/lib/compendium/tool-options"
+import { SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tools"
+import { SPECIES_SIZES } from "@/lib/compendium/constants"
 import {
   SRD_LANGUAGES,
   SRD_STANDARD_LANGUAGES,
@@ -872,6 +874,24 @@ function SkillsEditor({
   )
 }
 
+function useToolSuggestions(): string[] {
+  const [suggestions, setSuggestions] = useState<string[]>(() => mergeToolNameLists())
+
+  useEffect(() => {
+    const db = createClient()
+    void db
+      .from("tools")
+      .select("name")
+      .then(({ data }) => {
+        if (data?.length) {
+          setSuggestions(mergeToolNameLists(data))
+        }
+      })
+  }, [])
+
+  return suggestions
+}
+
 function ToolProficienciesEditor({
   mod,
   onChange,
@@ -881,6 +901,7 @@ function ToolProficienciesEditor({
 }) {
   const choiceEnabled = (mod.choiceCount ?? 0) > 0
   const sharedEnabled = !!(mod.sharedChoiceGroup && (mod.sharedChoiceCount ?? 0) > 0)
+  const toolSuggestions = useToolSuggestions()
 
   return (
     <div className="space-y-3">
@@ -908,7 +929,7 @@ function ToolProficienciesEditor({
       </label>
       {choiceEnabled && (() => {
         const poolValues = mod.choiceOptions ?? []
-        const restricted = poolValues.length > 0
+        const restricted = poolValues.length > 0 || !!mod.toolChoicePool
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -924,33 +945,72 @@ function ToolProficienciesEditor({
                 className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
               />
               <span className="text-muted-foreground">
-                tool(s) from {restricted ? "the list below" : "the standard list"}
+                tool(s) from{" "}
+                {mod.toolChoicePool
+                  ? `the ${mod.toolChoicePool} group`
+                  : restricted
+                    ? "the list below"
+                    : "the standard list"}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">Restrict pick list:</span>
+              <span className="text-xs text-muted-foreground">Pick pool:</span>
               <button
                 type="button"
-                onClick={() => onChange({ ...mod, choiceOptions: [...SRD_MUSICAL_INSTRUMENTS] })}
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    toolChoicePool: "musical",
+                    choiceOptions: null,
+                  })
+                }
                 className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-primary"
               >
                 Musical instruments
               </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    toolChoicePool: "artisans",
+                    choiceOptions: null,
+                  })
+                }
+                className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-primary"
+              >
+                Artisan's tools
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    choiceOptions: [...SRD_MUSICAL_INSTRUMENTS],
+                    toolChoicePool: null,
+                  })
+                }
+                className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-primary"
+              >
+                Custom list
+              </button>
               {restricted && (
                 <button
                   type="button"
-                  onClick={() => onChange({ ...mod, choiceOptions: null })}
+                  onClick={() => onChange({ ...mod, choiceOptions: null, toolChoicePool: null })}
                   className="text-xs px-2 py-1 rounded border border-border bg-background hover:border-destructive text-muted-foreground"
                 >
                   Clear (use all tools)
                 </button>
               )}
             </div>
-            {restricted && (
+            {poolValues.length > 0 && (
               <TagInput
                 values={poolValues}
-                onChange={(values) => onChange({ ...mod, choiceOptions: values })}
-                suggestions={[...SRD_MUSICAL_INSTRUMENTS, ...SRD_TOOL_NAMES]}
+                onChange={(values) =>
+                  onChange({ ...mod, choiceOptions: values, toolChoicePool: null })
+                }
+                suggestions={toolSuggestions}
                 placeholder="Add options to the pick list..."
               />
             )}
@@ -961,7 +1021,7 @@ function ToolProficienciesEditor({
         <TagInput
           values={mod.values}
           onChange={(values) => onChange({ ...mod, values })}
-          suggestions={[...SRD_TOOL_NAMES]}
+          suggestions={toolSuggestions}
           placeholder="Add tool proficiencies..."
         />
       )}
@@ -1470,6 +1530,51 @@ function ModifierFields({
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             />
           </div>
+        </div>
+      )
+
+    case "custom_skill":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Grants a named skill calculated like a standard SRD skill: ability modifier plus
+            proficiency bonus (doubled with expertise).
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Skill name</label>
+            <input
+              type="text"
+              value={mod.name}
+              onChange={(e) => onChange({ ...mod, name: e.target.value })}
+              placeholder="e.g. Psionics, Tactics, Lore"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Ability modifier</label>
+            <select
+              value={mod.ability}
+              onChange={(e) =>
+                onChange({ ...mod, ability: e.target.value as typeof mod.ability })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={mod.expertise ?? false}
+              onChange={(e) => onChange({ ...mod, expertise: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">Expertise (double proficiency bonus)</span>
+          </label>
         </div>
       )
 

@@ -189,6 +189,21 @@ const ImportProposalsAiSchema = z.object({
   custom_abilities: z.array(ProposedCustomAbilityAiSchema).nullable(),
 })
 
+const StartingEquipmentGroupAiSchema = z.object({
+  description: z.string(),
+  options: z.array(
+    z.object({
+      label: z.string(),
+      items: z.array(
+        z.object({
+          name: z.string(),
+          quantity: z.number(),
+        }),
+      ),
+    }),
+  ),
+})
+
 const ClassAiSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
@@ -202,6 +217,8 @@ const ClassAiSchema = z.object({
   spellcasting: SpellcastingAiSchema.nullable(),
   features: z.array(ClassFeatureAiSchema).nullable(),
   spell_list: z.array(z.string()).nullable(),
+  starting_equipment_groups: z.array(StartingEquipmentGroupAiSchema).nullable(),
+  starting_gold: z.number().nullable(),
 })
 
 const SubclassAiSchema = z.object({
@@ -251,6 +268,19 @@ const BackgroundAiSchema = z.object({
   feature: z.object({ name: z.string(), description: z.string() }).nullable(),
   grants_spells: z.boolean().nullable(),
   granted_spells: z.record(z.string(), z.array(z.string())).nullable(),
+  proficiencies: z
+    .object({
+      tools: z.array(z.string()).nullable(),
+      vehicles: z.array(z.string()).nullable(),
+      weapons: z.array(z.string()).nullable(),
+      armor: z.array(z.string()).nullable(),
+      languages: z.array(z.string()).nullable(),
+    })
+    .nullable(),
+  starting_equipment: z
+    .array(z.object({ name: z.string(), quantity: z.number() }))
+    .nullable(),
+  starting_gold: z.number().nullable(),
 })
 
 const EquipmentWeaponFormAiSchema = z.object({
@@ -443,6 +473,8 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
       weapon_proficiencies: row.weapon_proficiencies,
       skill_choices: row.skill_choices,
       spell_list: row.spell_list,
+      starting_equipment_groups: row.starting_equipment_groups,
+      starting_gold: row.starting_gold,
     }),
     ...(spellcasting && Object.keys(spellcasting).length ? { spellcasting } : {}),
   } as NonNullable<ImportContent["classes"]>[number]
@@ -517,6 +549,9 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         feature: background.feature,
         grants_spells: background.grants_spells === true ? true : undefined,
         granted_spells: background.granted_spells,
+        proficiencies: background.proficiencies,
+        starting_equipment: background.starting_equipment,
+        starting_gold: background.starting_gold,
       }),
     }))
   }

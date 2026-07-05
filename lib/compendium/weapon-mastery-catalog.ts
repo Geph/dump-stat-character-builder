@@ -15,13 +15,12 @@ export function buildWeaponMasteryCatalogEntry(): ModifierCatalogEntry {
     description:
       "<p>Link this template to a class feature named <strong>Weapon Mastery</strong>. " +
       "The builder shows one pick per slot from compendium weapons that have a mastery property. " +
-      "Slot count scales with the class <code>weapon_mastery</code> resource when present.</p>",
+      "Slot count scales via <code>choices.choiceCountByLevel</code> on the feature (legacy <code>resourceKey: weapon_mastery</code> still supported).</p>",
     characteristics: [
       legacyFeatureOptionPickerCharacteristic({
         id: "mod_weapon_mastery",
         category: "Weapon Mastery",
         choiceCount: 1,
-        resourceKey: "weapon_mastery",
         swappableOnRest: true,
         label: "Weapon types with mastery",
       }),

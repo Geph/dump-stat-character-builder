@@ -16,6 +16,7 @@ import {
   IMPORT_PROPOSALS_HINT,
   MECHANICS_IMPORT_HINT,
   SUBCLASS_IMPORT_HINT,
+  BACKGROUND_LEGACY_IMPORT_HINT,
 } from "@/lib/import/content-schema"
 import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import/dump-stat-export"
 import { parseFoundryInput } from "@/lib/import/parse-foundry-dnd5e"
@@ -61,6 +62,8 @@ ${CHOICE_EXTRACTION_HINT}
 ${FEAT_CATEGORY_IMPORT_HINT}
 
 ${SUBCLASS_IMPORT_HINT}
+
+${BACKGROUND_LEGACY_IMPORT_HINT}
 
 ${CLASS_RESOURCE_IMPORT_HINT}
 

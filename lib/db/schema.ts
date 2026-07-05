@@ -87,6 +87,17 @@ export const languages = mysqlTable("languages", {
   ...compendiumMeta,
 })
 
+export const tools = mysqlTable("tools", {
+  id: id(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  tool_group: varchar("tool_group", { length: 32 }).notNull().default("other"),
+  subcategory: varchar("subcategory", { length: 64 }),
+  check_ability: varchar("check_ability", { length: 32 }).notNull().default("intelligence"),
+  expands_to: json("expands_to").$type<string[]>(),
+  ...compendiumMeta,
+})
+
 export const backgrounds = mysqlTable("backgrounds", {
   id: id(),
   name: varchar("name", { length: 255 }).notNull().unique(),
@@ -272,6 +283,9 @@ export const characters = mysqlTable("characters", {
   feat_choice_picks: json("feat_choice_picks").$type<Record<string, string[]>>(),
   feature_choice_picks: json("feature_choice_picks").$type<Record<string, string[]>>(),
   modifier_player_picks: json("modifier_player_picks").$type<Record<string, string[]>>(),
+  builder_picks: json("builder_picks").$type<
+    import("@/lib/builder/builder-picks").CharacterBuilderPicks
+  >(),
   companion_state: json("companion_state").$type<
     import("@/lib/character/companion-stat-block").CharacterCompanionState[]
   >(),
@@ -301,6 +315,7 @@ export const tableMap = {
   feats,
   equipment,
   languages,
+  tools,
   class_resources: classResources,
   custom_abilities: customAbilities,
   characters,

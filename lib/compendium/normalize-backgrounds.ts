@@ -66,9 +66,12 @@ function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<str
 
 /** Normalize a background row before save or after load. */
 export function normalizeBackgroundRow(row: Record<string, unknown>): Record<string, unknown> {
-  let ability_bonuses = parseStoredAbilityBonuses(row.ability_bonuses)
+  const explicitNullBonuses = row.ability_bonuses === null
+  let ability_bonuses = explicitNullBonuses
+    ? ({} as Record<string, number>)
+    : parseStoredAbilityBonuses(row.ability_bonuses)
 
-  if (!Object.keys(ability_bonuses).length) {
+  if (!explicitNullBonuses && !Object.keys(ability_bonuses).length) {
     const abilityLine =
       typeof row.ability_scores === "string"
         ? row.ability_scores
@@ -82,7 +85,7 @@ export function normalizeBackgroundRow(row: Record<string, unknown>): Record<str
     }
   }
 
-  if (!Object.keys(ability_bonuses).length && typeof row.description === "string") {
+  if (!explicitNullBonuses && !Object.keys(ability_bonuses).length && typeof row.description === "string") {
     ability_bonuses = normalizeBackgroundAbilityBonuses(
       parseBackgroundAbilityFromImportText(row.description),
     )
@@ -90,7 +93,11 @@ export function normalizeBackgroundRow(row: Record<string, unknown>): Record<str
 
   return wireBackgroundFeatGrantChoice({
     ...row,
-    ability_bonuses: Object.keys(ability_bonuses).length ? ability_bonuses : null,
+    ability_bonuses: explicitNullBonuses
+      ? null
+      : Object.keys(ability_bonuses).length
+        ? ability_bonuses
+        : null,
   })
 }
 

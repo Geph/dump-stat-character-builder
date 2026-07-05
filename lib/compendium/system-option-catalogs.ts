@@ -2,6 +2,10 @@ import {
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
+import {
+  firstClauseOfWeaponMasteryRule,
+  WEAPON_MASTERY_DESCRIPTIONS,
+} from "@/lib/compendium/weapon-mastery"
 
 /** System-owned Metamagic option templates (PHB pp. 66–67). */
 export const METAMAGIC_OPTIONS_CATALOG_ID = "00000000-0000-4000-8000-000000000002"
@@ -19,9 +23,18 @@ export const ELDRITCH_INVOCATIONS_CATALOG_NAME = "Eldritch Invocations"
 export const ELDRITCH_INVOCATIONS_CATALOG_INFO =
   "Reusable Eldritch Invocation templates for the Warlock. Link from the Eldritch Invocations class feature via grant-feat or option picks."
 
+/** System-owned Weapon Mastery property templates (2024 PHB p.89). */
+export const WEAPON_MASTERY_PROPERTIES_CATALOG_ID = "00000000-0000-4000-8000-000000000004"
+
+export const WEAPON_MASTERY_PROPERTIES_CATALOG_NAME = "Weapon Mastery Properties"
+
+export const WEAPON_MASTERY_PROPERTIES_CATALOG_INFO =
+  "Reusable Weapon Mastery property templates (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex). Referenced by Weapon Mastery class features and weapon properties.mastery; add homebrew properties here."
+
 export const SYSTEM_OPTION_CATALOG_IDS = [
   METAMAGIC_OPTIONS_CATALOG_ID,
   ELDRITCH_INVOCATIONS_CATALOG_ID,
+  WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
 ] as const
 
 function optionEntry(
@@ -106,6 +119,18 @@ export function buildDefaultMetamagicOptions(): ModifierCatalogEntry[] {
   )
 }
 
+export function buildDefaultWeaponMasteryOptions(): ModifierCatalogEntry[] {
+  return Object.entries(WEAPON_MASTERY_DESCRIPTIONS).map(([name, description], index) =>
+    optionEntry(
+      `cat_weapon_mastery_${index}`,
+      name,
+      firstClauseOfWeaponMasteryRule(description),
+      description,
+      "Mastery Properties",
+    ),
+  )
+}
+
 export function buildDefaultEldritchInvocations(): ModifierCatalogEntry[] {
   const names = [
     ["Agonizing Blast", "Add Charisma modifier to Eldritch Blast damage"],
@@ -139,6 +164,12 @@ export function getSystemCatalogMeta(id: string): { name: string; info: string }
   if (id === ELDRITCH_INVOCATIONS_CATALOG_ID) {
     return { name: ELDRITCH_INVOCATIONS_CATALOG_NAME, info: ELDRITCH_INVOCATIONS_CATALOG_INFO }
   }
+  if (id === WEAPON_MASTERY_PROPERTIES_CATALOG_ID) {
+    return {
+      name: WEAPON_MASTERY_PROPERTIES_CATALOG_NAME,
+      info: WEAPON_MASTERY_PROPERTIES_CATALOG_INFO,
+    }
+  }
   return null
 }
 
@@ -148,6 +179,18 @@ export function isSystemCatalogEditor(id: string): boolean {
 
 export function isSystemOptionCatalogId(id: string): boolean {
   return (SYSTEM_OPTION_CATALOG_IDS as readonly string[]).includes(id)
+}
+
+/** Default compendium icons for system-owned custom ability catalogs. */
+export const SYSTEM_CATALOG_DEFAULT_ICONS: Record<string, string> = {
+  "00000000-0000-4000-8000-000000000001": "hammer-nails",
+  [METAMAGIC_OPTIONS_CATALOG_ID]: "sparkles",
+  [ELDRITCH_INVOCATIONS_CATALOG_ID]: "evil-bat",
+  [WEAPON_MASTERY_PROPERTIES_CATALOG_ID]: "winged-sword",
+}
+
+export function getSystemCatalogDefaultIcon(id: string): string {
+  return SYSTEM_CATALOG_DEFAULT_ICONS[id] ?? "sparkles"
 }
 
 export function buildMetamagicOptionsCatalogRow(): Record<string, unknown> {
@@ -163,7 +206,27 @@ export function buildMetamagicOptionsCatalogRow(): Record<string, unknown> {
     uses: null,
     show_in_builder: false,
     is_system: true,
-    icon: "sparkles",
+    icon: getSystemCatalogDefaultIcon(METAMAGIC_OPTIONS_CATALOG_ID),
+    source: "System",
+    creator_url: null,
+    enabled: true,
+  }
+}
+
+export function buildWeaponMasteryPropertiesCatalogRow(): Record<string, unknown> {
+  return {
+    id: WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
+    name: WEAPON_MASTERY_PROPERTIES_CATALOG_NAME,
+    description: `<p>${WEAPON_MASTERY_PROPERTIES_CATALOG_INFO}</p>`,
+    characteristics: [],
+    modifier_catalog: buildDefaultWeaponMasteryOptions(),
+    prerequisites: null,
+    attached_to_type: null,
+    attached_to_id: null,
+    uses: null,
+    show_in_builder: false,
+    is_system: true,
+    icon: getSystemCatalogDefaultIcon(WEAPON_MASTERY_PROPERTIES_CATALOG_ID),
     source: "System",
     creator_url: null,
     enabled: true,
@@ -183,7 +246,7 @@ export function buildEldritchInvocationsCatalogRow(): Record<string, unknown> {
     uses: null,
     show_in_builder: false,
     is_system: true,
-    icon: "sparkles",
+    icon: getSystemCatalogDefaultIcon(ELDRITCH_INVOCATIONS_CATALOG_ID),
     source: "System",
     creator_url: null,
     enabled: true,
@@ -196,6 +259,11 @@ export async function ensureSystemOptionCatalogs(
   const rows = [
     { id: METAMAGIC_OPTIONS_CATALOG_ID, build: buildMetamagicOptionsCatalogRow, defaults: buildDefaultMetamagicOptions },
     { id: ELDRITCH_INVOCATIONS_CATALOG_ID, build: buildEldritchInvocationsCatalogRow, defaults: buildDefaultEldritchInvocations },
+    {
+      id: WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
+      build: buildWeaponMasteryPropertiesCatalogRow,
+      defaults: buildDefaultWeaponMasteryOptions,
+    },
   ] as const
 
   for (const { id, build, defaults } of rows) {

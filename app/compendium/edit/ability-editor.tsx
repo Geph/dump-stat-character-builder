@@ -33,6 +33,7 @@ import {
   isSystemCatalogEditorRoute,
   parseCatalogFromRow,
 } from "@/app/compendium/edit/common-modifiers-catalog-editor"
+import { getSystemCatalogDefaultIcon } from "@/lib/compendium/system-option-catalogs"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { attachTypeToTable } from "@/lib/db/attach-target-table"
@@ -89,6 +90,7 @@ const ATTACH_OPTIONS = [
 export default function AbilityEditorPage({ id }: { id: string }) {
   const [form, setForm] = useState<AbilityFormData>(defaultAbility)
   const [catalog, setCatalog] = useState<ModifierCatalogEntry[]>([])
+  const [catalogIcon, setCatalogIcon] = useState<string | null>("sparkles")
   const catalogMeta = getCatalogEditorMeta(id)
   const isCatalogEditor = catalogMeta !== null
   const [loading, setLoading] = useState(false)
@@ -120,6 +122,8 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         } else if (data) {
           if (isSystemCatalogEditorRoute(id)) {
             setCatalog(parseCatalogFromRow(data as Record<string, unknown>))
+            const rowIcon = typeof data.icon === "string" ? data.icon : null
+            setCatalogIcon(rowIcon || getSystemCatalogDefaultIcon(id))
           } else {
             setForm({
               name: data.name || "",
@@ -204,7 +208,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     const db = createClient()
 
     if (isCatalogEditor && catalogMeta) {
-      const payload = buildCatalogSavePayload(catalog, catalogMeta.info)
+      const payload = buildCatalogSavePayload(catalog, catalogMeta.info, catalogIcon)
       const { error } = await db
         .from("custom_abilities")
         .update(payload)
@@ -292,6 +296,8 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         catalogName={catalogMeta.name}
         catalogInfo={catalogMeta.info}
         catalog={catalog}
+        icon={catalogIcon}
+        onIconChange={setCatalogIcon}
         spellOptions={allSpells}
         otherAbilities={otherAbilities}
         saving={saving}
@@ -440,7 +446,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
                 className="w-5 h-5 rounded border-border accent-primary"
               />
               <div>
-                <span className="font-semibold text-foreground">Show in Character Builder</span>
+                <span className="font-semibold text-foreground">Show on Character Sheet / Preview</span>
                 <p className="text-sm text-muted-foreground">
                   When enabled, this custom ability will appear in the &quot;Custom&quot; tab of the character builder preview as well as character sheet.
                 </p>

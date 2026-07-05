@@ -3,6 +3,7 @@ import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-s
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import {
   enrichWeaponMasteryFeature,
+  isWeaponMasteryFeature,
   parseWeaponMasteryCountFromDescription,
   weaponMasteryOptionsForClass,
 } from "@/lib/compendium/weapon-mastery-choice"
@@ -40,7 +41,8 @@ describe("weapon mastery choices", () => {
     })
 
     expect(enriched.isChoice).toBe(true)
-    expect(enriched.choices?.resourceKey).toBe("weapon_mastery")
+    expect(enriched.choices?.choiceCountByLevel?.length).toBeGreaterThan(0)
+    expect(enriched.choices?.resourceKey).toBeUndefined()
     expect(enriched.choices?.options?.length ?? 0).toBeGreaterThan(10)
     expect(enriched.linkedModifiers ?? []).toHaveLength(0)
   })
@@ -52,7 +54,7 @@ describe("weapon mastery choices", () => {
     expect(catalog.some((entry) => entry.id === WEAPON_MASTERY_CATALOG_ID)).toBe(true)
   })
 
-  it("scales Barbarian weapon mastery picks from class resources", () => {
+  it("scales Barbarian weapon mastery picks from choiceCountByLevel", () => {
     const choices = enrichWeaponMasteryFeature(
       { level: 1, name: "Weapon Mastery", description: "" },
       "Barbarian",
@@ -63,7 +65,7 @@ describe("weapon mastery choices", () => {
     expect(resolveFeatureChoiceCount(choices, 10, "Barbarian")).toBe(4)
   })
 
-  it("scales Fighter weapon mastery picks from class resources", () => {
+  it("scales Fighter weapon mastery picks from choiceCountByLevel without class resource", () => {
     const choices = enrichWeaponMasteryFeature(
       { level: 1, name: "Weapon Mastery", description: "" },
       "Fighter",
@@ -71,5 +73,43 @@ describe("weapon mastery choices", () => {
 
     expect(resolveFeatureChoiceCount(choices, 1, "Fighter")).toBe(3)
     expect(resolveFeatureChoiceCount(choices, 16, "Fighter")).toBe(6)
+  })
+
+  it("detects weapon mastery for builder UI without legacy resourceKey", () => {
+    const enriched = enrichClassFeatureWithModifierPresets(
+      "Barbarian",
+      {
+        level: 1,
+        name: "Weapon Mastery",
+        description:
+          "Your training with weapons allows you to use the mastery properties of two kinds of Simple or Martial Melee weapons of your choice.",
+      },
+      null,
+      { skipMechanicalDetection: true },
+    )
+    expect(isWeaponMasteryFeature(enriched)).toBe(true)
+    expect(enriched.choices?.resourceKey).toBeUndefined()
+  })
+
+  it("falls back to weapon_mastery class resource for unmigrated choices", () => {
+    const choices = {
+      category: "Weapon Mastery",
+      count: 2,
+      resourceKey: "weapon_mastery",
+      options: [],
+    }
+    const legacyResource = {
+      id: "weapon_mastery",
+      name: "Weapon Mastery",
+      uses: {
+        type: "at_level" as const,
+        atLevelMode: "tier" as const,
+        atLevelTable: [
+          { level: 1, count: 3 },
+          { level: 16, count: 6 },
+        ],
+      },
+    }
+    expect(resolveFeatureChoiceCount(choices, 16, "Fighter", [legacyResource])).toBe(6)
   })
 })

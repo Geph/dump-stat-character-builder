@@ -283,12 +283,40 @@ export const BackgroundImportSchema = z.object({
   description: z.string().nullable(),
   skill_proficiencies: z.array(z.string()).nullable(),
   tool_proficiencies: z.array(z.string()).nullable().optional(),
+  /**
+   * null = pre-2024 legacy background. The builder offers free +2/+1 or +1/+1/+1 ASI
+   * and any Origin feat — do NOT substitute zero-valued objects or invent a feat.
+   */
   feat_granted: z.string().nullable(),
   ability_bonuses: z.record(z.string(), z.number()).nullable(),
   feature: z.object({ name: z.string(), description: z.string() }).nullable().optional(),
   grants_spells: z.boolean().optional(),
   granted_spells: z.record(z.string(), z.array(z.string())).nullable().optional(),
+  proficiencies: z
+    .object({
+      tools: z.array(z.string()).optional(),
+      vehicles: z.array(z.string()).optional(),
+      weapons: z.array(z.string()).optional(),
+      armor: z.array(z.string()).optional(),
+      languages: z.array(z.string()).optional(),
+    })
+    .nullable()
+    .optional(),
+  starting_equipment: z
+    .array(z.object({ name: z.string(), quantity: z.number() }))
+    .nullable()
+    .optional(),
+  starting_gold: z.number().nullable().optional(),
 })
+
+/** Prompt hint for background PDF / BYO extraction. */
+export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feats:
+- D&D 2024 backgrounds: set ability_bonuses to eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed +1/+2 values; set feat_granted to the Origin feat name (e.g. "Magic Initiate (Cleric)").
+- Pre-2024 / legacy backgrounds (no fixed ASI or Origin feat): set ability_bonuses: null and feat_granted: null. Do NOT invent zero-valued ability objects or placeholder feats — the character builder offers the player a free +2/+1 or +1/+1/+1 allocation and any Origin feat pick.
+- Extract Languages into proficiencies.languages (e.g. ["One language of your choice"]).
+- Extract Equipment into starting_equipment as { name, quantity } items and starting_gold for GP in a belt pouch (e.g. starting_gold: 10).
+- Assign each Feature to the background whose toolset/theme it matches — do not attach a feature to the wrong background because of PDF column flow.
+- Omit chapter running heads, page numbers, nav ribbons, and d6 Ideals/Bonds/Flaws/Personality Trait tables from descriptions.`
 
 export const EquipmentImportSchema = z.object({
   name: z.string(),
@@ -480,20 +508,22 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present`
 
-export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice, Weapon Mastery):
-- Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, Weapon Mastery, etc.)
+export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice):
+- Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, etc.)
 - Set class_name to the parent class (e.g. "KibblesTasty Psion")
 - resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit")
 - name: display name from the table header (e.g. "Psi Points")
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
-- Psi Points and similar pools usually recharge on short_rest and long_rest
-- Psi Limit / per-activation caps can use type "special" with atLevelTable describing the cap by level
+- **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges (short_rest and/or long_rest)
+- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
+- **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
 export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. KibblesTasty Psion, Gunslinger):
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
 - Put each subclass/archetype/path in subclasses[] with class_name set to the parent class
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
+- Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror { description, options: [{ label, items: [{ name, quantity }] }] }
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
 - Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name`
 

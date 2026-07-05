@@ -1,6 +1,7 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { AbilityScoreKey, TurnStartTriggerCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { accrueResource, tickAccumulatedResources } from "@/lib/character/real-time-recharge"
 import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
@@ -27,10 +28,11 @@ function scanFeatureList(
   features: Feature[] | undefined,
   ctx: { className: string; classId: string; classLevel: number },
   into: TurnStartTriggerEntry[],
+  catalog: ModifierCatalogEntry[],
 ) {
   for (const feature of features ?? []) {
     if ((feature.level ?? 1) > ctx.classLevel) continue
-    for (const instance of readLinkedModifiers(feature)) {
+    for (const instance of readLinkedModifiers(feature, catalog)) {
       for (const characteristic of instance.characteristics ?? []) {
         if (characteristic.type !== "turn_start_trigger") continue
         const trigger = characteristic as TurnStartTriggerCharacteristic
@@ -54,6 +56,7 @@ function scanFeatureList(
 
 export function collectTurnStartTriggers(
   classDetails: CharacterClassDetail[],
+  catalog: ModifierCatalogEntry[] = [],
 ): TurnStartTriggerEntry[] {
   const entries: TurnStartTriggerEntry[] = []
 
@@ -66,14 +69,14 @@ export function collectTurnStartTriggers(
       className,
       classId,
       classLevel: entry.row.level,
-    }, entries)
+    }, entries, catalog)
 
     if (entry.subclass) {
       scanFeatureList(entry.subclass.features as Feature[] | undefined, {
         className,
         classId,
         classLevel: entry.row.level,
-      }, entries)
+      }, entries, catalog)
     }
   }
 

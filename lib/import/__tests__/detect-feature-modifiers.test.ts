@@ -5,6 +5,7 @@ import {
 } from "@/lib/import/detect-feature-modifiers"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
@@ -469,7 +470,8 @@ describe("detectFeatureModifiers by feature name", () => {
       linkedModifiers: [detections[0]!.instance],
     } as Feature)
     expect(feature.isChoice).toBe(true)
-    expect(feature.choices?.resourceKey).toBe("weapon_mastery")
+    const enriched = enrichWeaponMasteryFeature(feature, "Fighter")
+    expect(enriched.choices?.choiceCountByLevel?.length).toBeGreaterThan(0)
   })
 
   it("wires attunement slot increases from description", () => {

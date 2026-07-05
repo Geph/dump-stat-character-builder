@@ -16,6 +16,7 @@ const EDITORS: Record<CompendiumContentType, ReturnType<typeof dynamic>> = {
   equipment: dynamic(() => import("./equipment-editor")),
   magic_items: dynamic(() => import("./equipment-editor")),
   languages: dynamic(() => import("./language-editor")),
+  tools: dynamic(() => import("./tool-editor")),
   class_resources: dynamic(() => import("./class-resource-editor")),
   abilities: dynamic(() => import("./ability-editor")),
 }

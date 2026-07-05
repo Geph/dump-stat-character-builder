@@ -21,6 +21,15 @@ export type BackgroundAbilityGrant = {
 export function getBackgroundAbilityGrant(
   background: Background | null | undefined,
 ): BackgroundAbilityGrant {
+  /** Pre-2024 backgrounds import with null — player chooses +2/+1 or +1/+1/+1 across any abilities. */
+  if (background?.ability_bonuses === null) {
+    return {
+      fixed: {},
+      needsChoice: true,
+      eligible: [...ABILITY_SCORE_KEYS],
+    }
+  }
+
   const normalized = normalizeBackgroundAbilityBonuses(background?.ability_bonuses)
   const keys = Object.keys(normalized) as AbilityScoreKey[]
 
@@ -44,7 +53,12 @@ export function getBackgroundAbilityGrant(
   return { fixed: {}, needsChoice: eligible.length > 0, eligible }
 }
 
-export function getBackgroundAsiHelpText(): string {
+export function getBackgroundAsiHelpText(
+  grant?: Pick<BackgroundAbilityGrant, "eligible">,
+): string {
+  if (grant?.eligible.length === ABILITY_SCORE_KEYS.length) {
+    return "+2 to one ability score and +1 to another, or +1 to each of three ability scores"
+  }
   return "+2 to one eligible score and +1 to another, or +1 to each of the three eligible scores"
 }
 
@@ -68,13 +82,23 @@ export function isValidBackgroundAsiAllocation(
   const ones = eligible.filter((key) => (allocation[key] ?? 0) === 1).length
 
   if (twos === 1) {
-    return ones === 1 && eligible.every((key) => {
-      const value = allocation[key] ?? 0
-      return value === 0 || value === 1 || value === 2
-    })
+    const boosted = ABILITY_SCORE_KEYS.filter((key) => (allocation[key] ?? 0) > 0)
+    return (
+      ones === 1 &&
+      boosted.length === 2 &&
+      eligible.every((key) => {
+        const value = allocation[key] ?? 0
+        return value === 0 || value === 1 || value === 2
+      })
+    )
   }
 
-  return eligible.length === 3 && ones === 3
+  if (twos === 0 && ones === 3) {
+    const boosted = ABILITY_SCORE_KEYS.filter((key) => (allocation[key] ?? 0) > 0)
+    return boosted.length === 3 && boosted.every((key) => eligible.includes(key))
+  }
+
+  return false
 }
 
 export function aggregateBackgroundAbilityBonuses(

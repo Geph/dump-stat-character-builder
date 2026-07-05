@@ -87,6 +87,23 @@ CREATE TABLE IF NOT EXISTS languages (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS tools (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  tool_group VARCHAR(32) NOT NULL DEFAULT 'other',
+  subcategory VARCHAR(64),
+  check_ability VARCHAR(32) NOT NULL DEFAULT 'intelligence',
+  expands_to JSON,
+  icon VARCHAR(255),
+  accent_color VARCHAR(32),
+  card_image_url MEDIUMTEXT,
+  source VARCHAR(64) NOT NULL DEFAULT 'Custom',
+  creator_url VARCHAR(512),
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS backgrounds (
   id CHAR(36) PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE,
@@ -294,6 +311,7 @@ CREATE TABLE IF NOT EXISTS characters (
   feat_choice_picks JSON,
   feature_choice_picks JSON,
   modifier_player_picks JSON,
+  builder_picks JSON,
   asi_allocations JSON,
   companion_state JSON,
   sheet_state JSON,

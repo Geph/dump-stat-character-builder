@@ -50,14 +50,14 @@ export function buildIncomingAttackNotes(input: IncomingAttackNotesInput): Incom
   const notes: IncomingAttackNote[] = []
   if (advantageSources.length) {
     notes.push({
-      label: "Attacks against you",
-      detail: `Advantage (${[...new Set(advantageSources)].join(", ")})`,
+      label: "Attacks vs you — advantage",
+      detail: [...new Set(advantageSources)].join(", "),
     })
   }
   if (disadvantageSources.length) {
     notes.push({
-      label: "Attacks against you",
-      detail: `Disadvantage (${[...new Set(disadvantageSources)].join(", ")})`,
+      label: "Attacks vs you — disadvantage",
+      detail: [...new Set(disadvantageSources)].join(", "),
     })
   }
   return notes

@@ -7,6 +7,7 @@ export const COMPENDIUM_TABLES = [
   "feats",
   "equipment",
   "languages",
+  "tools",
   "class_resources",
   "custom_abilities",
 ] as const

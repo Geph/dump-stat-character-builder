@@ -21,6 +21,7 @@ export const COMPENDIUM_TOGGLE_LABELS: Record<CompendiumContentType, string> = {
   equipment: "Equipment",
   magic_items: "Magic Item",
   languages: "Language",
+  tools: "Tool",
   class_resources: "Class Resource",
   abilities: "Custom Ability",
 }

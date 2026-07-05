@@ -15,6 +15,7 @@ import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { SpecialAttackTemplateSection } from "@/components/compendium/special-attack-template-section"
 import { CharacteristicModifiersEditor } from "@/components/characteristic-modifiers-editor"
 import { FeatureEffectList } from "@/components/compendium/feature-effect-list"
+import { collectCustomSkillNames } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatureActivation } from "@/lib/types"
 
 type ModifierCatalogAdminEditorProps = {
@@ -118,6 +119,7 @@ function CatalogEntryEditor({
 }) {
   const activation = entry.activation ?? {}
   const hasActivation = !!(activation.action || activation.bonusAction || activation.reaction)
+  const extraSkillNames = collectCustomSkillNames(entry.characteristics)
 
   return (
     <div className="rounded-xl border-2 border-border bg-card p-4 space-y-4">
@@ -233,6 +235,7 @@ function CatalogEntryEditor({
               uses: { type: "unlimited" as const },
             }))}
             otherAbilities={otherAbilities}
+            extraSkillNames={extraSkillNames}
             onChange={(next) => onChange({ activation: next })}
             templatePreview
           />

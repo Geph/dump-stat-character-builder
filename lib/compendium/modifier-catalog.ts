@@ -20,6 +20,8 @@ import {
   buildWeaponMasteryCatalogEntry,
   WEAPON_MASTERY_CATALOG_ID,
 } from "@/lib/compendium/weapon-mastery-catalog"
+import { buildCustomSkillCatalogEntry } from "@/lib/compendium/custom-skill-catalog"
+import { getSystemCatalogDefaultIcon } from "@/lib/compendium/system-option-catalogs"
 
 /** Fixed id for the system-owned common modifiers custom ability. */
 export const COMMON_MODIFIERS_CATALOG_ID = "00000000-0000-4000-8000-000000000001"
@@ -29,6 +31,7 @@ export const SYSTEM_MODIFIER_CATALOG_IDS = [
   COMMON_MODIFIERS_CATALOG_ID,
   "00000000-0000-4000-8000-000000000002",
   "00000000-0000-4000-8000-000000000003",
+  "00000000-0000-4000-8000-000000000004",
 ] as const
 
 /** Catalog entry id for the shared Special Attack passive template. */
@@ -72,6 +75,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   ability_scores: "Ability scores & checks",
   skills: "Skills & saving throws",
   skill_check_alternate_ability: "Skills & saving throws",
+  custom_skill: "Skills & saving throws",
   languages: "Proficiencies",
   armor_proficiencies: "Proficiencies",
   weapon_proficiencies: "Proficiencies",
@@ -114,6 +118,8 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   grant_feat: "Feats & choices",
   equipment_and_magic_items: "Equipment & items",
   catalog_option: "Feats & choices",
+  craftable_items: "Equipment & items",
+  held_items_cap: "Equipment & items",
   rest_replacement: "Resources & uses",
   creature_size: "Movement & senses",
   magical_sleep_immunity: "Damage mitigation",
@@ -211,6 +217,7 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
   })
 
   entries.push(buildWeaponMasteryCatalogEntry())
+  entries.push(buildCustomSkillCatalogEntry())
 
   return entries
 }
@@ -223,6 +230,8 @@ export function normalizeModifierCatalog(raw: unknown): ModifierCatalogEntry[] {
     })
     .map((entry) => ({
       ...entry,
+      name: typeof entry.name === "string" ? entry.name : "Untitled",
+      group: typeof entry.group === "string" && entry.group.trim() ? entry.group : "Other",
       characteristics: normalizeCharacteristics(entry.characteristics, null),
       activation: entry.activation ?? null,
     }))
@@ -298,9 +307,10 @@ export function catalogEditorNavSections(catalog: ModifierCatalogEntry[]): { id:
 }
 
 export function catalogEntryById(
-  catalog: ModifierCatalogEntry[],
+  catalog: ModifierCatalogEntry[] | undefined | null,
   id: string,
 ): ModifierCatalogEntry | undefined {
+  if (!catalog?.length) return undefined
   const aliases: Record<string, string> = {
     cat_fx_buff_ally_roll: "cat_fx_modify_creature",
     cat_fx_debuff_enemy_roll: "cat_fx_modify_creature",
@@ -382,7 +392,7 @@ export function buildCommonModifiersCatalogRow(): Record<string, unknown> {
     uses: null,
     show_in_builder: false,
     is_system: true,
-    icon: "sparkles",
+    icon: getSystemCatalogDefaultIcon(COMMON_MODIFIERS_CATALOG_ID),
     source: "System",
     creator_url: null,
     enabled: true,

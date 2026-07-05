@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Check, Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { WEAPON_MASTERY_DESCRIPTIONS } from "@/lib/compendium/weapon-mastery"
+import { buildWeaponMasteryDescriptionsLookup } from "@/lib/compendium/weapon-mastery"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { GameIcon } from "@/components/game-icon-picker"
 
@@ -18,6 +18,8 @@ type WeaponMasteryChoicesProps = {
   onChange: (selected: string[]) => void
   unavailableOptions?: string[]
   layout?: "visual" | "compact"
+  /** Catalog-backed mastery property rules (falls back to SRD defaults when omitted). */
+  masteryDescriptions?: Record<string, string>
 }
 
 /** Extract the mastery property name from an option description (e.g. "Topple — ..."). */
@@ -37,9 +39,11 @@ export function WeaponMasteryChoices({
   onChange,
   unavailableOptions = [],
   layout = "compact",
+  masteryDescriptions,
 }: WeaponMasteryChoicesProps) {
   const [showInfo, setShowInfo] = useState(false)
   const unavailable = new Set(unavailableOptions)
+  const masteryRules = masteryDescriptions ?? buildWeaponMasteryDescriptionsLookup()
 
   const masteryByWeapon = new Map<string, string | null>(
     options.map((option) => [option.name, masteryNameFromDescription(option.description)]),
@@ -145,7 +149,7 @@ export function WeaponMasteryChoices({
               <div className="mt-3 space-y-1">
                 {selected.map((name) => {
                   const mastery = masteryByWeapon.get(name) ?? null
-                  const rule = mastery ? WEAPON_MASTERY_DESCRIPTIONS[mastery] : null
+                  const rule = mastery ? masteryRules[mastery] ?? null : null
                   if (!rule) return null
                   return (
                     <p key={name} className="text-xs text-muted-foreground leading-snug">
@@ -158,45 +162,36 @@ export function WeaponMasteryChoices({
             )}
           </>
         ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {slotValues.map((value, index) => {
             const chosenElsewhere = new Set(
               slotValues.filter((_, i) => i !== index).filter(Boolean),
             )
-            const mastery = value ? masteryByWeapon.get(value) ?? null : null
-            const masteryRule = mastery ? WEAPON_MASTERY_DESCRIPTIONS[mastery] : null
             return (
-              <div key={index} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 shrink-0 text-xs font-bold text-muted-foreground">
-                    {index + 1}.
-                  </span>
-                  <select
-                    value={value}
-                    onChange={(e) => setSlot(index, e.target.value)}
-                    className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:border-primary focus:outline-none"
-                  >
-                    <option value="">— Choose a weapon —</option>
-                    {options.map((option) => {
-                      const optionMastery = masteryByWeapon.get(option.name)
-                      const disabled =
-                        option.name !== value &&
-                        (chosenElsewhere.has(option.name) || unavailable.has(option.name))
-                      return (
-                        <option key={option.name} value={option.name} disabled={disabled}>
-                          {option.name}
-                          {optionMastery ? ` (${optionMastery})` : ""}
-                          {disabled ? " — taken" : ""}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </div>
-                {masteryRule && (
-                  <p className="pl-7 text-xs text-muted-foreground leading-snug">
-                    <span className="font-semibold text-foreground">{mastery}:</span> {masteryRule}
-                  </p>
-                )}
+              <div key={index} className="flex items-center gap-2">
+                <span className="w-5 shrink-0 text-xs font-bold text-muted-foreground">
+                  {index + 1}.
+                </span>
+                <select
+                  value={value}
+                  onChange={(e) => setSlot(index, e.target.value)}
+                  className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:border-primary focus:outline-none"
+                >
+                  <option value="">— Choose a weapon —</option>
+                  {options.map((option) => {
+                    const optionMastery = masteryByWeapon.get(option.name)
+                    const disabled =
+                      option.name !== value &&
+                      (chosenElsewhere.has(option.name) || unavailable.has(option.name))
+                    return (
+                      <option key={option.name} value={option.name} disabled={disabled}>
+                        {option.name}
+                        {optionMastery ? ` (${optionMastery})` : ""}
+                        {disabled ? " — taken" : ""}
+                      </option>
+                    )
+                  })}
+                </select>
               </div>
             )
           })}
@@ -235,12 +230,12 @@ export function WeaponMasteryChoices({
                 Mastery Properties
               </h4>
               <dl className="mt-3 space-y-3">
-                {(masteriesPresent.length ? masteriesPresent : Object.keys(WEAPON_MASTERY_DESCRIPTIONS)).map(
+                {(masteriesPresent.length ? masteriesPresent : Object.keys(masteryRules)).map(
                   (name) => (
                     <div key={name}>
                       <dt className="text-sm font-bold text-foreground">{name}</dt>
                       <dd className="text-sm text-muted-foreground leading-relaxed">
-                        {WEAPON_MASTERY_DESCRIPTIONS[name] ?? "No description available."}
+                        {masteryRules[name] ?? "No description available."}
                       </dd>
                     </div>
                   ),

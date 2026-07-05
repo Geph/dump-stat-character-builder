@@ -13,7 +13,7 @@ import {
   getWeaponPropertyTags,
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
-import { describeWeaponMastery } from "@/lib/compendium/weapon-mastery"
+import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { SUBCLASS_LEVEL } from "@/lib/builder/choices"
@@ -194,8 +194,13 @@ function pickMatchesWeapon(pick: string, weapon: Equipment): boolean {
 }
 
 function featureGrantsWeaponMastery(feature: Feature): boolean {
+  if (!/^weapon mastery$/i.test(feature.name?.trim() ?? "")) return false
   const migrated = migrateFeatureOptionPickers(feature)
-  return migrated.choices?.resourceKey === "weapon_mastery"
+  return Boolean(
+    migrated.choices?.choiceCountByLevel?.length ||
+      migrated.choices?.resourceKey === "weapon_mastery" ||
+      migrated.isChoice,
+  )
 }
 
 function characterHasWeaponMasteryFeature(inputs: CharacterBuildInputs): boolean {
@@ -255,8 +260,11 @@ export function buildWeaponSheetContext(
   const allMods = [...builderMods, ...equipmentMagicMods]
   aggregateCharacteristics(allMods)
 
+  const masteryCatalogEntries = weaponMasteryCatalogEntriesFromAbilities(inputs.customAbilities)
   const masteryName = getWeaponMastery(weapon)
-  const masteryDescription = masteryName ? describeWeaponMastery(masteryName) : null
+  const masteryDescription = masteryName
+    ? describeWeaponMastery(masteryName, masteryCatalogEntries)
+    : null
   const hasMasteryFeature = characterHasWeaponMasteryFeature(inputs)
   const proficient = isWeaponProficient(weapon, weaponProficiencies)
   const masteryPicks = collectWeaponMasteryPicks(inputs)

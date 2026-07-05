@@ -1,6 +1,8 @@
-import type { ClassResource, FeatureChoice } from "@/lib/types"
-import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
+import type { FeatureChoice } from "@/lib/types"
+import type { ClassResource } from "@/lib/types"
+import { resolveTierCountAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
+import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 
 function resourcesForClassName(
   className: string,
@@ -20,6 +22,12 @@ export function resolveFeatureChoiceCount(
   classResources?: ClassResource[],
 ): number {
   const fallback = choices.count > 0 ? choices.count : 1
+
+  if (choices.choiceCountByLevel?.length) {
+    const resolved = resolveTierCountAtLevel(choices.choiceCountByLevel, classLevel)
+    return resolved > 0 ? resolved : fallback
+  }
+
   const resourceKey = choices.resourceKey?.trim()
   if (!resourceKey) return fallback
 

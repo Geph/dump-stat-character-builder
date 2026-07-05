@@ -113,6 +113,8 @@ export type DerivedCharacter = {
   maxHp: number
   initiative: number
   speed: number
+  /** All movement modes (walk, fly, swim, etc.) when present. */
+  speeds: import("@/lib/character/resolve-all-speeds").CharacterSpeedEntry[]
   passivePerception: number
   skillProficiencies: string[]
   skillExpertise: string[]

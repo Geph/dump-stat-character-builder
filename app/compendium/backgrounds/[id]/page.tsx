@@ -18,6 +18,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { enrichBackgroundList, normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
+import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
 import {

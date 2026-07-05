@@ -53,15 +53,89 @@ function WeaponAttackCard({
   const masteryActive = sheetContext?.masteryActive ?? false
 
   return (
-    <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 space-y-2 min-w-0">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
-          {weapon.subcategory ? (
-            <p className="text-[10px] text-muted-foreground">{weapon.subcategory}</p>
+    <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 min-w-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-baseline gap-x-1.5">
+            <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
+            {weapon.subcategory ? (
+              <p className="text-[10px] text-muted-foreground">{weapon.subcategory}</p>
+            ) : null}
+          </div>
+
+          {range || baseDamage ? (
+            <p className="text-[10px] text-foreground">
+              {baseDamage ? (
+                <span className="font-medium">
+                  {baseDamage}
+                  {weapon.damage_type ? ` ${weapon.damage_type}` : ""}
+                </span>
+              ) : null}
+              {range ? (
+                <span className="inline-flex items-center gap-0.5">
+                  {baseDamage ? <span className="text-muted-foreground mx-1">·</span> : null}
+                  {range}
+                  <ConditionInfoTip
+                    description={describeWeaponRange(range) ?? range}
+                    ariaLabel="Range rules"
+                  />
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+
+          {mastery || properties.length > 0 || sheetContext?.appliedModifiers.length ? (
+            <div className="flex flex-wrap gap-1">
+              {mastery ? (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold border",
+                    masteryActive
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border bg-muted/60 text-muted-foreground",
+                  )}
+                >
+                  {mastery}
+                  <ConditionInfoTip
+                    description={masteryDescription ?? mastery}
+                    ariaLabel={`${mastery} mastery`}
+                  />
+                </span>
+              ) : null}
+              {properties.map((property) => {
+                const description = describeWeaponProperty(property)
+                return (
+                  <span
+                    key={property}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-foreground"
+                  >
+                    {property}
+                    {description ? (
+                      <ConditionInfoTip
+                        description={description}
+                        ariaLabel={`${property} property`}
+                      />
+                    ) : null}
+                  </span>
+                )
+              })}
+              {(sheetContext?.appliedModifiers ?? []).map((modifier) => (
+                <span
+                  key={`${modifier.name}-${modifier.description}`}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-[10px] font-medium text-foreground"
+                >
+                  {modifier.name}
+                  <ConditionInfoTip
+                    description={modifier.description}
+                    ariaLabel={`${modifier.name} modifier`}
+                  />
+                </span>
+              ))}
+            </div>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+
+        <div className="flex flex-col items-end gap-1 shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground uppercase">To Hit</span>
             <D20RollButton
@@ -79,94 +153,6 @@ function WeaponAttackCard({
           ) : null}
         </div>
       </div>
-
-      <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[10px]">
-        {range ? (
-          <>
-            <dt className="text-muted-foreground font-semibold">Range</dt>
-            <dd className="text-foreground">
-              <span className="inline-flex items-center gap-0.5">
-                {range}
-                <ConditionInfoTip
-                  description={describeWeaponRange(range) ?? range}
-                  ariaLabel="Range rules"
-                />
-              </span>
-            </dd>
-          </>
-        ) : null}
-        {baseDamage ? (
-          <>
-            <dt className="text-muted-foreground font-semibold">Damage</dt>
-            <dd className="text-foreground">
-              {baseDamage}
-              {weapon.damage_type ? ` ${weapon.damage_type}` : ""}
-            </dd>
-          </>
-        ) : null}
-        {mastery ? (
-          <>
-            <dt className="text-muted-foreground font-semibold">Mastery</dt>
-            <dd>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold border",
-                  masteryActive
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border bg-muted/60 text-muted-foreground",
-                )}
-              >
-                {mastery}
-                <ConditionInfoTip
-                  description={masteryDescription ?? mastery}
-                  ariaLabel={`${mastery} mastery`}
-                />
-              </span>
-            </dd>
-          </>
-        ) : null}
-      </dl>
-
-      {properties.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {properties.map((property) => {
-            const description = describeWeaponProperty(property)
-            return (
-              <span
-                key={property}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-foreground"
-              >
-                {property}
-                {description ? (
-                  <ConditionInfoTip description={description} ariaLabel={`${property} property`} />
-                ) : null}
-              </span>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {sheetContext?.appliedModifiers.length ? (
-        <div className="space-y-1 pt-0.5 border-t border-border/60">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-            Common modifiers
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {sheetContext.appliedModifiers.map((modifier) => (
-              <span
-                key={`${modifier.name}-${modifier.description}`}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-[10px] font-medium text-foreground"
-              >
-                {modifier.name}
-                <ConditionInfoTip
-                  description={modifier.description}
-                  ariaLabel={`${modifier.name} modifier`}
-                />
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

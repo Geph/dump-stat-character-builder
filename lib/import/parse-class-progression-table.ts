@@ -661,7 +661,7 @@ export function usesConfigForProgressionColumn(
       atLevelTable: sorted,
       dieSidesByLevel: dieSides.length ? dieSides : undefined,
       dieType: dieLabel,
-      recharges: [{ rest: "short_rest" }],
+      recharges: pattern?.defaultUses.recharges ?? [{ rest: "short_rest" }, { rest: "long_rest" }],
       ...(pattern?.defaultUses ?? {}),
     }
   }
