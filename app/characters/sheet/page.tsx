@@ -2,9 +2,9 @@
 
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import CharacterSheetClient from "@/components/characters/character-sheet-client"
 import { MainNav } from "@/components/main-nav"
 import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
+import { CharacterSheetLoader } from "@/components/characters/character-sheet-loader"
 
 function CharacterSheetInner() {
   const searchParams = useSearchParams()
@@ -22,7 +22,7 @@ function CharacterSheetInner() {
     )
   }
 
-  return <CharacterSheetClient id={id} />
+  return <CharacterSheetLoader id={id} />
 }
 
 export default function CharacterSheetPage() {

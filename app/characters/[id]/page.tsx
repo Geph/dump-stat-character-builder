@@ -1,4 +1,4 @@
-import CharacterSheetClient from "@/components/characters/character-sheet-client"
+import { CharacterSheetLoader } from "@/components/characters/character-sheet-loader"
 
 export default async function CharacterSheetPage({
   params,
@@ -6,5 +6,5 @@ export default async function CharacterSheetPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  return <CharacterSheetClient id={id} />
+  return <CharacterSheetLoader id={id} />
 }
