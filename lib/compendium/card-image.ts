@@ -29,6 +29,7 @@ export const DETAIL_OVERLAY_HERO_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_18%,rgba(0,0,0,0.45)_22%,transparent_25%)]"
 export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended); ${CLASS_CARD_IMAGE_ASPECT}`
 export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
+export const PORTRAIT_CARD_IMAGE_HINT = `${CLASS_CARD_IMAGE_ASPECT} · 600×800px recommended`
 
 export type CompendiumCardImageCrop = "top" | "center"
 
@@ -114,6 +115,25 @@ export function applyBundledCardImage(
   if (existing) return { ...row, card_image_url: existing }
   const card_image_url = defaults[String(row.name ?? "")] ?? null
   return card_image_url ? { ...row, card_image_url } : row
+}
+
+/** Compendium tabs that use portrait (3:4) card art in browse grids. */
+export const COMPENDIUM_PORTRAIT_CARD_TABS = new Set<CompendiumContentType>([
+  "classes",
+  "species",
+  "subclasses",
+])
+
+export function compendiumUsesPortraitCardArt(tab: CompendiumContentType): boolean {
+  return COMPENDIUM_PORTRAIT_CARD_TABS.has(tab)
+}
+
+/** Browse grid: portrait tabs show 4 columns from lg breakpoint up. */
+export function compendiumBrowseGridClass(tab: CompendiumContentType): string {
+  if (compendiumUsesPortraitCardArt(tab)) {
+    return "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+  }
+  return "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
 }
 
 /** Portrait class/species art is top-cropped; other types use full landscape framing. */

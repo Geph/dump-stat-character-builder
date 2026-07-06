@@ -1,3 +1,6 @@
+import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
+import { SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
+
 export type CompendiumContentType =
   | "species"
   | "classes"
@@ -68,6 +71,20 @@ export function getCompendiumItemIcon(
   item: Record<string, unknown>,
 ): string {
   const icon = item.icon
-  if (typeof icon === "string" && icon.trim()) return icon
+  if (typeof icon === "string" && icon.trim()) return icon.trim()
+  if (
+    (tab === "equipment" || tab === "magic_items") &&
+    item.category === "Weapon"
+  ) {
+    const name = String(item.name ?? "").trim()
+    if (name) return weaponIconSlug(name)
+  }
+  if (
+    (tab === "equipment" || tab === "magic_items") &&
+    item.category === "Armor"
+  ) {
+    const armorIcon = SRD_ARMOR_ICONS_BY_NAME[String(item.name ?? "")]
+    if (armorIcon) return armorIcon
+  }
   return COMPENDIUM_DEFAULT_ICONS[tab]
 }

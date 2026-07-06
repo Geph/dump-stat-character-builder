@@ -12,6 +12,8 @@ type RichTextEditorProps = {
   placeholder?: string
   className?: string
   minHeightClass?: string
+  /** Stretch editor to fill a flex/grid column (toolbar stays fixed height). */
+  fillHeight?: boolean
 }
 
 const EDITOR_CONTENT_CLASS =
@@ -23,6 +25,7 @@ export function RichTextEditor({
   placeholder = "Enter description…",
   className,
   minHeightClass = "min-h-[6rem]",
+  fillHeight = false,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const lastValueRef = useRef(value)
@@ -84,8 +87,14 @@ export function RichTextEditor({
   }
 
   return (
-    <div className={cn("rounded-lg border-2 border-border bg-background overflow-hidden", className)}>
-      <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
+    <div
+      className={cn(
+        "rounded-lg border-2 border-border bg-background overflow-hidden",
+        fillHeight && "h-full flex flex-col",
+        className,
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5 shrink-0">
         <ToolbarButton title="Bold" onClick={() => runCommand("bold")}>
           <Bold className="h-4 w-4" />
         </ToolbarButton>
@@ -128,7 +137,10 @@ export function RichTextEditor({
         onKeyUp={refreshTableState}
         onMouseUp={refreshTableState}
         data-placeholder={placeholder}
-        className={cn(EDITOR_CONTENT_CLASS, minHeightClass)}
+        className={cn(
+          EDITOR_CONTENT_CLASS,
+          fillHeight ? "flex-1 min-h-[8rem]" : minHeightClass,
+        )}
       />
     </div>
   )

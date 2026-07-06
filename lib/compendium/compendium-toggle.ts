@@ -1,5 +1,6 @@
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
+import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import { compendiumStorageContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
@@ -196,6 +197,44 @@ export async function findCompendiumDependents(
   }
 
   return dependents
+}
+
+/** Related entries that are currently disabled (candidates for batch re-enable). */
+export async function findDisabledCompendiumDependents(
+  db: DataClient,
+  contentType: CompendiumContentType,
+  id: string,
+): Promise<CompendiumToggleTarget[]> {
+  const dependents = await findCompendiumDependents(db, contentType, id)
+  const byTable = new Map<CompendiumTable, CompendiumToggleTarget[]>()
+
+  for (const dependent of dependents) {
+    if (isProtectedSystemCompendiumItem(dependent.table, dependent.id)) continue
+    const list = byTable.get(dependent.table) ?? []
+    list.push(dependent)
+    byTable.set(dependent.table, list)
+  }
+
+  const disabled: CompendiumToggleTarget[] = []
+  for (const [table, targets] of byTable) {
+    const { data, error } = await db
+      .from(table)
+      .select("id, enabled")
+      .in(
+        "id",
+        targets.map((target) => target.id),
+      )
+    if (error) throw new Error(error.message ?? "Failed to load dependents")
+
+    for (const row of data ?? []) {
+      if (!isCompendiumItemEnabled(row as { enabled?: boolean | number | null })) {
+        const match = targets.find((target) => target.id === row.id)
+        if (match) disabled.push(match)
+      }
+    }
+  }
+
+  return disabled.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function setCompendiumItemsEnabled(

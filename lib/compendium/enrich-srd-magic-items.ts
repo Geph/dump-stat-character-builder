@@ -7,7 +7,9 @@ import {
 } from "@/lib/compendium/modifier-instance-builders"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { BaseEquipmentFilter } from "@/lib/compendium/equipment-magic"
+import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { isSrdSource } from "@/lib/srd/source"
+import { applySrdItemIcon, SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 
 type MagicItemSeedRow = Record<string, unknown> & {
   name: string
@@ -209,15 +211,34 @@ export function enrichSrdMagicItemList(rows: MagicItemSeedRow[]): MagicItemSeedR
 
 /** Reclassify the mundane Potion of Healing seed row with structured magic fields. */
 export function enrichSrdMundaneEquipmentRow(row: Record<string, unknown>): Record<string, unknown> {
-  if (!isSrdSource(String(row.source ?? ""))) return row
-  if (row.name !== "Potion of Healing") return row
-  return {
-    ...row,
-    magic_item_category: "Potion",
-    rarity: "Common",
-    requires_attunement: false,
-    magic_effects: healPotionEffects("modinst_potion_healing", "2d4 + 2", "Potion of Healing"),
+  let enriched = { ...row }
+  if (!isSrdSource(String(row.source ?? ""))) return enriched
+
+  if (row.name === "Potion of Healing") {
+    enriched = {
+      ...enriched,
+      magic_item_category: "Potion",
+      rarity: "Common",
+      requires_attunement: false,
+      magic_effects: healPotionEffects("modinst_potion_healing", "2d4 + 2", "Potion of Healing"),
+    }
   }
+
+  if (
+    enriched.category === "Weapon" &&
+    !(typeof enriched.icon === "string" && enriched.icon.trim())
+  ) {
+    const name = String(enriched.name ?? "").trim()
+    if (name) {
+      enriched = { ...enriched, icon: weaponIconSlug(name) }
+    }
+  }
+
+  if (enriched.category === "Armor") {
+    enriched = applySrdItemIcon(enriched, SRD_ARMOR_ICONS_BY_NAME)
+  }
+
+  return enriched
 }
 
 export function enrichSrdMundaneEquipmentList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

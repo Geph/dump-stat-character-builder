@@ -1,10 +1,34 @@
 import { describe, expect, it } from "vitest"
 import {
+  compendiumBrowseGridClass,
   compendiumItemSupportsCardImage,
   compendiumTabSupportsCardImage,
+  compendiumUsesPortraitCardArt,
   resolveCompendiumCardImageUrl,
 } from "@/lib/compendium/card-image"
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
+
+describe("compendiumBrowseGridClass", () => {
+  it("uses four columns from lg for portrait card tabs", () => {
+    expect(compendiumBrowseGridClass("classes")).toContain("lg:grid-cols-4")
+    expect(compendiumBrowseGridClass("species")).toContain("lg:grid-cols-4")
+    expect(compendiumBrowseGridClass("subclasses")).toContain("lg:grid-cols-4")
+  })
+
+  it("keeps xl breakpoint for other tabs", () => {
+    expect(compendiumBrowseGridClass("spells")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("spells")).not.toContain("lg:grid-cols-4")
+  })
+})
+
+describe("compendiumUsesPortraitCardArt", () => {
+  it("matches classes, species, and subclasses only", () => {
+    expect(compendiumUsesPortraitCardArt("classes")).toBe(true)
+    expect(compendiumUsesPortraitCardArt("species")).toBe(true)
+    expect(compendiumUsesPortraitCardArt("subclasses")).toBe(true)
+    expect(compendiumUsesPortraitCardArt("backgrounds")).toBe(false)
+  })
+})
 
 describe("compendiumTabSupportsCardImage", () => {
   it("allows card art on supported tabs", () => {
