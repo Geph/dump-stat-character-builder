@@ -2654,6 +2654,11 @@ export default function BuilderPage() {
                         nextLabel="Next classes"
                         className={cinematicPickerPaginationClass}
                       />
+                    </>
+                  )
+                })()}
+
+                {multiclassAbilityIssues.length > 0 && (
                   <div className="mt-4 rounded-xl border border-warning/50 bg-warning/10 p-4">
                     <p className="text-sm font-bold text-warning mb-2">Multiclass ability requirements</p>
                     <ul className="space-y-1 text-xs text-foreground">
