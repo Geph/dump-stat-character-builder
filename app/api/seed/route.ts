@@ -18,6 +18,7 @@ import { enrichSrdToolList } from "@/lib/compendium/enrich-srd-tools"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
@@ -67,7 +68,10 @@ export async function POST(request: NextRequest) {
 
     await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
     await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
-    await upsertByName("spells", withSrdCreatorUrlList(spells))
+    await upsertByName(
+      "spells",
+      enrichSrdSpellList(withSrdCreatorUrlList(spells as Record<string, unknown>[])),
+    )
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
     await upsertByName("languages", withSrdCreatorUrlList(languages))
     await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools)))

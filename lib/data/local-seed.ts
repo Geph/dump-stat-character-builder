@@ -7,6 +7,7 @@ import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { createClient } from "@/lib/db/client"
+import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
@@ -25,6 +26,8 @@ export type LocalSeedResult = {
 }
 
 const SRD_VERSION_STORAGE_KEY = "dump-stat-srd-version"
+const SPELL_CARD_ART_VERSION_STORAGE_KEY = "dump-stat-spell-card-art-version"
+const BUNDLED_SPELL_CARD_ART_VERSION = "2"
 
 export { isIndexedDbEmpty, getIndexedDbRowCounts } from "./indexed-db-store"
 
@@ -36,6 +39,26 @@ function readStoredSrdVersion(): string | null {
 function writeStoredSrdVersion(version: string): void {
   if (typeof localStorage === "undefined") return
   localStorage.setItem(SRD_VERSION_STORAGE_KEY, version)
+}
+
+function readStoredSpellCardArtVersion(): string | null {
+  if (typeof localStorage === "undefined") return null
+  return localStorage.getItem(SPELL_CARD_ART_VERSION_STORAGE_KEY)
+}
+
+function writeStoredSpellCardArtVersion(version: string): void {
+  if (typeof localStorage === "undefined") return
+  localStorage.setItem(SPELL_CARD_ART_VERSION_STORAGE_KEY, version)
+}
+
+async function ensureBundledSpellCardArt(): Promise<void> {
+  if (readStoredSpellCardArtVersion() === BUNDLED_SPELL_CARD_ART_VERSION) return
+  const { spells } = getSrdSeedData()
+  await upsertByName(
+    "spells",
+    enrichSrdSpellList(withSrdCreatorUrlList(spells as Record<string, unknown>[])),
+  )
+  writeStoredSpellCardArtVersion(BUNDLED_SPELL_CARD_ART_VERSION)
 }
 
 async function seedClassResources(classIdMap: Map<string, string>): Promise<void> {
@@ -64,7 +87,10 @@ async function ensureBundledSrdFresh(): Promise<void> {
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
   await upsertByName("languages", withSrdCreatorUrlList(languages as Record<string, unknown>[]))
   await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as Record<string, unknown>[])))
-  await upsertByName("spells", withSrdCreatorUrlList(spells as Record<string, unknown>[]))
+  await upsertByName(
+    "spells",
+    enrichSrdSpellList(withSrdCreatorUrlList(spells as Record<string, unknown>[])),
+  )
   await seedSrdEquipment({
     upsertByName,
     listEquipmentByName: async () => {
@@ -107,6 +133,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
   )
 
   writeStoredSrdVersion(manifest.version)
+  writeStoredSpellCardArtVersion(BUNDLED_SPELL_CARD_ART_VERSION)
 }
 
 export async function seedLocalSrd(): Promise<LocalSeedResult> {
@@ -148,7 +175,10 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
 
   await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
-  await upsertByName("spells", withSrdCreatorUrlList(spells))
+  await upsertByName(
+    "spells",
+    enrichSrdSpellList(withSrdCreatorUrlList(spells as Record<string, unknown>[])),
+  )
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as Record<string, unknown>[])))
   await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as Record<string, unknown>[])))
   await seedSrdEquipment({
@@ -163,6 +193,7 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
 
   const { total, breakdown } = getSrdSeedTotals()
   writeStoredSrdVersion(manifest.version)
+  writeStoredSpellCardArtVersion(BUNDLED_SPELL_CARD_ART_VERSION)
   return { total, breakdown, srdVersion: manifest.version }
 }
 
@@ -175,5 +206,6 @@ export async function ensureLocalSrdSeed(): Promise<LocalSeedResult | null> {
   }
 
   await ensureBundledSrdFresh()
+  await ensureBundledSpellCardArt()
   return null
 }

@@ -750,7 +750,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {cardImage ? (
           <CompendiumCardHero
             imageUrl={cardImage}
-            crop={compendiumCardImageCropForType(activeTab)}
+            crop={compendiumCardImageCropForType(activeTab, cardImage)}
             variant="list"
             fullBleed
             listGradientClass={listGradientClass}

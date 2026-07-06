@@ -21,9 +21,9 @@ export const COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[350px]"
 /** Landscape browse cards — bottom scrim for text legibility. */
 export const COMPENDIUM_LIST_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_40%,rgba(0,0,0,0.45)_46%,transparent_50%)]"
-/** Portrait class/species/subclass cards — clear above 2/3; bottom third fades to 25% black. */
+/** Portrait / graphic browse cards — top 70% clear; 10% ramp; bottom 20% at 85% black (15% transparent). */
 export const COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS =
-  "bg-[linear-gradient(to_top,rgba(0,0,0,0.25)_0%,transparent_33.33%)]"
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_20%,transparent_30%)]"
 /** Builder selection cards — clear top 40%, then ramp to 80% black at the bottom. */
 export const SELECTION_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_bottom,transparent_0%,transparent_40%,rgba(0,0,0,0.45)_54%,rgba(0,0,0,0.8)_100%)]"
@@ -69,6 +69,7 @@ export function compendiumTabSupportsCardImage(tab: CompendiumContentType): bool
     tab === "subclasses" ||
     tab === "species" ||
     tab === "backgrounds" ||
+    tab === "spells" ||
     tab === "magic_items" ||
     tab === "abilities"
   )
@@ -125,27 +126,38 @@ export const COMPENDIUM_PORTRAIT_CARD_TABS = new Set<CompendiumContentType>([
   "classes",
   "species",
   "subclasses",
+  "spells",
 ])
 
 export function compendiumUsesPortraitCardArt(tab: CompendiumContentType): boolean {
   return COMPENDIUM_PORTRAIT_CARD_TABS.has(tab)
 }
 
-/** Browse card with portrait (3:4) art — classes, species, subclasses when card_image_url is set. */
+/** Browse card with portrait (3:4) art when card_image_url is set. */
 export function isCompendiumPortraitGraphicCard(
   tab: CompendiumContentType,
   cardImage: string | null | undefined,
 ): boolean {
-  return Boolean(cardImage) && compendiumUsesPortraitCardArt(tab)
+  if (!cardImage) return false
+  if (compendiumUsesPortraitCardArt(tab)) return true
+  return tab === "backgrounds"
 }
 
-export function compendiumPortraitListGradientClass(
+export function compendiumGraphicCardListGradientClass(
   tab: CompendiumContentType,
   cardImage: string | null | undefined,
 ): string {
   return isCompendiumPortraitGraphicCard(tab, cardImage)
     ? COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS
     : COMPENDIUM_LIST_CARD_GRADIENT_CLASS
+}
+
+/** @deprecated Use compendiumGraphicCardListGradientClass */
+export function compendiumPortraitListGradientClass(
+  tab: CompendiumContentType,
+  cardImage: string | null | undefined,
+): string {
+  return compendiumGraphicCardListGradientClass(tab, cardImage)
 }
 
 /** Browse grid: portrait tabs show 4 columns from lg breakpoint up. */
@@ -156,9 +168,20 @@ export function compendiumBrowseGridClass(tab: CompendiumContentType): string {
   return "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
 }
 
-/** Portrait class/species art is top-cropped; other types use full landscape framing. */
-export function compendiumCardImageCropForType(tab: CompendiumContentType): CompendiumCardImageCrop {
-  return tab === "classes" || tab === "subclasses" || tab === "species" ? "top" : "center"
+/** Portrait class/species/spell/background art is top-cropped when shown as a graphic card. */
+export function compendiumCardImageCropForType(
+  tab: CompendiumContentType,
+  cardImage?: string | null,
+): CompendiumCardImageCrop {
+  if (
+    cardImage &&
+    (compendiumUsesPortraitCardArt(tab) || tab === "backgrounds")
+  ) {
+    return "top"
+  }
+  return tab === "classes" || tab === "subclasses" || tab === "species" || tab === "spells"
+    ? "top"
+    : "center"
 }
 
 export function compendiumCardHeroImageClass(crop: CompendiumCardImageCrop = "center"): string {
