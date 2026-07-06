@@ -27,7 +27,7 @@ export type LocalSeedResult = {
 
 const SRD_VERSION_STORAGE_KEY = "dump-stat-srd-version"
 const SPELL_CARD_ART_VERSION_STORAGE_KEY = "dump-stat-spell-card-art-version"
-const BUNDLED_SPELL_CARD_ART_VERSION = "2"
+const BUNDLED_SPELL_CARD_ART_VERSION = "3"
 
 export { isIndexedDbEmpty, getIndexedDbRowCounts } from "./indexed-db-store"
 

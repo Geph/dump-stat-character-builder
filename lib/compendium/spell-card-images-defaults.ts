@@ -21,6 +21,7 @@ export const BUNDLED_SPELL_CARD_IMAGE_NAMES = [
   "Create Bonfire",
   "Dancing Lights",
   "Druidcraft",
+  "Eldritch Blast",
   "Elementalism",
   "Sorcerous Burst",
   "Starry Wisp",
