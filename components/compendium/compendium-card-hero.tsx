@@ -2,6 +2,7 @@
 
 import {
   WIDE_CARD_ASPECT_CLASS,
+  COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
   compendiumCardHeroImageClass,
   type CompendiumCardImageCrop,
 } from "@/lib/compendium/card-image"
@@ -12,6 +13,10 @@ type CompendiumCardHeroProps = {
   crop?: CompendiumCardImageCrop
   /** List cards fade into card body; overlays use a darker scrim. */
   variant?: "list" | "overlay"
+  /** Fill parent height instead of fixed 21:9 aspect (detail overlay hero). */
+  fillHeight?: boolean
+  /** List card: image covers the entire card behind content. */
+  fullBleed?: boolean
   className?: string
   minHeightClass?: string
   maxHeightClass?: string
@@ -21,6 +26,8 @@ export function CompendiumCardHero({
   imageUrl,
   crop = "center",
   variant = "list",
+  fillHeight = false,
+  fullBleed = false,
   className,
   minHeightClass,
   maxHeightClass,
@@ -30,8 +37,9 @@ export function CompendiumCardHero({
   return (
     <div
       className={cn(
-        "relative w-full shrink-0 overflow-hidden",
-        WIDE_CARD_ASPECT_CLASS,
+        "relative overflow-hidden",
+        fullBleed ? "absolute inset-0" : "relative w-full shrink-0",
+        !fullBleed && (fillHeight ? "h-full" : WIDE_CARD_ASPECT_CLASS),
         minHeightClass,
         maxHeightClass,
         className,
@@ -44,7 +52,14 @@ export function CompendiumCardHero({
         <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
       )}
       {variant === "list" ? (
-        <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+        <div
+          className={cn(
+            "absolute inset-0",
+            fullBleed
+              ? COMPENDIUM_LIST_CARD_GRADIENT_CLASS
+              : "bg-gradient-to-t from-card via-card/60 to-transparent",
+          )}
+        />
       ) : (
         <>
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />

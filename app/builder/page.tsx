@@ -84,11 +84,14 @@ import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 import { CompendiumSelectionCard } from "@/components/compendium/compendium-selection-card"
-import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
+import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
+import { ClassDetailFeatureList } from "@/components/compendium/class-detail-feature-list"
+import { ClassComplexityDisplay } from "@/components/compendium/class-complexity-display"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { compendiumCardBlurb, getCompendiumCardBlurb } from "@/lib/compendium/card-image"
-import { getClassDetailFeatures } from "@/lib/builder/class-detail-features"
+import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
+import { getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
 import {
   suggestEquipmentLoadout,
 } from "@/lib/builder/equipment-loadout"
@@ -96,7 +99,8 @@ import {
   getBackgroundStartingEquipmentGroups,
   getBackgroundStartingGold,
 } from "@/lib/compendium/background-equipment"
-import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
+import { getCompendiumItemAccentColor, compendiumAccentColorStyles } from "@/lib/compendium/theme-colors"
+import { cn } from "@/lib/utils"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
@@ -2598,18 +2602,6 @@ export default function BuilderPage() {
                               key={cls.id}
                               item={cls}
                               subtitle={cls.source || "Custom"}
-                              tags={[
-                                ...(cls.primary_ability?.length
-                                  ? [
-                                      {
-                                        label: cls.primary_ability.join(" • ").toUpperCase(),
-                                        emphasis: true,
-                                      },
-                                    ]
-                                  : []),
-                                { label: `D${cls.hit_die} HIT DIE` },
-                                ...(cls.spellcasting ? [{ label: "SPELLCASTER" }] : []),
-                              ]}
                               accentColor={accent}
                               selected={isSelected}
                               selectionVariant={isSelected && !isPrimary ? "secondary" : "primary"}
@@ -5268,17 +5260,18 @@ export default function BuilderPage() {
 
         if (detailsModal.type === "class") {
           const cls = item as DndClass
-          const detailFeatures = getClassDetailFeatures(cls)
-          const featuresByLevel = [1, 2, 3].map((level) => ({
-            level,
-            features: detailFeatures.filter((f) => f.level === level),
-          }))
+          const accentStyles = compendiumAccentColorStyles(accent)
+          const baseFeatures = getClassDetailBaseFeatures(cls)
+          const classSubclasses = subclasses
+            .filter((subclass) => subclass.class_id === cls.id)
+            .sort((a, b) => a.name.localeCompare(b.name))
           return (
             <CompendiumDetailOverlay
               open
               onClose={close}
               item={cls}
               imageCrop="top"
+              enableCardImage
               subtitle={cls.source || "Custom"}
               tagline={getCompendiumCardBlurb(cls).toUpperCase()}
               tags={[
@@ -5286,57 +5279,53 @@ export default function BuilderPage() {
                   ? [{ label: cls.primary_ability.join(" • ").toUpperCase(), emphasis: true }]
                   : []),
                 { label: `D${cls.hit_die} HIT DIE` },
+                ...getClassDetailHeroBadges(cls),
               ]}
               accentColor={accent}
+              detailScroll={false}
             >
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Class highlights</p>
-                  <h3 className="font-serif text-lg font-bold text-white mb-2">How it feels to play</h3>
-                  <RichTextContent html={cls.description} />
+              <div className="grid h-full gap-3 overflow-hidden md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(0,1.05fr)] md:gap-4">
+                <div className="min-w-0 overflow-hidden">
+                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.iconText)}>
+                    Class highlights
+                  </p>
+                  <h3 className="font-serif text-sm font-bold text-white">How it feels to play</h3>
+                  <p className="mt-1 text-[11px] leading-snug text-white/75 line-clamp-3">
+                    {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
+                  </p>
+                  <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.iconText} />
                 </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Levels 1–3</p>
-                  <h3 className="font-serif text-lg font-bold text-white mb-2">Class features</h3>
-                  {detailFeatures.length > 0 ? (
-                    <div className="space-y-4">
-                      {featuresByLevel.map(({ level, features }) =>
-                        features.length > 0 ? (
-                          <div key={level}>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1.5">
-                              Level {level}
-                            </p>
-                            <ul className="space-y-1">
-                              {features.map((feature) => (
-                                <li
-                                  key={`${level}-${feature.name}`}
-                                  className={`text-sm ${
-                                    feature.resourceRelated
-                                      ? "font-bold text-primary"
-                                      : "text-white/85"
-                                  }`}
-                                >
-                                  {feature.name}
-                                  {feature.resourceRelated && (
-                                    <span className="ml-1.5 text-[10px] uppercase tracking-wide text-primary/80">
-                                      Resource
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null,
-                      )}
+                <div className="min-w-0 overflow-hidden">
+                  <h3 className="font-serif text-sm font-bold text-white">Class features</h3>
+                  {baseFeatures.length > 0 ? (
+                    <div className="mt-1">
+                      <ClassDetailFeatureList
+                        features={baseFeatures}
+                        accentClassName={accentStyles.iconText}
+                      />
                     </div>
                   ) : (
-                    <p className="text-sm text-white/70">No features listed for levels 1–3.</p>
+                    <p className="mt-1 text-[11px] text-white/70">No class features listed.</p>
                   )}
-                  {cls.armor_proficiencies && cls.armor_proficiencies.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-xs uppercase text-white/50 mb-1">Armor</p>
-                      <p className="text-sm">{cls.armor_proficiencies.join(", ")}</p>
-                    </div>
+                </div>
+                <div className="min-w-0 overflow-hidden">
+                  {classSubclasses.length > 0 ? (
+                    <ul className="space-y-1">
+                      {classSubclasses.map((subclass) => (
+                        <li key={subclass.id} className="min-w-0">
+                          <p className="text-[11px] font-semibold leading-tight text-white/90">
+                            {subclass.name}
+                          </p>
+                          {subclass.description ? (
+                            <p className="text-[10px] leading-snug text-white/60 line-clamp-1">
+                              {compendiumCardBlurb(subclass.description)}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-white/70">No subclasses listed.</p>
                   )}
                 </div>
               </div>
@@ -5351,6 +5340,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={sp}
+              enableCardImage
               subtitle={sp.source || "Custom"}
               tags={[
                 { label: String(sp.size || "Medium") },
@@ -5387,6 +5377,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={bg}
+              enableCardImage
               subtitle={bg.source || "Custom"}
               tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
               accentColor={accent}
@@ -5446,6 +5437,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={spell}
+              enableCardImage={false}
               subtitle={spell.school}
               tags={[
                 { label: spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`, emphasis: true },
@@ -5471,6 +5463,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={eq}
+              enableCardImage={false}
               subtitle={eq.category}
               accentColor={accent}
             >
@@ -5486,6 +5479,7 @@ export default function BuilderPage() {
               open
               onClose={close}
               item={feat}
+              enableCardImage={false}
               subtitle={feat.category ?? feat.source ?? "Feat"}
               tags={[
                 ...(feat.category

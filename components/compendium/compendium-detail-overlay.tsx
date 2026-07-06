@@ -29,6 +29,10 @@ type CompendiumDetailOverlayProps = {
   tagline?: string
   tags?: CompendiumDetailTag[]
   accentColor?: CompendiumThemeColorId | null
+  /** When false, the detail strip clips instead of scrolling (compact class layout). */
+  detailScroll?: boolean
+  /** When false, hero/card art is hidden even if card_image_url is set. */
+  enableCardImage?: boolean
   headerActions?: ReactNode
   children: ReactNode
   /** Portrait class art uses top crop inside the landscape banner. */
@@ -46,8 +50,10 @@ export function CompendiumDetailOverlay({
   headerActions,
   children,
   imageCrop = "center",
+  detailScroll = true,
+  enableCardImage = true,
 }: CompendiumDetailOverlayProps) {
-  const imageUrl = getCompendiumCardImageUrl(item)
+  const imageUrl = enableCardImage ? getCompendiumCardImageUrl(item) : null
   const accent = compendiumAccentColorStyles(accentColor)
 
   return (
@@ -65,18 +71,16 @@ export function CompendiumDetailOverlay({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            className="relative flex w-full max-w-6xl flex-col overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl"
+            className="relative flex h-[min(92vh,900px)] max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             style={{ boxShadow: "inset 0 0 0 1px rgba(212, 175, 55, 0.2), 0 24px 80px rgba(0,0,0,0.65)" }}
           >
-            {/* Hero band — fixed aspect so art is not stretched over full overlay height */}
-            <div className="relative shrink-0 overflow-hidden">
+            <div className="relative min-h-0 flex-[3] overflow-hidden">
               <CompendiumCardHero
                 imageUrl={imageUrl}
                 crop={imageCrop}
                 variant="overlay"
-                minHeightClass="min-h-[180px]"
-                maxHeightClass="max-h-[42vh]"
+                fillHeight
               />
 
               <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
@@ -132,9 +136,21 @@ export function CompendiumDetailOverlay({
               </div>
             </div>
 
-            {/* Scrollable body */}
-            <div className="relative z-10 flex-1 overflow-y-auto border-t border-border bg-black/55 backdrop-blur-sm">
-              <div className="p-4 sm:p-6 text-white/90 [&_.text-muted-foreground]:text-white/65 [&_.text-foreground]:text-white">
+            {/* Detail strip — 25% of overlay height */}
+            <div
+              className={cn(
+                "relative z-10 min-h-0 flex-[1] border-t",
+                accent.detailStripBg,
+                accent.detailStripBorder,
+                detailScroll ? "overflow-y-auto" : "overflow-hidden",
+              )}
+            >
+              <div
+                className={cn(
+                  "p-3 sm:p-4 text-white/90 [&_.text-muted-foreground]:text-white/70 [&_.text-foreground]:text-white",
+                  !detailScroll && "h-full overflow-hidden",
+                )}
+              >
                 {children}
               </div>
             </div>

@@ -57,9 +57,17 @@ import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
+import { classComplexityDetailRow } from "@/components/compendium/class-complexity-display"
 import { CustomClassSpellListDialog } from "@/components/compendium/custom-class-spell-list-dialog"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
-import { getCompendiumCardImageUrl, compendiumCardImageCropForType } from "@/lib/compendium/card-image"
+import {
+  COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS,
+  COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS,
+  compendiumItemSupportsCardImage,
+  resolveCompendiumCardImageUrl,
+  compendiumCardImageCropForType,
+  type CompendiumCardVisual,
+} from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
@@ -689,15 +697,28 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(data as { id?: string; is_system?: boolean })
     const canCopy = canDuplicateCompendiumItem(activeTab, data.id as string, data as { is_system?: boolean | null })
 
-    const cardImage = getCompendiumCardImageUrl(data as Record<string, unknown>)
+    const cardImage = resolveCompendiumCardImageUrl(
+      data as Record<string, unknown> & CompendiumCardVisual,
+      activeTab,
+    )
+    const cardMinHeightClass =
+      cardImage && activeTab === "classes"
+        ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
+        : cardImage
+          ? COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
+          : null
 
     return (
       <motion.div
         key={data.id as string}
         layoutId={data.id as string}
-        className={`relative overflow-hidden bg-card rounded-2xl border-2 transition-colors ${
-          enabled ? `border-primary/40 ${accentStyles.hoverBorder}` : "border-border/60 opacity-60 hover:opacity-80"
-        }`}
+        className={cn(
+          "relative overflow-hidden rounded-2xl border-2 transition-colors",
+          cardMinHeightClass ?? "bg-card",
+          enabled
+            ? `border-primary/40 ${accentStyles.hoverBorder}`
+            : "border-border/60 opacity-60 hover:opacity-80",
+        )}
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
         {cardImage ? (
@@ -705,16 +726,28 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             imageUrl={cardImage}
             crop={compendiumCardImageCropForType(activeTab)}
             variant="list"
+            fullBleed
           />
         ) : null}
-        <div className={`p-5 pb-11 ${cardImage ? "pt-3" : ""}`}>
+        <div
+          className={cn(
+            "relative z-10 p-5 pb-11",
+            cardImage && "flex min-h-full flex-col justify-end pt-3",
+            cardImage &&
+              "[&_.text-foreground]:text-white [&_.text-muted-foreground]:text-white/75 [&_.text-primary]:text-primary [&_.text-secondary]:text-secondary [&_.text-warning]:text-warning [&_.text-orange]:text-orange [&_.text-lime]:text-lime [&_.text-magenta]:text-magenta [&_.text-accent]:text-accent [&_.bg-muted]:bg-black/40 [&_.bg-muted]:text-white/90",
+          )}
+        >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
               <GameIcon name={iconName} className="w-10 h-10" />
             </div>
             <h3 
-              className={`font-bold text-lg text-foreground cursor-pointer ${accentStyles.titleHover} leading-tight flex items-center gap-1.5`}
+              className={cn(
+                "font-bold text-lg cursor-pointer leading-tight flex items-center gap-1.5",
+                cardImage ? "text-white drop-shadow-md" : "text-foreground",
+                accentStyles.titleHover,
+              )}
               onClick={() => setSelectedItem(item)}
             >
               {activeTab === "class_resources"
@@ -747,7 +780,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   void handleCopyItem(data)
                 }}
                 disabled={copyingId === (data.id as string)}
-                className={`flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground hover:bg-muted disabled:opacity-50 ${accentStyles.editHover}`}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full border transition-colors hover:bg-muted disabled:opacity-50",
+                  cardImage
+                    ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
+                    : `border-border text-muted-foreground hover:text-foreground ${accentStyles.editHover}`,
+                )}
                 title="Make a copy"
               >
                 <Copy className="w-4 h-4" />
@@ -755,7 +793,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
             <Link
               href={editPath}
-              className={`flex items-center justify-center w-8 h-8 shrink-0 rounded-full border border-border text-muted-foreground transition-colors ${accentStyles.editHover}`}
+              className={cn(
+                "flex items-center justify-center w-8 h-8 shrink-0 rounded-full border transition-colors",
+                cardImage
+                  ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
+                  : `border-border text-muted-foreground ${accentStyles.editHover}`,
+              )}
               title="Edit"
             >
               <Edit className="w-4 h-4" />
@@ -1512,6 +1555,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           open
           onClose={() => setSelectedItem(null)}
           imageCrop={compendiumCardImageCropForType(activeTab)}
+          enableCardImage={compendiumItemSupportsCardImage(
+            activeTab,
+            selectedItem as Record<string, unknown>,
+          )}
           item={
             activeTab === "class_resources"
               ? {
@@ -1631,6 +1678,18 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               ) : null}
             </dl>
           )}
+          {activeTab === "classes" && (() => {
+            const row = classComplexityDetailRow(selectedItem as DndClass)
+            if (!row) return null
+            return (
+              <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <div className="contents">
+                  <dt className="text-white/50 font-semibold">{row.label}</dt>
+                  <dd className="text-white/90">{row.value}</dd>
+                </div>
+              </dl>
+            )
+          })()}
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
           )}
