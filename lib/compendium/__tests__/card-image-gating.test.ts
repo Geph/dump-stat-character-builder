@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   compendiumBrowseGridClass,
+  COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
   COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
   compendiumItemSupportsCardImage,
   compendiumPortraitListGradientClass,
@@ -16,43 +17,48 @@ describe("compendiumBrowseGridClass", () => {
     expect(compendiumBrowseGridClass("classes")).toContain("lg:grid-cols-4")
     expect(compendiumBrowseGridClass("species")).toContain("lg:grid-cols-4")
     expect(compendiumBrowseGridClass("subclasses")).toContain("lg:grid-cols-4")
+    expect(compendiumBrowseGridClass("spells")).toContain("lg:grid-cols-4")
   })
 
   it("keeps xl breakpoint for other tabs", () => {
-    expect(compendiumBrowseGridClass("spells")).toContain("xl:grid-cols-4")
-    expect(compendiumBrowseGridClass("spells")).not.toContain("lg:grid-cols-4")
+    expect(compendiumBrowseGridClass("feats")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("feats")).not.toContain("lg:grid-cols-4")
+    expect(compendiumBrowseGridClass("backgrounds")).toContain("xl:grid-cols-4")
   })
 })
 
 describe("compendiumUsesPortraitCardArt", () => {
-  it("matches classes, species, and subclasses only", () => {
+  it("matches classes, species, subclasses, and spells only", () => {
     expect(compendiumUsesPortraitCardArt("classes")).toBe(true)
     expect(compendiumUsesPortraitCardArt("species")).toBe(true)
     expect(compendiumUsesPortraitCardArt("subclasses")).toBe(true)
+    expect(compendiumUsesPortraitCardArt("spells")).toBe(true)
     expect(compendiumUsesPortraitCardArt("backgrounds")).toBe(false)
   })
 })
 
 describe("isCompendiumPortraitGraphicCard", () => {
-  it("treats portrait tabs with card art the same for classes, species, and subclasses", () => {
+  it("treats portrait tabs and backgrounds with card art as graphic portrait cards", () => {
     const url = "https://example.com/art.png"
     expect(isCompendiumPortraitGraphicCard("classes", url)).toBe(true)
     expect(isCompendiumPortraitGraphicCard("species", url)).toBe(true)
     expect(isCompendiumPortraitGraphicCard("subclasses", url)).toBe(true)
-    expect(isCompendiumPortraitGraphicCard("backgrounds", url)).toBe(false)
-    expect(isCompendiumPortraitGraphicCard("classes", null)).toBe(false)
+    expect(isCompendiumPortraitGraphicCard("spells", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("backgrounds", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("backgrounds", null)).toBe(false)
+    expect(isCompendiumPortraitGraphicCard("feats", url)).toBe(false)
   })
 
-  it("uses the lighter portrait gradient for portrait tabs only", () => {
+  it("uses the graphic-card gradient for portrait tabs and backgrounds with art", () => {
     const url = "https://example.com/art.png"
     expect(compendiumPortraitListGradientClass("species", url)).toBe(
       COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
     )
-    expect(compendiumPortraitListGradientClass("subclasses", url)).toBe(
+    expect(compendiumPortraitListGradientClass("backgrounds", url)).toBe(
       COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
     )
     expect(compendiumPortraitListGradientClass("backgrounds", url)).not.toBe(
-      COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+      COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
     )
   })
 })
@@ -62,13 +68,13 @@ describe("compendiumTabSupportsCardImage", () => {
     expect(compendiumTabSupportsCardImage("classes")).toBe(true)
     expect(compendiumTabSupportsCardImage("subclasses")).toBe(true)
     expect(compendiumTabSupportsCardImage("species")).toBe(true)
+    expect(compendiumTabSupportsCardImage("spells")).toBe(true)
     expect(compendiumTabSupportsCardImage("backgrounds")).toBe(true)
     expect(compendiumTabSupportsCardImage("magic_items")).toBe(true)
     expect(compendiumTabSupportsCardImage("abilities")).toBe(true)
   })
 
   it("disallows card art on other tabs", () => {
-    expect(compendiumTabSupportsCardImage("spells")).toBe(false)
     expect(compendiumTabSupportsCardImage("feats")).toBe(false)
     expect(compendiumTabSupportsCardImage("equipment")).toBe(false)
     expect(compendiumTabSupportsCardImage("tools")).toBe(false)
@@ -97,16 +103,24 @@ describe("compendiumItemSupportsCardImage", () => {
   })
 })
 
+describe("compendium graphic card gradient", () => {
+  it("uses a 70/10/20 scrim ramp", () => {
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.85)_0%")
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("transparent_30%")
+  })
+})
+
 describe("resolveCompendiumCardImageUrl", () => {
   const item = { card_image_url: "https://example.com/art.png" }
 
   it("returns null for unsupported tabs even when url is set", () => {
-    expect(resolveCompendiumCardImageUrl(item, "spells")).toBeNull()
     expect(resolveCompendiumCardImageUrl(item, "feats")).toBeNull()
+    expect(resolveCompendiumCardImageUrl(item, "equipment")).toBeNull()
   })
 
   it("returns url for supported tabs", () => {
     expect(resolveCompendiumCardImageUrl(item, "classes")).toBe(item.card_image_url)
+    expect(resolveCompendiumCardImageUrl(item, "spells")).toBe(item.card_image_url)
     expect(resolveCompendiumCardImageUrl(item, "magic_items")).toBe(item.card_image_url)
   })
 })

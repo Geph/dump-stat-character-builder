@@ -1,4 +1,5 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import {
   parsePsionicAugmentsFromDescription,
   type PsionicAugmentsConfig,
@@ -105,5 +106,6 @@ export function normalizeSpellImportRows(
   return rows
     .map(normalizeSpellImportRow)
     .map(enrichSpellPsionicAugments)
+    .map((row) => enrichSpellRowWithBundledCardImage(row as Record<string, unknown>))
     .filter((row) => row.name.length > 0)
 }
