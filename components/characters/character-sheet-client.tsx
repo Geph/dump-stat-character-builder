@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { pageBackLinkClass } from "@/lib/compendium/editor-field-styles"
@@ -52,8 +53,6 @@ import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
 import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-powers-panel"
 import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
-import { SpellDetailOverlay } from "@/components/character-sheet/spell-detail-overlay"
-import { EquipmentDetailOverlay } from "@/components/character-sheet/equipment-detail-overlay"
 import {
   getMulticlassSpellSlotTables,
   isConcentrationCondition,
@@ -174,7 +173,6 @@ import {
 } from "@/lib/character/resolve-companions"
 import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
-import { downloadCharacterPdf } from "@/lib/character/pdf-export"
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
@@ -183,6 +181,20 @@ import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-t
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+
+const SpellDetailOverlay = dynamic(
+  () =>
+    import("@/components/character-sheet/spell-detail-overlay").then((mod) => ({
+      default: mod.SpellDetailOverlay,
+    })),
+)
+
+const EquipmentDetailOverlay = dynamic(
+  () =>
+    import("@/components/character-sheet/equipment-detail-overlay").then((mod) => ({
+      default: mod.EquipmentDetailOverlay,
+    })),
+)
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -2386,17 +2398,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             type="button"
                             onClick={() => {
                               if (!character || !derived) return
-                              void downloadCharacterPdf({
-                                name: character.name,
-                                level: character.level,
-                                classSummary: classLabel,
-                                derived,
-                                breakdowns: statBreakdowns,
-                                sheetUrl:
-                                  typeof window !== "undefined"
-                                    ? `${window.location.origin}/characters/${character.id}`
-                                    : undefined,
-                              })
+                              void import("@/lib/character/pdf-export").then(({ downloadCharacterPdf }) =>
+                                downloadCharacterPdf({
+                                  name: character.name,
+                                  level: character.level,
+                                  classSummary: classLabel,
+                                  derived,
+                                  breakdowns: statBreakdowns,
+                                  sheetUrl:
+                                    typeof window !== "undefined"
+                                      ? `${window.location.origin}/characters/${character.id}`
+                                      : undefined,
+                                }),
+                              )
                               setSheetMenuOpen(false)
                             }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
