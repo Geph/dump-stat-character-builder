@@ -142,14 +142,76 @@ export function toolGroupLabel(group: ToolGroup): string {
     case "artisans":
       return "Artisan's Tools"
     case "musical":
-      return "Musical Instrument"
+      return "Musical Instruments"
     case "gaming":
-      return "Gaming Set"
+      return "Gaming Sets"
     case "vehicle":
-      return "Vehicle"
+      return "Vehicles"
     case "other":
       return "Other Tools"
     default:
       return group
   }
+}
+
+export type ToolOptionGroup = {
+  key: string
+  label: string
+  names: string[]
+}
+
+function seedSubcategoryForName(name: string): string | null {
+  const row = seedByName.get(name.toLowerCase())
+  return row?.subcategory?.trim() || null
+}
+
+function seedGroupForName(name: string): ToolGroup | null {
+  const row = seedByName.get(name.toLowerCase())
+  return (row?.tool_group as ToolGroup | undefined) ?? null
+}
+
+/** Group tool proficiency options for accordion pickers (artisans / musical pools). */
+export function groupToolOptionsForPicker(
+  names: string[],
+  pool?: ToolChoicePool | null,
+): ToolOptionGroup[] {
+  const unique = [...new Set(names.filter((name) => name.trim().length > 0))].sort((a, b) =>
+    a.localeCompare(b),
+  )
+  if (unique.length === 0) return []
+
+  const shouldGroup =
+    pool === "artisans" ||
+    pool === "musical" ||
+    pool === "gaming" ||
+    pool === "vehicle" ||
+    pool === "other" ||
+    pool === "all"
+
+  if (!shouldGroup) {
+    return [{ key: "all", label: "Tools", names: unique }]
+  }
+
+  const buckets = new Map<string, ToolOptionGroup>()
+  for (const name of unique) {
+    const group = seedGroupForName(name)
+    const subcategory = seedSubcategoryForName(name)
+    const label =
+      subcategory ||
+      (group ? toolGroupLabel(group) : null) ||
+      (name.toLowerCase() === "musical instrument"
+        ? "Musical Instruments"
+        : name.toLowerCase() === "gaming set"
+          ? "Gaming Sets"
+          : "Other Tools")
+    const key = `${group ?? "misc"}::${label}`
+    const existing = buckets.get(key)
+    if (existing) {
+      existing.names.push(name)
+    } else {
+      buckets.set(key, { key, label, names: [name] })
+    }
+  }
+
+  return [...buckets.values()].sort((a, b) => a.label.localeCompare(b.label))
 }

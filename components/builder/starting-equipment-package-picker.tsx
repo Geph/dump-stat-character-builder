@@ -3,6 +3,8 @@
 import { Coins } from "lucide-react"
 import type { StartingEquipmentOption } from "@/lib/types"
 import { isGoldOnlyOption } from "@/lib/builder/equipment-utils"
+import { getCinematicPickerContainerClass } from "@/lib/builder/picker-pagination"
+import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { STARTING_EQUIPMENT_CARD_IMAGES } from "@/lib/site-images"
 import { cn } from "@/lib/utils"
 
@@ -15,6 +17,8 @@ type StartingEquipmentPackagePickerProps = {
   onSelect: (index: number) => void
   /** Alternate image side per row for visual variety */
   imageSide?: "left" | "right" | "alternate"
+  /** Phone swipe carousel (cinematic builder on narrow screens). */
+  swipeLayout?: boolean
 }
 
 export function StartingEquipmentPackagePicker({
@@ -25,6 +29,7 @@ export function StartingEquipmentPackagePicker({
   startingGold,
   onSelect,
   imageSide = "alternate",
+  swipeLayout = false,
 }: StartingEquipmentPackagePickerProps) {
   if (!options.length) return null
 
@@ -38,7 +43,14 @@ export function StartingEquipmentPackagePicker({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SwipeVisualPicker
+        enabled={swipeLayout}
+        className={cn(
+          swipeLayout
+            ? getCinematicPickerContainerClass()
+            : "grid grid-cols-1 lg:grid-cols-2 gap-4",
+        )}
+      >
         {options.map((option, index) => {
           const selected = selectedIndex === index
           const goldOnly = isGoldOnlyOption(option, startingGold)
@@ -129,7 +141,7 @@ export function StartingEquipmentPackagePicker({
             </button>
           )
         })}
-      </div>
+      </SwipeVisualPicker>
     </div>
   )
 }

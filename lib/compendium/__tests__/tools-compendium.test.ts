@@ -3,6 +3,7 @@ import {
   getAllSeedToolNames,
   getMusicalInstrumentNames,
   getStandardProficiencyToolNames,
+  groupToolOptionsForPicker,
   toolNamesForPool,
 } from "@/lib/compendium/tool-options"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
@@ -24,6 +25,14 @@ describe("SRD tools compendium seed", () => {
     expect(pool).toContain("Musical Instrument")
     expect(pool).not.toContain("Thieves' Tools")
     expect(getMusicalInstrumentNames().every((name) => pool.includes(name))).toBe(true)
+  })
+
+  it("groups musical instruments under one accordion section", () => {
+    const pool = toolNamesForPool("musical", getAllSeedToolNames())
+    const groups = groupToolOptionsForPicker(pool, "musical")
+    expect(groups.length).toBeGreaterThanOrEqual(1)
+    expect(groups.some((group) => group.label.includes("Musical"))).toBe(true)
+    expect(groups.flatMap((group) => group.names)).toContain("Lute")
   })
 })
 
