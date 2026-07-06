@@ -10,6 +10,7 @@ import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
 } from "@/components/compendium/compendium-editor-section"
+import { CompendiumDescriptionCardImageRow } from "@/components/compendium/description-card-image-row"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
@@ -17,7 +18,6 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import type { FeatureChoice, Feature, ClassResource, ClassResourceRow } from "@/lib/types"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
-import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { CardBlurbField } from "@/components/compendium/card-blurb-field"
 import { CLASS_COMPLEXITY_OPTIONS, type ClassComplexity } from "@/lib/compendium/class-complexity"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
@@ -461,17 +461,17 @@ export default function ClassEditorPage({ id }: { id: string }) {
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
-            cardImageAspect="21/9"
-            cardImageCrop="top"
+            cardImagePlacement="none"
           />
 
-          <CompendiumEditorPanel title="Description">
-            <RichTextEditor
-              value={form.description}
-              onChange={(description) => setForm({ ...form, description })}
-              placeholder="A warrior who fights with great strength..."
-            />
-          </CompendiumEditorPanel>
+          <CompendiumDescriptionCardImageRow
+            description={form.description}
+            onDescriptionChange={(description) => setForm({ ...form, description })}
+            descriptionPlaceholder="A warrior who fights with great strength..."
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageCrop="top"
+          />
 
           <CardBlurbField
             value={form.card_blurb}

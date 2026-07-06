@@ -41,6 +41,23 @@ export const SRD_BACKGROUND_ICONS_BY_NAME: Record<string, string> = {
   Soldier: "guards",
 }
 
+/** Default game-icons.net slugs for SRD mundane armor (from bundled seed / local MySQL export). */
+export const SRD_ARMOR_ICONS_BY_NAME: Record<string, string> = {
+  Breastplate: "armor-vest",
+  "Chain Mail": "mail-shirt",
+  "Chain Shirt": "chain-mail",
+  "Half Plate Armor": "breastplate",
+  "Hide Armor": "fur-shirt",
+  "Leather Armor": "leather-vest",
+  "Padded Armor": "shirt",
+  "Plate Armor": "cape-armor",
+  "Ring Mail": "linked-rings",
+  "Scale Mail": "scale-mail",
+  Shield: "checked-shield",
+  "Splint Armor": "shoulder-armor",
+  "Studded Leather Armor": "leather-armor",
+}
+
 /** Default game-icons.net slugs for SRD tools (matched to locally installed game-icons.net set). */
 export const SRD_TOOL_ICONS_BY_NAME: Record<string, string> = {
   "Alchemist's Supplies": "round-potion",
@@ -74,7 +91,7 @@ export const SRD_TOOL_ICONS_BY_NAME: Record<string, string> = {
   "Playing Card Set": "card-play",
   "Poisoner's Kit": "poison-bottle",
   "Potter's Tools": "painted-pottery",
-  Shawm: "pipes",
+  Shawm: "hunting-horn",
   "Smith's Tools": "anvil",
   "Thieves' Tools": "lockpicks",
   "Three-Dragon Ante Set": "card-joker",
@@ -82,7 +99,7 @@ export const SRD_TOOL_ICONS_BY_NAME: Record<string, string> = {
   "Vehicles (Land)": "old-wagon",
   "Vehicles (Water)": "sailboat",
   Viol: "violin",
-  "Weaver's Tools": "sewing-machine",
+  "Weaver's Tools": "rolled-cloth",
   "Woodcarver's Tools": "wood-axe",
 }
 

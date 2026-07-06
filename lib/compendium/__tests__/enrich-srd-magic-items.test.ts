@@ -60,6 +60,16 @@ describe("enrichSrdMundaneEquipmentRow", () => {
     expect(row.rarity).toBe("Common")
     expect(row.magic_effects).toHaveLength(1)
   })
+
+  it("applies bundled armor icons on seed enrich", () => {
+    const row = enrichSrdMundaneEquipmentRow({
+      name: "Chain Mail",
+      source: "D&D 5.5e SRD",
+      category: "Armor",
+      subcategory: "Heavy Armor",
+    })
+    expect(row.icon).toBe("mail-shirt")
+  })
 })
 
 describe("prepareMagicItemsForSeed", () => {

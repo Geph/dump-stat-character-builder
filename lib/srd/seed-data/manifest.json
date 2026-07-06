@@ -1,8 +1,8 @@
 {
-  "version": "5.2.2",
+  "version": "5.2.3",
   "source": "downfallx/dnd-5e-srd-markdown",
   "license": "CC-BY-4.0 (SRD 5.2.1 by Wizards of the Coast)",
-  "generatedAt": "2026-06-25T00:00:50.854Z",
+  "generatedAt": "2026-07-06T05:05:11.989Z",
   "counts": {
     "species": 9,
     "backgrounds": 4,
@@ -10,9 +10,7 @@
     "subclasses": 12,
     "spells": 339,
     "feats": 17,
-    "equipment": 126,
-    "magicItems": 266,
-    "languages": 19,
-    "tools": 41
+    "equipment": 133,
+    "magicItems": 266
   }
 }

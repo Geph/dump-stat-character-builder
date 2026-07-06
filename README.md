@@ -14,7 +14,8 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Editable class levels** — Type a class level directly (Enter/Escape/blur to commit) instead of only stepping it; subclass selections clear automatically when a level drops below the subclass threshold
 - **Player-choice modifiers everywhere** — Skill/expertise picks, tool & instrument choices, languages, weapon-mastery selections, and feat grants surface as interactive choices at the step where they apply (class, species Origin, or background)
 - **Species options at Origin** — Species that offer a size choice (e.g. Human/Tiefling Small or Medium), skill proficiencies, languages (Common + choices from the Standard Languages table), or an Origin feat present those picks inline
-- **Weapon Mastery UI** — One dropdown per mastery slot with an info overlay explaining each property; switch between a **compact** list and a **visual** weapon-icon grid (default selectable in settings)
+- **Weapon Mastery UI** — One dropdown per mastery slot with an info overlay explaining each property; switch between a **compact** list and a **visual** weapon-icon grid (default selectable in settings); the same weapon icons appear on mundane equipment cards in the compendium
+- **Dual wield & two-weapon fighting** — Equip a Light weapon in the off-hand; TWF rules apply on the sheet with a damage-roll menu (advantage/disadvantage, versatile dice, no-mod options)
 - **Real-time preview** — Live character sheet with Summary, Combat, Features, Companion / Beast Form, and Custom tabs
 - **Point buy & standard array** — Multiple methods for determining ability scores
 - **Repeatable feats** — Feats marked repeatable can fill more than one milestone slot; duplicate ASI feats combine into a shared bonus pool on the Abilities step
@@ -32,10 +33,11 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Companions & beast forms** — Companion / Beast Form stat-block templates (with SRD Druid Wild Shape defaults: Rat, Riding Horse, Spider, Wolf) populate the character sheet via a common modifier
 - **Spell-slot progression editor** — Accordion editor with full / half / third / pact caster presets for class spellcasting
 - **SRD modifier enrichment** — Bundled SRD classes, subclasses, feats, and species traits ship with linked common-modifier presets (class resources, cast spell, movement types, Metamagic/Eldritch Invocations catalogs, unarmed die scaling, standard-language grants, size options, Monk tool/weapon proficiencies, and more); run `pnpm dlx tsx scripts/audit-srd-class-features.ts` to list gaps
-- **Card background graphics** — Every compendium entry can have a hero image for selection cards and full-screen detail overlays (upload or URL in the editor header area)
+- **Card background graphics** — Every compendium entry can have a hero image for selection cards and full-screen detail overlays (upload or URL in the editor header area); classes, species, and subclasses use **3:4 portrait** art on browse cards and a side-by-side **Description & card art** editor row
 - **Cinematic selection UI** — Builder class/species/background pickers and compendium detail views use full-bleed artwork with gold-framed cards inspired by D&D Beyond
+- **Default SRD icons** — Bundled defaults for subclasses, mundane weapons (same icons as the mastery visual grid), and all 13 mundane armor types; compendium browse shows them when no custom icon is set
 - **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses
-- **Enable / disable content** — Toggle compendium entries off for the builder, with prompts to disable dependents (subclasses, attached abilities, etc.)
+- **Enable / disable content** — Toggle compendium entries off for the builder (grayed-out cards including artwork); prompts when disabling or re-enabling related entries (subclasses, class resources, attached abilities, etc.)
 - **Unified editor header** — Icon picker (inline with name field), name, source, and source link on one row across all compendium editors
 - **Background proficiencies editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, and languages
 - **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level
@@ -45,11 +47,11 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 
 ### Character Management
 - **Save & load characters** — Persist characters to MySQL; resume editing from the builder
-- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab, and roll-able special actions from features
+- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab, roll-able special actions from features, off-hand weapon slots for dual wielding, and class-feature toggles (e.g. Rage, Innate Sorcery) with conditional combat bonuses
 - **Export options** — Download character and compendium data as JSON
 
 ### Import
-- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown); **no AI**
+- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including all 13 mundane armor types); **no AI**
 - **Web import** — Paste a supported wiki URL; server fetches HTML and parses it deterministically (**no AI**)
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content

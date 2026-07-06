@@ -28,6 +28,7 @@ const KIND_OPTIONS: { value: ModifierLimitationKind; label: string }[] = [
   { value: "condition", label: "Condition" },
   { value: "armor_type", label: "Armor / shield" },
   { value: "sheet_toggle", label: "Sheet toggle" },
+  { value: "hp_threshold", label: "HP threshold" },
 ]
 
 function defaultValueForKind(kind: ModifierLimitationKind): string {
@@ -38,11 +39,13 @@ function defaultValueForKind(kind: ModifierLimitationKind): string {
       return ARMOR_LIMITATION_OPTIONS[0].value
     case "sheet_toggle":
       return EDITOR_SHEET_TOGGLE_OPTIONS[0]?.id ?? "while_raging"
+    case "hp_threshold":
+      return "0"
   }
 }
 
 function defaultRuleForKind(kind: ModifierLimitationKind) {
-  return LIMITATION_RULE_LABELS[kind][0]?.value ?? "blocked_when_has"
+  return LIMITATION_RULE_LABELS[kind]?.[0]?.value ?? "blocked_when_has"
 }
 
 function updateLimitations(
@@ -138,7 +141,7 @@ export function ModifierLimitationsEditor({ value, onChange }: ModifierLimitatio
                   }
                   className="px-2 py-1 bg-card border border-border rounded text-xs"
                 >
-                  {LIMITATION_RULE_LABELS[limitation.kind].map((option) => (
+                  {(LIMITATION_RULE_LABELS[limitation.kind] ?? []).map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -182,6 +185,16 @@ export function ModifierLimitationsEditor({ value, onChange }: ModifierLimitatio
                       </option>
                     ))}
                   </select>
+                ) : null}
+                {limitation.kind === "hp_threshold" ? (
+                  <input
+                    type="number"
+                    min={0}
+                    value={limitation.value}
+                    onChange={(e) => patchLimitation(limitation.id, { value: e.target.value })}
+                    className="w-20 px-2 py-1 bg-card border border-border rounded text-xs tabular-nums"
+                    aria-label="HP threshold"
+                  />
                 ) : null}
                 <button
                   type="button"

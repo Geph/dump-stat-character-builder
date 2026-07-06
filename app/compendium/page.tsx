@@ -20,6 +20,7 @@ import {
   COMPENDIUM_TOGGLE_LABELS,
   contentTypeToTable,
   findCompendiumDependents,
+  findDisabledCompendiumDependents,
   isProtectedSystemCompendiumRow,
   setCompendiumItemsEnabled,
   type CompendiumToggleTarget,
@@ -62,9 +63,12 @@ import { classComplexityDetailRow } from "@/components/compendium/class-complexi
 import { CustomClassSpellListDialog } from "@/components/compendium/custom-class-spell-list-dialog"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
+  CLASS_CARD_ASPECT_CLASS,
   COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS,
   COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS,
+  compendiumBrowseGridClass,
   compendiumItemSupportsCardImage,
+  compendiumUsesPortraitCardArt,
   resolveCompendiumCardImageUrl,
   compendiumCardImageCropForType,
   type CompendiumCardVisual,
@@ -160,6 +164,7 @@ function CompendiumPageContent() {
   const [toggleConfirm, setToggleConfirm] = useState<{
     item: CompendiumToggleTarget
     dependents: CompendiumToggleTarget[]
+    action: "disable" | "enable"
   } | null>(null)
   const [toggleSaving, setToggleSaving] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
@@ -639,13 +644,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   const applyItemEnabled = async (targets: CompendiumToggleTarget[], enabled: boolean) => {
     setToggleSaving(true)
     setToggleError(null)
+    patchContentEnabled(targets, enabled)
     try {
       const db = createClient()
       await setCompendiumItemsEnabled(db, targets, enabled)
-      patchContentEnabled(targets, enabled)
       setToggleConfirm(null)
     } catch (err) {
       console.error("[v0] Toggle compendium item error:", err)
+      patchContentEnabled(targets, !enabled)
       setToggleError(err instanceof Error ? err.message : "Failed to update item")
     } finally {
       setToggleSaving(false)
@@ -665,7 +671,15 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     }
 
     if (nextEnabled) {
-      await applyItemEnabled([target], true)
+      const db = createClient()
+      const disabledDependents = await findDisabledCompendiumDependents(db, activeTab, target.id)
+      if (disabledDependents.length === 0) {
+        await applyItemEnabled([target], true)
+        return
+      }
+
+      setToggleError(null)
+      setToggleConfirm({ item: target, dependents: disabledDependents, action: "enable" })
       return
     }
 
@@ -677,7 +691,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     }
 
     setToggleError(null)
-    setToggleConfirm({ item: target, dependents })
+    setToggleConfirm({ item: target, dependents, action: "disable" })
   }
 
   const handleCopyItem = async (item: Record<string, unknown>) => {
@@ -707,12 +721,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       data as Record<string, unknown> & CompendiumCardVisual,
       activeTab,
     )
+    const portraitGraphicCard =
+      Boolean(cardImage) && compendiumUsesPortraitCardArt(activeTab)
     const cardMinHeightClass =
-      cardImage && activeTab === "classes"
-        ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
-        : cardImage
-          ? COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
-          : null
+      cardImage && !portraitGraphicCard
+        ? activeTab === "classes"
+          ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
+          : COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
+        : null
 
     return (
       <motion.div
@@ -720,10 +736,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         layoutId={data.id as string}
         className={cn(
           "relative overflow-hidden rounded-2xl border-2 transition-colors",
-          cardMinHeightClass ?? "bg-card",
+          portraitGraphicCard && CLASS_CARD_ASPECT_CLASS,
+          cardMinHeightClass ?? (!portraitGraphicCard ? "bg-card" : null),
           enabled
             ? `border-primary/40 ${accentStyles.hoverBorder}`
-            : "border-border/60 opacity-60 hover:opacity-80",
+            : "border-border/50 opacity-50 grayscale saturate-0 hover:opacity-60",
         )}
         whileHover={{ scale: enabled ? 1.02 : 1.01 }}
       >
@@ -733,24 +750,29 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             crop={compendiumCardImageCropForType(activeTab)}
             variant="list"
             fullBleed
+            className={!enabled ? "opacity-90" : undefined}
           />
         ) : null}
         <div
           className={cn(
-            "relative z-10 p-5 pb-11",
-            cardImage && "flex min-h-full flex-col justify-end pt-3",
+            "relative z-10",
+            portraitGraphicCard ? "flex min-h-full flex-col justify-end p-3 pb-10" : "p-5 pb-11",
+            cardImage && !portraitGraphicCard && "flex min-h-full flex-col justify-end pt-3",
             cardImage &&
               "[&_.text-foreground]:text-white [&_.text-muted-foreground]:text-white/75 [&_.text-primary]:text-primary [&_.text-secondary]:text-secondary [&_.text-warning]:text-warning [&_.text-orange]:text-orange [&_.text-lime]:text-lime [&_.text-magenta]:text-magenta [&_.text-accent]:text-accent [&_.bg-muted]:bg-black/40 [&_.bg-muted]:text-white/90",
           )}
         >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
-              <GameIcon name={iconName} className="w-10 h-10" />
-            </div>
+            {!portraitGraphicCard ? (
+              <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
+                <GameIcon name={iconName} className="w-10 h-10" />
+              </div>
+            ) : null}
             <h3 
               className={cn(
-                "font-bold text-lg cursor-pointer leading-tight flex items-center gap-1.5",
+                "font-bold cursor-pointer leading-tight flex items-center gap-1.5",
+                portraitGraphicCard ? "text-base" : "text-lg",
                 cardImage ? "text-white drop-shadow-md" : "text-foreground",
                 accentStyles.titleHover,
               )}
@@ -1033,7 +1055,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         )}
         </div>
         <div
-          className="absolute bottom-4 right-4 flex items-center"
+          className="absolute bottom-4 right-4 z-20 flex items-center rounded-full bg-background/85 p-1 shadow-sm backdrop-blur-sm"
           onClick={(e) => e.stopPropagation()}
           title={
             isSystemCatalog
@@ -1183,11 +1205,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl border-2 border-border p-6 max-w-lg w-full shadow-xl">
               <h2 className="text-xl font-black text-foreground mb-2">
-                Disable {toggleConfirm.item.name}?
+                {toggleConfirm.action === "enable"
+                  ? `Enable ${toggleConfirm.item.name}?`
+                  : `Disable ${toggleConfirm.item.name}?`}
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Other compendium entries rely on this {COMPENDIUM_TOGGLE_LABELS[toggleConfirm.item.contentType].toLowerCase()}.
-                You can disable only this item, or disable it together with the related entries below.
+                {toggleConfirm.action === "enable"
+                  ? `Related compendium entries for this ${COMPENDIUM_TOGGLE_LABELS[toggleConfirm.item.contentType].toLowerCase()} are still disabled. Re-enable only this item, or re-enable them together.`
+                  : `Other compendium entries rely on this ${COMPENDIUM_TOGGLE_LABELS[toggleConfirm.item.contentType].toLowerCase()}. You can disable only this item, or disable it together with the related entries below.`}
               </p>
               <ul className="max-h-48 overflow-y-auto space-y-2 mb-4 rounded-xl border border-border bg-muted/30 p-3">
                 {toggleConfirm.dependents.map((dependent) => (
@@ -1212,7 +1237,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 </button>
                 <button
                   type="button"
-                  onClick={() => void applyItemEnabled([toggleConfirm.item], false)}
+                  onClick={() =>
+                    void applyItemEnabled(
+                      [toggleConfirm.item],
+                      toggleConfirm.action === "enable",
+                    )
+                  }
                   disabled={toggleSaving}
                   className="flex-1 px-4 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50"
                 >
@@ -1221,14 +1251,24 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 <button
                   type="button"
                   onClick={() =>
-                    void applyItemEnabled([toggleConfirm.item, ...toggleConfirm.dependents], false)
+                    void applyItemEnabled(
+                      [toggleConfirm.item, ...toggleConfirm.dependents],
+                      toggleConfirm.action === "enable",
+                    )
                   }
                   disabled={toggleSaving}
-                  className="flex-1 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                  className={cn(
+                    "flex-1 px-4 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50",
+                    toggleConfirm.action === "enable"
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+                  )}
                 >
                   {toggleSaving
                     ? "Saving..."
-                    : `Disable all (${toggleConfirm.dependents.length + 1})`}
+                    : toggleConfirm.action === "enable"
+                      ? `Enable all (${toggleConfirm.dependents.length + 1})`
+                      : `Disable all (${toggleConfirm.dependents.length + 1})`}
                 </button>
               </div>
             </div>
@@ -1502,7 +1542,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
         {/* Content Grid */}
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className={compendiumBrowseGridClass(activeTab)}>
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-card rounded-2xl p-5 border-2 border-border animate-pulse">
                 <div className="h-6 bg-muted rounded w-3/4 mb-3" />
@@ -1548,7 +1588,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             copyingId={copyingId}
           />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className={compendiumBrowseGridClass(activeTab)}>
             <AnimatePresence>
               {filteredContent.map(renderContentCard)}
             </AnimatePresence>

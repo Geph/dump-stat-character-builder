@@ -13,8 +13,8 @@ import type { DndClass, Feature, FeatureChoice, ClassResource } from "@/lib/type
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { CompendiumDescriptionCardImageRow } from "@/components/compendium/description-card-image-row"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
-import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
@@ -338,8 +338,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
-            cardImageAspect="21/9"
-            cardImageCrop="top"
+            cardImagePlacement="none"
             afterName={
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-2">
@@ -360,13 +359,14 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             }
           />
 
-          <CompendiumEditorPanel title="Description">
-            <RichTextEditor
-              value={form.description}
-              onChange={(description) => setForm({ ...form, description })}
-              placeholder="Describe the subclass theme and flavor..."
-            />
-          </CompendiumEditorPanel>
+          <CompendiumDescriptionCardImageRow
+            description={form.description}
+            onDescriptionChange={(description) => setForm({ ...form, description })}
+            descriptionPlaceholder="Describe the subclass theme and flavor..."
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageCrop="top"
+          />
 
           <CompendiumEditorPanel title="Spellcasting">
             <label className="flex items-center gap-2 cursor-pointer mb-4">

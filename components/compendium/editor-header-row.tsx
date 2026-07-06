@@ -29,6 +29,8 @@ type CompendiumEditorHeaderRowProps = {
   onCardImageUrlChange?: (url: string | null) => void
   cardImageAspect?: "3/4" | "21/9"
   cardImageCrop?: CompendiumCardImageCrop
+  /** When "none", card image is rendered elsewhere (e.g. beside description). */
+  cardImagePlacement?: "below" | "none"
   /** Optional field between name and source (e.g. parent class). */
   afterName?: ReactNode
 }
@@ -51,6 +53,7 @@ export function CompendiumEditorHeaderRow({
   onCardImageUrlChange,
   cardImageAspect = "21/9",
   cardImageCrop = "center",
+  cardImagePlacement = "below",
   afterName,
 }: CompendiumEditorHeaderRowProps) {
   const gridCols = afterName
@@ -101,7 +104,7 @@ export function CompendiumEditorHeaderRow({
         />
       </div>
     </div>
-    {onCardImageUrlChange ? (
+    {onCardImageUrlChange && cardImagePlacement === "below" ? (
       <CardImageField
         value={cardImageUrl}
         onChange={onCardImageUrlChange}

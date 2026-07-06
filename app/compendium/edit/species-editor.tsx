@@ -9,6 +9,7 @@ import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
 } from "@/components/compendium/compendium-editor-section"
+import { CompendiumDescriptionCardImageRow } from "@/components/compendium/description-card-image-row"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
@@ -341,16 +342,16 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
-            cardImageAspect="21/9"
+            cardImagePlacement="none"
           />
 
-          <CompendiumEditorPanel title="Description">
-            <RichTextEditor
-              value={form.description}
-              onChange={(description) => setForm({ ...form, description })}
-              placeholder="Elves are a magical people of otherworldly grace..."
-            />
-          </CompendiumEditorPanel>
+          <CompendiumDescriptionCardImageRow
+            description={form.description}
+            onDescriptionChange={(description) => setForm({ ...form, description })}
+            descriptionPlaceholder="Elves are a magical people of otherworldly grace..."
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+          />
 
           <CompendiumEditorPanel title="Size, creature type & speed">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

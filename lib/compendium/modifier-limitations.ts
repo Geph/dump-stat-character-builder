@@ -52,6 +52,10 @@ export const LIMITATION_RULE_LABELS: Record<
     { value: "requires_wearing", label: "Only while wearing" },
   ],
   sheet_toggle: [{ value: "requires_active", label: "Only while active" }],
+  hp_threshold: [
+    { value: "requires_at_most_hp", label: "Only at or below HP" },
+    { value: "requires_above_hp", label: "Only above HP" },
+  ],
 }
 
 let limitationIdCounter = 0
@@ -229,6 +233,12 @@ export function summarizeLimitations(source: LimitationSource): string {
       }
       if (entry.kind === "sheet_toggle" && entry.rule === "requires_active") {
         return `while ${entry.value} active`
+      }
+      if (entry.kind === "hp_threshold" && entry.rule === "requires_at_most_hp") {
+        return `at or below ${entry.value} HP`
+      }
+      if (entry.kind === "hp_threshold" && entry.rule === "requires_above_hp") {
+        return `above ${entry.value} HP`
       }
       return `${entry.rule} ${entry.value}`
     })

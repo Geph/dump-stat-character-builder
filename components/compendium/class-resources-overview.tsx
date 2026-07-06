@@ -204,7 +204,7 @@ function ResourceVariantRow({
     <div
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 transition-colors",
-        !enabled && "opacity-60",
+        !enabled && "opacity-50 grayscale saturate-0",
       )}
     >
       <button

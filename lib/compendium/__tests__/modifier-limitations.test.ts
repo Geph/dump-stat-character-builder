@@ -8,6 +8,7 @@ import {
   isWearingArmorLimitation,
   modifierLimitationsMet,
   notWearingArmorLimitation,
+  requiresAtMostHpLimitation,
 } from "@/lib/compendium/modifier-limitations"
 import { collectFeatureRollModes } from "@/lib/character/collect-feature-roll-modes"
 import type { Equipment } from "@/lib/types"
@@ -63,6 +64,13 @@ describe("modifierLimitationsMet", () => {
     expect(isWearingArmorLimitation("Shield", null, { id: "s", name: "Shield", category: "Armor" })).toBe(
       true,
     )
+  })
+
+  it("gates modifiers by HP threshold (Survivor at 0 HP)", () => {
+    const atZero = requiresAtMostHpLimitation(0)
+    expect(modifierLimitationsMet({ limitations: [atZero] }, { currentHp: 0 })).toBe(true)
+    expect(modifierLimitationsMet({ limitations: [atZero] }, { currentHp: 5 })).toBe(false)
+    expect(modifierLimitationsMet({ limitations: [atZero] }, {})).toBe(true)
   })
 })
 
