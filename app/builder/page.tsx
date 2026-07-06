@@ -6,14 +6,10 @@ import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
+import { loadBuilderCompendium } from "@/lib/data/builder-compendium-cache"
 import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { pageFloatingHintClass, pageStepStripClass } from "@/lib/compendium/editor-field-styles"
-import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
-import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
-import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
-import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
-import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import {
   filterEnabled,
   filterEnabledIds,
@@ -194,8 +190,6 @@ import {
   nonSpellModifierPlayerChoiceSlots,
   spellModifierPlayerChoiceSlots,
 } from "@/lib/builder/modifier-player-choices"
-import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
-import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
 import {
   allAbilityScorePoolAllocationsValid,
   collectAbilityScorePoolGrants,
@@ -757,63 +751,18 @@ export default function BuilderPage() {
   useEffect(() => {
     const fetchContent = async () => {
       const db = createClient()
-      
-      const [classesRes, subclassesRes, speciesRes, backgroundsRes, featsRes, spellsRes, equipmentRes, classResourcesRes] = await Promise.all([
-        db.from("classes").select("*").order("name"),
-        db.from("subclasses").select("*").order("name"),
-        db.from("species").select("*").order("name"),
-        db.from("backgrounds").select("*").order("name"),
-        db.from("feats").select("*").order("name"),
-        db.from("spells").select("*").order("level").order("name"),
-        db.from("equipment").select("*").order("category").order("name"),
-        db.from("class_resources").select("*"),
-      ])
+      const payload = await loadBuilderCompendium(db)
 
-      const catalog = await loadModifierCatalog(db)
-      setModifierCatalog(catalog)
-      const gameplayAbilities = await loadCustomAbilitiesForGameplay(db)
-
-      const classResourceRows = asCompendiumRows(classResourcesRes.data)
-      const enrichedClasses = enrichClassesList(
-        asCompendiumRows<Parameters<typeof enrichClassesList>[0][number]>(classesRes.data),
-      ) as unknown as DndClass[]
-      setClasses(
-        filterEnabled(
-          enrichedClasses.map((cls) =>
-            attachClassResourcesToClass(cls, classResourceRows as never),
-          ) as (DndClass & { enabled?: boolean | number | null })[],
-        ) as unknown as DndClass[],
-      )
-      setSubclasses(filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[])
-      setSpecies(
-        filterEnabled(enrichSpeciesList(asCompendiumRows<Parameters<typeof enrichSpeciesList>[0][number]>(speciesRes.data)) as unknown as Species[]),
-      )
-      setBackgrounds(
-        enrichBackgroundList(
-          filterEnabled(
-            asCompendiumRows<
-              Parameters<typeof enrichBackgroundList>[0][number] & { enabled?: boolean | number | null }
-            >(backgroundsRes.data),
-          ),
-        ) as unknown as Background[],
-      )
-      if (featsRes.error) {
-        setFeatsLoadError(featsRes.error.message)
-        setFeats([])
-      } else {
-        setFeatsLoadError(null)
-        setFeats(
-          filterEnabled(
-            enrichFeatsList(
-              asCompendiumRows<Parameters<typeof enrichFeatsList>[0][number]>(featsRes.data),
-              catalog,
-            ) as (Feat & { enabled?: boolean | number | null })[],
-          ) as unknown as Feat[],
-        )
-      }
-      setSpells(filterEnabled(asCompendiumRows(spellsRes.data)) as unknown as Spell[])
-      setEquipment(filterEnabled(asCompendiumRows(equipmentRes.data)) as unknown as Equipment[])
-      setCustomAbilities(gameplayAbilities)
+      setModifierCatalog(payload.modifierCatalog)
+      setClasses(payload.classes)
+      setSubclasses(payload.subclasses)
+      setSpecies(payload.species)
+      setBackgrounds(payload.backgrounds)
+      setFeatsLoadError(payload.featsLoadError)
+      setFeats(payload.feats)
+      setSpells(payload.spells)
+      setEquipment(payload.equipment)
+      setCustomAbilities(payload.customAbilities)
       setLoading(false)
     }
 
