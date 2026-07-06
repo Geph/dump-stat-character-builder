@@ -5,6 +5,7 @@ import {
 } from "@/lib/character/magic-item-activation"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import type { MagicItemPower } from "@/lib/character/magic-item-powers"
 import type { ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 
 type MagicItemPowersPanelProps = {

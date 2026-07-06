@@ -55,7 +55,7 @@ export function cleanProperties(props: unknown): Record<string, unknown> {
     return {}
   }
 
-  const p = { ...(props as Record<string, unknown>) }
+  const p = { ...(props as unknown as Record<string, unknown>) }
 
   if (typeof p.damage === "string") {
     p.damage = stripHtml(p.damage)
@@ -77,7 +77,7 @@ export function cleanProperties(props: unknown): Record<string, unknown> {
     p.forms = p.forms
       .filter((form) => form && typeof form === "object")
       .map((form) => {
-        const entry = { ...(form as Record<string, unknown>) }
+        const entry = { ...(form as unknown as Record<string, unknown>) }
         if (typeof entry.name === "string") entry.name = stripHtml(entry.name)
         if (typeof entry.damage === "string") entry.damage = stripHtml(entry.damage)
         if (typeof entry.mastery === "string") entry.mastery = stripHtml(entry.mastery)

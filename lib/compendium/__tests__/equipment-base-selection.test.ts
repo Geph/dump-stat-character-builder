@@ -7,7 +7,7 @@ import {
 import { normalizeEquipmentRow } from "@/lib/import/normalize-equipment"
 import type { Equipment } from "@/lib/types"
 
-const longsword: Equipment = {
+const longsword = {
   id: "base-longsword",
   name: "Longsword",
   category: "Weapon",
@@ -22,7 +22,7 @@ const longsword: Equipment = {
   created_at: "",
 }
 
-const plusOneLongsword: Equipment = {
+const plusOneLongsword = {
   id: "magic-plus-one-longsword",
   name: "+1 Longsword",
   category: "Weapon",
@@ -37,13 +37,13 @@ const plusOneLongsword: Equipment = {
   description: "A magical longsword.",
   source: "SRD",
   created_at: "",
-}
+} as unknown as Equipment
 
 describe("equipment-base-selection", () => {
   it("resolves magic weapon stats from character base selection", () => {
     const resolved = resolveCharacterEquipment(
       plusOneLongsword,
-      [longsword, plusOneLongsword],
+      [longsword, plusOneLongsword] as unknown as Equipment[],
       { [plusOneLongsword.id]: longsword.id },
     )
     expect(resolved.damage).toBe("1d8")
@@ -51,15 +51,15 @@ describe("equipment-base-selection", () => {
   })
 
   it("flags items that need a base pick", () => {
-    const filterWeapon: Equipment = {
+    const filterWeapon = {
       ...plusOneLongsword,
       id: "plus-one-weapon",
       name: "+1 Weapon",
       base_equipment_ids: [],
       base_equipment_filter: "any_melee_weapon",
-    }
-    expect(needsBaseSelection(filterWeapon, [longsword, filterWeapon], {})).toBe(true)
-    expect(getBaseSelectionOptions(filterWeapon, [longsword, filterWeapon])).toEqual([longsword])
+    } as unknown as Equipment
+    expect(needsBaseSelection(filterWeapon, [longsword, filterWeapon] as unknown as Equipment[], {})).toBe(true)
+    expect(getBaseSelectionOptions(filterWeapon, [longsword, filterWeapon] as unknown as Equipment[])).toEqual([longsword])
   })
 })
 

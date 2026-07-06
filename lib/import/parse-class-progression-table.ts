@@ -543,7 +543,7 @@ export function usesConfigForProgressionColumn(
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
       : []
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d8"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d8"
     return {
       type: "at_level",
       atLevelMode: "tier",
@@ -558,7 +558,7 @@ export function usesConfigForProgressionColumn(
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
       : []
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d6"
     return {
       type: "at_level",
       atLevelMode: "tier",
@@ -585,7 +585,7 @@ export function usesConfigForProgressionColumn(
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
       : []
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d8"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d8"
     const latestCount = sorted[sorted.length - 1]?.count ?? 1
     return {
       type: "special",
@@ -603,7 +603,7 @@ export function usesConfigForProgressionColumn(
       specialDescription: `Endurance die size at each ${className} level (e.g. ${dieLabel}). Not a spendable pool — pairs with Endurance Dice.`,
       atLevelTable: sorted,
       atLevelMode: "tier",
-      dieType: dieLabel as UsesConfig["dieType"],
+      dieType: dieLabel as unknown as unknown as unknown as UsesConfig["dieType"],
     }
   }
 
@@ -638,7 +638,7 @@ export function usesConfigForProgressionColumn(
   ) {
     const dieSides = [...(column.dieSidesByLevel ?? [])].sort((a, b) => a.level - b.level)
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d6"
     return {
       type: "special",
       specialDescription: `${column.resourceName} die size at each ${className} level (e.g. ${dieLabel}). Pairs with on-hit or spend riders — not a spendable pool count.`,
@@ -654,14 +654,14 @@ export function usesConfigForProgressionColumn(
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
       : []
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d6"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d6"
     return {
       type: "at_level",
       atLevelMode: "tier",
       atLevelTable: sorted,
       dieSidesByLevel: dieSides.length ? dieSides : undefined,
       dieType: dieLabel,
-      recharges: pattern?.defaultUses.recharges ?? [{ rest: "short_rest" }, { rest: "long_rest" }],
+      recharges: pattern?.defaultUses?.recharges ?? [{ rest: "short_rest" }, { rest: "long_rest" }],
       ...(pattern?.defaultUses ?? {}),
     }
   }

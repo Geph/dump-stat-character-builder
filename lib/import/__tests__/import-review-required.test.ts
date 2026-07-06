@@ -4,7 +4,7 @@ import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("import review gate", () => {
   it("requires confirmation even for a single spell import", () => {
-    const content: ImportContent = {
+    const content = {
       spells: [
         {
           name: "Test Spell",

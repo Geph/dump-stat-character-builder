@@ -16,6 +16,8 @@ export type LinkedModifierInstance = {
   catalogRefId: string
   characteristics?: CharacteristicModifier[]
   activation?: FeatureActivation | null
+  /** Legacy catalog effects on fx instances (prefer characteristics). */
+  effects?: import("@/lib/types").FeatureEffect[]
 }
 
 /** Stored on migrated inline-only modifier instances (characteristics live on the instance). */
@@ -192,22 +194,35 @@ export function effectiveLinkedModifiers(
 }
 
 export function readLinkedModifiers(
-  row: Record<string, unknown> | null | undefined,
+  row:
+    | {
+        linkedModifiers?: LinkedModifierInstance[]
+        linked_modifiers?: LinkedModifierInstance[]
+        modifierRefs?: string[]
+        modifier_refs?: string[]
+        benefits?: CharacteristicModifier[]
+        characteristics?: CharacteristicModifier[]
+        uses?: UsesConfig | null
+      }
+    | Record<string, unknown>
+    | null
+    | undefined,
   catalog?: ModifierCatalogEntry[] | null,
 ): LinkedModifierInstance[] {
   if (!row) return []
-  const raw = row.linkedModifiers ?? row.linked_modifiers
-  const legacyRefs = Array.isArray(row.modifierRefs)
-    ? row.modifierRefs
-    : Array.isArray(row.modifier_refs)
-      ? row.modifier_refs
+  const record = row as unknown as Record<string, unknown>
+  const raw = (record.linkedModifiers ?? record.linked_modifiers) as LinkedModifierInstance[] | undefined
+  const legacyRefs = Array.isArray(record.modifierRefs)
+    ? (record.modifierRefs as string[])
+    : Array.isArray(record.modifier_refs)
+      ? (record.modifier_refs as string[])
       : undefined
-  const linked = normalizeLinkedModifiers(raw, catalog, legacyRefs as string[] | undefined)
-  const inline = row.benefits ?? row.characteristics
-  const uses = row.uses as UsesConfig | null | undefined
+  const linked = normalizeLinkedModifiers(raw, catalog, legacyRefs)
+  const inline = (record.benefits ?? record.characteristics) as CharacteristicModifier[] | undefined
+  const uses = record.uses as unknown as unknown as unknown as UsesConfig | null | undefined
   return appendInlineCharacteristicsAsLinked(
     linked,
-    inline as CharacteristicModifier[] | undefined,
+    inline,
     uses,
   )
 }

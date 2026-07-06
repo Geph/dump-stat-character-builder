@@ -44,6 +44,7 @@ function parseBlindsenseRangeByLevel(
 
   const byLevel = new Map<number, number>()
   for (const row of rows) {
+    if (row.fixed == null) continue
     byLevel.set(row.level, row.fixed)
   }
   return normalizeBonusByLevel(

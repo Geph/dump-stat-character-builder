@@ -26,7 +26,7 @@ describe("modifierCatalogSearchScore", () => {
   })
 
   it("handles catalog entries with missing group", () => {
-    const partial = { id: "cat_partial", name: "Craftable Items Known" } as ModifierCatalogEntry
+    const partial = { id: "cat_partial", name: "Craftable Items Known" } as unknown as ModifierCatalogEntry
     expect(() => filterModifierCatalogEntries([partial], "craft")).not.toThrow()
     expect(normalizeModifierCatalog([partial])[0].group).toBe("Other")
   })

@@ -88,7 +88,7 @@ function weaponMatchesPool(weapon: SeedWeapon | Equipment, pool: WeaponMasteryPo
     return sub.includes("melee") && (sub.includes("simple") || sub.includes("martial"))
   }
   if (pool === "rogue") {
-    const props = (weapon.properties?.properties ?? []).join(" ").toLowerCase()
+    const props = (Array.isArray(weapon.properties) ? weapon.properties : weapon.properties?.properties ?? []).join(" ").toLowerCase()
     if (sub.includes("simple")) return true
     return sub.includes("martial") && (props.includes("light") || props.includes("finesse"))
   }

@@ -20,6 +20,7 @@ import { CREATURE_TYPES, SPECIES_SIZES } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { DurationEditor } from "@/components/compendium/duration-editor"
 import type { FeatureDurationKey } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 interface TraitChoice {
   category: string
@@ -81,7 +82,7 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
     const fetchSpells = async () => {
       const db = createClient()
       const { data } = await db.from("spells").select("id, name, level").order("level").order("name").limit(500)
-      setAllSpells(data || [])
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(data))
     }
     fetchSpells()
   }, [])
@@ -100,18 +101,25 @@ export default function SpeciesEditorPage({ params }: { params: Promise<{ id: st
         if (error) {
           setError("Species not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            speed: data.speed || 30,
-            size: data.size || "Medium",
-            creature_type: data.creature_type || "Humanoid",
-            traits: data.traits?.length ? data.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
-            characteristics: normalizeCharacteristics(data.characteristics, null),
-            icon: data.icon || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Species not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              speed: (row.speed as number | null | undefined) || 30,
+              size: String(row.size ?? "Medium"),
+              creature_type: String(row.creature_type ?? "Humanoid"),
+              traits: Array.isArray(row.traits) && row.traits.length
+                ? (row.traits as Trait[]).map((t) => ({ ...t, level: t.level || 1 }))
+                : [{ name: "", description: "", level: 1 }],
+              characteristics: normalizeCharacteristics(row.characteristics, null),
+              icon: (row.icon as string | null) ?? null,
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+            })
+          }
         }
         setLoading(false)
       }

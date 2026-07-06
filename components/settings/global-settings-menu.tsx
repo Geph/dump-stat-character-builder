@@ -31,6 +31,7 @@ import { PageBackgroundSettings } from "@/components/settings/page-background-se
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { LayoutGrid, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 const BUILDER_LAYOUT_OPTIONS = [
   {
@@ -74,11 +75,11 @@ export function GlobalSettingsMenu() {
       const allItems = []
       for (const { tab, table } of EXPORT_SECTIONS) {
         const { data } = await db.from(table).select("*").order("name").limit(5000)
-        for (const row of data ?? []) {
-          const exportRow = { ...(row as Record<string, unknown>) }
+        for (const row of asCompendiumRows(data)) {
+          const exportRow = { ...(row as unknown as Record<string, unknown>) }
           if (tab === "subclasses" && exportRow.class_id) {
             const { data: classes } = await db.from("classes").select("id, name")
-            const cls = (classes ?? []).find((c) => c.id === exportRow.class_id)
+            const cls = (asCompendiumRows(classes)).find((c) => c.id === exportRow.class_id)
             if (cls) exportRow.class_name = cls.name
           }
           const item = rowToExportItem(tab, exportRow)

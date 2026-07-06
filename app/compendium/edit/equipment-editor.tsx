@@ -55,6 +55,8 @@ import {
 } from "@/lib/compendium/weapon-mastery"
 import { WEAPON_MASTERY_PROPERTIES_CATALOG_ID } from "@/lib/compendium/system-option-catalogs"
 import { normalizeModifierCatalog } from "@/lib/compendium/modifier-catalog"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 interface EquipmentFormData {
   name: string
@@ -157,7 +159,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
     const loadEquipmentCatalog = async () => {
       const db = createClient()
       const { data } = await db.from("equipment").select("id, name, category").order("name")
-      setAllEquipment(data || [])
+      setAllEquipment(asCompendiumRows<{ id: string; name: string; category: string }>(data))
     }
     void loadEquipmentCatalog()
   }, [])
@@ -179,7 +181,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
           {
             ...data,
             modifier_catalog: normalizeModifierCatalog(
-              (data as Record<string, unknown>).modifier_catalog,
+              (data as unknown as Record<string, unknown>).modifier_catalog,
             ),
           } as never,
         ]),
@@ -207,57 +209,62 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Equipment not found")
         } else if (data) {
-          const props = data.properties
-          const propTags = propertiesToStringArray(props)
-          let damage = data.damage || ""
-          let damageType = data.damage_type || ""
-          let mastery = data.mastery || ""
-          if (props && typeof props === "object" && !Array.isArray(props)) {
-            const record = props as Record<string, unknown>
-            if (typeof record.damage === "string" && !damage) {
-              const dm = record.damage.match(/^([\dd+\s]+)\s+(\w+)/i)
-              if (dm) {
-                damage = dm[1].trim()
-                damageType = dm[2]
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Equipment not found")
+          } else {
+            const props = row.properties
+            const propTags = propertiesToStringArray(props)
+            let damage = String(row.damage ?? "")
+            let damageType = String(row.damage_type ?? "")
+            let mastery = String(row.mastery ?? "")
+            if (props && typeof props === "object" && !Array.isArray(props)) {
+              const record = props as unknown as Record<string, unknown>
+              if (typeof record.damage === "string" && !damage) {
+                const dm = record.damage.match(/^([\dd+\s]+)\s+(\w+)/i)
+                if (dm) {
+                  damage = dm[1].trim()
+                  damageType = dm[2]
+                }
+              }
+              if (typeof record.mastery === "string" && !mastery) {
+                mastery = record.mastery
               }
             }
-            if (typeof record.mastery === "string" && !mastery) {
-              mastery = record.mastery
-            }
+            setRawProperties(props)
+            setForm({
+              name: String(row.name ?? ""),
+              category: String(row.category ?? "Adventuring Gear"),
+              subcategory: String(row.subcategory ?? ""),
+              cost: (row.cost as EquipmentFormData["cost"]) ?? null,
+              weight: (row.weight as number | null) ?? null,
+              description: String(row.description ?? ""),
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              armor_class: (row.armor_class as number | null) ?? null,
+              stealth_disadvantage: Boolean(row.stealth_disadvantage),
+              damage,
+              damage_type: damageType,
+              range: String(row.range ?? ""),
+              mastery,
+              properties: propTags,
+              icon: (row.icon as string | null) ?? null,
+              accent_color: (row.accent_color as string | null) ?? null,
+              card_image_url: (row.card_image_url as string | null) ?? null,
+              requires_attunement:
+                typeof row.requires_attunement === "boolean" ? row.requires_attunement : null,
+              magic_item_category: String(row.magic_item_category ?? ""),
+              rarity: String(row.rarity ?? ""),
+              base_equipment_ids: Array.isArray(row.base_equipment_ids)
+                ? (row.base_equipment_ids as string[])
+                : [],
+              selected_base_equipment_id: String(row.selected_base_equipment_id ?? ""),
+              base_equipment_filter: (row.base_equipment_filter as BaseEquipmentFilter | null) || "",
+              magic_effects: Array.isArray(row.magic_effects)
+                ? (row.magic_effects as LinkedModifierInstance[])
+                : [],
+            })
           }
-          setRawProperties(props)
-          setForm({
-            name: data.name || "",
-            category: data.category || "Adventuring Gear",
-            subcategory: data.subcategory || "",
-            cost: data.cost ?? null,
-            weight: data.weight || null,
-            description: data.description || "",
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            armor_class: data.armor_class || null,
-            stealth_disadvantage: data.stealth_disadvantage || false,
-            damage,
-            damage_type: damageType,
-            range: data.range || "",
-            mastery,
-            properties: propTags,
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            card_image_url: data.card_image_url || null,
-            requires_attunement:
-              typeof data.requires_attunement === "boolean" ? data.requires_attunement : null,
-            magic_item_category: data.magic_item_category || "",
-            rarity: data.rarity || "",
-            base_equipment_ids: Array.isArray(data.base_equipment_ids)
-              ? data.base_equipment_ids
-              : [],
-            selected_base_equipment_id: data.selected_base_equipment_id || "",
-            base_equipment_filter: (data.base_equipment_filter as BaseEquipmentFilter | null) || "",
-            magic_effects: Array.isArray(data.magic_effects)
-              ? (data.magic_effects as LinkedModifierInstance[])
-              : [],
-          })
         }
         setLoading(false)
       }
@@ -278,7 +285,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
         .eq("attached_to_type", "equipment")
         .eq("attached_to_id", form.category)
         .order("name")
-      setCustomAbilities(data || [])
+      setCustomAbilities(asCompendiumRows<{ id: string; name: string }>(data))
     }
     loadAbilities()
   }, [form.category])
@@ -404,7 +411,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             {...(listTab === "magic_items"
               ? {

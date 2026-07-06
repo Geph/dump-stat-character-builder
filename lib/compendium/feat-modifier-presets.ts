@@ -679,9 +679,11 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
         },
         {},
       ),
-      movementEffectsPassive("grappler_fast_wrestler", {
-        label: "Fast Wrestler: no extra movement dragging grappled creature your size or smaller",
-      }),
+      movementEffectsPassive(
+        "grappler_fast_wrestler",
+        {},
+        "Fast Wrestler: no extra movement dragging grappled creature your size or smaller",
+      ),
     ],
   },
 

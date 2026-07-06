@@ -8,7 +8,7 @@ const upgrades: CustomAbility[] = [
     name: "Shield Proficiency",
     description: "Shields",
     characteristics: [],
-    modifier_refs: [],
+    modifierRefs: [],
     linked_modifiers: [],
     prerequisites: null,
     attached_to_type: null,

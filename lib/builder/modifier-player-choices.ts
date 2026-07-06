@@ -121,7 +121,7 @@ export function characteristicsForFeatSelection(
   catalog: ModifierCatalogEntry[],
 ): CharacteristicModifier[] {
   const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
-  const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
+  const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as unknown as Record<string, unknown>)
   return characteristicsFromLinkedModifiers(catalog, instances, refs)
 }
 
@@ -499,7 +499,7 @@ export function collectSpeciesModifierPlayerChoiceSlots(
   if (!species) return []
   const slots: ModifierPlayerChoiceSlot[] = []
 
-  const speciesRow = species as unknown as Record<string, unknown>
+  const speciesRow = species as unknown as unknown as Record<string, unknown>
   const speciesWide = characteristicsFromLinkedModifiers(
     catalog,
     readLinkedModifiers(speciesRow, catalog),

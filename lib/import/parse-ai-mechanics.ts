@@ -191,7 +191,7 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "weapons")),
             type: "weapon_proficiencies",
-            mode: mechanic.weaponMode,
+            mode: mechanic.weaponMode as import("@/lib/compendium/weapon-proficiency-options").WeaponProficiencyMode,
             values: [],
           },
         ]),
@@ -271,7 +271,17 @@ function buildFromMechanic(
           ]),
         }
       }
-      const abilities = (mechanic.acAbilities ?? []) as AbilityScoreKey[]
+      const abilities = (mechanic.acAbilities ?? []).map(
+        (ability) =>
+          ({
+            strength: "STR",
+            dexterity: "DEX",
+            constitution: "CON",
+            intelligence: "INT",
+            wisdom: "WIS",
+            charisma: "CHA",
+          })[ability],
+      ) as import("@/lib/compendium/characteristic-modifiers").AbilityModifierKey[]
       if (!abilities.length || mechanic.acBase == null) return null
       return {
         ruleId: "ai.ac.formula",

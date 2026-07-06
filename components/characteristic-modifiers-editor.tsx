@@ -94,6 +94,8 @@ import {
   formatRollBonusSummary,
 } from "@/lib/compendium/roll-bonus-config"
 import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
+import type { LimitationSource } from "@/lib/compendium/modifier-limitations"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type CharacteristicModifiersEditorProps = {
   value: CharacteristicModifier[]
@@ -883,8 +885,9 @@ function useToolSuggestions(): string[] {
       .from("tools")
       .select("name")
       .then(({ data }) => {
-        if (data?.length) {
-          setSuggestions(mergeToolNameLists(data))
+        const rows = asCompendiumRows<{ name: string }>(data)
+        if (rows.length) {
+          setSuggestions(mergeToolNameLists(rows))
         }
       })
   }, [])
@@ -1040,8 +1043,9 @@ function useLanguageSuggestions(): string[] {
       .from("languages")
       .select("name")
       .then(({ data }) => {
-        if (data?.length) {
-          setSuggestions(mergeLanguageNameLists(data))
+        const rows = asCompendiumRows<{ name: string }>(data)
+        if (rows.length) {
+          setSuggestions(mergeLanguageNameLists(rows))
         }
       })
   }, [])
@@ -2457,7 +2461,7 @@ export function CharacteristicModifiersEditor({
                   classResources={classResources}
                 />
                 <ModifierLimitationsEditor
-                  value={mod}
+                  value={mod as LimitationSource}
                   onChange={(patch) => onChange(updateModifier(value, mod.id, { ...mod, ...patch }))}
                 />
               </div>

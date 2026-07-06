@@ -92,12 +92,12 @@ export async function duplicateCompendiumItem(
     return { error: error?.message ?? "Item not found." }
   }
 
-  const source = data as Record<string, unknown>
+  const source = data as unknown as Record<string, unknown>
   if (contentType === "abilities" && source.is_system) {
     return { error: "System abilities cannot be duplicated." }
   }
 
-  const copy = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
+  const copy = JSON.parse(JSON.stringify(source)) as unknown as Record<string, unknown>
   delete copy.created_at
   delete copy.updated_at
   copy.id = newCompendiumItemId()

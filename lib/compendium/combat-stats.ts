@@ -1,4 +1,5 @@
 import type { Equipment } from "@/lib/types"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { propertiesToStringArray } from "@/lib/compendium/equipment-properties"
 
 export type AbilityMods = {
@@ -12,7 +13,7 @@ export type AbilityMods = {
 
 function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
   if (equipment.properties && typeof equipment.properties === "object" && !Array.isArray(equipment.properties)) {
-    return equipment.properties as Record<string, unknown>
+    return equipment.properties as unknown as Record<string, unknown>
   }
   return {}
 }
@@ -112,7 +113,7 @@ export function getWeaponAbilityMod(weapon: Equipment, abilityMods: AbilityMods)
 export function getWeaponAttackAbility(
   weapon: Equipment,
   abilityMods: AbilityMods,
-): { ability: "strength" | "dexterity"; mod: number; label: string } {
+): { ability: AbilityScoreKey; mod: number; label: string } {
   const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
   if (isRanged) {
     return { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity" }

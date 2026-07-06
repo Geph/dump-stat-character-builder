@@ -17,7 +17,7 @@ function mockEldritchCatalogAbility(): CustomAbility {
     id: ELDRITCH_CATALOG_ID,
     name: "Eldritch Invocations",
     modifier_catalog: buildDefaultEldritchInvocations(),
-  } as CustomAbility
+  } as unknown as CustomAbility
 }
 
 describe("catalog-feat-options", () => {

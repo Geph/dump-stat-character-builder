@@ -15,6 +15,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -115,7 +116,7 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
       const db = createClient()
       const { data } = await db.from("classes").select("id, name, source").order("name")
       setCustomClasses(
-        (data ?? [])
+        (asCompendiumRows(data))
           .filter((row) => !isSrdSource(row.source as string))
           .map((row) => ({ id: row.id as string, name: row.name as string })),
       )
@@ -137,24 +138,29 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
         if (error) {
           setError("Spell not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            level: data.level || 0,
-            school: data.school || "Evocation",
-            casting_time: data.casting_time || "1 action",
-            range: data.range || "Self",
-            components: data.components || ["V", "S"],
-            material: data.material || "",
-            duration: data.duration || "Instantaneous",
-            concentration: data.concentration || false,
-            ritual: data.ritual || false,
-            description: data.description || "",
-            higher_levels: data.higher_levels || "",
-            classes: data.classes || [],
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Spell not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              level: (row.level as number | null | undefined) ?? 0,
+              school: String(row.school ?? "Evocation"),
+              casting_time: String(row.casting_time ?? "1 action"),
+              range: String(row.range ?? "Self"),
+              components: (row.components as string[]) || ["V", "S"],
+              material: String(row.material ?? ""),
+              duration: String(row.duration ?? "Instantaneous"),
+              concentration: Boolean(row.concentration),
+              ritual: Boolean(row.ritual),
+              description: String(row.description ?? ""),
+              higher_levels: String(row.higher_levels ?? ""),
+              classes: (row.classes as string[]) || [],
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+            })
+          }
         }
         setLoading(false)
       }

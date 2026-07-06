@@ -30,10 +30,10 @@ describe("buildImportCollisions", () => {
   })
 
   it("detects class name conflicts and suggests alternate names", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [{ name: "Fighter", features: [] }],
     }
-    const collisions = buildImportCollisions(content, {
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
       class: [{ name: "Fighter", source: "SRD" }],
     })
     expect(collisions).toHaveLength(1)
@@ -42,7 +42,7 @@ describe("buildImportCollisions", () => {
   })
 
   it("applies renames and prefixes class resource keys", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [{ name: "Fighter", features: [] }],
       class_resources: [
         {
@@ -54,18 +54,18 @@ describe("buildImportCollisions", () => {
       ],
       spells: [{ name: "Test", classes: ["Fighter"] }],
     }
-    const collisions = buildImportCollisions(content, {
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
       class: [{ name: "Fighter", source: "SRD" }],
     })
     const renameMap = defaultRenameMap(collisions)
-    const next = applyImportRenames(content, renameMap)
+    const next = applyImportRenames(content as unknown as ImportContent, renameMap)
     expect(next.classes?.[0].name).toBe("Alternate Fighter")
     expect(next.class_resources?.[0].resource_key).toBe("alternate_fighter_exploit_dice")
     expect(next.spells?.[0].classes).toEqual(["Alternate Fighter"])
   })
 
   it("keeps the original name when overwrite is selected", () => {
-    const content: ImportContent = {
+    const content = {
       spells: [
         {
           name: "Searing Orb",
@@ -81,7 +81,7 @@ describe("buildImportCollisions", () => {
         },
       ],
     }
-    const collisions = buildImportCollisions(content, {
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
       spell: [{ name: "Searing Orb", source: "Homebrew" }],
     })
     const next = applyImportCollisionResolutions(

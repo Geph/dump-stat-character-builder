@@ -9,9 +9,9 @@ function mergeProperties(
   if (base && typeof base === "object" && !Array.isArray(base)) {
     const magicRecord =
       magic && typeof magic === "object" && !Array.isArray(magic)
-        ? (magic as Record<string, unknown>)
+        ? (magic as unknown as Record<string, unknown>)
         : {}
-    return { ...(base as Record<string, unknown>), ...magicRecord }
+    return { ...(base as unknown as Record<string, unknown>), ...magicRecord } as unknown as Equipment["properties"]
   }
   return magic ?? base
 }

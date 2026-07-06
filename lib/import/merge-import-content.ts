@@ -110,38 +110,38 @@ export function combineImportContents(contents: ImportContent[]): ImportContent 
   for (const content of contents) {
     if (content.spells?.length) {
       supplementSpells.push(
-        ...normalizeSpellImportRows(content.spells as Record<string, unknown>[]),
+        ...normalizeSpellImportRows(content.spells as unknown as Record<string, unknown>[]),
       )
     }
     if (content.classes?.length) {
-      merged.classes = mergeArrayByName(merged.classes, content.classes) as ImportContent["classes"]
+      merged.classes = mergeArrayByName(merged.classes, content.classes) as unknown as ImportContent["classes"]
     }
     if (content.subclasses?.length) {
       merged.subclasses = mergeArrayByName(
         merged.subclasses,
         content.subclasses,
-      ) as ImportContent["subclasses"]
+      ) as unknown as ImportContent["subclasses"]
     }
     if (content.feats?.length) {
-      merged.feats = mergeArrayByName(merged.feats, content.feats) as ImportContent["feats"]
+      merged.feats = mergeArrayByName(merged.feats, content.feats) as unknown as ImportContent["feats"]
     }
     if (content.species?.length) {
-      merged.species = mergeArrayByName(merged.species, content.species) as ImportContent["species"]
+      merged.species = mergeArrayByName(merged.species, content.species) as unknown as ImportContent["species"]
     }
     if (content.backgrounds?.length) {
       merged.backgrounds = mergeArrayByName(
         merged.backgrounds,
         content.backgrounds,
-      ) as ImportContent["backgrounds"]
+      ) as unknown as ImportContent["backgrounds"]
     }
     if (content.equipment?.length) {
       merged.equipment = mergeArrayByName(
         merged.equipment,
         content.equipment,
-      ) as ImportContent["equipment"]
+      ) as unknown as ImportContent["equipment"]
     }
     if (content.abilities?.length) {
-      merged.abilities = mergeArrayByName(merged.abilities, content.abilities) as ImportContent["abilities"]
+      merged.abilities = mergeArrayByName(merged.abilities, content.abilities) as unknown as ImportContent["abilities"]
     }
     if (content.class_resources?.length) {
       merged.class_resources = [
@@ -168,7 +168,7 @@ export function combineImportContents(contents: ImportContent[]): ImportContent 
   const withSpells = attachReferencedSpellsFromSupplements(
     {
       ...merged,
-      spells: mergeArrayByName(undefined, supplementSpells) as ImportContent["spells"],
+      spells: mergeArrayByName(undefined, supplementSpells) as unknown as ImportContent["spells"],
     },
     supplementSpells,
   )
@@ -185,7 +185,7 @@ export function enrichSubclassSpellTablesOnImport(content: ImportContent): Impor
     ...content,
     subclasses: content.subclasses.map((subclass) =>
       enrichSubclassSpellTableFeatures(
-        subclass as Record<string, unknown>,
+        subclass as unknown as Record<string, unknown>,
         catalog,
       ) as typeof subclass,
     ),

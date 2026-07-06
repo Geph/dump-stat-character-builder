@@ -31,7 +31,7 @@ describe("Fey Pact import", () => {
   })
 
   it("wires language, skill, and cantrip modifiers from description", () => {
-    const content: ImportContent = {
+    const content = {
       feats: [
         {
           name: "Fey Pact",
@@ -58,7 +58,7 @@ describe("Fey Pact import", () => {
       ],
     }
 
-    const enriched = enrichImportContentModifiers(content)
+    const enriched = enrichImportContentModifiers(content as unknown as ImportContent)
     const feat = enriched.feats?.[0] as {
       category?: string
       linkedModifiers?: { catalogRefId: string; characteristics?: { type: string }[] }[]
@@ -111,7 +111,11 @@ describe("Fey Pact import", () => {
       [{ id: "spell-druidcraft", name: "Druidcraft" }],
     )
 
-    const spellId = linked?.[0]?.characteristics?.[0]?.spells?.[0]?.spellId
+    const spellId = (
+      linked?.[0]?.characteristics?.[0] as
+        | import("@/lib/compendium/characteristic-modifiers").SpellsKnownCharacteristic
+        | undefined
+    )?.spells?.[0]?.spellId
     expect(spellId).toBe("spell-druidcraft")
   })
 })

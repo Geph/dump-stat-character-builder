@@ -5,7 +5,7 @@ import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-re
 import { legacyFeatureOptionPickerCharacteristic, migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { createModifierInstanceId, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
 const FEATURE_OPTION_PICKER_CATALOG_ID = "cat_char_feature_option_picker"
@@ -288,14 +288,14 @@ function enrichFeatureChoices(
   }
 
   if (/^grand hex$/i.test(feature.name.trim())) {
-    const grandHexOptions = (content.abilities ?? [])
+    const grandHexOptions = ((content as ImportContentWithAbilities).abilities ?? [])
       .filter(
-        (ability) =>
+        (ability: { source_name?: string | null; level_requirement?: number | null; name: string }) =>
           /witch/i.test(ability.source_name ?? "") &&
           (ability.level_requirement ?? 0) >= 11 &&
           !/creature form/i.test(ability.name),
       )
-      .map((ability) => ({ name: ability.name, description: ability.description }))
+      .map((ability: { name: string; description: string }) => ({ name: ability.name, description: ability.description }))
     if (grandHexOptions.length) {
       next = syncModifierRefs({
         ...next,
@@ -389,7 +389,7 @@ export function enrichImportChoiceFeatures(content: ImportContent): ImportConten
           spellcasting: cls.spellcasting as ClassSpellcastingContext["spellcasting"],
         }),
       ),
-    }))
+    })) as unknown as ImportContent["classes"]
   }
 
   if (content.subclasses?.length) {
@@ -398,8 +398,8 @@ export function enrichImportChoiceFeatures(content: ImportContent): ImportConten
       features: (subclass.features ?? []).map((feature) =>
         enrichFeatureChoices(feature as Feature, content),
       ),
-    }))
+    })) as unknown as ImportContent["subclasses"]
   }
 
-  return next
+  return next as unknown as ImportContent
 }

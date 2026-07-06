@@ -33,11 +33,13 @@ import {
   syncModifierRefs,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
-import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
+import { clearModifierReviewPending, featureNeedsModifierReview, type ModifierReviewCarrier } from "@/lib/compendium/modifier-review"
 import { cn } from "@/lib/utils"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { DurationEditor } from "@/components/compendium/duration-editor"
-import type { Trait } from "@/lib/types"
+import type { Trait, Species } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 interface SpeciesFormData {
   name: string
@@ -91,7 +93,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
     const fetchSpells = async () => {
       const db = createClient()
       const { data } = await db.from("spells").select("id, name, level").order("level").order("name").limit(500)
-      setAllSpells(data || [])
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(data))
     }
     fetchSpells()
   }, [])
@@ -110,26 +112,31 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Species not found")
         } else if (data) {
-          const [enriched] = enrichSpeciesList([data as Record<string, unknown>])
-          setForm({
-            name: enriched.name || "",
-            description: enriched.description || "",
-            speed: enriched.speed || 30,
-            size: enriched.size || "Medium",
-            size_options: Array.isArray((enriched as { size_options?: unknown }).size_options)
-              ? ((enriched as { size_options?: string[] }).size_options as string[])
-              : [],
-            creature_type: enriched.creature_type || "Humanoid",
-            traits: enriched.traits?.length ? enriched.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
-            characteristics: normalizeCharacteristics(enriched.characteristics, null),
-            modifier_refs: readModifierRefs(enriched as Record<string, unknown>),
-            linked_modifiers: readLinkedModifiers(enriched as Record<string, unknown>, modifierCatalog),
-            icon: enriched.icon || null,
-            accent_color: enriched.accent_color || null,
-            card_image_url: enriched.card_image_url || null,
-            source: enriched.source || "Custom",
-            creator_url: enriched.creator_url || "",
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Species not found")
+          } else {
+            const [enriched] = enrichSpeciesList([castCompendiumRow<Species>(row)])
+            setForm({
+              name: enriched.name || "",
+              description: enriched.description || "",
+              speed: typeof enriched.speed === "number" ? enriched.speed : 30,
+              size: enriched.size || "Medium",
+              size_options: Array.isArray((enriched as { size_options?: unknown }).size_options)
+                ? ((enriched as { size_options?: string[] }).size_options as string[])
+                : [],
+              creature_type: enriched.creature_type || "Humanoid",
+              traits: enriched.traits?.length ? enriched.traits.map((t: Trait) => ({ ...t, level: t.level || 1 })) : [{ name: "", description: "", level: 1 }],
+              characteristics: normalizeCharacteristics(enriched.characteristics, null),
+              modifier_refs: readModifierRefs(enriched as unknown as Record<string, unknown>),
+              linked_modifiers: readLinkedModifiers(enriched as unknown as Record<string, unknown>, modifierCatalog),
+              icon: enriched.icon || null,
+              accent_color: enriched.accent_color || null,
+              card_image_url: enriched.card_image_url || null,
+              source: enriched.source || "Custom",
+              creator_url: enriched.creator_url || "",
+            })
+          }
         }
         setLoading(false)
       }
@@ -221,7 +228,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
       ...prev,
       traits: prev.traits.map((t, i) => {
         if (i !== index) return t
-        return clearModifierReviewPending({ ...t, ...updates })
+        return clearModifierReviewPending({ ...t, ...updates } as ModifierReviewCarrier)
       })
     }))
   }
@@ -338,7 +345,7 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
@@ -449,12 +456,12 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
                   key={index}
                   className={cn(
                     "bg-card border-2 rounded-xl p-4",
-                    featureNeedsModifierReview(trait)
+                    featureNeedsModifierReview(trait as ModifierReviewCarrier)
                       ? "border-destructive bg-destructive/5"
                       : "border-border",
                   )}
                 >
-                  {featureNeedsModifierReview(trait) ? (
+                  {featureNeedsModifierReview(trait as ModifierReviewCarrier) ? (
                     <p className="mb-3 text-xs font-medium text-destructive">
                       No modifier linked — use Modifier effects below, then save.
                     </p>

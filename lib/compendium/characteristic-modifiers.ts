@@ -851,7 +851,7 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
   accrueResourceMaxAbility?: AbilityScoreKey | null
   accrueDecayMinutes?: number | null
   /** Skip when toggle is off (e.g. in-combat gate). */
-  requiresSheetToggle?: SheetToggleKey | null
+  requiresSheetToggle?: SheetToggleKey
   /** Skip when any of these conditions are active (e.g. Incapacitated). */
   blockedByConditions?: string[]
   effect?: NestedModifierEffect | null
@@ -1148,8 +1148,14 @@ export function createCharacteristicModifier(
       return { id, type, featCategories: ["General"], count: 1 }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
+    case "craftable_items":
+      return { id, type, items: [], category: null }
+    case "held_items_cap":
+      return { id, type, baseAbility: "intelligence", flatBonus: 0 }
     case "catalog_option":
       return { id, type, catalogAbilityId: "", catalogEntryId: "" }
+    default:
+      throw new Error(`Unhandled characteristic modifier type: ${type}`)
   }
 }
 
@@ -1827,7 +1833,7 @@ function isModifierActive(
   mod: CharacteristicModifier,
   ctx: LimitationEvaluationContext = {},
 ): boolean {
-  return modifierLimitationsMet(mod, {
+  return modifierLimitationsMet(mod as LimitationSource, {
     activeConditions: ctx.activeConditions,
     activeSheetToggles: ctx.activeSheetToggles,
     equippedArmor: ctx.equippedArmor,
@@ -2332,9 +2338,14 @@ export type TargetConditionContext = {
   targetSize?: CreatureSizeValue | null
 }
 
-const SIZE_ORDER: CreatureSizeValue[] = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
+type ExtendedCreatureSize = CreatureSizeValue | "Tiny" | "Gargantuan"
 
-function sizeAtLeast(actual: CreatureSizeValue | null | undefined, minimum: CreatureSizeValue): boolean {
+const SIZE_ORDER: ExtendedCreatureSize[] = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
+
+function sizeAtLeast(
+  actual: ExtendedCreatureSize | null | undefined,
+  minimum: ExtendedCreatureSize,
+): boolean {
   if (!actual) return false
   return SIZE_ORDER.indexOf(actual) >= SIZE_ORDER.indexOf(minimum)
 }

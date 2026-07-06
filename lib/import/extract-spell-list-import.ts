@@ -38,6 +38,7 @@ export function spellListDocumentToImportContent(
         name: document.className,
         description: null,
         hit_die: 8,
+        primary_ability: null,
         features: [],
         spell_list: spellNames,
       },

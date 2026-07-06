@@ -77,7 +77,7 @@ describe("weapon mastery", () => {
   })
 
   it("reads mastery from top-level equipment field", () => {
-    const weapon = { mastery: "Sap" } as Equipment
+    const weapon = { mastery: "Sap" } as unknown as Equipment
     expect(getWeaponMastery(weapon)).toBe("Sap")
   })
 })

@@ -7,7 +7,7 @@ import {
 import type { FeatSelectionEntry } from "@/lib/builder/feat-choices"
 import type { Feat } from "@/lib/types"
 
-const asiFeat: Feat = {
+const asiFeat = {
   id: "feat_asi",
   name: "Ability Score Improvement",
   description: "",
@@ -16,13 +16,13 @@ const asiFeat: Feat = {
   prerequisite: null,
   benefits: null,
   isChoice: false,
-  choices: null,
+  choices: undefined,
   modifierRefs: [],
   linkedModifiers: [],
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as Feat
 
 describe("shouldUseLegacyMilestoneAsiUi", () => {
   it("hides legacy UI when catalog pool grants cover ASI feat picks", () => {

@@ -27,9 +27,15 @@ function loadJson(name: string) {
 describe("combineImportContents", () => {
   it("merges BYO template spells, class, and subclass payloads", () => {
     const combined = combineImportContents([
-      normalizeAiImportContent(IMPORT_JSON_TEMPLATES.spells as Record<string, unknown>),
-      normalizeAiImportContent(IMPORT_JSON_TEMPLATES.classes as Record<string, unknown>),
-      normalizeAiImportContent(IMPORT_JSON_TEMPLATES.subclasses as Record<string, unknown>),
+      normalizeAiImportContent(
+        IMPORT_JSON_TEMPLATES.spells as unknown as Parameters<typeof normalizeAiImportContent>[0],
+      ),
+      normalizeAiImportContent(
+        IMPORT_JSON_TEMPLATES.classes as unknown as Parameters<typeof normalizeAiImportContent>[0],
+      ),
+      normalizeAiImportContent(
+        IMPORT_JSON_TEMPLATES.subclasses as unknown as Parameters<typeof normalizeAiImportContent>[0],
+      ),
     ])
     expect(combined.spells?.length).toBeGreaterThan(0)
     expect(combined.classes?.[0]?.name).toBe("Fighter")
@@ -81,11 +87,15 @@ describe.runIf(hasHomebrewImportFixtures)("merge import spell libraries", () => 
     const enriched = enrichImportContentModifiers(combined)
     const redMagic = enriched.subclasses
       ?.find((sc) => sc.name === "Red Magic")
-      ?.features?.find((f) => f.name === "Red Magic Spells")
+      ?.features?.find((f) => f.name === "Red Magic Spells") as unknown as import("@/lib/types").Feature | undefined
 
     expect(
-      (redMagic?.linkedModifiers ?? []).some((mod) =>
-        (mod.characteristics ?? []).some((char) => char.type === "spells_known"),
+      (redMagic?.linkedModifiers ?? []).some(
+        (mod: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance) =>
+          (mod.characteristics ?? []).some(
+            (char: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier) =>
+              char.type === "spells_known",
+          ),
       ),
     ).toBe(true)
 
@@ -139,10 +149,18 @@ describe.runIf(hasHomebrewImportFixtures)("enrichSubclassSpellTablesOnImport", (
     const enriched = enrichSubclassSpellTablesOnImport(combined)
     const blackMagic = enriched.subclasses
       ?.find((sc) => sc.name === "Black Magic")
-      ?.features?.find((f) => f.name === "Black Magic Spells")
+      ?.features?.find((f) => f.name === "Black Magic Spells") as unknown as import("@/lib/types").Feature | undefined
     const spellsKnown = (blackMagic?.linkedModifiers ?? [])
-      .flatMap((mod) => mod.characteristics ?? [])
-      .find((char) => char.type === "spells_known")
-    expect((spellsKnown?.spells ?? []).some((s) => /exhume/i.test(String(s.spellId)))).toBe(true)
+      .flatMap(
+        (mod: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance) =>
+          mod.characteristics ?? [],
+      )
+      .find(
+        (char: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier) =>
+          char.type === "spells_known",
+      ) as import("@/lib/compendium/characteristic-modifiers").SpellsKnownCharacteristic | undefined
+    expect((spellsKnown?.spells ?? []).some((s: { spellId?: string }) => /exhume/i.test(String(s.spellId)))).toBe(
+      true,
+    )
   })
 })

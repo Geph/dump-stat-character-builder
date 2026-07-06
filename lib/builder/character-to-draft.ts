@@ -126,5 +126,6 @@ export function characterToBuilderState(
     currentHp: character.hit_points ?? character.hit_point_max ?? null,
     tempHp: 0,
     editingCharacterId: character.id,
+    cardViewMode: "dense",
   }
 }

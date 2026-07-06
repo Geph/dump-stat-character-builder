@@ -1,8 +1,8 @@
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
-import { readLinkedModifiers, syncModifierRefs } from "@/lib/compendium/linked-modifiers"
+import { readLinkedModifiers, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
-import type { Feature, LinkedModifierInstance } from "@/lib/types"
+import type { Feature } from "@/lib/types"
 
 function isMonkLikeClass(className: string): boolean {
   return /\bmonk\b/i.test(className) && className !== "Monk"
@@ -15,7 +15,7 @@ function monkUnarmoredDefense(instanceKey: string): LinkedModifierInstance {
       type: "ac",
       mode: "ability_modifiers",
       base: 10,
-      abilities: ["dexterity", "wisdom"],
+      abilities: ["DEX", "WIS"],
       label: "Unarmored Defense",
     },
   ])
@@ -48,7 +48,7 @@ function wireUnarmoredDefense(feature: Feature, className: string): Feature {
       ...(feature.linkedModifiers ?? []),
       monkUnarmoredDefense(`${prefix}_uac`),
     ],
-  }) as Feature
+  }) as unknown as Feature
 }
 
 /** Remap SRD focus_points → prefixed ki_points and wire monk UAC for homebrew monks. */
@@ -62,7 +62,7 @@ export function enrichMonkClassFeatures(features: Feature[], className: string):
     let next: Feature = wireUnarmoredDefense(feature, className)
     const remapped = remapResourceKeyInModifiers(next.linkedModifiers, "focus_points", kiKey)
     if (remapped !== next.linkedModifiers) {
-      next = syncModifierRefs({ ...next, linkedModifiers: remapped }) as Feature
+      next = syncModifierRefs({ ...next, linkedModifiers: remapped }) as unknown as Feature
     }
     return next
   })

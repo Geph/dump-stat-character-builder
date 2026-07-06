@@ -4,6 +4,7 @@ import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-fe
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { isSrdSource } from "@/lib/srd/source"
 import type { FeatureActivation, Trait, UsesConfig } from "@/lib/types"
+import type { Feature } from "@/lib/types"
 
 /**
  * Modifier presets for non-SRD species entered in the compendium (PHB, Eberron, etc.).
@@ -589,7 +590,7 @@ const SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
             attackProfile: "force_save",
             saveAbility: "Charisma",
             saveDCBase: 8,
-            saveDCConfig: { mode: "proficiency", ability: "charisma" },
+            saveDCConfig: { mode: "proficiency", ability: "CHA" },
             effectConditionTypes: ["Frightened"],
             label: "Non-allies within 10 ft.: CHA save or Frightened",
           },
@@ -709,7 +710,7 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
-  return enrichFeatureWithMechanicalDetection(next, {
+  return enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
     featureName: trait.name,

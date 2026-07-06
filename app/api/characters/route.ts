@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const row = Array.isArray(body) ? body[0] : body.rows?.[0] ?? body
-    const data = await insertCharacter(row as Record<string, unknown>)
+    const data = await insertCharacter(row as unknown as Record<string, unknown>)
     if (!data?.id) {
       return NextResponse.json({ error: "Character was not saved." }, { status: 500 })
     }

@@ -36,6 +36,8 @@ describe("getSubclassesForClass", () => {
       { id: "other", class_id: "other-class", name: "Other" },
     ] as const
 
-    expect(getSubclassesForClass([...rows], classId)).toHaveLength(2)
+    expect(
+      getSubclassesForClass([...rows] as unknown as import("@/lib/types").Subclass[], classId),
+    ).toHaveLength(2)
   })
 })

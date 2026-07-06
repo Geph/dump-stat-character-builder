@@ -14,7 +14,7 @@ import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifie
 import { detectSpellcastingAbilityFromText } from "@/lib/import/detect-governing-ability"
 import type { Equipment, Feature } from "@/lib/types"
 
-const trinketItem: Equipment = {
+const trinketItem = {
   id: "amulet-1",
   name: "Amulet of Warding",
   category: "Adventuring Gear",
@@ -70,7 +70,7 @@ describe("Investigator trinket magic items", () => {
         resourceEntries,
         usedResourcesById: { "class-1_trinkets": 1 },
         resolveContext: {},
-        classDetails: [{ row: { class_id: "class-1", level: 7 }, class: { id: "class-1", name: "Investigator" } as never }],
+        classDetails: [{ row: { class_id: "class-1", level: 7, order: 0 }, class: { id: "class-1", name: "Investigator" } as never }],
       }),
     ).toBe(true)
 
@@ -78,7 +78,7 @@ describe("Investigator trinket magic items", () => {
       uses,
       resourceEntries,
       usedResourcesById: { "class-1_trinkets": 0 },
-      classDetails: [{ row: { class_id: "class-1", level: 7 }, class: { id: "class-1", name: "Investigator" } as never }],
+      classDetails: [{ row: { class_id: "class-1", level: 7, order: 0 }, class: { id: "class-1", name: "Investigator" } as never }],
     })
     expect(next?.["class-1_trinkets"]).toBe(1)
 
@@ -88,7 +88,7 @@ describe("Investigator trinket magic items", () => {
         resourceEntries,
         usedResourcesById: { "class-1_trinkets": 2 },
         resolveContext: {},
-        classDetails: [{ row: { class_id: "class-1", level: 7 }, class: { id: "class-1", name: "Investigator" } as never }],
+        classDetails: [{ row: { class_id: "class-1", level: 7, order: 0 }, class: { id: "class-1", name: "Investigator" } as never }],
       }),
     ).toBe(false)
   })
@@ -119,7 +119,7 @@ describe("Investigator Finisher", () => {
           features: [{ level: 2, name: "Finisher", description: "Bloodied extra damage." }],
         },
       ],
-    })
+    } as unknown as import("@/lib/import/content-schema").ImportContent)
     const finisher = enriched.classes?.[0]?.features?.[0] as Feature
     const trigger = (finisher.linkedModifiers ?? [])
       .flatMap((mod) => mod.characteristics ?? [])
@@ -143,13 +143,13 @@ describe("Investigator Finisher", () => {
     ).toBe(false)
     expect(
       onHitTriggerMatchesTarget(
-        { type: "on_hit_trigger", onlyIfTargetMinSize: "Large" },
+        { type: "on_hit_trigger", onlyIfTargetMinSize: "Large" } as unknown as import("@/lib/compendium/characteristic-modifiers").OnHitTriggerCharacteristic,
         { targetSize: "Large" },
       ),
     ).toBe(true)
     expect(
       onHitTriggerMatchesTarget(
-        { type: "on_hit_trigger", onlyIfTargetMinSize: "Large" },
+        { type: "on_hit_trigger", onlyIfTargetMinSize: "Large" } as unknown as import("@/lib/compendium/characteristic-modifiers").OnHitTriggerCharacteristic,
         { targetSize: "Medium" },
       ),
     ).toBe(false)
@@ -207,8 +207,8 @@ describe("Investigator import integration", () => {
           ],
         },
       ],
-    })
-    const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets")
+    } as unknown as import("@/lib/import/content-schema").ImportContent)
+    const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as unknown as Feature | undefined
     expect(holy?.limitedUses).toBeUndefined()
     expect(content.equipment?.some((row) => row.name === "Amulet of Warding")).toBe(true)
   })

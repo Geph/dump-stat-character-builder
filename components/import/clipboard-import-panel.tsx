@@ -32,7 +32,7 @@ type ClipboardImportPanelProps = {
   onSourceTextChange: (value: string) => void
   jsonText: string
   onJsonTextChange: (value: string) => void
-  status: "idle" | "processing" | "review" | "success" | "error"
+  status: "idle" | "uploading" | "processing" | "review" | "success" | "error"
   serverAiEnabled: boolean
   importAiSettings: ImportAiSettingsValue
   onImportAiSettingsChange: (value: ImportAiSettingsValue) => void

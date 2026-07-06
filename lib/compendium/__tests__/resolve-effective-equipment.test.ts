@@ -18,7 +18,7 @@ function item(overrides: Partial<Equipment> = {}): Equipment {
     creator_url: null,
     created_at: "",
     ...overrides,
-  }
+  } as unknown as unknown as Equipment
 }
 
 describe("resolveEffectiveEquipment", () => {
@@ -30,7 +30,7 @@ describe("resolveEffectiveEquipment", () => {
     properties: {
       damage: "1d8 Slashing",
       mastery: "Sap",
-    } as Equipment["properties"],
+    } as unknown as Equipment["properties"],
   })
 
   it("returns mundane items unchanged", () => {
@@ -46,7 +46,7 @@ describe("resolveEffectiveEquipment", () => {
       requires_attunement: true,
       base_equipment_ids: [longsword.id],
       selected_base_equipment_id: longsword.id,
-      properties: {},
+      properties: {} as unknown as Equipment["properties"],
     })
 
     const resolved = resolveEffectiveEquipment(plusOne, [longsword, plusOne])

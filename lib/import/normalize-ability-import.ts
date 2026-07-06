@@ -29,7 +29,7 @@ function coerceStringArray(raw: unknown): string[] | null {
 
 function coerceChoices(raw: unknown): FeatureChoice | null {
   if (!raw || typeof raw !== "object") return null
-  const row = raw as Record<string, unknown>
+  const row = raw as unknown as Record<string, unknown>
   const category = typeof row.category === "string" ? row.category : null
   const count = typeof row.count === "number" ? row.count : null
   const options = Array.isArray(row.options)

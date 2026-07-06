@@ -85,10 +85,10 @@ function withSanitizedClassRows(content: ImportContent): ImportContent {
     ...content,
     ...(classResources.length ? { class_resources: classResources } : {}),
     classes: enrichImportedClassList(
-      content.classes as Record<string, unknown>[],
+      content.classes as unknown as Record<string, unknown>[],
       explicitResources,
-    ) as ImportContent["classes"],
-  }
+    ) as unknown as ImportContent["classes"],
+  } as unknown as ImportContent
 }
 
 export function needsImportReview(

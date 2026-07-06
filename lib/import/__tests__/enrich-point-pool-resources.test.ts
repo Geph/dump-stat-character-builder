@@ -3,7 +3,8 @@ import {
   enrichPointPoolClassResources,
   remapPointPoolResourceKey,
 } from "@/lib/import/enrich-point-pool-resources"
-import type { ClassResourceImportRow, Feature } from "@/lib/types"
+import type { Feature } from "@/lib/types"
+import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 
 describe("remapPointPoolResourceKey", () => {
   it("prefixes sorcery_points for homebrew classes but not SRD Sorcerer", () => {

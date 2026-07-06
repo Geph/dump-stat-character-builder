@@ -70,7 +70,7 @@ describe("collectSheetActions", () => {
                 ],
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ]),
       ],
       species: null,
@@ -97,7 +97,7 @@ describe("collectSheetActions", () => {
                 ],
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ]),
       ],
       species: null,
@@ -120,7 +120,7 @@ describe("collectSheetActions", () => {
                 activation: { bonusAction: true, effects: [] },
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ]),
       ],
       species: null,
@@ -151,7 +151,7 @@ describe("collectSheetActions", () => {
                 ],
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ]),
       ],
       species: null,
@@ -174,7 +174,7 @@ describe("collectSheetActions", () => {
                 characteristics: [{ id: "mod_v", type: "vision", senses: [] } as never],
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ]),
       ],
       species: null,
@@ -193,7 +193,7 @@ describe("collectSheetActions", () => {
             "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense.",
         },
       ],
-    } as unknown as Species
+    } as unknown as unknown as Species
     const actions = collectSheetActions({ classDetails: [classDetail([], 5)], species })
     const stonecunning = actions.find((a) => a.name === "Stonecunning")
     expect(stonecunning).toBeTruthy()
@@ -255,7 +255,7 @@ describe("collectSheetActions", () => {
           ],
         },
       ],
-    } as unknown as Species
+    } as unknown as unknown as Species
     const actions = collectSheetActions({
       classDetails: [classDetail([], 5)],
       species,
@@ -297,6 +297,7 @@ describe("collectSheetActions", () => {
                 id: "extend",
                 name: "Extend",
                 description: "Double duration.",
+                resourceKey: "psi_points",
                 cost: { fixed: 2 },
               },
             ],
@@ -337,7 +338,7 @@ describe("collectSheetActions", () => {
                 activation: { action: true, effects: [{ id: "fx1", kind: "extra_action" }] },
               },
             ],
-          } as unknown as Feature,
+          } as unknown as unknown as Feature,
         ], 5),
       ],
       species: null,

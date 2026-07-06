@@ -23,6 +23,12 @@ import { assertPublicFetchHostname } from "@/lib/network/ssrf-guard"
 import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 
+const MAIN_CONTENT_SELECTOR = "#page-content, .page-content, article"
+
+function mainContentText($: cheerio.CheerioAPI): string {
+  return $(MAIN_CONTENT_SELECTOR).first().text()
+}
+
 async function fetchPage(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
@@ -41,13 +47,12 @@ function parseSpecies(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim() || $("h1").first().text().trim()
   
-  const mainContent = getMainContentRoot($)
   const description = extractMainContentHtml($)
-  const fullText = mainContent.text()
+  const fullText = mainContentText($)
   
   // Extract traits
   const traits: { name: string; description: string }[] = []
-  mainContent.find("h3, h4, strong").each((_, el) => {
+  $(MAIN_CONTENT_SELECTOR).first().find("h3, h4, strong").each((_, el) => {
     const traitName = $(el).text().trim()
     const traitDesc = extractFollowingBlocks($, el) || $(el).next("p").text().trim()
     if (traitName && traitDesc && !traitName.includes("Ability") && !traitName.includes("Size")) {
@@ -77,16 +82,15 @@ function parseClass(html: string, url: string) {
   if (!name) name = $("h1").first().text().trim()
   name = name.replace(/^Class:\s*/i, "")
   
-  const mainContent = getMainContentRoot($)
   const description = extractMainContentHtml($)
-  const fullText = mainContent.text()
+  const fullText = mainContentText($)
   
   // Try to extract hit die
   const hitDieMatch = fullText.match(/Hit\s*Die[:\s]*d(\d+)/i) || fullText.match(/Hit\s*Points.*?d(\d+)/i)
   
   // Extract features
   const features: { level: number; name: string; description: string }[] = []
-  mainContent.find("h3, h4, h2").each((_, el) => {
+  $(MAIN_CONTENT_SELECTOR).first().find("h3, h4, h2").each((_, el) => {
     const featureName = $(el).text().trim()
     const featureDesc = extractFollowingBlocks($, el)
     // Try to extract level from feature name
@@ -179,9 +183,8 @@ function parseBackground(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Background:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = getMainContentRoot($)
   const description = extractMainContentHtml($) || null
-  const fullText = mainContent.text()
+  const fullText = mainContentText($)
   
   const skillsMatch = fullText.match(/Skill\s*Proficiencies?[:\s]*([^.]+)/i)
   const skills = skillsMatch
@@ -216,8 +219,7 @@ function parseSpell(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Spell:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = getMainContentRoot($)
-  const fullText = mainContent.text()
+  const fullText = mainContentText($)
   
   // Extract spell level
   const levelMatch = fullText.match(/(\d)(?:st|nd|rd|th)?[- ]level|Cantrip/i)
@@ -233,7 +235,7 @@ function parseSpell(html: string, url: string) {
   const durationMatch = fullText.match(/Duration[:\s]*([^\n]+)/i)
   const componentsMatch = fullText.match(/Components?[:\s]*([VSM,\s]+)/i)
   
-  const firstPara = mainContent.find("p").first().get(0)
+  const firstPara = $(MAIN_CONTENT_SELECTOR).first().find("p").first().get(0)
   const description =
     (firstPara ? extractFollowingBlocks($, firstPara) : "") ||
     extractMainContentHtml($) ||
@@ -265,8 +267,7 @@ function parseFeat(html: string, url: string) {
   const $ = cheerio.load(html)
   const name = $("#page-title").text().trim().replace(/^Feat:\s*/i, "") || $("h1").first().text().trim()
   
-  const mainContent = getMainContentRoot($)
-  const fullText = mainContent.text()
+  const fullText = mainContentText($)
   
   const description = formatFeatDescription(extractMainContentHtml($))
   
@@ -417,7 +418,7 @@ export async function POST(request: NextRequest) {
     let row = result
     if (tableName === "backgrounds") {
       const spells = (await listRows("spells")) as { id: string; name: string }[]
-      row = normalizeBackgroundRow(finalizeBackgroundImportRow(row, spells) as Record<string, unknown>)
+      row = normalizeBackgroundRow(finalizeBackgroundImportRow(row, spells) as unknown as Record<string, unknown>)
     }
 
     await upsertByName(tableName, [

@@ -56,7 +56,7 @@ describe("enrichPsionicTalentGrantFeatures", () => {
         description: "Choose talents.",
         isChoice: true,
         choices: { category: "Psionic Talents", count: 1, options: [] },
-      } as Feature,
+      } as unknown as Feature,
     ])
     expect(features[0].choices?.optionsSource).toBe("known_discipline_talents")
   })
@@ -64,7 +64,7 @@ describe("enrichPsionicTalentGrantFeatures", () => {
 
 describe("resolveFeatureChoiceOptions", () => {
   it("returns aggregated options when optionsSource is known_discipline_talents", () => {
-    const feature: Feature = {
+    const feature = {
       level: 2,
       name: "Psionic Talents",
       description: "Choose talents.",
@@ -73,9 +73,9 @@ describe("resolveFeatureChoiceOptions", () => {
         category: "Psionic Talents",
         count: 1,
         options: [],
-        optionsSource: "known_discipline_talents",
+        optionsSource: "known_discipline_talents" as const,
       },
-    }
+    } satisfies import("@/lib/types").Feature
     const options = resolveFeatureChoiceOptions(feature, {
       customAbilities: [
         discipline("Telekinetic Discipline", [

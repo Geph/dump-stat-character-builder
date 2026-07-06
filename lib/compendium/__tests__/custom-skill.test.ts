@@ -70,8 +70,7 @@ describe("custom skill modifier", () => {
             source: "SRD",
             creator_url: null,
             created_at: "",
-            enabled: true,
-          },
+          } as unknown as import("@/lib/types").DndClass,
         ],
         primaryClassId: "cls",
         modifierCatalog: mergeDefaultCatalogEntries([]),
@@ -81,7 +80,7 @@ describe("custom skill modifier", () => {
             name: "Loremaster",
             description: null,
             characteristics: null,
-            modifier_refs: [],
+            modifierRefs: [],
             linked_modifiers: [
               {
                 instanceId: "inst-lore",

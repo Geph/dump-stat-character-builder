@@ -68,9 +68,9 @@ export function magicItemSummaryLine(item: Equipment, resolved?: Equipment | nul
   if (target.armor_class != null) return `AC ${target.armor_class}`
   const props = target.properties
   if (props && typeof props === "object" && !Array.isArray(props)) {
-    const ac = (props as Record<string, unknown>).ac
+    const ac = (props as unknown as Record<string, unknown>).ac
     if (typeof ac === "string" || typeof ac === "number") return `AC ${ac}`
-    const damage = (props as Record<string, unknown>).damage
+    const damage = (props as unknown as Record<string, unknown>).damage
     if (typeof damage === "string") return `Damage ${damage}`
   }
   if (isMagicItem(item) && item.rarity) return item.rarity

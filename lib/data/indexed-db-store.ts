@@ -32,9 +32,9 @@ function normalizeCharacterSpeed(value: unknown): number {
 
 function firstInsertRow(payload: unknown): Record<string, unknown> {
   if (Array.isArray(payload)) {
-    return (payload[0] ?? {}) as Record<string, unknown>
+    return (payload[0] ?? {}) as unknown as Record<string, unknown>
   }
-  return (payload ?? {}) as Record<string, unknown>
+  return (payload ?? {}) as unknown as Record<string, unknown>
 }
 
 function applyFilters(rows: Record<string, unknown>[], filters: Filter[]): Record<string, unknown>[] {
@@ -119,7 +119,7 @@ async function getAllFromStore(storeName: StoreName): Promise<Record<string, unk
     const tx = db.transaction(storeName, "readonly")
     const store = tx.objectStore(storeName)
     const req = store.getAll()
-    req.onsuccess = () => resolve((req.result as Record<string, unknown>[]) ?? [])
+    req.onsuccess = () => resolve((req.result as unknown as Record<string, unknown>[]) ?? [])
     req.onerror = () => reject(req.error ?? new Error("Read failed"))
   })
 }
@@ -167,7 +167,7 @@ async function attachCharacterRelations(
     return cache.get(name)!
   }
 
-  const classRows = normalizeCharacterClassRows(character as Character)
+  const classRows = normalizeCharacterClassRows(character as unknown as Character)
   if (classRows.length) {
     const classes = await getStore("classes")
     const subclasses = await getStore("subclasses")
@@ -342,7 +342,7 @@ class IndexedDbQueryBuilder implements QueryBuilder {
       const storeName = resolved
 
       if (this.mode === "insert") {
-        const rows = (this.payload as Record<string, unknown>[]).map((row) => {
+        const rows = (this.payload as unknown as Record<string, unknown>[]).map((row) => {
           const now = new Date().toISOString()
           return {
             ...row,
@@ -360,17 +360,17 @@ class IndexedDbQueryBuilder implements QueryBuilder {
         if (conflict !== "name") {
           return { data: null, error: { message: `Unsupported upsert conflict: ${conflict}` } }
         }
-        const saved = await upsertByName(storeName, this.payload as Record<string, unknown>[])
+        const saved = await upsertByName(storeName, this.payload as unknown as Record<string, unknown>[])
         return { data: saved, error: null }
       }
 
       if (this.mode === "update") {
-        const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+        const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
         if (!id) return { data: null, error: { message: "Update requires .eq('id', ...)" } }
         const all = await getAllFromStore(storeName)
         const existing = all.find((r) => r.id === id)
         if (!existing) return { data: null, error: { message: "Not found" } }
-        const patch = { ...(this.payload as Record<string, unknown>) }
+        const patch = { ...(this.payload as unknown as Record<string, unknown>) }
         delete patch.id
         delete patch.created_at
         const updated = {
@@ -384,7 +384,7 @@ class IndexedDbQueryBuilder implements QueryBuilder {
       }
 
       if (this.mode === "delete") {
-        const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+        const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
         if (id) {
           await deleteRow(storeName, id)
           return { data: null, error: null }
@@ -439,12 +439,12 @@ class IndexedDbQueryBuilder implements QueryBuilder {
     }
 
     if (this.mode === "update") {
-      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+      const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
       if (!id) return { data: null, error: { message: "Update requires .eq('id', ...)" } }
       const all = await getAllFromStore("characters")
       const existing = all.find((r) => r.id === id)
       if (!existing) return { data: null, error: { message: "Not found" } }
-      const data = { ...(this.payload as Record<string, unknown>) }
+      const data = { ...(this.payload as unknown as Record<string, unknown>) }
       delete data.id
       delete data.created_at
       const row: Record<string, unknown> = {
@@ -462,7 +462,7 @@ class IndexedDbQueryBuilder implements QueryBuilder {
     }
 
     if (this.mode === "delete") {
-      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+      const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
       if (!id) return { data: null, error: { message: "Delete requires .eq('id', ...)" } }
       await deleteRow("characters", id)
       return { data: null, error: null }
@@ -472,7 +472,7 @@ class IndexedDbQueryBuilder implements QueryBuilder {
     rows = applyFilters(rows, this.filters)
     rows = applyOrder(rows, this.orders.length ? this.orders : [{ column: "created_at", ascending: false }])
 
-    const characterId = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as
+    const characterId = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as
       | string
       | undefined
 

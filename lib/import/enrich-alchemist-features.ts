@@ -95,7 +95,7 @@ function enrichBombFormulaAbility<T extends Record<string, unknown>>(row: T): T 
   const name = String(row.name ?? "")
   if (row.ability_role !== "bomb_formula" && !/\bbomb formula\b/i.test(name)) return row
   const damageTypes = formulaDamageTypes(name)
-  const existing = (row.linked_modifiers ?? row.linkedModifiers ?? []) as Feature["linkedModifiers"]
+  const existing = (row.linked_modifiers ?? row.linkedModifiers ?? []) as unknown as Feature["linkedModifiers"]
   if (existing?.some((mod) => mod.characteristics?.some((char) => char.type === "special_attack"))) {
     return row
   }
@@ -110,7 +110,7 @@ function enrichAlchemistBombAbility<T extends Record<string, unknown>>(row: T): 
   const name = String(row.name ?? "")
   const role = row.ability_role
   if (role !== "alchemist_bomb" && !/^bomb$/i.test(name.trim())) return row
-  const existing = (row.linked_modifiers ?? row.linkedModifiers ?? []) as Feature["linkedModifiers"]
+  const existing = (row.linked_modifiers ?? row.linkedModifiers ?? []) as unknown as Feature["linkedModifiers"]
   if (existing?.some((mod) => mod.characteristics?.some((char) => char.type === "special_attack"))) {
     return { ...row, ability_role: "alchemist_bomb" } as T
   }
@@ -142,7 +142,7 @@ function enrichDiscoveryAbility<T extends Record<string, unknown>>(row: T): T {
   let next = { ...row, ability_role: "discovery" } as T
   const description = String(row.description ?? "")
   const linked = [
-    ...((next.linked_modifiers ?? next.linkedModifiers ?? []) as Feature["linkedModifiers"] ?? []),
+    ...((next.linked_modifiers ?? next.linkedModifiers ?? []) as unknown as Feature["linkedModifiers"] ?? []),
   ]
 
   if (/batch brewing/i.test(name)) {
@@ -296,7 +296,7 @@ type ProposalAbility = NonNullable<
 
 function enrichProposalAbility(ability: ProposalAbility): ProposalAbility {
   if (!isAlchemistSource(ability.source_name)) return ability
-  let row = { ...ability } as Record<string, unknown>
+  let row = { ...ability } as unknown as Record<string, unknown>
   row = enrichAlchemistBombAbility(row)
   row = enrichBombFormulaAbility(row)
   row = enrichDiscoveryAbility(row)
@@ -313,10 +313,10 @@ export function enrichAlchemistFeatures(content: ImportContent): ImportContent {
       return {
         ...cls,
         features: (cls.features ?? []).map((feature) =>
-          enrichAlchemistClassFeature(feature as Feature, cls.name),
+          enrichAlchemistClassFeature(feature as unknown as Feature, cls.name),
         ),
       }
-    })
+    }) as unknown as ImportContent["classes"]
   }
 
   if (content.import_proposals?.custom_abilities?.length) {
@@ -336,7 +336,7 @@ export function enrichAlchemistFeatures(content: ImportContent): ImportContent {
           ...resource,
           uses: enrichReagentResourceUses(resource.uses),
         }
-      }),
+      }) as NonNullable<ImportContent["import_proposals"]>["class_resources"],
     }
   }
 
@@ -348,7 +348,7 @@ export function enrichAlchemistFeatures(content: ImportContent): ImportContent {
         ...resource,
         uses: enrichReagentResourceUses(resource.uses),
       }
-    })
+    }) as unknown as ImportContent["class_resources"]
   }
 
   return next

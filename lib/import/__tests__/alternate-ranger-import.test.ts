@@ -38,7 +38,7 @@ describe("Alternate Ranger progression table", () => {
 
 describe("Alternate Ranger import proposals", () => {
   it("splits knack options into one custom ability per Knack", () => {
-    const content: ImportContent = {
+    const content = {
       import_proposals: {
         custom_abilities: [
           {
@@ -67,7 +67,7 @@ describe("Alternate Ranger import proposals", () => {
         ],
       },
     }
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     expect(proposals.customAbilities.filter((row) => row.abilityRole === "knack")).toHaveLength(3)
     const slayerIi = proposals.customAbilities.find((row) => row.name === "Slayer II")
     expect(slayerIi?.prerequisite).toBe("Slayer I")
@@ -130,7 +130,7 @@ describe("Alternate Ranger Archery feat preset guard", () => {
       description:
         "You gain a +1 bonus to attack rolls you make with ranged weapons. Your ranged weapon attacks ignore half cover, and three-quarters cover counts as half cover for you.",
       linked_modifiers: [],
-      modifier_refs: [],
+      modifierRefs: [],
     })
     const json = JSON.stringify(row.linkedModifiers ?? row.linked_modifiers ?? [])
     expect(json).not.toContain('"bonus":2')

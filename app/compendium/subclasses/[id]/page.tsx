@@ -12,6 +12,7 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 
@@ -58,7 +59,7 @@ export default function SubclassEditorPage({ params }: { params: Promise<{ id: s
     const fetchClasses = async () => {
       const db = createClient()
       const { data } = await db.from("classes").select("id, name").order("name")
-      setClasses(data || [])
+      setClasses(asCompendiumRows(data) as unknown as DndClass[])
     }
     fetchClasses()
   }, [])
@@ -77,17 +78,24 @@ export default function SubclassEditorPage({ params }: { params: Promise<{ id: s
         if (error) {
           setError("Subclass not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            class_id: data.class_id || "",
-            features: data.features?.length ? data.features : [{ level: 3, name: "", description: "" }],
-            spellcasting: data.spellcasting || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-          })
-          setHasSpellcasting(!!data.spellcasting)
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Subclass not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              class_id: String(row.class_id ?? ""),
+              features: Array.isArray(row.features) && row.features.length
+                ? (row.features as Feature[])
+                : [{ level: 3, name: "", description: "" }],
+              spellcasting: (row.spellcasting as SubclassFormData["spellcasting"]) || null,
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+            })
+            setHasSpellcasting(!!row.spellcasting)
+          }
         }
         setLoading(false)
       }

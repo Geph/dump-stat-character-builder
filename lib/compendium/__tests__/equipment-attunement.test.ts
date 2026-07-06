@@ -22,7 +22,7 @@ function item(overrides: Partial<Equipment> = {}): Equipment {
     creator_url: null,
     created_at: "",
     ...overrides,
-  }
+  } as unknown as unknown as Equipment
 }
 
 describe("isMagicItem", () => {

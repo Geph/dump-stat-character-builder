@@ -13,7 +13,7 @@ export async function seedSrdEquipment(params: {
 }): Promise<{ mundaneCount: number; magicCount: number }> {
   const { equipment, magicItems } = getSrdSeedData()
   const mundaneRows = enrichSrdMundaneEquipmentList(
-    withSrdCreatorUrlList(equipment as Record<string, unknown>[]),
+    withSrdCreatorUrlList(equipment as unknown as Record<string, unknown>[]),
   )
   await params.upsertByName("equipment", mundaneRows)
 
@@ -22,12 +22,12 @@ export async function seedSrdEquipment(params: {
     : []
   const nameToId = new Map(equipmentRows.map((row) => [row.name, row.id]))
   const magicRows = prepareMagicItemsForSeed(
-    withSrdCreatorUrlList(magicItems as Record<string, unknown>[]) as never,
+    withSrdCreatorUrlList(magicItems as unknown as Record<string, unknown>[]) as never,
     nameToId,
   )
 
   if (magicRows.length > 0) {
-    await params.upsertByName("equipment", magicRows as Record<string, unknown>[])
+    await params.upsertByName("equipment", magicRows as unknown as Record<string, unknown>[])
   }
 
   return { mundaneCount: mundaneRows.length, magicCount: magicRows.length }

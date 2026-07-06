@@ -471,7 +471,7 @@ function collectTableResources(
 ) {
   for (const classRow of content.classes ?? []) {
     const className = classRow.name
-    const parsed = parseClassProgressionTable(collectClassText(classRow as Record<string, unknown>))
+    const parsed = parseClassProgressionTable(collectClassText(classRow as unknown as Record<string, unknown>))
     if (!parsed) continue
 
     for (const column of parsed.columns) {
@@ -495,7 +495,7 @@ function collectTextDerivedResources(
 ) {
   for (const classRow of content.classes ?? []) {
     const className = classRow.name
-    const text = collectClassText(classRow as Record<string, unknown>)
+    const text = collectClassText(classRow as unknown as Record<string, unknown>)
     if (!text) continue
     for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
       if (!pattern.proposeFromText || !pattern.textProposalUses) continue
@@ -812,5 +812,5 @@ export function applyProposalSelections(
     ...base,
     ...(classResources.length ? { class_resources: classResources } : {}),
     ...(abilities.length ? { abilities } : {}),
-  }
+  } as unknown as ImportContent
 }

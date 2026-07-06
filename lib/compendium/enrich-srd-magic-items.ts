@@ -85,7 +85,7 @@ function healPotionEffects(instanceId: string, dice: string, label: string): Lin
       bonusAction: true,
       effects: [{ id: modId(`${instanceId}_heal`), kind: "heal_self", bonusDice: dice }],
       label,
-    }),
+    } as import("@/lib/types").FeatureActivation),
   ]
 }
 
@@ -265,7 +265,7 @@ export function resolveMagicItemBaseEquipmentIds(
       base_equipment_filter: row.base_equipment_filter ?? null,
       magic_effects: row.magic_effects ?? [],
     }
-  })
+  }) as unknown as MagicItemSeedRow[]
 }
 
 export function prepareMagicItemsForSeed(

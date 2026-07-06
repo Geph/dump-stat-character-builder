@@ -41,5 +41,5 @@ export function enrichFeatsList<
     modifier_refs?: unknown
   },
 >(rows: T[], catalog: ModifierCatalogEntry[] = []): Feat[] {
-  return rows.map((row) => normalizeFeatRow(row as Record<string, unknown>, catalog))
+  return rows.map((row) => normalizeFeatRow(row as unknown as Record<string, unknown>, catalog))
 }

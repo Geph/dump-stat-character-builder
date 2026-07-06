@@ -77,6 +77,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
       usedActionUsesById: {},
       usedSpellSlotsByKey: {},
       rechargeCapsByResourceId: {},
+      usedHitDiceByClassId: {},
       currentHp: 24,
       tempHp: 0,
       deathSaves: { successes: 0, failures: 0 },
@@ -94,7 +95,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
 function barbarianHydrated(overrides: Partial<DashboardHydratedCharacter> = {}): DashboardHydratedCharacter {
   const inputs = barbarianShieldFixture()
   const derived = computeDerivedCharacter(inputs)
-  const dndClass = inputs.classes[0] as DndClass
+  const dndClass = inputs.classes[0] as unknown as DndClass
   const classDetails: CharacterClassDetail[] = [
     {
       row: { class_id: dndClass.id, level: 3, subclass_id: null, order: 0 },
@@ -109,10 +110,10 @@ function barbarianHydrated(overrides: Partial<DashboardHydratedCharacter> = {}):
       classes: classDetails[0].class,
       class_list: classDetails,
     },
-    feats: inputs.feats as Feat[],
+    feats: inputs.feats as unknown as Feat[],
     equipment: inputs.equipment,
     equipmentCatalog: inputs.equipmentCatalog ?? inputs.equipment,
-    modifierCatalog: inputs.modifierCatalog as ModifierCatalogEntry[],
+    modifierCatalog: inputs.modifierCatalog as unknown as ModifierCatalogEntry[],
     customAbilities: [],
     spells: [],
     ...overrides,
@@ -168,12 +169,12 @@ HP 5 plus five times your Artificer level (the companion has a number of Hit Dic
 Speed 30 ft.`,
     )!
 
-    const artificerClass: DndClass = {
+    const artificerClass = {
       id: "class-artificer",
       name: "Artificer",
       description: "",
       hit_die: 8,
-      primary_ability: "Intelligence",
+      primary_ability: ["Intelligence"],
       saving_throws: ["Constitution", "Intelligence"],
       skill_choices: { count: 2, options: [] },
       features: [
@@ -189,7 +190,7 @@ Speed 30 ft.`,
       source: "Custom",
       creator_url: null,
       created_at: "2026-01-01T00:00:00.000Z",
-    }
+    } as unknown as import("@/lib/types").DndClass
 
     const classDetails: CharacterClassDetail[] = [
       {

@@ -17,7 +17,7 @@ function stripFeatureStagingFields<T extends StagingFeature>(
 function stripFeatures(features: unknown[] | undefined): unknown[] | undefined {
   if (!features?.length) return features
   return features.map((raw) =>
-    markFeatureModifierReviewForPersist(stripFeatureStagingFields(raw as StagingFeature) as Feature),
+    markFeatureModifierReviewForPersist(stripFeatureStagingFields(raw as StagingFeature) as unknown as Feature),
   )
 }
 
@@ -52,7 +52,7 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
       return {
         ...background,
         feature: markFeatureModifierReviewForPersist(
-          stripFeatureStagingFields(background.feature as StagingFeature) as Feature,
+          stripFeatureStagingFields(background.feature as StagingFeature) as unknown as Feature,
         ),
       }
     })
@@ -60,9 +60,9 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
 
   if (content.feats?.length) {
     next.feats = content.feats.map((feat) =>
-      markFeatureModifierReviewForPersist(stripFeatureStagingFields(feat as StagingFeature) as Feature),
+      markFeatureModifierReviewForPersist(stripFeatureStagingFields(feat as StagingFeature) as unknown as Feature),
     ) as typeof content.feats
   }
 
-  return next
+  return next as unknown as ImportContent
 }

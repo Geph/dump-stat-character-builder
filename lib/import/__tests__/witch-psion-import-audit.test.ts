@@ -24,7 +24,7 @@ function unwiredNames(content: ImportContent): string[] {
   const enriched = enrichImportContentModifiers(content)
   return collectImportModifierReview(enriched)
     .filter((row) => row.status === "unwired")
-    .map((row) => `${row.sourceName ?? "?"} L${row.featureLevel ?? "?"} ${row.featureName}`)
+    .map((row) => `${row.sourceLabel ?? "?"} L${row.featureLevel ?? "?"} ${row.featureName}`)
 }
 
 describe.runIf(hasHomebrewImportFixtures)("Witch / KibblesTasty Psion homebrew import fixtures", () => {

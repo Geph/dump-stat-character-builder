@@ -15,7 +15,7 @@ const nextConfig = {
   /** pdf-parse bundles native/pdf.js assets; keep it external on the server. */
   serverExternalPackages: ["pdf-parse"],
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,

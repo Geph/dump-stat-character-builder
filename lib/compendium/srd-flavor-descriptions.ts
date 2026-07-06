@@ -106,7 +106,7 @@ export function applySrdFlavorDescription(
   row: Record<string, unknown>,
   category: SrdFlavorCategory,
 ): Record<string, unknown> {
-  if (!isSrdSource(row.source)) return row
+  if (!isSrdSource(row.source as string | null | undefined)) return row
   const name = String(row.name ?? "").trim()
   if (!name) return row
   const flavor = srdFlavorDescription(category, name)

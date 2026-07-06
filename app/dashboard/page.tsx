@@ -19,6 +19,7 @@ import {
 import { hydrateDashboardCharacters } from "@/lib/character/hydrate-dashboard"
 import { createClient } from "@/lib/db/client"
 import type { Character, DndClass, Species } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type LibraryCharacter = Character & {
   classes?: DndClass | null
@@ -55,7 +56,7 @@ function DashboardPageInner() {
         setLoadError(error.message)
         setLibraryCharacters([])
       } else {
-        const sorted = [...((data ?? []) as LibraryCharacter[])].sort(
+        const sorted = [...(asCompendiumRows<LibraryCharacter & Record<string, unknown>>(data) as LibraryCharacter[])].sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
         setLibraryCharacters(sorted)

@@ -10,8 +10,7 @@ function bardFixture(): DndClass {
     id: "bard",
     name: "Bard",
     description: null,
-    card_blurb: null,
-    hit_die: 8,
+        hit_die: 8,
     primary_ability: ["Charisma"],
     saving_throws: ["Dexterity", "Charisma"],
     armor_proficiencies: ["Light armor"],
@@ -35,7 +34,7 @@ function bardFixture(): DndClass {
     source: "SRD",
     creator_url: null,
     created_at: "",
-  }
+  } as unknown as unknown as DndClass
 }
 
 describe("getClassDetailBaseFeatures", () => {

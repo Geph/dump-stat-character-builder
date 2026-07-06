@@ -20,7 +20,7 @@ export async function readImportApiJson(response: Response): Promise<ImportApiJs
   }
 
   try {
-    const data = JSON.parse(trimmed) as Record<string, unknown>
+    const data = JSON.parse(trimmed) as unknown as Record<string, unknown>
     return { ok: true, status, data }
   } catch {
     return {

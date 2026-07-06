@@ -22,7 +22,7 @@ const IMPORT_CONTENT_KEYS = [
 
 function hasImportContentShape(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false
-  const record = value as Record<string, unknown>
+  const record = value as unknown as Record<string, unknown>
   return IMPORT_CONTENT_KEYS.some((key) => key in record)
 }
 
@@ -44,18 +44,20 @@ function countImportRows(content: ImportContent): number {
 
 function unwrapImportJsonCandidate(parsed: unknown): unknown {
   if (typeof parsed !== "object" || parsed === null) return parsed
-  const record = parsed as Record<string, unknown>
+  const record = parsed as unknown as Record<string, unknown>
   if (record.type === "import-content" && record.content) return record.content
   if (hasImportContentShape(record)) return record
-  if (hasImportContentShape(record.content)) return record.content
-  if (hasImportContentShape(record.data)) return record.data
+  const nestedContent = (record as { content?: unknown; data?: unknown }).content
+  const nestedData = (record as { content?: unknown; data?: unknown }).data
+  if (hasImportContentShape(nestedContent)) return nestedContent
+  if (hasImportContentShape(nestedData)) return nestedData
   return record
 }
 
 function parseSingleImportContent(candidate: unknown): ImportContent | null {
   if (!hasImportContentShape(candidate)) return null
 
-  const record = candidate as Record<string, unknown>
+  const record = candidate as unknown as Record<string, unknown>
 
   try {
     const normalized = normalizeAiImportContent(record as AiImportContent)

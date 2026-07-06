@@ -6,15 +6,15 @@ import {
 } from "@/lib/character/compute-derived"
 import { barbarianShieldFixture } from "@/lib/character/__tests__/fixtures"
 import type { DndClass } from "@/lib/types"
+import type { CharacterBuildInputs } from "@/lib/character/types"
 
-const fighterClass: DndClass = {
+const fighterClass = {
   id: "class_fighter",
   name: "Fighter",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
+    card_image_url: null,
   hit_die: 10,
-  primary_ability: "Strength",
+  primary_ability: ["Strength"],
   saving_throws: ["Strength", "Constitution"],
   skill_choices: { count: 2, options: ["Athletics", "Perception"] },
   weapon_proficiencies: ["Simple weapons", "Martial weapons"],
@@ -25,27 +25,26 @@ const fighterClass: DndClass = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as DndClass
 
-const wizardClass: DndClass = {
+const wizardClass = {
   id: "class_wizard",
   name: "Wizard",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
+    card_image_url: null,
   hit_die: 6,
-  primary_ability: "Intelligence",
+  primary_ability: ["Intelligence"],
   saving_throws: ["Intelligence", "Wisdom"],
   skill_choices: { count: 2, options: ["Arcana", "History"] },
   weapon_proficiencies: ["Simple weapons"],
   armor_proficiencies: [],
   tool_proficiencies: [],
   features: [],
-  spellcasting: { ability: "Intelligence", type: "full" },
+  spellcasting: { ability: "Intelligence", caster_progression: "full" },
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as DndClass
 
 describe("multiclass persistence", () => {
   it("snapshot stores class rows and reload inputs preserve total level", () => {
@@ -62,7 +61,7 @@ describe("multiclass persistence", () => {
       subclassByClassId: {},
     }
 
-    const derived = computeDerivedCharacter(inputs)
+    const derived = computeDerivedCharacter(inputs as unknown as CharacterBuildInputs)
     const snapshot = buildCharacterSaveSnapshot(inputs, derived)
 
     expect(snapshot.character_classes).toEqual([
@@ -99,7 +98,7 @@ describe("multiclass persistence", () => {
         equipped_shield_id: null,
         equipped_weapon_id: null,
       },
-      classes: [fighterClass, wizardClass],
+      classes: [fighterClass, wizardClass] as unknown as DndClass[],
       species: base.species,
       background: base.background,
       feats: [],

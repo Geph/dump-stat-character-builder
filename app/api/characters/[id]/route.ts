@@ -44,7 +44,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const row = (body?.rows?.[0] ?? body) as Record<string, unknown>
+    const row = (body?.rows?.[0] ?? body) as unknown as Record<string, unknown>
     const existing = await getCharacterWithRelations(id)
     if (!existing) {
       return NextResponse.json({ error: "Character not found." }, { status: 404 })

@@ -18,6 +18,8 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 const SPELL_SCHOOLS = [
   "Abjuration", "Conjuration", "Divination", "Enchantment",
@@ -118,9 +120,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
       const db = createClient()
       const { data } = await db.from("classes").select("id, name, source").order("name")
       setCustomClasses(
-        (data ?? [])
-          .filter((row) => !isSrdSource(row.source as string))
-          .map((row) => ({ id: row.id as string, name: row.name as string })),
+        asCompendiumRows<{ id: string; name: string; source: string | null }>(data)
+          .filter((row) => !isSrdSource(String(row.source ?? "")))
+          .map((row) => ({ id: row.id, name: row.name })),
       )
     }
     fetchCustomClasses()
@@ -140,26 +142,31 @@ export default function SpellEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Spell not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            level: data.level || 0,
-            school: data.school || "Evocation",
-            casting_time: data.casting_time || "1 action",
-            range: data.range || "Self",
-            components: data.components || ["V", "S"],
-            material: data.material || "",
-            duration: data.duration || "Instantaneous",
-            concentration: data.concentration || false,
-            ritual: data.ritual || false,
-            description: data.description || "",
-            higher_levels: data.higher_levels || "",
-            classes: data.classes || [],
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            card_image_url: data.card_image_url || null,
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Spell not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              level: (row.level as number | null | undefined) ?? 0,
+              school: String(row.school ?? "Evocation"),
+              casting_time: String(row.casting_time ?? "1 action"),
+              range: String(row.range ?? "Self"),
+              components: (row.components as string[]) || ["V", "S"],
+              material: String(row.material ?? ""),
+              duration: String(row.duration ?? "Instantaneous"),
+              concentration: Boolean(row.concentration),
+              ritual: Boolean(row.ritual),
+              description: String(row.description ?? ""),
+              higher_levels: String(row.higher_levels ?? ""),
+              classes: (row.classes as string[]) || [],
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+              accent_color: (row.accent_color as string | null) ?? null,
+              card_image_url: (row.card_image_url as string | null) ?? null,
+            })
+          }
         }
         setLoading(false)
       }
@@ -302,7 +309,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 

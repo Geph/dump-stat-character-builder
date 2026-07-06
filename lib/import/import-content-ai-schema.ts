@@ -392,7 +392,7 @@ export function buildImportContentAiOutputSchema(options?: {
   includeAbilities?: boolean
   contentTypeHint?: string | null
 }) {
-  return zodSchema(buildImportContentAiSchema(options))
+  return zodSchema(buildImportContentAiSchema(options) as Parameters<typeof zodSchema>[0])
 }
 
 function omitNull<T extends Record<string, unknown>>(row: T): Partial<T> {
@@ -407,10 +407,10 @@ function omitNull<T extends Record<string, unknown>>(row: T): Partial<T> {
 function normalizeUsesConfig(
   uses: z.infer<typeof UsesConfigAiSchema>,
 ): NonNullable<ImportContent["class_resources"]>[number]["uses"] {
-  const next = omitNull(uses) as Record<string, unknown>
+  const next = omitNull(uses) as unknown as Record<string, unknown>
   if (Array.isArray(next.recharges)) {
     next.recharges = next.recharges.map((entry) =>
-      omitNull(entry as Record<string, unknown>),
+      omitNull(entry as unknown as Record<string, unknown>),
     )
   }
   return next as NonNullable<ImportContent["class_resources"]>[number]["uses"]
@@ -422,7 +422,7 @@ function normalizeMechanics(
   if (!mechanics?.length) return undefined
   const cleaned: ImportMechanic[] = []
   for (const entry of mechanics) {
-    const parsed = ImportMechanicSchema.safeParse(omitNull(entry as Record<string, unknown>))
+    const parsed = ImportMechanicSchema.safeParse(omitNull(entry as unknown as Record<string, unknown>))
     if (parsed.success) cleaned.push(parsed.data)
   }
   return cleaned.length ? cleaned : undefined
@@ -511,7 +511,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           mechanics: normalizeMechanics(trait.mechanics),
         }),
       ),
-    }))
+    })) as NonNullable<ImportContent["species"]>
   }
 
   if (raw.classes?.length) {
@@ -553,11 +553,11 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         starting_equipment: background.starting_equipment,
         starting_gold: background.starting_gold,
       }),
-    }))
+    })) as NonNullable<ImportContent["backgrounds"]>
   }
 
   if (raw.spells?.length) {
-    content.spells = normalizeSpellImportRows(raw.spells as Record<string, unknown>[])
+    content.spells = normalizeSpellImportRows(raw.spells as unknown as Record<string, unknown>[])
   }
 
   if (raw.feats?.length) {
@@ -586,7 +586,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           requires_attunement: item.requires_attunement,
           magic_item_category: item.magic_item_category,
           rarity: item.rarity,
-        }) as Record<string, unknown>,
+        }) as unknown as Record<string, unknown>,
       ),
     ) as NonNullable<ImportContent["equipment"]>
   }

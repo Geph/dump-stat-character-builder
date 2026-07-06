@@ -15,7 +15,7 @@ describe("loadCustomAbilitiesForGameplay integration", () => {
         modifier_catalog: buildDefaultMetamagicOptions(),
         show_in_builder: false,
         is_system: true,
-      } as CustomAbility,
+      } as unknown as CustomAbility,
     ]
 
     const options = catalogFeatPickOptions(["Metamagic"], abilities)

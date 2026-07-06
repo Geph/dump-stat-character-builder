@@ -56,7 +56,7 @@ function coreHolyTrinkets(): NonNullable<ImportContent["equipment"]> {
           {
             id: modId("amulet_of_warding"),
             kind: "boost_ac",
-            bonusConfig: { mode: "ability_modifier", ability: "intelligence", minimum: 1 },
+            bonusConfig: { mode: "ability_modifier", ability: "INT", minimum: 1 } as import("@/lib/compendium/roll-bonus-config").RollBonusConfig,
             label: "Amulet of Warding",
           },
         ],
@@ -73,7 +73,7 @@ function coreHolyTrinkets(): NonNullable<ImportContent["equipment"]> {
             kind: "heal_self",
             healMode: "character_level",
             healLevelMultiplier: 1,
-            healAbility: "intelligence",
+            healAbility: "INT",
             label: "Restorative Ankh",
           },
         ],
@@ -243,10 +243,10 @@ export function enrichInvestigatorFeatures(content: ImportContent): ImportConten
       return {
         ...cls,
         features: (cls.features ?? []).map((feature) =>
-          enrichInvestigatorFeature(feature as Feature),
+          enrichInvestigatorFeature(feature as unknown as Feature),
         ),
       }
-    })
+    }) as ImportContent["classes"]
   }
 
   const existingEquipment = [...(next.equipment ?? [])]
@@ -259,5 +259,5 @@ export function enrichInvestigatorFeatures(content: ImportContent): ImportConten
   }
   if (existingEquipment.length) next.equipment = existingEquipment
 
-  return next
+  return next as unknown as ImportContent
 }

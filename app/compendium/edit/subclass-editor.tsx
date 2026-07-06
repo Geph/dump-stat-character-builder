@@ -9,7 +9,7 @@ import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
 } from "@/components/compendium/compendium-editor-section"
-import type { DndClass, Feature, FeatureChoice, ClassResource } from "@/lib/types"
+import type { DndClass, Feature, FeatureChoice, ClassResource, ClassResourceRow } from "@/lib/types"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
@@ -24,6 +24,8 @@ import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/
 import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
 import { cn } from "@/lib/utils"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 
@@ -72,7 +74,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     const fetchClasses = async () => {
       const db = createClient()
       const { data } = await db.from("classes").select("id, name").order("name")
-      setClasses(data || [])
+      setClasses(asCompendiumRows(data) as unknown as DndClass[])
     }
     fetchClasses()
   }, [])
@@ -91,19 +93,26 @@ export default function SubclassEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Subclass not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            class_id: data.class_id || "",
-            features: data.features?.length ? data.features : [{ level: 3, name: "", description: "" }],
-            spellcasting: data.spellcasting || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            card_image_url: data.card_image_url || null,
-          })
-          setHasSpellcasting(!!data.spellcasting)
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Subclass not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              class_id: String(row.class_id ?? ""),
+              features: Array.isArray(row.features) && row.features.length
+                ? (row.features as Feature[])
+                : [{ level: 3, name: "", description: "" }],
+              spellcasting: (row.spellcasting as SubclassFormData["spellcasting"]) || null,
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+              accent_color: (row.accent_color as string | null) ?? null,
+              card_image_url: (row.card_image_url as string | null) ?? null,
+            })
+            setHasSpellcasting(!!row.spellcasting)
+          }
         }
         setLoading(false)
       }
@@ -123,7 +132,9 @@ export default function SubclassEditorPage({ id }: { id: string }) {
         .select("class_id, resource_key, name, description, uses")
         .eq("class_id", form.class_id)
         .order("name")
-      setClassResources(resourcesForClass(form.class_id, data ?? []))
+      setClassResources(
+        resourcesForClass(form.class_id, asCompendiumRows(data) as unknown as ClassResourceRow[]),
+      )
     }
     void loadClassResources()
   }, [form.class_id])
@@ -268,10 +279,10 @@ export default function SubclassEditorPage({ id }: { id: string }) {
         options: feature.choices.options.map((opt, i) => {
           if (i !== optionIndex) return opt
           if (field === "linkedModifiers" && Array.isArray(value)) {
-            return syncModifierRefs({ ...opt, linkedModifiers: value })
+            return syncModifierRefs({ ...opt, linkedModifiers: value as LinkedModifierInstance[] })
           }
-          return { ...opt, [field]: value }
-        }),
+          return { ...opt, [field]: value as string | string[] }
+        }) as FeatureChoice["options"],
       },
     })
   }
@@ -334,7 +345,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}

@@ -1,8 +1,8 @@
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
-import { readLinkedModifiers, syncModifierRefs } from "@/lib/compendium/linked-modifiers"
+import { readLinkedModifiers, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
-import type { Feature, LinkedModifierInstance, UsesConfig } from "@/lib/types"
+import type { Feature, UsesConfig } from "@/lib/types"
 
 const QUARRY_TOGGLE = "quarry_marked"
 
@@ -39,10 +39,15 @@ function quarryOnHitDie(instanceKey: string): LinkedModifierInstance {
       type: "on_hit_trigger",
       requiresSheetToggle: QUARRY_TOGGLE,
       effect: {
-        id: modId(`${instanceKey}_damage`),
-        kind: "extra_damage_on_hit",
-        bonusDice: "1d6",
-        label: "Quarry Die damage (scales on class table)",
+        catalogRefId: modId(`${instanceKey}_damage`),
+        characteristics: [
+          {
+            id: modId(`${instanceKey}_damage`),
+            type: "extra_damage_on_hit",
+            bonusDice: "1d6",
+            label: "Quarry Die damage (scales on class table)",
+          } as unknown as import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier,
+        ],
       },
     },
   ])
@@ -59,7 +64,7 @@ function wireQuarryFeature(feature: Feature, className: string): Feature {
   return syncModifierRefs({
     ...feature,
     linkedModifiers: [...(feature.linkedModifiers ?? []), quarryOnHitDie(`${prefix}_quarry_hit`)],
-  }) as Feature
+  }) as unknown as Feature
 }
 
 export function enrichAlternateRangerFeatures(features: Feature[], className: string): Feature[] {

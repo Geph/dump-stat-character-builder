@@ -164,7 +164,7 @@ function injectClassProficiencyChoices(className: string, features: Feature[]): 
 
 function normalizeSpellcasting(raw: unknown): Record<string, unknown> | null {
   if (!raw || typeof raw !== "object") return null
-  const spellcasting = { ...(raw as Record<string, unknown>) }
+  const spellcasting = { ...(raw as unknown as Record<string, unknown>) }
   if (spellcasting.starts_at == null) spellcasting.starts_at = 1
   return spellcasting
 }

@@ -198,7 +198,9 @@ function ResourceVariantRow({
   copying?: boolean
 }) {
   const enabled = isCompendiumItemEnabled(row)
-  const accentStyles = compendiumAccentColorStyles(getCompendiumItemAccentColor(row))
+  const accentStyles = compendiumAccentColorStyles(
+    getCompendiumItemAccentColor(row as unknown as Record<string, unknown>),
+  )
 
   return (
     <div

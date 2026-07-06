@@ -98,9 +98,9 @@ const RAGE_MODIFIERS: LinkedModifierInstance[] = [
     fx("fx_rage_damage", {
       kind: "bonus_damage_by_level",
       bonusByLevel: [
-        { level: 1, bonus: "+2" },
-        { level: 9, bonus: "+3" },
-        { level: 16, bonus: "+4" },
+        { level: 1, mode: "fixed", bonus: "+2" },
+        { level: 9, mode: "fixed", bonus: "+3" },
+        { level: 16, mode: "fixed", bonus: "+4" },
       ],
       limitations: RAGE_WHILE_ACTIVE,
     }),
@@ -513,7 +513,7 @@ export function enrichClassFeatureWithResource(className: string, feature: Featu
   )
   if (!preset) return feature
 
-  return applyResourcePreset(feature, preset)
+  return applyResourcePreset(feature, preset as Parameters<typeof applyResourcePreset>[1])
 }
 
 /** Attach parent-class resource bindings to matching SRD subclass features. */
@@ -528,7 +528,7 @@ export function enrichSubclassFeatureWithResource(
   )
   if (!preset) return feature
 
-  return applyResourcePreset(feature, preset)
+  return applyResourcePreset(feature, preset as Parameters<typeof applyResourcePreset>[1])
 }
 
 export function enrichClassFeaturesWithResources(

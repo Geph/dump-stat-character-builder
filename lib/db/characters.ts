@@ -15,7 +15,7 @@ export async function listCharactersWithRelations() {
 
   const result = []
   for (const row of rows) {
-    result.push(await attachRelations(serializeRow(row as Record<string, unknown>)))
+    result.push(await attachRelations(serializeRow(row as unknown as Record<string, unknown>)))
   }
   return result
 }
@@ -28,12 +28,12 @@ export async function getCharacterWithRelations(id: string) {
     .where(eq(schema.characters.id, id))
     .limit(1)
   if (!row) return null
-  return attachRelations(serializeRow(row as Record<string, unknown>))
+  return attachRelations(serializeRow(row as unknown as Record<string, unknown>))
 }
 
 async function attachRelations(character: Record<string, unknown>) {
   const db = getDb()
-  const out = { ...character } as Record<string, unknown>
+  const out = { ...character } as unknown as Record<string, unknown>
 
   if (character.class_id) {
     const [cls] = await db
@@ -41,7 +41,7 @@ async function attachRelations(character: Record<string, unknown>) {
       .from(schema.classes)
       .where(eq(schema.classes.id, character.class_id as string))
       .limit(1)
-    if (cls) out.classes = serializeRow(cls as Record<string, unknown>)
+    if (cls) out.classes = serializeRow(cls as unknown as Record<string, unknown>)
   }
 
   if (character.species_id) {
@@ -50,7 +50,7 @@ async function attachRelations(character: Record<string, unknown>) {
       .from(schema.species)
       .where(eq(schema.species.id, character.species_id as string))
       .limit(1)
-    if (sp) out.species = serializeRow(sp as Record<string, unknown>)
+    if (sp) out.species = serializeRow(sp as unknown as Record<string, unknown>)
   }
 
   if (character.background_id) {
@@ -59,7 +59,7 @@ async function attachRelations(character: Record<string, unknown>) {
       .from(schema.backgrounds)
       .where(eq(schema.backgrounds.id, character.background_id as string))
       .limit(1)
-    if (bg) out.backgrounds = serializeRow(bg as Record<string, unknown>)
+    if (bg) out.backgrounds = serializeRow(bg as unknown as Record<string, unknown>)
   }
 
   if (character.subclass_id) {
@@ -68,7 +68,7 @@ async function attachRelations(character: Record<string, unknown>) {
       .from(schema.subclasses)
       .where(eq(schema.subclasses.id, character.subclass_id as string))
       .limit(1)
-    if (sub) out.subclasses = serializeRow(sub as Record<string, unknown>)
+    if (sub) out.subclasses = serializeRow(sub as unknown as Record<string, unknown>)
   }
 
   return attachMulticlassRelations(out)
@@ -87,7 +87,7 @@ export async function updateCharacter(id: string, data: Record<string, unknown>)
   const db = getDb()
   const now = new Date()
   const classRows = data.character_classes as CharacterClassRow[] | undefined
-  const payload = {
+  const payload: Record<string, unknown> = {
     ...data,
     speed: normalizeCharacterSpeed(data.speed),
     portrait_url: normalizePortraitUrl(data.portrait_url),

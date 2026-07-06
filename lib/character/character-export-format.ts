@@ -112,7 +112,7 @@ export function parseCharacterExportJson(raw: string): CharacterExportItem[] | n
   }
 
   if (typeof parsed !== "object" || parsed === null) return null
-  const record = parsed as Record<string, unknown>
+  const record = parsed as unknown as Record<string, unknown>
 
   if (record.type === DUMP_STAT_EXPORT_TYPE && Array.isArray(record.items)) {
     const items = record.items.filter(isCharacterExportItem)

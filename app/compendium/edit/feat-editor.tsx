@@ -30,9 +30,11 @@ import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { DurationEditor } from "@/components/compendium/duration-editor"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
 import { ModifierChoiceFields } from "@/components/compendium/modifier-choice-fields"
-import type { FeatureChoice, FeatureDurationKey } from "@/lib/types"
+import type { FeatureChoice, FeatureDurationKey, Feat } from "@/lib/types"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import {
   normalizeLinkedModifiers,
   readLinkedModifiers,
@@ -119,11 +121,11 @@ export default function FeatEditorPage({ id }: { id: string }) {
         db.from("backgrounds").select("id, name").order("name"),
         db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
-      setAllFeats(feats || [])
-      setAllClasses(classes || [])
-      setAllSpecies(species || [])
-      setAllBackgrounds(backgrounds || [])
-      setAllSpells(spells || [])
+      setAllFeats(asCompendiumRows<{ id: string; name: string; category: string }>(feats))
+      setAllClasses(asCompendiumRows<{ id: string; name: string }>(classes))
+      setAllSpecies(asCompendiumRows<{ id: string; name: string }>(species))
+      setAllBackgrounds(asCompendiumRows<{ id: string; name: string }>(backgrounds))
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(spells))
     }
     fetchPrereqOptions()
   }, [])
@@ -142,29 +144,34 @@ export default function FeatEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Feat not found")
         } else if (data) {
-          const [enriched] = enrichFeatsList([data as Record<string, unknown>], modifierCatalog)
-          setForm({
-            name: enriched.name || "",
-            description: enriched.description || "",
-            category: enriched.category || "General",
-            level_requirement: enriched.level_requirement ?? 1,
-            prerequisite_feat_ids: enriched.prerequisite_feat_ids || [],
-            prerequisite_class_ids: enriched.prerequisite_class_ids || [],
-            prerequisite_species_ids: enriched.prerequisite_species_ids || [],
-            prerequisite_background_ids: enriched.prerequisite_background_ids || [],
-            characteristics: normalizeCharacteristics(enriched.benefits, null),
-            modifier_refs: readModifierRefs(enriched),
-            linked_modifiers: readLinkedModifiers(enriched, modifierCatalog),
-            is_choice: Boolean(enriched.isChoice),
-            choices: enriched.choices ?? null,
-            source: enriched.source || "Custom",
-            creator_url: enriched.creator_url || "",
-            icon: enriched.icon || null,
-            accent_color: enriched.accent_color || null,
-            card_image_url: enriched.card_image_url || null,
-            repeatable: Boolean(enriched.repeatable),
-            duration: (enriched.duration as FeatureDurationKey | null) ?? null,
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Feat not found")
+          } else {
+            const [enriched] = enrichFeatsList([castCompendiumRow<Feat>(row)], modifierCatalog)
+            setForm({
+              name: enriched.name || "",
+              description: enriched.description || "",
+              category: enriched.category || "General",
+              level_requirement: enriched.level_requirement ?? 1,
+              prerequisite_feat_ids: enriched.prerequisite_feat_ids || [],
+              prerequisite_class_ids: enriched.prerequisite_class_ids || [],
+              prerequisite_species_ids: enriched.prerequisite_species_ids || [],
+              prerequisite_background_ids: enriched.prerequisite_background_ids || [],
+              characteristics: normalizeCharacteristics(enriched.benefits, null),
+              modifier_refs: readModifierRefs(enriched as unknown as Record<string, unknown>),
+              linked_modifiers: readLinkedModifiers(enriched as unknown as Record<string, unknown>, modifierCatalog),
+              is_choice: Boolean(enriched.isChoice),
+              choices: enriched.choices ?? null,
+              source: enriched.source || "Custom",
+              creator_url: enriched.creator_url || "",
+              icon: enriched.icon || null,
+              accent_color: enriched.accent_color || null,
+              card_image_url: enriched.card_image_url || null,
+              repeatable: Boolean(enriched.repeatable),
+              duration: (enriched.duration as FeatureDurationKey | null) ?? null,
+            })
+          }
         }
         setLoading(false)
       }
@@ -377,7 +384,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 

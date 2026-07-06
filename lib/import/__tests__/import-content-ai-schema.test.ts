@@ -6,7 +6,12 @@ import {
 } from "@/lib/import/import-content-ai-schema"
 import { zodSchema } from "ai"
 
-type JsonSchemaObject = Record<string, unknown>
+type JsonSchemaObject = Record<string, unknown> & {
+  properties?: Record<string, JsonSchemaObject>
+  items?: JsonSchemaObject
+  anyOf?: JsonSchemaObject[]
+  required?: string[]
+}
 
 function getSpeciesTraitItemsSchema(jsonSchema: JsonSchemaObject) {
   const speciesProp = jsonSchema.properties?.species as JsonSchemaObject | undefined
@@ -26,7 +31,9 @@ function getSpeciesTraitItemsSchema(jsonSchema: JsonSchemaObject) {
 describe("import content AI schema", () => {
   it("produces OpenAI-compatible required keys for trait isChoice", async () => {
     const schema = buildImportContentAiSchema()
-    const jsonSchema = (await zodSchema(schema).jsonSchema) as JsonSchemaObject
+    const jsonSchema = (await zodSchema(
+      buildImportContentAiSchema() as Parameters<typeof zodSchema>[0],
+    ).jsonSchema) as JsonSchemaObject
     const traitItems = getSpeciesTraitItemsSchema(jsonSchema)
 
     expect(jsonSchema.properties?.species).toHaveProperty("anyOf")
@@ -99,8 +106,7 @@ describe("import content AI schema", () => {
         {
           name: "Gunslinger",
           description: "A daring shooter.",
-          card_blurb: null,
-          hit_die: 8,
+                    hit_die: 8,
           primary_ability: ["Dexterity"],
           saving_throws: ["Dexterity", "Charisma"],
           armor_proficiencies: ["Light armor"],
@@ -108,6 +114,9 @@ describe("import content AI schema", () => {
           skill_choices: { count: 2, options: ["Acrobatics", "Stealth"] },
           spellcasting: null,
           spell_list: null,
+          card_blurb: null,
+          starting_equipment_groups: null,
+          starting_gold: null,
           features: [
             {
               level: 1,
@@ -115,6 +124,7 @@ describe("import content AI schema", () => {
               description: "You have Advantage on Initiative rolls.",
               isChoice: null,
               choices: null,
+              mechanics: null,
             },
           ],
         },
@@ -126,7 +136,7 @@ describe("import content AI schema", () => {
       feats: null,
       equipment: null,
       import_proposals: null,
-    })
+    } as Parameters<typeof normalizeAiImportContent>[0])
 
     expect(normalized.classes?.[0]?.card_blurb).toBeUndefined()
     expect(normalized.classes?.[0]?.features?.[0]?.isChoice).toBeUndefined()

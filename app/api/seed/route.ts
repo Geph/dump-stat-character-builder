@@ -22,6 +22,7 @@ import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       source: sc.source,
             class_id: classIdMap.get(sc.class_name) ?? null,
           }))
-          .filter((sc) => sc.class_id !== null) as Record<string, unknown>[],
+          .filter((sc) => sc.class_id !== null) as unknown as Record<string, unknown>[],
       ),
       new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
     )
@@ -67,10 +68,15 @@ export async function POST(request: NextRequest) {
     await insertRows("class_resources", buildSrdClassResourceRows(classIdMap))
 
     await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
-    await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds)))
+    await upsertByName(
+      "backgrounds",
+      normalizeBackgroundRows(
+        withSrdCreatorUrlList(backgrounds) as Parameters<typeof normalizeBackgroundRows>[0],
+      ),
+    )
     await upsertByName(
       "spells",
-      enrichSrdSpellList(withSrdCreatorUrlList(spells as Record<string, unknown>[])),
+      enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
     )
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
     await upsertByName("languages", withSrdCreatorUrlList(languages))

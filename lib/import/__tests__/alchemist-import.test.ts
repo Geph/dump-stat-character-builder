@@ -50,7 +50,7 @@ describe("Alchemist unified Bomb import", () => {
   it("wires attack and explode special_attack characteristics on one ability", () => {
     const enriched = enrichAlchemistFeatures({
       import_proposals: { custom_abilities: [alchemistBombProposal] },
-    })
+    } as unknown as ImportContent)
     const bomb = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     const mods = bomb.linkedModifiers as { characteristics?: { type: string; attackVariant?: string }[] }[]
     const chars = mods.flatMap((mod) => mod.characteristics ?? [])
@@ -66,7 +66,7 @@ describe("Alchemist unified Bomb import", () => {
   it("includes Prime Bomb linear scaling fields", () => {
     const enriched = enrichAlchemistFeatures({
       import_proposals: { custom_abilities: [alchemistBombProposal] },
-    })
+    } as unknown as ImportContent)
     const bomb = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     const mods = bomb.linkedModifiers as { characteristics?: Record<string, unknown>[] }[]
     const attack = mods.flatMap((mod) => mod.characteristics ?? []).find((char) => char.attackVariant === "attack")
@@ -87,11 +87,11 @@ describe("Alchemist unified Bomb import", () => {
             ...acidBombFormula,
             name: "Acid Bomb",
             ability_role: "bomb_formula" as const,
-            choices: undefined,
-          },
+            choices: null,
+          } as unknown as (typeof acidBombFormula),
         ],
       },
-    })
+    } as unknown as ImportContent)
     const formula = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     const mods = formula.linkedModifiers as { characteristics?: { damageTypes?: string[] }[] }[]
     const damageTypes = mods.flatMap((mod) => mod.characteristics ?? []).flatMap((char) => char.damageTypes ?? [])
@@ -117,7 +117,7 @@ describe("Alchemist choice pickers", () => {
           ],
         },
       ],
-    })
+    } as unknown as ImportContent)
     const feature = content.classes?.[0]?.features.find((f) => f.name === "Bomb Formulas")
     expect(feature?.choices?.resourceKey).toBe("bomb_formulas_known")
     expect(feature?.choices?.optionsSource).toBe("class_bomb_formulas")
@@ -135,7 +135,7 @@ describe("Alchemist choice pickers", () => {
           features: [{ level: 5, name: "Discoveries", description: "Choose a Discovery." }],
         },
       ],
-    })
+    } as unknown as ImportContent)
     const feature = content.classes?.[0]?.features.find((f) => f.name === "Discoveries")
     expect(feature?.choices?.resourceKey).toBe("discoveries_known")
     expect(feature?.choices?.optionsSource).toBe("class_discoveries")
@@ -198,9 +198,12 @@ Antitoxin | 2 | 3
           ],
         },
       ],
-    })
-    const feature = enriched.classes?.[0]?.features?.[0]
-    const chars = (feature?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    } as unknown as ImportContent)
+    const feature = enriched.classes?.[0]?.features?.[0] as unknown as import("@/lib/types").Feature | undefined
+    const chars = (feature?.linkedModifiers ?? []).flatMap(
+      (mod: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance) =>
+        mod.characteristics ?? [],
+    )
     expect(chars.some((char) => char.type === "craftable_items")).toBe(true)
   })
 
@@ -220,7 +223,7 @@ Antitoxin | 2 | 3
           },
         ],
       },
-    })
+    } as unknown as ImportContent)
     const discovery = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     const chars = ((discovery.linkedModifiers as { characteristics?: unknown[] }[]) ?? []).flatMap(
       (mod) => mod.characteristics ?? [],
@@ -250,6 +253,7 @@ describe("Alchemist Reagent Synthesis recharge", () => {
             class_name: "Alchemist",
             resource_key: "reagents",
             name: "Reagents",
+            definition: "Level-scaled reagents.",
             uses: {
               type: "at_level",
               atLevelMode: "multiply_level",
@@ -259,7 +263,7 @@ describe("Alchemist Reagent Synthesis recharge", () => {
           },
         ],
       },
-    })
+    } as unknown as ImportContent)
     const resource = enriched.import_proposals?.class_resources?.[0]
     expect(resource?.uses.recharges).toEqual(
       expect.arrayContaining([
@@ -287,7 +291,7 @@ describe("Alchemist Reagent Synthesis recharge", () => {
 
 describe("Alchemist import proposals", () => {
   it("splits bomb formula options into one custom ability per formula", () => {
-    const content: ImportContent = {
+    const content = {
       import_proposals: { custom_abilities: [acidBombFormula] },
     }
     const proposals = collectImportProposals(content)
@@ -319,7 +323,7 @@ describe("enrichImportContentModifiers integration", () => {
         },
       ],
       import_proposals: { custom_abilities: [alchemistBombProposal] },
-    })
+    } as unknown as ImportContent)
     expect(content.classes?.[0]?.features?.[0]?.choices?.optionsSource).toBe("class_bomb_formulas")
     const bomb = content.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     expect(bomb.ability_role).toBe("alchemist_bomb")
@@ -338,7 +342,7 @@ describe("enrichImportContentModifiers integration", () => {
         optionsSource: "class_bomb_formulas" as const,
       },
     }
-    const options = resolveFeatureChoiceOptions(feature, {
+    const options = resolveFeatureChoiceOptions(feature as unknown as import("@/lib/types").Feature, {
       customAbilities: [
         {
           id: "acid",

@@ -49,7 +49,7 @@ function elvenLineageTraitIndex(species: Species): number {
 
 describe("SRD species enrichment — languages & size", () => {
   it("grants a species-wide language choice (Common + two standard)", () => {
-    const enriched = enrichSrdSpeciesRow(humanRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(humanRow()) as unknown as unknown as Species
     const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
     const langSlot = slots.find((s) => s.kind === "language")
     expect(langSlot).toBeDefined()
@@ -61,7 +61,7 @@ describe("SRD species enrichment — languages & size", () => {
   })
 
   it("surfaces the Skillful skill choice as a builder slot", () => {
-    const enriched = enrichSrdSpeciesRow(humanRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(humanRow()) as unknown as unknown as Species
     const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
     const skillSlot = slots.find((s) => s.kind === "skill")
     expect(skillSlot).toBeDefined()
@@ -70,21 +70,21 @@ describe("SRD species enrichment — languages & size", () => {
   })
 
   it("flags Human and Tiefling as size-choice species", () => {
-    const human = enrichSrdSpeciesRow(humanRow()) as unknown as Species
+    const human = enrichSrdSpeciesRow(humanRow()) as unknown as unknown as Species
     expect(human.size_options).toEqual(["Small", "Medium"])
 
     const tiefling = enrichSrdSpeciesRow({
       ...humanRow(),
       id: "species_tiefling",
       name: "Tiefling",
-    }) as unknown as Species
+    }) as unknown as unknown as Species
     expect(tiefling.size_options).toEqual(["Small", "Medium"])
 
     const dwarf = enrichSrdSpeciesRow({
       ...humanRow(),
       id: "species_dwarf",
       name: "Dwarf",
-    }) as unknown as Species
+    }) as unknown as unknown as Species
     expect(dwarf.size_options ?? null).toBeNull()
   })
 
@@ -93,9 +93,9 @@ describe("SRD species enrichment — languages & size", () => {
     const withSnakeCaseOnly = {
       ...humanRow(),
       linked_modifiers: enrichedOnce.linked_modifiers,
-      modifier_refs: enrichedOnce.modifier_refs,
+      modifierRefs: enrichedOnce.modifierRefs,
     }
-    const enrichedTwice = enrichSrdSpeciesRow(withSnakeCaseOnly) as unknown as Species
+    const enrichedTwice = enrichSrdSpeciesRow(withSnakeCaseOnly) as unknown as unknown as Species
     const slots = collectSpeciesModifierPlayerChoiceSlots(enrichedTwice, {}, catalog)
     expect(slots.filter((s) => s.kind === "language")).toHaveLength(1)
   })
@@ -103,7 +103,7 @@ describe("SRD species enrichment — languages & size", () => {
 
 describe("Elf — Elven Lineage", () => {
   it("does not ask for a spell list when High Elf is selected (fixed lineage spells)", () => {
-    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as unknown as Species
     const lineageIndex = elvenLineageTraitIndex(enriched)
     const slots = collectSpeciesModifierPlayerChoiceSlots(
       enriched,
@@ -115,7 +115,7 @@ describe("Elf — Elven Lineage", () => {
   })
 
   it("asks for spellcasting ability (Int/Wis/Cha) after a lineage is selected", () => {
-    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as unknown as Species
     const lineageIndex = elvenLineageTraitIndex(enriched)
     const slots = collectSpeciesModifierPlayerChoiceSlots(
       enriched,
@@ -132,7 +132,7 @@ describe("Elf — Elven Lineage", () => {
   })
 
   it("wires fixed High Elf lineage spells on the option preset", () => {
-    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(elfRow()) as unknown as unknown as Species
     const lineage = enriched.traits?.find((trait) => trait.name === "Elven Lineage")
     const highElf = lineage?.choices?.options?.find((option) => option.name === "High Elf")
     const spellMod = highElf?.linkedModifiers
@@ -170,7 +170,7 @@ function gnomishLineageTraitIndex(species: Species): number {
 
 describe("Gnome — Gnomish Lineage", () => {
   it("asks for spellcasting ability after Forest Gnome is selected", () => {
-    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as unknown as Species
     const lineageIndex = gnomishLineageTraitIndex(enriched)
     const slots = collectSpeciesModifierPlayerChoiceSlots(
       enriched,
@@ -188,7 +188,7 @@ describe("Gnome — Gnomish Lineage", () => {
   })
 
   it("wires fixed Rock Gnome lineage cantrips on the option preset", () => {
-    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as Species
+    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as unknown as Species
     const lineage = enriched.traits?.find((trait) => trait.name === "Gnomish Lineage")
     const rockGnome = lineage?.choices?.options?.find((option) => option.name === "Rock Gnome")
     const spellMod = rockGnome?.linkedModifiers
@@ -203,17 +203,17 @@ describe("Gnome — Gnomish Lineage", () => {
 })
 
 describe("isFeatEligibleForCategories — Origin slots", () => {
-  const originFeat: Feat = {
+  const originFeat = {
     id: "feat_skilled",
     name: "Skilled",
     category: "Origin",
-  } as Feat
-  const generalFeat: Feat = {
+  } as unknown as Feat
+  const generalFeat = {
     id: "feat_alert",
     name: "Alert",
     category: "General",
     level_requirement: 4,
-  } as Feat
+  } as unknown as Feat
   const ctx: FeatSlotContext = {
     totalLevel: 1,
     classIds: [],
@@ -239,12 +239,12 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
   })
 
   it("allows a Fighting Style feat at the granting feature level (Paladin level 2)", () => {
-    const fightingStyleFeat: Feat = {
+    const fightingStyleFeat = {
       id: "feat_defense",
       name: "Defense",
       category: "Fighting Style",
       level_requirement: null,
-    } as Feat
+    } as unknown as Feat
     const fightingCtx: FeatSlotContext = {
       ...ctx,
       feats: [...ctx.feats, fightingStyleFeat],

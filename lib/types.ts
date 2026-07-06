@@ -14,7 +14,7 @@ export type FeatureDurationKey =
   | "1_minute"
   | "10_minutes"
 
-export type RollTarget = "ally" | "enemy"
+export type RollTarget = "ally" | "enemy" | "self"
 
 export type MoveDistanceMode = "speed" | "fixed" | "multiplier"
 
@@ -30,6 +30,7 @@ export type CreatureModifyMode =
   | "speed"
   | "forced_movement"
   | "restrict"
+  | "movement"
 
 export type CreatureSpeedChange = "halve" | "reduce" | "set" | "zero"
 
@@ -252,6 +253,14 @@ export interface FeatureEffect {
   remoteViewingDurationMinutes?: number | null
   /** remote_viewing: destroy the linked token when the effect ends. */
   destroysTokenOnEnd?: boolean
+  /** Human-readable label for sheet / builder display. */
+  label?: string | null
+  /** movement_option: teleport instead of normal movement. */
+  movementTeleport?: boolean
+  /** force_save / emanation: area shape label (cone, cube, etc.). */
+  areaShape?: string | null
+  /** heal_self: fixed heal amount (legacy import presets). */
+  healAmount?: number | null
 }
 
 export interface FeatureSheetDisplay {
@@ -311,6 +320,8 @@ export interface Feature {
   modifierRefs?: string[]
   /** Per-instance catalog links with inline configuration. */
   linkedModifiers?: LinkedModifierInstance[]
+  /** Import pipeline metadata (stripped before persist when configured). */
+  importModifierMeta?: import("@/lib/import/detect-feature-modifiers").ImportModifierMeta[]
   /** Where this feature appears on the character sheet (all optional; inferred when unset). */
   sheetDisplay?: FeatureSheetDisplay | null
 }

@@ -16,15 +16,18 @@ import {
 import { getDerivedCharacterBreakdowns } from "@/lib/character/get-derived-breakdowns"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
-import type { Character, DndClass, Equipment, Feat } from "@/lib/types"
+import type { Character, DndClass, Equipment, Feat, Species, Background } from "@/lib/types"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type LoadedCharacter = Character & {
   classes?: DndClass | null
   class_list?: CharacterClassDetail[]
-  species?: Character["species"]
-  backgrounds?: Character["backgrounds"]
+  species?: Species | null
+  backgrounds?: Background | null
+  temporary_hit_points?: number | null
+  active_conditions?: string[] | null
 }
 
 function TableModeInner() {
@@ -57,7 +60,12 @@ function TableModeInner() {
         setLoading(false)
         return
       }
-      const row = data as LoadedCharacter
+      const row = asCompendiumRow<LoadedCharacter & Record<string, unknown>>(data)
+      if (error || !row) {
+        setCharacter(null)
+        setLoading(false)
+        return
+      }
       setCharacter(row)
       setCurrentHp(row.hit_points ?? 0)
       setTempHp(row.temporary_hit_points ?? 0)
@@ -68,9 +76,10 @@ function TableModeInner() {
         db.from("feats").select("*"),
         loadModifierCatalog(db),
       ])
-      setEquipment((equipRes.data ?? []) as Equipment[])
-      const allFeats = (featRes.data ?? []) as Feat[]
-      const selectedFeatIds = row.selected_feat_ids ?? []
+      const allEquipment = asCompendiumRows<Equipment & Record<string, unknown>>(equipRes.data) as Equipment[]
+      setEquipment(allEquipment)
+      const allFeats = asCompendiumRows<Feat & Record<string, unknown>>(featRes.data) as Feat[]
+      const selectedFeatIds = row.feat_ids ?? []
       setFeats(allFeats.filter((feat) => selectedFeatIds.includes(feat.id)))
       setModifierCatalog(catalog)
       setLoading(false)
@@ -81,7 +90,7 @@ function TableModeInner() {
   const buildInputs = useMemo(() => {
     if (!character) return null
     const classList = character.class_list ?? []
-    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as DndClass[]
+    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as unknown as DndClass[]
     return buildInputsFromSavedCharacter({
       character,
       classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
@@ -150,17 +159,18 @@ function TableModeInner() {
         <h2 className="text-xs font-bold uppercase text-muted-foreground mb-2">Conditions</h2>
         <div className="flex flex-wrap gap-1.5">
           {SRD_CONDITIONS.map((condition) => {
-            const active = activeConditions.includes(condition)
+            const conditionName = condition.name
+            const active = activeConditions.includes(conditionName)
             return (
               <button
-                key={condition}
+                key={conditionName}
                 type="button"
                 aria-pressed={active}
                 onClick={() =>
                   setActiveConditions((prev) =>
-                    prev.includes(condition)
-                      ? prev.filter((entry) => entry !== condition)
-                      : [...prev, condition],
+                    prev.includes(conditionName)
+                      ? prev.filter((entry) => entry !== conditionName)
+                      : [...prev, conditionName],
                   )
                 }
                 className={`min-h-9 rounded-lg border px-2 text-xs font-semibold ${
@@ -169,7 +179,7 @@ function TableModeInner() {
                     : "border-border text-muted-foreground"
                 }`}
               >
-                {condition}
+                {conditionName}
               </button>
             )
           })}

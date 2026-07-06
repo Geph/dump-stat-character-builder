@@ -7,6 +7,7 @@ import {
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
 import { prepareImportedContent } from "@/lib/import/finalize-import"
 import { mergeTableParsedClassResources } from "@/lib/import/enrich-import-classes"
+import type { ImportContent } from "@/lib/import/content-schema"
 
 const GUNSLINGER_TABLE = `<table>
 <tr><th>Level</th><th>Proficiency Bonus</th><th>Class Features</th><th>Risk Dice</th><th>Weapon Mastery</th></tr>
@@ -82,8 +83,8 @@ describe("mergeTableParsedClassResources", () => {
 
     const prepared = prepareImportedContent({
       ...content,
-      class_resources: merged,
-    })
+      class_resources: merged as ImportContent["class_resources"],
+    } as unknown as ImportContent)
     expect(prepared.kind).toBe("confirm")
     if (prepared.kind !== "confirm") return
 

@@ -1,4 +1,4 @@
-import type { AbilityScoreKey, UnarmedStrikeDie } from "@/lib/compendium/characteristic-modifiers"
+import type { AbilityScoreKey, AbilityModifierKey, UnarmedStrikeDie } from "@/lib/compendium/characteristic-modifiers"
 import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
 import {
   characteristicCatalogRefId,
@@ -18,7 +18,7 @@ import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
-import type { UsesConfig } from "@/lib/types"
+import type { UsesConfig, FeatureEffect } from "@/lib/types"
 import {
   blockedWhenConditionLimitation,
   notWearingArmorLimitation,
@@ -170,6 +170,19 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
 
 function parseAbilityWord(word: string): AbilityScoreKey | null {
   return ABILITY_WORD_TO_KEY[word.trim().toLowerCase()] ?? null
+}
+
+const ABILITY_SCORE_TO_MODIFIER: Record<AbilityScoreKey, AbilityModifierKey> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function abilityScoreToModifierKey(key: AbilityScoreKey): AbilityModifierKey {
+  return ABILITY_SCORE_TO_MODIFIER[key]
 }
 
 function parseSaveAbility(word: string): string | null {
@@ -484,7 +497,7 @@ function buildResourceDieCheckBonus(
   const abilities = parseSaveAbilitiesFromText(text)
   const rollKind = /saving throw/i.test(text) ? "save" : "ability"
 
-  const effects =
+  const effects: FeatureEffect[] =
     abilities.length > 0
       ? abilities.map((ability, index) => ({
           id: modId(instanceKey(ctx, `resource_die_${ability}_${index}`)),
@@ -499,7 +512,7 @@ function buildResourceDieCheckBonus(
             id: modId(instanceKey(ctx, "resource_die")),
             kind: "check_roll_modifier" as const,
             checkRollMode: "bonus" as const,
-            checkCategory: rollKind,
+            checkCategory: rollKind as FeatureEffect["checkCategory"],
             bonusConfig,
           },
         ]
@@ -570,7 +583,6 @@ function buildFreeResourceUseOnRollModifier(
       options: optionNames.map((name) => ({
         name,
         resourceCost: 0,
-        description: null,
       })),
       label: `Free ${optionNames.join(" / ")} on ${appliesOnAbilities.join("/") || "matching"} rolls`,
     },
@@ -688,7 +700,12 @@ function buildDamageDieScalingByLevelModifier(
     const dieCount = parseInt(match[2], 10)
     const dieSides = parseInt(match[3], 10)
     if (!Number.isFinite(level) || !Number.isFinite(dieCount) || !Number.isFinite(dieSides)) continue
-    tiers.push({ level, dieCount, dieType: `d${dieSides}` })
+    tiers.push({
+      level,
+      mode: "dice",
+      dieCount,
+      dieType: (`d${dieSides}` as BonusByLevelEntry["dieType"]),
+    })
   }
   if (tiers.length < 2) return null
 
@@ -1022,7 +1039,9 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       const first = parseAbilityWord(match[2])
       const second = match[3] ? parseAbilityWord(match[3]) : null
       if (!first || !Number.isFinite(base)) return null
-      const abilities = [first, second].filter(Boolean) as AbilityScoreKey[]
+      const abilities = [first, second]
+        .filter(Boolean)
+        .map((key) => abilityScoreToModifierKey(key as AbilityScoreKey))
       return charInstance(newInstanceId(), characteristicCatalogRefId("ac"), [
         {
           id: modId(instanceKey(ctx, "ac_formula")),
@@ -1043,7 +1062,9 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       const first = parseAbilityWord(match[1])
       const second = match[2] ? parseAbilityWord(match[2]) : null
       if (!first) return null
-      const abilities = [first, second].filter(Boolean) as AbilityScoreKey[]
+      const abilities = [first, second]
+        .filter(Boolean)
+        .map((key) => abilityScoreToModifierKey(key as AbilityScoreKey))
       return charInstance(newInstanceId(), characteristicCatalogRefId("ac"), [
         {
           id: modId(instanceKey(ctx, "ac_10")),
@@ -1492,7 +1513,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       if (!/\bregain(?:ing)?\s+all\s+expended\s+uses\b/i.test(text) && !/\bper\s+long\s+rest\b/i.test(text)) {
         return null
       }
-      const ability = match[1].toUpperCase().slice(0, 3) as UsesConfig["abilityModifier"]
+      const ability = match[1].toUpperCase().slice(0, 3) as unknown as unknown as unknown as unknown as UsesConfig["abilityModifier"]
       const uses: UsesConfig = {
         type: "ability_modifier",
         abilityModifier: ability,
@@ -1638,7 +1659,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           id: modId(instanceKey(ctx, "init_bonus")),
           type: "initiative",
           mode: "ability_modifier",
-          ability,
+          ability: abilityScoreToModifierKey(ability),
         },
       ])
     },
@@ -1843,7 +1864,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           uses: {
             type: "class_resource",
             classResourceKey: "psi_points",
-            classResourceCost: parseInt(match[1], 10) || 1,
+            classResourceAmount: parseInt(match[1], 10) || 1,
           },
           label: "Spend psi points",
         },
@@ -1906,7 +1927,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     confidence: "high",
     scope: "full",
     test: CLASSIC_ASI_PHRASE,
-    build: (ctx) =>
+    build: (_match, ctx) =>
       asiPool(`modinst_${instanceKey(ctx, "asi_classic")}`, 2, "Ability Score Improvement (+2 or +1/+1)"),
   },
   {
@@ -1914,7 +1935,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     confidence: "high",
     scope: "full",
     test: FEAT_ASI_2024_PHRASE,
-    build: (ctx) =>
+    build: (_match, ctx) =>
       grantFeatInstance(["General"], `General feat (${instanceKey(ctx, "asi_2024")})`),
   },
   {

@@ -32,7 +32,7 @@ function attackRangedBonus(id: string, bonus: number): CharacteristicModifier {
     id,
     type: "attack_roll_modifiers",
     entries: [{ bonus, target: "ranged" }],
-  }
+  } as unknown as unknown as CharacteristicModifier
 }
 
 function expertiseSkills(id: string, skills: string[]): CharacteristicModifier {
@@ -41,7 +41,7 @@ function expertiseSkills(id: string, skills: string[]): CharacteristicModifier {
     type: "skills",
     entries: skills.map((skill) => ({ skill, expertise: true })),
     grantExpertise: true,
-  }
+  } as unknown as unknown as CharacteristicModifier
 }
 
 export function toolExpertise(id: string): CharacteristicModifier {
@@ -50,62 +50,69 @@ export function toolExpertise(id: string): CharacteristicModifier {
     type: "tool_proficiencies",
     values: [],
     grantExpertise: true,
-  }
+  } as unknown as unknown as CharacteristicModifier
 }
 
-export const shieldEquipment: Equipment = {
+export const shieldEquipment = {
   id: "shield",
   name: "Shield",
   category: "Armor",
   subcategory: "Shield",
-  armor_class: "+2",
+  armor_class: 2,
+  cost: null,
+  weight: 6,
   properties: [],
+  description: null,
   icon: null,
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as unknown as Equipment
 
-export const longbowEquipment: Equipment = {
+export const longbowEquipment = {
   id: "longbow",
   name: "Longbow",
   category: "Weapon",
   subcategory: "Martial Ranged",
   damage: "1d8",
   damage_type: "Piercing",
+  cost: null,
+  weight: 2,
   properties: ["Ammunition", "Heavy", "Two-handed"],
+  description: null,
   icon: null,
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as unknown as Equipment
 
-export const chainMailEquipment: Equipment = {
+export const chainMailEquipment = {
   id: "chain-mail",
   name: "Chain Mail",
   category: "Armor",
   subcategory: "Heavy Armor",
-  armor_class: "16",
+  armor_class: 16,
+  cost: null,
+  weight: 55,
   properties: [],
+  description: null,
   icon: null,
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as unknown as Equipment
 
-const barbarianClass: DndClass = {
+const barbarianClass = {
   id: "class_barbarian",
   name: "Barbarian",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
+    card_image_url: null,
   hit_die: 12,
-  primary_ability: "Strength",
+  primary_ability: ["Strength"],
   saving_throws: ["Strength", "Constitution"],
   skill_choices: { count: 2, options: ["Athletics", "Perception"] },
   weapon_proficiencies: ["Simple weapons", "Martial weapons"],
   armor_proficiencies: ["Light armor", "Medium armor", "Shields"],
-  tool_proficiencies: [],
   features: [
     {
       name: "Unarmored Defense",
@@ -121,17 +128,15 @@ const barbarianClass: DndClass = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-  enabled: true,
-}
+} as unknown as unknown as DndClass
 
-const rogueClass: DndClass = {
+const rogueClass = {
   id: "class_rogue",
   name: "Rogue",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
+    card_image_url: null,
   hit_die: 8,
-  primary_ability: "Dexterity",
+  primary_ability: ["Dexterity"],
   saving_throws: ["Dexterity", "Intelligence"],
   skill_choices: { count: 4, options: ["Stealth", "Perception", "Acrobatics"] },
   weapon_proficiencies: ["Simple weapons"],
@@ -152,22 +157,19 @@ const rogueClass: DndClass = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-  enabled: true,
-}
+} as unknown as unknown as DndClass
 
-const fighterClass: DndClass = {
+const fighterClass = {
   id: "class_fighter",
   name: "Fighter",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
+    card_image_url: null,
   hit_die: 10,
-  primary_ability: "Strength",
+  primary_ability: ["Strength"],
   saving_throws: ["Strength", "Constitution"],
   skill_choices: { count: 2, options: ["Athletics", "Perception"] },
   weapon_proficiencies: ["Simple weapons", "Martial weapons"],
   armor_proficiencies: ["All armor", "Shields"],
-  tool_proficiencies: [],
   features: [],
   spellcasting: null,
   starting_equipment: [],
@@ -176,14 +178,19 @@ const fighterClass: DndClass = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-  enabled: true,
-}
+} as unknown as unknown as DndClass
 
-const archeryFeat: Feat = {
+const archeryFeat = {
   id: "feat_archery",
   name: "Archery",
   description: "",
   category: "Fighting Style",
+  level_requirement: null,
+  prerequisite: null,
+  prerequisite_feat_ids: null,
+  prerequisite_class_ids: null,
+  prerequisite_species_ids: null,
+  prerequisite_background_ids: null,
   repeatable: false,
   benefits: [],
   linkedModifiers: linked([attackRangedBonus("archery", 2)]),
@@ -191,27 +198,26 @@ const archeryFeat: Feat = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-  enabled: true,
-}
+} as unknown as unknown as Feat
 
-const soldierBackground: Background = {
+const soldierBackground = {
   id: "bg_soldier",
   name: "Soldier",
   description: "",
-  card_blurb: "",
-  card_image_url: null,
   ability_bonuses: { strength: 0, constitution: 0, dexterity: 0 },
   skill_proficiencies: ["Athletics"],
   tool_proficiencies: [],
-  languages: [],
   feat_granted: null,
+  starting_gold: null,
+  starting_equipment: null,
+  starting_equipment_groups: null,
+  proficiencies: null,
   equipment: [],
   icon: null,
   source: "SRD",
   creator_url: null,
   created_at: "",
-  enabled: true,
-}
+} as unknown as unknown as Background
 
 export function baseInputs(partial: Partial<CharacterBuildInputs>): CharacterBuildInputs {
   return {
@@ -252,7 +258,7 @@ export function baseInputs(partial: Partial<CharacterBuildInputs>): CharacterBui
     modifierCatalog: [],
     feats: [],
     ...partial,
-  }
+  } as unknown as unknown as CharacterBuildInputs
 }
 
 /** Barbarian 1, DEX 14 (+2), CON 16 (+3), shield, no armor → AC 17, HP 15 */

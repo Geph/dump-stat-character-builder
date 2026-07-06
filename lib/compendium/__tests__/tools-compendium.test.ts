@@ -45,7 +45,7 @@ describe("class tool choice wiring", () => {
     })
     const toolMod = feature.linkedModifiers?.flatMap((inst) => inst.characteristics ?? []).find(
       (mod) => mod.type === "tool_proficiencies" && (mod.choiceCount ?? 0) > 0,
-    )
+    ) as import("@/lib/compendium/characteristic-modifiers").ListCharacteristic | undefined
     expect(toolMod?.toolChoicePool).toBe("musical")
     expect(toolMod?.choiceCount).toBe(3)
     const pool = toolNamesForPool("musical", getAllSeedToolNames())

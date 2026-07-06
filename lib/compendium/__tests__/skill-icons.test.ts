@@ -27,7 +27,7 @@ describe("buildCustomSkillIconByName", () => {
             name: "Tactics",
             ability: "intelligence",
             expertise: false,
-          },
+          } as unknown as import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier,
         ],
         linked_modifiers: null,
       },

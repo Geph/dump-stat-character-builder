@@ -44,7 +44,7 @@ describe("aiMechanicsToDetections", () => {
     )
     expect(detections).toHaveLength(1)
     expect(detections[0]?.ruleId).toBe("ai.spellcasting_ability")
-    expect(detections[0]?.instance.characteristics[0]?.type).toBe("spellcasting_ability")
+    expect(detections[0]?.instance.characteristics?.[0]?.type).toBe("spellcasting_ability")
   })
 
   it("builds creature-type damage from AI mechanics", () => {
@@ -59,11 +59,15 @@ describe("aiMechanicsToDetections", () => {
             "when you hit an Aberration with this weapon, the Aberration takes an extra 2d10 Radiant damage",
         },
       ],
-      { contentKind: "equipment", featureName: "Shaarat'doovol" },
+      {
+        contentKind: "class_feature",
+        sourceName: "Item",
+        featureName: "Shaarat'doovol",
+      },
     )
     expect(detections).toHaveLength(1)
     expect(detections[0]?.ruleId).toBe("ai.damage.creature_type")
-    const mod = detections[0]?.instance.characteristics[0]
+    const mod = detections[0]?.instance.characteristics?.[0]
     expect(mod?.type).toBe("damage_roll_modifiers")
     if (mod?.type === "damage_roll_modifiers") {
       expect(mod.entries[0]?.onlyVsCreatureTypes).toEqual(["Aberration"])
@@ -81,16 +85,20 @@ describe("aiMechanicsToDetections", () => {
           sourcePhrase: "while the item grants you benefits",
         },
       ],
-      { contentKind: "equipment", featureName: "Unyielding Duty" },
+      {
+        contentKind: "class_feature",
+        sourceName: "Item",
+        featureName: "Unyielding Duty",
+      },
     )
     expect(detections).toHaveLength(1)
-    const mod = detections[0]?.instance.characteristics[0]
+    const mod = detections[0]?.instance.characteristics?.[0]
     expect(mod?.requiresSheetToggle).toBe("magic_item:abc:unyielding")
   })
 })
 
 describe("import modifier review helpers", () => {
-  const content: ImportContent = {
+  const content = {
     classes: [
       {
         name: "Skirmisher",

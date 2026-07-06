@@ -1,13 +1,13 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, type ComponentType } from "react"
 import { useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { isCompendiumContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
 import dynamic from "next/dynamic"
 
-const EDITORS: Record<CompendiumContentType, ReturnType<typeof dynamic>> = {
+const EDITORS: Record<CompendiumContentType, ComponentType<{ id: string }>> = {
   classes: dynamic(() => import("./class-editor")),
   subclasses: dynamic(() => import("./subclass-editor")),
   species: dynamic(() => import("./species-editor")),

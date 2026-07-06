@@ -143,7 +143,7 @@ class ApiQueryBuilder implements QueryBuilder {
       }
 
       if (this.mode === "update") {
-        const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+        const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
         if (!id) return { data: null, error: { message: "Update requires .eq('id', ...)" } }
         const res = await fetch(`/api/data/${apiTable}/${id}`, {
           method: "PATCH",
@@ -156,7 +156,7 @@ class ApiQueryBuilder implements QueryBuilder {
       }
 
       if (this.mode === "delete") {
-        const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+        const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
         if (id) {
           const res = await fetch(`/api/data/${apiTable}/${id}`, { method: "DELETE" })
           const json = await res.json()
@@ -216,7 +216,7 @@ class ApiQueryBuilder implements QueryBuilder {
     }
 
     if (this.mode === "update") {
-      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+      const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
       if (!id) return { data: null, error: { message: "Update requires .eq('id', ...)" } }
       const res = await fetch(`/api/characters/${id}`, {
         method: "PATCH",
@@ -229,14 +229,14 @@ class ApiQueryBuilder implements QueryBuilder {
     }
 
     if (this.mode === "delete") {
-      const id = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as string
+      const id = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as string
       const res = await fetch(`/api/characters/${id}`, { method: "DELETE" })
       const json = await res.json()
       if (!res.ok) return { data: null, error: apiError(json, "Delete failed") }
       return { data: null, error: null }
     }
 
-    const characterId = this.filters.find((f) => f.op === "eq" && f.column === "id")?.value as
+    const characterId = this.filters.find((f): f is Extract<import("@/lib/data/types").Filter, { op: "eq" }> => f.op === "eq" && f.column === "id")?.value as
       | string
       | undefined
     if (this.singleRow || (this.embedRelations && characterId)) {

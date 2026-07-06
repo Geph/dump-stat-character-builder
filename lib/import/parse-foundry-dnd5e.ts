@@ -170,7 +170,7 @@ const FEAT_CATEGORIES: Record<string, string> = {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
+    ? (value as unknown as Record<string, unknown>)
     : {}
 }
 
@@ -701,7 +701,7 @@ function mapBackground(item: FoundryItem): BackgroundImport | null {
 
 function isFoundryItemShape(value: unknown): value is FoundryItem {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false
-  const record = value as Record<string, unknown>
+  const record = value as unknown as Record<string, unknown>
   const type = record.type
   if (typeof type !== "string" || !FOUNDRY_ITEM_TYPES.has(type)) return false
   // Foundry items always carry a `system` block; require name too to avoid noise.
@@ -710,7 +710,7 @@ function isFoundryItemShape(value: unknown): value is FoundryItem {
 
 function isFoundryActorShape(value: unknown): value is FoundryItem {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false
-  const record = value as Record<string, unknown>
+  const record = value as unknown as Record<string, unknown>
   if (asString(record.documentName) === "Actor") return true
   const type = asString(record.type).toLowerCase()
   return FOUNDRY_ACTOR_TYPES.has(type) && "system" in record && typeof record.name === "string"

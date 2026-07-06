@@ -18,7 +18,7 @@ import {
   type ClassResourceImportRow,
 } from "@/lib/import/enrich-import-classes"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 import {
   deleteWhereLocal,
@@ -106,7 +106,7 @@ export async function persistImportedContentLocal(
 
       const importClassRow =
         enrichedClasses.find((row) => row.name === className) ??
-        ({ name: className, description: null, features: [] } as Record<string, unknown>)
+        ({ name: className, description: null, features: [] } as unknown as Record<string, unknown>)
 
       const resourceRows = buildClassResourceRowsForClass(
         importClassRow,
@@ -222,7 +222,7 @@ export async function persistImportedContentLocal(
   if (sanitized.feats?.length) {
     const featSpellCatalog = await loadSpellCatalogLocal()
     const featRows = sanitized.feats.map((f) => {
-      const row = f as Record<string, unknown>
+      const row = f as unknown as Record<string, unknown>
       const linkedModifiers = resolveLinkedModifierSpells(
         (row.linkedModifiers ?? row.linked_modifiers) as import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | undefined,
         featSpellCatalog,
@@ -239,7 +239,8 @@ export async function persistImportedContentLocal(
             : null,
         linked_modifiers: linkedModifiers ?? [],
         modifier_refs: modifierRefs ?? [],
-        source: sanitizeImportRowSource(f.source, source),
+        source: sanitizeImportRowSource((f as { source?: string | null }).source, source),
+        prerequisite_feat_ids: [] as string[],
       }
     })
     await upsertByNameLocal("feats", featRows)
@@ -270,20 +271,21 @@ export async function persistImportedContentLocal(
 
   if (sanitized.equipment?.length) {
     const equipment = normalizeEquipmentRows(
-      sanitized.equipment.map((e) => stampSource({ ...e }, source)) as Record<string, unknown>[],
+      sanitized.equipment.map((e) => stampSource({ ...e }, source)) as unknown as Record<string, unknown>[],
     )
     await upsertByNameLocal("equipment", equipment)
     breakdown.equipment = sanitized.equipment.length
     totalImported += sanitized.equipment.length
   }
 
-  if (sanitized.abilities?.length) {
+  if ((sanitized as ImportContentWithAbilities).abilities?.length) {
+    const rawAbilities = (sanitized as ImportContentWithAbilities).abilities!
     await upsertByNameLocal(
       "custom_abilities",
-      sanitized.abilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
+      rawAbilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
     )
-    breakdown.abilities = sanitized.abilities.length
-    totalImported += sanitized.abilities.length
+    breakdown.abilities = rawAbilities.length
+    totalImported += rawAbilities.length
   }
 
   const report = buildImportReport({

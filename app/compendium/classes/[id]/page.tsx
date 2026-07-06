@@ -13,6 +13,8 @@ import {
 import type { RestType, UsesConfig, FeatureChoice } from "@/lib/types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { isRestRechargeRule } from "@/lib/character/real-time-recharge"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -108,24 +110,29 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
         if (error) {
           setError("Class not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            hit_die: data.hit_die || 8,
-            primary_ability: data.primary_ability || [],
-            saving_throws: data.saving_throws || [],
-            armor_proficiencies: data.armor_proficiencies || [],
-            weapon_proficiencies: data.weapon_proficiencies || [],
-            skill_choices: data.skill_choices || { count: 2, options: [] },
-            features: data.features || [{ level: 1, name: "", description: "" }],
-            spellcasting: data.spellcasting || null,
-            starting_gold: data.starting_gold ?? 0,
-            starting_equipment_groups: data.starting_equipment_groups || [],
-            icon: data.icon || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-          })
-          setHasSpellcasting(!!data.spellcasting)
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Class not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              hit_die: (row.hit_die as number | null | undefined) || 8,
+              primary_ability: (row.primary_ability as string[]) || [],
+              saving_throws: (row.saving_throws as string[]) || [],
+              armor_proficiencies: (row.armor_proficiencies as string[]) || [],
+              weapon_proficiencies: (row.weapon_proficiencies as string[]) || [],
+              skill_choices: (row.skill_choices as ClassFormData["skill_choices"]) || { count: 2, options: [] },
+              features: (row.features as ClassFeature[]) || [{ level: 1, name: "", description: "" }],
+              spellcasting: (row.spellcasting as ClassFormData["spellcasting"]) || null,
+              starting_gold: (row.starting_gold as number | null | undefined) ?? 0,
+              starting_equipment_groups: (row.starting_equipment_groups as StartingEquipmentGroup[]) || [],
+              icon: (row.icon as string | null) ?? null,
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+            })
+            setHasSpellcasting(!!row.spellcasting)
+          }
         }
         setLoading(false)
       }
@@ -825,7 +832,16 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                             Recharges On
                           </label>
                           <select
-                            value={feature.limitedUses.recharges?.[0]?.rest ?? feature.limitedUses.recharge ?? ""}
+                            value={
+                              (() => {
+                                const firstRule = feature.limitedUses.recharges?.[0]
+                                return (
+                                  (firstRule && isRestRechargeRule(firstRule) ? firstRule.rest : undefined) ??
+                                  feature.limitedUses.recharge ??
+                                  ""
+                                )
+                              })()
+                            }
                             onChange={(e) => {
                               const rest = e.target.value as RestType | ""
                               const newFeatures = [...form.features]

@@ -18,6 +18,8 @@ import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-de
 import type { UsesConfig } from "@/lib/types"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { compendiumListHref } from "@/lib/compendium/content-types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 interface ClassResourceFormData {
   class_id: string
@@ -60,7 +62,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
     const fetchClasses = async () => {
       const db = createClient()
       const { data } = await db.from("classes").select("id, name").order("name")
-      setClasses(data || [])
+      setClasses(asCompendiumRows(data))
     }
     fetchClasses()
   }, [])
@@ -85,18 +87,23 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Class resource not found")
         } else if (data) {
-          setForm({
-            class_id: data.class_id || "",
-            resource_key: data.resource_key || "",
-            name: data.name || "",
-            description: data.description || "",
-            uses: normalizeUsesConfig((data.uses as UsesConfig) || defaultForm.uses),
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            accent_color: data.accent_color || null,
-            card_image_url: data.card_image_url || null,
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Class resource not found")
+          } else {
+            setForm({
+              class_id: String(row.class_id ?? ""),
+              resource_key: String(row.resource_key ?? ""),
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              uses: normalizeUsesConfig((row.uses as UsesConfig) || defaultForm.uses),
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+              accent_color: (row.accent_color as string | null) ?? null,
+              card_image_url: (row.card_image_url as string | null) ?? null,
+            })
+          }
         }
         setLoading(false)
       }
@@ -218,7 +225,7 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm((prev) => ({ ...prev, creator_url }))}
             icon={form.icon}
             onIconChange={(icon) => setForm((prev) => ({ ...prev, icon }))}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm((prev) => ({ ...prev, accent_color }))}
           />
 

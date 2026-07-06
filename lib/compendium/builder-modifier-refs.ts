@@ -227,7 +227,7 @@ function speciesCharacteristicsWithPlayerPicks(
   if (!species) return []
   const mods: CharacteristicModifier[] = []
 
-  const speciesRow = species as unknown as Record<string, unknown>
+  const speciesRow = species as unknown as unknown as Record<string, unknown>
   const speciesWide = characteristicsFromLinkedModifiers(
     catalog,
     readLinkedModifiers(speciesRow, catalog),
@@ -366,7 +366,7 @@ export function collectBuilderModifierRefIds(params: {
     const feat = feats.find((entry) => entry.id === featId)
     if (!feat) return []
     const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
-    const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>)
+    const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as unknown as Record<string, unknown>)
     const mods = characteristicsFromLinkedModifiers(catalog, instances, refs)
     return tagModifierSource(applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks), {
       sourceType: "feat",
@@ -377,7 +377,7 @@ export function collectBuilderModifierRefIds(params: {
   })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
-    const row = ability as unknown as Record<string, unknown>
+    const row = ability as unknown as unknown as Record<string, unknown>
     const linked = readLinkedModifiers(row, catalog)
     const refs = ability.modifierRefs ?? readModifierRefs(row)
     return tagModifierSource(

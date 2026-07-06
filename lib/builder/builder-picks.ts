@@ -34,7 +34,7 @@ export function normalizeBuilderPicks(raw: unknown): CharacterBuilderPicks {
 function normalizeStringRecord(raw: unknown): Record<string, string[]> | undefined {
   if (!raw || typeof raw !== "object") return undefined
   const out: Record<string, string[]> = {}
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(raw as unknown as Record<string, unknown>)) {
     if (!Array.isArray(value)) continue
     const picks = value.filter((entry): entry is string => typeof entry === "string")
     if (picks.length) out[key] = picks

@@ -15,7 +15,7 @@ describe("SRD background card images", () => {
   it("enriches SRD background rows with default card art when unset", () => {
     const [row] = enrichBackgroundList([
       { name: "Sage", source: "SRD", ability_bonuses: { Intelligence: 1, Wisdom: 1 } },
-    ])
+    ] as unknown as import("@/lib/types").Background[])
     expect(row.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Sage)
   })
 

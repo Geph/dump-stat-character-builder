@@ -260,7 +260,7 @@ export function applyImportRenames(content: ImportContent, renameMap: ImportRena
     }
   }
 
-  return next
+  return next as unknown as ImportContent
 }
 
 export function importCollisionsNeedResolution(collisions: ImportCollision[]): boolean {

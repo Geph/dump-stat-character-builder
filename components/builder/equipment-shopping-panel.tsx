@@ -39,7 +39,7 @@ export function EquipmentShoppingPanel({
   onTogglePurchase,
   onShowDetails,
 }: EquipmentShoppingPanelProps) {
-  const pageSize = usePickerPageSize()
+  const pageSize = usePickerPageSize("dense")
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({})
   const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("all")
 
@@ -48,11 +48,12 @@ export function EquipmentShoppingPanel({
     for (const item of equipment) {
       if (item.category?.trim()) seen.add(item.category.trim())
     }
-    return EQUIPMENT_CATEGORY_ORDER.filter((cat) => seen.has(cat)).concat(
-      [...seen]
+    return [
+      ...EQUIPMENT_CATEGORY_ORDER.filter((cat) => seen.has(cat)),
+      ...[...seen]
         .filter((cat) => !EQUIPMENT_CATEGORY_ORDER.includes(cat as (typeof EQUIPMENT_CATEGORY_ORDER)[number]))
         .sort(),
-    )
+    ]
   }, [equipment])
 
   const equipmentGroups = useMemo(() => {

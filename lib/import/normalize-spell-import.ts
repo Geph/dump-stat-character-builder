@@ -15,7 +15,7 @@ function normalizeComponents(raw: unknown): string[] | null {
     return parts.length ? parts : null
   }
   if (raw && typeof raw === "object") {
-    const record = raw as Record<string, unknown>
+    const record = raw as unknown as Record<string, unknown>
     const parts: string[] = []
     if (record.v === true) parts.push("V")
     if (record.s === true) parts.push("S")
@@ -105,7 +105,11 @@ export function normalizeSpellImportRows(
   if (!rows?.length) return []
   return rows
     .map(normalizeSpellImportRow)
-    .map(enrichSpellPsionicAugments)
-    .map((row) => enrichSpellRowWithBundledCardImage(row as Record<string, unknown>))
-    .filter((row) => row.name.length > 0)
+    .map((spell) => enrichSpellPsionicAugments(spell as Parameters<typeof enrichSpellPsionicAugments>[0]))
+    .map((row) =>
+      enrichSpellRowWithBundledCardImage(row as unknown as Record<string, unknown>),
+    )
+    .filter((row) => (row as { name: string }).name.length > 0) as unknown as NonNullable<
+    ImportContent["spells"]
+  >
 }

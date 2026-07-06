@@ -199,20 +199,21 @@ export function CompanionStatPanel({
           <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Conditions</p>
           <div className="flex flex-wrap gap-1">
             {SRD_CONDITIONS.slice(0, 8).map((condition) => {
-              const active = activeConditions.includes(condition)
+              const conditionName = condition.name
+              const active = activeConditions.includes(conditionName)
               return (
                 <button
-                  key={condition}
+                  key={conditionName}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => toggleCondition(condition)}
+                  onClick={() => toggleCondition(conditionName)}
                   className={`rounded px-1.5 py-0.5 text-[9px] font-semibold border ${
                     active
                       ? "border-destructive/50 bg-destructive/15 text-destructive"
                       : "border-border text-muted-foreground"
                   }`}
                 >
-                  {condition}
+                  {conditionName}
                 </button>
               )
             })}

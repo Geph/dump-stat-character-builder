@@ -46,7 +46,7 @@ export function SheetAddEquipmentOverlay({
   currentGold,
   onAddItem,
 }: SheetAddEquipmentOverlayProps) {
-  const pageSize = usePickerPageSize()
+  const pageSize = usePickerPageSize("dense")
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("all")
@@ -63,13 +63,14 @@ export function SheetAddEquipmentOverlay({
     for (const item of catalog) {
       if (item.category?.trim()) seen.add(item.category.trim())
     }
-    return EQUIPMENT_CATEGORY_ORDER.filter((cat) => seen.has(cat)).concat(
-      [...seen]
+    return [
+      ...EQUIPMENT_CATEGORY_ORDER.filter((cat) => seen.has(cat)),
+      ...[...seen]
         .filter(
           (cat) => !EQUIPMENT_CATEGORY_ORDER.includes(cat as (typeof EQUIPMENT_CATEGORY_ORDER)[number]),
         )
         .sort(),
-    )
+    ]
   }, [catalog])
 
   const magicCategoryOptions = useMemo(() => {

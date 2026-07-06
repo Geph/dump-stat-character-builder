@@ -20,14 +20,14 @@ export function getSrdSeedData() {
     manifest,
     classes: classes as SrdClassRow[],
     subclasses: subclasses as SrdSubclassRow[],
-    species: species as Record<string, unknown>[],
-    backgrounds: backgrounds as Record<string, unknown>[],
-    spells: spells as Record<string, unknown>[],
-    feats: feats as Record<string, unknown>[],
-    equipment: equipment as Record<string, unknown>[],
-    magicItems: magicItems as Record<string, unknown>[],
-    languages: languages as Record<string, unknown>[],
-    tools: tools as Record<string, unknown>[],
+    species: species as unknown as Record<string, unknown>[],
+    backgrounds: backgrounds as unknown as Record<string, unknown>[],
+    spells: spells as unknown as Record<string, unknown>[],
+    feats: feats as unknown as Record<string, unknown>[],
+    equipment: equipment as unknown as Record<string, unknown>[],
+    magicItems: magicItems as unknown as Record<string, unknown>[],
+    languages: languages as unknown as Record<string, unknown>[],
+    tools: tools as unknown as Record<string, unknown>[],
   }
 }
 

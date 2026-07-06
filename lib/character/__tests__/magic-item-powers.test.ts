@@ -14,7 +14,7 @@ function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
   ]
 }
 
-const conditionalItem: Equipment = {
+const conditionalItem = {
   id: "item-1",
   name: "Unyielding Duty",
   category: "Weapon",

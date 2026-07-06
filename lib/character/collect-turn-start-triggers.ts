@@ -88,15 +88,7 @@ function abilityModForKey(
   abilityMods: Record<string, number>,
 ): number {
   if (!key) return 0
-  const map: Record<AbilityScoreKey, string> = {
-    STR: "strength",
-    DEX: "dexterity",
-    CON: "constitution",
-    INT: "intelligence",
-    WIS: "wisdom",
-    CHA: "charisma",
-  }
-  return abilityMods[map[key]] ?? 0
+  return abilityMods[key] ?? 0
 }
 
 export function applyTurnStartTriggers(params: {

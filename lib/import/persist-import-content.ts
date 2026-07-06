@@ -24,7 +24,7 @@ import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
 export type { ImportSourceLabel } from "@/lib/import/import-material-source"
@@ -113,7 +113,7 @@ export async function persistImportedContent(
 
       const importClassRow =
         enrichedClasses.find((row) => row.name === className) ??
-        ({ name: className, description: null, features: [] } as Record<string, unknown>)
+        ({ name: className, description: null, features: [] } as unknown as Record<string, unknown>)
 
       const resourceRows = buildClassResourceRowsForClass(
         importClassRow,
@@ -229,7 +229,7 @@ export async function persistImportedContent(
   if (sanitized.feats?.length) {
     const spellCatalog = await loadSpellCatalog()
     const featRows = sanitized.feats.map((f) => {
-      const row = f as Record<string, unknown>
+      const row = f as unknown as Record<string, unknown>
       const linkedModifiers = resolveLinkedModifierSpells(
         (row.linkedModifiers ?? row.linked_modifiers) as import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | undefined,
         spellCatalog,
@@ -246,7 +246,8 @@ export async function persistImportedContent(
             : null,
         linked_modifiers: linkedModifiers ?? [],
         modifier_refs: modifierRefs ?? [],
-        source: sanitizeImportRowSource(f.source, source),
+        source: sanitizeImportRowSource((f as { source?: string | null }).source, source),
+        prerequisite_feat_ids: [] as string[],
       }
     })
     await upsertByName("feats", featRows)
@@ -277,14 +278,15 @@ export async function persistImportedContent(
 
   if (sanitized.equipment?.length) {
     const equipment = normalizeEquipmentRows(
-      sanitized.equipment.map((e) => stampSource({ ...e }, source)) as Record<string, unknown>[],
+      sanitized.equipment.map((e) => stampSource({ ...e }, source)) as unknown as Record<string, unknown>[],
     )
     await upsertByName("equipment", equipment)
     breakdown.equipment = sanitized.equipment.length
     totalImported += sanitized.equipment.length
   }
 
-  if (sanitized.abilities?.length) {
+  if ((sanitized as ImportContentWithAbilities).abilities?.length) {
+    const rawAbilities = (sanitized as ImportContentWithAbilities).abilities!
     const classIdByName = new Map(
       (await listRows("classes")).map((row) => [row.name as string, row.id as string]),
     )
@@ -310,13 +312,13 @@ export async function persistImportedContent(
 
     const abilityRows = enrichAbilityImportRows(
       normalizeAbilityImportRows(
-        sanitized.abilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
+        rawAbilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
       ),
     ).map((row) => resolveAbilityAttachmentRow(row, attachmentMaps))
 
     await upsertByName("custom_abilities", abilityRows)
-    breakdown.abilities = sanitized.abilities.length
-    totalImported += sanitized.abilities.length
+    breakdown.abilities = abilityRows.length
+    totalImported += abilityRows.length
   }
 
   const report = buildImportReport({

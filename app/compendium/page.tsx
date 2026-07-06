@@ -94,6 +94,7 @@ import {
   backgroundMatchesAbilityFilter,
 } from "@/lib/compendium/background-ability-filter"
 import type { AbilityModifierKey } from "@/lib/compendium/characteristic-modifiers"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type ContentType = CompendiumContentType
 
@@ -108,7 +109,7 @@ function systemCatalogSortIndex(id: string): number {
 }
 
 function enrichCompendiumTabRows(tab: ContentType, rows: unknown[]) {
-  if (tab === "classes") return enrichClassesList(rows as DndClass[])
+  if (tab === "classes") return enrichClassesList(rows as unknown as DndClass[])
   if (tab === "species") return enrichSpeciesList(rows as { name: string; source?: string | null }[])
   return rows
 }
@@ -244,7 +245,7 @@ function CompendiumPageContent() {
         db.from("class_resources").select("*", { count: "exact", head: true }),
         db.from("custom_abilities").select("*", { count: "exact", head: true }),
       ])
-      const equipmentSplit = splitEquipmentByKind((equipmentRows ?? []) as Equipment[])
+      const equipmentSplit = splitEquipmentByKind(asCompendiumRows(equipmentRows) as unknown as Equipment[])
       setTabCounts({
         species: speciesCount ?? 0,
         classes: classesCount ?? 0,
@@ -288,17 +289,17 @@ function CompendiumPageContent() {
               : 100,
         )
       
-      let rows = data || []
+      let rows = asCompendiumRows(data)
       if (activeTab === "abilities") {
         rows = [...rows].sort((a, b) => {
-          const aRank = systemCatalogSortIndex(a.id)
-          const bRank = systemCatalogSortIndex(b.id)
+          const aRank = systemCatalogSortIndex(String(a.id))
+          const bRank = systemCatalogSortIndex(String(b.id))
           if (aRank !== bRank) return aRank - bRank
           return String(a.name).localeCompare(String(b.name))
         })
       }
       if (isEquipmentBrowserTab(activeTab)) {
-        const split = splitEquipmentByKind(rows as Equipment[])
+        const split = splitEquipmentByKind(asCompendiumRows(rows) as unknown as Equipment[])
         setContent((prev) => ({
           ...prev,
           equipment: split.mundane,
@@ -317,12 +318,16 @@ function CompendiumPageContent() {
           .select("*")
           .order("name")
           .limit(200)
-        setSubclassesForClasses(subclasses || [])
+        setSubclassesForClasses(asCompendiumRows(subclasses) as unknown as Subclass[])
       }
 
       if (activeTab === "class_resources") {
         const { data: classes } = await db.from("classes").select("id, name").order("name")
-        setClassNamesById(Object.fromEntries((classes || []).map((cls) => [cls.id as string, cls.name as string])))
+        setClassNamesById(
+          Object.fromEntries(
+            asCompendiumRows<{ id: string; name: string }>(classes).map((cls) => [cls.id, cls.name]),
+          ),
+        )
       }
 
       setLoading(false)
@@ -342,7 +347,7 @@ function CompendiumPageContent() {
   }, [subclassesForClasses])
 
   // Derive unique spell filter options from loaded spell data
-  const spellData = (content.spells as Spell[])
+  const spellData = (content.spells as unknown as Spell[])
 const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
   const spellClassOptions = Array.from(
@@ -410,8 +415,8 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     return true
   })
 
-  const equipmentData = content.equipment as Equipment[]
-  const magicItemData = content.magic_items as Equipment[]
+  const equipmentData = content.equipment as unknown as Equipment[]
+  const magicItemData = content.magic_items as unknown as Equipment[]
   const equipmentCategoryOptions = useMemo(
     () =>
       Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
@@ -423,11 +428,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   )
   const equipmentGroups = useMemo(() => {
     if (activeTab !== "equipment") return []
-    return groupEquipmentByCategory(filteredContent as Equipment[])
+    return groupEquipmentByCategory(filteredContent as unknown as Equipment[])
   }, [filteredContent, activeTab])
   const magicItemGroups = useMemo(() => {
     if (activeTab !== "magic_items") return []
-    return groupMagicItemsByCategory(filteredContent as Equipment[])
+    return groupMagicItemsByCategory(filteredContent as unknown as Equipment[])
   }, [filteredContent, activeTab])
 
   const classResourceGroups = useMemo(() => {
@@ -469,7 +474,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       db.from("class_resources").select("*", { count: "exact", head: true }),
       db.from("custom_abilities").select("*", { count: "exact", head: true }),
     ])
-    const equipmentSplit = splitEquipmentByKind((equipmentRows ?? []) as Equipment[])
+    const equipmentSplit = splitEquipmentByKind(asCompendiumRows(equipmentRows) as unknown as Equipment[])
     setTabCounts({
       species: speciesCount ?? 0,
       classes: classesCount ?? 0,
@@ -495,9 +500,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       .select("*")
       .order("name")
       .limit(isEquipmentBrowserTab(activeTab) ? 500 : 100)
-    const rows = data || []
+    const rows = asCompendiumRows(data)
     if (isEquipmentBrowserTab(activeTab)) {
-      const split = splitEquipmentByKind(rows as Equipment[])
+      const split = splitEquipmentByKind(asCompendiumRows(rows) as unknown as Equipment[])
       setContent((prev) => ({
         ...prev,
         equipment: split.mundane,
@@ -519,7 +524,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       .select(
         "id, magic_item_category, rarity, requires_attunement, category, subcategory, description, properties",
       )
-    const ids = ((data ?? []) as Equipment[])
+    const ids = (asCompendiumRows(data) as unknown as Equipment[])
       .filter((row) => (kind === "magic" ? isMagicItem(row) : !isMagicItem(row)))
       .map((row) => row.id)
       .filter(Boolean)
@@ -601,21 +606,22 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     const db = createClient()
     const resolvedTable = tableName(activeTab)
     const { data } = await db.from(resolvedTable).select("*").order("name").limit(500)
-    if (!data?.length) return
+    const exportRowsRaw = asCompendiumRows(data)
+    if (!exportRowsRaw.length) return
 
-    let exportRows = data as Record<string, unknown>[]
+    let exportRows = exportRowsRaw
     if (activeTab === "equipment") {
-      exportRows = splitEquipmentByKind(exportRows as Equipment[]).mundane as Record<string, unknown>[]
+      exportRows = splitEquipmentByKind(exportRows as unknown as Equipment[]).mundane as unknown as Record<string, unknown>[]
     } else if (activeTab === "magic_items") {
-      exportRows = splitEquipmentByKind(exportRows as Equipment[]).magic as Record<string, unknown>[]
+      exportRows = splitEquipmentByKind(exportRows as unknown as Equipment[]).magic as unknown as Record<string, unknown>[]
     }
     if (!exportRows.length) return
 
     const classNameById = new Map<string, string>()
     if (activeTab === "subclasses" || activeTab === "class_resources") {
       const { data: classesData } = await db.from("classes").select("id, name")
-      for (const cls of classesData ?? []) {
-        classNameById.set(cls.id as string, cls.name as string)
+      for (const cls of asCompendiumRows<{ id: string; name: string }>(classesData)) {
+        classNameById.set(cls.id, cls.name)
       }
     }
 
@@ -644,7 +650,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       const next = { ...prev }
       for (const target of targets) {
         const tab = target.contentType
-        next[tab] = (next[tab] as Record<string, unknown>[]).map((row) =>
+        next[tab] = (next[tab] as unknown as Record<string, unknown>[]).map((row) =>
           row.id === target.id ? { ...row, enabled } : row,
         )
       }
@@ -720,16 +726,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   }
 
   const renderContentCard = (item: unknown) => {
-    const data = item as Record<string, unknown>
+    const data = item as unknown as Record<string, unknown>
     const editPath = compendiumEditHref(activeTab, data.id as string)
     const iconName = getCompendiumItemIcon(activeTab, data)
     const accentStyles = compendiumAccentColorStyles(getCompendiumItemAccentColor(data))
     const enabled = isCompendiumItemEnabled(data)
-    const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(data as { id?: string; is_system?: boolean })
+    const isSystemCatalog = activeTab === "abilities" && isProtectedSystemCompendiumRow(castCompendiumRow<{ id?: string; is_system?: boolean }>(data))
     const canCopy = canDuplicateCompendiumItem(activeTab, data.id as string, data as { is_system?: boolean | null })
 
     const cardImage = resolveCompendiumCardImageUrl(
-      data as Record<string, unknown> & CompendiumCardVisual,
+      data as unknown as Record<string, unknown> & CompendiumCardVisual,
       activeTab,
     )
     const portraitGraphicCard = isCompendiumPortraitGraphicCard(activeTab, cardImage)
@@ -798,9 +804,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               onClick={() => setSelectedItem(item)}
             >
               {activeTab === "class_resources"
-                ? (classNamesById[(data as ClassResourceRow).class_id] ?? "Unknown class")
+                ? (classNamesById[castCompendiumRow<ClassResourceRow>(data).class_id] ?? "Unknown class")
                 : (data.name as string)}
-              {activeTab === "abilities" && isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+              {activeTab === "abilities" && isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
@@ -855,7 +861,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {activeTab === "classes" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {formatCompendiumSource((data as DndClass).source) || "Custom"}
+              {formatCompendiumSource(castCompendiumRow<DndClass>(data).source) || "Custom"}
             </span>
             {(() => {
               const subs = subclassesByClassId.get(data.id as string) ?? []
@@ -873,8 +879,8 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {activeTab === "subclasses" && (
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
-              {(data as Subclass).features?.length
-                ? (data as Subclass).features!.map((f) => f.name).join(", ")
+              {castCompendiumRow<Subclass>(data).features?.length
+                ? castCompendiumRow<Subclass>(data).features!.map((f) => f.name).join(", ")
                 : "No features listed"}
             </p>
           </div>
@@ -882,7 +888,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {activeTab === "species" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {formatCompendiumSource((data as Species).source) || "Custom"}
+              {formatCompendiumSource(castCompendiumRow<Species>(data).source) || "Custom"}
             </span>
           </div>
         )}
@@ -890,18 +896,18 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           <div className="space-y-2">
             <div className="flex gap-2 flex-wrap">
               <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {formatCompendiumSource((data as Background).source) || "Custom"}
+                {formatCompendiumSource(castCompendiumRow<Background>(data).source) || "Custom"}
               </span>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {(data as Background).skill_proficiencies?.slice(0, 2).map((skill) => (
+              {castCompendiumRow<Background>(data).skill_proficiencies?.slice(0, 2).map((skill) => (
                 <span key={skill} className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
                   {skill}
                 </span>
               ))}
-              {(data as Background).feat_granted && (
+              {castCompendiumRow<Background>(data).feat_granted && (
                 <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                  {(data as Background).feat_granted}
+                  {castCompendiumRow<Background>(data).feat_granted}
                 </span>
               )}
             </div>
@@ -915,12 +921,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 cardImage ? "bg-lime/25 text-lime" : "bg-primary/10 text-primary",
               )}
             >
-              {(data as Spell).level === 0 ? "Cantrip" : `Level ${(data as Spell).level}`}
+              {castCompendiumRow<Spell>(data).level === 0 ? "Cantrip" : `Level ${castCompendiumRow<Spell>(data).level}`}
             </span>
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {(data as Spell).school}
+              {castCompendiumRow<Spell>(data).school}
             </span>
-            {(data as Spell).concentration && (
+            {castCompendiumRow<Spell>(data).concentration && (
               <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
                 Concentration
               </span>
@@ -930,62 +936,62 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {activeTab === "feats" && (
           <div className="flex gap-2 flex-wrap">
             <span className={`text-xs px-2 py-1 rounded-full ${
-              (data as Feat).category === "Origin"
+              castCompendiumRow<Feat>(data).category === "Origin"
                 ? "bg-lime/10 text-lime"
-                : (data as Feat).category === "Epic Boon"
+                : castCompendiumRow<Feat>(data).category === "Epic Boon"
                 ? "bg-magenta/10 text-magenta"
                 : "bg-primary/10 text-primary"
             }`}>
-              {(data as Feat).category || "General"}
+              {castCompendiumRow<Feat>(data).category || "General"}
             </span>
-            {((data as Feat).level_requirement ?? 1) > 1 && (
+            {(castCompendiumRow<Feat>(data).level_requirement ?? 1) > 1 && (
               <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
-                Lvl {(data as Feat).level_requirement}+
+                Lvl {castCompendiumRow<Feat>(data).level_requirement}+
               </span>
             )}
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {(data as Feat).source || "Custom"}
+              {castCompendiumRow<Feat>(data).source || "Custom"}
             </span>
           </div>
         )}
         {activeTab === "equipment" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {(data as Equipment).category}
+              {castCompendiumRow<Equipment>(data).category}
             </span>
-            {(data as Equipment).subcategory && (
+            {castCompendiumRow<Equipment>(data).subcategory && (
               <span className="text-xs px-2 py-1 bg-accent/10 text-accent rounded-full">
-                {(data as Equipment).subcategory!.replace(/\s+Weapons$/i, "")}
+                {castCompendiumRow<Equipment>(data).subcategory!.replace(/\s+Weapons$/i, "")}
               </span>
             )}
-            {(data as Equipment).cost && (
+            {castCompendiumRow<Equipment>(data).cost && (
               <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                {((data as Equipment).cost as { amount: number; unit: string })?.amount}{" "}
-                {((data as Equipment).cost as { amount: number; unit: string })?.unit}
+                {(castCompendiumRow<Equipment>(data).cost as { amount: number; unit: string })?.amount}{" "}
+                {(castCompendiumRow<Equipment>(data).cost as { amount: number; unit: string })?.unit}
               </span>
             )}
           </div>
         )}
         {activeTab === "magic_items" && (
           <div className="flex gap-2 flex-wrap">
-            {(data as Equipment).rarity && (
+            {castCompendiumRow<Equipment>(data).rarity && (
               <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-                {(data as Equipment).rarity}
+                {castCompendiumRow<Equipment>(data).rarity}
               </span>
             )}
-            {(data as Equipment).magic_item_category && (
+            {castCompendiumRow<Equipment>(data).magic_item_category && (
               <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
-                {(data as Equipment).magic_item_category}
+                {castCompendiumRow<Equipment>(data).magic_item_category}
               </span>
             )}
-            {(data as Equipment).requires_attunement && (
+            {castCompendiumRow<Equipment>(data).requires_attunement && (
               <span className="text-xs px-2 py-1 bg-orange/10 text-orange rounded-full">
                 Attunement
               </span>
             )}
-            {(data as Equipment).category && (data as Equipment).category !== "Other" && (
+            {castCompendiumRow<Equipment>(data).category && castCompendiumRow<Equipment>(data).category !== "Other" && (
               <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {(data as Equipment).category}
+                {castCompendiumRow<Equipment>(data).category}
               </span>
             )}
           </div>
@@ -994,75 +1000,75 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           <div className="flex gap-2 flex-wrap">
             <span
               className={`text-xs px-2 py-1 rounded-full ${
-                (data as Language).pool === "rare"
+                castCompendiumRow<Language>(data).pool === "rare"
                   ? "bg-magenta/10 text-magenta"
                   : "bg-primary/10 text-primary"
               }`}
             >
-              {(data as Language).pool === "rare" ? "Rare" : "Standard"}
+              {castCompendiumRow<Language>(data).pool === "rare" ? "Rare" : "Standard"}
             </span>
-            {(data as Language).script && (
+            {castCompendiumRow<Language>(data).script && (
               <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {(data as Language).script}
+                {castCompendiumRow<Language>(data).script}
               </span>
             )}
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {formatCompendiumSource((data as Language).source) || "Custom"}
+              {formatCompendiumSource(castCompendiumRow<Language>(data).source) || "Custom"}
             </span>
           </div>
         )}
         {activeTab === "tools" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full capitalize">
-              {(data as Tool).tool_group.replace(/_/g, " ")}
+              {castCompendiumRow<Tool>(data).tool_group.replace(/_/g, " ")}
             </span>
-            {(data as Tool).subcategory && (
+            {castCompendiumRow<Tool>(data).subcategory && (
               <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {(data as Tool).subcategory}
+                {castCompendiumRow<Tool>(data).subcategory}
               </span>
             )}
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full uppercase">
-              {(data as Tool).check_ability?.slice(0, 3)}
+              {castCompendiumRow<Tool>(data).check_ability?.slice(0, 3)}
             </span>
           </div>
         )}
         {activeTab === "class_resources" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
-              {(data as ClassResourceRow).name}
+              {castCompendiumRow<ClassResourceRow>(data).name}
             </span>
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full font-mono">
-              {(data as ClassResourceRow).resource_key}
+              {castCompendiumRow<ClassResourceRow>(data).resource_key}
             </span>
             <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-              {formatUsesSummary((data as ClassResourceRow).uses)}
+              {formatUsesSummary(castCompendiumRow<ClassResourceRow>(data).uses)}
             </span>
           </div>
         )}
         {activeTab === "abilities" && (
           <div className="space-y-2">
-            {(data as { prerequisites?: string }).prerequisites && (
+            {castCompendiumRow<{ prerequisites?: string }>(data).prerequisites && (
               <p className="text-xs text-orange">
-                Prereq: {(data as { prerequisites: string }).prerequisites}
+                Prereq: {castCompendiumRow<{ prerequisites: string }>(data).prerequisites}
               </p>
             )}
-            {!isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+            {!isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {(data as { description?: string }).description}
+                {castCompendiumRow<{ description?: string }>(data).description}
               </p>
             )}
             {activeTab === "abilities" &&
-              isCommonModifiersCatalogAbility(data as { id?: string; is_system?: boolean }) && (
+              isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {getSystemCatalogMeta(data.id as string)?.info ?? MODIFIER_CATALOG_INFO}
                 </p>
               )}
-            {(data as { attached_to_type?: string; attached_to_id?: string }).attached_to_type && (
+            {castCompendiumRow<{ attached_to_type?: string; attached_to_id?: string }>(data).attached_to_type && (
               <span className="text-xs px-2 py-1 bg-lime/10 text-lime rounded-full">
-                {(data as { attached_to_type: string; attached_to_id?: string }).attached_to_type === "equipment" &&
-                (data as { attached_to_id?: string }).attached_to_id
-                  ? `Equipment: ${(data as { attached_to_id: string }).attached_to_id}`
-                  : `For: ${(data as { attached_to_type: string }).attached_to_type}`}
+                {castCompendiumRow<{ attached_to_type: string; attached_to_id?: string }>(data).attached_to_type === "equipment" &&
+                castCompendiumRow<{ attached_to_id?: string }>(data).attached_to_id
+                  ? `Equipment: ${castCompendiumRow<{ attached_to_id: string }>(data).attached_to_id}`
+                  : `For: ${castCompendiumRow<{ attached_to_type: string }>(data).attached_to_type}`}
               </span>
             )}
           </div>
@@ -1639,8 +1645,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             groups={classResourceGroups}
             classNamesById={classNamesById}
             onSelect={(row) => setSelectedItem(row)}
-            onToggleEnabled={(row, enabled) => void handleItemEnabledChange(row, enabled)}
-            onCopy={(row) => void handleCopyItem(row as Record<string, unknown>)}
+            onToggleEnabled={(row, enabled) =>
+              void handleItemEnabledChange(row as unknown as Record<string, unknown>, enabled)
+            }
+            onCopy={(row) => void handleCopyItem(row as unknown as Record<string, unknown>)}
             copyingId={copyingId}
           />
         ) : (
@@ -1652,14 +1660,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         )}
       </main>
 
-      {selectedItem && (
+      {selectedItem != null && (
         <CompendiumDetailOverlay
           open
           onClose={() => setSelectedItem(null)}
           imageCrop={compendiumCardImageCropForType(activeTab)}
           enableCardImage={compendiumItemSupportsCardImage(
             activeTab,
-            selectedItem as Record<string, unknown>,
+            selectedItem as unknown as Record<string, unknown>,
           )}
           item={
             activeTab === "class_resources"
@@ -1715,7 +1723,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                       ]
                 : undefined
           }
-          accentColor={getCompendiumItemAccentColor(selectedItem as Record<string, unknown>)}
+          accentColor={getCompendiumItemAccentColor(selectedItem as unknown as Record<string, unknown>)}
           headerActions={
             canDuplicateCompendiumItem(
               activeTab,
@@ -1724,7 +1732,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             ) ? (
               <button
                 type="button"
-                onClick={() => void handleCopyItem(selectedItem as Record<string, unknown>)}
+                onClick={() => void handleCopyItem(selectedItem as unknown as Record<string, unknown>)}
                 disabled={copyingId === (selectedItem as { id: string }).id}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-white/20 text-white/90 hover:bg-white/10 disabled:opacity-50"
               >
@@ -1801,7 +1809,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               <RichTextContent
                 html={
                   (selectedItem as { description?: string }).description ??
-                  `<p>${getSystemCatalogMeta(selectedItem.id as string)?.info ?? MODIFIER_CATALOG_INFO}</p>`
+                  `<p>${getSystemCatalogMeta((selectedItem as { id?: string }).id as string)?.info ?? MODIFIER_CATALOG_INFO}</p>`
                 }
               />
               {(() => {

@@ -6,6 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
+import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { pageFloatingHintClass, pageStepStripClass } from "@/lib/compendium/editor-field-styles"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
@@ -772,25 +773,46 @@ export default function BuilderPage() {
       setModifierCatalog(catalog)
       const gameplayAbilities = await loadCustomAbilitiesForGameplay(db)
 
-      const classResourceRows = classResourcesRes.data || []
-      const enrichedClasses = enrichClassesList(classesRes.data || []) as DndClass[]
+      const classResourceRows = asCompendiumRows(classResourcesRes.data)
+      const enrichedClasses = enrichClassesList(
+        asCompendiumRows<Parameters<typeof enrichClassesList>[0][number]>(classesRes.data),
+      ) as unknown as DndClass[]
       setClasses(
         filterEnabled(
-          enrichedClasses.map((cls) => attachClassResourcesToClass(cls, classResourceRows as never)),
-        ),
+          enrichedClasses.map((cls) =>
+            attachClassResourcesToClass(cls, classResourceRows as never),
+          ) as (DndClass & { enabled?: boolean | number | null })[],
+        ) as unknown as DndClass[],
       )
-      setSubclasses(filterEnabled(subclassesRes.data || []))
-      setSpecies(filterEnabled(enrichSpeciesList(speciesRes.data || []) as Species[]))
-      setBackgrounds(enrichBackgroundList(filterEnabled(backgroundsRes.data || [])) as Background[])
+      setSubclasses(filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[])
+      setSpecies(
+        filterEnabled(enrichSpeciesList(asCompendiumRows<Parameters<typeof enrichSpeciesList>[0][number]>(speciesRes.data)) as unknown as Species[]),
+      )
+      setBackgrounds(
+        enrichBackgroundList(
+          filterEnabled(
+            asCompendiumRows<
+              Parameters<typeof enrichBackgroundList>[0][number] & { enabled?: boolean | number | null }
+            >(backgroundsRes.data),
+          ),
+        ) as unknown as Background[],
+      )
       if (featsRes.error) {
         setFeatsLoadError(featsRes.error.message)
         setFeats([])
       } else {
         setFeatsLoadError(null)
-        setFeats(filterEnabled(enrichFeatsList(featsRes.data || [], catalog)) as Feat[])
+        setFeats(
+          filterEnabled(
+            enrichFeatsList(
+              asCompendiumRows<Parameters<typeof enrichFeatsList>[0][number]>(featsRes.data),
+              catalog,
+            ) as (Feat & { enabled?: boolean | number | null })[],
+          ) as unknown as Feat[],
+        )
       }
-      setSpells(filterEnabled(spellsRes.data || []))
-      setEquipment(filterEnabled(equipmentRes.data || []))
+      setSpells(filterEnabled(asCompendiumRows(spellsRes.data)) as unknown as Spell[])
+      setEquipment(filterEnabled(asCompendiumRows(equipmentRes.data)) as unknown as Equipment[])
       setCustomAbilities(gameplayAbilities)
       setLoading(false)
     }
@@ -1479,8 +1501,8 @@ export default function BuilderPage() {
       : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
   const cinematicPickerPaginationClass = useSwipeVisualPicker ? "max-sm:hidden" : undefined
 
-  const compactPickerLayout = cardViewMode === "dense" ? "compact" : "default"
-  const skillPickerLayout = cardViewMode === "cinematic" ? "visual" : "compact"
+  const compactPickerLayout = (cardViewMode === "dense" ? "compact" : "default") as "compact" | "default"
+  const skillPickerLayout = (cardViewMode === "cinematic" ? "visual" : "compact") as "visual" | "compact"
   const asiAllocatorVariant = cardViewMode === "cinematic" ? "visual" : "default"
   const selectedBackgroundCardImage = selectedBackground
     ? getCompendiumCardImageUrl(selectedBackground)
@@ -1589,10 +1611,10 @@ export default function BuilderPage() {
         selectedFeatIds,
         grantedFeatIds,
         featSelectionEntries,
-        extraSkillProficiencies: character.skill_proficiencies,
-        extraToolProficiencies: character.tool_proficiencies,
-        extraWeaponProficiencies: character.weapon_proficiencies,
-        extraArmorProficiencies: character.armor_proficiencies,
+        extraSkillProficiencies: character.skill_proficiencies ?? [],
+        extraToolProficiencies: character.tool_proficiencies ?? [],
+        extraWeaponProficiencies: character.weapon_proficiencies ?? [],
+        extraArmorProficiencies: character.armor_proficiencies ?? [],
         languages: character.languages ?? ["Common"],
         equipment,
         equippedArmorId,
@@ -1742,10 +1764,10 @@ export default function BuilderPage() {
         selectedFeatIds,
         grantedFeatIds,
         featSelectionEntries,
-        extraSkillProficiencies: character.skill_proficiencies,
-        extraToolProficiencies: character.tool_proficiencies,
-        extraWeaponProficiencies: character.weapon_proficiencies,
-        extraArmorProficiencies: character.armor_proficiencies,
+        extraSkillProficiencies: character.skill_proficiencies ?? [],
+        extraToolProficiencies: character.tool_proficiencies ?? [],
+        extraWeaponProficiencies: character.weapon_proficiencies ?? [],
+        extraArmorProficiencies: character.armor_proficiencies ?? [],
         languages: character.languages ?? ["Common"],
         equipment,
         equippedArmorId,
@@ -1864,7 +1886,8 @@ export default function BuilderPage() {
         ? await db.from("characters").update(characterData).eq("id", editingCharacterId).select().single()
         : await db.from("characters").insert([characterData]).select().single()
 
-      if (error?.message || !data?.id) {
+      const savedRow = asCompendiumRow<{ id: string }>(data)
+      if (error?.message || !savedRow?.id) {
         const message =
           error?.message ??
           (editingCharacterId
@@ -1876,7 +1899,7 @@ export default function BuilderPage() {
       }
 
       clearBuilderDraft()
-      router.push(characterSheetHref(data.id))
+      router.push(characterSheetHref(savedRow.id))
     } catch (err) {
       console.error("Error saving character:", err)
       alert(err instanceof Error ? err.message : "Failed to save character. Please try again.")
@@ -2319,7 +2342,7 @@ export default function BuilderPage() {
                     </span>
                   </button>
                   {index < visibleSteps.length - 1 && (
-                    <div className={`w-3 sm:w-10 md:w-14 h-1 mx-0.5 sm:mx-1 md:mx-2 rounded shrink-0 ${
+                    <div className={`w-1.5 h-1.5 sm:w-10 sm:h-1 md:w-14 rounded-full sm:rounded mx-0.5 sm:mx-1 md:mx-2 shrink-0 ${
                       step.id < maxStepReached ? "bg-success/80" : "bg-border/80"
                     }`} />
                   )}
@@ -2589,7 +2612,7 @@ export default function BuilderPage() {
                           const existingLevel = activeClassLevels.find((cl) => cl.classId === cls.id)
                           const isSelected = !!existingLevel
                           const isPrimary = cls.id === resolvedPrimaryClassId
-                          const accent = getCompendiumItemAccentColor(cls as Record<string, unknown>)
+                          const accent = getCompendiumItemAccentColor(cls as unknown as Record<string, unknown>)
                           const selectClass = () => {
                             if (existingLevel) {
                               if (totalLevel < 20) {
@@ -3157,7 +3180,7 @@ export default function BuilderPage() {
                                           <GameIcon
                                             name={getCompendiumItemIcon(
                                               "feats",
-                                              feat as unknown as Record<string, unknown>,
+                                              feat as unknown as unknown as Record<string, unknown>,
                                             )}
                                             className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
                                           />
@@ -3329,7 +3352,7 @@ export default function BuilderPage() {
                       <>
                         <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                           {speciesToShow.map((sp) => {
-                        const accent = getCompendiumItemAccentColor(sp as Record<string, unknown>)
+                        const accent = getCompendiumItemAccentColor(sp as unknown as Record<string, unknown>)
                         const isSelected = character.species_id === sp.id
                         const selectSpecies = () => {
                           const deselecting = character.species_id === sp.id
@@ -3431,13 +3454,14 @@ export default function BuilderPage() {
                       )}
                       {(selectedSpecies.traits ?? []).map((trait, index) => {
                         if (!trait.isChoice || !(trait.choices?.options?.length ?? 0)) return null
+                        const choices = trait.choices!
                         return (
                           <MultiSelectChoices
                             key={`${selectedSpecies.id}-${index}`}
                             title={trait.name}
-                            hint={trait.choices.category}
-                            options={trait.choices.options}
-                            maxCount={trait.choices.count}
+                            hint={choices.category}
+                            options={choices.options}
+                            maxCount={choices.count}
                             selected={speciesTraitPicks[String(index)] ?? []}
                             unavailableOptions={[
                               ...getTakenSkills(skillPickSources, `species:${index}`),
@@ -3664,7 +3688,7 @@ export default function BuilderPage() {
                         <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                           {backgroundsToShow.map((bg) => {
                         const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
-                        const accent = getCompendiumItemAccentColor(bg as Record<string, unknown>)
+                        const accent = getCompendiumItemAccentColor(bg as unknown as Record<string, unknown>)
                         const isSelected = character.background_id === bg.id
                         const selectBackground = () => {
                           const nextId = character.background_id === bg.id ? null : bg.id
@@ -5089,7 +5113,7 @@ export default function BuilderPage() {
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
                           <Eye className="w-3 h-3 mx-auto text-cyan mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">Darkvision</p>
-                          <p className="text-base font-black text-cyan">{darkvision > 0 ? `${darkvision} ft` : "—"}</p>
+                          <p className="text-base font-black text-cyan">{Number(darkvision) > 0 ? `${darkvision} ft` : "—"}</p>
                         </div>
                       </div>
                       
@@ -5347,7 +5371,7 @@ export default function BuilderPage() {
       {/* Details overlay */}
       {detailsModal.item && detailsModal.type && (() => {
         const item = detailsModal.item
-        const accent = getCompendiumItemAccentColor(item as Record<string, unknown>)
+        const accent = getCompendiumItemAccentColor(item as unknown as Record<string, unknown>)
         const close = () => setDetailsModal({ type: null, item: null })
 
         if (detailsModal.type === "class") {

@@ -302,7 +302,7 @@ export function buildByoExtractionPrompt(
   options?: ByoExtractionPromptOptions,
 ): string {
   const hint = resolveHint(contentTypeHint)
-  const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all
+  const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all ?? ""
   const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
 
   const sections = [buildImportSystemPrompt(contentTypeHint)]

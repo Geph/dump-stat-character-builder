@@ -3,6 +3,7 @@ import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-
 import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
 import type { DataClient } from "@/lib/db/client"
 import type { CustomAbility } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 /**
  * Custom abilities shown in the builder/sheet, plus system option catalogs
@@ -18,14 +19,16 @@ export async function loadCustomAbilitiesForGameplay(
   ])
 
   const byId = new Map<string, Record<string, unknown>>()
-  for (const row of builderRes.data ?? []) {
-    byId.set(row.id as string, row as Record<string, unknown>)
+  for (const row of asCompendiumRows(builderRes.data)) {
+    byId.set(row.id as string, row as unknown as Record<string, unknown>)
   }
-  for (const row of systemRes.data ?? []) {
-    byId.set(row.id as string, row as Record<string, unknown>)
+  for (const row of asCompendiumRows(systemRes.data)) {
+    byId.set(row.id as string, row as unknown as Record<string, unknown>)
   }
 
-  return filterEnabled(enrichRowsWithModifierRefs([...byId.values()])).filter((ability) => {
+  return filterEnabled(
+    enrichRowsWithModifierRefs([...byId.values()] as { enabled?: number | boolean | null; show_in_builder?: boolean; id?: string }[]),
+  ).filter((ability) => {
     if ((SYSTEM_OPTION_CATALOG_IDS as readonly string[]).includes(ability.id as string)) {
       return true
     }

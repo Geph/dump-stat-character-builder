@@ -208,7 +208,7 @@ export function compendiumCardHeroImageClass(crop: CompendiumCardImageCrop = "ce
 }
 
 export function compendiumCardAccent(item: CompendiumCardVisual): CompendiumThemeColorId | null {
-  return getCompendiumItemAccentColor(item as Record<string, unknown>)
+  return getCompendiumItemAccentColor(item as unknown as Record<string, unknown>)
 }
 
 /** First plain-text sentence for card blurbs. */

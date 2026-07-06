@@ -21,7 +21,11 @@ describe("import extraction cache", () => {
     })
 
     expect(getCachedImportChunk(key)).toBeUndefined()
-    setCachedImportChunk(key, { classes: [{ name: "Fighter", hit_die: 10, features: [] }] })
+    setCachedImportChunk(key, {
+      classes: [
+        { name: "Fighter", hit_die: 10, features: [], description: null, primary_ability: null },
+      ],
+    })
     expect(getCachedImportChunk(key)?.classes?.[0]?.name).toBe("Fighter")
     expect(getImportExtractionCacheSize()).toBe(1)
   })

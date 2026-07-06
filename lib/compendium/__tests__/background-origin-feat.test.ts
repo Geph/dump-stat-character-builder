@@ -28,7 +28,7 @@ function legacyBackground(overrides: Partial<Background> = {}): Background {
     creator_url: null,
     created_at: "",
     ...overrides,
-  }
+  } as unknown as unknown as Background
 }
 
 describe("isLegacyBackground", () => {
@@ -81,7 +81,7 @@ describe("legacy background origin feat pick", () => {
       { id: "mi", name: "Magic Initiate", description: "Learn spells." },
       { id: "alert", name: "Alert", description: "Always on guard." },
     ]
-    const resolved = findBackgroundGrantedFeat("Magic Initiate (Cleric)", feats)
+    const resolved = findBackgroundGrantedFeat("Magic Initiate (Cleric)", feats as unknown as import("@/lib/types").Feat[])
     expect(resolved?.id).toBe("mi")
   })
 })

@@ -78,7 +78,10 @@ function rowForTable(
   }
 
   if (exportType === "dnd-ability") {
-    const characteristics = normalizeCharacteristics(cleaned.characteristics, cleaned.uses)
+    const characteristics = normalizeCharacteristics(
+      cleaned.characteristics,
+      cleaned.uses as import("@/lib/types").UsesConfig | null | undefined,
+    )
     row.characteristics = characteristics
     row.uses = extractUsesConfig(characteristics)
     if (row.show_in_builder == null) row.show_in_builder = true

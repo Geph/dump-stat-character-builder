@@ -7,13 +7,12 @@ function wizardFixture(): DndClass {
     id: "wizard",
     name: "Wizard",
     description: null,
-    card_blurb: null,
-    hit_die: 6,
+        hit_die: 6,
     primary_ability: ["Intelligence"],
     saving_throws: null,
     armor_proficiencies: null,
     weapon_proficiencies: null,
-    skill_choices: null,
+    skill_choices: undefined,
     starting_equipment: null,
     starting_equipment_groups: null,
     starting_gold: null,
@@ -31,7 +30,7 @@ function wizardFixture(): DndClass {
     source: "SRD",
     creator_url: null,
     created_at: "",
-  }
+  } as unknown as unknown as DndClass
 }
 
 describe("getClassDetailHeroBadges", () => {

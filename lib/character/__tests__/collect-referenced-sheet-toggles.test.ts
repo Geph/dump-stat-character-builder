@@ -34,7 +34,7 @@ describe("collectReferencedSheetToggleIds", () => {
               ],
             },
           ],
-        } as Feature,
+        } as unknown as Feature,
       ],
       feats: [],
       catalog: [],

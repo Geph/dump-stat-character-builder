@@ -1,4 +1,4 @@
-import type { DataClient } from "@/lib/data/types"
+import { asCompendiumRows, type DataClient } from "@/lib/data/types"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -48,7 +48,7 @@ export async function hydrateDashboardCharacters(
     loadCustomAbilitiesForGameplay(db),
     db.from("equipment").select("*").order("name"),
   ])
-  const equipmentCatalog = (equipmentCatalogResult.data ?? []) as Equipment[]
+  const equipmentCatalog = asCompendiumRows(equipmentCatalogResult.data) as unknown as Equipment[]
 
   const characterRows = await Promise.all(
     ids.map(async (id) => {
@@ -73,20 +73,20 @@ export async function hydrateDashboardCharacters(
   const [featsResult, equipmentResult, spellsResult] = await Promise.all([
     allFeatIds.length
       ? db.from("feats").select("*").in("id", allFeatIds)
-      : Promise.resolve({ data: [] as Feat[] }),
+      : Promise.resolve({ data: [] as unknown as Feat[] }),
     allEquipmentIds.length
       ? db.from("equipment").select("*").in("id", allEquipmentIds)
-      : Promise.resolve({ data: [] as Equipment[] }),
+      : Promise.resolve({ data: [] as unknown as Equipment[] }),
     allSpellIds.length
       ? db.from("spells").select("*").in("id", allSpellIds)
-      : Promise.resolve({ data: [] as Spell[] }),
+      : Promise.resolve({ data: [] as unknown as Spell[] }),
   ])
 
-  const featsById = new Map(((featsResult.data ?? []) as Feat[]).map((feat) => [feat.id, feat]))
+  const featsById = new Map((asCompendiumRows(featsResult.data) as unknown as Feat[]).map((feat) => [feat.id, feat]))
   const equipmentById = new Map(
-    ((equipmentResult.data ?? []) as Equipment[]).map((item) => [item.id, item]),
+    (asCompendiumRows(equipmentResult.data) as unknown as Equipment[]).map((item) => [item.id, item]),
   )
-  const spellsById = new Map(((spellsResult.data ?? []) as Spell[]).map((spell) => [spell.id, spell]))
+  const spellsById = new Map((asCompendiumRows(spellsResult.data) as unknown as Spell[]).map((spell) => [spell.id, spell]))
 
   return validCharacters.map((character) => ({
     character,

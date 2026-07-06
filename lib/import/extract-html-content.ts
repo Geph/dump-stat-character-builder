@@ -1,10 +1,19 @@
-import type { Cheerio, CheerioAPI, Element } from "cheerio"
+import type { Cheerio, CheerioAPI } from "cheerio"
 import { escapeHtml } from "@/lib/compendium/rich-text-html"
+
+type TagElement = {
+  type?: string
+  tagName?: string
+  data?: string
+  attribs?: Record<string, string>
+}
+
+type CheerioInput = Parameters<CheerioAPI>[0]
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"])
 
-function sanitizeInlineHtml($: CheerioAPI, el: Element): string {
-  const $el = $(el)
+function sanitizeInlineHtml($: CheerioAPI, el: TagElement): string {
+  const $el = $(el as CheerioInput)
   const clone = $el.clone()
   clone.find("script, style, iframe, object").remove()
   clone.find("*").each((_, node) => {
@@ -22,9 +31,9 @@ function sanitizeInlineHtml($: CheerioAPI, el: Element): string {
   return clone.html()?.trim() ?? escapeHtml($el.text().trim())
 }
 
-function normalizeTableHtml($: CheerioAPI, table: Element): string {
+function normalizeTableHtml($: CheerioAPI, table: TagElement): string {
   const rows: string[] = []
-  $(table)
+  $(table as CheerioInput)
     .find("tr")
     .each((_, tr) => {
       const cells: string[] = []
@@ -32,7 +41,7 @@ function normalizeTableHtml($: CheerioAPI, table: Element): string {
         .find("td, th")
         .each((_, cell) => {
           const tag = cell.tagName?.toLowerCase() === "th" ? "th" : "td"
-          const inner = sanitizeInlineHtml($, cell)
+          const inner = sanitizeInlineHtml($, cell as TagElement)
           cells.push(`<${tag}>${inner || "&nbsp;"}</${tag}>`)
         })
       if (cells.length) rows.push(`<tr>${cells.join("")}</tr>`)
@@ -42,13 +51,13 @@ function normalizeTableHtml($: CheerioAPI, table: Element): string {
   return `<table><tbody>${rows.join("")}</tbody></table>`
 }
 
-function normalizeListHtml($: CheerioAPI, list: Element): string {
+function normalizeListHtml($: CheerioAPI, list: TagElement): string {
   const tag = list.tagName?.toLowerCase() === "ol" ? "ol" : "ul"
   const items: string[] = []
-  $(list)
+  $(list as CheerioInput)
     .children("li")
     .each((_, li) => {
-      const inner = sanitizeInlineHtml($, li)
+      const inner = sanitizeInlineHtml($, li as TagElement)
       if (inner) items.push(`<li>${inner}</li>`)
     })
   if (!items.length) return ""
@@ -60,63 +69,75 @@ function appendBlock(parts: string[], html: string) {
   if (trimmed) parts.push(trimmed)
 }
 
-function walkBlocks($: CheerioAPI, $root: Cheerio<Element>, parts: string[]) {
-  $root.contents().each((_, node) => {
-    if (node.type === "text") {
-      const text = (node.data ?? "").replace(/\s+/g, " ").trim()
-      if (text) appendBlock(parts, `<p>${escapeHtml(text)}</p>`)
-      return
+function cheerioChildNodes(root: Cheerio<unknown>): TagElement[] {
+  return (
+    root as unknown as {
+      contents(): { toArray(): unknown[] }
     }
-    if (node.type !== "tag") return
+  )
+    .contents()
+    .toArray() as TagElement[]
+}
 
-    const el = node as Element
+function walkBlocks($: CheerioAPI, $root: Cheerio<unknown>, parts: string[]) {
+  const children = cheerioChildNodes($root)
+  for (const node of children) {
+    const typedNode = node as TagElement
+    if (typedNode.type === "text") {
+      const text = (typedNode.data ?? "").replace(/\s+/g, " ").trim()
+      if (text) appendBlock(parts, `<p>${escapeHtml(text)}</p>`)
+      continue
+    }
+    if (typedNode.type !== "tag") continue
+
+    const el = typedNode
     const tag = el.tagName?.toLowerCase()
-    if (!tag) return
+    if (!tag) continue
 
     if (tag === "p") {
       const inner = sanitizeInlineHtml($, el)
       if (inner) appendBlock(parts, `<p>${inner}</p>`)
-      return
+      continue
     }
 
     if (tag === "table") {
       appendBlock(parts, normalizeTableHtml($, el))
-      return
+      continue
     }
 
     if (tag === "ul" || tag === "ol") {
       appendBlock(parts, normalizeListHtml($, el))
-      return
+      continue
     }
 
     if (HEADING_TAGS.has(tag)) {
-      const text = $(el).text().trim()
+      const text = $(el as CheerioInput).text().trim()
       if (text) appendBlock(parts, `<p><strong>${escapeHtml(text)}</strong></p>`)
-      return
+      continue
     }
 
     if (tag === "blockquote") {
-      const inner = $(el).text().trim()
+      const inner = $(el as CheerioInput).text().trim()
       if (inner) appendBlock(parts, `<p><em>${escapeHtml(inner)}</em></p>`)
-      return
+      continue
     }
 
-    if (tag === "br") return
+    if (tag === "br") continue
 
     if (tag === "div" || tag === "section" || tag === "article") {
-      walkBlocks($, $(el), parts)
+      walkBlocks($, $(el as CheerioInput), parts)
     }
-  })
+  }
 }
 
 /** Extract paragraphs, lists, and tables from a content root in document order. */
-export function extractRichHtmlFromRoot($: CheerioAPI, root: Cheerio<Element>): string {
+export function extractRichHtmlFromRoot($: CheerioAPI, root: Cheerio<unknown>): string {
   const parts: string[] = []
   walkBlocks($, root, parts)
   return parts.join("\n")
 }
 
-export function getMainContentRoot($: CheerioAPI): Cheerio<Element> {
+export function getMainContentRoot($: CheerioAPI): Cheerio<CheerioInput> {
   return $("#page-content, .page-content, article").first()
 }
 
@@ -139,9 +160,9 @@ export function extractPlainSummary(html: string): string {
 }
 
 /** Collect rich HTML from sibling blocks immediately after a heading/element. */
-export function extractFollowingBlocks($: CheerioAPI, el: Element): string {
+export function extractFollowingBlocks($: CheerioAPI, el: TagElement): string {
   const parts: string[] = []
-  let $next = $(el).next()
+  let $next = $(el as CheerioInput).next()
 
   while ($next.length) {
     const tag = $next.prop("tagName")?.toLowerCase()
