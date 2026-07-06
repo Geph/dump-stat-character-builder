@@ -3,11 +3,14 @@ import {
   compendiumBrowseGridClass,
   COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
   COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+  COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
   compendiumItemSupportsCardImage,
   compendiumPortraitListGradientClass,
   compendiumTabSupportsCardImage,
   compendiumUsesPortraitCardArt,
+  hidesCompendiumBrowseCardIcon,
   isCompendiumPortraitGraphicCard,
+  usesCompendiumGraphicCardGradient,
   resolveCompendiumCardImageUrl,
 } from "@/lib/compendium/card-image"
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
@@ -38,28 +41,50 @@ describe("compendiumUsesPortraitCardArt", () => {
 })
 
 describe("isCompendiumPortraitGraphicCard", () => {
-  it("treats portrait tabs and backgrounds with card art as graphic portrait cards", () => {
+  it("uses portrait layout only for portrait tabs with card art", () => {
     const url = "https://example.com/art.png"
     expect(isCompendiumPortraitGraphicCard("classes", url)).toBe(true)
     expect(isCompendiumPortraitGraphicCard("species", url)).toBe(true)
     expect(isCompendiumPortraitGraphicCard("subclasses", url)).toBe(true)
     expect(isCompendiumPortraitGraphicCard("spells", url)).toBe(true)
-    expect(isCompendiumPortraitGraphicCard("backgrounds", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("backgrounds", url)).toBe(false)
     expect(isCompendiumPortraitGraphicCard("backgrounds", null)).toBe(false)
     expect(isCompendiumPortraitGraphicCard("feats", url)).toBe(false)
   })
 
-  it("uses the graphic-card gradient for portrait tabs and backgrounds with art", () => {
+  it("uses the graphic-card gradient for portrait tabs and widescreen backgrounds with art", () => {
     const url = "https://example.com/art.png"
+    expect(usesCompendiumGraphicCardGradient("species", url)).toBe(true)
+    expect(usesCompendiumGraphicCardGradient("backgrounds", url)).toBe(true)
     expect(compendiumPortraitListGradientClass("species", url)).toBe(
       COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
     )
     expect(compendiumPortraitListGradientClass("backgrounds", url)).toBe(
-      COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+      COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
+    )
+    expect(compendiumPortraitListGradientClass("spells", url)).toBe(
+      COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
     )
     expect(compendiumPortraitListGradientClass("backgrounds", url)).not.toBe(
       COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
     )
+    expect(usesCompendiumGraphicCardGradient("feats", url)).toBe(false)
+  })
+})
+
+describe("hidesCompendiumBrowseCardIcon", () => {
+  const url = "https://example.com/art.png"
+
+  it("hides icons for portrait tabs and backgrounds with card art", () => {
+    expect(hidesCompendiumBrowseCardIcon("classes", url)).toBe(true)
+    expect(hidesCompendiumBrowseCardIcon("species", url)).toBe(true)
+    expect(hidesCompendiumBrowseCardIcon("backgrounds", url)).toBe(true)
+  })
+
+  it("shows icons when there is no card art or the tab is not graphic", () => {
+    expect(hidesCompendiumBrowseCardIcon("backgrounds", null)).toBe(false)
+    expect(hidesCompendiumBrowseCardIcon("feats", url)).toBe(false)
+    expect(hidesCompendiumBrowseCardIcon("magic_items", url)).toBe(false)
   })
 })
 
@@ -104,9 +129,15 @@ describe("compendiumItemSupportsCardImage", () => {
 })
 
 describe("compendium graphic card gradient", () => {
-  it("uses a 70/10/20 scrim ramp", () => {
-    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.85)_0%")
-    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("transparent_30%")
+  it("uses a 65/15/20 scrim ramp for class portrait cards", () => {
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_0%")
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("transparent_35%")
+  })
+
+  it("uses a 60/20/20 scrim ramp for spells and backgrounds", () => {
+    expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_0%")
+    expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_20%")
+    expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("transparent_40%")
   })
 })
 

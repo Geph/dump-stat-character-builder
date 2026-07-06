@@ -21,9 +21,12 @@ export const COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[350px]"
 /** Landscape browse cards — bottom scrim for text legibility. */
 export const COMPENDIUM_LIST_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_40%,rgba(0,0,0,0.45)_46%,transparent_50%)]"
-/** Portrait / graphic browse cards — top 70% clear; 10% ramp; bottom 20% at 85% black (15% transparent). */
+/** Portrait / graphic browse cards — top 65% clear; 15% ramp; bottom 20% at 80% black (20% transparent). */
 export const COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS =
-  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_20%,transparent_30%)]"
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.8)_20%,transparent_35%)]"
+/** Spell and background graphic browse cards — top 60% clear; 20% ramp; bottom 20% at 80% black. */
+export const COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS =
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.8)_20%,transparent_40%)]"
 /** Builder selection cards — clear top 40%, then ramp to 80% black at the bottom. */
 export const SELECTION_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_bottom,transparent_0%,transparent_40%,rgba(0,0,0,0.45)_54%,rgba(0,0,0,0.8)_100%)]"
@@ -138,18 +141,37 @@ export function isCompendiumPortraitGraphicCard(
   tab: CompendiumContentType,
   cardImage: string | null | undefined,
 ): boolean {
+  return Boolean(cardImage) && compendiumUsesPortraitCardArt(tab)
+}
+
+/** Graphic cards that use the 65/15/20 bottom scrim (portrait tabs + backgrounds with art). */
+export function usesCompendiumGraphicCardGradient(
+  tab: CompendiumContentType,
+  cardImage: string | null | undefined,
+): boolean {
   if (!cardImage) return false
   if (compendiumUsesPortraitCardArt(tab)) return true
   return tab === "backgrounds"
+}
+
+export function hidesCompendiumBrowseCardIcon(
+  tab: CompendiumContentType,
+  cardImage: string | null | undefined,
+): boolean {
+  return usesCompendiumGraphicCardGradient(tab, cardImage)
 }
 
 export function compendiumGraphicCardListGradientClass(
   tab: CompendiumContentType,
   cardImage: string | null | undefined,
 ): string {
-  return isCompendiumPortraitGraphicCard(tab, cardImage)
-    ? COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS
-    : COMPENDIUM_LIST_CARD_GRADIENT_CLASS
+  if (!usesCompendiumGraphicCardGradient(tab, cardImage)) {
+    return COMPENDIUM_LIST_CARD_GRADIENT_CLASS
+  }
+  if (tab === "spells" || tab === "backgrounds") {
+    return COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS
+  }
+  return COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS
 }
 
 /** @deprecated Use compendiumGraphicCardListGradientClass */
@@ -168,17 +190,12 @@ export function compendiumBrowseGridClass(tab: CompendiumContentType): string {
   return "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
 }
 
-/** Portrait class/species/spell/background art is top-cropped when shown as a graphic card. */
+/** Portrait class/species/spell art is top-cropped; widescreen tabs use center framing. */
 export function compendiumCardImageCropForType(
   tab: CompendiumContentType,
   cardImage?: string | null,
 ): CompendiumCardImageCrop {
-  if (
-    cardImage &&
-    (compendiumUsesPortraitCardArt(tab) || tab === "backgrounds")
-  ) {
-    return "top"
-  }
+  if (cardImage && compendiumUsesPortraitCardArt(tab)) return "top"
   return tab === "classes" || tab === "subclasses" || tab === "species" || tab === "spells"
     ? "top"
     : "center"

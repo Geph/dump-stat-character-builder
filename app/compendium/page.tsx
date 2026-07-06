@@ -70,6 +70,7 @@ import {
   compendiumCardImageCropForType,
   compendiumItemSupportsCardImage,
   compendiumPortraitListGradientClass,
+  hidesCompendiumBrowseCardIcon,
   isCompendiumPortraitGraphicCard,
   resolveCompendiumCardImageUrl,
   type CompendiumCardVisual,
@@ -88,6 +89,11 @@ import {
 import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import {
+  BACKGROUND_ABILITY_FILTER_OPTIONS,
+  backgroundMatchesAbilityFilter,
+} from "@/lib/compendium/background-ability-filter"
+import type { AbilityModifierKey } from "@/lib/compendium/characteristic-modifiers"
 
 type ContentType = CompendiumContentType
 
@@ -180,6 +186,7 @@ function CompendiumPageContent() {
   const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
   const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
   const [toolFilterGroup, setToolFilterGroup] = useState<string>("all")
+  const [backgroundFilterAbilities, setBackgroundFilterAbilities] = useState<AbilityModifierKey[]>([])
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -396,6 +403,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     if (activeTab === "tools") {
       const tool = item as Tool
       if (toolFilterGroup !== "all" && tool.tool_group !== toolFilterGroup) return false
+    }
+    if (activeTab === "backgrounds" && backgroundFilterAbilities.length > 0) {
+      if (!backgroundMatchesAbilityFilter(item as Background, backgroundFilterAbilities)) return false
     }
     return true
   })
@@ -723,6 +733,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       activeTab,
     )
     const portraitGraphicCard = isCompendiumPortraitGraphicCard(activeTab, cardImage)
+    const hideCardIcon = hidesCompendiumBrowseCardIcon(activeTab, cardImage)
     const cardMinHeightClass =
       cardImage && !portraitGraphicCard
         ? activeTab === "classes"
@@ -768,7 +779,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         >
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            {!portraitGraphicCard ? (
+            {!hideCardIcon ? (
               <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
                 <GameIcon name={iconName} className="w-10 h-10" />
               </div>
@@ -776,8 +787,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <h3 
               className={cn(
                 "font-bold cursor-pointer leading-tight flex items-center gap-1.5",
-                portraitGraphicCard ? "text-base" : "text-lg",
-                cardImage ? "text-white drop-shadow-md" : "text-foreground",
+                cardImage
+                  ? cn(
+                      portraitGraphicCard ? "text-2xl" : "text-[1.6875rem]",
+                      "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]",
+                    )
+                  : "text-lg text-foreground",
                 accentStyles.titleHover,
               )}
               onClick={() => setSelectedItem(item)}
@@ -872,25 +887,34 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           </div>
         )}
         {activeTab === "backgrounds" && (
-          <div className="flex gap-2 flex-wrap">
-            {(data as Background).skill_proficiencies?.slice(0, 2).map((skill) => (
-              <span key={skill} className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
-                {skill}
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {formatCompendiumSource((data as Background).source) || "Custom"}
               </span>
-            ))}
-            {(data as Background).feat_granted && (
-              <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
-                {(data as Background).feat_granted}
-              </span>
-            )}
-            <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-              {formatCompendiumSource((data as Background).source) || "Custom"}
-            </span>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {(data as Background).skill_proficiencies?.slice(0, 2).map((skill) => (
+                <span key={skill} className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
+                  {skill}
+                </span>
+              ))}
+              {(data as Background).feat_granted && (
+                <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
+                  {(data as Background).feat_granted}
+                </span>
+              )}
+            </div>
           </div>
         )}
         {activeTab === "spells" && (
           <div className="flex gap-2 flex-wrap">
-            <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+            <span
+              className={cn(
+                "text-xs px-2 py-1 rounded-full",
+                cardImage ? "bg-lime/25 text-lime" : "bg-primary/10 text-primary",
+              )}
+            >
               {(data as Spell).level === 0 ? "Cantrip" : `Level ${(data as Spell).level}`}
             </span>
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
@@ -899,20 +923,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             {(data as Spell).concentration && (
               <span className="text-xs px-2 py-1 bg-warning/10 text-warning rounded-full">
                 Concentration
-              </span>
-            )}
-            {((data as Spell).classes ?? []).length > 0 ? (
-              ((data as Spell).classes ?? []).map((cls) => (
-                <span
-                  key={cls}
-                  className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
-                >
-                  {cls}
-                </span>
-              ))
-            ) : (
-              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                No class list
               </span>
             )}
           </div>
@@ -1432,6 +1442,48 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                       setSpellFilterLevel("all")
                       setSpellFilterSchool("all")
                     }}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "backgrounds" && (
+              <div id="background-filters" className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Abilities
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {BACKGROUND_ABILITY_FILTER_OPTIONS.map((ability) => {
+                    const selected = backgroundFilterAbilities.includes(ability)
+                    return (
+                      <button
+                        key={ability}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() =>
+                          setBackgroundFilterAbilities((prev) =>
+                            selected ? prev.filter((key) => key !== ability) : [...prev, ability],
+                          )
+                        }
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+                          selected
+                            ? "border-primary bg-primary/15 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                        )}
+                      >
+                        {ability}
+                      </button>
+                    )
+                  })}
+                </div>
+                {backgroundFilterAbilities.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBackgroundFilterAbilities([])}
                     className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                   >
                     Clear filters

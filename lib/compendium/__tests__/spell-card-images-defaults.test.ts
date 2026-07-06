@@ -30,7 +30,7 @@ describe("spell card image defaults", () => {
   })
 
   it("applies bundled art to remaining SRD cantrips", () => {
-    for (const name of ["Starry Wisp", "Elementalism", "Sorcerous Burst"] as const) {
+    for (const name of ["Starry Wisp", "Elementalism", "Sorcerous Burst", "Eldritch Blast"] as const) {
       const row = enrichSrdSpellRow({ name, source: "SRD", level: 0 })
       expect(row.card_image_url).toMatch(
         new RegExp(`/images/compendium/spells/${spellNameToCardImageSlug(name)}\\.png$`),
