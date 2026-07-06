@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { ToolGroupedChoices } from "@/components/builder/tool-grouped-choices"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
@@ -204,6 +205,11 @@ export function ModifierPlayerChoicePanel({
         }
 
         const isSkillKind = slot.kind === "skill" || slot.kind === "skill_or_tool"
+        const useToolGroups =
+          slot.kind === "tool" &&
+          (slot.toolChoicePool === "artisans" ||
+            slot.toolChoicePool === "musical" ||
+            slot.toolChoicePool === "gaming")
         const currentSelection = picks[slot.slotKey] ?? []
         const displayOptions = slot.grantsExpertise
           ? optionsForExpertiseSlot(slot, {
@@ -225,6 +231,29 @@ export function ModifierPlayerChoicePanel({
             : slot.grantsExpertise
               ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
               : `Choose ${slot.maxCount}`
+        if (useToolGroups) {
+          return (
+            <div key={slot.slotKey} className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="font-bold text-sm text-foreground">{slot.label}</h3>
+                <span className="text-xs text-muted-foreground">
+                  {currentSelection.length}/{slot.maxCount} selected
+                </span>
+              </div>
+              <ToolGroupedChoices
+                options={displayOptions}
+                toolChoicePool={slot.toolChoicePool}
+                maxCount={slot.maxCount}
+                selected={currentSelection}
+                onChange={(selected) => onChange(slot.slotKey, selected)}
+                accentClass={accentClass}
+                unavailableOptions={unavailableOptions}
+                compact={choiceLayout === "compact"}
+              />
+            </div>
+          )
+        }
+
         return (
           <MultiSelectChoices
             key={slot.slotKey}

@@ -147,6 +147,61 @@ describe("Elf — Elven Lineage", () => {
   })
 })
 
+function gnomeRow(): Record<string, unknown> {
+  const gnome = bundledSpecies.find((row) => row.name === "Gnome")
+  if (!gnome) throw new Error("Gnome species missing from seed data")
+  return {
+    id: "species_gnome",
+    name: "Gnome",
+    description: gnome.description ?? null,
+    speed: 30,
+    size: "Small",
+    creature_type: "Humanoid",
+    source: SRD_SOURCE,
+    traits: gnome.traits,
+  }
+}
+
+function gnomishLineageTraitIndex(species: Species): number {
+  const index = species.traits?.findIndex((trait) => trait.name === "Gnomish Lineage") ?? -1
+  if (index < 0) throw new Error("Gnomish Lineage trait missing")
+  return index
+}
+
+describe("Gnome — Gnomish Lineage", () => {
+  it("asks for spellcasting ability after Forest Gnome is selected", () => {
+    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as Species
+    const lineageIndex = gnomishLineageTraitIndex(enriched)
+    const slots = collectSpeciesModifierPlayerChoiceSlots(
+      enriched,
+      { [String(lineageIndex)]: ["Forest Gnome"] },
+      catalog,
+    )
+    const abilitySlot = slots.find((slot) => slot.kind === "spellcasting_ability")
+    expect(abilitySlot).toBeDefined()
+    expect(abilitySlot?.options?.map((option) => option.name).sort()).toEqual([
+      "Charisma",
+      "Intelligence",
+      "Wisdom",
+    ])
+    expect(slots.some((slot) => slot.kind === "spell")).toBe(false)
+  })
+
+  it("wires fixed Rock Gnome lineage cantrips on the option preset", () => {
+    const enriched = enrichSrdSpeciesRow(gnomeRow()) as unknown as Species
+    const lineage = enriched.traits?.find((trait) => trait.name === "Gnomish Lineage")
+    const rockGnome = lineage?.choices?.options?.find((option) => option.name === "Rock Gnome")
+    const spellMod = rockGnome?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "spells_known")
+    expect(spellMod?.spells?.map((entry) => entry.spellId)).toEqual([
+      "Mending",
+      "Prestidigitation",
+    ])
+    expect(spellMod?.choiceGrants ?? []).toHaveLength(0)
+  })
+})
+
 describe("isFeatEligibleForCategories — Origin slots", () => {
   const originFeat: Feat = {
     id: "feat_skilled",

@@ -93,6 +93,7 @@ import {
   splitSpeciesTraits,
 } from "@/components/compendium/species-detail-trait-list"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
+import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
 import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
@@ -2318,7 +2319,7 @@ export default function BuilderPage() {
                     </span>
                   </button>
                   {index < visibleSteps.length - 1 && (
-                    <div className={`w-6 sm:w-10 md:w-14 h-1 mx-1 md:mx-2 rounded shrink-0 ${
+                    <div className={`w-3 sm:w-10 md:w-14 h-1 mx-0.5 sm:mx-1 md:mx-2 rounded shrink-0 ${
                       step.id < maxStepReached ? "bg-success/80" : "bg-border/80"
                     }`} />
                   )}
@@ -2583,7 +2584,7 @@ export default function BuilderPage() {
                         nextLabel="Next classes"
                         className={cn("mb-2 mt-0", cinematicPickerPaginationClass)}
                       />
-                      <div className={pickerGridClass}>
+                      <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                         {classesToShow.map((cls) => {
                           const existingLevel = activeClassLevels.find((cl) => cl.classId === cls.id)
                           const isSelected = !!existingLevel
@@ -2642,7 +2643,7 @@ export default function BuilderPage() {
                             />
                           )
                         })}
-                      </div>
+                      </SwipeVisualPicker>
                       <PickerGridPagination
                         page={safeClassPage}
                         pageCount={classPageCount}
@@ -3326,7 +3327,7 @@ export default function BuilderPage() {
 
                     return (
                       <>
-                        <div className={pickerGridClass}>
+                        <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                           {speciesToShow.map((sp) => {
                         const accent = getCompendiumItemAccentColor(sp as Record<string, unknown>)
                         const isSelected = character.species_id === sp.id
@@ -3374,7 +3375,7 @@ export default function BuilderPage() {
                       />
                         )
                       })}
-                        </div>
+                        </SwipeVisualPicker>
                         <PickerGridPagination
                           page={safeSpeciesPage}
                           pageCount={speciesPageCount}
@@ -3660,7 +3661,7 @@ export default function BuilderPage() {
 
                     return (
                       <>
-                        <div className={pickerGridClass}>
+                        <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                           {backgroundsToShow.map((bg) => {
                         const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
                         const accent = getCompendiumItemAccentColor(bg as Record<string, unknown>)
@@ -3742,7 +3743,7 @@ export default function BuilderPage() {
                       />
                         )
                       })}
-                        </div>
+                        </SwipeVisualPicker>
                         <PickerGridPagination
                           page={safeBackgroundPage}
                           pageCount={backgroundPageCount}
@@ -4274,6 +4275,7 @@ export default function BuilderPage() {
                             selectedIndex={startingEquipmentOptionIndex}
                             startingGold={classStartingGold}
                             onSelect={selectStartingEquipmentOption}
+                            swipeLayout={useSwipeVisualPicker}
                           />
                         ))
                       ) : (
@@ -4338,6 +4340,7 @@ export default function BuilderPage() {
                             startingGold={backgroundStartingGold}
                             onSelect={selectBackgroundStartingEquipmentOption}
                             imageSide="alternate"
+                            swipeLayout={useSwipeVisualPicker}
                           />
                         ))
                       ) : (

@@ -745,16 +745,28 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
 
   "Gnome::Gnomish Lineage::Forest Gnome": {
     linkedModifiers: [
-      spellsKnownChoice("forest_gnome_spells", [{ level: 0, count: 2 }], {
-        label: "Forest Gnome cantrips",
-      }),
+      spellcastingAbilityChoice("forest_gnome_lineage_ability"),
+      spellsKnownFixed(
+        "forest_gnome_spells",
+        [
+          { name: "Minor Illusion", unlocksAtLevel: 1 },
+          { name: "Speak with Animals", unlocksAtLevel: 1 },
+        ],
+        "Forest Gnome lineage spells",
+      ),
     ],
   },
   "Gnome::Gnomish Lineage::Rock Gnome": {
     linkedModifiers: [
-      spellsKnownChoice("rock_gnome_spells", [{ level: 0, count: 2 }], {
-        label: "Rock Gnome cantrips",
-      }),
+      spellcastingAbilityChoice("rock_gnome_lineage_ability"),
+      spellsKnownFixed(
+        "rock_gnome_spells",
+        [
+          { name: "Mending", unlocksAtLevel: 1 },
+          { name: "Prestidigitation", unlocksAtLevel: 1 },
+        ],
+        "Rock Gnome lineage cantrips",
+      ),
     ],
   },
 

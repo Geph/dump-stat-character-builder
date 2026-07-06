@@ -26,7 +26,7 @@ import {
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
-import { mergeToolNameLists, toolNamesForPool } from "@/lib/compendium/tool-options"
+import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib/compendium/tool-options"
 import { SRD_TOOL_NAMES, getAllSeedToolNames } from "@/lib/compendium/srd-tools"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
 import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
@@ -63,6 +63,8 @@ export type ModifierPlayerChoiceSlot = {
    * picker must NOT hide skills already chosen elsewhere in the build.
    */
   grantsExpertise?: boolean
+  /** Tool proficiency pool — drives grouped accordion UI for artisans / musical picks. */
+  toolChoicePool?: ToolChoicePool | null
 }
 
 const SKILL_NAME_SET = new Set<string>(SKILL_NAMES)
@@ -192,6 +194,7 @@ function slotsFromCharacteristic(
           : `Choose ${count} tool${count === 1 ? "" : "s"}`),
       maxCount: count,
       options: pool.map((name) => ({ name })),
+      toolChoicePool: mod.toolChoicePool ?? null,
     })
     return slots
   }
@@ -769,7 +772,8 @@ export function spellOptionsForModifierSlot(
   return spells.filter(
     (spell) =>
       spell.level === slot.spellLevel &&
-      spell.classes?.some((className) => classSet.has(className.toLowerCase())) &&
+      (classSet.size === 0 ||
+        spell.classes?.some((className) => classSet.has(className.toLowerCase()))) &&
       (!otherSlotSpellIds.has(spell.id) || ownPicks.includes(spell.id)),
   )
 }
