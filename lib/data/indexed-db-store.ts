@@ -8,8 +8,8 @@ import {
 } from "@/lib/character/character-classes"
 
 const DB_NAME = "dump-stat"
-/** Bump when COMPENDIUM_TABLES gains a new store (v3: tools). */
-const DB_VERSION = 3
+/** Bump when COMPENDIUM_TABLES gains a new store (v3: tools, v4: repair pass). */
+const DB_VERSION = 4
 
 const ALL_STORES = [...COMPENDIUM_TABLES, "characters"] as const
 type StoreName = CompendiumTable | "characters"
@@ -71,20 +71,44 @@ function applyOrder(rows: Record<string, unknown>[], orders: OrderBy[]): Record<
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise
-  dbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
+function createMissingStores(db: IDBDatabase): void {
+  for (const store of ALL_STORES) {
+    if (!db.objectStoreNames.contains(store)) {
+      db.createObjectStore(store, { keyPath: "id" })
+    }
+  }
+}
+
+function listMissingStores(db: IDBDatabase): StoreName[] {
+  return ALL_STORES.filter((store) => !db.objectStoreNames.contains(store))
+}
+
+function openDbAtVersion(version: number): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, version)
     request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB"))
     request.onupgradeneeded = () => {
-      const db = request.result
-      for (const store of ALL_STORES) {
-        if (!db.objectStoreNames.contains(store)) {
-          db.createObjectStore(store, { keyPath: "id" })
-        }
-      }
+      createMissingStores(request.result)
     }
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      const db = request.result
+      const missing = listMissingStores(db)
+      if (missing.length > 0) {
+        db.close()
+        const nextVersion = Math.max(version, db.version) + 1
+        openDbAtVersion(nextVersion).then(resolve, reject)
+        return
+      }
+      resolve(db)
+    }
+  })
+}
+
+function openDb(): Promise<IDBDatabase> {
+  if (dbPromise) return dbPromise
+  dbPromise = openDbAtVersion(DB_VERSION).catch((error) => {
+    dbPromise = null
+    throw error
   })
   return dbPromise
 }
