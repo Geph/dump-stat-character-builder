@@ -18,6 +18,8 @@ type CompendiumCardHeroProps = {
   fillHeight?: boolean
   /** List card: image covers the entire card behind content. */
   fullBleed?: boolean
+  /** Override list-card scrim (portrait vs landscape browse cards). */
+  listGradientClass?: string
   className?: string
   minHeightClass?: string
   maxHeightClass?: string
@@ -29,6 +31,7 @@ export function CompendiumCardHero({
   variant = "list",
   fillHeight = false,
   fullBleed = false,
+  listGradientClass,
   className,
   minHeightClass,
   maxHeightClass,
@@ -57,7 +60,7 @@ export function CompendiumCardHero({
           className={cn(
             "absolute inset-0",
             fullBleed
-              ? COMPENDIUM_LIST_CARD_GRADIENT_CLASS
+              ? (listGradientClass ?? COMPENDIUM_LIST_CARD_GRADIENT_CLASS)
               : "bg-gradient-to-t from-card via-card/60 to-transparent",
           )}
         />

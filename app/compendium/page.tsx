@@ -67,10 +67,11 @@ import {
   COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS,
   COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS,
   compendiumBrowseGridClass,
-  compendiumItemSupportsCardImage,
-  compendiumUsesPortraitCardArt,
-  resolveCompendiumCardImageUrl,
   compendiumCardImageCropForType,
+  compendiumItemSupportsCardImage,
+  compendiumPortraitListGradientClass,
+  isCompendiumPortraitGraphicCard,
+  resolveCompendiumCardImageUrl,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -721,14 +722,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       data as Record<string, unknown> & CompendiumCardVisual,
       activeTab,
     )
-    const portraitGraphicCard =
-      Boolean(cardImage) && compendiumUsesPortraitCardArt(activeTab)
+    const portraitGraphicCard = isCompendiumPortraitGraphicCard(activeTab, cardImage)
     const cardMinHeightClass =
       cardImage && !portraitGraphicCard
         ? activeTab === "classes"
           ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
           : COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
         : null
+    const listGradientClass = cardImage
+      ? compendiumPortraitListGradientClass(activeTab, cardImage)
+      : undefined
 
     return (
       <motion.div
@@ -750,6 +753,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             crop={compendiumCardImageCropForType(activeTab)}
             variant="list"
             fullBleed
+            listGradientClass={listGradientClass}
             className={!enabled ? "opacity-90" : undefined}
           />
         ) : null}

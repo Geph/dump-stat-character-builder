@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
   compendiumBrowseGridClass,
+  COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
   compendiumItemSupportsCardImage,
+  compendiumPortraitListGradientClass,
   compendiumTabSupportsCardImage,
   compendiumUsesPortraitCardArt,
+  isCompendiumPortraitGraphicCard,
   resolveCompendiumCardImageUrl,
 } from "@/lib/compendium/card-image"
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
@@ -27,6 +30,30 @@ describe("compendiumUsesPortraitCardArt", () => {
     expect(compendiumUsesPortraitCardArt("species")).toBe(true)
     expect(compendiumUsesPortraitCardArt("subclasses")).toBe(true)
     expect(compendiumUsesPortraitCardArt("backgrounds")).toBe(false)
+  })
+})
+
+describe("isCompendiumPortraitGraphicCard", () => {
+  it("treats portrait tabs with card art the same for classes, species, and subclasses", () => {
+    const url = "https://example.com/art.png"
+    expect(isCompendiumPortraitGraphicCard("classes", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("species", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("subclasses", url)).toBe(true)
+    expect(isCompendiumPortraitGraphicCard("backgrounds", url)).toBe(false)
+    expect(isCompendiumPortraitGraphicCard("classes", null)).toBe(false)
+  })
+
+  it("uses the lighter portrait gradient for portrait tabs only", () => {
+    const url = "https://example.com/art.png"
+    expect(compendiumPortraitListGradientClass("species", url)).toBe(
+      COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+    )
+    expect(compendiumPortraitListGradientClass("subclasses", url)).toBe(
+      COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+    )
+    expect(compendiumPortraitListGradientClass("backgrounds", url)).not.toBe(
+      COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
+    )
   })
 })
 
