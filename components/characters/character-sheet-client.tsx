@@ -40,6 +40,11 @@ import type {
   Subclass,
 } from "@/lib/types"
 import { resolveEquippedItems } from "@/lib/compendium/equipment-magic-modifiers"
+import {
+  characterHasTwoWeaponFighting,
+  defaultOffHandIncludesAbilityMod,
+} from "@/lib/compendium/two-weapon-fighting"
+import { getWeaponAttackAbility } from "@/lib/compendium/combat-stats"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
@@ -73,7 +78,7 @@ import {
 } from "@/lib/character/collect-turn-start-triggers"
 import { getPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import {
-  metamagicOptionsFromFeats,
+  metamagicOptionsForCharacter,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
 import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
@@ -120,7 +125,7 @@ import {
   EXHAUSTION_MAX_LEVEL,
   getExhaustionEffectSummary,
 } from "@/lib/srd/exhaustion-effects"
-import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
+import { collectFeatureRollBonuses } from "@/lib/character/collect-limited-feature-effects"
 import { BLOODIED_DESCRIPTION, isBloodied } from "@/lib/character/bloodied"
 import {
   buildSheetPlayStateFromSheet,
@@ -428,6 +433,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [equippedArmorId, setEquippedArmorId] = useState<string | null>(null)
   const [equippedShieldId, setEquippedShieldId] = useState<string | null>(null)
   const [equippedWeaponId, setEquippedWeaponId] = useState<string | null>(null)
+  const [equippedOffHandWeaponId, setEquippedOffHandWeaponId] = useState<string | null>(null)
   const [usedSpellSlotsByKey, setUsedSpellSlotsByKey] = useState<Record<string, number[]>>({})
   const [usedResourcesById, setUsedResourcesById] = useState<Record<string, number>>({})
   const [rechargeCapsByResourceId, setRechargeCapsByResourceId] = useState<Record<string, number>>({})
@@ -438,6 +444,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
+  const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
   const [realTimeCooldowns, setRealTimeCooldowns] = useState<RealTimeCooldownState>({})
   const [accumulatedResources, setAccumulatedResources] = useState<
     Record<string, AccumulatedResourceState>
@@ -472,6 +479,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedArmorId((data as Character).equipped_armor_id ?? null)
         setEquippedShieldId((data as Character).equipped_shield_id ?? null)
         setEquippedWeaponId((data as Character).equipped_weapon_id ?? null)
+        setEquippedOffHandWeaponId((data as Character).equipped_off_hand_weapon_id ?? null)
         setAttunedItemIds((data as Character).attuned_item_ids ?? [])
         setEquipmentBaseSelections((data as Character).equipment_base_selections ?? {})
         setCurrentHp(data.hit_points || data.hit_point_max || 0)
@@ -598,6 +606,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedArmorId,
       equippedShieldId,
       equippedWeaponId,
+      equippedOffHandWeaponId,
       attunedItemIds,
       modifierCatalog,
     }),
@@ -606,6 +615,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedArmorId,
       equippedShieldId,
       equippedWeaponId,
+      equippedOffHandWeaponId,
       attunedItemIds,
       modifierCatalog,
     ],
@@ -676,6 +686,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedArmorId,
       equippedShieldId,
       equippedWeaponId,
+      equippedOffHandWeaponId,
       attunedItemIds,
       equipmentBaseSelections,
       activeSheetToggles: effectiveSheetToggles,
@@ -691,6 +702,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equippedArmorId,
     equippedShieldId,
     equippedWeaponId,
+    equippedOffHandWeaponId,
     attunedItemIds,
     equipmentBaseSelections,
     activeSheetToggleIds,
@@ -715,12 +727,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       armorId?: string | null
       shieldId?: string | null
       weaponId?: string | null
+      offHandWeaponId?: string | null
     }) => {
       if (!character) return
       const loadout = {
         armorId: next.armorId !== undefined ? next.armorId : equippedArmorId,
         shieldId: next.shieldId !== undefined ? next.shieldId : equippedShieldId,
         weaponId: next.weaponId !== undefined ? next.weaponId : equippedWeaponId,
+        offHandWeaponId:
+          next.offHandWeaponId !== undefined ? next.offHandWeaponId : equippedOffHandWeaponId,
       }
       const nextAc = characterBuildInputs
         ? deriveArmorClassForLoadout(characterBuildInputs, loadout)
@@ -732,6 +747,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           equipped_armor_id: loadout.armorId,
           equipped_shield_id: loadout.shieldId,
           equipped_weapon_id: loadout.weaponId,
+          equipped_off_hand_weapon_id: loadout.offHandWeaponId,
           armor_class: nextAc,
         })
         .eq("id", character.id)
@@ -742,9 +758,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedArmorId(loadout.armorId)
         setEquippedShieldId(loadout.shieldId)
         setEquippedWeaponId(loadout.weaponId)
+        setEquippedOffHandWeaponId(loadout.offHandWeaponId)
       }
     },
-    [character, characterBuildInputs, equippedArmorId, equippedShieldId, equippedWeaponId],
+    [character, characterBuildInputs, equippedArmorId, equippedShieldId, equippedWeaponId, equippedOffHandWeaponId],
   )
 
   const persistGold = useCallback(
@@ -855,12 +872,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   useEffect(() => {
     if (!character || !equipment.length) return
-    if (equippedArmorId || equippedShieldId || equippedWeaponId) return
+    if (equippedArmorId || equippedShieldId || equippedWeaponId || equippedOffHandWeaponId) return
     const suggestion = suggestEquipmentLoadout(character.equipment_ids ?? [], equipment)
     if (suggestion.armorId || suggestion.shieldId || suggestion.weaponId) {
       void persistEquipmentLoadout(suggestion)
     }
-  }, [character, equipment, equippedArmorId, equippedShieldId, equippedWeaponId, persistEquipmentLoadout])
+  }, [character, equipment, equippedArmorId, equippedShieldId, equippedWeaponId, equippedOffHandWeaponId, persistEquipmentLoadout])
 
   useEffect(() => {
     if (!character || !equipment.length) return
@@ -869,6 +886,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       armorId?: string | null
       shieldId?: string | null
       weaponId?: string | null
+      offHandWeaponId?: string | null
     } = {}
     const armor = equippedArmorId ? byId.get(equippedArmorId) : undefined
     if (
@@ -897,16 +915,26 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     ) {
       clears.weaponId = null
     }
+    const offHandWeapon = equippedOffHandWeaponId ? byId.get(equippedOffHandWeaponId) : undefined
+    if (
+      equippedOffHandWeaponId &&
+      offHandWeapon &&
+      mustAttuneBeforeEquip(offHandWeapon) &&
+      !attunedItemIds.includes(equippedOffHandWeaponId)
+    ) {
+      clears.offHandWeaponId = null
+    }
     if (Object.keys(clears).length > 0) {
       void persistEquipmentLoadout(clears)
     }
   }, [
     character,
     equipment,
-    equippedArmorId,
-    equippedShieldId,
-    equippedWeaponId,
-    attunedItemIds,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      equippedOffHandWeaponId,
+      attunedItemIds,
     persistEquipmentLoadout,
   ])
 
@@ -978,8 +1006,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [manualSheetToggles],
   )
 
+  const innateSorcerySheetToggle = useMemo(
+    () => manualSheetToggles.find((toggle) => toggle.id === "while_innate_sorcery_active") ?? null,
+    [manualSheetToggles],
+  )
+
+  const isSorcerer = useMemo(
+    () => classDetails.some((entry) => /^sorcerer$/i.test(entry.class?.name ?? "")),
+    [classDetails],
+  )
+
   const secondaryManualSheetToggles = useMemo(
-    () => manualSheetToggles.filter((toggle) => toggle.id !== "while_raging"),
+    () =>
+      manualSheetToggles.filter(
+        (toggle) => toggle.id !== "while_raging" && toggle.id !== "while_innate_sorcery_active",
+      ),
     [manualSheetToggles],
   )
 
@@ -1001,6 +1042,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     (toggle: { id: string; label: string }) => {
       const active = activeSheetToggleIds.includes(toggle.id)
       const isRagingToggle = toggle.id === "while_raging"
+      const isInnateSorceryToggle = toggle.id === "while_innate_sorcery_active"
       const label = active ? toggle.label : `Not ${toggle.label.toLowerCase()}`
       const RagingIcon = active ? Angry : Smile
       return (
@@ -1010,12 +1052,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           aria-pressed={active}
           onClick={() => toggleSheetToggle(toggle.id)}
           className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
-            active ? SHEET_BANNER_BUTTON.toggleActive : SHEET_BANNER_BUTTON.toggleIdle
+            active
+              ? isInnateSorceryToggle
+                ? "border-violet-500/40 bg-violet-500/15 text-violet-800 dark:text-violet-200"
+                : SHEET_BANNER_BUTTON.toggleActive
+              : SHEET_BANNER_BUTTON.toggleIdle
           }`}
         >
           {isRagingToggle ? (
             <span className="inline-flex items-center gap-1.5">
               <RagingIcon className="h-4 w-4 shrink-0" aria-hidden />
+              {label}
+            </span>
+          ) : isInnateSorceryToggle ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
               {label}
             </span>
           ) : (
@@ -1229,9 +1280,67 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return null
   }, [classDetails])
 
+  const primarySpellcaster = useMemo(() => {
+    if (pointPoolClassDetail) return pointPoolClassDetail
+    for (const entry of classDetails) {
+      if (entry.class?.spellcasting) return entry
+    }
+    return null
+  }, [classDetails, pointPoolClassDetail])
+
+  const sorceryPointsState = useMemo(() => {
+    const pool = pointPoolClassDetail?.class
+      ? getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
+      : null
+    if (pool && pointPoolClassDetail) {
+      const resourceId = `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
+      const resourceEntry = resourceEntries.find((entry) => entry.id === resourceId)
+      const maxPoints = resourceEntry
+        ? resolveUsesAtLevel(resourceEntry.uses, resourceEntry.classLevel, usesResolveContext) ?? 0
+        : 0
+      const usedPoints = usedResourcesById[resourceId] ?? 0
+      return {
+        resourceId,
+        available: Math.max(0, maxPoints - usedPoints),
+      }
+    }
+
+    const entry = resourceEntries.find(
+      (row) => row.id.endsWith("_sorcery_points") || /^sorcery points/i.test(row.name),
+    )
+    if (!entry) return null
+    const maxPoints = resolveUsesAtLevel(entry.uses, entry.classLevel, usesResolveContext) ?? 0
+    const usedPoints = usedResourcesById[entry.id] ?? 0
+    return {
+      resourceId: entry.id,
+      available: Math.max(0, maxPoints - usedPoints),
+    }
+  }, [
+    pointPoolClassDetail,
+    resourceEntries,
+    usedResourcesById,
+    usesResolveContext,
+  ])
+
   const metamagicOptions = useMemo(
-    () => metamagicOptionsFromFeats(characterFeats),
-    [characterFeats],
+    () =>
+      metamagicOptionsForCharacter({
+        featIds: [
+          ...(character?.feat_ids ?? []),
+          ...characterFeats.map((feat) => feat.id),
+          ...(originFeat ? [originFeat.id] : []),
+        ],
+        feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
+        customAbilities: sheetCustomAbilities,
+        spellLevel: selectedSpell?.level ?? 1,
+      }),
+    [
+      character?.feat_ids,
+      characterFeats,
+      originFeat,
+      sheetCustomAbilities,
+      selectedSpell?.level,
+    ],
   )
 
   const selectedMetamagic = useMemo(
@@ -1240,41 +1349,36 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const spellCastCost = useMemo(() => {
-    if (!selectedSpell || !pointPoolClassDetail?.class) return null
-    const pool = getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
-    if (!pool) return null
+    if (!selectedSpell || !primarySpellcaster?.class) return null
 
-    const resourceId = `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
-    const resourceEntry = resourceEntries.find((entry) => entry.id === resourceId)
-    const maxPoints = resourceEntry
-      ? resolveUsesAtLevel(resourceEntry.uses, resourceEntry.classLevel, usesResolveContext) ?? 0
-      : 0
-    const usedPoints = usedResourcesById[resourceId] ?? 0
-    const availablePoints = Math.max(0, maxPoints - usedPoints)
+    const availablePoints = sorceryPointsState?.available ?? 0
+    const pool = getPointPoolSpellcasting(primarySpellcaster.class.spellcasting)
 
     let arcanumAvailable: boolean | undefined
-    const poolMaxLevel = Math.max(
-      0,
-      ...Object.keys(pool.cost_by_level)
-        .map((key) => parseInt(key, 10))
-        .filter((level) => !Number.isNaN(level) && level > 0),
-    )
-    if (selectedSpell.level > poolMaxLevel) {
-      const arcanumEntry = resourceEntries.find((entry) => /innate arcanum/i.test(entry.name))
-      if (arcanumEntry) {
-        const arcanumMax =
-          resolveUsesAtLevel(arcanumEntry.uses, arcanumEntry.classLevel, usesResolveContext) ?? 0
-        arcanumAvailable = (usedResourcesById[arcanumEntry.id] ?? 0) < arcanumMax
-      } else {
-        arcanumAvailable = true
+    if (pool) {
+      const poolMaxLevel = Math.max(
+        0,
+        ...Object.keys(pool.cost_by_level)
+          .map((key) => parseInt(key, 10))
+          .filter((level) => !Number.isNaN(level) && level > 0),
+      )
+      if (selectedSpell.level > poolMaxLevel) {
+        const arcanumEntry = resourceEntries.find((entry) => /innate arcanum/i.test(entry.name))
+        if (arcanumEntry) {
+          const arcanumMax =
+            resolveUsesAtLevel(arcanumEntry.uses, arcanumEntry.classLevel, usesResolveContext) ?? 0
+          arcanumAvailable = (usedResourcesById[arcanumEntry.id] ?? 0) < arcanumMax
+        } else {
+          arcanumAvailable = true
+        }
       }
     }
 
     return resolveSpellCastCost({
       spellLevel: selectedSpell.level,
-      spellcasting: pointPoolClassDetail.class.spellcasting,
-      classRow: pointPoolClassDetail.class,
-      classLevel: pointPoolClassDetail.row.level,
+      spellcasting: primarySpellcaster.class.spellcasting,
+      classRow: primarySpellcaster.class,
+      classLevel: primarySpellcaster.row.level,
       availablePoints,
       selectedMetamagic,
       ctx: usesResolveContext,
@@ -1282,7 +1386,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
   }, [
     selectedSpell,
-    pointPoolClassDetail,
+    primarySpellcaster,
+    sorceryPointsState,
     resourceEntries,
     usedResourcesById,
     selectedMetamagic,
@@ -1319,6 +1424,55 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (!raw) return null
     return resolveCharacterEquipment(raw, equipmentCatalog.length ? equipmentCatalog : equipment, equipmentBaseSelections)
   }, [equipment, equipmentCatalog, equippedWeaponId, equipmentBaseSelections])
+
+  const equippedOffHandWeapon = useMemo(() => {
+    if (!equippedOffHandWeaponId) return null
+    const raw = equipment.find((item) => item.id === equippedOffHandWeaponId)
+    if (!raw) return null
+    return resolveCharacterEquipment(raw, equipmentCatalog.length ? equipmentCatalog : equipment, equipmentBaseSelections)
+  }, [equipment, equipmentCatalog, equippedOffHandWeaponId, equipmentBaseSelections])
+
+  const equippedWeaponCards = useMemo(() => {
+    const hasTwoWeaponFighting = characterHasTwoWeaponFighting([
+      ...characterFeats,
+      ...(originFeat ? [originFeat] : []),
+    ])
+    const cards = []
+    if (equippedWeapon && derived?.equippedWeaponAttack) {
+      cards.push({
+        weapon: equippedWeapon,
+        attack: derived.equippedWeaponAttack,
+        hand: "main" as const,
+        defaultIncludeAbilityModifier: true,
+        abilityModifier: getWeaponAttackAbility(equippedWeapon, derived.abilityMods).mod,
+      })
+    }
+    if (equippedOffHandWeapon && derived?.equippedOffHandWeaponAttack) {
+      const abilityMod = getWeaponAttackAbility(
+        equippedOffHandWeapon,
+        derived.abilityMods,
+      ).mod
+      cards.push({
+        weapon: equippedOffHandWeapon,
+        attack: derived.equippedOffHandWeaponAttack,
+        hand: "off" as const,
+        defaultIncludeAbilityModifier: defaultOffHandIncludesAbilityMod(
+          abilityMod,
+          hasTwoWeaponFighting,
+        ),
+        abilityModifier: abilityMod,
+      })
+    }
+    return cards
+  }, [
+    equippedWeapon,
+    equippedOffHandWeapon,
+    derived?.equippedWeaponAttack,
+    derived?.equippedOffHandWeaponAttack,
+    derived?.abilityMods,
+    characterFeats,
+    originFeat,
+  ])
 
   // Tools the character is proficient with are surfaced automatically in the
   // equipment list, even if they were never explicitly purchased/added.
@@ -1462,9 +1616,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (result.tempHp != null) setTempHp(result.tempHp)
       if (result.deathSaves) setDeathSaves(result.deathSaves)
       if (result.activeConditions) setActiveConditions(result.activeConditions)
+      if (rest === "short_rest") {
+        setShortRestHitDiceOpen(true)
+      }
       if (rest === "long_rest") {
         const pool = buildHitDicePool(classDetails, usedHitDiceByClassId)
         setUsedHitDiceByClassId(recoverHitDiceOnLongRest(usedHitDiceByClassId, pool))
+        setShortRestHitDiceOpen(false)
       }
     },
     [
@@ -1716,23 +1874,54 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const proficiencyBonus =
       derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2
     const castingClasses = classDetails.filter((detail) => detail.class?.spellcasting?.ability)
+    const limitationCtx = {
+      activeConditions,
+      activeSheetToggles: activeSheetToggleSet,
+      equippedArmor: limitationEquipment.armor,
+      equippedShield: limitationEquipment.shield,
+      currentHp,
+      proficiencyBonus,
+      abilityMods,
+      characterLevel: derived?.totalLevel ?? character?.level ?? 1,
+    }
+    const sorcererSaveDcBonus = collectFeatureRollBonuses(
+      sheetClassFeatures,
+      { kind: "spell_save_dc" },
+      limitationCtx,
+    ).total
     return castingClasses.flatMap((detail) => {
       const abilityKey = resolveSpellcastingAbilityKey(detail.class!.spellcasting!.ability)
       if (!abilityKey) return []
       const className = detail.class!.name
+      const baseDc = 8 + proficiencyBonus + abilityMods[abilityKey]
+      const bonus = /^sorcerer$/i.test(className) ? sorcererSaveDcBonus : 0
       return [
         {
           id: detail.row.class_id,
+          className,
           label:
             castingClasses.length > 1
               ? `Spell Save DC (${className} · ${ABILITY_LABELS[abilityKey]})`
               : "Spell Save DC",
-          dc: 8 + proficiencyBonus + abilityMods[abilityKey],
+          dc: baseDc + bonus,
+          baseDc,
+          bonus,
           abilityKey,
         },
       ]
     })
-  }, [classDetails, derived?.abilityMods, derived?.proficiencyBonus, character?.level])
+  }, [
+    classDetails,
+    derived?.abilityMods,
+    derived?.proficiencyBonus,
+    derived?.totalLevel,
+    character?.level,
+    activeConditions,
+    activeSheetToggleSet,
+    limitationEquipment,
+    currentHp,
+    sheetClassFeatures,
+  ])
 
   const partitionedToolProficiencies = useMemo(
     () =>
@@ -1838,6 +2027,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const hasSpellcasting = Boolean(spellcastingAbilityLabel && spellcastingAbilityKey)
   const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
   const spellAttackMod = hasSpellcasting ? proficiencyBonus + spellAbilityMod : null
+  const innateSorceryBuffActive =
+    isSorcerer && activeSheetToggleSet.has("while_innate_sorcery_active")
+  const combatStatHighlightClass = innateSorceryBuffActive
+    ? "border border-violet-500/40 bg-violet-500/10"
+    : "bg-secondary/10"
 
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
 
@@ -2122,6 +2316,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     )}
                   </div>
                   {ragingSheetToggle ? renderManualToggleButton(ragingSheetToggle) : null}
+                  {innateSorcerySheetToggle && isSorcerer
+                    ? renderManualToggleButton(innateSorcerySheetToggle)
+                    : null}
                   <div className="relative">
                     <button
                       ref={sheetMenuButtonRef}
@@ -2447,24 +2644,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     })}
                   </div>
                   <div className="mt-3 space-y-1.5 border-t border-border pt-3">
-                    {spellSaveDcEntries.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium"
-                      >
-                        <span className="min-w-0">{entry.label}</span>
-                        <span className="flex items-center gap-1 shrink-0">
-                          <span className="font-bold tabular-nums">{entry.dc}</span>
-                          {spellSaveDcEntries.length === 1 && statBreakdowns ? (
-                            <StatExplainPopover
-                              title="Spell Save DC"
-                              total={entry.dc}
-                              contributions={breakdownLines(statBreakdowns, "spellSaveDc")}
-                            />
-                          ) : null}
-                        </span>
-                      </div>
-                    ))}
                     <div
                       className={`flex justify-between items-center gap-2 px-2 rounded text-xs bg-secondary/10 font-medium ${
                         speedEntries.length > 1 ? "py-2 min-h-[2.75rem]" : "py-1.5"
@@ -2765,9 +2944,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onTempHpChange={setTempHp}
                     hitDicePool={hitDicePool}
                     conMod={abilityMods.constitution}
-                    onShortRestHeal={(amount) =>
+                    showShortRestHitDice={shortRestHitDiceOpen}
+                    onShortRestHeal={(amount) => {
                       setCurrentHp((hp) => Math.min(maxHp, hp + amount))
-                    }
+                      setShortRestHitDiceOpen(false)
+                    }}
                     onSpendHitDice={(classId, count) =>
                       setUsedHitDiceByClassId((prev) => ({
                         ...prev,
@@ -2828,8 +3009,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
                   </div>
                   <SheetEquippedWeaponsPanel
-                    weapon={equippedWeapon}
-                    attack={derived?.equippedWeaponAttack ?? null}
+                    weapons={equippedWeaponCards}
                     buildInputs={characterBuildInputs}
                     weaponProficiencies={derived?.weaponProficiencies ?? []}
                   />
@@ -2844,7 +3024,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     incapacitated={incapacitated}
                     psiLimit={psiLimit}
                   />
-                  {!equippedWeapon && !combatActions.length ? (
+                  {!equippedWeaponCards.length && !combatActions.length ? (
                     <p className="text-xs text-muted-foreground italic">
                       No action-economy abilities listed.
                     </p>
@@ -2918,19 +3098,67 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </h2>
                     <div className="space-y-1">
                       {hasSpellcasting && spellAttackMod != null && Number.isFinite(spellAttackMod) && (
-                        <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <div
+                          className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs font-medium ${combatStatHighlightClass}`}
+                        >
                           <span>Spell Attack</span>
                           <div className="flex items-center gap-2">
                             <span className="font-bold tabular-nums">{formatMod(spellAttackMod)}</span>
                             <D20RollButton
                               modifier={spellAttackMod}
                               title="Roll spell attack"
-                              rollContext={{ kind: "attack" }}
+                              rollContext={{ kind: "spell_attack" }}
                             />
                           </div>
                         </div>
                       )}
-                      <div className={hasSpellcasting && spellAttackMod != null ? "pt-2 mt-1 border-t border-border/60" : ""}>
+                      {hasSpellcasting && spellSaveDcEntries.length > 0 ? (
+                        <div className="space-y-1">
+                          {spellSaveDcEntries.map((entry) => {
+                            const entryBuffed =
+                              innateSorceryBuffActive && /^sorcerer$/i.test(entry.className) && entry.bonus > 0
+                            return (
+                              <div
+                                key={entry.id}
+                                className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs font-medium ${
+                                  entryBuffed ? combatStatHighlightClass : "bg-secondary/10"
+                                }`}
+                              >
+                                <span className="min-w-0">{entry.label}</span>
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <span className="font-bold tabular-nums">{entry.dc}</span>
+                                  {spellSaveDcEntries.length === 1 && statBreakdowns ? (
+                                    <StatExplainPopover
+                                      title="Spell Save DC"
+                                      total={entry.dc}
+                                      contributions={[
+                                        ...breakdownLines(statBreakdowns, "spellSaveDc"),
+                                        ...(entry.bonus > 0
+                                          ? [
+                                              {
+                                                sourceType: "feature" as const,
+                                                source: "Innate Sorcery",
+                                                label: "Innate Sorcery",
+                                                amount: entry.bonus,
+                                              },
+                                            ]
+                                          : []),
+                                      ]}
+                                    />
+                                  ) : null}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : null}
+                      <div
+                        className={
+                          hasSpellcasting && (spellAttackMod != null || spellSaveDcEntries.length > 0)
+                            ? "pt-2 mt-1 border-t border-border/60"
+                            : ""
+                        }
+                      >
                         {spellSlotTables.length > 0 && (
                           <div className="space-y-3">
                             {spellSlotTables.map((table) => {
@@ -3032,6 +3260,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   equippedArmorId={equippedArmorId}
                   equippedShieldId={equippedShieldId}
                   equippedWeaponId={equippedWeaponId}
+                  equippedOffHandWeaponId={equippedOffHandWeaponId}
                   attunedItemIds={attunedItemIds}
                   maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
                   onEquipArmor={(id) => {
@@ -3073,6 +3302,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     }
                     void persistEquipmentLoadout({ weaponId: id })
                   }}
+                  onEquipOffHandWeapon={(id) => {
+                    if (id) {
+                      const item = equipment.find((entry) => entry.id === id)
+                      if (
+                        item &&
+                        mustAttuneBeforeEquip(item) &&
+                        !attunedItemIds.includes(id)
+                      ) {
+                        return
+                      }
+                    }
+                    void persistEquipmentLoadout({ offHandWeaponId: id })
+                  }}
                   onToggleAttune={(itemId) => {
                     if (attunedItemIds.includes(itemId)) {
                       const nextAttuned = attunedItemIds.filter((id) => id !== itemId)
@@ -3081,10 +3323,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         armorId?: string | null
                         shieldId?: string | null
                         weaponId?: string | null
+                        offHandWeaponId?: string | null
                       } = {}
                       if (equippedArmorId === itemId) clears.armorId = null
                       if (equippedShieldId === itemId) clears.shieldId = null
                       if (equippedWeaponId === itemId) clears.weaponId = null
+                      if (equippedOffHandWeaponId === itemId) clears.offHandWeaponId = null
                       if (Object.keys(clears).length > 0) {
                         void persistEquipmentLoadout(clears)
                       }
@@ -3396,20 +3640,28 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             onClose={() => setSelectedSpell(null)}
             psiLimit={psiLimit}
             castCost={spellCastCost}
-            metamagicOptions={spellCastCost?.castKind === "pool" ? metamagicOptions : []}
+            metamagicOptions={metamagicOptions}
             selectedMetamagicIds={selectedMetamagicIds}
             onMetamagicChange={setSelectedMetamagicIds}
             onCast={(result) => {
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
               }
-              if (result.psiPointsSpent && pointPoolClassDetail?.class) {
-                const pool = getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
-                if (pool) {
-                  const resourceId = `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
+              if (result.psiPointsSpent) {
+                const spResourceId =
+                  sorceryPointsState?.resourceId ??
+                  (pointPoolClassDetail?.class
+                    ? (() => {
+                        const pool = getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)
+                        return pool
+                          ? `${pointPoolClassDetail.row.class_id}_${pool.resource_key}`
+                          : null
+                      })()
+                    : null)
+                if (spResourceId) {
                   setUsedResourcesById((prev) => ({
                     ...prev,
-                    [resourceId]: (prev[resourceId] ?? 0) + result.psiPointsSpent!,
+                    [spResourceId]: (prev[spResourceId] ?? 0) + result.psiPointsSpent!,
                   }))
                 }
               }

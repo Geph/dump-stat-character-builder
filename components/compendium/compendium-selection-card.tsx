@@ -8,6 +8,7 @@ import {
   getCompendiumCardImageUrl,
   compendiumCardHeroImageClass,
   WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
+  SELECTION_CARD_GRADIENT_CLASS,
   type CompendiumCardImageCrop,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
@@ -56,6 +57,7 @@ function CardContent({
   onLearnMore,
   learnMoreLabel,
   selectLabel,
+  accent,
 }: {
   item: CompendiumCardVisual & { name: string }
   subtitle?: string
@@ -68,6 +70,7 @@ function CardContent({
   onLearnMore?: (e: React.MouseEvent) => void
   learnMoreLabel: string
   selectLabel: string
+  accent: ReturnType<typeof compendiumAccentColorStyles>
 }) {
   const sourceLabel = subtitle?.trim() || item.source?.trim() || null
 
@@ -101,7 +104,12 @@ function CardContent({
 
       <div className="mt-3 flex items-center justify-between gap-3">
         {sourceLabel ? (
-          <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.2em] text-primary/90">
+          <p
+            className={cn(
+              "min-w-0 truncate text-[10px] font-bold uppercase tracking-wider",
+              accent.cardFooterText,
+            )}
+          >
             {sourceLabel}
           </p>
         ) : (
@@ -131,7 +139,12 @@ function CardContent({
                 "rounded border px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
                 selected
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-primary/70 bg-black/40 text-primary hover:bg-primary/20",
+                  : cn(
+                      "bg-black/30",
+                      accent.cardFooterBorder,
+                      accent.cardFooterText,
+                      accent.cardFooterSelectHover,
+                    ),
               )}
             >
               {selected ? "Selected" : selectLabel}
@@ -218,6 +231,7 @@ export function CompendiumSelectionCard({
     onLearnMore,
     learnMoreLabel,
     selectLabel,
+    accent,
   }
 
   return (
@@ -230,7 +244,7 @@ export function CompendiumSelectionCard({
           <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
         )}
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-black/55 to-black/80" />
+      <div className={cn("pointer-events-none absolute inset-0", SELECTION_CARD_GRADIENT_CLASS)} />
       {item.icon && (
         <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
           <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />

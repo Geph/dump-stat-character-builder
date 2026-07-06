@@ -3,6 +3,7 @@
 import {
   WIDE_CARD_ASPECT_CLASS,
   COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
+  DETAIL_OVERLAY_HERO_GRADIENT_CLASS,
   compendiumCardHeroImageClass,
   type CompendiumCardImageCrop,
 } from "@/lib/compendium/card-image"
@@ -61,10 +62,7 @@ export function CompendiumCardHero({
           )}
         />
       ) : (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
-        </>
+        <div className={cn("absolute inset-0", DETAIL_OVERLAY_HERO_GRADIENT_CLASS)} />
       )}
     </div>
   )

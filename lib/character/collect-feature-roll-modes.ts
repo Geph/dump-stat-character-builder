@@ -38,6 +38,8 @@ export function featureEffectMatchesRollContext(
 
   if (category === "initiative") return context.kind === "initiative"
   if (category === "attack") return context.kind === "attack"
+  if (category === "spell_attack") return context.kind === "spell_attack"
+  if (category === "spell_save_dc") return context.kind === "spell_save_dc"
 
   if (category === "ability") {
     if (context.kind !== "ability") return false

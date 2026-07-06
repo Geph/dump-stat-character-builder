@@ -3,7 +3,9 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { GameIcon } from "@/components/game-icon-picker"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
+import { skillIconSlug } from "@/lib/compendium/skill-icons"
 import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 
 type ChoiceOption = { name: string; description?: string }
@@ -20,7 +22,9 @@ type MultiSelectChoicesProps = {
   /** When true, show an info button for D&D skill options. */
   showSkillInfo?: boolean
   /** Compact builder layout: denser grid, no skill info buttons. */
-  layout?: "default" | "compact"
+  layout?: "default" | "compact" | "visual"
+  /** Custom skill name → game-icons slug (from compendium custom abilities). */
+  skillIconByName?: Record<string, string>
   /** When true, let the player add custom free-text entries (e.g. user-defined languages). */
   allowCustom?: boolean
   /** Placeholder for the custom-entry input. */
@@ -40,10 +44,13 @@ export function MultiSelectChoices({
   layout = "default",
   allowCustom = false,
   customPlaceholder = "Add a custom entry...",
+  skillIconByName = {},
 }: MultiSelectChoicesProps) {
   const unavailable = new Set(unavailableOptions)
   const compact = layout === "compact"
+  const visual = layout === "visual"
   const showInfoButtons = showSkillInfo && !compact
+  const showSkillIcons = visual && showSkillInfo
   const [skillInfo, setSkillInfo] = useState<string | null>(null)
   const [customDraft, setCustomDraft] = useState("")
   const pendingScrollY = useRef<number | null>(null)
@@ -106,6 +113,7 @@ export function MultiSelectChoices({
             const isTakenElsewhere = !isSelected && unavailable.has(option.name)
             const isDisabled = isTakenElsewhere || (!isSelected && selected.length >= maxCount)
             const skillDescription = showInfoButtons ? getSkillDescription(option.name) : null
+            const iconSlug = showSkillIcons ? skillIconSlug(option.name, skillIconByName) : null
             return (
               <div key={option.name} className={compact ? undefined : "flex items-stretch gap-1"}>
                 <button
@@ -113,7 +121,7 @@ export function MultiSelectChoices({
                   disabled={isDisabled}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => toggle(option.name)}
-                  className={`${compact ? "w-full px-2.5 py-1.5" : "flex-1 p-2"} rounded-lg border-2 text-left transition-all ${
+                  className={`${compact ? "w-full px-2.5 py-1.5" : visual ? "flex-1 p-2.5" : "flex-1 p-2"} rounded-lg border-2 text-left transition-all ${
                     isSelected
                       ? accentClass
                       : isDisabled
@@ -121,9 +129,19 @@ export function MultiSelectChoices({
                         : "border-border bg-card hover:border-primary/40"
                   }`}
                 >
-                  <p className={`font-semibold text-foreground ${compact ? "text-xs" : "text-sm"}`}>
-                    {option.name}
-                  </p>
+                  <div className={iconSlug ? "flex items-center gap-2 min-w-0" : undefined}>
+                    {iconSlug ? (
+                      <GameIcon
+                        name={iconSlug}
+                        className={`shrink-0 text-muted-foreground ${visual ? "h-5 w-5" : "h-4 w-4"}`}
+                      />
+                    ) : null}
+                    <p
+                      className={`font-semibold text-foreground min-w-0 ${compact ? "text-xs" : "text-sm"}`}
+                    >
+                      {option.name}
+                    </p>
+                  </div>
                   {isTakenElsewhere && (
                     <p className={`text-muted-foreground mt-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
                       Already chosen

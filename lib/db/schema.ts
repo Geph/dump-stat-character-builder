@@ -279,6 +279,7 @@ export const characters = mysqlTable("characters", {
   equipped_armor_id: char("equipped_armor_id", { length: 36 }),
   equipped_shield_id: char("equipped_shield_id", { length: 36 }),
   equipped_weapon_id: char("equipped_weapon_id", { length: 36 }),
+  equipped_off_hand_weapon_id: char("equipped_off_hand_weapon_id", { length: 36 }),
   attuned_item_ids: json("attuned_item_ids").$type<string[]>().default([]),
   equipment_base_selections: json("equipment_base_selections").$type<Record<string, string>>(),
   spell_ids: json("spell_ids").$type<string[]>().default([]),

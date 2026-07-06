@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest"
 import {
+  metamagicOptionsForCharacter,
   metamagicOptionsFromFeats,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
+import { buildCatalogFeatPickId } from "@/lib/builder/catalog-feat-options"
+import {
+  buildDefaultMetamagicOptions,
+  METAMAGIC_OPTIONS_CATALOG_ID,
+} from "@/lib/compendium/system-option-catalogs"
 import { DEFAULT_ALTERNATE_SORCERER_COST_BY_LEVEL } from "@/lib/character/point-pool-spellcasting"
 import type { DndClass, Feat } from "@/lib/types"
 
@@ -53,6 +59,25 @@ describe("metamagicOptionsFromFeats", () => {
   })
 })
 
+describe("metamagicOptionsForCharacter", () => {
+  it("includes Metamagic catalog picks from feat_ids", () => {
+    const pickId = buildCatalogFeatPickId(METAMAGIC_OPTIONS_CATALOG_ID, "cat_metamagic_7")
+    const options = metamagicOptionsForCharacter({
+      featIds: [pickId],
+      feats: [],
+      customAbilities: [
+        {
+          id: METAMAGIC_OPTIONS_CATALOG_ID,
+          name: "Metamagic Options",
+          modifier_catalog: buildDefaultMetamagicOptions(),
+        } as import("@/lib/types").CustomAbility,
+      ],
+      spellLevel: 3,
+    })
+    expect(options.some((row) => row.name === "Twinned Spell" && row.cost === 3)).toBe(true)
+  })
+})
+
 describe("resolveSpellCastCost", () => {
   it("returns slot mode when no point pool is configured", () => {
     const result = resolveSpellCastCost({
@@ -65,6 +90,22 @@ describe("resolveSpellCastCost", () => {
       ctx,
     })
     expect(result.mode).toBe("slots")
+    expect(result.canCast).toBe(true)
+  })
+
+  it("tracks metamagic sorcery point spend in slot mode", () => {
+    const result = resolveSpellCastCost({
+      spellLevel: 3,
+      spellcasting: { ability: "Charisma" },
+      classRow: alternateSorcererClass,
+      classLevel: 5,
+      availablePoints: 2,
+      selectedMetamagic: [{ id: "a", name: "Empowered", cost: 1 }],
+      ctx,
+    })
+    expect(result.mode).toBe("slots")
+    expect(result.metamagicCost).toBe(1)
+    expect(result.totalCost).toBe(1)
     expect(result.canCast).toBe(true)
   })
 

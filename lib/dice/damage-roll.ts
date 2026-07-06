@@ -28,6 +28,8 @@ export function parseDamageRoll(expression: string): ParsedDamageRoll | null {
   return { dice, modifier }
 }
 
+export type DamageRollMode = "normal" | "advantage" | "disadvantage"
+
 export function rollDamage(parsed: ParsedDamageRoll): {
   rolls: number[]
   total: number
@@ -45,6 +47,30 @@ export function rollDamage(parsed: ParsedDamageRoll): {
     modifier: parsed.modifier,
     total: diceSum + parsed.modifier,
   }
+}
+
+export function rollDamageWithMode(
+  parsed: ParsedDamageRoll,
+  mode: DamageRollMode = "normal",
+): {
+  rolls: number[]
+  total: number
+  modifier: number
+  mode: DamageRollMode
+} {
+  if (mode === "normal") {
+    return { ...rollDamage(parsed), mode }
+  }
+  const first = rollDamage(parsed)
+  const second = rollDamage(parsed)
+  const picked = mode === "advantage"
+    ? first.total >= second.total
+      ? first
+      : second
+    : first.total <= second.total
+      ? first
+      : second
+  return { ...picked, mode }
 }
 
 export function formatDamageRollResult(

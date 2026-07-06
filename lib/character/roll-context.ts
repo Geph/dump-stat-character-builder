@@ -1,6 +1,13 @@
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
-export type RollKind = "ability" | "skill" | "save" | "attack" | "initiative"
+export type RollKind =
+  | "ability"
+  | "skill"
+  | "save"
+  | "attack"
+  | "initiative"
+  | "spell_attack"
+  | "spell_save_dc"
 
 export type RollContext = {
   kind: RollKind
@@ -20,6 +27,8 @@ export function rollContextLabel(context: RollContext): string {
     if (context.kind === "save") return `${capitalized} save`
     if (context.kind === "attack") return `${capitalized} attack`
     if (context.kind === "initiative") return "Initiative"
+    if (context.kind === "spell_attack") return "Spell attack"
+    if (context.kind === "spell_save_dc") return "Spell save DC"
     return `${capitalized} check`
   }
   return context.kind

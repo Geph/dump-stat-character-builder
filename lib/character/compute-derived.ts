@@ -41,10 +41,21 @@ import {
   calculateWeaponAttack,
   getArmorAcText,
   getShieldBonus,
+  getWeaponAttackAbility,
+  getWeaponDamageText,
   getWeaponPropertyTags,
   isWeaponProficient,
   parseArmorAc,
+  type AbilityMods,
 } from "@/lib/compendium/combat-stats"
+import {
+  buildWeaponDamageExpression,
+  parseWeaponDamageDice,
+} from "@/lib/compendium/weapon-damage-roll"
+import {
+  characterHasTwoWeaponFighting,
+  defaultOffHandIncludesAbilityMod,
+} from "@/lib/compendium/two-weapon-fighting"
 import type { Background, DndClass, Equipment } from "@/lib/types"
 import type { CharacterClassRow } from "@/lib/character/character-classes"
 import {
@@ -63,6 +74,7 @@ import type {
   SkillBonus,
   StatBreakdownPart,
   ToolBonus,
+  WeaponAttackDerived,
 } from "@/lib/character/types"
 import {
   collectFeatureDamageBonuses,
@@ -90,6 +102,63 @@ const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Stealth", ability: "dexterity" },
   { name: "Survival", ability: "wisdom" },
 ]
+
+function buildWeaponAttackDerived(
+  weapon: Equipment,
+  params: {
+    abilityMods: AbilityMods
+    proficiencyBonus: number
+    weaponProficiencies: string[]
+    aggregatedCharacteristics: AggregatedCharacteristics
+    featureDamageBonus: number
+    includeAbilityModifier?: boolean
+  },
+): WeaponAttackDerived | null {
+  const base = calculateWeaponAttack(
+    weapon,
+    params.abilityMods,
+    params.proficiencyBonus,
+    isWeaponProficient(weapon, params.weaponProficiencies),
+  )
+  if (!base) return null
+
+  const weaponProps = getWeaponPropertyTags(weapon)
+  const modifierBonus = sumAttackRollModifiers(params.aggregatedCharacteristics, {
+    subcategory: weapon.subcategory ?? "",
+    properties: weaponProps,
+  })
+  const damageBonus =
+    sumDamageRollModifiers(params.aggregatedCharacteristics, {
+      subcategory: weapon.subcategory ?? "",
+      properties: weaponProps,
+      damageType: weapon.damage_type ?? "",
+    }) + params.featureDamageBonus
+
+  const attackBonus = base.attackBonus + modifierBonus
+  const attackBreakdown = [...base.attackBreakdown]
+  if (modifierBonus !== 0) {
+    attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
+  }
+  if (params.featureDamageBonus > 0) {
+    attackBreakdown.push({ label: "Feature damage", value: params.featureDamageBonus })
+  }
+
+  const damageDice = parseWeaponDamageDice(getWeaponDamageText(weapon)).oneHanded
+  const damageDisplay =
+    damageDice != null && params.includeAbilityModifier != null
+      ? buildWeaponDamageExpression({
+          weapon,
+          abilityMods: params.abilityMods,
+          dice: damageDice,
+          includeAbilityModifier: params.includeAbilityModifier,
+          flatDamageBonus: damageBonus,
+        })
+      : damageBonus > 0
+        ? `${base.damageDisplay} + ${damageBonus}`
+        : base.damageDisplay
+
+  return { attackBonus, damageDisplay, attackBreakdown }
+}
 
 function abilityModsFromScores(scores: Record<AbilityScoreKey, number>) {
   return ABILITY_SCORE_KEYS.reduce(
@@ -364,17 +433,19 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     equippedArmorId: inputs.equippedArmorId,
     equippedShieldId: inputs.equippedShieldId,
     equippedWeaponId: inputs.equippedWeaponId,
+    equippedOffHandWeaponId: inputs.equippedOffHandWeaponId ?? null,
     attunedItemIds: inputs.attunedItemIds ?? [],
     modifierCatalog: inputs.modifierCatalog,
   })
 
-  const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon } =
+  const { armor: equippedArmor, shield: equippedShield, weapon: equippedWeapon, offHandWeapon: equippedOffHandWeapon } =
     resolveEquippedItems(
       inputs.equipment,
       {
         equippedArmorId: inputs.equippedArmorId,
         equippedShieldId: inputs.equippedShieldId,
         equippedWeaponId: inputs.equippedWeaponId,
+        equippedOffHandWeaponId: inputs.equippedOffHandWeaponId ?? null,
       },
       inputs.equipmentBaseSelections ?? {},
       inputs.equipmentCatalog,
@@ -546,18 +617,6 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       ? proficiencyBonus * (skillExpertise.includes("Perception") ? 2 : 1)
       : 0)
 
-  const baseEquippedWeaponAttack =
-    equippedWeapon && primaryClass
-      ? calculateWeaponAttack(
-          equippedWeapon,
-          abilityMods,
-          proficiencyBonus,
-          isWeaponProficient(equippedWeapon, weaponProficiencies),
-        )
-      : equippedWeapon
-        ? calculateWeaponAttack(equippedWeapon, abilityMods, proficiencyBonus, false)
-        : null
-
   const featureLimitationCtx = {
     activeConditions: inputs.activeConditions,
     activeSheetToggles: inputs.activeSheetToggles,
@@ -574,35 +633,44 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
         }).flatBonus
       : 0
 
+  const hasTwoWeaponFighting = characterHasTwoWeaponFighting(inputs.feats)
+  const weaponAttackContext = {
+    abilityMods,
+    proficiencyBonus,
+    weaponProficiencies,
+    aggregatedCharacteristics,
+    featureDamageBonus,
+  }
+
   const equippedWeaponAttack =
-    baseEquippedWeaponAttack && equippedWeapon
-      ? (() => {
-          const weaponProps = getWeaponPropertyTags(equippedWeapon)
-          const modifierBonus = sumAttackRollModifiers(aggregatedCharacteristics, {
-            subcategory: equippedWeapon.subcategory ?? "",
-            properties: weaponProps,
+    equippedWeapon && primaryClass
+      ? buildWeaponAttackDerived(equippedWeapon, weaponAttackContext)
+      : equippedWeapon
+        ? buildWeaponAttackDerived(equippedWeapon, {
+            ...weaponAttackContext,
+            weaponProficiencies: [],
           })
-          const attackBonus = baseEquippedWeaponAttack.attackBonus + modifierBonus
-          const damageBonus =
-            sumDamageRollModifiers(aggregatedCharacteristics, {
-              subcategory: equippedWeapon.subcategory ?? "",
-              properties: weaponProps,
-              damageType: equippedWeapon.damage_type ?? "",
-            }) + featureDamageBonus
-          const damageDisplay =
-            damageBonus > 0
-              ? `${baseEquippedWeaponAttack.damageDisplay} + ${damageBonus}`
-              : baseEquippedWeaponAttack.damageDisplay
-          const attackBreakdown = [...baseEquippedWeaponAttack.attackBreakdown]
-          if (modifierBonus !== 0) {
-            attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
-          }
-          if (featureDamageBonus > 0) {
-            attackBreakdown.push({ label: "Feature damage", value: featureDamageBonus })
-          }
-          return { attackBonus, damageDisplay, attackBreakdown }
-        })()
-      : baseEquippedWeaponAttack
+        : null
+
+  const equippedOffHandWeaponAttack =
+    equippedOffHandWeapon && primaryClass
+      ? buildWeaponAttackDerived(equippedOffHandWeapon, {
+          ...weaponAttackContext,
+          includeAbilityModifier: defaultOffHandIncludesAbilityMod(
+            getWeaponAttackAbility(equippedOffHandWeapon, abilityMods).mod,
+            hasTwoWeaponFighting,
+          ),
+        })
+      : equippedOffHandWeapon
+        ? buildWeaponAttackDerived(equippedOffHandWeapon, {
+            ...weaponAttackContext,
+            weaponProficiencies: [],
+            includeAbilityModifier: defaultOffHandIncludesAbilityMod(
+              getWeaponAttackAbility(equippedOffHandWeapon, abilityMods).mod,
+              hasTwoWeaponFighting,
+            ),
+          })
+        : null
 
   return {
     abilityScores,
@@ -648,6 +716,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     ),
     saves: buildSaveBonuses(proficiencyBonus, abilityMods, savingThrowProficiencies),
     equippedWeaponAttack,
+    equippedOffHandWeaponAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,
   }
 }
@@ -735,6 +804,7 @@ export function buildInputsFromSavedCharacter(params: {
     equipped_armor_id?: string | null
     equipped_shield_id?: string | null
     equipped_weapon_id?: string | null
+    equipped_off_hand_weapon_id?: string | null
     attuned_item_ids?: string[] | null
     equipment_base_selections?: Record<string, string> | null
   }
@@ -795,6 +865,7 @@ export function buildInputsFromSavedCharacter(params: {
     equippedArmorId: character.equipped_armor_id ?? null,
     equippedShieldId: character.equipped_shield_id ?? null,
     equippedWeaponId: character.equipped_weapon_id ?? null,
+    equippedOffHandWeaponId: character.equipped_off_hand_weapon_id ?? null,
     attunedItemIds: character.attuned_item_ids ?? [],
     equipmentBaseSelections: character.equipment_base_selections ?? {},
     modifierCatalog: params.modifierCatalog,

@@ -256,6 +256,7 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     equippedArmorId: inputs.equippedArmorId,
     equippedShieldId: inputs.equippedShieldId,
     equippedWeaponId: inputs.equippedWeaponId,
+    equippedOffHandWeaponId: inputs.equippedOffHandWeaponId ?? null,
     attunedItemIds: inputs.attunedItemIds ?? [],
     modifierCatalog: inputs.modifierCatalog,
   })

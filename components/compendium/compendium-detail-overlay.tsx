@@ -71,7 +71,7 @@ export function CompendiumDetailOverlay({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            className="relative flex h-[min(92vh,900px)] max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl"
+            className="relative flex h-[min(92vh,900px)] max-h-[92vh] w-[80vw] max-w-[80vw] flex-col overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             style={{ boxShadow: "inset 0 0 0 1px rgba(212, 175, 55, 0.2), 0 24px 80px rgba(0,0,0,0.65)" }}
           >
@@ -104,7 +104,12 @@ export function CompendiumDetailOverlay({
 
               <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6 sm:pb-6">
                 {subtitle && (
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary/90">
+                  <p
+                    className={cn(
+                      "text-xs font-bold uppercase tracking-[0.25em]",
+                      accent.cardFooterText,
+                    )}
+                  >
                     {subtitle}
                   </p>
                 )}
@@ -124,7 +129,7 @@ export function CompendiumDetailOverlay({
                         className={cn(
                           "rounded border px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
                           tag.emphasis
-                            ? "border-primary/60 bg-primary/25 text-primary"
+                            ? cn(accent.cardFooterBorder, "bg-black/35", accent.cardFooterText)
                             : "border-white/35 bg-black/35 text-white",
                         )}
                       >

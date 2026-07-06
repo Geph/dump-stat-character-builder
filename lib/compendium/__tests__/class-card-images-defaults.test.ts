@@ -28,6 +28,12 @@ describe("SRD class card images", () => {
     expect(row.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Wizard)
   })
 
+  it("enriches Warlock with bundled warlock card art for visual builder view", () => {
+    const row = enrichSrdClassRow({ name: "Warlock", source: "SRD", features: [] })
+    expect(row.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Warlock)
+    expect(row.card_image_url).toMatch(/\/images\/compendium\/classes\/warlock\.png$/)
+  })
+
   it("preserves custom card art when already set", () => {
     const custom = "/custom/wizard.png"
     const row = enrichSrdClassRow({

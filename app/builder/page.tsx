@@ -88,8 +88,13 @@ import { CompendiumDetailOverlay } from "@/components/compendium/compendium-deta
 import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
 import { ClassDetailFeatureList } from "@/components/compendium/class-detail-feature-list"
 import { ClassComplexityDisplay } from "@/components/compendium/class-complexity-display"
+import {
+  SpeciesDetailTraitList,
+  splitSpeciesTraits,
+} from "@/components/compendium/species-detail-trait-list"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
-import { compendiumCardBlurb, getCompendiumCardBlurb } from "@/lib/compendium/card-image"
+import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
+import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
 import { getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
 import {
@@ -103,6 +108,7 @@ import { getCompendiumItemAccentColor, compendiumAccentColorStyles } from "@/lib
 import { cn } from "@/lib/utils"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { CatalogOptionDescriptionHover } from "@/components/builder/catalog-option-description-hover"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import {
   buildWeaponMasteryDescriptionsLookup,
@@ -1470,6 +1476,15 @@ export default function BuilderPage() {
       : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
 
   const compactPickerLayout = cardViewMode === "dense" ? "compact" : "default"
+  const skillPickerLayout = cardViewMode === "cinematic" ? "visual" : "compact"
+  const asiAllocatorVariant = cardViewMode === "cinematic" ? "visual" : "default"
+  const selectedBackgroundCardImage = selectedBackground
+    ? getCompendiumCardImageUrl(selectedBackground)
+    : null
+  const customSkillIconByName = useMemo(
+    () => buildCustomSkillIconByName(customAbilities),
+    [customAbilities],
+  )
 
   const skillPickSources = buildSkillPickSources({
     backgroundSkills: selectedBackground?.skill_proficiencies,
@@ -1527,6 +1542,8 @@ export default function BuilderPage() {
     ],
     existingExpertiseSkills: aggregatedCharacteristics.skillExpertise,
     choiceLayout: compactPickerLayout,
+    skillPickerLayout,
+    skillIconByName: customSkillIconByName,
   }
   const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
   const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
@@ -2530,7 +2547,11 @@ export default function BuilderPage() {
                   />
                 </div>
                 
-                <p className={`${pageFloatingHintClass} text-xs mb-2`}>Click a class to add it, or increase its level if already selected.</p>
+                {cardViewMode !== "cinematic" ? (
+                  <p className={`${pageFloatingHintClass} text-xs mb-2`}>
+                    Click a class to add it, or increase its level if already selected.
+                  </p>
+                ) : null}
 
                 {(() => {
                   const filteredClasses = classes.filter((cls) =>
@@ -2607,7 +2628,7 @@ export default function BuilderPage() {
                               selectionVariant={isSelected && !isPrimary ? "secondary" : "primary"}
                               disabled={totalLevel >= 20 && !existingLevel}
                               badge={levelBadge}
-                              size="lg"
+                              size="md"
                               imageCrop="top"
                               onSelect={selectClass}
                               onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
@@ -2696,7 +2717,8 @@ export default function BuilderPage() {
                                 ...getTakenSkills(skillPickSources, `class:${entry.classId}`),
                               ]}
                               showSkillInfo
-                              layout={compactPickerLayout}
+                              layout={skillPickerLayout}
+                              skillIconByName={customSkillIconByName}
                               onChange={(selected) =>
                                 setClassSkillPicks((prev) => ({
                                   ...prev,
@@ -2857,7 +2879,16 @@ export default function BuilderPage() {
                                     showSkillInfo={
                                       feature.choices!.category.toLowerCase().includes("skill")
                                     }
-                                    layout={compactPickerLayout}
+                                    layout={
+                                      feature.choices!.category.toLowerCase().includes("skill")
+                                        ? skillPickerLayout
+                                        : compactPickerLayout
+                                    }
+                                    skillIconByName={
+                                      feature.choices!.category.toLowerCase().includes("skill")
+                                        ? customSkillIconByName
+                                        : undefined
+                                    }
                                     onChange={handleFeatureChoiceChange}
                                     accentClass="border-accent bg-accent/10"
                                   />
@@ -3064,27 +3095,32 @@ export default function BuilderPage() {
                               ? catalogOptions.map((option) => {
                                   const isSelected = option.pickId === pickedId
                                   return (
-                                    <button
-                                      key={option.pickId}
-                                      type="button"
-                                      onClick={() =>
-                                        selectPick(isSelected ? null : option.pickId)
-                                      }
-                                      className={`rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
-                                        isSelected
-                                          ? "border-secondary bg-secondary/10"
-                                          : "border-border bg-card hover:border-secondary/50"
-                                      }`}
-                                    >
-                                      <p className="font-semibold text-foreground text-xs">
-                                        {option.name}
-                                      </p>
-                                      {option.summary ? (
-                                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-                                          {option.summary}
+                                    <div key={option.pickId} className="flex items-stretch gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          selectPick(isSelected ? null : option.pickId)
+                                        }
+                                        className={`flex-1 rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
+                                          isSelected
+                                            ? "border-secondary bg-secondary/10"
+                                            : "border-border bg-card hover:border-secondary/50"
+                                        }`}
+                                      >
+                                        <p className="font-semibold text-foreground text-xs">
+                                          {option.name}
                                         </p>
-                                      ) : null}
-                                    </button>
+                                        {option.summary ? (
+                                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                                            {option.summary}
+                                          </p>
+                                        ) : null}
+                                      </button>
+                                      <CatalogOptionDescriptionHover
+                                        name={option.name}
+                                        description={option.description}
+                                      />
+                                    </div>
                                   )
                                 })
                               : eligibleFeats.map((feat) => {
@@ -3323,7 +3359,7 @@ export default function BuilderPage() {
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
-                        imageAspect="21/9"
+                        imageCrop="top"
                         onSelect={selectSpecies}
                         onLearnMore={() => setDetailsModal({ type: "species", item: sp })}
                       />
@@ -3997,6 +4033,7 @@ export default function BuilderPage() {
                       allocation={milestoneAsiAllocation}
                       totalPoints={milestoneAsiTotalPoints}
                       pickCount={milestoneAsiFeatCount}
+                      variant={asiAllocatorVariant}
                       onChange={(allocation) =>
                         setAsiAllocationsByFeatId((prev) =>
                           withCombinedMilestoneAsiAllocation(prev, allocation),
@@ -4012,6 +4049,7 @@ export default function BuilderPage() {
                       title={grant.label}
                       allocation={asiAllocationsByFeatId[grant.allocationKey] ?? {}}
                       totalPoints={grant.points}
+                      variant={asiAllocatorVariant}
                       onChange={(allocation) =>
                         setAsiAllocationsByFeatId((prev) => ({
                           ...prev,
@@ -4031,6 +4069,8 @@ export default function BuilderPage() {
                       allowedAbilities={backgroundAbilityGrant.eligible}
                       maxPerAbility={2}
                       helpText={getBackgroundAsiHelpText(backgroundAbilityGrant)}
+                      variant={asiAllocatorVariant}
+                      headerImageUrl={selectedBackgroundCardImage}
                       onChange={(allocation) =>
                         setAsiAllocationsByFeatId((prev) => ({
                           ...prev,
@@ -4042,11 +4082,48 @@ export default function BuilderPage() {
                 )}
 
                 {Object.keys(backgroundAbilityGrant.fixed).length > 0 && (
-                  <div className="mb-6 p-3 rounded-lg border border-border bg-card/80">
-                    <p className="text-xs font-bold text-foreground mb-1">
+                  <div
+                    className={
+                      asiAllocatorVariant === "visual"
+                        ? "mb-6 overflow-hidden rounded-xl border-2 border-border bg-gradient-to-b from-black via-zinc-950 to-black p-4"
+                        : "mb-6 p-3 rounded-lg border border-border bg-card/80"
+                    }
+                    style={
+                      asiAllocatorVariant === "visual"
+                        ? {
+                            boxShadow:
+                              "inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)",
+                          }
+                        : undefined
+                    }
+                  >
+                    {asiAllocatorVariant === "visual" && selectedBackgroundCardImage ? (
+                      <div className="relative -mx-4 -mt-4 mb-3 aspect-[21/9] max-h-28 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedBackgroundCardImage}
+                          alt=""
+                          className="h-full w-full object-cover object-top"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/45 to-black" />
+                      </div>
+                    ) : null}
+                    <p
+                      className={
+                        asiAllocatorVariant === "visual"
+                          ? "font-serif text-base font-black uppercase tracking-wide text-white"
+                          : "text-xs font-bold text-foreground mb-1"
+                      }
+                    >
                       {selectedBackground?.name ?? "Background"} Ability Scores
                     </p>
-                    <p className="text-sm text-foreground">
+                    <p
+                      className={
+                        asiAllocatorVariant === "visual"
+                          ? "mt-1 text-sm text-amber-400/90"
+                          : "text-sm text-foreground"
+                      }
+                    >
                       {formatBackgroundAbilityBonuses(selectedBackground?.ability_bonuses)}
                     </p>
                   </div>
@@ -5286,14 +5363,14 @@ export default function BuilderPage() {
             >
               <div className="grid h-full gap-3 overflow-hidden md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(0,1.05fr)] md:gap-4">
                 <div className="min-w-0 overflow-hidden">
-                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.iconText)}>
+                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.cardFooterText)}>
                     Class highlights
                   </p>
                   <h3 className="font-serif text-sm font-bold text-white">How it feels to play</h3>
                   <p className="mt-1 text-[11px] leading-snug text-white/75 line-clamp-3">
                     {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
                   </p>
-                  <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.iconText} />
+                  <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.cardFooterText} />
                 </div>
                 <div className="min-w-0 overflow-hidden">
                   <h3 className="font-serif text-sm font-bold text-white">Class features</h3>
@@ -5301,7 +5378,7 @@ export default function BuilderPage() {
                     <div className="mt-1">
                       <ClassDetailFeatureList
                         features={baseFeatures}
-                        accentClassName={accentStyles.iconText}
+                        accentClassName={accentStyles.cardFooterText}
                       />
                     </div>
                   ) : (
@@ -5335,33 +5412,63 @@ export default function BuilderPage() {
 
         if (detailsModal.type === "species") {
           const sp = item as Species
+          const accentStyles = compendiumAccentColorStyles(accent)
+          const traits = sp.traits ?? []
+          const [traitsColA, traitsColB] = splitSpeciesTraits(traits)
+          const speedFt =
+            typeof sp.speed === "object" ? sp.speed.walking ?? 30 : sp.speed ?? 30
           return (
             <CompendiumDetailOverlay
               open
               onClose={close}
               item={sp}
+              imageCrop="top"
               enableCardImage
               subtitle={sp.source || "Custom"}
-              tags={[
-                { label: String(sp.size || "Medium") },
-                { label: `${typeof sp.speed === "object" ? sp.speed.walking ?? 30 : sp.speed} FT` },
-              ]}
+              tagline={getCompendiumCardBlurb(sp).toUpperCase()}
               accentColor={accent}
+              detailScroll={false}
             >
-              <RichTextContent html={sp.description} />
-              {(sp.traits?.length ?? 0) > 0 && (
-                <div className="mt-6">
-                  <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3">Traits</p>
-                  <div className="space-y-4">
-                    {sp.traits!.map((trait, i) => (
-                      <div key={i}>
-                        <p className="font-semibold text-primary">{trait.name}</p>
-                        <RichTextContent html={trait.description} className="text-sm" />
-                      </div>
-                    ))}
-                  </div>
+              <div className="grid h-full gap-3 overflow-hidden md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(0,1.05fr)] md:gap-4">
+                <div className="min-w-0 overflow-hidden">
+                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.cardFooterText)}>
+                    Species highlights
+                  </p>
+                  <h3 className="font-serif text-sm font-bold text-white">What sets them apart</h3>
+                  <p className="mt-1 text-[11px] leading-snug text-white/75 line-clamp-4">
+                    {getCompendiumCardBlurb(sp) || compendiumCardBlurb(sp.description)}
+                  </p>
+                  <dl className="mt-3 space-y-1 text-[10px] text-white/65">
+                    <div className="flex gap-2">
+                      <dt className="font-bold uppercase tracking-wide text-white/45">Size</dt>
+                      <dd>{String(sp.size || "Medium")}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="font-bold uppercase tracking-wide text-white/45">Speed</dt>
+                      <dd>{speedFt} ft.</dd>
+                    </div>
+                  </dl>
                 </div>
-              )}
+                <div className="min-w-0 overflow-hidden">
+                  <h3 className="font-serif text-sm font-bold text-white">Traits</h3>
+                  {traitsColA.length > 0 ? (
+                    <div className="mt-1">
+                      <SpeciesDetailTraitList traits={traitsColA} />
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-white/70">No traits listed.</p>
+                  )}
+                </div>
+                <div className="min-w-0 overflow-hidden">
+                  {traitsColB.length > 0 ? (
+                    <div className="mt-5">
+                      <SpeciesDetailTraitList traits={traitsColB} />
+                    </div>
+                  ) : traitsColA.length === 0 ? (
+                    <p className="mt-5 text-[11px] text-white/70">No traits listed.</p>
+                  ) : null}
+                </div>
+              </div>
             </CompendiumDetailOverlay>
           )
         }
