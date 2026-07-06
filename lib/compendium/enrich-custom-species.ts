@@ -718,12 +718,18 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
 }
 
 import { speciesRowHasLanguageGrant } from "@/lib/compendium/enrich-srd-species"
+import { applyBundledCardImage } from "@/lib/compendium/card-image"
+import { SPECIES_CARD_IMAGES_BY_NAME } from "@/lib/compendium/species-card-images-defaults"
+
+function withSpeciesCardImage(row: Record<string, unknown>): Record<string, unknown> {
+  return applyBundledCardImage(row, SPECIES_CARD_IMAGES_BY_NAME)
+}
 
 /** Apply non-SRD species modifier presets when the species name matches the registry. */
 export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {
   if (isSrdSource(row.source as string | null | undefined)) return row
   const speciesName = String(row.name ?? "")
-  if (!speciesHasTraitPresetRegistry(speciesName)) return row
+  if (!speciesHasTraitPresetRegistry(speciesName)) return withSpeciesCardImage(row)
 
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
   let next = { ...row }
@@ -749,10 +755,10 @@ export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<str
     }
   }
 
-  if (!traits.length) return next
+  if (!traits.length) return withSpeciesCardImage(next)
 
   const enrichedTraits = traits.map((trait) => applyPresetToTrait(speciesName, trait))
-  return { ...next, traits: enrichedTraits }
+  return withSpeciesCardImage({ ...next, traits: enrichedTraits })
 }
 
 /** @deprecated Use enrichCustomSpeciesRow */

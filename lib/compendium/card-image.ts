@@ -99,6 +99,17 @@ export function applySrdCardImage(
   return card_image_url ? { ...row, card_image_url } : row
 }
 
+/** Keep custom card art; otherwise apply bundled defaults by item name (any source). */
+export function applyBundledCardImage(
+  row: Record<string, unknown>,
+  defaults: Record<string, string>,
+): Record<string, unknown> {
+  const existing = normalizeCardImageUrl(row.card_image_url)
+  if (existing) return { ...row, card_image_url: existing }
+  const card_image_url = defaults[String(row.name ?? "")] ?? null
+  return card_image_url ? { ...row, card_image_url } : row
+}
+
 /** Portrait class art is top-cropped into the landscape banner; other types use full landscape framing. */
 export function compendiumCardImageCropForType(tab: CompendiumContentType): CompendiumCardImageCrop {
   return tab === "classes" || tab === "subclasses" ? "top" : "center"
