@@ -4,6 +4,7 @@ import { Children, useEffect, useRef, useState, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { getCinematicPickerItemClass } from "@/lib/builder/picker-pagination"
 
 type SwipeVisualPickerProps = {
   children: ReactNode
@@ -54,13 +55,15 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
     return <div className={className}>{children}</div>
   }
 
+  const swipeItemClass = getCinematicPickerItemClass()
+
   const animatedChildren = Children.map(children, (child, index) => (
     <motion.div
       key={index}
       initial={{ opacity: 0, x: 28 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.35), ease: "easeOut" }}
-      className="max-sm:contents"
+      className={swipeItemClass}
     >
       {child}
     </motion.div>

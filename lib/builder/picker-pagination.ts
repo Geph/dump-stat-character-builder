@@ -33,13 +33,17 @@ export function getFeatSpellGrantPickerPageSize(isSmScreen: boolean): number {
   return isSmScreen ? PICKER_GRID_ROWS * 3 : PICKER_GRID_ROWS * 2
 }
 
+/** Width/snap for one swipe carousel slide (apply to each item wrapper). */
+export function getCinematicPickerItemClass(): string {
+  return "max-sm:w-[min(85vw,340px)] max-sm:max-w-[340px] max-sm:shrink-0 max-sm:snap-center max-sm:snap-always"
+}
+
 /** Visual builder cards: swipe on phones, grid from `sm` up. */
 export function getCinematicPickerContainerClass(): string {
   return [
     "px-1 py-2",
-    "max-sm:flex max-sm:gap-3 max-sm:overflow-x-auto max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:-mx-1 max-sm:px-1",
+    "max-sm:flex max-sm:flex-nowrap max-sm:gap-3 max-sm:overflow-x-auto max-sm:overscroll-x-contain max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:-mx-1 max-sm:px-1 max-sm:[touch-action:pan-x]",
     "max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden",
-    "[&>*]:max-sm:w-[min(85vw,340px)] [&>*]:max-sm:max-w-[340px] [&>*]:max-sm:shrink-0 [&>*]:max-sm:snap-center",
     "sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-4",
   ].join(" ")
 }
