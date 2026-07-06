@@ -127,6 +127,7 @@ import {
 } from "@/lib/srd/exhaustion-effects"
 import { collectFeatureRollBonuses } from "@/lib/character/collect-limited-feature-effects"
 import { BLOODIED_DESCRIPTION, isBloodied } from "@/lib/character/bloodied"
+import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
 import {
   buildSheetPlayStateFromSheet,
   loadSheetSessionState,
