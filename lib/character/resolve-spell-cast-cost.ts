@@ -132,7 +132,7 @@ export function resolveSpellLimitCap(
   ctx: ResolveUsesContext,
 ): number | null {
   if (!capResourceKey) return null
-  const resources = resolveClassResourcesForClass(cls)
+  const resources = resolveClassResourcesForClass({ id: "", name: "", ...cls })
   const cap = resources.find((row) => row.id === capResourceKey)
   if (!cap) return null
   return resolveUsesAtLevel(cap.uses, classLevel, ctx)

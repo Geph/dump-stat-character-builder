@@ -1,3 +1,4 @@
+import { parseBackgroundAbilityFromImportText } from "@/lib/import/background-parse"
 import { applySrdItemIcon, SRD_BACKGROUND_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 import { SRD_BACKGROUND_CARD_IMAGES_BY_NAME } from "@/lib/compendium/background-card-images-defaults"
 import { applySrdCardImage } from "@/lib/compendium/card-image"
@@ -40,7 +41,7 @@ function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<str
   )
   if (!category) return row
 
-  const feature = (row.feature ?? null) as Record<string, unknown> | null
+  const feature = (row.feature ?? null) as unknown as Record<string, unknown> | null
   const linked = (feature?.linkedModifiers ?? feature?.linked_modifiers) as unknown[] | undefined
   if (linked?.length) return row
 
@@ -113,7 +114,7 @@ export function enrichBackgroundList<
   },
 >(rows: T[]): T[] {
   return rows.map((row) => {
-    const normalized = normalizeBackgroundRow(row as Record<string, unknown>) as T
+    const normalized = normalizeBackgroundRow(row as unknown as Record<string, unknown>) as T
     const bonuses = parseStoredAbilityBonuses(normalized.ability_bonuses)
     const seed = bundledBackgroundByName.get(row.name)
 
@@ -135,7 +136,7 @@ export function enrichBackgroundList<
       }
     }
 
-    const rowRecord = row as Record<string, unknown>
+    const rowRecord = row as unknown as Record<string, unknown>
     if (!rowRecord.starting_equipment_groups && seed?.starting_equipment_groups) {
       enriched.starting_equipment_groups = seed.starting_equipment_groups
     }
@@ -145,7 +146,7 @@ export function enrichBackgroundList<
 
     return applySrdCardImage(
       applySrdItemIcon(
-        applySrdFlavorDescription(enriched as Record<string, unknown>, "background"),
+        applySrdFlavorDescription(enriched as unknown as Record<string, unknown>, "background"),
         SRD_BACKGROUND_ICONS_BY_NAME,
       ),
       SRD_BACKGROUND_CARD_IMAGES_BY_NAME,
@@ -153,6 +154,10 @@ export function enrichBackgroundList<
   })
 }
 
-export function normalizeBackgroundRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  return enrichBackgroundList(rows.map(normalizeBackgroundRow))
+export function normalizeBackgroundRows(
+  rows: { name: string; ability_bonuses?: unknown; feat_granted?: string | null; source?: string | null }[],
+): Record<string, unknown>[] {
+  return enrichBackgroundList(
+    rows as { name: string; ability_bonuses?: unknown; feat_granted?: string | null; source?: string | null }[],
+  )
 }

@@ -60,16 +60,15 @@ describe("AC formula selection", () => {
   })
 
   it("defaults to the highest computed AC when no pick is saved", () => {
-    const monkBarbClasses: DndClass[] = [
+    const monkBarbClasses = [
       {
         id: "monk",
         name: "Monk",
-        hit_die: "d8",
+        hit_die: 8,
         saving_throws: ["Strength", "Dexterity"],
-        skill_choices: { category: "Skills", count: 2, options: [] },
+        skill_choices: { count: 2, options: [] },
         features: [
           {
-            id: "f1",
             name: "Unarmored Defense",
             level: 1,
             description:
@@ -93,12 +92,11 @@ describe("AC formula selection", () => {
       {
         id: "barbarian",
         name: "Barbarian",
-        hit_die: "d12",
+        hit_die: 12,
         saving_throws: ["Strength", "Constitution"],
-        skill_choices: { category: "Skills", count: 2, options: [] },
+        skill_choices: { count: 2, options: [] },
         features: [
           {
-            id: "f2",
             name: "Unarmored Defense",
             level: 1,
             description:
@@ -119,9 +117,9 @@ describe("AC formula selection", () => {
         created_at: "",
         icon: null,
       },
-    ]
+    ] as unknown as DndClass[]
 
-    const inputs: CharacterBuildInputs = {
+    const inputs = {
       baseAbilityScores: {
         strength: 10,
         dexterity: 14,
@@ -155,7 +153,7 @@ describe("AC formula selection", () => {
       extraWeaponProficiencies: [],
       extraArmorProficiencies: [],
       languages: [],
-      equipment: [] as Equipment[],
+      equipment: [] as unknown as Equipment[],
       equippedArmorId: null,
       equippedShieldId: null,
       equippedWeaponId: null,

@@ -30,7 +30,7 @@ describe("weapon mastery choices", () => {
   })
 
   it("enriches SRD Weapon Mastery into a real feature choice without legacy picker mods", () => {
-    const feature: Feature = {
+    const feature = {
       level: 1,
       name: "Weapon Mastery",
       description:

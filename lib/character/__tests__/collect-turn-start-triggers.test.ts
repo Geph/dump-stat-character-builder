@@ -62,7 +62,7 @@ describe("applyTurnStartTriggers", () => {
         type: "turn_start_trigger",
         accrueResourceKey: "influence_points",
         accrueResourceAmount: 1,
-        accrueResourceMaxAbility: "INT",
+        accrueResourceMaxAbility: "intelligence",
         accrueDecayMinutes: 1,
         requiresSheetToggle: "in_combat_or_high_stakes",
       },

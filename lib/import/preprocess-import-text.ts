@@ -227,7 +227,7 @@ export function preprocessImportText(
           deterministic.class_resources = [
             ...(deterministic.class_resources ?? []),
             ...resources,
-          ]
+          ] as NonNullable<ImportContent["class_resources"]>
         }
       }
     }
@@ -270,6 +270,7 @@ export function preprocessImportText(
             name: resolvedClassName,
             description: null,
             hit_die: 8,
+            primary_ability: null,
             features: [],
             spell_list: mergedNames,
           },

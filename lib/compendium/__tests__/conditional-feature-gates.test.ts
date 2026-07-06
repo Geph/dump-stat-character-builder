@@ -9,23 +9,23 @@ import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import classes from "@/lib/srd/seed-data/classes.json"
 import type { Equipment, Feature } from "@/lib/types"
 
-const heavyPlate: Equipment = {
+const heavyPlate = {
   id: "heavy-1",
   name: "Plate Armor",
   category: "Armor",
   subcategory: "Heavy Armor",
-}
+} as unknown as Equipment
 
 function enrichedBarbarianFeatures(): Feature[] {
   const enriched = enrichSrdClassList(classes as Record<string, unknown>[])
   const barbarian = enriched.find((row) => row.name === "Barbarian")!
-  return (barbarian.features ?? []) as Feature[]
+  return (barbarian.features ?? []) as unknown as unknown as Feature[]
 }
 
 function enrichedSorcererFeatures(): Feature[] {
   const enriched = enrichSrdClassList(classes as Record<string, unknown>[])
   const sorcerer = enriched.find((row) => row.name === "Sorcerer")!
-  return (sorcerer.features ?? []) as Feature[]
+  return (sorcerer.features ?? []) as unknown as unknown as Feature[]
 }
 
 describe("Innate Sorcery feature effects (SRD: while active)", () => {
@@ -149,7 +149,7 @@ describe("Escape the Horde (SRD: opportunity attacks have Disadvantage)", () => 
   it("does not grant self-roll advantage", () => {
     const roll = collectFeatureRollModes(
       [{ ...feature, linkedModifiers: escapeOption.linkedModifiers }],
-      { kind: "other" },
+      { kind: "save" },
       {},
     )
     expect(roll.mode).toBe("normal")

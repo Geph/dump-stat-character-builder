@@ -16,7 +16,7 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import type { FeatureChoice, Feature, ClassResource, ClassResourceRow } from "@/lib/types"
+import type { FeatureChoice, Feature, ClassResource, ClassResourceRow, DndClass } from "@/lib/types"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { CardBlurbField } from "@/components/compendium/card-blurb-field"
 import { CLASS_COMPLEXITY_OPTIONS, type ClassComplexity } from "@/lib/compendium/class-complexity"
@@ -34,6 +34,8 @@ import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/compendium/modifier-review"
 import { cn } from "@/lib/utils"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -127,7 +129,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
         .order("level")
         .order("name")
         .limit(1000)
-      setAllSpells((spells ?? []) as { id: string; name: string }[])
+      setAllSpells(asCompendiumRows<{ id: string; name: string }>(spells))
     }
     fetchSpells()
   }, [])
@@ -145,39 +147,46 @@ export default function ClassEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Class not found")
         } else if (data) {
-          const [enriched] = enrichClassesList([data as Record<string, unknown>])
-          const spellcasting = enriched.spellcasting
-            ? {
-                ability: enriched.spellcasting.ability || "Intelligence",
-                starts_at: enriched.spellcasting.starts_at ?? 1,
-              }
-            : null
-          setForm({
-            name: enriched.name || "",
-            description: enriched.description || "",
-            card_blurb: enriched.card_blurb || "",
-            complexity: enriched.complexity ?? "",
-            hit_die: enriched.hit_die || 8,
-            primary_ability: enriched.primary_ability || [],
-            saving_throws: enriched.saving_throws || [],
-            armor_proficiencies: enriched.armor_proficiencies || [],
-            weapon_proficiencies: enriched.weapon_proficiencies || [],
-            skill_choices: enriched.skill_choices || { count: 2, options: [] },
-            features: (enriched.features || [{ level: 1, name: "", description: "" }]).map((feature) =>
-              normalizeFeatureRow(feature),
-            ),
-            spellcasting,
-            starting_gold: enriched.starting_gold ?? 0,
-            starting_equipment_groups: enriched.starting_equipment_groups || [],
-            icon: enriched.icon || null,
-            accent_color: enriched.accent_color || null,
-            card_image_url: data.card_image_url || null,
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-          })
-          setHasSpellcasting(!!data.spellcasting)
-          setClassResources(resourcesForClass(id, (resourceRows || []) as ClassResourceRow[]))
-          setClassResourceRows((resourceRows || []) as ClassResourceRow[])
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Class not found")
+          } else {
+            const [enriched] = enrichClassesList([castCompendiumRow<DndClass>(row)])
+            const spellcasting = enriched.spellcasting
+              ? {
+                  ability: enriched.spellcasting.ability || "Intelligence",
+                  starts_at: enriched.spellcasting.starts_at ?? 1,
+                }
+              : null
+            setForm({
+              name: enriched.name || "",
+              description: enriched.description || "",
+              card_blurb: enriched.card_blurb || "",
+              complexity: enriched.complexity ?? "",
+              hit_die: enriched.hit_die || 8,
+              primary_ability: enriched.primary_ability || [],
+              saving_throws: enriched.saving_throws || [],
+              armor_proficiencies: enriched.armor_proficiencies || [],
+              weapon_proficiencies: enriched.weapon_proficiencies || [],
+              skill_choices: enriched.skill_choices || { count: 2, options: [] },
+              features: (enriched.features || [{ level: 1, name: "", description: "" }]).map((feature: ClassFeature) =>
+                normalizeFeatureRow(feature),
+              ),
+              spellcasting,
+              starting_gold: enriched.starting_gold ?? 0,
+              starting_equipment_groups: (enriched.starting_equipment_groups as StartingEquipmentGroup[]) || [],
+              icon: enriched.icon || null,
+              accent_color: enriched.accent_color || null,
+              card_image_url: (row.card_image_url as string | null) ?? null,
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+            })
+            setHasSpellcasting(!!row.spellcasting)
+            setClassResources(
+              resourcesForClass(id, asCompendiumRows(resourceRows) as unknown as ClassResourceRow[]),
+            )
+            setClassResourceRows(asCompendiumRows(resourceRows) as unknown as ClassResourceRow[])
+          }
         }
         setLoading(false)
       }
@@ -341,11 +350,14 @@ export default function ClassEditorPage({ id }: { id: string }) {
     const newOptions = existing.options.map((o, i) => {
       if (i !== optIndex) return o
       if (field === "linkedModifiers" && Array.isArray(value)) {
-        return syncModifierRefs({ ...o, linkedModifiers: value })
+        return syncModifierRefs({ ...o, linkedModifiers: value as LinkedModifierInstance[] })
       }
-      return { ...o, [field]: value }
+      return { ...o, [field]: value as string | string[] }
     })
-    newFeatures[featIndex] = { ...newFeatures[featIndex], choices: { ...existing, options: newOptions } }
+    newFeatures[featIndex] = {
+      ...newFeatures[featIndex],
+      choices: { ...existing, options: newOptions as FeatureChoice["options"] },
+    }
     setForm({ ...form, features: newFeatures })
   }
 
@@ -457,7 +469,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}

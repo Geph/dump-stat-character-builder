@@ -12,7 +12,7 @@ function checkRollFingerprint(effect: FeatureEffect): string | null {
     effect.checkCategory ?? "",
     (effect.checkAbility ?? "").toLowerCase(),
     effect.checkRollMode ?? "",
-    effect.checkSkill ?? "",
+    effect.checkSkills?.[0] ?? "",
   ].join("|")
 }
 
@@ -39,7 +39,7 @@ describe("SRD class enrichment audit", () => {
     const violations: string[] = []
     for (const cls of enriched) {
       const className = String(cls.name)
-      for (const feature of (cls.features ?? []) as Feature[]) {
+      for (const feature of (cls.features ?? []) as unknown as unknown as Feature[]) {
         const dupes = findDuplicateCheckRolls(feature)
         for (const dupe of dupes) {
           violations.push(`${className} L${feature.level} ${feature.name}: ${dupe}`)
@@ -53,13 +53,13 @@ describe("SRD class enrichment audit", () => {
     for (const className of MARTIAL_WEAPON_MASTERY_CLASSES) {
       const cls = enriched.find((row) => row.name === className)
       expect(cls, `${className} missing from SRD`).toBeTruthy()
-      const wm = ((cls!.features ?? []) as Feature[]).find((f) => f.name === "Weapon Mastery")
+      const wm = ((cls!.features ?? []) as unknown as unknown as Feature[]).find((f) => f.name === "Weapon Mastery")
       expect(wm?.isChoice).toBe(true)
       expect(wm?.choices?.choiceCountByLevel?.length).toBeGreaterThan(0)
       expect(wm?.choices?.resourceKey).toBeUndefined()
       expect(wm?.choices?.options?.length ?? 0).toBeGreaterThan(0)
       const hasLegacyPicker = (wm?.linkedModifiers ?? []).some((mod) =>
-        mod.characteristics?.some((c) => c.type === "feature_option_picker"),
+        mod.characteristics?.some((c) => (c as { type?: string }).type === "feature_option_picker"),
       )
       expect(hasLegacyPicker).toBe(false)
     }

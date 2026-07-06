@@ -120,7 +120,7 @@ export function collectAbilityScorePoolGrants(params: {
 
   const grants: AbilityScorePoolGrant[] = []
 
-  const speciesRow = species as unknown as Record<string, unknown> | undefined
+  const speciesRow = species as unknown as unknown as Record<string, unknown> | undefined
   grants.push(
     ...grantsFromLinkedModifiers(
       speciesRow ? readLinkedModifiers(speciesRow, catalog) : [],
@@ -196,7 +196,7 @@ export function collectAbilityScorePoolGrants(params: {
     grants.push(
       ...grantsFromLinkedModifiers(
         instances,
-        feat.modifierRefs ?? readModifierRefs(feat as unknown as Record<string, unknown>),
+        feat.modifierRefs ?? readModifierRefs(feat as unknown as unknown as Record<string, unknown>),
         catalog,
         choicePickKey,
         feat.name,

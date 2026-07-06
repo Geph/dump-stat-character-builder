@@ -202,7 +202,11 @@ describe("custom species modifier wiring", () => {
       ],
     })
 
-    const traits = enriched.traits as { name: string; linkedModifiers?: { catalogRefId: string }[] }[]
+    const traits = enriched.traits as Array<{
+      name: string
+      linkedModifiers?: { catalogRefId: string }[]
+      choices?: { options?: Array<{ name: string; linkedModifiers?: { catalogRefId: string }[] }> }
+    }>
     const resistance = traits.find((trait) => trait.name === "Celestial Resistance")
     expect(
       resistance?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_damage_resistance"),
@@ -214,8 +218,11 @@ describe("custom species modifier wiring", () => {
     ).toBe(true)
 
     const revelation = traits.find((trait) => trait.name === "Celestial Revelation")
-    const wings = revelation?.choices?.options?.find((option) => option.name === "Heavenly Wings")
-    expect(wings?.linkedModifiers?.some((m) => m.catalogRefId === "cat_char_speed")).toBe(true)
+    const wings = revelation?.choices?.options?.find(
+      (option: { name: string; linkedModifiers?: { catalogRefId: string }[] }) =>
+        option.name === "Heavenly Wings",
+    )
+    expect(wings?.linkedModifiers?.some((m: { catalogRefId: string }) => m.catalogRefId === "cat_char_speed")).toBe(true)
     expect(enriched.size_options).toEqual(["Small", "Medium"])
   })
 
@@ -254,7 +261,6 @@ describe("custom species modifier wiring", () => {
 
 describe("subclass feature presets", () => {
   const baseFeature = (name: string): Feature => ({
-    id: "feat_test",
     name,
     description: "",
     level: 3,
@@ -313,7 +319,6 @@ describe("subclass feature presets", () => {
 
 describe("canonical SRD feature choices", () => {
   const baseFeature = (name: string): Feature => ({
-    id: "feat_test",
     name,
     description: "",
     level: 1,

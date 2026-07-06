@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:mysql
       - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
       - run: node node_modules/vitest/vitest.mjs run
       - run: pnpm dlx tsx scripts/audit-srd-class-features.ts
       - run: pnpm dlx tsx scripts/audit-modifier-wiring-registry.ts

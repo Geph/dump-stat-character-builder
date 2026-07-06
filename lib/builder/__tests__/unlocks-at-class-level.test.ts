@@ -3,7 +3,7 @@ import { collectClassFeatureModifierPlayerChoiceSlots } from "@/lib/builder/modi
 import type { DndClass, Feature } from "@/lib/types"
 
 describe("unlocksAtClassLevel on SpellsKnownChoiceGrant", () => {
-  const arcanumFeature: Feature = {
+  const arcanumFeature = {
     level: 11,
     name: "Innate Arcanum",
     linkedModifiers: [
@@ -26,11 +26,11 @@ describe("unlocksAtClassLevel on SpellsKnownChoiceGrant", () => {
     ],
   }
 
-  const cls: DndClass = {
+  const cls = {
     id: "alt-sorc",
     name: "Alternate Sorcerer",
     features: [arcanumFeature],
-  } as DndClass
+  } as unknown as DndClass
 
   it("hides grants above the current class level", () => {
     const at11 = collectClassFeatureModifierPlayerChoiceSlots({

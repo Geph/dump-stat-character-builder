@@ -25,7 +25,7 @@ function makeWeapon(partial: Partial<Equipment>): Equipment {
     subcategory: "Martial Melee Weapons",
     properties: null,
     ...partial,
-  } as Equipment
+  } as unknown as Equipment
 }
 
 describe("Monk SRD proficiency wiring", () => {
@@ -39,7 +39,7 @@ describe("Monk SRD proficiency wiring", () => {
 
   it("attaches a tool-proficiency choice (Artisan's Tools or Musical Instrument) to Martial Arts", () => {
     const monk = monkRow()
-    const features = monk.features as Feature[]
+    const features = monk.features as unknown as Feature[]
     const martialArts = features.find((f) => f.name === "Martial Arts")
     const toolMods = (martialArts?.linkedModifiers ?? []).flatMap((instance) =>
       (instance.characteristics ?? []).filter((mod) => mod.type === "tool_proficiencies"),

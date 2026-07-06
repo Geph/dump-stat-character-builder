@@ -2,6 +2,7 @@ import {
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import {
   firstClauseOfWeaponMasteryRule,
   WEAPON_MASTERY_DESCRIPTIONS,
@@ -268,7 +269,7 @@ export async function ensureSystemOptionCatalogs(
 
   for (const { id, build, defaults } of rows) {
     const { data: existing } = await db.from("custom_abilities").select("*").eq("id", id).maybeSingle()
-    const existingRow = existing as Record<string, unknown> | null
+    const existingRow = existing as unknown as Record<string, unknown> | null
     const defaultEntries = defaults()
 
     if (!existingRow) {

@@ -9,6 +9,7 @@ import type { DerivedStatBreakdowns } from "@/lib/character/stat-contributions"
 import { breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
 import type { IncomingAttackNote } from "@/lib/character/incoming-attack-notes"
+import type { StatBreakdownPart } from "@/lib/character/types"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 
 type SheetPersistentStatsBarProps = {
@@ -158,7 +159,7 @@ function CombatStatsCompactRow({
         <span className="block w-full text-center text-2xl font-black tabular-nums leading-none text-primary">
           {armorClass}
         </span>
-        {incomingAttackNotes.length > 0 ? (
+        {incomingAttackNotes && incomingAttackNotes.length > 0 ? (
           <div className="space-y-0.5 max-w-[10rem]">
             {incomingAttackNotes.map((note) => (
               <p

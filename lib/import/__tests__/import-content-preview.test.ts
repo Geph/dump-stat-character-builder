@@ -4,7 +4,7 @@ import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("collectImportContentPreview", () => {
   it("summarizes spell and equipment fields for import review", () => {
-    const content: ImportContent = {
+    const content = {
       spells: [
         {
           name: "Fire Bolt",

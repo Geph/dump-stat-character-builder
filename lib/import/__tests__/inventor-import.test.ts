@@ -40,7 +40,7 @@ describe("Inventor progression table", () => {
 
 describe("Inventor import proposals", () => {
   it("splits upgrade options into one custom ability per Upgrade", () => {
-    const content: ImportContent = {
+    const content = {
       import_proposals: {
         custom_abilities: [
           {
@@ -69,7 +69,7 @@ describe("Inventor import proposals", () => {
         ],
       },
     }
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     expect(proposals.customAbilities.filter((row) => row.abilityRole === "upgrade")).toHaveLength(2)
     expect(proposals.customAbilities.find((row) => row.name === "Shield Proficiency")?.abilityRole).toBe(
       "upgrade",

@@ -61,9 +61,6 @@ function walkFeatureForSpendKeys(
   catalog: ModifierCatalogEntry[],
   spendKeys: Set<string>,
 ): void {
-  if (feature.choices?.resourceCost && feature.choices.resourceKey?.trim()) {
-    spendKeys.add(feature.choices.resourceKey.trim())
-  }
   for (const option of feature.choices?.options ?? []) {
     if (option.resourceCost && feature.choices?.resourceKey?.trim()) {
       spendKeys.add(feature.choices.resourceKey.trim())

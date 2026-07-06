@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  CharacteristicModifier,
+  SkillsCharacteristic,
+  VisionCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
 import { detectFeatureModifiers } from "@/lib/import/detect-feature-modifiers"
 import { enrichImportedClassRow } from "@/lib/import/enrich-import-classes"
@@ -150,7 +155,8 @@ describe("Alternate Rogue import wiring", () => {
     for (const feature of features) {
       for (const inst of feature.linkedModifiers ?? []) {
         for (const mod of inst.characteristics ?? []) {
-          if (mod.choiceCount) totalPicks += mod.choiceCount
+          const skillsMod = mod as SkillsCharacteristic
+          if (skillsMod.choiceCount) totalPicks += skillsMod.choiceCount
         }
       }
     }
@@ -163,21 +169,42 @@ describe("Alternate Rogue import wiring", () => {
       name: "Blindsense",
       description: BLINDSENSE_TEXT,
     } as Feature)
-    const vision = feature.linkedModifiers?.[0]?.characteristics?.[0]
+    const vision = feature.linkedModifiers?.[0]?.characteristics?.[0] as VisionCharacteristic | undefined
     expect(vision?.type).toBe("vision")
     expect(vision?.rangeFeetByLevel?.map((row) => row.level)).toEqual([14, 17, 20])
     expect(vision?.rangeFeetByLevel?.map((row) => row.fixed)).toEqual([10, 20, 30])
 
     const at14 = aggregateCharacteristics(
-      [{ type: "vision", visionType: "blindsight", rangeFeet: 10, rangeFeetByLevel: vision?.rangeFeetByLevel ?? [] }],
+      [
+        {
+          type: "vision",
+          visionType: "blindsight",
+          rangeFeet: 10,
+          rangeFeetByLevel: vision?.rangeFeetByLevel ?? [],
+        } as unknown as CharacteristicModifier,
+      ],
       { characterLevel: 14 },
     )
     const at17 = aggregateCharacteristics(
-      [{ type: "vision", visionType: "blindsight", rangeFeet: 10, rangeFeetByLevel: vision?.rangeFeetByLevel ?? [] }],
+      [
+        {
+          type: "vision",
+          visionType: "blindsight",
+          rangeFeet: 10,
+          rangeFeetByLevel: vision?.rangeFeetByLevel ?? [],
+        } as unknown as CharacteristicModifier,
+      ],
       { characterLevel: 17 },
     )
     const at20 = aggregateCharacteristics(
-      [{ type: "vision", visionType: "blindsight", rangeFeet: 10, rangeFeetByLevel: vision?.rangeFeetByLevel ?? [] }],
+      [
+        {
+          type: "vision",
+          visionType: "blindsight",
+          rangeFeet: 10,
+          rangeFeetByLevel: vision?.rangeFeetByLevel ?? [],
+        } as unknown as CharacteristicModifier,
+      ],
       { characterLevel: 20 },
     )
     expect(at14.vision[0]?.rangeFeet).toBe(10)
@@ -244,7 +271,7 @@ describe("collectFeatureUsesResources catalog safety", () => {
       collectFeatureUsesResources(
         [
           {
-            row: { class_id: "cls_1", level: 5, subclass_id: null },
+            row: { class_id: "cls_1", level: 5, subclass_id: null, order: 0 },
             class: {
               name: "Rogue",
               features: [
@@ -255,7 +282,7 @@ describe("collectFeatureUsesResources catalog safety", () => {
                   modifierRefs: ["cat_char_uses"],
                 },
               ],
-            },
+            } as unknown as import("@/lib/types").DndClass,
           },
         ],
         [],

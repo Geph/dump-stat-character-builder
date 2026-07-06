@@ -328,7 +328,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "You gain a bonus to Initiative rolls equal to your Charisma modifier (minimum bonus of +1).",
     ],
-    mechanicsKind: "initiative",
+    mechanicsKind: "initiative" as (typeof AI_MECHANIC_KINDS)[number],
     notes: 'mode: "ability_modifier"',
   },
   {
@@ -453,7 +453,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     trigger: "description",
     catalog: "cat_char_telepathy",
     examples: ["You have telepathy with a range of 120 feet"],
-    mechanicsKind: "telepathy",
+    mechanicsKind: "telepathy" as (typeof AI_MECHANIC_KINDS)[number],
   },
   {
     ruleId: "vision.darkvision",

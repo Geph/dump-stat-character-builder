@@ -5,6 +5,7 @@ import { enrichClassFeaturesWithResources } from "@/lib/compendium/class-resourc
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import type { Feature } from "@/lib/types"
+import type { DndClass } from "@/lib/types"
 
 describe("Bardic Inspiration resource tracker dedup", () => {
   it("does not duplicate bardic inspiration from class resources and feature uses", () => {
@@ -18,11 +19,11 @@ describe("Bardic Inspiration resource tracker dedup", () => {
       enrichClassFeatureWithModifierPresets("Bard", feature),
     )
     features = enrichClassFeaturesWithResources("Bard", features)
-    const cls = { ...bardSeed!, id: "cls_bard", features, class_resources: null }
+    const cls = { ...bardSeed!, id: "cls_bard", features, class_resources: null } as unknown as DndClass
 
     const fromClass = resolveClassResourcesForClass(cls)
     const fromFeatures = collectFeatureUsesResources(
-      [{ row: { class_id: "cls_bard", level: 5, subclass_id: null }, class: cls }],
+      [{ row: { class_id: "cls_bard", level: 5, subclass_id: null, order: 0 }, class: cls }],
       [],
     )
 
@@ -34,7 +35,7 @@ describe("Bardic Inspiration resource tracker dedup", () => {
     const entries = collectFeatureUsesResources(
       [
         {
-          row: { class_id: "cls_wiz", level: 11, subclass_id: null },
+          row: { class_id: "cls_wiz", level: 11, subclass_id: null, order: 0 },
           class: {
             id: "cls_wiz",
             name: "Wizard",
@@ -59,7 +60,7 @@ describe("Bardic Inspiration resource tracker dedup", () => {
                 ],
               },
             ],
-          },
+          } as unknown as DndClass,
         },
       ],
       [],

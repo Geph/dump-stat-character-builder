@@ -5,6 +5,7 @@ import { clearTable } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
 import { createClient } from "@/lib/db/client"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 export async function POST(request: NextRequest) {
   try {

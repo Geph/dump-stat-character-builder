@@ -7,17 +7,25 @@ import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("getMultipleClassImportBlock", () => {
   it("allows a single class import", () => {
-    const content: ImportContent = {
-      classes: [{ name: "Alternate Fighter", features: [] }],
+    const content = {
+      classes: [
+        {
+          name: "Alternate Fighter",
+          features: [],
+          description: null,
+          hit_die: 8,
+          primary_ability: null,
+        },
+      ],
     }
     expect(getMultipleClassImportBlock(content)).toBeNull()
   })
 
   it("blocks when more than one class is present", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
-        { name: "Fighter", features: [] },
-        { name: "KibblesTasty Psion", features: [] },
+        { name: "Fighter", features: [], description: null, hit_die: 8, primary_ability: null },
+        { name: "KibblesTasty Psion", features: [], description: null, hit_die: 8, primary_ability: null },
       ],
     }
     const block = getMultipleClassImportBlock(content, "pdf")

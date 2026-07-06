@@ -68,7 +68,7 @@ function catalogEntriesForAbility(
   const ability = customAbilities.find((row) => row.id === catalogAbilityId)
   if (!ability) return []
   return normalizeModifierCatalog(
-    (ability as unknown as Record<string, unknown>).modifier_catalog,
+    (ability as unknown as unknown as Record<string, unknown>).modifier_catalog,
   )
 }
 

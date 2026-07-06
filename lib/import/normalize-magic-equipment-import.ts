@@ -133,7 +133,7 @@ export function coerceMagicEquipmentImportFields(
   const next = { ...row }
   const rawProps =
     next.properties && typeof next.properties === "object" && !Array.isArray(next.properties)
-      ? ({ ...(next.properties as Record<string, unknown>) } as Record<string, unknown>)
+      ? ({ ...(next.properties as unknown as Record<string, unknown>) } as unknown as Record<string, unknown>)
       : {}
 
   const lifted = liftMagicFieldsFromProperties(rawProps)

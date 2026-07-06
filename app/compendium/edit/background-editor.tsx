@@ -35,6 +35,8 @@ import { StartingEquipmentGroupsEditor } from "@/components/compendium/starting-
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import type { StartingEquipmentGroup } from "@/lib/types"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import {
   normalizeLinkedModifiers,
   readLinkedModifiers,
@@ -127,7 +129,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         .select("id, name")
         .eq("category", "Origin")
         .order("name")
-      setOriginFeats(data || [])
+      setOriginFeats(asCompendiumRows<{ id: string; name: string }>(data))
     }
     fetchOriginFeats()
   }, [])
@@ -140,7 +142,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         .select("id, name, subcategory")
         .eq("category", "Weapon")
         .order("name")
-      setWeaponOptions(data || [])
+      setWeaponOptions(asCompendiumRows<{ id: string; name: string; subcategory: string | null }>(data))
     }
     fetchWeapons()
   }, [])
@@ -149,7 +151,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
     const fetchSpells = async () => {
       const db = createClient()
       const { data } = await db.from("spells").select("id, name, level").order("level").order("name")
-      setAllSpells(data || [])
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(data))
     }
     fetchSpells()
   }, [])
@@ -168,7 +170,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         if (error) {
           setError("Background not found")
         } else if (data) {
-          const row = data as Record<string, unknown> & { name: string }
+          const row = data as unknown as Record<string, unknown> & { name: string }
           const enriched = enrichBackgroundList([row])[0]
           setForm({
             name: String(row.name || ""),
@@ -178,7 +180,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             ),
             skill_proficiencies: (row.skill_proficiencies as string[]) || [],
             proficiencies: normalizeBackgroundProficiencies(
-              row.proficiencies,
+              row.proficiencies as BackgroundProficiencies | null | undefined,
               row.tool_proficiencies as string[] | null | undefined,
             ),
             feat_granted: String(
@@ -196,7 +198,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             feature_name: (row.feature as { name?: string } | null)?.name || "",
             feature_description: (row.feature as { description?: string } | null)?.description || "",
             feature_linked_modifiers: readLinkedModifiers(
-              (row.feature ?? {}) as Record<string, unknown>,
+              (row.feature ?? {}) as unknown as Record<string, unknown>,
               modifierCatalog,
             ),
             feature_modifier_refs: Array.isArray((row.feature as { modifierRefs?: string[] } | null)?.modifierRefs)
@@ -405,7 +407,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}

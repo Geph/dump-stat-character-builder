@@ -16,6 +16,7 @@ import {
   parseCharacterExportJson,
   prepareCharacterImportRow,
 } from "@/lib/character/character-export-format"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,7 +61,7 @@ export default function CharactersPage() {
       setLoadError(message)
       console.error("Failed to load characters:", message)
     } else if (data) {
-      const sorted = [...data].sort(
+      const sorted = [...asCompendiumRows<CharacterWithRelations & Record<string, unknown>>(data)].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
       setCharacters(sorted)
@@ -142,7 +143,7 @@ export default function CharactersPage() {
 
   const handleExportCharacter = (character: CharacterWithRelations) => {
     downloadCharacterExport(
-      characterRowToExportItem(character as unknown as Record<string, unknown>),
+      characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
     )
   }
 
@@ -150,7 +151,7 @@ export default function CharactersPage() {
     if (!characters.length) return
     downloadCharacterExport(
       characters.map((character) =>
-        characterRowToExportItem(character as unknown as Record<string, unknown>),
+        characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
       ),
     )
   }

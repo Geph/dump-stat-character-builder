@@ -1,6 +1,6 @@
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/feat-modifier-presets"
-import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
-import type { Feature, LinkedModifierInstance } from "@/lib/types"
+import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import type { Feature } from "@/lib/types"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 
 const WORD_TO_COUNT: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
@@ -98,9 +98,9 @@ function patchSkillsModifier(
       sharedChoiceGroup: `expertise_${featureLevel}`,
       sharedChoiceCount: count,
       grantExpertise: true,
-    }
+    } as unknown as CharacteristicModifier
   }
-  return { ...mod, choiceCount: count, grantExpertise: true }
+  return { ...mod, choiceCount: count, grantExpertise: true } as unknown as CharacteristicModifier
 }
 
 /** Override *::Expertise preset pick count (and skill-or-tool shape) from feature text. */

@@ -18,7 +18,7 @@ function triggerEntry(
       type: "turn_start_trigger",
       accrueResourceKey,
       accrueResourceAmount: 1,
-      accrueResourceMaxAbility: "INT",
+      accrueResourceMaxAbility: "intelligence",
       accrueDecayMinutes: 1,
     },
   }

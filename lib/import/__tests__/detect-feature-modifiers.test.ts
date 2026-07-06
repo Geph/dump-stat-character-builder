@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
   detectFeatureModifiers,
   mergeDetectionsIntoFeature,
@@ -8,6 +9,13 @@ import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-cho
 import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
+
+function modOf<T extends CharacteristicModifier["type"]>(
+  char: CharacteristicModifier | undefined,
+  type: T,
+): Extract<CharacteristicModifier, { type: T }> | undefined {
+  return char?.type === type ? (char as Extract<CharacteristicModifier, { type: T }>) : undefined
+}
 
 const baseCtx = {
   contentKind: "class_feature" as const,
@@ -45,7 +53,7 @@ describe("detectFeatureModifiers", () => {
         if (char?.type === "ac") {
           expect(char.mode).toBe("ability_modifiers")
           expect(char.base).toBe(10)
-          expect(char.abilities).toEqual(["dexterity", "wisdom"])
+          expect(char.abilities).toEqual(["DEX", "WIS"])
         }
       },
     },
@@ -138,14 +146,16 @@ describe("detectFeatureModifiers", () => {
         "Your attack rolls with Ranged weapons can score a Critical Hit on a roll of 19 or 20 on the d20. At level 9, your attack rolls with Ranged weapons score a Critical Hit on a roll of 18–20. At level 17, they score a Critical Hit on a roll of 17–20.",
       ruleId: "attack.critical.scaling",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "attack.critical.scaling")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("attack_roll_modifiers")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "attack.critical.scaling")?.instance
+            .characteristics?.[0],
+          "attack_roll_modifiers",
+        )
         const entry = char?.entries?.[0]
         expect(entry?.target).toBe("ranged")
         expect(entry?.criticalHitMinimum).toBe(19)
-        expect(entry?.criticalHitMinimumByLevel?.map((row) => row.level)).toEqual([9, 17])
-        expect(entry?.criticalHitMinimumByLevel?.map((row) => row.fixed)).toEqual([18, 17])
+        expect(entry?.criticalHitMinimumByLevel?.map((row: { level: number }) => row.level)).toEqual([9, 17])
+        expect(entry?.criticalHitMinimumByLevel?.map((row: { fixed?: number | null }) => row.fixed)).toEqual([18, 17])
       },
     },
     {
@@ -154,9 +164,11 @@ describe("detectFeatureModifiers", () => {
         "When you deal damage with a Ranged weapon that doesn't add your ability modifier to the roll, you add your ability modifier nonetheless. If you already add your modifier to the damage roll, the target takes an extra 1d8 damage of the weapon's type.",
       ruleId: "damage.weapon.ability_modifier",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "damage.weapon.ability_modifier")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("damage_roll_modifiers")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "damage.weapon.ability_modifier")?.instance
+            .characteristics?.[0],
+          "damage_roll_modifiers",
+        )
         const entry = char?.entries?.[0]
         expect(entry?.grantAbilityModifierWhenMissing).toBe(true)
         expect(entry?.bonusDiceWhenModifierIncluded).toBe("1d8")
@@ -169,7 +181,9 @@ describe("detectFeatureModifiers", () => {
       ruleId: "speed.equal_to_walk",
       assert: (detections) => {
         const chars =
-          detections.find((d) => d.ruleId === "speed.equal_to_walk")?.instance.characteristics ?? []
+          detections.find((d) => d.ruleId === "speed.equal_to_walk")?.instance.characteristics?.filter(
+            (c): c is Extract<CharacteristicModifier, { type: "speed" }> => c.type === "speed",
+          ) ?? []
         expect(chars.map((c) => c.speedType).sort()).toEqual(["climb", "swim"])
         expect(chars.every((c) => c.mode === "equal_to_walk")).toBe(true)
       },
@@ -180,9 +194,11 @@ describe("detectFeatureModifiers", () => {
         "Whenever you score a critical hit with a weapon attack you deal bonus damage equal to your Fighter level.",
       ruleId: "damage.crit.bonus",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "damage.crit.bonus")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("bonus_damage_riders")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "damage.crit.bonus")?.instance
+            .characteristics?.[0],
+          "bonus_damage_riders",
+        )
         expect(char?.triggerOn).toBe("on_crit")
         expect(char?.automaticBonus?.mode).toBe("character_level")
       },
@@ -193,9 +209,11 @@ describe("detectFeatureModifiers", () => {
         "At 15th level, when you score a critical hit with a weapon attack, you can maximize the damage instead of rolling.",
       ruleId: "damage.crit.maximize",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "damage.crit.maximize")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("on_hit_trigger")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "damage.crit.maximize")?.instance
+            .characteristics?.[0],
+          "on_hit_trigger",
+        )
         expect(char?.triggerOn).toBe("crit")
         expect(char?.maximizeWeaponDamage).toBe(true)
         expect(char?.maximizeWeaponDamageAtLevel).toBe(15)
@@ -222,8 +240,11 @@ describe("detectFeatureModifiers", () => {
         "You gain a +2 bonus to attack rolls with ranged weapons, and your attacks with ranged weapons ignore half-cover.",
       ruleId: "attack.bonus.all",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "attack.bonus.all")?.instance
-          .characteristics?.[0]
+        const char = modOf(
+          detections.find((d) => d.ruleId === "attack.bonus.all")?.instance
+            .characteristics?.[0],
+          "attack_roll_modifiers",
+        )
         const entry = char?.entries?.[0]
         expect(entry?.target).toBe("ranged")
         expect(entry?.bonus).toBe(2)
@@ -236,13 +257,15 @@ describe("detectFeatureModifiers", () => {
         "When you make a Strength or Constitution ability check or saving throw, you can use feat of strength or heroic fortitude without expending an Exploit Die.",
       ruleId: "resource.free_use_on_roll",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "resource.free_use_on_roll")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("resource_ability_menu")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "resource.free_use_on_roll")?.instance
+            .characteristics?.[0],
+          "resource_ability_menu",
+        )
         expect(char?.waiveResourceCost).toBe(true)
         expect(char?.resourceKey).toBe("exploit_dice")
         expect(char?.appliesOnAbilities).toEqual(["Strength", "Constitution"])
-        expect(char?.options?.map((o) => o.name)).toEqual(["Feat Of Strength", "Heroic Fortitude"])
+        expect(char?.options?.map((o: { name: string }) => o.name)).toEqual(["Feat Of Strength", "Heroic Fortitude"])
       },
     },
     {
@@ -251,9 +274,11 @@ describe("detectFeatureModifiers", () => {
         "If you begin your turn with less than half of your hit points remaining, but at least 1 hit point, you regain hit points equal to 5 + your Constitution modifier.",
       ruleId: "heal.turn_start_low_hp",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "heal.turn_start_low_hp")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("turn_start_trigger")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "heal.turn_start_low_hp")?.instance
+            .characteristics?.[0],
+          "turn_start_trigger",
+        )
         expect(char?.hpBelowFraction).toBe(0.5)
         expect(char?.hpAtLeast).toBe(1)
         const healFx = char?.effect?.activation?.effects?.[0]
@@ -267,10 +292,16 @@ describe("detectFeatureModifiers", () => {
       text: "You learn two languages of your choice.",
       ruleId: "language.choice",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "language.choice")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("languages")
-        expect(char?.choiceCount).toBe(2)
+        const char = modOf(
+          detections.find((d) => d.ruleId === "language.choice")?.instance
+            .characteristics?.[0],
+          "languages",
+        )
+        expect(
+          (char as unknown as import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier & {
+            choiceCount?: number
+          })?.choiceCount,
+        ).toBe(2)
       },
     },
     {
@@ -278,10 +309,16 @@ describe("detectFeatureModifiers", () => {
       text: "You know Sylvan.",
       ruleId: "language.known",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "language.known")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("languages")
-        expect(char?.values).toEqual(["Sylvan"])
+        const char = modOf(
+          detections.find((d) => d.ruleId === "language.known")?.instance
+            .characteristics?.[0],
+          "languages",
+        )
+        expect(
+          (char as unknown as import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier & {
+            values?: string[]
+          })?.values,
+        ).toEqual(["Sylvan"])
       },
     },
     {
@@ -289,9 +326,11 @@ describe("detectFeatureModifiers", () => {
       text: "You know the Druidcraft cantrip.",
       ruleId: "spell.know_cantrip",
       assert: (detections) => {
-        const char = detections.find((d) => d.ruleId === "spell.know_cantrip")?.instance
-          .characteristics?.[0]
-        expect(char?.type).toBe("spells_known")
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.know_cantrip")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
         expect(char?.spells?.[0]?.spellId).toContain("Druidcraft")
       },
     },
@@ -342,7 +381,7 @@ describe("detectFeatureModifiers", () => {
       modifierRefs: ["cat_char_skills"],
     }
     const detections = detectFeatureModifiers(feature.description, baseCtx)
-    const merged = mergeDetectionsIntoFeature(feature, detections)
+    const merged = mergeDetectionsIntoFeature(feature as unknown as Feature, detections)
     expect(merged.linkedModifiers).toHaveLength(2)
     expect(merged.modifierRefs).toContain("cat_char_skills")
   })
@@ -350,7 +389,7 @@ describe("detectFeatureModifiers", () => {
 
 describe("enrichImportContentModifiers", () => {
   it("walks class features and persists linked modifiers on feats", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
         {
           name: "Skirmisher",

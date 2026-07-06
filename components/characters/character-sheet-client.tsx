@@ -182,6 +182,7 @@ import { SheetPersistentStatsBar, SheetInitiativeBlock } from "@/components/char
 import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -189,6 +190,12 @@ interface CharacterWithRelations extends Character {
   species?: Species
   backgrounds?: Background
   subclasses?: Subclass
+}
+
+type CharacterQueryRow = CharacterWithRelations & Record<string, unknown>
+
+function parseCharacterQueryRow(data: unknown): CharacterQueryRow | null {
+  return asCompendiumRow<CharacterQueryRow>(data)
 }
 
 const ABILITY_LABELS: Record<string, string> = {
@@ -474,21 +481,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", id)
         .single()
 
-      if (!error && data) {
-        setCharacter(data)
-        setCharacterGold(typeof data.gold === "number" ? data.gold : 0)
-        setEquippedArmorId((data as Character).equipped_armor_id ?? null)
-        setEquippedShieldId((data as Character).equipped_shield_id ?? null)
-        setEquippedWeaponId((data as Character).equipped_weapon_id ?? null)
-        setEquippedOffHandWeaponId((data as Character).equipped_off_hand_weapon_id ?? null)
-        setAttunedItemIds((data as Character).attuned_item_ids ?? [])
-        setEquipmentBaseSelections((data as Character).equipment_base_selections ?? {})
-        setCurrentHp(data.hit_points || data.hit_point_max || 0)
-        setCompanionState((data as Character).companion_state ?? [])
-        setFeatureChoicePicks((data as Character).feature_choice_picks ?? {})
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) {
+        setCharacter(row)
+        setCharacterGold(typeof row.gold === "number" ? row.gold : 0)
+        setEquippedArmorId(row.equipped_armor_id ?? null)
+        setEquippedShieldId(row.equipped_shield_id ?? null)
+        setEquippedWeaponId(row.equipped_weapon_id ?? null)
+        setEquippedOffHandWeaponId(row.equipped_off_hand_weapon_id ?? null)
+        setAttunedItemIds(row.attuned_item_ids ?? [])
+        setEquipmentBaseSelections(row.equipment_base_selections ?? {})
+        setCurrentHp(row.hit_points || row.hit_point_max || 0)
+        setCompanionState(row.companion_state ?? [])
+        setFeatureChoicePicks(row.feature_choice_picks ?? {})
 
         const playState = pickInitialPlayState(
-          (data as Character).sheet_state,
+          row.sheet_state,
           loadSheetSessionState(id),
         )
         setActiveConditions(playState.activeConditions)
@@ -507,32 +515,38 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setAccumulatedResources(tickAccumulatedResources(playState.accumulatedResources))
         setSessionHydrated(true)
 
-        if (data.spell_ids?.length) {
-          const { data: spellData } = await db.from("spells").select("*").in("id", data.spell_ids)
-          if (spellData) setSpells(spellData)
+        if (row.spell_ids?.length) {
+          const { data: spellData } = await db.from("spells").select("*").in("id", row.spell_ids)
+          if (spellData) setSpells(asCompendiumRows<Spell & Record<string, unknown>>(spellData) as Spell[])
         }
 
         const { data: spellCatalogData } = await db.from("spells").select("*")
-        if (spellCatalogData) setSpellCatalog(spellCatalogData as Spell[])
+        if (spellCatalogData) {
+          setSpellCatalog(asCompendiumRows<Spell & Record<string, unknown>>(spellCatalogData) as Spell[])
+        }
 
-        if (data.equipment_ids?.length) {
-          const { data: equipmentData } = await db.from("equipment").select("*").in("id", data.equipment_ids)
-          if (equipmentData) setEquipment(equipmentData)
+        if (row.equipment_ids?.length) {
+          const { data: equipmentData } = await db.from("equipment").select("*").in("id", row.equipment_ids)
+          if (equipmentData) {
+            setEquipment(asCompendiumRows<Equipment & Record<string, unknown>>(equipmentData) as Equipment[])
+          }
         }
 
         const { data: catalogData } = await db.from("equipment").select("*").order("name")
-        if (catalogData) setEquipmentCatalog(catalogData as Equipment[])
+        if (catalogData) {
+          setEquipmentCatalog(asCompendiumRows<Equipment & Record<string, unknown>>(catalogData) as Equipment[])
+        }
 
         const catalog = await loadModifierCatalog(db)
         setModifierCatalog(catalog)
         setCustomAbilities(await loadCustomAbilitiesForGameplay(db))
 
-        const featIds = (data.feat_ids ?? []).filter(Boolean)
+        const featIds = (row.feat_ids ?? []).filter(Boolean)
         if (featIds.length) {
           const uniqueFeatIds = [...new Set(featIds)]
           const { data: featData } = await db.from("feats").select("*").in("id", uniqueFeatIds)
           if (featData) {
-            const rows = featData as Feat[]
+            const rows = asCompendiumRows<Feat & Record<string, unknown>>(featData) as Feat[]
             const byId = new Map(rows.map((feat) => [feat.id, feat]))
             setCharacterFeats(
               featIds.map((id) => byId.get(id)).filter((feat): feat is Feat => Boolean(feat)),
@@ -540,15 +554,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           }
         }
 
-        const bg = data.backgrounds as Background | undefined
-        const featurePicks = (data.feature_choice_picks as Record<string, string[]>) ?? {}
+        const bg = row.backgrounds
+        const featurePicks = row.feature_choice_picks ?? {}
         const effectiveOriginGrant = getEffectiveBackgroundFeatGranted(bg, featurePicks)
         if (effectiveOriginGrant) {
           const { data: featCatalog } = await db.from("feats").select("*")
-          const resolved = findBackgroundGrantedFeat(effectiveOriginGrant, featCatalog ?? [])
+          const resolved = findBackgroundGrantedFeat(
+            effectiveOriginGrant,
+            asCompendiumRows<Feat & Record<string, unknown>>(featCatalog ?? []) as Feat[],
+          )
           if (resolved) {
             const full =
-              (featCatalog as Feat[] | null)?.find((feat) => feat.id === resolved.id) ??
+              (featCatalog as unknown as Feat[] | null)?.find((feat) => feat.id === resolved.id) ??
               resolved
             setOriginFeat(full as Feat)
           }
@@ -630,10 +647,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const characterBuildInputs = useMemo(() => {
     if (!character) return null
     const classList = character.class_list ?? []
-    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as DndClass[]
+    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as unknown as DndClass[]
     const subclassesFromList = classList
       .map((entry) => entry.subclass)
-      .filter(Boolean) as Subclass[]
+      .filter(Boolean) as unknown as Subclass[]
     const inputs = buildInputsFromSavedCharacter({
       character,
       classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
@@ -663,7 +680,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     }
     const resolvedFeatures: Feature[] = []
     for (const entry of classList) {
-      const classLevel = entry.level ?? 1
+      const classLevel = entry.row.level ?? 1
       for (const feature of entry.class?.features ?? []) {
         if ((feature.level ?? 1) <= classLevel) resolvedFeatures.push(feature as Feature)
       }
@@ -754,8 +771,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
-      if (!error && data) {
-        setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) {
+        setCharacter(row)
         setEquippedArmorId(loadout.armorId)
         setEquippedShieldId(loadout.shieldId)
         setEquippedWeaponId(loadout.weaponId)
@@ -777,7 +795,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
-      if (!error && data) setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) setCharacter(row)
     },
     [character],
   )
@@ -793,7 +812,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
-      if (!error && data) setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) setCharacter(row)
     },
     [character],
   )
@@ -821,7 +841,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
-      if (!error && data) setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) setCharacter(row)
     },
     [character, equipmentBaseSelections],
   )
@@ -829,7 +850,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const openAddEquipmentOverlay = useCallback(async () => {
     const db = createClient()
     const { data } = await db.from("equipment").select("*").order("name")
-    if (data) setEquipmentCatalog(data as Equipment[])
+    if (data) setEquipmentCatalog(data as unknown as Equipment[])
     setAddEquipmentOpen(true)
   }, [])
 
@@ -863,7 +884,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
       if (error || !data) return
 
-      setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!row) return
+
+      setCharacter(row)
       setCharacterGold(nextGold)
       setEquipmentBaseSelections(nextSelections)
       setEquipment((prev) => (prev.some((e) => e.id === item.id) ? prev : [...prev, item]))
@@ -1136,7 +1160,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       return
     }
     saveSheetSessionState(character.id, state)
-    if (data) setCharacter(data)
+    const row = parseCharacterQueryRow(data)
+    if (row) setCharacter(row)
     setPlayStateSaveStatus("saved")
     window.setTimeout(() => setPlayStateSaveStatus("idle"), 2500)
   }, [character, buildCurrentPlayState, currentHp])
@@ -1483,7 +1508,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const profNames = new Set(
       (character?.tool_proficiencies ?? []).map(normalize).filter(Boolean),
     )
-    if (!profNames.size || !equipmentCatalog.length) return [] as Equipment[]
+    if (!profNames.size || !equipmentCatalog.length) return [] as unknown as Equipment[]
     const ownedIds = new Set(equipment.map((item) => item.id))
     const ownedNames = new Set(equipment.map((item) => normalize(item.name)))
     return equipmentCatalog.filter(
@@ -1761,7 +1786,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .eq("id", character.id)
         .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
         .single()
-      if (!error && data) setCharacter(data)
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) setCharacter(row)
     },
     [character],
   )
@@ -2347,7 +2373,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             onClick={() => {
                               if (!character) return
                               downloadCharacterExport(
-                                characterRowToExportItem(character as unknown as Record<string, unknown>),
+                                characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
                               )
                               setSheetMenuOpen(false)
                             }}

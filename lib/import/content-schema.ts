@@ -489,7 +489,13 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
   return z.object(base)
 }
 
-export type ImportContent = z.infer<ReturnType<typeof buildImportContentSchema>>
+export type ImportContent = z.infer<ReturnType<typeof buildImportContentSchema>> & {
+  abilities?: z.infer<typeof AbilityImportSchema>[]
+}
+
+export type ImportContentWithAbilities = ImportContent & {
+  abilities?: z.infer<typeof AbilityImportSchema>[]
+}
 
 import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-import-hints"
 

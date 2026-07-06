@@ -29,7 +29,17 @@ describe("ImportExtractionError", () => {
     const error = new ImportExtractionError(
       classifyImportAiError(new Error("quota")),
       {
-        partialContent: { classes: [{ name: "Fighter", features: [], hit_die: 10 }] },
+        partialContent: {
+          classes: [
+            {
+              name: "Fighter",
+              features: [],
+              hit_die: 10,
+              description: null,
+              primary_ability: null,
+            },
+          ],
+        },
         completedChunks: 1,
         totalChunks: 3,
       },

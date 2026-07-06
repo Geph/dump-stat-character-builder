@@ -13,6 +13,8 @@ import {
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import type { ToolCheckAbility, ToolGroup } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
 interface ToolFormData {
   name: string
@@ -74,18 +76,23 @@ export default function ToolEditor({ id }: { id: string }) {
       if (fetchError || !data) {
         setError("Tool not found")
       } else {
-        setForm({
-          name: data.name || "",
-          tool_group: (data.tool_group as ToolGroup) || "other",
-          subcategory: data.subcategory || "",
-          check_ability: (data.check_ability as ToolCheckAbility) || "intelligence",
-          description: data.description || "",
-          source: data.source || "Custom",
-          creator_url: data.creator_url || "",
-          icon: data.icon || null,
-          accent_color: data.accent_color || null,
-          card_image_url: data.card_image_url || null,
-        })
+        const row = asCompendiumRow(data)
+        if (!row) {
+          setError("Tool not found")
+        } else {
+          setForm({
+            name: String(row.name ?? ""),
+            tool_group: (row.tool_group as ToolGroup) || "other",
+            subcategory: String(row.subcategory ?? ""),
+            check_ability: (row.check_ability as ToolCheckAbility) || "intelligence",
+            description: String(row.description ?? ""),
+            source: String(row.source ?? "Custom"),
+            creator_url: String(row.creator_url ?? ""),
+            icon: (row.icon as string | null) ?? null,
+            accent_color: (row.accent_color as string | null) ?? null,
+            card_image_url: (row.card_image_url as string | null) ?? null,
+          })
+        }
       }
       setLoading(false)
     }
@@ -159,7 +166,7 @@ export default function ToolEditor({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 

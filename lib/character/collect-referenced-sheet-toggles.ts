@@ -1,6 +1,6 @@
 import { characteristicsFromLinkedModifiers } from "@/lib/compendium/builder-modifier-refs"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
-import { expandLegacyLimitations } from "@/lib/compendium/modifier-limitations"
+import { expandLegacyLimitations, type LimitationSource } from "@/lib/compendium/modifier-limitations"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import {
@@ -11,7 +11,7 @@ import type { CustomAbility, Feat, Feature, Species } from "@/lib/types"
 import type { MagicItemPower } from "@/lib/character/magic-item-powers"
 
 function collectFromModifier(mod: CharacteristicModifier, ids: Set<string>) {
-  for (const limitation of expandLegacyLimitations(mod)) {
+  for (const limitation of expandLegacyLimitations(mod as LimitationSource)) {
     if (limitation.kind === "sheet_toggle" && limitation.rule === "requires_active") {
       ids.add(limitation.value)
     }
@@ -23,7 +23,7 @@ function collectFromModifier(mod: CharacteristicModifier, ids: Set<string>) {
 
   if (mod.type === "attack_roll_modifiers") {
     for (const entry of mod.entries ?? []) {
-      for (const limitation of entry.limitations ?? []) {
+      for (const limitation of (entry as LimitationSource).limitations ?? []) {
         if (limitation.kind === "sheet_toggle" && limitation.rule === "requires_active") {
           ids.add(limitation.value)
         }
@@ -44,7 +44,7 @@ function collectFromFeatureLike(
   ids: Set<string>,
 ) {
   if (!row) return
-  const linked = readLinkedModifiers(row, catalog)
+  const linked = readLinkedModifiers(row as Parameters<typeof readLinkedModifiers>[0], catalog)
   collectFromCharacteristics(
     characteristicsFromLinkedModifiers(catalog, linked, null),
     ids,
@@ -72,11 +72,11 @@ export function collectReferencedSheetToggleIds(params: {
   collectFromFeatureLike(params.originFeat ?? null, params.catalog, ids)
 
   for (const trait of params.species?.traits ?? []) {
-    collectFromFeatureLike(trait as unknown as Record<string, unknown>, params.catalog, ids)
+    collectFromFeatureLike(trait as unknown as unknown as Record<string, unknown>, params.catalog, ids)
   }
 
   for (const ability of params.customAbilities ?? []) {
-    collectFromFeatureLike(ability as unknown as Record<string, unknown>, params.catalog, ids)
+    collectFromFeatureLike(ability as unknown as unknown as Record<string, unknown>, params.catalog, ids)
   }
 
   for (const power of params.magicItemPowers ?? []) {

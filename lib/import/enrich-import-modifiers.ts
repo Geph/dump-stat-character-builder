@@ -34,18 +34,19 @@ type ImportMechanicsCarrier = {
   linkedModifiers?: Feature["linkedModifiers"]
   modifierRefs?: Feature["modifierRefs"]
   importModifierMeta?: ImportModifierMeta[]
+  companion_stat_block?: Feature["companion_stat_block"]
 }
 
 function enrichFeatureLike<T extends ImportMechanicsCarrier>(
   item: T,
   ctx: DetectFeatureContext,
 ): T {
-  const baseFeature = enrichWildcardFeaturePresets(item as Feature) as T
+  const baseFeature = enrichWildcardFeaturePresets(item as unknown as Feature) as unknown as T
   const aiDetections = aiMechanicsToDetections(baseFeature.mechanics, ctx)
   const detectorDetections = detectFeatureModifiers(baseFeature.description ?? "", ctx)
   if (!aiDetections.length && !detectorDetections.length) {
     if (
-      isCompanionStatBlockFeature(baseFeature as Feature) &&
+      isCompanionStatBlockFeature(baseFeature as unknown as Feature) &&
       !baseFeature.companion_stat_block
     ) {
       const companion_stat_block = parseCompanionStatBlock(
@@ -57,18 +58,18 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
         companion_stat_block,
         linkedModifiers: baseFeature.linkedModifiers,
         modifierRefs: baseFeature.modifierRefs,
-      }) as T
+      }) as unknown as T
     }
     if (baseFeature === item) return item
     return syncModifierRefs({
       ...baseFeature,
       linkedModifiers: baseFeature.linkedModifiers,
       modifierRefs: baseFeature.modifierRefs,
-    }) as T
+    }) as unknown as T
   }
 
   const merged = mergeFeatureModifierDetections(
-    baseFeature as Feature,
+    baseFeature as unknown as Feature,
     aiDetections,
     detectorDetections,
   )
@@ -87,7 +88,7 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
     modifierRefs: withCompanion.modifierRefs,
     importModifierMeta: withCompanion.importModifierMeta,
     companion_stat_block: withCompanion.companion_stat_block ?? baseFeature.companion_stat_block,
-  }
+  } as unknown as T
 }
 
 function enrichFeatures(
@@ -101,7 +102,7 @@ function enrichFeatures(
       featureName: feature.name,
       level: feature.level,
     }),
-  ) as Feature[]
+  ) as unknown as Feature[]
 }
 
 function enrichTraits(
@@ -116,7 +117,7 @@ function enrichTraits(
       featureName: trait.name,
       level: trait.level,
     }),
-  ) as Trait[]
+  ) as unknown as Trait[]
 }
 
 function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | undefined {
@@ -141,7 +142,7 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
       ...inferred,
       linkedModifiers: enriched.linkedModifiers,
       modifierRefs: enriched.modifierRefs,
-      importModifierMeta: enriched.importModifierMeta,
+      importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
     } as ImportFeatRow
   })
 }
@@ -151,7 +152,7 @@ function enrichEquipmentRows(
 ): ImportContent["equipment"] | undefined {
   if (!equipment?.length) return equipment
   const normalized = normalizeEquipmentRows(
-    equipment.map((row) => ({ ...row })) as Record<string, unknown>[],
+    equipment.map((row) => ({ ...row })) as unknown as Record<string, unknown>[],
   ) as NonNullable<ImportContent["equipment"]>
   return normalized.map((item) => {
     const description = item.description ?? ""
@@ -179,9 +180,9 @@ function enrichEquipmentRows(
       magic_effects: magicEffects,
       linkedModifiers: enriched.linkedModifiers,
       modifierRefs: enriched.modifierRefs,
-      importModifierMeta: enriched.importModifierMeta,
+      importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
     }
-  }) as ImportContent["equipment"]
+  }) as unknown as ImportContent["equipment"]
 }
 
 /** Run AI mechanics parsing + mechanical phrase detection on importable features. */
@@ -218,7 +219,7 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   if (content.backgrounds?.length) {
     next.backgrounds = content.backgrounds.map((background) => {
       if (!background.feature?.description) return background
-      const enriched = enrichFeatureLike(background.feature, {
+      const enriched = enrichFeatureLike(background.feature as ImportMechanicsCarrier, {
         contentKind: "background_feature",
         sourceName: background.name,
         featureName: background.feature.name,
@@ -229,7 +230,7 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
           ...background.feature,
           linkedModifiers: enriched.linkedModifiers,
           modifierRefs: enriched.modifierRefs,
-          importModifierMeta: enriched.importModifierMeta,
+          importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
         }),
       }
     })
@@ -237,9 +238,11 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
 
   if (content.feats?.length) {
     next.feats = remapKiKeysOnFeatRows(
-      enrichFeats(content.feats),
+      enrichFeats(content.feats) as unknown as Array<{
+        linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[]
+      }>,
       (content.classes ?? []).map((cls) => cls.name),
-    )
+    ) as unknown as ImportContent["feats"]
   }
 
   if (content.equipment?.length) {
@@ -248,7 +251,7 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
 
   const withSpells = attachReferencedSpellsFromSupplements(
     mergeReferencedSpellsIntoImport(next),
-    normalizeSpellImportRows((content.spells ?? []) as Record<string, unknown>[]),
+    normalizeSpellImportRows((content.spells ?? []) as unknown as Record<string, unknown>[]),
   )
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 

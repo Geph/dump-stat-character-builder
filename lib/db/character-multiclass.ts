@@ -80,7 +80,7 @@ export async function attachMulticlassRelations(
       .from(schema.classes)
       .where(eq(schema.classes.id, classId))
       .limit(1)
-    if (cls) allClasses.push(serializeRow(cls as Record<string, unknown>))
+    if (cls) allClasses.push(serializeRow(cls as unknown as Record<string, unknown>))
   }
 
   const allSubclasses = []
@@ -90,7 +90,7 @@ export async function attachMulticlassRelations(
       .from(schema.subclasses)
       .where(eq(schema.subclasses.id, subclassId))
       .limit(1)
-    if (sub) allSubclasses.push(serializeRow(sub as Record<string, unknown>))
+    if (sub) allSubclasses.push(serializeRow(sub as unknown as Record<string, unknown>))
   }
 
   const resourceRows =
@@ -100,7 +100,7 @@ export async function attachMulticlassRelations(
             .select()
             .from(schema.classResources)
             .where(inArray(schema.classResources.class_id, classIds))
-        ).map((row) => serializeRow(row as Record<string, unknown>))
+        ).map((row) => serializeRow(row as unknown as Record<string, unknown>))
       : []
 
   const classesWithResources = allClasses.map((cls) =>

@@ -1,6 +1,7 @@
 import { usesPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
-import type { ClassResourceImportRow, Feature, UsesConfig } from "@/lib/types"
+import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
+import type { Feature, UsesConfig } from "@/lib/types"
 
 const POINT_POOL_RESOURCE_KEYS = new Set(["sorcery_points", "spell_limit"])
 
@@ -16,7 +17,7 @@ function hasSorcerousRegeneration(features: Feature[]): boolean {
 
 function withSorcerousRegenerationRecharge(uses: UsesConfig): UsesConfig {
   const recharges = [...(uses.recharges ?? (uses.recharge ? [{ rest: uses.recharge }] : []))]
-  const hasShort = recharges.some((rule) => rule.rest === "short_rest")
+  const hasShort = recharges.some((rule) => "rest" in rule && rule.rest === "short_rest")
   if (!hasShort) {
     recharges.push({
       rest: "short_rest",

@@ -12,7 +12,7 @@ function enrichedCircleFeatures(): Feature[] {
     { ...circleSeed, source: "SRD", id: "col-test", class_id: "druid-test" },
     "Druid",
   )
-  return (row.features as Feature[]) ?? []
+  return (row.features as unknown as Feature[]) ?? []
 }
 
 function spellsFeature(): Feature {

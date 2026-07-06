@@ -32,7 +32,7 @@ describe("getDerivedCharacterBreakdowns", () => {
 
   it("lists species trait sources for each movement speed", () => {
     const base = barbarianShieldFixture()
-    const speciesInputs: CharacterBuildInputs = {
+    const speciesInputs = {
       ...base,
       species: {
         id: "aarakocra",
@@ -57,8 +57,8 @@ describe("getDerivedCharacterBreakdowns", () => {
       },
     }
 
-    const derived = computeDerivedCharacter(speciesInputs)
-    const breakdowns = getDerivedCharacterBreakdowns(speciesInputs)
+    const derived = computeDerivedCharacter(speciesInputs as unknown as CharacterBuildInputs)
+    const breakdowns = getDerivedCharacterBreakdowns(speciesInputs as unknown as CharacterBuildInputs)
     const speedLines = breakdownLines(breakdowns, "speed")
 
     expect(derived.speeds?.some((entry) => entry.type === "fly" && entry.feet === 45)).toBe(true)

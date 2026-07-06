@@ -4,6 +4,7 @@ import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import { compendiumStorageContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
+import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
 
 export type CompendiumToggleTarget = {
   table: CompendiumTable
@@ -28,8 +29,9 @@ export const COMPENDIUM_TOGGLE_LABELS: Record<CompendiumContentType, string> = {
 }
 
 export function contentTypeToTable(contentType: CompendiumContentType): CompendiumTable {
-  const storageType = compendiumStorageContentType(contentType)
-  return storageType === "abilities" ? "custom_abilities" : storageType
+  if (contentType === "abilities") return "custom_abilities"
+  if (contentType === "magic_items") return "equipment"
+  return contentType
 }
 
 export function tableToContentType(table: CompendiumTable): CompendiumContentType {
@@ -85,7 +87,7 @@ async function addAttachedAbilities(
   seen: Set<string>,
 ) {
   const { data: abilities } = await db.from("custom_abilities").select("id, name, attached_to_type, attached_to_id")
-  for (const row of abilities ?? []) {
+  for (const row of asCompendiumRows(abilities)) {
     if (row.attached_to_type !== attachType) continue
     if (row.attached_to_id !== attachId) continue
     addDependent(dependents, seen, "custom_abilities", row.id as string, row.name as string)
@@ -104,20 +106,21 @@ export async function findCompendiumDependents(
 
   if (table === "classes") {
     const { data: cls } = await db.from("classes").select("name").eq("id", id).single()
-    const className = typeof cls?.name === "string" ? cls.name : null
+    const clsRow = asCompendiumRow(cls)
+    const className = typeof clsRow?.name === "string" ? clsRow.name : null
 
     const { data: subclasses } = await db.from("subclasses").select("id, name").eq("class_id", id)
-    for (const row of subclasses ?? []) {
+    for (const row of asCompendiumRows(subclasses)) {
       addDependent(dependents, seen, "subclasses", row.id as string, row.name as string, id)
     }
 
     const { data: resources } = await db.from("class_resources").select("id, name").eq("class_id", id)
-    for (const row of resources ?? []) {
+    for (const row of asCompendiumRows(resources)) {
       addDependent(dependents, seen, "class_resources", row.id as string, row.name as string, id)
     }
 
     const { data: feats } = await db.from("feats").select("id, name, prerequisite_class_ids")
-    for (const row of feats ?? []) {
+    for (const row of asCompendiumRows(feats)) {
       if (idsInclude(row.prerequisite_class_ids, id)) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
@@ -125,7 +128,7 @@ export async function findCompendiumDependents(
 
     if (className) {
       const { data: spells } = await db.from("spells").select("id, name, classes")
-      for (const row of spells ?? []) {
+      for (const row of asCompendiumRows(spells)) {
         if (stringArrayIncludes(row.classes, className)) {
           addDependent(dependents, seen, "spells", row.id as string, row.name as string, id)
         }
@@ -138,7 +141,7 @@ export async function findCompendiumDependents(
 
   if (table === "species") {
     const { data: feats } = await db.from("feats").select("id, name, prerequisite_species_ids")
-    for (const row of feats ?? []) {
+    for (const row of asCompendiumRows(feats)) {
       if (idsInclude(row.prerequisite_species_ids, id)) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
@@ -149,7 +152,7 @@ export async function findCompendiumDependents(
 
   if (table === "backgrounds") {
     const { data: feats } = await db.from("feats").select("id, name, prerequisite_background_ids")
-    for (const row of feats ?? []) {
+    for (const row of asCompendiumRows(feats)) {
       if (idsInclude(row.prerequisite_background_ids, id)) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
@@ -160,7 +163,7 @@ export async function findCompendiumDependents(
 
   if (table === "feats") {
     const { data: feats } = await db.from("feats").select("id, name, prerequisite_feat_ids")
-    for (const row of feats ?? []) {
+    for (const row of asCompendiumRows(feats)) {
       if (idsInclude(row.prerequisite_feat_ids, id)) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
@@ -176,14 +179,15 @@ export async function findCompendiumDependents(
 
   if (table === "equipment") {
     const { data: item } = await db.from("equipment").select("name, category").eq("id", id).single()
+    const itemRow = asCompendiumRow(item)
     const { data: abilities } = await db.from("custom_abilities").select("id, name, attached_to_type, attached_to_id")
-    for (const row of abilities ?? []) {
+    for (const row of asCompendiumRows(abilities)) {
       if (row.attached_to_type !== "equipment") continue
       const attachedId = row.attached_to_id as string
       if (
         attachedId === id ||
-        attachedId === item?.name ||
-        attachedId === item?.category
+        attachedId === itemRow?.name ||
+        attachedId === itemRow?.category
       ) {
         addDependent(dependents, seen, "custom_abilities", row.id as string, row.name as string, id)
       }
@@ -226,7 +230,7 @@ export async function findDisabledCompendiumDependents(
       )
     if (error) throw new Error(error.message ?? "Failed to load dependents")
 
-    for (const row of data ?? []) {
+    for (const row of asCompendiumRows(data)) {
       if (!isCompendiumItemEnabled(row as { enabled?: boolean | number | null })) {
         const match = targets.find((target) => target.id === row.id)
         if (match) disabled.push(match)

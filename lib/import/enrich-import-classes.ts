@@ -224,7 +224,7 @@ export function mergeTableParsedClassResources(content: {
   }
 
   for (const classRow of content.classes ?? []) {
-    const record = classRow as Record<string, unknown>
+    const record = classRow as unknown as Record<string, unknown>
     const className = String(record.name ?? "")
     if (!className) continue
 
@@ -260,8 +260,8 @@ export function mergeTableParsedClassResources(content: {
 
   return [...merged.values()].flatMap((row) => {
     const classRow = (content.classes ?? []).find(
-      (entry) => String((entry as Record<string, unknown>).name ?? "") === row.class_name,
-    ) as Record<string, unknown> | undefined
+      (entry) => String((entry as unknown as Record<string, unknown>).name ?? "") === row.class_name,
+    ) as unknown as Record<string, unknown> | undefined
     const features = Array.isArray(classRow?.features)
       ? (classRow.features as Feature[])
       : []
@@ -307,7 +307,7 @@ export function buildClassResourceRowsForClass(
     const existingRow = rows.find((row) => row.resource_key === column.resourceKey)
     if (existingRow) {
       existingRow.uses = mergeUsesFromProgressionTable(
-        existingRow.uses as UsesConfig,
+        existingRow.uses as unknown as unknown as unknown as UsesConfig,
         tableUses,
       )
       continue

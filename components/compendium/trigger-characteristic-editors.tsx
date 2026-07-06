@@ -29,10 +29,12 @@ import type { ClassResource } from "@/lib/types"
 function TagInput({
   values,
   onChange,
+  suggestions,
   placeholder,
 }: {
   values: string[]
   onChange: (values: string[]) => void
+  suggestions?: readonly string[]
   placeholder?: string
 }) {
   return (

@@ -12,6 +12,7 @@ import {
   HERO_ROTATING_IMAGES,
   LIBRARY_STATS_BACKGROUND,
 } from "@/lib/site-images"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import {
   getCustomHeroBackground,
   HERO_BG_CHANGE_EVENT,

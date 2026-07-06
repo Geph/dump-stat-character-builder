@@ -28,14 +28,13 @@ function feat(partial: Partial<Feat> & Pick<Feat, "id" | "name" | "category">): 
     modifierRefs: null,
     benefits: null,
     isChoice: false,
-    choices: null,
+    choices: undefined,
     repeatable: false,
     source: "Test",
     creator_url: null,
     icon: null,
-    enabled: true,
-    ...partial,
-  }
+        ...partial,
+  } as unknown as unknown as Feat
 }
 
 describe("parseFeatPrerequisite", () => {
@@ -72,8 +71,8 @@ describe("enrichFeatRowWithPrerequisites", () => {
       },
       [{ id: "infernal-pact", name: "Infernal Pact" }],
     )
-    expect(enriched.level_requirement).toBe(4)
-    expect(enriched.prerequisite_feat_ids).toEqual(["infernal-pact"])
+    expect((enriched as Record<string, unknown>).level_requirement).toBe(4)
+    expect((enriched as Record<string, unknown>).prerequisite_feat_ids).toEqual(["infernal-pact"])
   })
 })
 

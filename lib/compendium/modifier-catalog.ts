@@ -57,6 +57,7 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Active abilities",
   "Resources & uses",
   "Feats & choices",
+  "Equipment & items",
 ] as const
 
 export type ModifierCatalogGroup = (typeof MODIFIER_CATALOG_GROUPS)[number]

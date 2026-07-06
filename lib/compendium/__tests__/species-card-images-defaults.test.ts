@@ -74,7 +74,7 @@ describe("species card images", () => {
     const [elf, tabaxi] = enrichSpeciesList([
       { name: "Elf", source: "SRD", traits: [] },
       { name: "Tabaxi", source: "Eberron", traits: [] },
-    ])
+    ] as unknown as import("@/lib/types").Species[])
     expect(elf.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Elf)
     expect(tabaxi.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Tabaxi)
   })

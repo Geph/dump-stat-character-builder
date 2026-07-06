@@ -31,6 +31,7 @@ import {
 import {
   confirmClientByoJsonImport,
   runClientByoJsonImport,
+  type ClientByoImportSuccessResult,
 } from "@/lib/import/client-byo-import"
 import { seedLocalSrd } from "@/lib/data/local-seed"
 import {
@@ -235,7 +236,7 @@ export default function ImportPage() {
       breakdown?: Record<string, number>
       count?: number
       pagesParsed?: { from?: number; to?: number; total?: number }
-    },
+    } | ClientByoImportSuccessResult,
   ) => {
     setImportReport(data.report ?? null)
     const breakdownText = data.breakdown
@@ -244,9 +245,10 @@ export default function ImportPage() {
           .map(([type, count]) => `${count} ${type}`)
           .join(", ")
       : ""
-    const pagesText = data.pagesParsed?.from
-      ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
-      : ""
+    const pagesText =
+      "pagesParsed" in data && data.pagesParsed?.from
+        ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
+        : ""
     setMessage(
       data.report?.headline ??
         `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`,
@@ -376,14 +378,15 @@ export default function ImportPage() {
           setRenameMap(defaultRenameMap(collisions))
           setCollisionResolutionMap(defaultCollisionResolutionMap(collisions))
           setPendingImport({
-            content: data.pendingContent,
-            proposals: data.proposals,
-            previewSummary: data.previewSummary ?? "",
+            content: data.pendingContent as ImportContent,
+            proposals: data.proposals as ImportProposalSet,
+            previewSummary: (data.previewSummary as string) ?? "",
             source: "pdf",
             collisions,
             stages: (data.stages ?? []) as ImportStage[],
-            stagingSummary: data.stagingSummary ?? "",
-            tokenSavings: data.tokenSavings,
+            stagingSummary: (data.stagingSummary as string) ?? "",
+            tokenSavings: data.tokenSavings as ImportTokenSavingsReport | undefined,
+            materialSource: importMaterialSource,
           })
           setMessage("Review this import before writing to the compendium.")
           return
@@ -429,7 +432,9 @@ export default function ImportPage() {
           setMessage("Review this import before writing to the compendium.")
           return
         }
-        applyImportSuccess(data)
+        if ("success" in data) {
+          applyImportSuccess(data)
+        }
         setTextStatus("success")
         return
       }

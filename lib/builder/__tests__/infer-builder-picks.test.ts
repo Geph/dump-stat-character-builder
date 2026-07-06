@@ -12,7 +12,7 @@ function mockClass(id: string, name: string, skills: string[]): DndClass {
     weapon_proficiencies: [],
     armor_proficiencies: [],
     features: [],
-  } as DndClass
+  } as unknown as unknown as DndClass
 }
 
 describe("inferClassSkillPicks", () => {
@@ -44,7 +44,7 @@ describe("inferClassSkillPicks", () => {
       ],
     } as unknown as Character
 
-    const picks = inferClassSkillPicks(character, [fighter, ranger], null as Background | null)
+    const picks = inferClassSkillPicks(character, [fighter, ranger], null as unknown as Background | null)
 
     expect(picks[fighterId]).toEqual(["Athletics", "Perception"])
     expect(picks[rangerId]).toEqual(["Survival"])

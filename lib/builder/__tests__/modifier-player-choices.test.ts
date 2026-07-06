@@ -29,7 +29,7 @@ describe("expertise modifier player choices", () => {
   })
 
   it("limits SRD Bard Expertise options to proficient skills only", () => {
-    const feature: Feature = {
+    const feature = {
       level: 2,
       name: "Expertise",
       description:
@@ -38,11 +38,11 @@ describe("expertise modifier player choices", () => {
     const enriched = enrichClassFeatureWithModifierPresets("Bard", feature, null, {
       skipMechanicalDetection: true,
     })
-    const cls: DndClass = {
+    const cls = {
       id: "bard",
       name: "Bard",
       features: [enriched],
-    } as DndClass
+    } as unknown as DndClass
 
     const slots = collectClassFeatureModifierPlayerChoiceSlots({
       classLevels: [{ classId: "bard", level: 2 }],

@@ -2,7 +2,8 @@ import { randomUUID } from "crypto"
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { getDb, schema } from "./index"
 import { serializeRow, serializeRows } from "./serialize"
-import type { CompendiumTable, TableName } from "./tables"
+import type { TableName } from "./schema"
+import type { CompendiumTable } from "./tables"
 import { isCompendiumTable } from "./tables"
 
 export type Filter =
@@ -17,7 +18,7 @@ function getTable(name: CompendiumTable | "characters") {
 
 function buildWhere(table: ReturnType<typeof getTable>, filters: Filter[]) {
   const conditions = filters.map((f) => {
-    const col = (table as Record<string, unknown>)[f.column]
+    const col = (table as unknown as Record<string, unknown>)[f.column]
     if (!col) throw new Error(`Unknown column: ${f.column}`)
     if (f.op === "eq") return eq(col as never, f.value as never)
     return inArray(col as never, f.values as never[])
@@ -27,7 +28,7 @@ function buildWhere(table: ReturnType<typeof getTable>, filters: Filter[]) {
 
 function buildOrder(table: ReturnType<typeof getTable>, orders: OrderBy[]) {
   return orders.map((o) => {
-    const col = (table as Record<string, unknown>)[o.column]
+    const col = (table as unknown as Record<string, unknown>)[o.column]
     if (!col) throw new Error(`Unknown column: ${o.column}`)
     return o.ascending === false ? desc(col as never) : asc(col as never)
   })
@@ -61,14 +62,14 @@ export async function listRows(
   if (orderBy.length) query = query.orderBy(...orderBy)
   if (options.limit) query = query.limit(options.limit)
   const rows = await query
-  return serializeRows(rows as Record<string, unknown>[])
+  return serializeRows(rows as unknown as Record<string, unknown>[])
 }
 
 export async function getRowById(table: CompendiumTable | "characters", id: string) {
   const t = getTable(table)
   const db = getDb()
   const [row] = await db.select().from(t).where(eq(t.id, id)).limit(1)
-  return row ? serializeRow(row as Record<string, unknown>) : null
+  return row ? serializeRow(row as unknown as Record<string, unknown>) : null
 }
 
 export async function insertRows(table: CompendiumTable | "characters", rows: Record<string, unknown>[]) {
@@ -88,10 +89,10 @@ export async function updateRowById(
   const db = getDb()
   const { id: _id, created_at: _c, ...rest } = data
   if (table === "characters") {
-    ;(rest as Record<string, unknown>).updated_at = new Date()
+    ;(rest as unknown as Record<string, unknown>).updated_at = new Date()
   }
   if (table === "custom_abilities") {
-    ;(rest as Record<string, unknown>).updated_at = new Date()
+    ;(rest as unknown as Record<string, unknown>).updated_at = new Date()
   }
   await db.update(t).set(rest as never).where(eq(t.id, id))
 }
@@ -126,7 +127,7 @@ export async function upsertByName(table: CompendiumTable, rows: Record<string, 
     const [existing] = await db.select().from(t).where(eq(t.name, name)).limit(1)
     const payload = { ...row, id: (existing as { id?: string } | undefined)?.id ?? randomUUID() }
     if (existing) {
-      const { id: _id, created_at: _c, ...rest } = payload
+      const { id: _id, created_at: _c, ...rest } = payload as Record<string, unknown>
       await db.update(t).set(rest as never).where(eq(t.id, (existing as { id: string }).id))
     } else {
       await db.insert(t).values(payload as never)

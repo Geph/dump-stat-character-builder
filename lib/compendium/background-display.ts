@@ -95,8 +95,8 @@ export function getBackgroundProficiencySections(background: Background) {
 
 export function findBackgroundGrantedFeat(
   featGranted: string | null | undefined,
-  feats: { id: string; name: string; description: string | null }[],
-): { id: string; name: string; description: string | null } | undefined {
+  feats: import("@/lib/types").Feat[],
+): import("@/lib/types").Feat | undefined {
   if (!featGranted?.trim()) return undefined
   const name = featGranted.trim()
   const exact = feats.find((f) => f.name === name)

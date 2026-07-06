@@ -19,7 +19,7 @@ import type { Equipment, Feat } from "@/lib/types"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 
-function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
+function makeLinked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
   return [
     {
       instanceId: `modinst_${chars[0]?.id ?? "test"}`,
@@ -29,7 +29,7 @@ function linked(chars: CharacteristicModifier[]): LinkedModifierInstance[] {
   ]
 }
 
-const longswordEquipment: Equipment = {
+const longswordEquipment = {
   id: "longsword",
   name: "Longsword",
   category: "Weapon",
@@ -39,9 +39,9 @@ const longswordEquipment: Equipment = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as Equipment
 
-const plusOneLongsword: Equipment = {
+const plusOneLongsword = {
   id: "plus-one-longsword",
   name: "+1 Longsword",
   category: "Weapon",
@@ -51,7 +51,7 @@ const plusOneLongsword: Equipment = {
   requires_attunement: true,
   base_equipment_ids: [longswordEquipment.id],
   selected_base_equipment_id: longswordEquipment.id,
-  magic_effects: linked([
+  magic_effects: makeLinked([
     {
       id: "plus_one_attack",
       type: "attack_roll_modifiers",
@@ -67,40 +67,40 @@ const plusOneLongsword: Equipment = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as Equipment
 
-const plusOneShield: Equipment = {
+const plusOneShield = {
   id: "plus-one-shield",
   name: "+1 Shield",
   category: "Armor",
   subcategory: "Shield",
-  armor_class: "+2",
+  armor_class: 2,
   rarity: "Uncommon",
   magic_item_category: "Armor",
   requires_attunement: true,
   base_equipment_ids: [shieldEquipment.id],
   selected_base_equipment_id: shieldEquipment.id,
-  magic_effects: linked([
+  magic_effects: makeLinked([
     { id: "plus_one_shield_ac", type: "ac", mode: "flat_bonus", flatBonus: 1 },
   ]),
   icon: null,
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as Equipment
 
-const plusOneChainMail: Equipment = {
+const plusOneChainMail = {
   id: "plus-one-chain-mail",
   name: "+1 Chain Mail",
   category: "Armor",
   subcategory: "Heavy Armor",
-  armor_class: "16",
+  armor_class: 16,
   rarity: "Rare",
   magic_item_category: "Armor",
   requires_attunement: true,
   base_equipment_ids: [chainMailEquipment.id],
   selected_base_equipment_id: chainMailEquipment.id,
-  magic_effects: linked([
+  magic_effects: makeLinked([
     {
       id: "plus_one_armor_ac",
       type: "ac",
@@ -113,7 +113,7 @@ const plusOneChainMail: Equipment = {
   source: "SRD",
   creator_url: null,
   created_at: "",
-}
+} as unknown as Equipment
 
 describe("computeDerivedCharacter", () => {
   it("Barbarian 1 with shield uses Unarmored Defense + shield", () => {
@@ -158,7 +158,7 @@ describe("computeDerivedCharacter", () => {
   })
 
   it("Defense fighting style only applies while wearing armor", () => {
-    const defenseFeat: import("@/lib/types").Feat = {
+    const defenseFeat = {
       id: "feat_defense",
       name: "Defense",
       description: "",
@@ -184,8 +184,7 @@ describe("computeDerivedCharacter", () => {
       source: "SRD",
       creator_url: null,
       created_at: "",
-      enabled: true,
-    }
+    } as unknown as Feat
 
     const base = fighterArcheryBackgroundFixture()
     const armorOnly = computeDerivedCharacter({
@@ -246,7 +245,7 @@ describe("computeDerivedCharacter", () => {
       attunedItemIds: [],
       equipment: [longswordEquipment],
     })
-    const withMagic = computeDerivedCharacter(inputs)
+    const withMagic = computeDerivedCharacter(inputs as unknown as import("@/lib/character/types").CharacterBuildInputs)
 
     expect(withMagic.equippedWeaponAttack?.attackBonus).toBe(
       (withoutMagic.equippedWeaponAttack?.attackBonus ?? 0) + 1,
@@ -288,21 +287,21 @@ describe("computeDerivedCharacter", () => {
 
   it("does not apply attuned magic item effects without attunement", () => {
     const base = fighterArcheryBackgroundFixture()
-    const ringOfProtection: Equipment = {
+    const ringOfProtection = {
       id: "ring-protection",
       name: "Ring of Protection",
       category: "Adventuring Gear",
       magic_item_category: "Ring",
       rarity: "Rare",
       requires_attunement: true,
-      magic_effects: linked([
+      magic_effects: makeLinked([
         { id: "ring_ac", type: "ac", mode: "flat_bonus", flatBonus: 1 },
       ]),
       icon: null,
       source: "SRD",
       creator_url: null,
       created_at: "",
-    }
+    } as unknown as Equipment
     const unattuned = computeDerivedCharacter({
       ...base,
       equipment: [...base.equipment, ringOfProtection],
@@ -389,11 +388,11 @@ describe("save vs preview invariant", () => {
   })
 
   it("doubles proficiency bonus on tool checks with tool expertise", () => {
-    const toolExpertiseFeat: Feat = {
+    const toolExpertiseFeat = {
       id: "tool-expertise-feat",
       name: "Tool Expertise",
       description: "Double PB on tool checks.",
-      linkedModifiers: linked([toolExpertise("tool_expertise")]),
+      linkedModifiers: makeLinked([toolExpertise("tool_expertise")]),
       modifierRefs: [],
       prerequisite: null,
       prerequisite_feat_ids: null,
@@ -402,13 +401,13 @@ describe("save vs preview invariant", () => {
       prerequisite_background_ids: null,
       benefits: null,
       is_choice: false,
-      choices: null,
+      choices: undefined,
       repeatable: false,
       icon: null,
       source: "test",
       creator_url: null,
       created_at: "",
-    }
+    } as unknown as Feat
     const derived = computeDerivedCharacter(
       baseInputs({
         baseAbilityScores: {

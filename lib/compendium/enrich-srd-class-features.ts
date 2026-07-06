@@ -61,7 +61,7 @@ const SKILL_CHECK_ALTERNATE_ABILITY_CATALOG_ID = "cat_char_skill_check_alternate
 type ClassFeatureModifierPreset =
   | LinkedModifierInstance[]
   | {
-      linkedModifiers: LinkedModifierInstance[]
+      linkedModifiers?: LinkedModifierInstance[]
       activation?: Partial<FeatureActivation>
     }
 
@@ -464,6 +464,7 @@ function checkBonus(
     ability?: string | null
     skills?: string[]
     limitations?: ModifierLimitation[]
+    label?: string
   },
 ): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, CHECK_ROLL_MODIFIER_CATALOG_ID, {
@@ -477,6 +478,7 @@ function checkBonus(
         checkSkills: options.skills,
         bonusConfig: options.bonusConfig,
         limitations: options.limitations?.length ? options.limitations : undefined,
+        label: options.label,
       },
     ],
   })
@@ -3349,7 +3351,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             kind: "movement_option",
             movementTeleport: true,
             moveDistanceMode: "fixed",
-            moveDistanceFeet: 60,
+            moveDistanceFixed: 60,
             label: "Teleport up to 60 ft. (150 ft. once per Rage with allies)",
           },
         ],
@@ -3737,7 +3739,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             kind: "movement_option",
             movementTeleport: true,
             moveDistanceMode: "fixed",
-            moveDistanceFeet: 30,
+            moveDistanceFixed: 30,
             label: "On Action Surge: teleport up to 30 ft.",
           },
         ],
@@ -3811,7 +3813,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             kind: "movement_option",
             movementTeleport: true,
             moveDistanceMode: "fixed",
-            moveDistanceFeet: 60,
+            moveDistanceFixed: 60,
             label: "Teleport 60 ft. in dim light/darkness; Advantage on next melee attack",
           },
         ],
@@ -3834,7 +3836,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             areaShape: "sphere",
             areaRadiusFeet: 20,
             label: "20-ft. sphere DEX save for 3× Martial Arts die elemental damage",
-          },
+          } as import("@/lib/types").FeatureEffect,
         ],
       }),
     ],
@@ -4986,7 +4988,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: [
       damageResistance(["Acid", "Poison"], "Resistance to Acid and Poison damage"),
       charInstance("modinst_chemical_mastery_immune", CONDITION_IMMUNITY_CATALOG_ID, [
-        { id: modId("chemical_mastery_immune"), type: "condition_immunity", values: ["Poisoned"] },
+        { id: modId("chemical_mastery_immune"), type: "condition_immunity", conditions: ["Poisoned"] },
       ]),
       onHitTriggerPreset("alchemical_eruption", {
         effectCatalogRefId: "cat_fx_extra_damage_on_hit",

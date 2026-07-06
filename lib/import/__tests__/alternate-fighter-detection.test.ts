@@ -56,7 +56,7 @@ const alternateFighterFeatures = [
 
 describe("Alternate Fighter homebrew detection", () => {
   it("wires key class and archetype mechanics from description text", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
         {
           name: "Alternate Fighter",

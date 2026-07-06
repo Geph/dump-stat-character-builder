@@ -13,7 +13,7 @@ const psionTableDescription = `1st 	+2 	1 	1 	Psionic Archetype, Psionics
 
 describe("collectImportProposals", () => {
   it("detects psi resources from class level table and discipline features", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
         {
           name: "KibblesTasty Psion",
@@ -41,7 +41,7 @@ describe("collectImportProposals", () => {
       ],
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     expect(importProposalsNeedConfirmation(proposals)).toBe(true)
     expect(proposals.classResources.map((row) => row.name)).toEqual(["Psi Points", "Psi Limit"])
     expect(proposals.classResources[0].definition.toLowerCase()).toContain("psionic")
@@ -50,7 +50,7 @@ describe("collectImportProposals", () => {
   })
 
   it("merges AI proposals with definitions", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [{ name: "KibblesTasty Psion", description: null, hit_die: 6, primary_ability: ["Intelligence"], features: [] }],
       import_proposals: {
         class_resources: [
@@ -90,7 +90,7 @@ describe("collectImportProposals", () => {
       },
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     expect(proposals.classResources[0].definition).toContain("psionic fuel")
     expect(proposals.customAbilities[0].definition).toContain("moving matter")
     expect(proposals.customAbilities[0].talentCount).toBe(2)
@@ -99,7 +99,7 @@ describe("collectImportProposals", () => {
 
 describe("applyProposalSelections", () => {
   it("creates only selected class resources and abilities", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
         {
           name: "KibblesTasty Psion",
@@ -123,7 +123,7 @@ describe("applyProposalSelections", () => {
       ],
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     const psiPointsId = proposals.classResources.find((row) => row.name === "Psi Points")!.id
     const selections = {
       classResourceIds: [psiPointsId],
@@ -140,7 +140,7 @@ describe("applyProposalSelections", () => {
 
 describe("Battle Master maneuvers", () => {
   it("proposes superiority-dice maneuvers as custom abilities", () => {
-    const content: ImportContent = {
+    const content = {
       subclasses: [
         {
           name: "Battle Master",
@@ -163,7 +163,7 @@ describe("Battle Master maneuvers", () => {
       ],
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     const trip = proposals.customAbilities.find((row) => row.name === "Trip Attack")
     expect(trip).toBeDefined()
     expect(trip?.resourceKey).toBe("superiority_dice")
@@ -174,7 +174,7 @@ describe("Battle Master maneuvers", () => {
 
 describe("innate psionics", () => {
   it("proposes innate psionic features for user confirmation", () => {
-    const content: ImportContent = {
+    const content = {
       classes: [
         {
           name: "KibblesTasty Psion",
@@ -197,7 +197,7 @@ describe("innate psionics", () => {
       ],
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     const innate = proposals.customAbilities.find((row) => row.name === "Innate Psionics")
     expect(innate).toBeDefined()
     expect(innate?.abilityRole).toBe("talent_pool")
@@ -207,7 +207,7 @@ describe("innate psionics", () => {
 
 describe("companion stat blocks", () => {
   it("proposes companion features as custom abilities with companionStatBlock flag", () => {
-    const content: ImportContent = {
+    const content = {
       subclasses: [
         {
           name: "Battle Smith",
@@ -225,7 +225,7 @@ describe("companion stat blocks", () => {
       ],
     }
 
-    const proposals = collectImportProposals(content)
+    const proposals = collectImportProposals(content as unknown as ImportContent)
     const defender = proposals.customAbilities.find((row) => row.name === "Steel Defender")
     expect(defender).toBeDefined()
     expect(defender?.companionStatBlock).toBeTruthy()

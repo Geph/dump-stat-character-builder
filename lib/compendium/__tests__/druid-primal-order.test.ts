@@ -9,7 +9,7 @@ const druidSeed = bundledClasses.find((c) => c.name === "Druid")!
 
 function enrichedDruid(): DndClass {
   const row = enrichSrdClassRow({ ...druidSeed, source: "SRD", id: "druid-test" })
-  return row as unknown as DndClass
+  return row as unknown as unknown as DndClass
 }
 
 describe("Druid Primal Order weapon proficiencies", () => {
@@ -76,7 +76,7 @@ describe("Druid Primal Order weapon proficiencies", () => {
       customAbilities: [],
       primaryClassId: druid.id,
       classAddOrder: [druid.id],
-    })
+    } as unknown as import("@/lib/character/types").CharacterBuildInputs)
 
     expect(derived.weaponProficiencies).toEqual(["Simple weapons"])
     expect(derived.weaponProficiencies).not.toContain("Martial weapons")
@@ -121,7 +121,7 @@ describe("Druid Primal Order weapon proficiencies", () => {
       customAbilities: [],
       primaryClassId: druid.id,
       classAddOrder: [druid.id],
-    })
+    } as unknown as import("@/lib/character/types").CharacterBuildInputs)
 
     expect(derived.weaponProficiencies).toContain("Simple weapons")
     expect(derived.weaponProficiencies).toContain("Martial weapons")

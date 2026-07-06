@@ -51,7 +51,7 @@ describe("metamagicOptionsFromFeats", () => {
         name: "Twinned Spell",
         category: "Metamagic",
         description: "When you cast a spell, you can spend 1 sorcery point to twin it.",
-      } as Feat,
+      } as unknown as Feat,
     ]
     expect(metamagicOptionsFromFeats(feats)).toEqual([
       { id: "mm_twinned", name: "Twinned Spell", cost: 1 },

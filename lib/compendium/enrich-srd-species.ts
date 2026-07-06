@@ -1,3 +1,4 @@
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import { applySrdItemIcon, SRD_SPECIES_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 import { applySrdCardImage } from "@/lib/compendium/card-image"
 import { SPECIES_CARD_IMAGES_BY_NAME } from "@/lib/compendium/species-card-images-defaults"
@@ -8,7 +9,7 @@ import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-fe
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import { isSrdSource } from "@/lib/srd/source"
-import type { FeatureActivation, Trait, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureActivation, Trait, UsesConfig } from "@/lib/types"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
 import { SPECIAL_ATTACK_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
@@ -193,7 +194,7 @@ function onHitApplyCondition(instanceKey: string, condition: string, label?: str
               id: modId(`${instanceKey}_fx`),
               kind: "modify_creature",
               rollTarget: "enemy",
-              creatureModifyMode: "condition",
+              creatureModifyMode: "condition" as import("@/lib/types").CreatureModifyMode,
               effectConditionTypes: [condition],
             },
           ],
@@ -900,7 +901,7 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
-  return enrichFeatureWithMechanicalDetection(next, {
+  return enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
     featureName: trait.name,
@@ -922,7 +923,7 @@ export function enrichSrdSpeciesRow(row: Record<string, unknown>): Record<string
 }
 
 function enrichSrdSpeciesRowCore(row: Record<string, unknown>): Record<string, unknown> {
-  if (!isSrdSource(row.source)) return row
+  if (!isSrdSource(row.source as string | null | undefined)) return row
   const speciesName = String(row.name ?? "")
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
 
@@ -984,7 +985,7 @@ export function speciesRowHasLanguageGrant(row: Record<string, unknown>): boolea
 
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
   return traits.some((trait) => {
-    const traitRow = trait as unknown as Record<string, unknown>
+    const traitRow = trait as unknown as unknown as Record<string, unknown>
     if (
       linkedModifiersHaveLanguageGrant(trait.linkedModifiers) ||
       linkedModifiersHaveLanguageGrant(traitRow.linked_modifiers)
@@ -992,7 +993,7 @@ export function speciesRowHasLanguageGrant(row: Record<string, unknown>): boolea
       return true
     }
     return (trait.choices?.options ?? []).some((option) => {
-      const optionRow = option as unknown as Record<string, unknown>
+      const optionRow = option as unknown as unknown as Record<string, unknown>
       return (
         linkedModifiersHaveLanguageGrant(option.linkedModifiers) ||
         linkedModifiersHaveLanguageGrant(optionRow.linked_modifiers)

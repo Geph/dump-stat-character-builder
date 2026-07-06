@@ -68,7 +68,7 @@ export function collectUnmatchedModifierFeatures(
 
   for (const cls of content.classes ?? []) {
     for (const feature of cls.features ?? []) {
-      collectUnmatchedFromFeature(`Class: ${cls.name}`, feature, entries)
+      collectUnmatchedFromFeature(`Class: ${cls.name}`, feature as unknown as Feature, entries)
     }
   }
 
@@ -76,7 +76,7 @@ export function collectUnmatchedModifierFeatures(
     for (const feature of subclass.features ?? []) {
       collectUnmatchedFromFeature(
         `Subclass: ${subclass.name} (${subclass.class_name})`,
-        feature,
+        feature as unknown as Feature,
         entries,
       )
     }
@@ -84,18 +84,22 @@ export function collectUnmatchedModifierFeatures(
 
   for (const species of content.species ?? []) {
     for (const trait of species.traits ?? []) {
-      collectUnmatchedFromFeature(`Species: ${species.name}`, trait, entries)
+      collectUnmatchedFromFeature(`Species: ${species.name}`, trait as unknown as Feature, entries)
     }
   }
 
   for (const background of content.backgrounds ?? []) {
     if (background.feature) {
-      collectUnmatchedFromFeature(`Background: ${background.name}`, background.feature, entries)
+      collectUnmatchedFromFeature(
+        `Background: ${background.name}`,
+        background.feature as unknown as Feature,
+        entries,
+      )
     }
   }
 
   for (const feat of content.feats ?? []) {
-    collectUnmatchedFromFeature(`Feat: ${feat.name}`, feat, entries)
+    collectUnmatchedFromFeature(`Feat: ${feat.name}`, feat as unknown as Feature, entries)
   }
 
   return entries
@@ -280,7 +284,7 @@ export function removeImportModifierPreview(
                 : feature,
             ),
           },
-    )
+    ) as ImportContent["classes"]
     return next
   }
 
@@ -298,7 +302,7 @@ export function removeImportModifierPreview(
                 : feature,
             ),
           },
-    )
+    ) as ImportContent["subclasses"]
     return next
   }
 
@@ -315,7 +319,7 @@ export function removeImportModifierPreview(
                 : trait,
             ),
           },
-    )
+    ) as ImportContent["species"]
     return next
   }
 
@@ -341,5 +345,5 @@ export function removeImportModifierPreview(
     )
   }
 
-  return next
+  return next as unknown as ImportContent
 }

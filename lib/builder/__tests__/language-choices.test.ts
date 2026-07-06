@@ -42,8 +42,8 @@ describe("applyModifierPlayerPicks — languages", () => {
     const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "language")
     const result = applyModifierPlayerPicks([mod], sourceKey, {
       [key]: ["Dwarvish", "Giant"],
-    })
-    const resolved = result[0] as Extract<CharacteristicModifier, { type: "languages" }>
+    }) as unknown as unknown as CharacteristicModifier[]
+    const resolved = result[0] as CharacteristicModifier & { values: string[]; choiceCount?: number | null }
     expect(resolved.values).toEqual(["Common", "Dwarvish", "Giant"])
     expect(resolved.choiceCount).toBe(0)
   })
@@ -52,15 +52,15 @@ describe("applyModifierPlayerPicks — languages", () => {
     const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "language")
     const result = applyModifierPlayerPicks([mod], sourceKey, {
       [key]: ["Thieves' Cant", "Custom Homebrew Tongue"],
-    })
-    const resolved = result[0] as Extract<CharacteristicModifier, { type: "languages" }>
+    }) as unknown as unknown as CharacteristicModifier[]
+    const resolved = result[0] as CharacteristicModifier & { values: string[]; choiceCount?: number | null }
     expect(resolved.values).toContain("Custom Homebrew Tongue")
     expect(resolved.values).toContain("Common")
   })
 
   it("grants only the fixed languages when the player has not picked yet", () => {
-    const result = applyModifierPlayerPicks([mod], sourceKey, {})
-    const resolved = result[0] as Extract<CharacteristicModifier, { type: "languages" }>
+    const result = applyModifierPlayerPicks([mod], sourceKey, {}) as unknown as unknown as CharacteristicModifier[]
+    const resolved = result[0] as CharacteristicModifier & { values: string[]; choiceCount?: number | null }
     expect(resolved.values).toEqual(["Common"])
   })
 
@@ -68,8 +68,8 @@ describe("applyModifierPlayerPicks — languages", () => {
     const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "language")
     const result = applyModifierPlayerPicks([mod], sourceKey, {
       [key]: ["Common", "Elvish"],
-    })
-    const resolved = result[0] as Extract<CharacteristicModifier, { type: "languages" }>
+    }) as unknown as unknown as CharacteristicModifier[]
+    const resolved = result[0] as CharacteristicModifier & { values: string[]; choiceCount?: number | null }
     expect(resolved.values).toEqual(["Common", "Elvish"])
   })
 })

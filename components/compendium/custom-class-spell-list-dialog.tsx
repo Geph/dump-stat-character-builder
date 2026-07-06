@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Upload, X, Check, AlertTriangle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/db/client"
 import { formatCompendiumSource } from "@/lib/srd/source"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type ClassOption = { id: string; name: string; source: string }
 type SpellRow = { id: string; name: string; classes: string[] }
@@ -92,17 +93,17 @@ export function CustomClassSpellListDialog({
         db.from("spells").select("id, name, classes").order("name").limit(2000),
       ])
       setClasses(
-        (classRows ?? []).map((row) => ({
-          id: row.id as string,
-          name: row.name as string,
-          source: (row.source as string) ?? "Custom",
+        asCompendiumRows<{ id: string; name: string; source: string }>(classRows).map((row) => ({
+          id: row.id,
+          name: row.name,
+          source: row.source ?? "Custom",
         })),
       )
       setSpells(
-        (spellRows ?? []).map((row) => ({
-          id: row.id as string,
-          name: (row.name as string) ?? "",
-          classes: ((row.classes as string[]) ?? []).filter(Boolean),
+        asCompendiumRows<{ id: string; name: string; classes: string[] }>(spellRows).map((row) => ({
+          id: row.id,
+          name: row.name ?? "",
+          classes: (row.classes ?? []).filter(Boolean),
         })),
       )
       setLoading(false)

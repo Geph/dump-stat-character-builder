@@ -22,12 +22,17 @@ export function normalizeBonusByLevel(
     if (!row || typeof row !== "object") {
       return { level: 1, mode: "fixed" as const, fixed: 0 }
     }
-    const r = row as Record<string, unknown>
+    const r = row as unknown as Record<string, unknown>
     if (r.mode && typeof r.mode === "string") {
+      let fixed = typeof r.fixed === "number" ? r.fixed : null
+      if (fixed == null && typeof r.bonus === "string") {
+        const fixedMatch = r.bonus.match(/^\+?(\d+)$/)
+        if (fixedMatch) fixed = parseInt(fixedMatch[1], 10)
+      }
       return {
         level: typeof r.level === "number" ? r.level : 1,
         mode: r.mode as BonusByLevelMode,
-        fixed: typeof r.fixed === "number" ? r.fixed : null,
+        fixed,
         dieCount: typeof r.dieCount === "number" ? r.dieCount : null,
         dieType: (r.dieType as BonusByLevelEntry["dieType"]) ?? null,
         modifierConfig: (r.modifierConfig as RollBonusConfig | null) ?? null,

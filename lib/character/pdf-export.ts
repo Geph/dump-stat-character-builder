@@ -29,7 +29,7 @@ export function buildCharacterPdfText(input: CharacterPdfExportInput): string {
     "Saving throws",
     ...derived.saves.map(
       (save) =>
-        `  ${save.ability}: ${save.modifier >= 0 ? "+" : ""}${save.modifier}${save.proficient ? " (prof)" : ""}`,
+        `  ${save.ability}: ${save.bonus >= 0 ? "+" : ""}${save.bonus}${save.proficient ? " (prof)" : ""}`,
     ),
   ]
 
@@ -81,7 +81,7 @@ export async function downloadCharacterPdf(input: CharacterPdfExportInput): Prom
     }
 
     const bytes = await doc.save()
-    const blob = new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)], {
+    const blob = new Blob([new Uint8Array(bytes)], {
       type: "application/pdf",
     })
     const url = URL.createObjectURL(blob)

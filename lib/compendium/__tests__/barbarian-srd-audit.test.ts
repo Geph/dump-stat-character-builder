@@ -71,7 +71,7 @@ describe("collectFeatureRollModes", () => {
 
 describe("barbarian rage wiring", () => {
   it("does not duplicate strength check and save advantage on Rage", () => {
-    const rage: Feature = {
+    const rage = {
       level: 1,
       name: "Rage",
       description:

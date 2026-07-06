@@ -8,12 +8,12 @@ import type { Feature } from "@/lib/types"
 
 describe("feature sheet display", () => {
   it("defaults passive features to Features tab only", () => {
-    const feature: Feature = {
+    const feature = {
       level: 2,
       name: "Danger Sense",
       description: "You have advantage on Dexterity saving throws unless incapacitated.",
     }
-    expect(inferFeatureSheetDisplay(feature)).toEqual({
+    expect(inferFeatureSheetDisplay(feature as unknown as import("@/lib/character/sheet-actions").ActivatableItem)).toEqual({
       featuresTab: true,
       abilitiesActions: false,
       combatActions: false,
@@ -21,14 +21,14 @@ describe("feature sheet display", () => {
   })
 
   it("routes combat actions to Combat tab and Features tab", () => {
-    const feature: Feature = {
+    const feature = {
       level: 2,
       name: "Action Surge",
       description: "On your turn, you can take one additional action.",
       activation: { action: true },
       limitedUses: { type: "class_resource", classResourceKey: "action_surge" },
     }
-    expect(inferFeatureSheetDisplay(feature)).toEqual({
+    expect(inferFeatureSheetDisplay(feature as unknown as import("@/lib/character/sheet-actions").ActivatableItem)).toEqual({
       featuresTab: true,
       abilitiesActions: false,
       combatActions: true,
@@ -36,7 +36,7 @@ describe("feature sheet display", () => {
   })
 
   it("respects explicit sheetDisplay overrides", () => {
-    const feature: Feature = {
+    const feature = {
       level: 1,
       name: "Channel Divinity",
       description: "As a magic action...",
@@ -55,7 +55,7 @@ describe("feature sheet display", () => {
   })
 
   it("stamps sheetDisplay when enriching SRD features", () => {
-    const feature: Feature = {
+    const feature = {
       level: 1,
       name: "Rage",
       description: "As a bonus action, you can enter your Rage.",

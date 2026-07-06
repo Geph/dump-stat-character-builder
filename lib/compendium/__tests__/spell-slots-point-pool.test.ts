@@ -16,7 +16,7 @@ describe("getSpellSlotTable", () => {
   })
 
   it("still returns a table for standard full casters", () => {
-    const table = getSpellSlotTable("Wizard", 5, { ability: "Intelligence", progression: "full" })
+    const table = getSpellSlotTable("Wizard", 5, { ability: "Intelligence", caster_progression: "full" })
     expect(table?.type).toBe("full")
     expect(table?.slotsByLevel[0]).toBeGreaterThan(0)
   })

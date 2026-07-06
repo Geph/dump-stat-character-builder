@@ -13,19 +13,19 @@ import {
 import { collectFeatureRollModes } from "@/lib/character/collect-feature-roll-modes"
 import type { Equipment } from "@/lib/types"
 
-const heavyPlate: Equipment = {
+const heavyPlate = {
   id: "heavy-1",
   name: "Plate Armor",
   category: "Armor",
   subcategory: "Heavy Armor",
-}
+} as unknown as Equipment
 
-const leather: Equipment = {
+const leather = {
   id: "light-1",
   name: "Leather Armor",
   category: "Armor",
   subcategory: "Light Armor",
-}
+} as unknown as Equipment
 
 describe("modifierLimitationsMet", () => {
   it("blocks when character has a gated condition", () => {
@@ -61,7 +61,7 @@ describe("modifierLimitationsMet", () => {
   it("detects shield and any armor", () => {
     expect(isWearingArmorLimitation("Heavy armor", heavyPlate, null)).toBe(true)
     expect(isWearingArmorLimitation("Any armor", leather, null)).toBe(true)
-    expect(isWearingArmorLimitation("Shield", null, { id: "s", name: "Shield", category: "Armor" })).toBe(
+    expect(isWearingArmorLimitation("Shield", null, { id: "s", name: "Shield", category: "Armor" } as unknown as Equipment)).toBe(
       true,
     )
   })

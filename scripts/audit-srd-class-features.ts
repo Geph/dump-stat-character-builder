@@ -83,7 +83,7 @@ const enrichedSubclasses = enrichSrdSubclassList(
       class_id: classIdMap.get(sc.class_name) ?? sc.class_name,
     }),
   ) as Record<string, unknown>[],
-  new Map(enrichedClasses.map((c) => [(c as { id?: string }).id ?? c.name, c.name as string])),
+  new Map(enrichedClasses.map((c) => [String((c as { id?: string }).id ?? c.name), c.name as string])),
 )
 
 let detectorFallbackCount = 0

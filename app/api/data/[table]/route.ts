@@ -117,7 +117,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const rows = (body.rows ?? []) as Record<string, unknown>[]
+    const rows = (body.rows ?? []) as unknown as Record<string, unknown>[]
 
     if (body.upsert) {
       await upsertByName(table, rows)

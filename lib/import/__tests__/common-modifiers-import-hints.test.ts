@@ -41,8 +41,7 @@ describe("common modifiers import hints", () => {
         {
           name: "Gunslinger",
           description: null,
-          card_blurb: null,
-          hit_die: 8,
+                    hit_die: 8,
           primary_ability: ["Dexterity"],
           saving_throws: null,
           armor_proficiencies: null,
@@ -64,7 +63,7 @@ describe("common modifiers import hints", () => {
                   featCount: 1,
                   sourcePhrase: "You gain a Fighting Style feat of your choice.",
                   confidence: "high",
-                },
+                } as import("@/lib/import/content-schema").ImportMechanic,
               ],
             },
           ],
@@ -78,7 +77,7 @@ describe("common modifiers import hints", () => {
       feats: null,
       equipment: null,
       import_proposals: null,
-    })
+    } as Parameters<typeof normalizeAiImportContent>[0])
 
     const feature = normalized.classes?.[0]?.features?.[0] as {
       mechanics?: { kind: string }[]

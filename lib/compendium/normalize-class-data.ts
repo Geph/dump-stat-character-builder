@@ -101,7 +101,7 @@ export function enrichClassesList<
     }
 
     if (isSrdSource(row.source)) {
-      return enrichSrdClassRow(enriched as Record<string, unknown>) as T
+      return enrichSrdClassRow(enriched as unknown as Record<string, unknown>) as T
     }
     return enriched
   })

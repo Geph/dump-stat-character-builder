@@ -61,10 +61,10 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
       return `${instance.catalogRefId}:attack:${JSON.stringify(char.entries ?? [])}`
     }
     if (char.type === "damage_resistance") {
-      return `${instance.catalogRefId}:res:${(char.damageTypes ?? char.values ?? []).join(",")}`
+      return `${instance.catalogRefId}:res:${(char.damageTypes ?? []).join(",")}`
     }
     if (char.type === "condition_immunity") {
-      return `${instance.catalogRefId}:immune:${(char.conditions ?? char.values ?? []).join(",")}`
+      return `${instance.catalogRefId}:immune:${(char.conditions ?? []).join(",")}`
     }
     if (char.type === "speed") {
       return `${instance.catalogRefId}:speed:${char.speedType}:${char.value}`

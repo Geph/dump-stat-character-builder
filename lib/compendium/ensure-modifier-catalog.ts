@@ -6,6 +6,7 @@ import {
 } from "@/lib/compendium/modifier-catalog"
 import { ensureSystemOptionCatalogs } from "@/lib/compendium/system-option-catalogs"
 import { createClient } from "@/lib/db/client"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type CatalogDb = ReturnType<typeof createClient>
 
@@ -16,7 +17,7 @@ export async function ensureModifierCatalog(db: CatalogDb): Promise<void> {
     .eq("id", COMMON_MODIFIERS_CATALOG_ID)
     .maybeSingle()
 
-  const existingRow = existing as Record<string, unknown> | null
+  const existingRow = existing as unknown as Record<string, unknown> | null
 
   if (!existingRow) {
     await db.from("custom_abilities").insert([buildCommonModifiersCatalogRow()])
@@ -48,6 +49,6 @@ export async function loadModifierCatalog(db: CatalogDb) {
     .eq("id", COMMON_MODIFIERS_CATALOG_ID)
     .single()
 
-  const row = data as Record<string, unknown> | null
+  const row = data as unknown as Record<string, unknown> | null
   return mergeDefaultCatalogEntries(normalizeModifierCatalog(row?.modifier_catalog))
 }

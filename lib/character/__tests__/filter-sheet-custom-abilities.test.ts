@@ -85,7 +85,7 @@ describe("filterCustomAbilitiesForCharacterSheet", () => {
       name: "Knowing Mind",
       source_type: "class",
       source_name: "KibblesTasty Psion",
-    } as CustomAbility & { source_type: string; source_name: string })
+    } as unknown as CustomAbility & { source_type: string; source_name: string })
 
     expect(
       customAbilityAppliesOnCharacterSheet(row, {

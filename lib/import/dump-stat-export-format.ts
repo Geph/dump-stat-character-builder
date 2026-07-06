@@ -73,7 +73,7 @@ export function parseDumpStatExportJson(raw: string): DumpStatExportItem[] | nul
 
   if (typeof parsed !== "object" || parsed === null) return null
 
-  const record = parsed as Record<string, unknown>
+  const record = parsed as unknown as Record<string, unknown>
 
   if (record.type === DUMP_STAT_EXPORT_TYPE && Array.isArray(record.items)) {
     return record.items.filter(isDumpStatExportItem)
@@ -116,7 +116,7 @@ export function rowToExportItem(tab: string, row: Record<string, unknown>): Dump
   }
 
   if (exportType === "dnd-ability") {
-    data.characteristics = normalizeCharacteristics(data.characteristics, data.uses)
+    data.characteristics = normalizeCharacteristics(data.characteristics, data.uses as import("@/lib/types").UsesConfig | null | undefined)
   }
 
   if (exportType === "dnd-species") {

@@ -21,7 +21,7 @@ export function propertiesToStringArray(props: unknown): string[] {
     return props.filter((p): p is string => typeof p === "string")
   }
   if (props && typeof props === "object") {
-    const record = props as Record<string, unknown>
+    const record = props as unknown as Record<string, unknown>
     if (Array.isArray(record.properties)) {
       return record.properties.filter((p): p is string => typeof p === "string")
     }
@@ -35,7 +35,7 @@ export function stringifyPropertiesForDb(
   existing: unknown,
 ): string[] | Record<string, unknown> {
   if (existing && typeof existing === "object" && !Array.isArray(existing)) {
-    const record = { ...(existing as Record<string, unknown>) }
+    const record = { ...(existing as unknown as Record<string, unknown>) }
     record.properties = tags
     return record
   }

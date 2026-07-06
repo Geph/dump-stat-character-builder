@@ -185,7 +185,7 @@ function previewSpecies(content: ImportContent): ImportContentPreviewSection | n
     descriptionSnippet: snippet(row.description),
   }))
 
-  return { key: "species", label: "Species", items }
+  return { key: "species", label: "Species", items: items as ImportContentPreviewItem[] }
 }
 
 function previewBackgrounds(content: ImportContent): ImportContentPreviewSection | null {

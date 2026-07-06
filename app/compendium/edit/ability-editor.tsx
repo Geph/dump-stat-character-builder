@@ -38,6 +38,9 @@ import { getSystemCatalogDefaultIcon } from "@/lib/compendium/system-option-cata
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { attachTypeToTable } from "@/lib/db/attach-target-table"
+import type { UsesConfig } from "@/lib/types"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import {
   EQUIPMENT_ATTACH_CATEGORIES,
   isEquipmentCategoryAttach,
@@ -122,26 +125,35 @@ export default function AbilityEditorPage({ id }: { id: string }) {
           setError("Custom Ability not found")
         } else if (data) {
           if (isSystemCatalogEditorRoute(id)) {
-            setCatalog(parseCatalogFromRow(data as Record<string, unknown>))
-            const rowIcon = typeof data.icon === "string" ? data.icon : null
+            const row = asCompendiumRow(data)
+            setCatalog(parseCatalogFromRow(row as unknown as Record<string, unknown>))
+            const rowIcon = typeof row?.icon === "string" ? row.icon : null
             setCatalogIcon(rowIcon || getSystemCatalogDefaultIcon(id))
           } else {
-            setForm({
-              name: data.name || "",
-              description: data.description || "",
-              prerequisites: data.prerequisites || "",
-              characteristics: normalizeCharacteristics(data.characteristics, data.uses),
-              modifier_refs: readModifierRefs(data as Record<string, unknown>),
-              linked_modifiers: readLinkedModifiers(data as Record<string, unknown>, modifierCatalog),
-              attached_to_type: data.attached_to_type || "",
-              attached_to_id: data.attached_to_id || "",
-              show_in_builder: data.show_in_builder ?? false,
-              source: data.source || "Custom",
-              creator_url: data.creator_url || "",
-              icon: data.icon || null,
-              accent_color: data.accent_color || null,
-            card_image_url: data.card_image_url || null,
-            })
+            const row = asCompendiumRow(data)
+            if (!row) {
+              setError("Custom Ability not found")
+            } else {
+              setForm({
+                name: String(row.name ?? ""),
+                description: String(row.description ?? ""),
+                prerequisites: String(row.prerequisites ?? ""),
+                characteristics: normalizeCharacteristics(
+                  row.characteristics,
+                  row.uses as UsesConfig | null | undefined,
+                ),
+                modifier_refs: readModifierRefs(row as unknown as Record<string, unknown>),
+                linked_modifiers: readLinkedModifiers(row as unknown as Record<string, unknown>, modifierCatalog),
+                attached_to_type: String(row.attached_to_type ?? ""),
+                attached_to_id: String(row.attached_to_id ?? ""),
+                show_in_builder: Boolean(row.show_in_builder ?? false),
+                source: String(row.source ?? "Custom"),
+                creator_url: String(row.creator_url ?? ""),
+                icon: (row.icon as string | null) ?? null,
+                accent_color: (row.accent_color as string | null) ?? null,
+                card_image_url: (row.card_image_url as string | null) ?? null,
+              })
+            }
           }
         }
         setLoading(false)
@@ -181,7 +193,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         .order("name")
         .limit(200)
 
-      const rows = (data || []).filter((row) => row.id !== id)
+      const rows = asCompendiumRows<{ id: string; name: string }>(data).filter((row) => row.id !== id)
       setAttachTargets(rows)
     }
     fetchTargets()
@@ -195,8 +207,10 @@ export default function AbilityEditorPage({ id }: { id: string }) {
         db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
 
-      setOtherAbilities((abilities || []).filter((a) => a.id !== id))
-      setAllSpells(spells || [])
+      setOtherAbilities(
+        asCompendiumRows<{ id: string; name: string }>(abilities).filter((a) => a.id !== id),
+      )
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(spells))
     }
     fetchOtherAbilities()
   }, [id])
@@ -343,7 +357,7 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             onCreatorUrlChange={(creator_url) => setForm({ ...form, creator_url })}
             icon={form.icon}
             onIconChange={(icon) => setForm({ ...form, icon })}
-            accentColor={form.accent_color}
+            accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}

@@ -27,7 +27,7 @@ function legacyBackground(): Background {
     source: "Homebrew",
     creator_url: null,
     created_at: "",
-  }
+  } as unknown as unknown as Background
 }
 
 function modernChoiceBackground(): Background {
@@ -37,7 +37,7 @@ function modernChoiceBackground(): Background {
     name: "Acolyte",
     ability_bonuses: { intelligence: 0, wisdom: 0, charisma: 0 },
     feat_granted: "Magic Initiate (Cleric)",
-  }
+  } as unknown as unknown as Background
 }
 
 function fixedBonusBackground(): Background {
@@ -47,7 +47,7 @@ function fixedBonusBackground(): Background {
     name: "Custom",
     ability_bonuses: { strength: 2, constitution: 1 },
     feat_granted: "Alert",
-  }
+  } as unknown as unknown as Background
 }
 
 describe("getBackgroundAbilityGrant", () => {

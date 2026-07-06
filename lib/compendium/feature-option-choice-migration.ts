@@ -14,7 +14,9 @@ type LegacyFeatureOptionPicker = {
   choiceCount?: number | null
   choiceCountByLevel?: { level: number; count: number }[] | null
   swappableOnRest?: boolean | null
+  swapRestType?: "short" | "long" | null
   resourceKey?: string | null
+  optionsSource?: string | null
   label?: string | null
   options?: { name?: string | null; description?: string | null; resourceCost?: number | null }[] | null
 }

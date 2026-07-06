@@ -15,7 +15,7 @@ const SPELL_CATALOG = [
   { id: "spell-death-ward", name: "Death Ward" },
 ]
 
-const lifeDomainSpellsFeature: Feature = {
+const lifeDomainSpellsFeature = {
   level: 3,
   name: "Life Domain Spells",
   description: [
@@ -45,7 +45,7 @@ describe("collectSubclassAlwaysPreparedSpells", () => {
   })
 
   it("prefers already-wired spells_known modifiers over parsing", () => {
-    const wired: Feature = {
+    const wired = {
       level: 3,
       name: "Mind Domain Spells",
       description: "Always prepared spells from your domain.",
@@ -67,7 +67,7 @@ describe("collectSubclassAlwaysPreparedSpells", () => {
         },
       ],
     }
-    const atLevel3 = collectSubclassAlwaysPreparedSpells([wired], 3, SPELL_CATALOG)
+    const atLevel3 = collectSubclassAlwaysPreparedSpells([wired as unknown as import("@/lib/types").Feature], 3, SPELL_CATALOG)
     expect(atLevel3.map((g) => g.spellId)).toEqual(["spell-bless"])
   })
 
@@ -77,7 +77,7 @@ describe("collectSubclassAlwaysPreparedSpells", () => {
   })
 
   it("collectSubclassAlwaysPreparedSpellIds dedups across subclasses", () => {
-    const subclass = { features: [lifeDomainSpellsFeature] } as unknown as Subclass
+    const subclass = { features: [lifeDomainSpellsFeature] } as unknown as unknown as Subclass
     const ids = collectSubclassAlwaysPreparedSpellIds(
       [
         { subclass, classLevel: 5 },

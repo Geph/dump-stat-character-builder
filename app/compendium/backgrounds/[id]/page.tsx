@@ -22,6 +22,7 @@ import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import { BackgroundProficienciesEditor } from "@/components/compendium/background-proficiencies-editor"
 import { pageOverlayPanelClass } from "@/lib/compendium/editor-field-styles"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import {
   emptyBackgroundProficiencies,
   normalizeBackgroundProficiencies,
@@ -106,7 +107,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
         .select("id, name")
         .eq("category", "Origin")
         .order("name")
-      setOriginFeats(data || [])
+      setOriginFeats(asCompendiumRows<{ id: string; name: string }>(data))
     }
     fetchOriginFeats()
   }, [])
@@ -119,7 +120,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
         .select("id, name, subcategory")
         .eq("category", "Weapon")
         .order("name")
-      setWeaponOptions(data || [])
+      setWeaponOptions(asCompendiumRows<{ id: string; name: string; subcategory: string | null }>(data))
     }
     fetchWeapons()
   }, [])
@@ -128,7 +129,7 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
     const fetchSpells = async () => {
       const db = createClient()
       const { data } = await db.from("spells").select("id, name, level").order("level").order("name")
-      setAllSpells(data || [])
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(data))
     }
     fetchSpells()
   }, [])
@@ -147,32 +148,39 @@ export default function BackgroundEditorPage({ params }: { params: Promise<{ id:
         if (error) {
           setError("Background not found")
         } else if (data) {
-          const row = data as Record<string, unknown> & { name: string }
-          const enriched = enrichBackgroundList([row])[0]
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            ability_bonuses: normalizeBackgroundAbilityBonuses(
-              (enriched as { ability_bonuses?: Record<string, number> }).ability_bonuses ??
-                data.ability_bonuses,
-            ),
-            skill_proficiencies: data.skill_proficiencies || [],
-            proficiencies: normalizeBackgroundProficiencies(
-              data.proficiencies,
-              data.tool_proficiencies,
-            ),
-            feat_granted:
-              String((enriched as { feat_granted?: string | null }).feat_granted || data.feat_granted || ""),
-            starting_gold: data.starting_gold ?? 0,
-            starting_equipment: data.starting_equipment || [],
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            feature_name: data.feature?.name || "",
-            feature_description: data.feature?.description || "",
-            grants_spells: Boolean(data.grants_spells),
-            granted_spells: normalizeGrantedSpells(data.granted_spells),
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Background not found")
+          } else {
+            const enriched = enrichBackgroundList([row as unknown as Record<string, unknown> & { name: string }])[0]
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              ability_bonuses: normalizeBackgroundAbilityBonuses(
+                (enriched as { ability_bonuses?: Record<string, number> }).ability_bonuses ??
+                  (row.ability_bonuses as Record<string, number> | null | undefined),
+              ),
+              skill_proficiencies: (row.skill_proficiencies as string[]) || [],
+              proficiencies: normalizeBackgroundProficiencies(
+                row.proficiencies as BackgroundProficiencies | null | undefined,
+                row.tool_proficiencies as string[] | null | undefined,
+              ),
+              feat_granted: String(
+                (enriched as { feat_granted?: string | null }).feat_granted || row.feat_granted || "",
+              ),
+              starting_gold: (row.starting_gold as number | null | undefined) ?? 0,
+              starting_equipment: (row.starting_equipment as BackgroundFormData["starting_equipment"]) || [],
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+              feature_name: (row.feature as { name?: string } | null)?.name || "",
+              feature_description: (row.feature as { description?: string } | null)?.description || "",
+              grants_spells: Boolean(row.grants_spells),
+              granted_spells: normalizeGrantedSpells(
+                row.granted_spells as Record<string, string[]> | null | undefined,
+              ),
+            })
+          }
         }
         setLoading(false)
       }

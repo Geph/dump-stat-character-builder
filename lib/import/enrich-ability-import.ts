@@ -55,7 +55,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     {
       name,
       description: plainText,
-      linkedModifiers: (row.linked_modifiers ?? row.linkedModifiers ?? []) as Feature["linkedModifiers"],
+      linkedModifiers: (row.linked_modifiers ?? row.linkedModifiers ?? []) as unknown as Feature["linkedModifiers"],
       modifierRefs: (row.modifier_refs ?? row.modifierRefs ?? []) as string[],
     } as Feature,
     {

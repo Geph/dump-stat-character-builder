@@ -23,7 +23,7 @@ describe("buildWeaponSheetContext", () => {
     damage_type: "Bludgeoning",
     mastery: "Sap",
     properties: null,
-  } as Equipment
+  } as unknown as Equipment
 
   const fighterWeaponMasteryKey = featureChoiceKey("fighter", "Weapon Mastery", 1)
 
@@ -80,7 +80,7 @@ describe("buildWeaponSheetContext", () => {
     equippedShieldId: null,
     primaryClassId: "fighter",
     classAddOrder: ["fighter"],
-  } as CharacterBuildInputs
+  } as unknown as CharacterBuildInputs
 
   it("marks mastery active when weapon mastery picks include the weapon", () => {
     const context = buildWeaponSheetContext(mace, {
@@ -131,7 +131,7 @@ describe("buildWeaponSheetContext", () => {
       id: "longbow",
       name: "Longbow",
       subcategory: "Martial Ranged Weapons",
-    } as Equipment
+    } as unknown as Equipment
 
     const rangedContext = buildWeaponSheetContext(
       longbow,

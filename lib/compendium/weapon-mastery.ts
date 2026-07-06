@@ -54,7 +54,7 @@ export function weaponMasteryCatalogEntriesFromAbilities(
   const ability = customAbilities.find((row) => row.id === WEAPON_MASTERY_PROPERTIES_CATALOG_LOOKUP_ID)
   if (!ability) return []
   return normalizeModifierCatalog(
-    (ability as unknown as Record<string, unknown>).modifier_catalog,
+    (ability as unknown as unknown as Record<string, unknown>).modifier_catalog,
   )
 }
 

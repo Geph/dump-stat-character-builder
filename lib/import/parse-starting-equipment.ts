@@ -37,7 +37,7 @@ export function parseStartingEquipmentFromText(
     .replace(/^\*+|\*+$/g, "")
     .trim()
 
-  const prefixMatch = text.match(/^(Choose[^:]*):\s*_?\s*(.+)$/is)
+  const prefixMatch = text.match(/^(Choose[^:]*):\s*_?\s*([\s\S]+)$/i)
   const description = prefixMatch ? prefixMatch[1].trim() : "Choose starting equipment"
   let optionsText = prefixMatch ? prefixMatch[2].trim() : text
   optionsText = optionsText.replace(/^_+\s*/, "")
@@ -48,7 +48,7 @@ export function parseStartingEquipmentFromText(
   let starting_gold = 0
 
   for (const chunk of optionsText.split(/;\s*(?:or\s+)?/i)) {
-    const m = chunk.trim().match(/^\(([A-Z])\)\s*(.+)$/is)
+    const m = chunk.trim().match(/^\(([A-Z])\)\s*([\s\S]+)$/i)
     if (!m) continue
     const letter = m[1]
     let content = m[2].trim().replace(/^or\s+/i, "")

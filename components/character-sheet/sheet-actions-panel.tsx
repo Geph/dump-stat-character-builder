@@ -104,7 +104,7 @@ function ActionInfoOverlay({
     (action.customAbilityId
       ? resolveAbilityPsionicAugments({
           name: action.name,
-          description: action.description,
+          description: action.description ?? null,
           psionic_augments: action.psionicAugments,
         })
       : null)

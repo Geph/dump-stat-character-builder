@@ -240,7 +240,7 @@ function expansionsFromMovementOptions(
   for (const effect of instance.activation?.effects ?? []) {
     if ((effect as { kind?: string }).kind !== "movement_option") continue
     for (const { flag, actionId } of MOVEMENT_OPTION_DEFAULT_ACTIONS) {
-      if (!(effect as Record<string, unknown>)[flag]) continue
+      if (!(effect as unknown as Record<string, unknown>)[flag]) continue
       const defaultAction = DEFAULT_ACTION_BY_ID.get(actionId)
       if (!defaultAction) continue
       expansions.push({
@@ -305,7 +305,7 @@ function pushFeatureActions(
 ) {
   for (const feature of features ?? []) {
     if ((feature.level ?? 1) > levelCap) continue
-    const display = resolveFeatureSheetDisplay(feature as Feature)
+    const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
     const movementExpansions = collectMovementOptionExpansions(feature)
     const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
 

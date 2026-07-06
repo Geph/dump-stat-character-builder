@@ -17,13 +17,13 @@ function wireFeaturePresets(feature: Feature, className: string, hasPointPool: b
     return syncModifierRefs({
       ...feature,
       linkedModifiers: innateArcanumPresetForClass(className, ALTERNATE_SORCERER_ARCANUM_TIERS),
-    }) as Feature
+    }) as unknown as Feature
   }
   if (/^innate sorcery$/i.test(name)) {
     return syncModifierRefs({
       ...feature,
       linkedModifiers: innateSorceryPreset(),
-    }) as Feature
+    }) as unknown as Feature
   }
   if (/^sorcerous regeneration$/i.test(name) && hasPointPool) {
     const prefix = slugClassPrefix(className)

@@ -68,12 +68,16 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     linkedModifiers: [
       asiOne("athlete_asi", "+1 Strength or Dexterity"),
       speedMod("athlete_climb", "climb", "equal_to_walk", 0, "Climb Speed equal to your Speed"),
-      movementEffectsPassive("athlete_hop_up", {
-        label: "Hop Up: stand from Prone using only 5 feet of movement",
-      }),
-      movementEffectsPassive("athlete_jumping", {
-        label: "Jumping: running Long or High Jump after moving only 5 feet",
-      }),
+      movementEffectsPassive(
+        "athlete_hop_up",
+        {},
+        "Hop Up: stand from Prone using only 5 feet of movement",
+      ),
+      movementEffectsPassive(
+        "athlete_jumping",
+        {},
+        "Jumping: running Long or High Jump after moving only 5 feet",
+      ),
     ],
   },
 
@@ -153,9 +157,11 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     linkedModifiers: [
       asiOne("dual_wielder_asi", "+1 Strength or Dexterity"),
       bonusActionAttackFx("dual_wielder_extra"),
-      movementEffectsPassive("dual_wielder_quick_draw", {
-        label: "Quick Draw: draw or stow two one-handed weapons when you could draw or stow one",
-      }),
+      movementEffectsPassive(
+        "dual_wielder_quick_draw",
+        {},
+        "Quick Draw: draw or stow two one-handed weapons when you could draw or stow one",
+      ),
     ],
   },
 
@@ -212,9 +218,11 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         { kind: "check_advantage", checkCategory: "attack" },
         {},
       ),
-      movementEffectsPassive("grappler_fast_wrestler", {
-        label: "Fast Wrestler: no extra movement dragging grappled creature your size or smaller",
-      }),
+      movementEffectsPassive(
+        "grappler_fast_wrestler",
+        {},
+        "Fast Wrestler: no extra movement dragging grappled creature your size or smaller",
+      ),
     ],
   },
 
@@ -505,13 +513,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     linkedModifiers: [
       asiOne("speedy_asi", "+1 Dexterity or Constitution"),
       speedMod("speedy_walk", "walk", "add", 10, "Speed Increase: +10 feet"),
-      movementEffectsPassive("speedy_dash", {
-        movementDash: true,
-        label: "Dash over Difficult Terrain: no extra cost when Dashing",
-      }),
+      movementEffectsPassive(
+        "speedy_dash",
+        { movementDash: true },
+        "Dash over Difficult Terrain: no extra cost when Dashing",
+      ),
       checkFx(
         "speedy_agile",
-        { kind: "check_disadvantage", checkCategory: "attack", checkRollTargets: ["opportunity_against_you"] },
+        { kind: "check_disadvantage", checkCategory: "attack", checkRollTargets: ["opportunity_against_you"] as unknown as ("attack" | "ability" | "skill" | "save")[] },
         {},
       ),
     ],

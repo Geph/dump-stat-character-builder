@@ -24,6 +24,7 @@ import {
   type CharacteristicModifier,
 } from "@/lib/compendium/characteristic-modifiers"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -93,11 +94,11 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         db.from("backgrounds").select("id, name").order("name"),
         db.from("spells").select("id, name, level").order("level").order("name").limit(500),
       ])
-      setAllFeats(feats || [])
-      setAllClasses(classes || [])
-      setAllSpecies(species || [])
-      setAllBackgrounds(backgrounds || [])
-      setAllSpells(spells || [])
+      setAllFeats(asCompendiumRows<{ id: string; name: string; category: string }>(feats))
+      setAllClasses(asCompendiumRows<{ id: string; name: string }>(classes))
+      setAllSpecies(asCompendiumRows<{ id: string; name: string }>(species))
+      setAllBackgrounds(asCompendiumRows<{ id: string; name: string }>(backgrounds))
+      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(spells))
     }
     fetchPrereqOptions()
   }, [])
@@ -116,21 +117,26 @@ export default function FeatEditorPage({ params }: { params: Promise<{ id: strin
         if (error) {
           setError("Feat not found")
         } else if (data) {
-          setForm({
-            name: data.name || "",
-            description: data.description || "",
-            category: data.category || "General",
-            level_requirement: data.level_requirement ?? 1,
-            prerequisite_feat_ids: data.prerequisite_feat_ids || [],
-            prerequisite_class_ids: data.prerequisite_class_ids || [],
-            prerequisite_species_ids: data.prerequisite_species_ids || [],
-            prerequisite_background_ids: data.prerequisite_background_ids || [],
-            characteristics: normalizeCharacteristics(data.benefits, null),
-            source: data.source || "Custom",
-            creator_url: data.creator_url || "",
-            icon: data.icon || null,
-            repeatable: Boolean(data.repeatable),
-          })
+          const row = asCompendiumRow(data)
+          if (!row) {
+            setError("Feat not found")
+          } else {
+            setForm({
+              name: String(row.name ?? ""),
+              description: String(row.description ?? ""),
+              category: String(row.category ?? "General"),
+              level_requirement: (row.level_requirement as number | null | undefined) ?? 1,
+              prerequisite_feat_ids: (row.prerequisite_feat_ids as string[]) || [],
+              prerequisite_class_ids: (row.prerequisite_class_ids as string[]) || [],
+              prerequisite_species_ids: (row.prerequisite_species_ids as string[]) || [],
+              prerequisite_background_ids: (row.prerequisite_background_ids as string[]) || [],
+              characteristics: normalizeCharacteristics(row.benefits, null),
+              source: String(row.source ?? "Custom"),
+              creator_url: String(row.creator_url ?? ""),
+              icon: (row.icon as string | null) ?? null,
+              repeatable: Boolean(row.repeatable),
+            })
+          }
         }
         setLoading(false)
       }

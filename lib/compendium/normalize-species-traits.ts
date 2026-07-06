@@ -25,7 +25,7 @@ function normalizeStoredLinkedModifiers(raw: unknown): LinkedModifierInstance[] 
 function normalizeChoice(raw: unknown, fallbackCategory: string): FeatureChoice | undefined {
   if (!raw || typeof raw !== "object") return undefined
 
-  const choice = raw as Record<string, unknown>
+  const choice = raw as unknown as Record<string, unknown>
   const options = Array.isArray(choice.options)
     ? choice.options
         .filter((option): option is Record<string, unknown> => !!option && typeof option === "object")
@@ -121,7 +121,7 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
         }
       }
 
-      const enriched = enrichSrdSpeciesRow(next as Record<string, unknown>)
+      const enriched = enrichSrdSpeciesRow(next as unknown as Record<string, unknown>)
       return {
         ...next,
         traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
@@ -150,7 +150,7 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
       } as T
     }
 
-    const enriched = enrichCustomSpeciesRow(next as Record<string, unknown>)
+    const enriched = enrichCustomSpeciesRow(next as unknown as Record<string, unknown>)
     return {
       ...next,
       traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
