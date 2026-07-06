@@ -63,6 +63,28 @@ function extraAttackPreset(featureName: string, count: number): ResourceFeatureP
 
 const RAGE_WHILE_ACTIVE = [requiresActiveToggleLimitation("while_raging")]
 
+const INNATE_SORCERY_WHILE_ACTIVE = [requiresActiveToggleLimitation("while_innate_sorcery_active")]
+
+const INNATE_SORCERY_MODIFIERS: LinkedModifierInstance[] = [
+  modInstance("modinst_innate_sorcery_spell_attack", CLASS_RESOURCE_FX_CATALOG.checkAdvantage, [
+    fx("fx_innate_sorcery_spell_attack", {
+      kind: "check_roll_modifier",
+      checkRollMode: "advantage",
+      checkCategory: "spell_attack",
+      limitations: INNATE_SORCERY_WHILE_ACTIVE,
+    }),
+  ]),
+  modInstance("modinst_innate_sorcery_spell_save_dc", CLASS_RESOURCE_FX_CATALOG.checkBonus, [
+    fx("fx_innate_sorcery_spell_save_dc", {
+      kind: "check_roll_modifier",
+      checkRollMode: "bonus",
+      checkCategory: "spell_save_dc",
+      bonusConfig: { mode: "fixed", fixed: 1 },
+      limitations: INNATE_SORCERY_WHILE_ACTIVE,
+    }),
+  ]),
+]
+
 const RAGE_MODIFIERS: LinkedModifierInstance[] = [
   modInstance("modinst_rage_resist", CLASS_RESOURCE_FX_CATALOG.damageReduction, [
     fx("fx_rage_resist", {
@@ -299,6 +321,7 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
         modInstance("modinst_innate_sorcery", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
           fx("fx_innate_sorcery", { kind: "self_buff_caster" }),
         ]),
+        ...INNATE_SORCERY_MODIFIERS,
       ],
     },
     {

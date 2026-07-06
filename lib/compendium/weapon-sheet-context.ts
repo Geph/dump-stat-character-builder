@@ -260,6 +260,7 @@ export function buildWeaponSheetContext(
     equippedArmorId: inputs.equippedArmorId,
     equippedShieldId: inputs.equippedShieldId,
     equippedWeaponId: inputs.equippedWeaponId,
+    equippedOffHandWeaponId: inputs.equippedOffHandWeaponId,
     attunedItemIds: inputs.attunedItemIds ?? [],
     modifierCatalog: inputs.modifierCatalog,
   })

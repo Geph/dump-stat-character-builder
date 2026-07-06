@@ -5,7 +5,13 @@ import {
 } from "@/lib/character/point-pool-spellcasting"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
-import type { DndClass, Feat } from "@/lib/types"
+import {
+  isCatalogFeatPickId,
+  parseCatalogFeatPickId,
+  resolveCatalogFeatPickEntry,
+} from "@/lib/builder/catalog-feat-options"
+import { METAMAGIC_OPTIONS_CATALOG_ID } from "@/lib/compendium/system-option-catalogs"
+import type { CustomAbility, DndClass, Feat } from "@/lib/types"
 
 export type MetamagicCastOption = {
   id: string
@@ -51,14 +57,72 @@ function parseMetamagicCostFromText(description: string | null | undefined): num
   return 0
 }
 
-export function metamagicOptionsFromFeats(feats: Feat[]): MetamagicCastOption[] {
+function stripHtmlText(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+export function parseMetamagicCost(
+  summary: string | null | undefined,
+  description: string | null | undefined,
+  spellLevel: number,
+): number {
+  const summaryText = summary?.trim() ?? ""
+  if (/cost:\s*spell\s*level/i.test(summaryText)) {
+    return Math.max(0, spellLevel)
+  }
+  const summaryMatch = summaryText.match(/cost:\s*(\d+)\s*sp\b/i)
+  if (summaryMatch) return parseInt(summaryMatch[1], 10) || 0
+
+  const plain = stripHtmlText(description ?? "")
+  if (/\bequal to the spell'?s level\b/i.test(plain)) {
+    return Math.max(0, spellLevel)
+  }
+  return parseMetamagicCostFromText(description)
+}
+
+export function metamagicOptionsFromFeats(
+  feats: Feat[],
+  spellLevel = 1,
+): MetamagicCastOption[] {
   return feats
     .filter((feat) => feat.category?.toLowerCase() === "metamagic")
     .map((feat) => ({
       id: feat.id,
       name: feat.name,
-      cost: parseMetamagicCostFromText(feat.description),
+      cost: parseMetamagicCost(null, feat.description, spellLevel),
     }))
+}
+
+export function metamagicOptionsForCharacter(params: {
+  featIds: string[]
+  feats: Feat[]
+  customAbilities: CustomAbility[]
+  spellLevel?: number
+}): MetamagicCastOption[] {
+  const spellLevel = params.spellLevel ?? 1
+  const options: MetamagicCastOption[] = []
+  const seen = new Set<string>()
+
+  for (const feat of metamagicOptionsFromFeats(params.feats, spellLevel)) {
+    options.push(feat)
+    seen.add(feat.id)
+  }
+
+  for (const pickId of params.featIds) {
+    if (!isCatalogFeatPickId(pickId) || seen.has(pickId)) continue
+    const parsed = parseCatalogFeatPickId(pickId)
+    if (!parsed || parsed.catalogAbilityId !== METAMAGIC_OPTIONS_CATALOG_ID) continue
+    const entry = resolveCatalogFeatPickEntry(pickId, params.customAbilities)
+    if (!entry) continue
+    options.push({
+      id: pickId,
+      name: entry.name,
+      cost: parseMetamagicCost(entry.summary, entry.description, spellLevel),
+    })
+    seen.add(pickId)
+  }
+
+  return options.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export function resolveSpellLimitCap(
@@ -86,13 +150,29 @@ export function resolveSpellCastCost(params: {
   arcanumAvailable?: boolean
 }): ResolvedSpellCastCost {
   const pool = getPointPoolSpellcasting(params.spellcasting)
+  const metamagicCost = params.selectedMetamagic.reduce((sum, row) => sum + row.cost, 0)
+  const metamagicCap = params.ctx.proficiencyBonus ?? 2
+
   if (!pool) {
+    let canCast = true
+    let blockReason: SpellCastCostBlockReason | undefined
+
+    if (metamagicCost > params.availablePoints) {
+      canCast = false
+      blockReason = "insufficient_points"
+    } else if (metamagicCost > metamagicCap) {
+      canCast = false
+      blockReason = "metamagic_over_proficiency_cap"
+    }
+
     return {
       mode: "slots",
       baseCost: 0,
-      metamagicCost: 0,
-      totalCost: 0,
-      canCast: true,
+      metamagicCost,
+      totalCost: metamagicCost,
+      canCast,
+      blockReason,
+      metamagicCap,
     }
   }
 
@@ -113,7 +193,6 @@ export function resolveSpellCastCost(params: {
   }
 
   const baseCost = pointCostForSpellLevel(pool, params.spellLevel)
-  const metamagicCost = params.selectedMetamagic.reduce((sum, row) => sum + row.cost, 0)
   const totalCost = baseCost + metamagicCost
 
   const spellLimit = resolveSpellLimitCap(
@@ -122,10 +201,8 @@ export function resolveSpellCastCost(params: {
     params.classLevel,
     params.ctx,
   )
-  const metamagicCap =
-    pool.metamagic_cost_cap === "proficiency_bonus"
-      ? (params.ctx.proficiencyBonus ?? 2)
-      : null
+  const metamagicCapFromPool =
+    pool.metamagic_cost_cap === "proficiency_bonus" ? metamagicCap : null
 
   let canCast = true
   let blockReason: SpellCastCostBlockReason | undefined
@@ -141,8 +218,8 @@ export function resolveSpellCastCost(params: {
     canCast = false
     blockReason = "base_over_spell_limit"
   } else if (
-    metamagicCap != null &&
-    metamagicCost > metamagicCap
+    metamagicCapFromPool != null &&
+    metamagicCost > metamagicCapFromPool
   ) {
     canCast = false
     blockReason = "metamagic_over_proficiency_cap"
@@ -159,6 +236,6 @@ export function resolveSpellCastCost(params: {
     pointPool: pool,
     resourceKey: pool.resource_key,
     spellLimit,
-    metamagicCap,
+    metamagicCap: metamagicCapFromPool,
   }
 }

@@ -160,7 +160,7 @@ export function AbilityScoreCards({
                   <GameIcon name={ABILITY_GAME_ICONS[ability]} className={cn("h-7 w-7", theme.text)} />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-serif text-lg font-black uppercase tracking-wide text-white leading-tight">
+                  <h3 className="font-serif text-base font-black uppercase tracking-wide text-white leading-tight">
                     {ability}
                   </h3>
                   <p className="text-[10px] uppercase tracking-wider text-white/45 truncate">
@@ -246,7 +246,7 @@ export function AbilityScoreCards({
             )}
 
             {method === "standard" && (
-              <div className="relative mt-3 flex flex-wrap justify-center gap-1.5">
+              <div className="relative mt-3 grid grid-cols-3 gap-1.5 justify-items-center">
                 {standardArray.map((value) => {
                   const selectedHere = standardAssignments[ability] === value
                   const usedElsewhere = isStandardValueUsedElsewhere(ability, value)

@@ -22,6 +22,46 @@ function enrichedBarbarianFeatures(): Feature[] {
   return (barbarian.features ?? []) as Feature[]
 }
 
+function enrichedSorcererFeatures(): Feature[] {
+  const enriched = enrichSrdClassList(classes as Record<string, unknown>[])
+  const sorcerer = enriched.find((row) => row.name === "Sorcerer")!
+  return (sorcerer.features ?? []) as Feature[]
+}
+
+describe("Innate Sorcery feature effects (SRD: while active)", () => {
+  const innateSorcery = enrichedSorcererFeatures().find((feature) => feature.name === "Innate Sorcery")!
+
+  it("grants spell save DC bonus only while Innate Sorcery toggle is on", () => {
+    const off = collectFeatureRollBonuses(
+      [innateSorcery],
+      { kind: "spell_save_dc" },
+      { activeSheetToggles: new Set() },
+    )
+    const on = collectFeatureRollBonuses(
+      [innateSorcery],
+      { kind: "spell_save_dc" },
+      { activeSheetToggles: new Set(["while_innate_sorcery_active"]) },
+    )
+    expect(off.total).toBe(0)
+    expect(on.total).toBe(1)
+  })
+
+  it("grants spell attack advantage only while Innate Sorcery toggle is on", () => {
+    const off = collectFeatureRollModes(
+      [innateSorcery],
+      { kind: "spell_attack" },
+      { activeSheetToggles: new Set() },
+    )
+    const on = collectFeatureRollModes(
+      [innateSorcery],
+      { kind: "spell_attack" },
+      { activeSheetToggles: new Set(["while_innate_sorcery_active"]) },
+    )
+    expect(off.mode).toBe("normal")
+    expect(on.mode).toBe("advantage")
+  })
+})
+
 describe("Rage feature effects (SRD: while Rage is active)", () => {
   const rage = enrichedBarbarianFeatures().find((feature) => feature.name === "Rage")!
 

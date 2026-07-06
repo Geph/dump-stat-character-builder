@@ -14,6 +14,7 @@ import {
 } from "@/lib/compendium/equipment-base-selection"
 import { filterEquipmentList } from "@/lib/compendium/equipment-display"
 import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
+import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -31,11 +32,13 @@ type SheetEquipmentPanelProps = {
   equippedArmorId: string | null
   equippedShieldId: string | null
   equippedWeaponId: string | null
+  equippedOffHandWeaponId: string | null
   attunedItemIds: string[]
   maxAttunementSlots: number
   onEquipArmor: (id: string | null) => void
   onEquipShield: (id: string | null) => void
   onEquipWeapon: (id: string | null) => void
+  onEquipOffHandWeapon: (id: string | null) => void
   onToggleAttune: (id: string) => void
   onShowDetails: (item: Equipment) => void
 }
@@ -89,11 +92,13 @@ export function SheetEquipmentPanel({
   equippedArmorId,
   equippedShieldId,
   equippedWeaponId,
+  equippedOffHandWeaponId,
   attunedItemIds,
   maxAttunementSlots,
   onEquipArmor,
   onEquipShield,
   onEquipWeapon,
+  onEquipOffHandWeapon,
   onToggleAttune,
   onShowDetails,
 }: SheetEquipmentPanelProps) {
@@ -172,7 +177,8 @@ export function SheetEquipmentPanel({
                   "rounded-lg border px-2.5 py-2 bg-muted/40 min-w-0",
                   (equippedArmorId === item.id ||
                     equippedShieldId === item.id ||
-                    equippedWeaponId === item.id) &&
+                    equippedWeaponId === item.id ||
+                    equippedOffHandWeaponId === item.id) &&
                     "border-primary/50 bg-primary/5",
                 )}
               >
@@ -219,7 +225,42 @@ export function SheetEquipmentPanel({
                           onChange={(checked) => onEquipShield(checked ? item.id : null)}
                         />
                       )}
-                      {isWeapon && (
+                      {isWeapon && isLightWeapon(resolved) ? (
+                        <>
+                          <EquipRow
+                            label="Main"
+                            checked={equippedWeaponId === item.id}
+                            disabled={equipBlocked && equippedWeaponId !== item.id}
+                            title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
+                            onChange={(checked) => {
+                              if (checked) {
+                                if (equippedOffHandWeaponId === item.id) {
+                                  onEquipOffHandWeapon(null)
+                                }
+                                onEquipWeapon(item.id)
+                                return
+                              }
+                              if (equippedWeaponId === item.id) onEquipWeapon(null)
+                            }}
+                          />
+                          <EquipRow
+                            label="Off-hand"
+                            checked={equippedOffHandWeaponId === item.id}
+                            disabled={equipBlocked && equippedOffHandWeaponId !== item.id}
+                            title={equipBlocked && equippedOffHandWeaponId !== item.id ? equipBlockedTitle : undefined}
+                            onChange={(checked) => {
+                              if (checked) {
+                                if (equippedWeaponId === item.id) {
+                                  onEquipWeapon(null)
+                                }
+                                onEquipOffHandWeapon(item.id)
+                                return
+                              }
+                              if (equippedOffHandWeaponId === item.id) onEquipOffHandWeapon(null)
+                            }}
+                          />
+                        </>
+                      ) : isWeapon ? (
                         <EquipRow
                           label="Wield"
                           checked={equippedWeaponId === item.id}
@@ -227,7 +268,7 @@ export function SheetEquipmentPanel({
                           title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
                           onChange={(checked) => onEquipWeapon(checked ? item.id : null)}
                         />
-                      )}
+                      ) : null}
                       {attunable && (
                         <EquipRow
                           label="Attune"

@@ -12,6 +12,7 @@ export type SheetToggleDefinition = {
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "while_raging", label: "Raging", sourceType: "builtin" },
+  { id: "while_innate_sorcery_active", label: "Innate Sorcery", sourceType: "builtin" },
   { id: "reckless_attack", label: "Attacking Recklessly", sourceType: "builtin" },
   { id: "form_of_dread", label: "Form of Dread", sourceType: "builtin" },
   { id: "vow_of_enmity", label: "Vow of Enmity", sourceType: "builtin" },

@@ -47,6 +47,7 @@ export type CharacterBuildInputs = {
   equippedArmorId: string | null
   equippedShieldId: string | null
   equippedWeaponId: string | null
+  equippedOffHandWeaponId?: string | null
   attunedItemIds?: string[]
   equipmentBaseSelections?: Record<string, string>
   modifierCatalog: ModifierCatalogEntry[]
@@ -127,6 +128,7 @@ export type DerivedCharacter = {
   tools: ToolBonus[]
   saves: SaveBonus[]
   equippedWeaponAttack: WeaponAttackDerived | null
+  equippedOffHandWeaponAttack: WeaponAttackDerived | null
   attunementSlots: number
 }
 

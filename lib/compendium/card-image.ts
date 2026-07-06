@@ -21,6 +21,12 @@ export const COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[350px]"
 /** Top half stays clear; bottom 40% holds at 85% black, then a sharp 10% ramp. */
 export const COMPENDIUM_LIST_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_40%,rgba(0,0,0,0.45)_46%,transparent_50%)]"
+/** Builder selection cards — clear top 40%, then ramp to 80% black at the bottom. */
+export const SELECTION_CARD_GRADIENT_CLASS =
+  "bg-[linear-gradient(to_bottom,transparent_0%,transparent_40%,rgba(0,0,0,0.45)_54%,rgba(0,0,0,0.8)_100%)]"
+/** Detail overlay hero — dark band in bottom 25% for title/tags. */
+export const DETAIL_OVERLAY_HERO_GRADIENT_CLASS =
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_18%,rgba(0,0,0,0.45)_22%,transparent_25%)]"
 export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended); ${CLASS_CARD_IMAGE_ASPECT}`
 export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
 
@@ -110,9 +116,9 @@ export function applyBundledCardImage(
   return card_image_url ? { ...row, card_image_url } : row
 }
 
-/** Portrait class art is top-cropped into the landscape banner; other types use full landscape framing. */
+/** Portrait class/species art is top-cropped; other types use full landscape framing. */
 export function compendiumCardImageCropForType(tab: CompendiumContentType): CompendiumCardImageCrop {
-  return tab === "classes" || tab === "subclasses" ? "top" : "center"
+  return tab === "classes" || tab === "subclasses" || tab === "species" ? "top" : "center"
 }
 
 export function compendiumCardHeroImageClass(crop: CompendiumCardImageCrop = "center"): string {

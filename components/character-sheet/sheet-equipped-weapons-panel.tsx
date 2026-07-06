@@ -1,8 +1,8 @@
 "use client"
 
-import { DamageRollButton } from "@/components/character-sheet/damage-roll-button"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
+import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import {
   getWeaponDamageText,
@@ -16,14 +16,22 @@ import {
   describeWeaponRange,
 } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
+import { weaponDamageDiceOptions } from "@/lib/compendium/weapon-damage-roll"
 import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
+type EquippedWeaponCard = {
+  weapon: Equipment
+  attack: WeaponAttackDerived
+  hand: "main" | "off"
+  defaultIncludeAbilityModifier: boolean
+  abilityModifier: number
+}
+
 type SheetEquippedWeaponsPanelProps = {
-  weapon: Equipment | null
-  attack: WeaponAttackDerived | null
+  weapons: EquippedWeaponCard[]
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
 }
@@ -31,11 +39,12 @@ type SheetEquippedWeaponsPanelProps = {
 function WeaponAttackCard({
   weapon,
   attack,
+  hand,
+  defaultIncludeAbilityModifier,
+  abilityModifier,
   buildInputs,
   weaponProficiencies,
-}: {
-  weapon: Equipment
-  attack: WeaponAttackDerived
+}: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
 }) {
@@ -44,6 +53,7 @@ function WeaponAttackCard({
   const properties = getWeaponPropertyTags(weapon)
   const baseDamage = getWeaponDamageText(weapon)
   const damageExpression = attack.damageDisplay || baseDamage
+  const diceOptions = weaponDamageDiceOptions(weapon)
   const sheetContext = buildInputs
     ? buildWeaponSheetContext(weapon, buildInputs, weaponProficiencies)
     : null
@@ -59,6 +69,11 @@ function WeaponAttackCard({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
+            {hand === "off" ? (
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Off-hand
+              </span>
+            ) : null}
             {weapon.subcategory ? (
               <p className="text-[10px] text-muted-foreground">{weapon.subcategory}</p>
             ) : null}
@@ -152,7 +167,14 @@ function WeaponAttackCard({
           {damageExpression ? (
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground uppercase">Dmg</span>
-              <DamageRollButton expression={damageExpression} label={`${weapon.name} damage`} />
+              <WeaponDamageRollButton
+                expression={damageExpression}
+                label={`${weapon.name} damage`}
+                diceOptions={diceOptions}
+                showNoModToggle={hand === "off"}
+                defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
+                abilityModifier={abilityModifier}
+              />
             </div>
           ) : null}
         </div>
@@ -162,12 +184,11 @@ function WeaponAttackCard({
 }
 
 export function SheetEquippedWeaponsPanel({
-  weapon,
-  attack,
+  weapons,
   buildInputs,
   weaponProficiencies,
 }: SheetEquippedWeaponsPanelProps) {
-  if (!weapon || !attack) return null
+  if (!weapons.length) return null
 
   return (
     <div className="mb-3">
@@ -175,12 +196,14 @@ export function SheetEquippedWeaponsPanel({
         Weapon Attacks
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <WeaponAttackCard
-          weapon={weapon}
-          attack={attack}
-          buildInputs={buildInputs}
-          weaponProficiencies={weaponProficiencies}
-        />
+        {weapons.map((entry) => (
+          <WeaponAttackCard
+            key={`${entry.hand}-${entry.weapon.id}`}
+            {...entry}
+            buildInputs={buildInputs}
+            weaponProficiencies={weaponProficiencies}
+          />
+        ))}
       </div>
     </div>
   )

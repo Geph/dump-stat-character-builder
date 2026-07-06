@@ -28,6 +28,10 @@ type ModifierPlayerChoicePanelProps = {
   unavailableOptions?: string[]
   /** Compact builder layout: denser grid, no skill info buttons. */
   choiceLayout?: "default" | "compact"
+  /** Visual builder layout for skill pickers (icons + info buttons). */
+  skillPickerLayout?: "default" | "compact" | "visual"
+  /** Custom skill name → game-icons slug. */
+  skillIconByName?: Record<string, string>
   /** Skills the character is already proficient in (for Expertise pickers). */
   proficientSkills?: string[]
   /** Tools the character is already proficient in (for Expertise skill-or-tool pickers). */
@@ -144,6 +148,8 @@ export function ModifierPlayerChoicePanel({
   excludeKinds,
   unavailableOptions = [],
   choiceLayout = "default",
+  skillPickerLayout = "compact",
+  skillIconByName = {},
   proficientSkills = [],
   proficientTools = [],
   existingExpertiseSkills = [],
@@ -211,7 +217,8 @@ export function ModifierPlayerChoicePanel({
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
             showSkillInfo={isSkillKind}
-            layout={choiceLayout}
+            layout={isSkillKind ? skillPickerLayout : choiceLayout}
+            skillIconByName={isSkillKind ? skillIconByName : undefined}
             unavailableOptions={isSkillKind && !slot.grantsExpertise ? unavailableOptions : []}
             allowCustom={slot.allowCustom ?? false}
             customPlaceholder={slot.kind === "language" ? "Add a custom language..." : undefined}

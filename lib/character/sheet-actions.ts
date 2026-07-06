@@ -1,4 +1,5 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import { ACTION_PANEL_CLASS_RESOURCE_IDS } from "@/lib/compendium/class-resource-display"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
@@ -60,6 +61,7 @@ const COMBAT_EFFECT_KINDS = new Set<string>([
   "impose_disadvantage",
   "force_save_control",
   "heal_self",
+  "movement_option",
 ])
 
 /** Characteristic types that mark an action as combat-focused. */
@@ -206,6 +208,93 @@ export function inferActivatableActionCategory(item: ActivatableItem): SheetActi
   return classifyActionCategory(item)
 }
 
+/** Standard actions whose default action economy is a normal Action. */
+const DEFAULT_ACTION_BY_ID = new Map(DEFAULT_SHEET_ACTIONS.map((action) => [action.id, action]))
+
+const MOVEMENT_OPTION_DEFAULT_ACTIONS: Array<{
+  flag: "movementDash" | "movementDisengage" | "movementHide"
+  actionId: string
+}> = [
+  { flag: "movementDash", actionId: "dash" },
+  { flag: "movementDisengage", actionId: "disengage" },
+  { flag: "movementHide", actionId: "hide" },
+]
+
+type MovementOptionExpansion = {
+  actionKey: string
+  name: string
+  description: string
+  kinds: ActionEconomyKind[]
+  category: SheetActionCategory
+}
+
+function expansionsFromMovementOptions(
+  feature: ActivatableItem,
+  instance: LinkedModifierInstance,
+): MovementOptionExpansion[] {
+  const kinds = activationKinds(instance.activation)
+  if (!kinds.length) return []
+  if (kinds.every((kind) => kind === "action")) return []
+
+  const expansions: MovementOptionExpansion[] = []
+  for (const effect of instance.activation?.effects ?? []) {
+    if ((effect as { kind?: string }).kind !== "movement_option") continue
+    for (const { flag, actionId } of MOVEMENT_OPTION_DEFAULT_ACTIONS) {
+      if (!(effect as Record<string, unknown>)[flag]) continue
+      const defaultAction = DEFAULT_ACTION_BY_ID.get(actionId)
+      if (!defaultAction) continue
+      expansions.push({
+        actionKey: actionId,
+        name: defaultAction.name,
+        description:
+          (effect as { label?: string | null }).label?.trim() || defaultAction.description,
+        kinds,
+        category: defaultAction.category === "combat" ? "combat" : "utility",
+      })
+    }
+    if ((effect as { movementHideBehindLargerCreatures?: boolean }).movementHideBehindLargerCreatures) {
+      expansions.push({
+        actionKey: "hide-behind-larger",
+        name: "Hide behind larger creatures",
+        description:
+          (effect as { label?: string | null }).label?.trim() ||
+          "Hide behind a creature at least one size larger than you.",
+        kinds,
+        category: "combat",
+      })
+    }
+  }
+  return expansions
+}
+
+function collectMovementOptionExpansions(feature: ActivatableItem): MovementOptionExpansion[] {
+  const seen = new Set<string>()
+  const expansions: MovementOptionExpansion[] = []
+  for (const instance of feature.linkedModifiers ?? []) {
+    for (const expansion of expansionsFromMovementOptions(feature, instance)) {
+      const key = `${expansion.actionKey}:${expansion.kinds.join("+")}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      expansions.push(expansion)
+    }
+  }
+  return expansions
+}
+
+/** Hide the parent feature card when it only exists to grant alternate-timing standard actions. */
+function suppressParentForMovementExpansions(
+  feature: ActivatableItem,
+  expansions: MovementOptionExpansion[],
+): boolean {
+  if (!expansions.length) return false
+  const hasNonMovementEffect = (feature.linkedModifiers ?? []).some((instance) =>
+    (instance.activation?.effects ?? []).some(
+      (effect) => (effect as { kind?: string }).kind && (effect as { kind?: string }).kind !== "movement_option",
+    ),
+  )
+  return !hasNonMovementEffect
+}
+
 function pushFeatureActions(
   actions: SheetActionEntry[],
   features: ActivatableItem[] | undefined,
@@ -216,24 +305,50 @@ function pushFeatureActions(
 ) {
   for (const feature of features ?? []) {
     if ((feature.level ?? 1) > levelCap) continue
-    const kinds = inferActivatableActionKinds(feature)
-    if (!kinds.length) continue
     const display = resolveFeatureSheetDisplay(feature as Feature)
-    const category = inferActivatableActionCategory(feature)
-    if (category === "combat" && !display.combatActions) continue
-    if (category === "utility" && !display.abilitiesActions) continue
-    actions.push({
-      id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
-      name: feature.name,
-      sourceLabel,
-      kinds,
-      category,
-      limitedUses: feature.limitedUses,
-      classLevel: levelCap,
-      description: feature.description ?? null,
-      classId,
-      classResourceKey: resolveActionResourceKey(feature),
-    })
+    const movementExpansions = collectMovementOptionExpansions(feature)
+    const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
+
+    if (!suppressParent) {
+      const kinds = inferActivatableActionKinds(feature)
+      if (kinds.length) {
+        const category = inferActivatableActionCategory(feature)
+        if (
+          (category !== "combat" || display.combatActions) &&
+          (category !== "utility" || display.abilitiesActions)
+        ) {
+          actions.push({
+            id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
+            name: feature.name,
+            sourceLabel,
+            kinds,
+            category,
+            limitedUses: feature.limitedUses,
+            classLevel: levelCap,
+            description: feature.description ?? null,
+            classId,
+            classResourceKey: resolveActionResourceKey(feature),
+          })
+        }
+      }
+    }
+
+    for (const expansion of movementExpansions) {
+      if (expansion.category === "combat" && !display.combatActions) continue
+      if (expansion.category === "utility" && !display.abilitiesActions) continue
+      actions.push({
+        id: `${idPrefix}:${feature.level ?? 1}:${feature.name}:movement:${expansion.actionKey}`,
+        name: expansion.name,
+        sourceLabel: feature.name,
+        kinds: expansion.kinds,
+        category: expansion.category,
+        limitedUses: feature.limitedUses,
+        classLevel: levelCap,
+        description: expansion.description,
+        classId,
+        classResourceKey: resolveActionResourceKey(feature),
+      })
+    }
   }
 }
 

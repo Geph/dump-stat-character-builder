@@ -305,6 +305,7 @@ CREATE TABLE IF NOT EXISTS characters (
   equipped_armor_id CHAR(36),
   equipped_shield_id CHAR(36),
   equipped_weapon_id CHAR(36),
+  equipped_off_hand_weapon_id CHAR(36),
   attuned_item_ids JSON,
   equipment_base_selections JSON,
   spell_ids JSON,

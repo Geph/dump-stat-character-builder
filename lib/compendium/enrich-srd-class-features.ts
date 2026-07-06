@@ -405,7 +405,7 @@ function usesPool(uses: UsesConfig, label?: string): LinkedModifierInstance {
 function checkAdvantage(
   instanceKey: string,
   options: {
-    category: "save" | "attack" | "initiative" | "ability" | "skill" | "other"
+    category: "save" | "attack" | "initiative" | "ability" | "skill" | "spell_attack" | "spell_save_dc" | "other"
     ability?: string | null
     skills?: string[]
     conditions?: string[]
@@ -459,7 +459,7 @@ function incomingAttackMode(
 function checkBonus(
   instanceKey: string,
   options: {
-    category: "save" | "attack" | "initiative" | "ability" | "skill" | "other"
+    category: "save" | "attack" | "initiative" | "ability" | "skill" | "spell_attack" | "spell_save_dc" | "other"
     bonusConfig: import("@/lib/compendium/roll-bonus-config").RollBonusConfig
     ability?: string | null
     skills?: string[]
@@ -485,7 +485,7 @@ function checkBonus(
 function checkRollFloor(
   instanceKey: string,
   options: {
-    category: "save" | "attack" | "initiative" | "ability" | "skill" | "other"
+    category: "save" | "attack" | "initiative" | "ability" | "skill" | "spell_attack" | "spell_save_dc" | "other"
     below: number
     setTo: number
     ability?: string | null
@@ -1764,6 +1764,15 @@ export function innateSorceryPreset(): LinkedModifierInstance[] {
     fxInstance("modinst_innate_sorcery", SELF_BUFF_CASTER_CATALOG_ID, {
       bonusAction: true,
       effects: [{ id: modId("innate_sorcery"), kind: "self_buff_caster", casterBuffLabel: "Innate Sorcery" }],
+    }),
+    checkAdvantage("innate_sorcery_spell_attack", {
+      category: "spell_attack",
+      limitations: [requiresActiveToggleLimitation("while_innate_sorcery_active")],
+    }),
+    checkBonus("innate_sorcery_spell_save_dc", {
+      category: "spell_save_dc",
+      bonusConfig: { mode: "fixed", fixed: 1 },
+      limitations: [requiresActiveToggleLimitation("while_innate_sorcery_active")],
     }),
   ]
 }

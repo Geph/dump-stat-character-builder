@@ -10,6 +10,7 @@ describe("sheet-toggle-registry", () => {
   it("includes builtin rage and below-half-hp toggles", () => {
     const ids = BUILTIN_SHEET_TOGGLES.map((entry) => entry.id)
     expect(ids).toContain("while_raging")
+    expect(ids).toContain("while_innate_sorcery_active")
     expect(ids).toContain("below_half_hp")
     expect(ids).not.toContain("in_combat_or_high_stakes")
   })

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
+import classes from "@/lib/srd/seed-data/classes.json"
 import type { Feature, Species } from "@/lib/types"
 
 function classDetail(
@@ -343,6 +345,32 @@ describe("collectSheetActions", () => {
     const surge = actions.find((a) => a.name === "Action Surge")
     expect(surge?.category).toBe("combat")
     expect(surge?.classResourceKey).toBe("action_surge")
+  })
+
+  it("expands Cunning Action into bonus-action Dash, Disengage, and Hide on the combat tab", () => {
+    const enriched = enrichSrdClassList(classes as Record<string, unknown>[])
+    const rogue = enriched.find((row) => row.name === "Rogue")!
+    const actions = collectSheetActions({
+      classDetails: [
+        {
+          row: { class_id: String(rogue.id), level: 5, subclass_id: null, order: 0 },
+          class: rogue as unknown as CharacterClassDetail["class"],
+          subclass: null,
+        },
+      ],
+      species: null,
+    })
+    expect(actions.map((action) => action.name)).not.toContain("Cunning Action")
+    const dash = actions.find((action) => action.name === "Dash")
+    const disengage = actions.find((action) => action.name === "Disengage")
+    const hide = actions.find((action) => action.name === "Hide")
+    expect(dash?.kinds).toEqual(["bonus"])
+    expect(dash?.sourceLabel).toBe("Cunning Action")
+    expect(dash?.category).toBe("combat")
+    expect(disengage?.kinds).toEqual(["bonus"])
+    expect(disengage?.sourceLabel).toBe("Cunning Action")
+    expect(hide?.kinds).toEqual(["bonus"])
+    expect(hide?.sourceLabel).toBe("Cunning Action")
   })
 
   it("honors sheetDisplay when combat or utility actions are disabled", () => {

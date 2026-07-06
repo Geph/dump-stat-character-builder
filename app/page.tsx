@@ -64,7 +64,7 @@ const features = [
     imageAlt: "Export and Database",
     title: "Export and Database",
     description:
-      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export as JSON for restoration later.",
+      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export compendium items and characters to JSON for backup and use elsewhere.",
   },
 ]
 

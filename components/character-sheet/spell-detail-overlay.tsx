@@ -15,7 +15,7 @@ import {
   PsionicAugmentPicker,
   resolveSpellPsionicAugments,
 } from "@/components/character-sheet/psionic-augment-picker"
-import { MetamagicCastPicker } from "@/components/character-sheet/metamagic-cast-picker"
+import { MetamagicCastDropdown } from "@/components/character-sheet/metamagic-cast-dropdown"
 import type {
   MetamagicCastOption,
   ResolvedSpellCastCost,
@@ -72,13 +72,18 @@ export function SpellDetailOverlay({
   const isCantrip = spell.level === 0
 
   const isPointPool = castCost?.mode === "point_pool"
-  const canCast = isCantrip
+  const hasMetamagic = metamagicOptions.length > 0
+  const metamagicSelected = selectedMetamagicIds.length > 0
+  const metamagicReady = !metamagicSelected || (castCost?.canCast ?? true)
+  const canCastSpell = isCantrip
     ? isPointPool
       ? (castCost?.canCast ?? true)
-      : true
+      : metamagicSelected
+        ? metamagicReady
+        : true
     : isPointPool
       ? (castCost?.canCast ?? false)
-      : canUseSlot
+      : canUseSlot && metamagicReady
 
   useEffect(() => {
     setConcentrationWarningOpen(false)
@@ -105,14 +110,24 @@ export function SpellDetailOverlay({
 
     if (needsAttack && spellAttackMod != null) {
       const resolved = resolveRollMode({
-        context: { kind: "attack" },
+        context: { kind: "spell_attack" },
         activeConditions: rollCtx.activeConditions,
         exhaustionLevel: rollCtx.exhaustionLevel,
         manualOverride: "normal",
+        classFeatures: rollCtx.classFeatures,
+        limitationContext: {
+          activeConditions: rollCtx.activeConditions,
+          activeSheetToggles: rollCtx.activeSheetToggles,
+          equippedArmor: rollCtx.equippedArmor,
+          equippedShield: rollCtx.equippedShield,
+          currentHp: rollCtx.featureEffectContext?.currentHp ?? rollCtx.currentHp,
+        },
       })
       const rolled = rollD20WithMode(resolved.mode, spellAttackMod)
       result.attackRoll = { natural: rolled.natural, total: rolled.total }
-      const attackSummary = `${result.attackRoll.natural}${spellAttackMod >= 0 ? ` + ${spellAttackMod}` : ` − ${Math.abs(spellAttackMod)}`} = ${result.attackRoll.total}${d20CriticalSuffix(result.attackRoll.natural)}`
+      const modeSuffix =
+        rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
+      const attackSummary = `${result.attackRoll.natural}${spellAttackMod >= 0 ? ` + ${spellAttackMod}` : ` − ${Math.abs(spellAttackMod)}`} = ${result.attackRoll.total}${modeSuffix}${d20CriticalSuffix(result.attackRoll.natural)}`
       feedbackParts.push(`Attack: ${attackSummary}`)
       history?.logRoll({
         kind: "spell",
@@ -125,17 +140,27 @@ export function SpellDetailOverlay({
       result.concentrationApplied = concentrationConditionName(spell.name)
       feedbackParts.push(`Concentration: ${spell.name}`)
     }
-    if (!isCantrip && canCast) {
+    if (!isCantrip && canCastSpell) {
       if (isPointPool && castCost?.castKind === "arcanum") {
         result.arcanumUsed = true
         feedbackParts.push("Used Innate Arcanum charge")
       } else if (isPointPool && castCost) {
         result.psiPointsSpent = castCost.totalCost
         feedbackParts.push(`Spent ${castCost.totalCost} Sorcery Points`)
-      } else {
+      } else if (castCost?.metamagicCost) {
+        result.psiPointsSpent = castCost.metamagicCost
+        feedbackParts.push(`Spent ${castCost.metamagicCost} Sorcery Points on Metamagic`)
+        if (!isCantrip) {
+          result.slotUsed = true
+          feedbackParts.push(`Used 1 level ${spell.level} slot`)
+        }
+      } else if (!isCantrip) {
         result.slotUsed = true
         feedbackParts.push(`Used 1 level ${spell.level} slot`)
       }
+    } else if (isCantrip && castCost?.metamagicCost) {
+      result.psiPointsSpent = castCost.metamagicCost
+      feedbackParts.push(`Spent ${castCost.metamagicCost} Sorcery Points on Metamagic`)
     }
     if (psionicAugments && augmentSelections.length) {
       result.psionicAugments = augmentSelections
@@ -242,15 +267,6 @@ export function SpellDetailOverlay({
             </div>
           )}
 
-          {metamagicOptions.length > 0 && isPointPool ? (
-            <MetamagicCastPicker
-              options={metamagicOptions}
-              selectedIds={selectedMetamagicIds}
-              onChange={onMetamagicChange ?? (() => {})}
-              maxTotalCost={castCost?.metamagicCap ?? null}
-            />
-          ) : null}
-
           {psionicAugments ? (
             <PsionicAugmentPicker
               config={psionicAugments}
@@ -262,6 +278,14 @@ export function SpellDetailOverlay({
         </div>
 
         <div className="sticky bottom-0 p-4 border-t border-border bg-card/95 backdrop-blur-sm space-y-2">
+          {metamagicOptions.length > 0 ? (
+            <MetamagicCastDropdown
+              options={metamagicOptions}
+              selectedIds={selectedMetamagicIds}
+              onChange={onMetamagicChange ?? (() => {})}
+              maxTotalCost={castCost?.metamagicCap ?? null}
+            />
+          ) : null}
           {castFeedback && (
             <p className="text-xs text-center font-semibold text-primary bg-primary/10 rounded-lg px-3 py-2">
               {castFeedback}
@@ -289,7 +313,7 @@ export function SpellDetailOverlay({
                 <button
                   type="button"
                   onClick={performCast}
-                  disabled={!isCantrip && !canCast}
+                  disabled={!isCantrip && !canCastSpell}
                   className="flex-1 px-3 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-600/90 transition-colors disabled:opacity-50"
                 >
                   End prior & cast
@@ -297,15 +321,24 @@ export function SpellDetailOverlay({
               </div>
             </div>
           )}
-          {!isCantrip && !canCast && (
+          {!isCantrip && !canCastSpell && (
             <p className="text-xs text-destructive text-center">
               {castCost?.blockReason === "base_over_spell_limit"
                 ? `Base cost exceeds Spell Limit (${castCost.baseCost} SP)`
                 : castCost?.blockReason === "metamagic_over_proficiency_cap"
                   ? "Metamagic cost exceeds Proficiency Bonus cap"
                   : castCost?.blockReason === "insufficient_points"
-                    ? "Not enough Sorcery Points"
+                    ? hasMetamagic && selectedMetamagicIds.length > 0 && canUseSlot
+                      ? "Not enough Sorcery Points for Metamagic"
+                      : "Not enough Sorcery Points"
                     : `No ${spell.level} slots remaining`}
+            </p>
+          )}
+          {isCantrip && hasMetamagic && selectedMetamagicIds.length > 0 && !metamagicReady && (
+            <p className="text-xs text-destructive text-center">
+              {castCost?.blockReason === "metamagic_over_proficiency_cap"
+                ? "Metamagic cost exceeds Proficiency Bonus cap"
+                : "Not enough Sorcery Points for Metamagic"}
             </p>
           )}
           {!concentrationWarningOpen && (
@@ -313,7 +346,7 @@ export function SpellDetailOverlay({
               <button
                 type="button"
                 onClick={handleCastClick}
-                disabled={!isCantrip && !canCast}
+                disabled={!isCantrip && !canCastSpell}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {needsAttack ? <Dices className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
@@ -334,9 +367,13 @@ export function SpellDetailOverlay({
                   ? "Uses one Innate Arcanum charge"
                   : !isCantrip && isPointPool && castCost
                     ? `Costs ${castCost.totalCost} Sorcery Points`
-                    : !isCantrip
-                      ? "Uses one spell slot"
-                      : "Cantrips do not use slots"}
+                    : !isCantrip && castCost?.metamagicCost
+                      ? `Uses 1 spell slot + ${castCost.metamagicCost} Sorcery Points Metamagic`
+                      : !isCantrip
+                        ? "Uses one spell slot"
+                        : castCost?.metamagicCost
+                          ? `Cantrip · ${castCost.metamagicCost} Sorcery Points Metamagic`
+                          : "Cantrips do not use slots"}
               </p>
             </>
           )}

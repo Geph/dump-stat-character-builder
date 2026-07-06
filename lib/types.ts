@@ -843,6 +843,7 @@ export interface Character {
   equipped_armor_id?: string | null
   equipped_shield_id?: string | null
   equipped_weapon_id?: string | null
+  equipped_off_hand_weapon_id?: string | null
   attuned_item_ids?: string[] | null
   /** Per-owned magic item: magic item id → chosen mundane base equipment id. */
   equipment_base_selections?: Record<string, string> | null

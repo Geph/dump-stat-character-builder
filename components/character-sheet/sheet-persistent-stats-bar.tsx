@@ -30,6 +30,8 @@ type SheetPersistentStatsBarProps = {
   onTempHpChange: (value: number) => void
   hitDicePool?: HitDicePoolEntry[]
   conMod?: number
+  /** Show hit-dice healing controls after the player takes a Short Rest. */
+  showShortRestHitDice?: boolean
   onShortRestHeal?: (amount: number) => void
   onSpendHitDice?: (classId: string, count: number) => void
   onInitiativeRoll: () => void
@@ -126,6 +128,7 @@ function CombatStatsCompactRow({
   onTempHpChange,
   hitDicePool = [],
   conMod = 0,
+  showShortRestHitDice = false,
   onShortRestHeal,
   onSpendHitDice,
 }: Omit<
@@ -238,7 +241,7 @@ function CombatStatsCompactRow({
               className="w-8 min-h-6 text-center bg-background/80 border border-cyan/30 rounded text-[11px] font-bold text-cyan tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          {onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
+          {showShortRestHitDice && onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
             <ShortRestHitDiceBox
               pool={hitDicePool}
               conMod={conMod}
@@ -285,6 +288,7 @@ export function SheetPersistentStatsBar({
   onTempHpChange,
   hitDicePool,
   conMod,
+  showShortRestHitDice,
   onShortRestHeal,
   onSpendHitDice,
   onInitiativeRoll,
@@ -306,6 +310,7 @@ export function SheetPersistentStatsBar({
         onTempHpChange={onTempHpChange}
         hitDicePool={hitDicePool}
         conMod={conMod}
+        showShortRestHitDice={showShortRestHitDice}
         onShortRestHeal={onShortRestHeal}
         onSpendHitDice={onSpendHitDice}
       />

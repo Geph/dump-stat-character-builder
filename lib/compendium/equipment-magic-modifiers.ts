@@ -20,6 +20,7 @@ export type EquipmentMagicContext = {
   equippedArmorId: string | null
   equippedShieldId: string | null
   equippedWeaponId: string | null
+  equippedOffHandWeaponId?: string | null
   attunedItemIds: string[]
   modifierCatalog: ModifierCatalogEntry[]
 }
@@ -32,7 +33,9 @@ export function isMagicItemEffectActive(
 
   const scope = getMagicEffectScope(item)
   if (scope === "wielded") {
-    return item.id === context.equippedWeaponId
+    return (
+      item.id === context.equippedWeaponId || item.id === context.equippedOffHandWeaponId
+    )
   }
   if (scope === "worn") {
     return item.id === context.equippedArmorId || item.id === context.equippedShieldId
@@ -71,6 +74,7 @@ export function resolveEquippedItems(
     equippedArmorId: string | null
     equippedShieldId: string | null
     equippedWeaponId: string | null
+    equippedOffHandWeaponId?: string | null
   },
   baseSelections: EquipmentBaseSelections = {},
   catalog?: Equipment[],
@@ -78,6 +82,7 @@ export function resolveEquippedItems(
   armor: Equipment | null
   shield: Equipment | null
   weapon: Equipment | null
+  offHandWeapon: Equipment | null
 } {
   const lookupCatalog = catalog?.length ? catalog : equipment
 
@@ -91,5 +96,6 @@ export function resolveEquippedItems(
     armor: resolve(loadout.equippedArmorId, isArmorItem),
     shield: resolve(loadout.equippedShieldId, isShieldItem),
     weapon: resolve(loadout.equippedWeaponId, isWeaponItem),
+    offHandWeapon: resolve(loadout.equippedOffHandWeaponId ?? null, isWeaponItem),
   }
 }

@@ -101,6 +101,19 @@ export function resolveCatalogFeatPickLabel(
   return entry?.name ?? null
 }
 
+export function resolveCatalogFeatPickEntry(
+  pickId: string,
+  customAbilities: CustomAbility[],
+): ModifierCatalogEntry | null {
+  const parsed = parseCatalogFeatPickId(pickId)
+  if (!parsed) return null
+  return (
+    catalogEntriesForAbility(customAbilities, parsed.catalogAbilityId).find(
+      (row) => row.id === parsed.entryId,
+    ) ?? null
+  )
+}
+
 export function resolveCatalogFeatPickCharacteristics(
   pickId: string,
   customAbilities: CustomAbility[],
