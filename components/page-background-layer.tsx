@@ -40,11 +40,9 @@ export function PageBackgroundLayer() {
   return createPortal(
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <div
-        className="absolute inset-x-0 top-0 min-h-full bg-no-repeat"
+        className="absolute inset-0 bg-no-repeat bg-top max-sm:bg-cover max-sm:bg-center sm:bg-[length:100%_auto]"
         style={{
           backgroundImage: `url(${backgroundUrl})`,
-          backgroundSize: "100% auto",
-          backgroundPosition: "top center",
         }}
       />
       <div className="absolute inset-0 bg-background/25" />

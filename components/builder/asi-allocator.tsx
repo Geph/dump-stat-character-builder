@@ -55,7 +55,14 @@ export function AsiAllocator({
   const bannerUrl = headerImageUrl?.trim() || null
 
   const abilityRows = (
-    <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-2", visual && "sm:grid-cols-2 xl:grid-cols-3")}>
+    <div
+      className={cn(
+        "grid gap-2",
+        visual
+          ? "max-sm:grid-cols-1 max-sm:gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          : "max-sm:grid-cols-1 sm:grid-cols-3",
+      )}
+    >
       {ABILITY_SCORE_KEYS.filter((ability) => visibleAbilities.includes(ability)).map((ability) => {
         const value = allocation[ability] ?? 0
         return (
@@ -64,8 +71,8 @@ export function AsiAllocator({
             className={cn(
               "flex items-center justify-between gap-2 px-2 py-1.5 rounded-md",
               visual
-                ? "rounded-lg border border-white/15 bg-white/5"
-                : "bg-muted/50",
+                ? "rounded-lg border border-white/15 bg-white/5 max-sm:px-3 max-sm:py-3"
+                : "bg-muted/50 max-sm:px-3 max-sm:py-3",
             )}
           >
             <span
@@ -82,10 +89,10 @@ export function AsiAllocator({
                 onClick={() => onChange(adjustAsiPoint(allocation, ability, -1, perAbilityMax))}
                 disabled={value <= 0}
                 className={cn(
-                  "w-6 h-6 rounded text-sm font-bold disabled:opacity-30",
+                  "rounded text-sm font-bold disabled:opacity-30 max-sm:h-10 max-sm:w-10 max-sm:text-base",
                   visual
                     ? "h-7 w-7 rounded-lg border border-white/15 bg-white/10 text-white hover:bg-white/20"
-                    : "bg-muted text-foreground",
+                    : "w-6 h-6 bg-muted text-foreground",
                 )}
                 aria-label={`Decrease ${ABILITY_LABELS[ability]}`}
               >
@@ -104,10 +111,10 @@ export function AsiAllocator({
                 onClick={() => onChange(adjustAsiPoint(allocation, ability, 1, perAbilityMax))}
                 disabled={pointsRemaining <= 0 || value >= perAbilityMax}
                 className={cn(
-                  "w-6 h-6 rounded text-sm font-bold disabled:opacity-30",
+                  "rounded text-sm font-bold disabled:opacity-30 max-sm:h-10 max-sm:w-10 max-sm:text-base",
                   visual
                     ? "h-7 w-7 rounded-lg border border-white/15 bg-white/10 text-white hover:bg-white/20"
-                    : "bg-muted text-foreground",
+                    : "w-6 h-6 bg-muted text-foreground",
                 )}
                 aria-label={`Increase ${ABILITY_LABELS[ability]}`}
               >

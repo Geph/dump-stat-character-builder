@@ -1,7 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
+import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
+import { paginateList } from "@/lib/builder/picker-pagination"
 import {
   modifierPlayerChoiceSlotsForSource,
   optionsForExpertiseSlot,
@@ -57,6 +60,13 @@ function SpellGrantPicker({
   const availableSpells = spellOptionsForModifierSlot(slot, spells, picks)
   const selectedIds = picks[slot.slotKey] ?? []
   const [filter, setFilter] = useState("")
+  const [page, setPage] = useState(0)
+  const isSmScreen = useIsSmPickerScreen()
+  const mobilePageSize = useFeatSpellGrantPickerPageSize()
+
+  useEffect(() => {
+    setPage(0)
+  }, [filter, listClass, slot.slotKey])
 
   if (slot.requiresSpellListPick && !listClass) {
     return (
@@ -69,6 +79,8 @@ function SpellGrantPicker({
   const filtered = availableSpells.filter((spell) =>
     spell.name.toLowerCase().includes(filter.toLowerCase()),
   )
+  const pageSize = isSmScreen ? Math.max(filtered.length, 1) : mobilePageSize
+  const { items: visibleSpells, pageCount, safePage } = paginateList(filtered, page, pageSize)
 
   const toggle = (spellId: string) => {
     if (selectedIds.includes(spellId)) {
@@ -105,32 +117,43 @@ function SpellGrantPicker({
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-          {filtered.map((spell) => {
-            const isSelected = selectedIds.includes(spell.id)
-            const isDisabled = !isSelected && selectedIds.length >= slot.maxCount
-            return (
-              <button
-                key={spell.id}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => toggle(spell.id)}
-                className={`p-2 rounded-lg border-2 text-left transition-all ${
-                  isSelected
-                    ? accentClass
-                    : isDisabled
-                      ? "border-border bg-card opacity-50 cursor-not-allowed"
-                      : "border-border bg-card hover:border-primary/40"
-                }`}
-              >
-                <p className="font-semibold text-sm text-foreground">{spell.name}</p>
-                {spell.school && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{spell.school}</p>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-sm:max-h-none sm:max-h-48 sm:overflow-y-auto">
+            {visibleSpells.map((spell) => {
+              const isSelected = selectedIds.includes(spell.id)
+              const isDisabled = !isSelected && selectedIds.length >= slot.maxCount
+              return (
+                <button
+                  key={spell.id}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => toggle(spell.id)}
+                  className={`p-2 rounded-lg border-2 text-left transition-all max-sm:min-h-[3.25rem] max-sm:p-3 ${
+                    isSelected
+                      ? accentClass
+                      : isDisabled
+                        ? "border-border bg-card opacity-50 cursor-not-allowed"
+                        : "border-border bg-card hover:border-primary/40"
+                  }`}
+                >
+                  <p className="font-semibold text-sm text-foreground">{spell.name}</p>
+                  {spell.school && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{spell.school}</p>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <PickerGridPagination
+            page={safePage}
+            pageCount={pageCount}
+            onPrevious={() => setPage((p) => Math.max(0, p - 1))}
+            onNext={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            previousLabel="Previous spells"
+            nextLabel="More spells"
+            className="max-sm:mt-3"
+          />
+        </>
       )}
     </div>
   )

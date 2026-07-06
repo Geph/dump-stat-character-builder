@@ -122,7 +122,7 @@ export function AbilityScoreCards({
   isStandardValueUsedElsewhere,
 }: AbilityScoreCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 max-sm:gap-4 sm:grid-cols-2 xl:grid-cols-3 gap-4">
       {BUILDER_ABILITY_NAMES.map((ability, index) => {
         const theme = ABILITY_THEME[ability]
         const assigned = method === "standard" ? standardAssignments[ability] ?? null : scores[ability]
@@ -138,7 +138,7 @@ export function AbilityScoreCards({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05, duration: 0.25 }}
             className={cn(
-              "relative overflow-hidden rounded-xl border-2 border-border bg-gradient-to-b from-black via-zinc-950 to-black p-4 transition-colors",
+              "relative overflow-hidden rounded-xl border-2 border-border bg-gradient-to-b from-black via-zinc-950 to-black p-4 transition-colors max-sm:p-5",
               theme.cardBorder,
             )}
             style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)" }}
@@ -225,7 +225,7 @@ export function AbilityScoreCards({
                   type="button"
                   onClick={() => onAdjust(ability, -1)}
                   disabled={scores[ability] <= 8}
-                  className="h-9 w-9 rounded-lg border border-white/15 bg-white/10 text-lg font-black text-white transition-colors hover:bg-white/20 disabled:opacity-25"
+                  className="h-9 w-9 rounded-lg border border-white/15 bg-white/10 text-lg font-black text-white transition-colors hover:bg-white/20 disabled:opacity-25 max-sm:h-11 max-sm:w-11 max-sm:text-xl"
                   aria-label={`Decrease ${ability}`}
                 >
                   −
@@ -237,7 +237,7 @@ export function AbilityScoreCards({
                   type="button"
                   onClick={() => onAdjust(ability, 1)}
                   disabled={scores[ability] >= 15}
-                  className="h-9 w-9 rounded-lg border border-white/15 bg-white/10 text-lg font-black text-white transition-colors hover:bg-white/20 disabled:opacity-25"
+                  className="h-9 w-9 rounded-lg border border-white/15 bg-white/10 text-lg font-black text-white transition-colors hover:bg-white/20 disabled:opacity-25 max-sm:h-11 max-sm:w-11 max-sm:text-xl"
                   aria-label={`Increase ${ability}`}
                 >
                   +

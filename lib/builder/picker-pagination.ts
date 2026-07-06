@@ -6,6 +6,9 @@ export const PICKER_LARGE_MIN_WIDTH = 1024
 /** Matches spell picker grid (`md:grid-cols-3`). */
 export const SPELL_PICKER_MD_MIN_WIDTH = 768
 
+/** Matches Tailwind `sm` — phone-only layout tweaks stay below this width. */
+export const PICKER_SM_MIN_WIDTH = 640
+
 /** Default visible rows for paginated picker grids. */
 export const PICKER_GRID_ROWS = 3
 
@@ -23,6 +26,22 @@ export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean):
 export function getSpellPickerPageSize(isMdScreen: boolean): number {
   const columns = isMdScreen ? 3 : 2
   return columns * PICKER_GRID_ROWS
+}
+
+/** Feat / feature spell grants on narrow phones — paginate long spell lists. */
+export function getFeatSpellGrantPickerPageSize(isSmScreen: boolean): number {
+  return isSmScreen ? PICKER_GRID_ROWS * 3 : PICKER_GRID_ROWS * 2
+}
+
+/** Visual builder cards: swipe on phones, grid from `sm` up. */
+export function getCinematicPickerContainerClass(): string {
+  return [
+    "px-1 py-2",
+    "max-sm:flex max-sm:gap-3 max-sm:overflow-x-auto max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:-mx-1 max-sm:px-1",
+    "max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden",
+    "[&>*]:max-sm:w-[min(85vw,340px)] [&>*]:max-sm:max-w-[340px] [&>*]:max-sm:shrink-0 [&>*]:max-sm:snap-center",
+    "sm:grid sm:grid-cols-1 lg:grid-cols-2 sm:gap-4",
+  ].join(" ")
 }
 
 export function paginateList<T>(

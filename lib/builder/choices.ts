@@ -63,7 +63,14 @@ export function buildSkillPickSources(params: {
 export const SUBCLASS_LEVEL = 3
 
 export function getSubclassesForClass(subclasses: Subclass[], classId: string): Subclass[] {
-  return subclasses.filter((subclass) => subclass.class_id === classId)
+  const seen = new Set<string>()
+  return subclasses.filter((subclass) => {
+    if (subclass.class_id !== classId) return false
+    const key = subclass.id?.trim() || subclass.name.trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function classNeedsSubclass(classLevel: number, subclassCount: number): boolean {

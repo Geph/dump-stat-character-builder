@@ -58,7 +58,9 @@ export function MainNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="relative px-3 py-2 rounded-lg transition-colors"
+                  className={`relative px-3 py-2 rounded-lg transition-colors ${
+                    item.href === "/dashboard" ? "hidden md:block" : ""
+                  }`}
                 >
                   <span className={`flex items-center gap-2 relative z-10 font-semibold text-sm ${
                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
