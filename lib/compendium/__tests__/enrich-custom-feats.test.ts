@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { enrichCustomFeatRow, presetForCustomFeatName } from "@/lib/compendium/enrich-custom-feats"
-import { PHB_SOURCE } from "@/lib/compendium/compendium-source"
 import { SRD_SOURCE } from "@/lib/srd/source"
+
+const PHB_SOURCE = "Player's Handbook"
 
 describe("enrichCustomFeatRow PHB presets", () => {
   it("wires Actor with Charisma ASI and deception/performance advantage", () => {

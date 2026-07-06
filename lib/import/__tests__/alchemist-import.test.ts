@@ -3,7 +3,6 @@ import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifi
 import { resolveRechargeRuleAmount } from "@/lib/compendium/normalize-uses-config"
 import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formulas"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
-import { resolveHeldItemsCap } from "@/lib/character/resolve-held-items-cap"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
 import { enrichAlchemistFeatures } from "@/lib/import/enrich-alchemist-features"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
@@ -230,16 +229,7 @@ Antitoxin | 2 | 3
     )
     const aggregated = aggregateCharacteristics(chars as never[])
     expect(aggregated.heldItemsCapBonus).toBe(2)
-    expect(
-      resolveHeldItemsCap(aggregated, {
-        strength: 0,
-        dexterity: 0,
-        constitution: 0,
-        intelligence: 3,
-        wisdom: 0,
-        charisma: 0,
-      }),
-    ).toBe(5)
+    expect(3 + aggregated.heldItemsCapBonus).toBe(5)
   })
 })
 

@@ -8,8 +8,9 @@ import {
   enrichClassFeatureWithModifierPresets,
 } from "@/lib/compendium/enrich-srd-class-features"
 import { enrichCustomSpeciesRow, speciesHasTraitPresetRegistry } from "@/lib/compendium/enrich-custom-species"
-import { PHB_SOURCE } from "@/lib/compendium/compendium-source"
 import type { Feature, Trait } from "@/lib/types"
+
+const PHB_SOURCE = "Player's Handbook"
 
 describe("Tier 1 common modifier types", () => {
   it("normalizes d20_test_reaction defaults", () => {
