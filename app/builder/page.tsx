@@ -225,7 +225,7 @@ import {
   withCombinedMilestoneAsiAllocation,
 } from "@/lib/builder/asi-allocation"
 import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
-import { paginateList } from "@/lib/builder/picker-pagination"
+import { getCinematicPickerContainerClass, paginateList } from "@/lib/builder/picker-pagination"
 import {
   BUILDER_ABILITY_NAMES,
   BUILDER_EMPTY_CHARACTER,
@@ -250,7 +250,7 @@ import {
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
-import { usePickerPageSize, useSpellPickerPageSize } from "@/hooks/use-picker-page-size"
+import { useIsLargePickerScreen, usePickerPageSize, useSpellPickerPageSize } from "@/hooks/use-picker-page-size"
 import {
   MAX_PORTRAIT_FILE_BYTES,
   MAX_PORTRAIT_FILE_MB,
@@ -370,6 +370,8 @@ export default function BuilderPage() {
   const [cardViewMode, setCardViewMode] = useState<"dense" | "cinematic">("cinematic")
   const pickerPageSize = usePickerPageSize(cardViewMode)
   const spellPickerPageSize = useSpellPickerPageSize()
+  const isLargePickerScreen = useIsLargePickerScreen()
+  const useSwipeVisualPicker = cardViewMode === "cinematic" && !isLargePickerScreen
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
@@ -952,7 +954,7 @@ export default function BuilderPage() {
   // Calculate total level from all class levels
   const totalLevel = activeClassLevels.length > 0 
     ? activeClassLevels.reduce((sum, cl) => sum + cl.level, 0)
-    : character.level
+      : character.level
 
   const featPickSlots = getFeatPickSlots(
     activeClassLevels,
@@ -1305,7 +1307,7 @@ export default function BuilderPage() {
       return changed ? next : prev
     })
   }, [abilityScorePoolGrants.map((grant) => `${grant.allocationKey}:${grant.points}`).join("|")])
-
+  
   // Get proficiency bonus based on total level
   const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
   
@@ -1457,7 +1459,7 @@ export default function BuilderPage() {
       setGoldPurchasedEquipmentIds((prev) =>
         prev.includes(itemId) ? prev : [...prev, itemId],
       )
-    } else {
+        } else {
       setGoldPurchasedEquipmentIds((prev) => prev.filter((id) => id !== itemId))
     }
   }
@@ -1472,8 +1474,9 @@ export default function BuilderPage() {
 
   const pickerGridClass =
     cardViewMode === "cinematic"
-      ? "grid grid-cols-1 lg:grid-cols-2 gap-4 px-1 py-2"
+      ? getCinematicPickerContainerClass()
       : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
+  const cinematicPickerPaginationClass = useSwipeVisualPicker ? "max-sm:hidden" : undefined
 
   const compactPickerLayout = cardViewMode === "dense" ? "compact" : "default"
   const skillPickerLayout = cardViewMode === "cinematic" ? "visual" : "compact"
@@ -2238,6 +2241,9 @@ export default function BuilderPage() {
     if (next == null) return
     setCurrentStep(next)
     setMaxStepReached((prev) => Math.max(prev, next))
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    })
   }
 
   // If the character stops being a spellcaster while parked on the Spells step,
@@ -2262,16 +2268,16 @@ export default function BuilderPage() {
             <div className="h-8 bg-muted rounded w-1/3 mb-8" />
             <div className="h-64 bg-muted rounded-2xl" />
           </div>
-      </main>
+        </main>
       <SiteFooter />
-    </div>
+      </div>
     )
   }
 
   return (
     <div id="builder-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
-
+      
       <div id="builder-steps" className={pageStepStripClass}>
         <div className="max-w-7xl mx-auto px-4 pt-3 pb-1">
           <div className="flex items-center justify-center">
@@ -2280,7 +2286,7 @@ export default function BuilderPage() {
               const isActive = currentStep === step.id
               const isReachable = step.id <= maxStepReached
               const isComplete = step.id < currentStep || (step.id < maxStepReached && !isActive)
-
+              
               return (
                 <div key={step.id} className="flex items-center">
                   <button
@@ -2320,13 +2326,13 @@ export default function BuilderPage() {
               )
             })}
           </div>
-        </div>
+          </div>
       </div>
       
       <main id="builder-main" className="max-w-7xl mx-auto px-4 py-8 min-h-[calc(100vh-4rem)] flex-1 w-full">
 
-        {/* Mobile: toggle between step choices and character preview */}
-        <div className="lg:hidden flex gap-2 mb-4">
+        {/* Mobile: sticky toggle between step choices and character preview */}
+        <div className="lg:hidden sticky top-16 z-40 -mx-4 px-4 py-2 mb-4 flex gap-2 bg-background/95 backdrop-blur-md border-b border-border/60">
           <button
             type="button"
             onClick={() => setMobilePanel("steps")}
@@ -2534,7 +2540,7 @@ export default function BuilderPage() {
                     </div>
                   </div>
                 )}
-
+                
                 {/* Search */}
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -2562,8 +2568,9 @@ export default function BuilderPage() {
                     pageCount: classPageCount,
                     safePage: safeClassPage,
                   } = paginateList(filteredClasses, classPickerPage, pickerPageSize)
+                  const classesToShow = useSwipeVisualPicker ? filteredClasses : visibleClasses
 
-                  return (
+                      return (
                     <>
                       <PickerGridPagination
                         page={safeClassPage}
@@ -2574,10 +2581,10 @@ export default function BuilderPage() {
                         }
                         previousLabel="Previous classes"
                         nextLabel="Next classes"
-                        className="mb-2 mt-0"
+                        className={cn("mb-2 mt-0", cinematicPickerPaginationClass)}
                       />
                       <div className={pickerGridClass}>
-                        {visibleClasses.map((cls) => {
+                        {classesToShow.map((cls) => {
                           const existingLevel = activeClassLevels.find((cl) => cl.classId === cls.id)
                           const isSelected = !!existingLevel
                           const isPrimary = cls.id === resolvedPrimaryClassId
@@ -2645,12 +2652,8 @@ export default function BuilderPage() {
                         }
                         previousLabel="Previous classes"
                         nextLabel="Next classes"
+                        className={cinematicPickerPaginationClass}
                       />
-                    </>
-                  )
-                })()}
-
-                {multiclassAbilityIssues.length > 0 && (
                   <div className="mt-4 rounded-xl border border-warning/50 bg-warning/10 p-4">
                     <p className="text-sm font-bold text-warning mb-2">Multiclass ability requirements</p>
                     <ul className="space-y-1 text-xs text-foreground">
@@ -2776,8 +2779,8 @@ export default function BuilderPage() {
                                         })
                                       }
                                       className={`p-3 rounded-lg border-2 text-left transition-all ${
-                                        isSelected
-                                          ? "border-primary bg-primary/10"
+                            isSelected
+                              ? "border-primary bg-primary/10"
                                           : "border-border bg-card hover:border-primary/40"
                                       }`}
                                     >
@@ -2996,7 +2999,7 @@ export default function BuilderPage() {
                       </div>
                       <span className="text-xs font-bold text-muted-foreground">
                         {selectedFeatCount}/{requiredFeatSlots}
-                      </span>
+                                </span>
                     </div>
 
                     {featsLoadError && (
@@ -3096,8 +3099,8 @@ export default function BuilderPage() {
                                   const isSelected = option.pickId === pickedId
                                   return (
                                     <div key={option.pickId} className="flex items-stretch gap-1">
-                                      <button
-                                        type="button"
+                              <button
+                                type="button"
                                         onClick={() =>
                                           selectPick(isSelected ? null : option.pickId)
                                         }
@@ -3115,12 +3118,12 @@ export default function BuilderPage() {
                                             {option.summary}
                                           </p>
                                         ) : null}
-                                      </button>
+                              </button>
                                       <CatalogOptionDescriptionHover
                                         name={option.name}
                                         description={option.description}
                                       />
-                                    </div>
+                            </div>
                                   )
                                 })
                               : eligibleFeats.map((feat) => {
@@ -3168,7 +3171,7 @@ export default function BuilderPage() {
                                             {feat.repeatable && (
                                               <span className="text-primary">Repeatable</span>
                                             )}
-                                          </div>
+                          </div>
                                         </div>
                                       </div>
                                     </button>
@@ -3206,7 +3209,7 @@ export default function BuilderPage() {
                             <p className="text-xs text-muted-foreground">No eligible feats for this slot.</p>
                           )}
                           {usesCatalog && catalogOptions.length === 0 && (
-                            <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                               No options available. Seed SRD content or open Compendium → Abilities to
                               verify Metamagic / Eldritch Invocation catalogs.
                             </p>
@@ -3281,7 +3284,7 @@ export default function BuilderPage() {
                         {requiredFeatSlots - selectedFeatCount === 1 ? "" : "s"} to continue.
                       </p>
                     )}
-                  </div>
+                </div>
                 )}
               </div>
             )}
@@ -3314,11 +3317,12 @@ export default function BuilderPage() {
                       pageCount: speciesPageCount,
                       safePage: safeSpeciesPage,
                     } = paginateList(filteredSpecies, speciesPickerPage, pickerPageSize)
+                    const speciesToShow = useSwipeVisualPicker ? filteredSpecies : visibleSpecies
 
                     return (
                       <>
                         <div className={pickerGridClass}>
-                          {visibleSpecies.map((sp) => {
+                          {speciesToShow.map((sp) => {
                         const accent = getCompendiumItemAccentColor(sp as Record<string, unknown>)
                         const isSelected = character.species_id === sp.id
                         const selectSpecies = () => {
@@ -3340,7 +3344,7 @@ export default function BuilderPage() {
                         if (cardViewMode === "dense") {
                           return (
                             <CompendiumDenseSelectionCard
-                              key={sp.id}
+                        key={sp.id}
                               name={sp.name}
                               subtitle={sp.source || "Custom"}
                               icon={sp.icon}
@@ -3375,6 +3379,7 @@ export default function BuilderPage() {
                           }
                           previousLabel="Previous species"
                           nextLabel="Next species"
+                          className={cinematicPickerPaginationClass}
                         />
                       </>
                     )
@@ -3520,9 +3525,9 @@ export default function BuilderPage() {
                               {eligible.map((feat) => {
                                 const isSelected = feat.id === pickedId
                                 return (
-                                  <button
+                          <button
                                     key={feat.id}
-                                    type="button"
+                            type="button"
                                     onClick={() => {
                                       const choiceKey = featChoicePickKey(slot.key)
                                       setFeatureChoicePicks((prev) => ({
@@ -3551,10 +3556,10 @@ export default function BuilderPage() {
                                       )}
                                       {feat.repeatable && <span className="text-primary">Repeatable</span>}
                                     </div>
-                                  </button>
+                          </button>
                                 )
                               })}
-                            </div>
+                        </div>
                             {eligible.length === 0 && feats.length > 0 && (
                               <p className="text-xs text-muted-foreground">
                                 No eligible feats for this choice.
@@ -3587,7 +3592,7 @@ export default function BuilderPage() {
                                   }}
                                   layout={compactPickerLayout}
                                 />
-                              </div>
+                  </div>
                             ) : null}
                             {picked ? (
                               <ModifierPlayerChoicePanel
@@ -3646,11 +3651,12 @@ export default function BuilderPage() {
                       pageCount: backgroundPageCount,
                       safePage: safeBackgroundPage,
                     } = paginateList(filteredBackgrounds, backgroundPickerPage, pickerPageSize)
+                    const backgroundsToShow = useSwipeVisualPicker ? filteredBackgrounds : visibleBackgrounds
 
                     return (
                       <>
                         <div className={pickerGridClass}>
-                          {visibleBackgrounds.map((bg) => {
+                          {backgroundsToShow.map((bg) => {
                         const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
                         const accent = getCompendiumItemAccentColor(bg as Record<string, unknown>)
                         const isSelected = character.background_id === bg.id
@@ -3699,7 +3705,7 @@ export default function BuilderPage() {
                         if (cardViewMode === "dense") {
                           return (
                             <CompendiumDenseSelectionCard
-                              key={bg.id}
+                        key={bg.id}
                               name={bg.name}
                               subtitle={bg.source || "Custom"}
                               icon={bg.icon}
@@ -3741,6 +3747,7 @@ export default function BuilderPage() {
                           }
                           previousLabel="Previous backgrounds"
                           nextLabel="Next backgrounds"
+                          className={cinematicPickerPaginationClass}
                         />
                       </>
                     )
@@ -3834,10 +3841,10 @@ export default function BuilderPage() {
                                     }}
                                     className={`rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
                                       isSelected
-                                        ? "border-accent bg-accent/10"
-                                        : "border-border bg-card hover:border-accent/50"
-                                    }`}
-                                  >
+                            ? "border-accent bg-accent/10"
+                            : "border-border bg-card hover:border-accent/50"
+                        }`}
+                      >
                                     <p className="font-semibold text-foreground text-xs">
                                       {feat.name}
                                     </p>
@@ -3846,10 +3853,10 @@ export default function BuilderPage() {
                                         Prereq: {feat.prerequisite}
                                       </p>
                                     ) : null}
-                                  </button>
+                          </button>
                                 )
                               })}
-                            </div>
+                        </div>
                             {eligible.length === 0 && feats.length > 0 && (
                               <p className="text-xs text-muted-foreground">
                                 No eligible feats for this choice.
@@ -3882,7 +3889,7 @@ export default function BuilderPage() {
                                   }}
                                   layout={compactPickerLayout}
                                 />
-                              </div>
+                  </div>
                             ) : null}
                             {picked ? (
                               <ModifierPlayerChoicePanel
@@ -3981,8 +3988,8 @@ export default function BuilderPage() {
                 <div className="flex flex-wrap gap-2 mb-6">
                   {(
                     [
-                      { id: "pointbuy", label: "Point Buy" },
-                      { id: "standard", label: "Standard Array" },
+                    { id: "pointbuy", label: "Point Buy" },
+                    { id: "standard", label: "Standard Array" },
                       { id: "roll", label: "Roll", dice: true },
                       { id: "custom", label: "Custom" },
                     ] as const
@@ -4170,31 +4177,31 @@ export default function BuilderPage() {
                           {standardArrayAssignments[ability] ?? "—"}
                         </span>
                       ) : (
-                        <div className="flex items-center justify-center gap-3">
+                      <div className="flex items-center justify-center gap-3">
                           {abilityMethod === "pointbuy" && (
-                            <button
+                        <button
                               type="button"
-                              onClick={() => updateAbilityScore(ability, -1)}
-                              disabled={character[ability] <= 8}
-                              className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
-                            >
-                              -
-                            </button>
+                          onClick={() => updateAbilityScore(ability, -1)}
+                          disabled={character[ability] <= 8}
+                          className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
+                        >
+                          -
+                        </button>
                           )}
-                          <span className="text-3xl font-black text-foreground w-12">
-                            {character[ability]}
-                          </span>
+                        <span className="text-3xl font-black text-foreground w-12">
+                          {character[ability]}
+                        </span>
                           {abilityMethod === "pointbuy" && (
-                            <button
+                        <button
                               type="button"
-                              onClick={() => updateAbilityScore(ability, 1)}
+                          onClick={() => updateAbilityScore(ability, 1)}
                               disabled={character[ability] >= 15}
-                              className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
-                            >
-                              +
-                            </button>
+                          className="w-8 h-8 bg-muted rounded-lg font-bold disabled:opacity-30"
+                        >
+                          +
+                        </button>
                           )}
-                        </div>
+                      </div>
                       )}
 
                       {abilityMethod === "standard" && (
@@ -4279,7 +4286,7 @@ export default function BuilderPage() {
                                         : "border-border bg-card hover:border-primary/50"
                                     }`}
                                   >
-                                    <input
+                    <input
                                       type="radio"
                                       name="class-starting-equipment"
                                       checked={startingEquipmentOptionIndex === oi}
@@ -4302,7 +4309,7 @@ export default function BuilderPage() {
                                           {classStartingGold} GP to spend
                                         </p>
                                       )}
-                                    </div>
+                  </div>
                                   </label>
                                 ))}
                               </div>
@@ -4335,22 +4342,22 @@ export default function BuilderPage() {
                               <p className="text-sm font-medium text-foreground mb-2">{group.description}</p>
                               <div className="space-y-2">
                                 {(group.options ?? []).map((option, oi) => (
-                                  <label
+                      <label
                                     key={oi}
                                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
                                       backgroundStartingEquipmentOptionIndex === oi
-                                        ? "border-primary bg-primary/10"
-                                        : "border-border bg-card hover:border-primary/50"
-                                    }`}
-                                  >
-                                    <input
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-card hover:border-primary/50"
+                        }`}
+                      >
+                        <input
                                       type="radio"
                                       name="background-starting-equipment"
                                       checked={backgroundStartingEquipmentOptionIndex === oi}
                                       onChange={() => selectBackgroundStartingEquipmentOption(oi)}
                                       className="mt-1"
                                     />
-                                    <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm text-foreground">{option.label}</p>
                                       {!isGoldOnlyOption(option, backgroundStartingGold) ? (
                                         <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
@@ -4366,11 +4373,11 @@ export default function BuilderPage() {
                                           {backgroundStartingGold} GP to spend
                                         </p>
                                       )}
-                                    </div>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                           ))}
                         </div>
                       )}
@@ -4489,7 +4496,7 @@ export default function BuilderPage() {
                         className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                       />
                     </div>
-
+                    
                     {spellcastingClasses.map((casterClass) => {
                       const casterLevel =
                         activeClassLevels.find((cl) => cl.classId === casterClass.id)?.level ?? 1
@@ -4532,7 +4539,7 @@ export default function BuilderPage() {
                         if (!spellsByLevel[s.level]) spellsByLevel[s.level] = []
                         spellsByLevel[s.level].push(s)
                       })
-
+                      
                       const levelFilter = spellFilterLevelByClassId[casterClass.id] ?? "all"
                       const spellLevels = Object.keys(spellsByLevel)
                         .map(Number)
@@ -4625,13 +4632,13 @@ export default function BuilderPage() {
 
                               return (
                                 <div key={`${casterClass.id}-${level}`}>
-                                  <p className="text-xs font-bold text-primary uppercase mb-2">
+                              <p className="text-xs font-bold text-primary uppercase mb-2">
                                     {formatSpellListGroupLabel(level)}
                                     <span className="text-muted-foreground font-normal ml-1">
                                       ({levelSpells.length})
                                     </span>
-                                  </p>
-                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              </p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {pageItems.map((spell) => {
                                       const selected = classSpellIds.includes(spell.id)
                                       const selectable = canSelectSpell(
@@ -4642,21 +4649,21 @@ export default function BuilderPage() {
                                         casterClass.name,
                                       )
                                       return (
-                                        <label
-                                          key={spell.id}
+                                  <label
+                                    key={spell.id}
                                           className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
                                             selected
                                               ? "border-secondary bg-secondary/10 cursor-pointer"
                                               : selectable
                                                 ? "border-border bg-card hover:border-secondary/50 cursor-pointer"
                                                 : "border-border bg-card opacity-50 cursor-not-allowed"
-                                          }`}
-                                        >
-                                          <input
-                                            type="checkbox"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
                                             checked={selected}
                                             disabled={!selectable}
-                                            onChange={(e) => {
+                                      onChange={(e) => {
                                               setSpellPicksByClassId((prev) => {
                                                 const current = prev[casterClass.id] ?? []
                                                 const next = e.target.checked
@@ -4664,9 +4671,9 @@ export default function BuilderPage() {
                                                   : current.filter((id) => id !== spell.id)
                                                 return { ...prev, [casterClass.id]: next }
                                               })
-                                            }}
-                                            className="sr-only"
-                                          />
+                                      }}
+                                      className="sr-only"
+                                    />
                                           <div
                                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                               selected
@@ -4675,28 +4682,28 @@ export default function BuilderPage() {
                                             }`}
                                           >
                                             {selected && <Check className="w-2.5 h-2.5 text-white" />}
-                                          </div>
-                                          <div className="flex-1 min-w-0">
+                                    </div>
+                                    <div className="flex-1 min-w-0">
                                             <p className="font-medium text-sm text-foreground truncate">
                                               {spell.name}
                                             </p>
-                                            <p className="text-xs text-muted-foreground">{spell.school}</p>
-                                          </div>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.preventDefault()
-                                              e.stopPropagation()
-                                              setDetailsModal({ type: "spell", item: spell })
-                                            }}
-                                            className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
-                                          >
-                                            <Info className="w-3 h-3" />
-                                          </button>
-                                        </label>
+                                      <p className="text-xs text-muted-foreground">{spell.school}</p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setDetailsModal({ type: "spell", item: spell })
+                                      }}
+                                      className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
+                                    >
+                                      <Info className="w-3 h-3" />
+                                    </button>
+                                  </label>
                                       )
                                     })}
-                                  </div>
+                              </div>
                                   {pageCount > 1 && (
                                     <PickerGridPagination
                                       page={safePage}
@@ -4717,19 +4724,19 @@ export default function BuilderPage() {
                                       nextLabel={`Next ${formatSpellListGroupLabel(level)}`}
                                     />
                                   )}
-                                </div>
+                            </div>
                               )
                             })}
-                            {availableSpells.length === 0 && (
-                              <p className="text-sm text-muted-foreground text-center py-4">
+                          {availableSpells.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">
                                 No spells found for {casterClass.name}.
-                              </p>
-                            )}
+                            </p>
+                          )}
                           </div>
                         </div>
                       )
                     })}
-                  </div>
+              </div>
             )}
 
             {/* Step 6: Character Details */}
@@ -4737,7 +4744,7 @@ export default function BuilderPage() {
               <div className="space-y-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-2xl font-black text-foreground mb-2">Character Details</h2>
+                <h2 className="text-2xl font-black text-foreground mb-2">Character Details</h2>
                     <p className={pageFloatingHintClass}>Give your character a name and personality.</p>
                   </div>
                   <button
@@ -4767,35 +4774,35 @@ export default function BuilderPage() {
                 <div className="flex flex-col lg:flex-row gap-6 mb-6">
                   <div className="flex items-start gap-4">
                     <div className="relative shrink-0">
-                      {character.portrait_url ? (
-                        <div className="relative">
-                          <img
-                            src={character.portrait_url}
-                            alt="Portrait"
-                            className="w-32 h-32 rounded-2xl object-cover border-4 border-border"
-                          />
-                          <button
+                    {character.portrait_url ? (
+                      <div className="relative">
+                        <img
+                          src={character.portrait_url}
+                          alt="Portrait"
+                          className="w-32 h-32 rounded-2xl object-cover border-4 border-border"
+                        />
+                        <button
                             onClick={() => patchCharacter({ portrait_url: null })}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
                         <label className="w-32 h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors px-2 text-center">
-                          <Upload className="w-8 h-8 text-muted-foreground mb-1" />
+                        <Upload className="w-8 h-8 text-muted-foreground mb-1" />
                           <span className="text-xs font-medium text-foreground">Portrait</span>
                           <span className="text-[10px] leading-tight text-muted-foreground mt-1">
                             {formatImageUploadHint("portrait")}
                           </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePortraitUpload}
-                            className="sr-only"
-                          />
-                        </label>
-                      )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePortraitUpload}
+                          className="sr-only"
+                        />
+                      </label>
+                    )}
                     </div>
 
                     <div className="relative flex-1 min-w-[200px]">
@@ -4830,7 +4837,7 @@ export default function BuilderPage() {
                       )}
                     </div>
                   </div>
-
+                  
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-foreground mb-2">Character Name *</label>
                     <input
@@ -4985,7 +4992,7 @@ export default function BuilderPage() {
                   </button>
                 ))}
               </div>
-
+              
               <div className="flex-1 min-h-0 flex flex-col">
               {/* Summary Tab */}
               {previewTab === "summary" && (
@@ -5135,32 +5142,32 @@ export default function BuilderPage() {
                           if (!spellKey) return null
                           const spellMod = abilityMods[spellKey]
                           return (
-                            <div className="p-2 bg-magenta/10 rounded-lg">
+                    <div className="p-2 bg-magenta/10 rounded-lg">
                               <p className="text-[9px] text-magenta uppercase font-bold mb-1">
                                 Spellcasting ({primaryClass.spellcasting.ability})
                               </p>
-                              <div className="grid grid-cols-2 gap-2 text-center">
-                                <div>
-                                  <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        <div>
+                          <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
                                   <p className="text-lg font-black text-magenta">
                                     {8 + proficiencyBonus + spellMod}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-[8px] text-muted-foreground">Spell Attack</p>
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[8px] text-muted-foreground">Spell Attack</p>
                                   <p className="text-lg font-black text-magenta">
                                     +{proficiencyBonus + spellMod}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                           )
                         })()}
-                    </div>
+                  </div>
                   </div>
                 </div>
               )}
-
+              
               {/* Features Tab */}
               {previewTab === "features" && (
                 <div className="space-y-2 flex-1 min-h-0 overflow-y-auto">
@@ -5244,9 +5251,9 @@ export default function BuilderPage() {
                           fallback="Granted by your background at 1st level."
                         />
                       </div>
-                    </div>
-                  )}
-
+                </div>
+              )}
+              
                   {/* Level-based feats */}
                   {selectedFeatIds.filter(Boolean).length > 0 && (
                     <div>
@@ -5274,7 +5281,7 @@ export default function BuilderPage() {
                         <p className="text-muted-foreground italic">
                           {effectiveWeaponProficiencies.join(", ") || "None"}
                         </p>
-                      </div>
+                          </div>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                         <p className="font-bold text-foreground">Armor</p>
                         <p className="text-muted-foreground italic">
@@ -5286,25 +5293,25 @@ export default function BuilderPage() {
                           <p className="font-bold text-foreground">Tools</p>
                           <p className="text-muted-foreground italic">
                             {partitionedToolProficiencies.tools.join(", ") || "None"}
-                          </p>
-                        </div>
+                      </p>
+                    </div>
                         <div>
                           <p className="font-bold text-foreground">Instruments</p>
                           <p className="text-muted-foreground italic">
                             {partitionedToolProficiencies.instruments.join(", ") || "None"}
                           </p>
-                        </div>
-                      </div>
+                </div>
+            </div>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                         <p className="font-bold text-foreground">Languages</p>
                         <p className="text-muted-foreground italic">
                           {(character.languages ?? []).join(", ") || "None"}
                         </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
+          </div>
+        </div>
+              </div>
+              
+                    <div>
                     <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Resistances</p>
                     <div className="p-1.5 bg-muted/30 rounded text-[10px]">
                       <p className="text-muted-foreground italic">
@@ -5323,10 +5330,10 @@ export default function BuilderPage() {
                   )}
                 </div>
               )}
-              </div>
-            </div>
-          </div>
-        </div>
+                  </div>
+                          </div>
+                      </div>
+                    </div>
       </main>
       
       {/* Details overlay */}
@@ -5371,7 +5378,7 @@ export default function BuilderPage() {
                     {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
                   </p>
                   <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.cardFooterText} />
-                </div>
+                    </div>
                 <div className="min-w-0 overflow-hidden">
                   <h3 className="font-serif text-sm font-bold text-white">Class features</h3>
                   {baseFeatures.length > 0 ? (
@@ -5403,9 +5410,9 @@ export default function BuilderPage() {
                     </ul>
                   ) : (
                     <p className="mt-1 text-[11px] text-white/70">No subclasses listed.</p>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
+                  </div>
             </CompendiumDetailOverlay>
           )
         }
@@ -5442,7 +5449,7 @@ export default function BuilderPage() {
                     <div className="flex gap-2">
                       <dt className="font-bold uppercase tracking-wide text-white/45">Size</dt>
                       <dd>{String(sp.size || "Medium")}</dd>
-                    </div>
+                </div>
                     <div className="flex gap-2">
                       <dt className="font-bold uppercase tracking-wide text-white/45">Speed</dt>
                       <dd>{speedFt} ft.</dd>
@@ -5500,13 +5507,13 @@ export default function BuilderPage() {
                 <div className="mt-4">
                   <p className="text-xs uppercase text-white/50 mb-1">Skills</p>
                   <p className="text-sm">{bg.skill_proficiencies.join(", ")}</p>
-                </div>
+                  </div>
               )}
               {getBackgroundProficiencySections(bg).map((section) => (
                 <div key={section.label} className="mt-4">
                   <p className="text-xs uppercase text-white/50 mb-1">{section.label}</p>
                   <p className="text-sm">{section.items.join(", ")}</p>
-                </div>
+                    </div>
               ))}
               {bg.feat_granted && (
                 <div className="mt-4">
