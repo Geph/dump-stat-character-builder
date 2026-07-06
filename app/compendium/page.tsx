@@ -53,6 +53,7 @@ import {
   duplicateCompendiumItem,
 } from "@/lib/compendium/duplicate-compendium-item"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
@@ -93,6 +94,12 @@ const SYSTEM_CATALOG_SORT_ORDER = [
 function systemCatalogSortIndex(id: string): number {
   const index = SYSTEM_CATALOG_SORT_ORDER.indexOf(id as (typeof SYSTEM_CATALOG_SORT_ORDER)[number])
   return index === -1 ? 999 : index
+}
+
+function enrichCompendiumTabRows(tab: ContentType, rows: unknown[]) {
+  if (tab === "classes") return enrichClassesList(rows as DndClass[])
+  if (tab === "species") return enrichSpeciesList(rows as { name: string; source?: string | null }[])
+  return rows
 }
 
 const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
@@ -287,8 +294,7 @@ function CompendiumPageContent() {
       } else {
         setContent((prev) => ({
           ...prev,
-          [activeTab]:
-            activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+          [activeTab]: enrichCompendiumTabRows(activeTab, rows),
         }))
       }
 
@@ -484,7 +490,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     } else {
       setContent((prev) => ({
         ...prev,
-        [activeTab]: activeTab === "classes" ? enrichClassesList(rows as DndClass[]) : rows,
+        [activeTab]: enrichCompendiumTabRows(activeTab, rows),
       }))
     }
     setLoading(false)

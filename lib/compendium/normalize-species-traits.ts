@@ -125,6 +125,10 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
       return {
         ...next,
         traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
+        card_image_url:
+          (enriched.card_image_url as string | null | undefined) ??
+          (next as { card_image_url?: string | null }).card_image_url ??
+          null,
         size_options:
           (enriched.size_options as string[] | undefined) ??
           (next as { size_options?: string[] | null }).size_options ??
@@ -150,6 +154,10 @@ export function enrichSpeciesList<T extends { name: string; traits?: unknown; so
     return {
       ...next,
       traits: (enriched.traits as Trait[] | undefined) ?? next.traits,
+      card_image_url:
+        (enriched.card_image_url as string | null | undefined) ??
+        (next as { card_image_url?: string | null }).card_image_url ??
+        null,
       size_options:
         (enriched.size_options as string[] | undefined) ??
         (next as { size_options?: string[] | null }).size_options ??
