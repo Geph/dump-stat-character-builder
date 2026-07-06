@@ -1,6 +1,7 @@
 // D&D 2024 Types
 
 import type { BackgroundProficiencies } from "@/lib/compendium/background-proficiencies"
+import type { ClassComplexity } from "@/lib/compendium/class-complexity"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { BuffAllyMode, RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
@@ -445,6 +446,8 @@ export interface DndClass {
   name: string
   description: string | null
   card_blurb: string | null
+  /** Builder-facing difficulty tier: easy, medium, or hard. */
+  complexity?: ClassComplexity | null
   hit_die: number
   primary_ability: string[] | null
   saving_throws: string[] | null

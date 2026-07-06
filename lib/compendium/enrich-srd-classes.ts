@@ -5,6 +5,8 @@ import {
   monkToolProficiencyChoice,
 } from "@/lib/compendium/enrich-srd-class-features"
 import { SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
+import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
+import { applySrdCardImage } from "@/lib/compendium/card-image"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import {
   GRANT_FEAT_CATALOG_ID,
@@ -16,6 +18,7 @@ import {
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { defaultClassComplexityForName, isClassComplexity } from "@/lib/compendium/class-complexity"
 import type { Feature } from "@/lib/types"
 
 function uniqueRefs(refs: string[]): string[] {
@@ -174,17 +177,23 @@ export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, 
     typeof row.icon === "string" && row.icon.trim()
       ? row.icon.trim()
       : SRD_CLASS_ICONS_BY_NAME[name] ?? null
-
   const weaponProficiencyOverride = SRD_CLASS_WEAPON_PROFICIENCY_OVERRIDES[name]
+  const complexity = isClassComplexity(row.complexity)
+    ? row.complexity
+    : defaultClassComplexityForName(name)
 
   return applySrdFlavorDescription(
-    {
-      ...row,
-      icon,
-      features,
-      ...(weaponProficiencyOverride ? { weapon_proficiencies: weaponProficiencyOverride } : {}),
-      spellcasting: normalizeSpellcasting(row.spellcasting),
-    },
+    applySrdCardImage(
+      {
+        ...row,
+        icon,
+        features,
+        ...(complexity ? { complexity } : {}),
+        ...(weaponProficiencyOverride ? { weapon_proficiencies: weaponProficiencyOverride } : {}),
+        spellcasting: normalizeSpellcasting(row.spellcasting),
+      },
+      SRD_CLASS_CARD_IMAGES_BY_NAME,
+    ),
     "class",
   )
 }

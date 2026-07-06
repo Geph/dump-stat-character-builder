@@ -3,6 +3,8 @@ import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
+import { isCommonModifiersCatalogAbility } from "@/lib/compendium/modifier-catalog"
+import { isSrdSource } from "@/lib/srd/source"
 
 /** Card / detail hero art — URL or data URL. */
 export const CLASS_CARD_IMAGE_ASPECT = "3:4 portrait (classes — top-cropped in banner)"
@@ -12,6 +14,13 @@ export const WIDE_CARD_ASPECT_CLASS = "aspect-[21/9]"
 /** Hero band for compendium list cards, selection cards, and detail overlays. */
 export const WIDE_SELECTION_CARD_HERO_CLASS = "aspect-[21/9]"
 export const WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS = "min-h-[300px]"
+/** Compendium browse cards — image fills the card; bottom half scrims for text legibility. */
+export const COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[280px]"
+/** Classes tab — 25% taller when card art is present (280 → 350). */
+export const COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[350px]"
+/** Top half stays clear; bottom 40% holds at 85% black, then a sharp 10% ramp. */
+export const COMPENDIUM_LIST_CARD_GRADIENT_CLASS =
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_40%,rgba(0,0,0,0.45)_46%,transparent_50%)]"
 export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended); ${CLASS_CARD_IMAGE_ASPECT}`
 export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
 
@@ -41,6 +50,53 @@ export function normalizeCardImageUrl(url: unknown): string | null {
 
 export function getCompendiumCardImageUrl(item: CompendiumCardVisual): string | null {
   return normalizeCardImageUrl(item.card_image_url)
+}
+
+/** Compendium tabs that may show card background art in browse/detail surfaces. */
+export function compendiumTabSupportsCardImage(tab: CompendiumContentType): boolean {
+  return (
+    tab === "classes" ||
+    tab === "subclasses" ||
+    tab === "species" ||
+    tab === "backgrounds" ||
+    tab === "magic_items" ||
+    tab === "abilities"
+  )
+}
+
+/** Whether a row in a given tab should render card background art. */
+export function compendiumItemSupportsCardImage(
+  tab: CompendiumContentType,
+  item: Record<string, unknown>,
+): boolean {
+  if (!compendiumTabSupportsCardImage(tab)) return false
+  if (
+    tab === "abilities" &&
+    isCommonModifiersCatalogAbility(item as { id?: string; is_system?: boolean })
+  ) {
+    return false
+  }
+  return true
+}
+
+export function resolveCompendiumCardImageUrl(
+  item: CompendiumCardVisual & Record<string, unknown>,
+  tab: CompendiumContentType | null | undefined,
+): string | null {
+  if (tab != null && !compendiumItemSupportsCardImage(tab, item)) return null
+  return getCompendiumCardImageUrl(item)
+}
+
+/** Keep custom card art; otherwise apply bundled SRD defaults by item name. */
+export function applySrdCardImage(
+  row: Record<string, unknown>,
+  defaults: Record<string, string>,
+): Record<string, unknown> {
+  const existing = normalizeCardImageUrl(row.card_image_url)
+  if (existing) return { ...row, card_image_url: existing }
+  if (!isSrdSource(row.source as string | null | undefined)) return row
+  const card_image_url = defaults[String(row.name ?? "")] ?? null
+  return card_image_url ? { ...row, card_image_url } : row
 }
 
 /** Portrait class art is top-cropped into the landscape banner; other types use full landscape framing. */

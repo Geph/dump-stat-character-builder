@@ -116,6 +116,33 @@ const SWATCH_RING: Record<CompendiumThemeColorId, string> = {
   violet: "ring-violet",
 }
 
+/** Dark card base tinted with the item accent — keeps white body text readable. */
+const DETAIL_STRIP_BG: Record<CompendiumThemeColorId, string> = {
+  primary: "bg-[color-mix(in_oklch,var(--primary)_34%,var(--card)_66%)]",
+  secondary: "bg-[color-mix(in_oklch,var(--secondary)_34%,var(--card)_66%)]",
+  accent: "bg-[color-mix(in_oklch,var(--accent)_34%,var(--card)_66%)]",
+  lime: "bg-[color-mix(in_oklch,var(--lime)_34%,var(--card)_66%)]",
+  lemon: "bg-[color-mix(in_oklch,var(--lemon)_34%,var(--card)_66%)]",
+  orange: "bg-[color-mix(in_oklch,var(--orange)_34%,var(--card)_66%)]",
+  magenta: "bg-[color-mix(in_oklch,var(--magenta)_34%,var(--card)_66%)]",
+  cyan: "bg-[color-mix(in_oklch,var(--cyan)_34%,var(--card)_66%)]",
+  sky: "bg-[color-mix(in_oklch,var(--sky)_34%,var(--card)_66%)]",
+  violet: "bg-[color-mix(in_oklch,var(--violet)_34%,var(--card)_66%)]",
+}
+
+const DETAIL_STRIP_BORDER: Record<CompendiumThemeColorId, string> = {
+  primary: "border-primary/40",
+  secondary: "border-secondary/40",
+  accent: "border-accent/40",
+  lime: "border-lime/40",
+  lemon: "border-lemon/40",
+  orange: "border-orange/40",
+  magenta: "border-magenta/40",
+  cyan: "border-cyan/40",
+  sky: "border-sky/40",
+  violet: "border-violet/40",
+}
+
 export function compendiumAccentColorStyles(colorId: CompendiumThemeColorId | null) {
   const id = colorId ?? "primary"
   return {
@@ -123,6 +150,8 @@ export function compendiumAccentColorStyles(colorId: CompendiumThemeColorId | nu
     hoverBorder: HOVER_BORDER[id],
     titleHover: TITLE_HOVER[id],
     editHover: EDIT_HOVER[id],
+    detailStripBg: DETAIL_STRIP_BG[id],
+    detailStripBorder: DETAIL_STRIP_BORDER[id],
   }
 }
 

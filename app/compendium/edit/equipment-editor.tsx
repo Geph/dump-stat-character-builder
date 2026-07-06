@@ -406,8 +406,13 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
-            cardImageUrl={form.card_image_url}
-            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            {...(listTab === "magic_items"
+              ? {
+                  cardImageUrl: form.card_image_url,
+                  onCardImageUrlChange: (card_image_url: string | null) =>
+                    setForm({ ...form, card_image_url }),
+                }
+              : {})}
           />
 
           <CompendiumEditorPanel title="Category & cost">

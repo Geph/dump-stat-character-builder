@@ -180,6 +180,7 @@ export const ClassImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   card_blurb: z.string().max(120).nullable().optional(),
+  complexity: z.enum(["easy", "medium", "hard"]).nullable().optional(),
   hit_die: z.number(),
   primary_ability: z.array(z.string()).nullable(),
   saving_throws: z.array(z.string()).nullable().optional(),

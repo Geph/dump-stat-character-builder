@@ -1,4 +1,6 @@
 import { applySrdItemIcon, SRD_BACKGROUND_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
+import { SRD_BACKGROUND_CARD_IMAGES_BY_NAME } from "@/lib/compendium/background-card-images-defaults"
+import { applySrdCardImage } from "@/lib/compendium/card-image"
 import bundledBackgrounds from "@/lib/srd/seed-data/backgrounds.json"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import { isSrdSource } from "@/lib/srd/source"
@@ -141,9 +143,12 @@ export function enrichBackgroundList<
       enriched.starting_gold = seed.starting_gold
     }
 
-    return applySrdItemIcon(
-      applySrdFlavorDescription(enriched as Record<string, unknown>, "background"),
-      SRD_BACKGROUND_ICONS_BY_NAME,
+    return applySrdCardImage(
+      applySrdItemIcon(
+        applySrdFlavorDescription(enriched as Record<string, unknown>, "background"),
+        SRD_BACKGROUND_ICONS_BY_NAME,
+      ),
+      SRD_BACKGROUND_CARD_IMAGES_BY_NAME,
     ) as T
   })
 }

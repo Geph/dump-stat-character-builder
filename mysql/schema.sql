@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS classes (
   name VARCHAR(255) NOT NULL UNIQUE,
   description TEXT,
   card_blurb VARCHAR(120),
+  complexity VARCHAR(16),
   hit_die INT NOT NULL DEFAULT 8,
   primary_ability JSON,
   saving_throws JSON,

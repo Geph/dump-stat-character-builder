@@ -30,6 +30,9 @@ export const classes = mysqlTable("classes", {
   name: varchar("name", { length: 255 }).notNull().unique(),
   description: text("description"),
   card_blurb: varchar("card_blurb", { length: 120 }),
+  complexity: varchar("complexity", { length: 16 }).$type<
+    import("@/lib/compendium/class-complexity").ClassComplexity | null
+  >(),
   hit_die: int("hit_die").notNull().default(8),
   primary_ability: json("primary_ability").$type<string[]>(),
   saving_throws: json("saving_throws").$type<string[]>(),

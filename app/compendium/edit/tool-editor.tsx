@@ -161,9 +161,6 @@ export default function ToolEditor({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
-            cardImageUrl={form.card_image_url}
-            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
-            cardImageAspect="21/9"
           />
 
           <CompendiumEditorPanel title="Tool details" className="space-y-4" defaultOpen>

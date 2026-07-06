@@ -19,6 +19,7 @@ import type { FeatureChoice, Feature, ClassResource, ClassResourceRow } from "@/
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { CardBlurbField } from "@/components/compendium/card-blurb-field"
+import { CLASS_COMPLEXITY_OPTIONS, type ClassComplexity } from "@/lib/compendium/class-complexity"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
@@ -59,6 +60,7 @@ interface ClassFormData {
   name: string
   description: string
   card_blurb: string
+  complexity: ClassComplexity | ""
   hit_die: number
   primary_ability: string[]
   saving_throws: string[]
@@ -84,6 +86,7 @@ const defaultClass: ClassFormData = {
   name: "",
   description: "",
   card_blurb: "",
+  complexity: "",
   hit_die: 8,
   primary_ability: [],
   saving_throws: [],
@@ -153,6 +156,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
             name: enriched.name || "",
             description: enriched.description || "",
             card_blurb: enriched.card_blurb || "",
+            complexity: enriched.complexity ?? "",
             hit_die: enriched.hit_die || 8,
             primary_ability: enriched.primary_ability || [],
             saving_throws: enriched.saving_throws || [],
@@ -190,6 +194,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
     const payload = {
       ...form,
       card_blurb: form.card_blurb.trim() || null,
+      complexity: form.complexity || null,
       features: form.features.filter(f => f.name.trim()),
       spellcasting: hasSpellcasting ? form.spellcasting : null,
       creator_url: normalizeCreatorUrl(form.creator_url),
@@ -473,6 +478,29 @@ export default function ClassEditorPage({ id }: { id: string }) {
             onChange={(card_blurb) => setForm({ ...form, card_blurb })}
             placeholder="A master of weapons and armor who adapts to any martial role…"
           />
+
+          <CompendiumEditorPanel title="Complexity">
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              How hard is this class to play?
+            </label>
+            <select
+              value={form.complexity}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  complexity: e.target.value as ClassComplexity | "",
+                })
+              }
+              className="w-full md:w-48 px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="">Not set</option>
+              {CLASS_COMPLEXITY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Proficiencies">
           <div className="space-y-4">

@@ -220,8 +220,6 @@ export default function ClassResourceEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm((prev) => ({ ...prev, icon }))}
             accentColor={form.accent_color}
             onAccentColorChange={(accent_color) => setForm((prev) => ({ ...prev, accent_color }))}
-            cardImageUrl={form.card_image_url}
-            onCardImageUrlChange={(card_image_url) => setForm((prev) => ({ ...prev, card_image_url }))}
           />
 
           <CompendiumEditorPanel title="Resource details">

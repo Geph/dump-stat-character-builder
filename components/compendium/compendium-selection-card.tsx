@@ -7,7 +7,6 @@ import {
   getCompendiumCardBlurb,
   getCompendiumCardImageUrl,
   compendiumCardHeroImageClass,
-  WIDE_SELECTION_CARD_HERO_CLASS,
   WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
   type CompendiumCardImageCrop,
   type CompendiumCardVisual,
@@ -70,13 +69,10 @@ function CardContent({
   learnMoreLabel: string
   selectLabel: string
 }) {
+  const sourceLabel = subtitle?.trim() || item.source?.trim() || null
+
   return (
     <div className="relative z-10 flex flex-col">
-      {subtitle && (
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/90 mb-1">
-          {subtitle}
-        </p>
-      )}
       <h3 className="font-serif text-2xl font-black text-white leading-tight drop-shadow-md">
         {item.name}
       </h3>
@@ -103,40 +99,45 @@ function CardContent({
         <p className={cn("mt-2 text-xs text-white/75 leading-relaxed", blurbLineClamp)}>{blurb}</p>
       )}
 
-      {item.source && item.source !== subtitle && (
-        <p className="mt-2 text-[10px] uppercase tracking-wide text-white/45">{item.source}</p>
-      )}
-
-      <div className="mt-3 flex items-center justify-end gap-2">
-        {onLearnMore && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onLearnMore(e)
-            }}
-            className="rounded border border-white/40 bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/90 hover:bg-white/10 transition-colors"
-          >
-            {learnMoreLabel}
-          </button>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        {sourceLabel ? (
+          <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.2em] text-primary/90">
+            {sourceLabel}
+          </p>
+        ) : (
+          <span className="min-w-0 flex-1" />
         )}
-        {onSelect && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!disabled) onSelect()
-            }}
-            className={cn(
-              "rounded border px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
-              selected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-primary/70 bg-black/40 text-primary hover:bg-primary/20",
-            )}
-          >
-            {selected ? "Selected" : selectLabel}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {onLearnMore && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onLearnMore(e)
+              }}
+              className="rounded border border-white/40 bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/90 hover:bg-white/10 transition-colors"
+            >
+              {learnMoreLabel}
+            </button>
+          )}
+          {onSelect && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!disabled) onSelect()
+              }}
+              className={cn(
+                "rounded border px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                selected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-primary/70 bg-black/40 text-primary hover:bg-primary/20",
+              )}
+            >
+              {selected ? "Selected" : selectLabel}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -221,22 +222,22 @@ export function CompendiumSelectionCard({
 
   return (
     <motion.div {...cardShellProps}>
-      <div className={cn("relative w-full shrink-0 overflow-hidden", WIDE_SELECTION_CARD_HERO_CLASS)}>
+      <div className="pointer-events-none absolute inset-0">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt="" className={heroImageClass} />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/35 to-black" />
-        {item.icon && (
-          <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
-            <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
-          </div>
-        )}
-        {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
       </div>
-      <div className={cn("relative flex flex-1 flex-col bg-gradient-to-b from-black via-black/95 to-black", contentPaddingClass)}>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-black/55 to-black/80" />
+      {item.icon && (
+        <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
+          <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
+        </div>
+      )}
+      {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
+      <div className={cn("relative z-10 flex flex-1 flex-col justify-end", contentPaddingClass)}>
         <CardContent {...contentProps} />
       </div>
     </motion.div>
