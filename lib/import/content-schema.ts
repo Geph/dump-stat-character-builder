@@ -150,6 +150,7 @@ export const SubclassImportSchema = z.object({
   name: z.string(),
   class_name: z.string(),
   description: z.string().nullable(),
+  card_image_url: z.string().nullable().optional(),
   features: z.array(ClassFeatureSchema),
 })
 
@@ -164,6 +165,7 @@ export const FeatImportSchema = z.object({
 
 export const SpellImportSchema = z.object({
   name: z.string(),
+  card_image_url: z.string().nullable().optional(),
   level: z.number(),
   school: z.string(),
   casting_time: z.string().nullable(),
@@ -179,6 +181,7 @@ export const SpellImportSchema = z.object({
 export const ClassImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
+  card_image_url: z.string().nullable().optional(),
   card_blurb: z.string().max(120).nullable().optional(),
   complexity: z.enum(["easy", "medium", "hard"]).nullable().optional(),
   hit_die: z.number(),
@@ -288,6 +291,7 @@ export const ClassImportSchema = z.object({
 
 export const BackgroundImportSchema = z.object({
   name: z.string(),
+  card_image_url: z.string().nullable().optional(),
   description: z.string().nullable(),
   skill_proficiencies: z.array(z.string()).nullable(),
   tool_proficiencies: z.array(z.string()).nullable().optional(),
@@ -328,6 +332,7 @@ export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feat
 
 export const EquipmentImportSchema = z.object({
   name: z.string(),
+  card_image_url: z.string().nullable().optional(),
   category: z.string(),
   subcategory: z.string().nullable(),
   description: z.string().nullable(),
@@ -345,6 +350,7 @@ export const EquipmentImportSchema = z.object({
 
 export const AbilityImportSchema = z.object({
   name: z.string(),
+  card_image_url: z.string().nullable().optional(),
   description: z.string(),
   prerequisite: z.string().nullable().optional(),
   repeatable: z.boolean().optional(),
@@ -462,6 +468,7 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
       .array(
         z.object({
           name: z.string(),
+          card_image_url: z.string().nullable().optional(),
           description: z.string().nullable(),
           speed: z.number().nullable(),
           size: z.string().nullable(),

@@ -22,6 +22,7 @@ import {
   type ImportSourceLabel,
 } from "@/lib/import/import-material-source"
 import { persistImportedContent } from "@/lib/import/persist-import-content"
+import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
 
 export async function finalizeImportedContent(
   pendingContent: ImportContent,
@@ -30,6 +31,7 @@ export async function finalizeImportedContent(
   renameMap: ImportRenameMap = {},
   collisions: ImportCollision[] = [],
   collisionResolutionMap: ImportCollisionResolutionMap = {},
+  cardArtUrlMap: ImportCardArtUrlMap = {},
 ) {
   return finalizeImportWithPersist(
     pendingContent,
@@ -39,6 +41,7 @@ export async function finalizeImportedContent(
     renameMap,
     collisions,
     collisionResolutionMap,
+    cardArtUrlMap,
   )
 }
 

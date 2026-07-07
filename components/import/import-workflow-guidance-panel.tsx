@@ -15,7 +15,7 @@ export function ImportWorkflowGuidancePanel() {
   const active = IMPORT_WORKFLOWS.find((workflow) => workflow.id === activeId) ?? IMPORT_WORKFLOWS[0]
 
   return (
-    <div className="rounded-xl border border-border bg-muted/30">
+    <div className="rounded-xl border border-border bg-muted/50">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
