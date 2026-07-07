@@ -150,7 +150,7 @@ export function AsiAllocator({
       style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)" }}
     >
       {bannerUrl ? (
-        <div className="relative aspect-[21/9] max-h-28 w-full overflow-hidden">
+        <div className="relative aspect-[21/9] max-h-[11.2rem] w-full overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={bannerUrl}

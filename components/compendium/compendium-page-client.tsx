@@ -793,7 +793,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         <div className="flex items-start justify-between mb-2 gap-2">
           <div className="flex items-center gap-3 min-w-0">
             {!hideCardIcon ? (
-              <div className={`w-10 h-10 shrink-0 ${accentStyles.iconText}`}>
+              <div className={cn("w-10 h-10 shrink-0", cardImage ? accentStyles.imageCardIconText : accentStyles.iconText)}>
                 <GameIcon name={iconName} className="w-10 h-10" />
               </div>
             ) : null}
@@ -1672,6 +1672,21 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           open
           onClose={() => setSelectedItem(null)}
           imageCrop={compendiumCardImageCropForType(activeTab)}
+          panelWidth={
+            isCompendiumPortraitGraphicCard(
+              activeTab,
+              resolveCompendiumCardImageUrl(
+                selectedItem as CompendiumCardVisual & Record<string, unknown>,
+                activeTab,
+              ),
+            )
+              ? activeTab === "spells"
+                ? "portrait-spell"
+                : activeTab === "species"
+                  ? "portrait-species"
+                  : "portrait"
+              : "default"
+          }
           enableCardImage={compendiumItemSupportsCardImage(
             activeTab,
             selectedItem as unknown as Record<string, unknown>,

@@ -187,6 +187,8 @@ export function compendiumAccentColorStyles(colorId: CompendiumThemeColorId | nu
   const id = colorId ?? "primary"
   return {
     iconText: ICON_TEXT[id],
+    /** Icons on dark image-card badges and overlays — lightest readable accent tone. */
+    imageCardIconText: CARD_FOOTER_TEXT[id],
     hoverBorder: HOVER_BORDER[id],
     titleHover: TITLE_HOVER[id],
     editHover: EDIT_HOVER[id],

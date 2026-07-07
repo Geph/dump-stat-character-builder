@@ -7,8 +7,10 @@ import {
   getCompendiumCardBlurb,
   getCompendiumCardImageUrl,
   compendiumCardHeroImageClass,
+  CLASS_CARD_ASPECT_CLASS,
   WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
   SELECTION_CARD_GRADIENT_CLASS,
+  COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
   type CompendiumCardImageCrop,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
@@ -40,6 +42,8 @@ type CompendiumSelectionCardProps = {
   selectLabel?: string
   className?: string
   size?: "sm" | "md" | "lg"
+  /** Wide landscape (default) or portrait 3:4 for tablet visual builder. */
+  cardShape?: "wide" | "portrait"
   /** @deprecated Always landscape; kept for call-site compatibility. */
   imageAspect?: "21/9"
   imageCrop?: CompendiumCardImageCrop
@@ -172,6 +176,7 @@ export function CompendiumSelectionCard({
   selectLabel = "Select",
   className,
   size = "md",
+  cardShape = "wide",
   imageAspect: _imageAspect = "21/9",
   imageCrop = "center",
 }: CompendiumSelectionCardProps) {
@@ -187,10 +192,11 @@ export function CompendiumSelectionCard({
       ? "border-secondary ring-2 ring-secondary/40 shadow-secondary/20"
       : "border-primary ring-2 ring-primary/40 shadow-primary/20"
 
+  const isPortrait = cardShape === "portrait"
   const cardShellClass = cn(
     "group relative flex w-full flex-col overflow-hidden rounded-lg text-left transition-shadow",
     "border-2 shadow-lg",
-    WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
+    isPortrait ? cn(CLASS_CARD_ASPECT_CLASS, "min-h-[240px]") : WIDE_SELECTION_CARD_MIN_HEIGHT_CLASS,
     selected
       ? selectedBorderClass
       : "border-primary/50 hover:border-primary/80 hover:shadow-xl",
@@ -244,10 +250,15 @@ export function CompendiumSelectionCard({
           <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
         )}
       </div>
-      <div className={cn("pointer-events-none absolute inset-0", SELECTION_CARD_GRADIENT_CLASS)} />
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0",
+          isPortrait ? COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS : SELECTION_CARD_GRADIENT_CLASS,
+        )}
+      />
       {item.icon && (
-        <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-primary/40 bg-black/50 backdrop-blur-sm">
-          <GameIcon name={item.icon} className={cn("h-6 w-6", accent.iconText)} />
+        <div className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/35 bg-black/50 backdrop-blur-sm">
+          <GameIcon name={item.icon} className={cn("h-6 w-6", accent.imageCardIconText)} />
         </div>
       )}
       {badge && <div className="absolute right-3 top-3 z-10">{badge}</div>}
