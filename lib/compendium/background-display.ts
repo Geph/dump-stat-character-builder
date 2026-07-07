@@ -41,6 +41,26 @@ export function formatBackgroundAbilityBonuses(
   return `+2 to one ability and +1 to another (from ${list})`
 }
 
+/** Detail overlays — choice pools list attribute names; fixed bonuses keep +N labels. */
+export function formatBackgroundAbilityBonusSummary(
+  bonuses: Record<string, number> | null | undefined,
+): string | null {
+  if (bonuses === null) return null
+  if (!bonuses || Object.keys(bonuses).length === 0) return null
+
+  const entries = Object.entries(bonuses).map(
+    ([ability, value]) => [formatAbilityLabel(ability), value] as const,
+  )
+  const fixed = entries.filter(([, value]) => value > 0)
+  if (fixed.length > 0) {
+    return fixed.map(([ability, value]) => `+${value} ${ability}`).join(", ")
+  }
+
+  const choices = entries.map(([ability]) => ability)
+  if (choices.length === 0) return null
+  return choices.join(", ")
+}
+
 export function formatBackgroundEquipment(background: Background): string | null {
   const groups = getBackgroundStartingEquipmentGroups(background)
   if (groups.length > 0) {

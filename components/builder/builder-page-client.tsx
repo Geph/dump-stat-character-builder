@@ -82,10 +82,8 @@ import { ClampedRichText } from "@/components/character-sheet/expandable-descrip
 import { CompendiumSelectionCard } from "@/components/compendium/compendium-selection-card"
 import { CompendiumDenseSelectionCard } from "@/components/compendium/compendium-dense-selection-card"
 import { ClassDetailFeatureList } from "@/components/compendium/class-detail-feature-list"
-import { ClassComplexityDisplay } from "@/components/compendium/class-complexity-display"
 import {
   SpeciesDetailTraitList,
-  splitSpeciesTraits,
 } from "@/components/compendium/species-detail-trait-list"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
@@ -96,7 +94,20 @@ import {
 import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
 import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
-import { getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
+import { getClassComplexityHeroBadge, getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
+import {
+  formatSpeciesSizeDisplay,
+  formatSpeciesSpeedDisplay,
+} from "@/lib/compendium/species-display"
+import {
+  portraitDetailBadge,
+  portraitDetailBody,
+  portraitDetailEyebrow,
+  portraitDetailHeading,
+  portraitDetailMeta,
+  portraitDetailSummary,
+  portraitDetailTitle,
+} from "@/lib/compendium/portrait-detail-typography"
 import {
   suggestEquipmentLoadout,
 } from "@/lib/builder/equipment-loadout"
@@ -5359,6 +5370,7 @@ export default function BuilderPageClient() {
           const classSubclasses = subclasses
             .filter((subclass) => subclass.class_id === cls.id)
             .sort((a, b) => a.name.localeCompare(b.name))
+          const complexityBadge = getClassComplexityHeroBadge(cls)
           return (
             <CompendiumDetailOverlay
               open
@@ -5374,46 +5386,47 @@ export default function BuilderPageClient() {
                   ? [{ label: cls.primary_ability.join(" • ").toUpperCase(), emphasis: true }]
                   : []),
                 { label: `D${cls.hit_die} HIT DIE` },
+                ...(complexityBadge ? [complexityBadge] : []),
                 ...getClassDetailHeroBadges(cls),
               ]}
               accentColor={accent}
-              detailScroll={false}
+              detailScroll
             >
-              <div className="grid h-full grid-cols-2 gap-3 overflow-hidden md:gap-4">
-                <div className="min-w-0 overflow-hidden">
-                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.cardFooterText)}>
+              <div className="space-y-6">
+                <div>
+                  <p className={cn(portraitDetailEyebrow, accentStyles.cardFooterText)}>
                     Class highlights
                   </p>
-                  <h3 className="font-serif text-sm font-bold text-white">How it feels to play</h3>
-                  <p className="mt-1 text-[11px] leading-snug text-white/75 line-clamp-3">
+                  <h3 className={portraitDetailHeading}>How it feels to play</h3>
+                  <p className={cn("mt-1 text-white/75", portraitDetailBody)}>
                     {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
                   </p>
-                  <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.cardFooterText} />
                 </div>
-                <div className="min-w-0 overflow-hidden">
-                  <h3 className="font-serif text-sm font-bold text-white">Class features</h3>
+                <div>
+                  <h3 className={portraitDetailHeading}>Class features</h3>
                   {baseFeatures.length > 0 ? (
                     <div className="mt-1">
                       <ClassDetailFeatureList
                         features={baseFeatures}
                         accentClassName={accentStyles.cardFooterText}
+                        comfortableFromMd
                       />
                     </div>
                   ) : (
-                    <p className="mt-1 text-[11px] text-white/70">No class features listed.</p>
+                    <p className={cn("mt-1 text-white/70", portraitDetailBody)}>No class features listed.</p>
                   )}
                   {classSubclasses.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
+                    <ul className="mt-2 space-y-2">
                       {classSubclasses.map((subclass) => (
                         <li key={subclass.id} className="min-w-0">
-                          <p className="text-[11px] font-semibold leading-tight text-white/90">
+                          <p className={cn(portraitDetailTitle, "text-white/90")}>
                             {subclass.name}
-                            <span className="ml-1 text-[9px] font-bold uppercase tracking-wide text-white/45">
+                            <span className={cn("ml-1 text-white/45", portraitDetailBadge)}>
                               Subclass
                             </span>
                           </p>
                           {subclass.description ? (
-                            <p className="text-[10px] leading-snug text-white/60 line-clamp-1">
+                            <p className={cn(portraitDetailSummary, "text-white/60")}>
                               {compendiumCardBlurb(subclass.description)}
                             </p>
                           ) : null}
@@ -5431,9 +5444,6 @@ export default function BuilderPageClient() {
           const sp = item as Species
           const accentStyles = compendiumAccentColorStyles(accent)
           const traits = sp.traits ?? []
-          const [traitsColA, traitsColB] = splitSpeciesTraits(traits)
-          const speedFt =
-            typeof sp.speed === "object" ? sp.speed.walking ?? 30 : sp.speed ?? 30
           return (
             <CompendiumDetailOverlay
               open
@@ -5445,46 +5455,36 @@ export default function BuilderPageClient() {
               subtitle={sp.source || "Custom"}
               tagline={getCompendiumCardBlurb(sp).toUpperCase()}
               accentColor={accent}
-              detailScroll={false}
             >
-              <div className="grid h-full gap-3 overflow-hidden md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(0,1.05fr)] md:gap-4">
-                <div className="min-w-0 overflow-hidden">
-                  <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.cardFooterText)}>
+              <div className="space-y-6">
+                <div>
+                  <p className={cn(portraitDetailEyebrow, accentStyles.cardFooterText)}>
                     Species highlights
                   </p>
-                  <h3 className="font-serif text-sm font-bold text-white">What sets them apart</h3>
-                  <p className="mt-1 text-[11px] leading-snug text-white/75 line-clamp-4">
+                  <h3 className={portraitDetailHeading}>What sets them apart</h3>
+                  <p className={cn("mt-1 text-white/75", portraitDetailBody)}>
                     {getCompendiumCardBlurb(sp) || compendiumCardBlurb(sp.description)}
                   </p>
-                  <dl className="mt-3 space-y-1 text-[10px] text-white/65">
+                  <dl className={cn("mt-3 space-y-2 text-white/65", portraitDetailMeta)}>
                     <div className="flex gap-2">
                       <dt className="font-bold uppercase tracking-wide text-white/45">Size</dt>
-                      <dd>{String(sp.size || "Medium")}</dd>
-                </div>
+                      <dd>{formatSpeciesSizeDisplay(sp)}</dd>
+                    </div>
                     <div className="flex gap-2">
                       <dt className="font-bold uppercase tracking-wide text-white/45">Speed</dt>
-                      <dd>{speedFt} ft.</dd>
+                      <dd>{formatSpeciesSpeedDisplay(sp.speed)}</dd>
                     </div>
                   </dl>
                 </div>
-                <div className="min-w-0 overflow-hidden">
-                  <h3 className="font-serif text-sm font-bold text-white">Traits</h3>
-                  {traitsColA.length > 0 ? (
+                <div>
+                  <h3 className={portraitDetailHeading}>Traits</h3>
+                  {traits.length > 0 ? (
                     <div className="mt-1">
-                      <SpeciesDetailTraitList traits={traitsColA} />
+                      <SpeciesDetailTraitList traits={traits} comfortableFromMd />
                     </div>
                   ) : (
-                    <p className="mt-1 text-[11px] text-white/70">No traits listed.</p>
+                    <p className={cn("mt-1 text-white/70", portraitDetailBody)}>No traits listed.</p>
                   )}
-                </div>
-                <div className="min-w-0 overflow-hidden">
-                  {traitsColB.length > 0 ? (
-                    <div className="mt-5">
-                      <SpeciesDetailTraitList traits={traitsColB} />
-                    </div>
-                  ) : traitsColA.length === 0 ? (
-                    <p className="mt-5 text-[11px] text-white/70">No traits listed.</p>
-                  ) : null}
                 </div>
               </div>
             </CompendiumDetailOverlay>
@@ -5499,12 +5499,18 @@ export default function BuilderPageClient() {
               onClose={close}
               item={bg}
               enableCardImage
+              heroLayout="balanced"
               subtitle={bg.source || "Custom"}
               tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
               accentColor={accent}
-              detailScroll={false}
+              detailScroll
             >
-              <BackgroundDetailStrip background={bg} feats={feats} spells={spells} />
+              <BackgroundDetailStrip
+                background={bg}
+                feats={feats}
+                spells={spells}
+                layout="stacked"
+              />
             </CompendiumDetailOverlay>
           )
         }

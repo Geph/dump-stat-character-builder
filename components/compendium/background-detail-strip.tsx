@@ -4,11 +4,12 @@ import type { ReactNode } from "react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   findBackgroundGrantedFeat,
-  formatBackgroundAbilityBonuses,
+  formatBackgroundAbilityBonusSummary,
   formatBackgroundEquipment,
   formatBackgroundGrantedSpells,
   getBackgroundProficiencySections,
 } from "@/lib/compendium/background-display"
+import { cn } from "@/lib/utils"
 import type { Background, Feat, Spell } from "@/lib/types"
 
 function BackgroundDetailField({ label, children }: { label: string; children: ReactNode }) {
@@ -24,32 +25,101 @@ type BackgroundDetailStripProps = {
   background: Background
   feats: Feat[]
   spells: Spell[]
+  /** Single-column stack for balanced wide overlays; multi-column grid otherwise. */
+  layout?: "grid" | "stacked"
 }
 
-/** Wide detail-overlay layout — three columns, no vertical scroll. */
-export function BackgroundDetailStrip({ background, feats, spells }: BackgroundDetailStripProps) {
-  const abilityText = formatBackgroundAbilityBonuses(background.ability_bonuses)
+/** Wide detail-overlay layout for background browse/details. */
+export function BackgroundDetailStrip({
+  background,
+  feats,
+  spells,
+  layout = "grid",
+}: BackgroundDetailStripProps) {
+  const abilityBonusSummary = formatBackgroundAbilityBonusSummary(background.ability_bonuses)
   const equipmentText = formatBackgroundEquipment(background)
   const grantedFeat = findBackgroundGrantedFeat(background.feat_granted, feats)
   const grantedSpellLines = formatBackgroundGrantedSpells(background, spells)
   const proficiencySections = getBackgroundProficiencySections(background)
 
-  return (
-    <div className="grid h-full gap-3 overflow-hidden sm:grid-cols-2 lg:grid-cols-3 lg:gap-4">
-      <div className="min-w-0 overflow-hidden">
+  if (layout === "stacked") {
+    return (
+      <div className="space-y-2 overflow-y-auto pr-0.5">
         {background.description?.trim() ? (
           <RichTextContent
             html={background.description}
-            className="text-[11px] leading-snug [&_p]:line-clamp-5 [&_p]:text-white/85"
+            className="text-[11px] leading-snug [&_p]:text-white/85"
           />
         ) : (
           <p className="text-[11px] text-white/70">No description listed.</p>
         )}
+        {abilityBonusSummary ? (
+          <BackgroundDetailField label="Ability Bonuses">{abilityBonusSummary}</BackgroundDetailField>
+        ) : null}
+        {background.skill_proficiencies && background.skill_proficiencies.length > 0 ? (
+          <BackgroundDetailField label="Skills">
+            {background.skill_proficiencies.join(", ")}
+          </BackgroundDetailField>
+        ) : null}
+        {background.feat_granted ? (
+          <BackgroundDetailField label="Origin Feat">
+            <span className="font-semibold">{background.feat_granted}</span>
+            {grantedFeat?.description ? (
+              <RichTextContent
+                html={grantedFeat.description}
+                className="mt-1 [&_p]:text-white/75"
+              />
+            ) : null}
+          </BackgroundDetailField>
+        ) : null}
+        {proficiencySections.map((section) => (
+          <BackgroundDetailField key={section.label} label={section.label}>
+            {section.items.join(", ")}
+          </BackgroundDetailField>
+        ))}
+        {grantedSpellLines.length > 0 ? (
+          <BackgroundDetailField label="Granted Spells">
+            <ul className="space-y-0.5">
+              {grantedSpellLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </BackgroundDetailField>
+        ) : null}
+        {equipmentText ? (
+          <BackgroundDetailField label="Starting Equipment">
+            <p className="whitespace-pre-wrap">{equipmentText}</p>
+          </BackgroundDetailField>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn("grid h-full gap-3 overflow-hidden sm:grid-cols-2 lg:grid-cols-3 lg:gap-4")}>
+      <div className="flex min-h-0 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {background.description?.trim() ? (
+            <RichTextContent
+              html={background.description}
+              className="text-[11px] leading-snug [&_p]:line-clamp-5 [&_p]:text-white/85"
+            />
+          ) : (
+            <p className="text-[11px] text-white/70">No description listed.</p>
+          )}
+        </div>
+        {abilityBonusSummary ? (
+          <div className="mt-2 hidden shrink-0 lg:mt-3 lg:block">
+            <BackgroundDetailField label="Ability Bonuses">{abilityBonusSummary}</BackgroundDetailField>
+          </div>
+        ) : null}
       </div>
 
       <div className="min-w-0 space-y-2 overflow-hidden">
-        {abilityText ? (
-          <BackgroundDetailField label="Ability Scores">{abilityText}</BackgroundDetailField>
+        {abilityBonusSummary ? (
+          <div className="lg:hidden">
+            <BackgroundDetailField label="Ability Bonuses">{abilityBonusSummary}</BackgroundDetailField>
+          </div>
         ) : null}
         {background.skill_proficiencies && background.skill_proficiencies.length > 0 ? (
           <BackgroundDetailField label="Skills">

@@ -19,7 +19,7 @@ import {
 import type { FeatureChoice, Feature, ClassResource, ClassResourceRow, DndClass } from "@/lib/types"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { CardBlurbField } from "@/components/compendium/card-blurb-field"
-import { CLASS_COMPLEXITY_OPTIONS, type ClassComplexity } from "@/lib/compendium/class-complexity"
+import { CLASS_COMPLEXITY_OPTIONS, formatClassComplexityPhrase, type ClassComplexity } from "@/lib/compendium/class-complexity"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
@@ -493,7 +493,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
 
           <CompendiumEditorPanel title="Complexity">
             <label className="block text-sm font-semibold text-foreground mb-2">
-              How hard is this class to play?
+              Complexity
             </label>
             <select
               value={form.complexity}
@@ -508,7 +508,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
               <option value="">Not set</option>
               {CLASS_COMPLEXITY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {formatClassComplexityPhrase(option.value)}
                 </option>
               ))}
             </select>

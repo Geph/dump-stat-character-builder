@@ -1,3 +1,5 @@
+import { formatClassComplexityPhrase, resolveClassComplexity } from "@/lib/compendium/class-complexity"
+import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { ClassResource, DndClass } from "@/lib/types"
@@ -5,7 +7,11 @@ import type { ClassResource, DndClass } from "@/lib/types"
 export type ClassDetailHeroBadge = {
   label: string
   emphasis?: boolean
+  /** Fixed palette slot — complexity uses violet so it stays distinct from class accent. */
+  themeColor?: CompendiumThemeColorId
 }
+
+export const CLASS_COMPLEXITY_BADGE_COLOR: CompendiumThemeColorId = "violet"
 
 const GENERIC_SPELL_RESOURCE_IDS = new Set(["spell_slots", "pact_magic_slots"])
 
@@ -95,6 +101,17 @@ function signatureFeatureFallbackBadge(cls: DndClass): ClassDetailHeroBadge | nu
   )
   if (!feature) return null
   return { label: feature.name.toUpperCase(), emphasis: true }
+}
+
+export function getClassComplexityHeroBadge(
+  cls: Pick<DndClass, "name" | "complexity">,
+): ClassDetailHeroBadge | null {
+  const complexity = resolveClassComplexity(cls)
+  if (!complexity) return null
+  return {
+    label: formatClassComplexityPhrase(complexity),
+    themeColor: CLASS_COMPLEXITY_BADGE_COLOR,
+  }
 }
 
 /** Characteristic + signature badges for the class detail overlay hero. */

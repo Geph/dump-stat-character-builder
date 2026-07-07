@@ -1,8 +1,8 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
+import { ChevronDown, ChevronUp, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import {
   getCompendiumCardImageUrl,
@@ -16,30 +16,23 @@ import {
 } from "@/lib/compendium/theme-colors"
 import { cn } from "@/lib/utils"
 
-/** Panel width derived from viewport height minus detail strip, at 3:4 hero ratio. */
-const PORTRAIT_PANEL_WIDTH =
-  "w-[min(90vw,calc((min(92vh,900px)-min(36vh,252px))*0.75))]"
+/** Class/species portrait — full hero with slide-up detail below `lg`; art left + detail right from `lg` up. */
+const PORTRAIT_COMPENDIUM_PANEL_WIDTH =
+  "w-[min(90vw,calc(min(92vh,900px)*0.75))] lg:w-[min(90vw,calc(min(92vh,900px)*0.75+min(34vw,360px)))]"
 /** Spell portrait previews — compact detail strip; hero and width expand accordingly. */
 const PORTRAIT_SPELL_PANEL_WIDTH =
   "w-[min(90vw,calc((min(92vh,900px)-min(23.4vh,164px))*0.75))]"
-/** Species portrait previews — detail strip is 20% shorter than class layout. */
-const PORTRAIT_SPECIES_PANEL_WIDTH =
-  "w-[min(90vw,calc((min(92vh,900px)-min(28.8vh,202px))*0.75))]"
 
-const PORTRAIT_DETAIL_STRIP_CLASS = "h-[min(36vh,252px)] max-h-[min(36vh,252px)]"
 const PORTRAIT_SPELL_DETAIL_STRIP_CLASS = "h-[min(23.4vh,164px)] max-h-[min(23.4vh,164px)]"
-const PORTRAIT_SPECIES_DETAIL_STRIP_CLASS = "h-[min(28.8vh,202px)] max-h-[min(28.8vh,202px)]"
 
 const PORTRAIT_PANEL_WIDTH_BY_VARIANT = {
-  portrait: PORTRAIT_PANEL_WIDTH,
+  portrait: PORTRAIT_COMPENDIUM_PANEL_WIDTH,
+  "portrait-species": PORTRAIT_COMPENDIUM_PANEL_WIDTH,
   "portrait-spell": PORTRAIT_SPELL_PANEL_WIDTH,
-  "portrait-species": PORTRAIT_SPECIES_PANEL_WIDTH,
 } as const
 
 const PORTRAIT_DETAIL_STRIP_BY_VARIANT = {
-  portrait: PORTRAIT_DETAIL_STRIP_CLASS,
   "portrait-spell": PORTRAIT_SPELL_DETAIL_STRIP_CLASS,
-  "portrait-species": PORTRAIT_SPECIES_DETAIL_STRIP_CLASS,
 } as const
 
 type PortraitPanelWidth = keyof typeof PORTRAIT_PANEL_WIDTH_BY_VARIANT
@@ -47,6 +40,7 @@ type PortraitPanelWidth = keyof typeof PORTRAIT_PANEL_WIDTH_BY_VARIANT
 export type CompendiumDetailTag = {
   label: string
   emphasis?: boolean
+  themeColor?: CompendiumThemeColorId
 }
 
 type CompendiumDetailOverlayProps = {
@@ -67,6 +61,8 @@ type CompendiumDetailOverlayProps = {
   imageCrop?: CompendiumCardImageCrop
   /** Default 80vw; narrow 64vw; slim 48vw; portrait variants tune detail strip height. */
   panelWidth?: "default" | "narrow" | "slim" | PortraitPanelWidth
+  /** `balanced` splits hero and detail strip evenly (background wide cards). */
+  heroLayout?: "default" | "balanced"
 }
 
 export function CompendiumDetailOverlay({
@@ -83,11 +79,14 @@ export function CompendiumDetailOverlay({
   detailScroll = true,
   enableCardImage = true,
   panelWidth = "default",
+  heroLayout = "default",
 }: CompendiumDetailOverlayProps) {
   const imageUrl = enableCardImage ? getCompendiumCardImageUrl(item) : null
   const accent = compendiumAccentColorStyles(accentColor)
   const isPortraitPanel = panelWidth in PORTRAIT_PANEL_WIDTH_BY_VARIANT
   const portraitPanelVariant = isPortraitPanel ? (panelWidth as PortraitPanelWidth) : null
+  const isPortraitCompendiumPanel =
+    portraitPanelVariant === "portrait" || portraitPanelVariant === "portrait-species"
   const panelWidthClass = portraitPanelVariant
     ? PORTRAIT_PANEL_WIDTH_BY_VARIANT[portraitPanelVariant]
     : panelWidth === "slim"
@@ -95,6 +94,13 @@ export function CompendiumDetailOverlay({
       : panelWidth === "narrow"
         ? "w-[64vw] max-w-[64vw]"
         : "w-[80vw] max-w-[80vw]"
+  const isBalancedHero = heroLayout === "balanced"
+  const [portraitDetailSheetOpen, setPortraitDetailSheetOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) setPortraitDetailSheetOpen(false)
+  }, [open])
+
   const viewportPanelHeightClass = "h-[min(92vh,900px)] max-h-[min(92vh,900px)]"
 
   return (
@@ -113,20 +119,40 @@ export function CompendiumDetailOverlay({
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
             className={cn(
-              "relative flex flex-col overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl",
+              "relative flex overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl",
+              isPortraitCompendiumPanel ? "flex-col lg:flex-row" : "flex-col",
               viewportPanelHeightClass,
               panelWidthClass,
             )}
             onClick={(e) => e.stopPropagation()}
             style={{ boxShadow: "inset 0 0 0 1px rgba(212, 175, 55, 0.2), 0 24px 80px rgba(0,0,0,0.65)" }}
           >
+            {isPortraitCompendiumPanel ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="absolute top-3 right-3 z-20 hidden rounded-full border border-white/20 bg-black/40 p-2 text-white/80 transition-colors hover:bg-black/60 hover:text-white sm:top-4 sm:right-4 lg:block"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            ) : null}
             <div
               className={cn(
-                "relative min-h-0 w-full overflow-hidden",
-                isPortraitPanel ? "flex-1" : "flex-[3]",
+                "relative min-h-0 overflow-hidden",
+                isPortraitCompendiumPanel && "h-full w-full lg:h-full lg:w-auto lg:shrink-0 lg:flex-none",
+                !isPortraitCompendiumPanel &&
+                  (isPortraitPanel || isBalancedHero ? "w-full flex-1" : "w-full flex-[3]"),
               )}
             >
-              <div className="relative h-full w-full overflow-hidden">
+              <div
+                className={cn(
+                  "relative overflow-hidden",
+                  isPortraitCompendiumPanel
+                    ? "h-full w-full lg:aspect-[3/4] lg:h-full lg:max-h-full"
+                    : "h-full w-full",
+                )}
+              >
                 <CompendiumCardHero
                   imageUrl={imageUrl}
                   crop={imageCrop}
@@ -134,7 +160,12 @@ export function CompendiumDetailOverlay({
                   fillHeight
                 />
 
-                <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
+                <div
+                  className={cn(
+                    "absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4 sm:p-6",
+                    isPortraitCompendiumPanel ? "z-50" : "z-10",
+                  )}
+                >
                   <div className="flex items-center gap-3">
                     {item.icon && (
                       <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-black/50 backdrop-blur-sm">
@@ -146,14 +177,22 @@ export function CompendiumDetailOverlay({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-full border border-white/20 bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white transition-colors"
+                    className={cn(
+                      "rounded-full border border-white/20 bg-black/40 p-2 text-white/80 hover:bg-black/60 hover:text-white transition-colors",
+                      isPortraitCompendiumPanel && "lg:hidden",
+                    )}
                     aria-label="Close"
                   >
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
-                <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6 sm:pb-6">
+                <div
+                  className={cn(
+                    "absolute inset-x-0 bottom-0 z-10 px-4 sm:px-6",
+                    isPortraitCompendiumPanel ? "pb-4 max-lg:pb-20 lg:pb-6" : "pb-4 sm:pb-6",
+                  )}
+                >
                   {subtitle && (
                     <p
                       className={cn(
@@ -173,46 +212,88 @@ export function CompendiumDetailOverlay({
                     </p>
                   )}
                   {tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {tags.map((tag) => (
-                        <span
-                          key={tag.label}
-                          className={cn(
-                            "rounded border px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
-                            tag.emphasis
-                              ? cn(accent.cardFooterBorder, "bg-black/35", accent.cardFooterText)
-                              : "border-white/35 bg-black/35 text-white",
-                          )}
-                        >
-                          {tag.label}
-                        </span>
-                      ))}
+                    <div
+                      className={cn(
+                        "mt-3 flex flex-wrap gap-2",
+                        isPortraitCompendiumPanel && "max-lg:mb-2",
+                      )}
+                    >
+                      {tags.map((tag) => {
+                        const tagAccent = tag.themeColor
+                          ? compendiumAccentColorStyles(tag.themeColor)
+                          : accent
+                        const emphasized = tag.emphasis || Boolean(tag.themeColor)
+                        return (
+                          <span
+                            key={tag.label}
+                            className={cn(
+                              "rounded border px-2.5 py-1 text-xs font-bold uppercase tracking-wide",
+                              emphasized
+                                ? cn(tagAccent.cardFooterBorder, "bg-black/35", tagAccent.cardFooterText)
+                                : "border-white/35 bg-black/35 text-white",
+                            )}
+                          >
+                            {tag.label}
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
+            {isPortraitCompendiumPanel ? (
+              <button
+                type="button"
+                onClick={() => setPortraitDetailSheetOpen((open) => !open)}
+                className={cn(
+                  "absolute left-1/2 z-40 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border border-white/25 bg-black/55 text-white/90 backdrop-blur-sm transition-colors hover:bg-black/70 lg:hidden",
+                  portraitDetailSheetOpen ? "top-4" : "bottom-3",
+                )}
+                aria-expanded={portraitDetailSheetOpen}
+                aria-label={portraitDetailSheetOpen ? "Hide details" : "Show details"}
+              >
+                {portraitDetailSheetOpen ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronUp className="h-5 w-5" />
+                )}
+              </button>
+            ) : null}
+
             <div
               className={cn(
-                "relative z-10 min-h-0 w-full shrink-0 border-t",
-                isPortraitPanel && portraitPanelVariant
-                  ? cn(
-                      PORTRAIT_DETAIL_STRIP_BY_VARIANT[portraitPanelVariant],
-                      "overflow-x-hidden overflow-y-auto",
-                    )
-                  : "flex-1",
+                "relative z-10 min-h-0 w-full shrink-0",
+                isPortraitCompendiumPanel &&
+                  cn(
+                    "max-lg:absolute max-lg:inset-0 max-lg:z-30 max-lg:flex max-lg:flex-col max-lg:overflow-hidden max-lg:transition-transform max-lg:duration-300 max-lg:ease-out",
+                    portraitDetailSheetOpen ? "max-lg:translate-y-0" : "max-lg:translate-y-full",
+                  ),
+                isPortraitCompendiumPanel &&
+                  "lg:relative lg:min-w-0 lg:flex-1 lg:translate-y-0 lg:overflow-y-auto lg:border-l lg:border-t-0",
+                isPortraitPanel &&
+                  portraitPanelVariant &&
+                  !isPortraitCompendiumPanel &&
+                  cn(
+                    PORTRAIT_DETAIL_STRIP_BY_VARIANT[portraitPanelVariant],
+                    "overflow-x-hidden overflow-y-auto border-t",
+                  ),
+                !isPortraitPanel && "min-h-0 flex-1 border-t",
+                isBalancedHero && "overflow-y-auto border-t",
                 accent.detailStripBg,
                 accent.detailStripBorder,
-                !isPortraitPanel && detailScroll ? "overflow-y-auto" : undefined,
-                !isPortraitPanel && !detailScroll ? "overflow-hidden" : undefined,
-                isPortraitPanel && !detailScroll ? "overflow-hidden" : undefined,
+                !isPortraitPanel && !isPortraitCompendiumPanel && detailScroll ? "overflow-y-auto" : undefined,
+                !isPortraitPanel && !isPortraitCompendiumPanel && !detailScroll ? "overflow-hidden" : undefined,
+                isPortraitPanel && !isPortraitCompendiumPanel && !detailScroll ? "overflow-hidden" : undefined,
               )}
             >
               <div
                 className={cn(
-                  "p-3 sm:p-4 text-white/90 [&_.text-muted-foreground]:text-white/70 [&_.text-foreground]:text-white",
-                  isPortraitPanel && "p-2.5 sm:p-3",
+                  "text-white/90 [&_.text-muted-foreground]:text-white/70 [&_.text-foreground]:text-white",
+                  isPortraitCompendiumPanel
+                    ? "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:px-3 max-lg:pb-14 max-lg:pt-24 lg:px-3 lg:py-3 lg:pr-14 lg:pt-4"
+                    : cn(isPortraitPanel && "p-2.5 sm:p-3", !isPortraitPanel && "p-3 sm:p-4"),
                   !detailScroll && "h-full overflow-hidden",
                 )}
               >
