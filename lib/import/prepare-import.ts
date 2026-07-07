@@ -29,6 +29,10 @@ import {
   type ImportSourceLabel,
 } from "@/lib/import/import-material-source"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
+import {
+  applyImportCardArtUrls,
+  type ImportCardArtUrlMap,
+} from "@/lib/import/import-card-art"
 
 export function summarizeImportPreview(content: ImportContent): string {
   const parts = Object.entries({
@@ -135,6 +139,7 @@ export async function finalizeImportWithPersist(
   renameMap: ImportRenameMap = {},
   collisions: ImportCollision[] = [],
   collisionResolutionMap: ImportCollisionResolutionMap = {},
+  cardArtUrlMap: ImportCardArtUrlMap = {},
 ): Promise<PersistImportResult> {
   const materialSource = normalizeImportMaterialSource(source)
   const renamed = collisions.length
@@ -149,5 +154,6 @@ export async function finalizeImportWithPersist(
   const withModifiers = enrichImportContentModifiers(
     applyProposalSelections(renamed, proposals, selections),
   )
-  return persist(withModifiers, materialSource)
+  const withCardArt = applyImportCardArtUrls(withModifiers, cardArtUrlMap)
+  return persist(withCardArt, materialSource)
 }

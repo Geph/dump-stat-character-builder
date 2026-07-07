@@ -16,6 +16,7 @@ import {
 } from "@/lib/import/prepare-import"
 import type { ImportProposalSelections, ImportProposalSet } from "@/lib/import/import-proposals"
 import type { ImportStage } from "@/lib/import/import-staging"
+import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
 
 const BYO_JSON_PARSE_ERROR =
   "Could not parse import JSON. Paste valid Dump Stat import-content JSON from the BYO workflow (see the prompt template)."
@@ -88,6 +89,7 @@ export async function confirmClientByoJsonImport(params: {
   renameMap: ImportRenameMap
   collisions: ImportCollision[]
   collisionResolutionMap: ImportCollisionResolutionMap
+  cardArtUrlMap?: ImportCardArtUrlMap
 }): Promise<ClientByoImportSuccessResult> {
   const multiClassBlock = getMultipleClassImportBlock(params.pendingContent, "text")
   if (multiClassBlock) {
@@ -102,6 +104,7 @@ export async function confirmClientByoJsonImport(params: {
     params.renameMap,
     params.collisions,
     params.collisionResolutionMap,
+    params.cardArtUrlMap ?? {},
   )
 
   return {

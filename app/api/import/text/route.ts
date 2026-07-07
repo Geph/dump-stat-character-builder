@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (authError) return authError
 
     const body = await request.json()
-    const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, collisionResolutionMap, collisions, materialSource } =
+    const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, collisionResolutionMap, collisions, materialSource, cardArtUrlMap } =
       body
     const aiOverride = parseImportAiOverride(body)
     const importMode = body.importMode as string | undefined
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         renameMap ?? {},
         (collisions ?? []) as import("@/lib/import/import-collisions").ImportCollision[],
         collisionResolutionMap ?? {},
+        (cardArtUrlMap ?? {}) as import("@/lib/import/import-card-art").ImportCardArtUrlMap,
       )
 
       return NextResponse.json({

@@ -10,6 +10,7 @@ import { ImportModifierReviewPanel } from "@/components/import/import-modifier-r
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
+import { ImportCardArtPanel } from "@/components/import/import-card-art-panel"
 import { ImportStagingPanel } from "@/components/import/import-staging-panel"
 import {
   ImportAiSettings,
@@ -69,6 +70,10 @@ import {
   collectImportModifierReview,
   removeImportModifierPreview,
 } from "@/lib/import/import-modifier-previews"
+import {
+  buildInitialImportCardArtUrlMap,
+  type ImportCardArtUrlMap,
+} from "@/lib/import/import-card-art"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
 type ImportTab = "clipboard" | "pdf" | "pack"
@@ -122,6 +127,7 @@ export default function ImportPage() {
   const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
   const [collisionResolutionMap, setCollisionResolutionMap] =
     useState<ImportCollisionResolutionMap>({})
+  const [cardArtUrlMap, setCardArtUrlMap] = useState<ImportCardArtUrlMap>({})
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
   const [showAiInfo, setShowAiInfo] = useState(false)
@@ -137,6 +143,7 @@ export default function ImportPage() {
   } | null>(null)
   const reviewRef = useRef<HTMLDivElement>(null)
   const reportRef = useRef<HTMLDivElement>(null)
+  const hadPendingImportRef = useRef(false)
 
   useEffect(() => {
     if (!canUseServerImport()) return
@@ -160,6 +167,29 @@ export default function ImportPage() {
   )
 
   useEffect(() => {
+    if (!pendingImport) {
+      hadPendingImportRef.current = false
+      setCardArtUrlMap({})
+      return
+    }
+
+    if (!hadPendingImportRef.current) {
+      hadPendingImportRef.current = true
+      setCardArtUrlMap(buildInitialImportCardArtUrlMap(pendingImport.content))
+      return
+    }
+
+    setCardArtUrlMap((current) => {
+      const initial = buildInitialImportCardArtUrlMap(pendingImport.content)
+      const next = { ...initial }
+      for (const [key, value] of Object.entries(current)) {
+        if (key in next && value.trim()) next[key] = value
+      }
+      return next
+    })
+  }, [pendingImport])
+
+  useEffect(() => {
     if (!pendingImport) return
     reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [pendingImport])
@@ -181,6 +211,7 @@ export default function ImportPage() {
     setPendingImport(null)
     setRenameMap({})
     setCollisionResolutionMap({})
+    setCardArtUrlMap({})
     setPdfFile(null)
     setPackFile(null)
     setPdfContentType("all")
@@ -272,6 +303,7 @@ export default function ImportPage() {
           renameMap,
           collisions: pendingImport.collisions,
           collisionResolutionMap,
+          cardArtUrlMap,
         })
         applyImportSuccess(data)
         setTextStatus("success")
@@ -289,6 +321,7 @@ export default function ImportPage() {
           collisionResolutionMap,
           collisions: pendingImport.collisions,
           materialSource: pendingImport.materialSource,
+          cardArtUrlMap,
         }),
       })
 
@@ -743,6 +776,11 @@ export default function ImportPage() {
               onRemoveModifier={handleRemoveModifierPreview}
               variant="review"
             />
+            <ImportCardArtPanel
+              content={pendingImport.content}
+              value={cardArtUrlMap}
+              onChange={setCardArtUrlMap}
+            />
             <ImportProposalPanel
               proposals={pendingImport.proposals}
               confirming={confirmingImport}
@@ -770,7 +808,7 @@ export default function ImportPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-2xl border-2 border-border overflow-hidden"
+          className="bg-card/80 rounded-2xl border-2 border-border overflow-hidden"
         >
           {/* Tab bar */}
           <div
