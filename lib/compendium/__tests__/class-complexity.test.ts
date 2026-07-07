@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   defaultClassComplexityForName,
   formatClassComplexityLabel,
+  formatClassComplexityPhrase,
   resolveClassComplexity,
   SRD_CLASS_COMPLEXITY_BY_NAME,
 } from "@/lib/compendium/class-complexity"
@@ -23,6 +24,9 @@ describe("class complexity", () => {
   })
 
   it("formats labels for display", () => {
+    expect(formatClassComplexityLabel("easy")).toBe("Low")
     expect(formatClassComplexityLabel("medium")).toBe("Medium")
+    expect(formatClassComplexityLabel("hard")).toBe("High")
+    expect(formatClassComplexityPhrase("hard")).toBe("High Complexity")
   })
 })

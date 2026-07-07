@@ -3,9 +3,9 @@ import type { DndClass } from "@/lib/types"
 export type ClassComplexity = "easy" | "medium" | "hard"
 
 export const CLASS_COMPLEXITY_OPTIONS: { value: ClassComplexity; label: string }[] = [
-  { value: "easy", label: "Easy" },
+  { value: "easy", label: "Low" },
   { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
+  { value: "hard", label: "High" },
 ]
 
 /** Default SRD 2024 class complexity tiers. */
@@ -37,6 +37,10 @@ export function resolveClassComplexity(
 
 export function formatClassComplexityLabel(complexity: ClassComplexity): string {
   return CLASS_COMPLEXITY_OPTIONS.find((option) => option.value === complexity)?.label ?? complexity
+}
+
+export function formatClassComplexityPhrase(complexity: ClassComplexity): string {
+  return `${formatClassComplexityLabel(complexity)} Complexity`
 }
 
 export function defaultClassComplexityForName(name: string): ClassComplexity | null {
