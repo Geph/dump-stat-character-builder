@@ -17,6 +17,11 @@ describe("getPickerPageSize", () => {
     expect(getPickerPageSize("dense", false)).toBe(6)
     expect(getPickerPageSize("dense", true)).toBe(12)
   })
+
+  it("paginates cinematic class/species grids with 2 cols × 3 rows", () => {
+    expect(getPickerPageSize("cinematic", false)).toBe(6)
+    expect(getPickerPageSize("cinematic", true)).toBe(6)
+  })
 })
 
 describe("getFeatSpellGrantPickerPageSize", () => {

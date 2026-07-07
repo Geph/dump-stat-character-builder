@@ -1,3 +1,4 @@
+import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
@@ -260,7 +261,11 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     ) as unknown as Feat[]
   }
 
-  const spells = filterEnabled(asCompendiumRows(spellsRes.data)) as unknown as Spell[]
+  const spells = filterEnabled(
+    asCompendiumRows(spellsRes.data).map((row) =>
+      enrichSpellRowWithBundledCardImage(row as Record<string, unknown>),
+    ),
+  ) as unknown as Spell[]
   const equipment = filterEnabled(asCompendiumRows(equipmentRes.data)) as unknown as Equipment[]
 
   return {

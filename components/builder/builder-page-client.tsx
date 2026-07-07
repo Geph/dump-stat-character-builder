@@ -50,9 +50,6 @@ import {
 import {
   findBackgroundGrantedFeat,
   formatBackgroundAbilityBonuses,
-  formatBackgroundEquipment,
-  formatBackgroundGrantedSpells,
-  getBackgroundProficiencySections,
 } from "@/lib/compendium/background-display"
 import {
   getEffectiveBackgroundFeatGranted,
@@ -79,6 +76,7 @@ import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
+import { BackgroundDetailStrip } from "@/components/compendium/background-detail-strip"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 import { CompendiumSelectionCard } from "@/components/compendium/compendium-selection-card"
@@ -91,6 +89,10 @@ import {
 } from "@/components/compendium/species-detail-trait-list"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
+import {
+  BuilderSpellCompactPick,
+  SpellSelectionCard,
+} from "@/components/builder/spell-selection-card"
 import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
 import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
@@ -106,7 +108,7 @@ import { getCompendiumItemAccentColor, compendiumAccentColorStyles } from "@/lib
 import { cn } from "@/lib/utils"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
-import { CatalogOptionDescriptionHover } from "@/components/builder/catalog-option-description-hover"
+import { CatalogFeatMultiPicker } from "@/components/builder/catalog-feat-multi-picker"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import {
   buildWeaponMasteryDescriptionsLookup,
@@ -163,9 +165,13 @@ import {
 import {
   catalogFeatPickOptions,
   isCatalogFeatPickId,
-  resolveCatalogFeatPickLabel,
   slotUsesCatalogFeatPicks,
 } from "@/lib/builder/catalog-feat-options"
+import {
+  distributeCatalogFeatPicksToSlots,
+  groupCatalogFeatPickSlots,
+  readCatalogFeatPicksFromSlots,
+} from "@/lib/builder/catalog-feat-pick-groups"
 import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import {
   buildFeatSelectionEntries,
@@ -221,7 +227,12 @@ import {
   withCombinedMilestoneAsiAllocation,
 } from "@/lib/builder/asi-allocation"
 import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
-import { getCinematicPickerContainerClass, paginateList } from "@/lib/builder/picker-pagination"
+import {
+  getCinematicPickerContainerClass,
+  getCinematicSpellPickerContainerClass,
+  paginateList,
+} from "@/lib/builder/picker-pagination"
+import { resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
 import {
   BUILDER_ABILITY_NAMES,
   BUILDER_EMPTY_CHARACTER,
@@ -246,7 +257,12 @@ import {
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
-import { useIsLargePickerScreen, usePickerPageSize, useSpellPickerPageSize } from "@/hooks/use-picker-page-size"
+import {
+  useIsMediumPickerScreen,
+  useIsPhonePickerScreen,
+  usePickerPageSize,
+  useSpellPickerPageSize,
+} from "@/hooks/use-picker-page-size"
 import {
   MAX_PORTRAIT_FILE_BYTES,
   MAX_PORTRAIT_FILE_MB,
@@ -373,8 +389,10 @@ export default function BuilderPageClient() {
   const [cardViewMode, setCardViewMode] = useState<"dense" | "cinematic">("cinematic")
   const pickerPageSize = usePickerPageSize(cardViewMode)
   const spellPickerPageSize = useSpellPickerPageSize()
-  const isLargePickerScreen = useIsLargePickerScreen()
-  const useSwipeVisualPicker = cardViewMode === "cinematic" && !isLargePickerScreen
+  const isPhonePickerScreen = useIsPhonePickerScreen()
+  const isMediumPickerScreen = useIsMediumPickerScreen()
+  const useSwipeVisualPicker = cardViewMode === "cinematic" && isPhonePickerScreen
+  const useCinematicPortraitCards = cardViewMode === "cinematic" && isMediumPickerScreen
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
@@ -942,6 +960,10 @@ export default function BuilderPageClient() {
     totalLevel,
     subclasses,
     subclassByClassId,
+  )
+  const { catalogGroups: classCatalogFeatGroups, regularSlots: regularClassFeatSlots } = useMemo(
+    () => groupCatalogFeatPickSlots(featPickSlots),
+    [featPickSlots],
   )
   const speciesFeatPickSlots = useMemo(
     () => getSpeciesFeatPickSlots(selectedSpecies, speciesTraitPicks, modifierCatalog),
@@ -2616,6 +2638,7 @@ export default function BuilderPageClient() {
                               disabled={totalLevel >= 20 && !existingLevel}
                               badge={levelBadge}
                               size="md"
+                              cardShape={useCinematicPortraitCards ? "portrait" : "wide"}
                               imageCrop="top"
                               onSelect={selectClass}
                               onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
@@ -3000,28 +3023,58 @@ export default function BuilderPageClient() {
                       </p>
                     )}
 
-                    {featPickSlots.map((slot) => {
-                      const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
-                      const usesCatalog = slotUsesCatalogFeatPicks(slot.featCategories)
-                      const takenCatalogPickIds = new Set(
-                        featPickSlots
-                          .filter((other) => other.key !== slot.key)
-                          .flatMap((other) => featureChoicePicks[other.key] ?? [])
-                          .filter(Boolean),
+                    {classCatalogFeatGroups.map((group) => {
+                      const catalogOptions = catalogFeatPickOptions(
+                        group.featCategories,
+                        customAbilities,
                       )
-                      const catalogOptions = usesCatalog
-                        ? catalogFeatPickOptions(slot.featCategories, customAbilities).filter(
-                            (option) =>
-                              !takenCatalogPickIds.has(option.pickId) ||
-                              option.pickId === pickedId,
-                          )
-                        : []
-                      const picked = usesCatalog
-                        ? null
-                        : feats.find((f) => f.id === pickedId) ?? null
-                      const pickedLabel = usesCatalog
-                        ? resolveCatalogFeatPickLabel(pickedId ?? "", customAbilities)
-                        : picked?.name ?? null
+                      const selectedPickIds = readCatalogFeatPicksFromSlots(
+                        group.slots,
+                        featureChoicePicks,
+                      )
+
+                      return (
+                        <CatalogFeatMultiPicker
+                          key={group.groupKey}
+                          className="mt-3"
+                          classPrefix={group.className || undefined}
+                          label={group.label}
+                          options={catalogOptions}
+                          maxCount={group.slots.length}
+                          selectedPickIds={selectedPickIds}
+                          customAbilities={customAbilities}
+                          cardViewMode={cardViewMode}
+                          onChange={(nextPickIds) => {
+                            const slotPicks = distributeCatalogFeatPicksToSlots(
+                              group.slots,
+                              nextPickIds,
+                            )
+                            setFeatureChoicePicks((prev) => ({ ...prev, ...slotPicks }))
+                            setFeatChoicePicks((prev) => {
+                              const next = { ...prev }
+                              for (const slot of group.slots) {
+                                delete next[featChoicePickKey(slot.key)]
+                              }
+                              return next
+                            })
+                            setModifierPlayerPicks((prev) => {
+                              let next = prev
+                              for (const slot of group.slots) {
+                                next = clearModifierPicksForSource(
+                                  next,
+                                  featChoicePickKey(slot.key),
+                                )
+                              }
+                              return next
+                            })
+                          }}
+                        />
+                      )
+                    })}
+
+                    {regularClassFeatSlots.map((slot) => {
+                      const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
+                      const picked = feats.find((f) => f.id === pickedId) ?? null
                       const featContext = {
                         totalLevel,
                         classIds: activeClassLevels.map((cl) => cl.classId),
@@ -3031,18 +3084,16 @@ export default function BuilderPageClient() {
                         backgroundId: character.background_id,
                         currentSlotFeatId: pickedId,
                       }
-                      const eligibleFeats = usesCatalog
-                        ? []
-                        : feats
-                            .filter((feat) =>
-                              isFeatEligibleForCategories(
-                                feat,
-                                slot.featCategories,
-                                slot.milestoneLevel,
-                                featContext,
-                              ),
-                            )
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                      const eligibleFeats = feats
+                        .filter((feat) =>
+                          isFeatEligibleForCategories(
+                            feat,
+                            slot.featCategories,
+                            slot.milestoneLevel,
+                            featContext,
+                          ),
+                        )
+                        .sort((a, b) => a.name.localeCompare(b.name))
 
                       const selectPick = (nextId: string | null) => {
                         const choiceKey = featChoicePickKey(slot.key)
@@ -3079,130 +3130,89 @@ export default function BuilderPageClient() {
                                 : "sm:grid-cols-2 lg:grid-cols-3 gap-1.5"
                             }`}
                           >
-                            {usesCatalog
-                              ? catalogOptions.map((option) => {
-                                  const isSelected = option.pickId === pickedId
-                                  return (
-                                    <div key={option.pickId} className="flex items-stretch gap-1">
-                              <button
-                                type="button"
-                                        onClick={() =>
-                                          selectPick(isSelected ? null : option.pickId)
-                                        }
-                                        className={`flex-1 rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
-                                          isSelected
-                                            ? "border-secondary bg-secondary/10"
-                                            : "border-border bg-card hover:border-secondary/50"
+                            {eligibleFeats.map((feat) => {
+                              const isSelected = feat.id === pickedId
+                              const featCard = (
+                                <button
+                                  type="button"
+                                  onClick={() => selectPick(isSelected ? null : feat.id)}
+                                  className={`rounded-lg border-2 text-left transition-all ${
+                                    cardViewMode === "cinematic"
+                                      ? "flex-1 p-3"
+                                      : "w-full px-2.5 py-1.5"
+                                  } ${
+                                    isSelected
+                                      ? "border-secondary bg-secondary/10"
+                                      : "border-border bg-card hover:border-secondary/50"
+                                  }`}
+                                >
+                                  <div
+                                    className={`flex items-start ${
+                                      cardViewMode === "cinematic" ? "gap-2.5" : "gap-2"
+                                    }`}
+                                  >
+                                    {cardViewMode === "cinematic" && (
+                                      <GameIcon
+                                        name={getCompendiumItemIcon(
+                                          "feats",
+                                          feat as unknown as unknown as Record<string, unknown>,
+                                        )}
+                                        className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
+                                      />
+                                    )}
+                                    <div className="min-w-0">
+                                      <p
+                                        className={`font-semibold text-foreground ${
+                                          cardViewMode === "cinematic" ? "text-sm" : "text-xs"
                                         }`}
                                       >
-                                        <p className="font-semibold text-foreground text-xs">
-                                          {option.name}
-                                        </p>
-                                        {option.summary ? (
-                                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-                                            {option.summary}
-                                          </p>
-                                        ) : null}
-                              </button>
-                                      <CatalogOptionDescriptionHover
-                                        name={option.name}
-                                        description={option.description}
-                                      />
-                            </div>
-                                  )
-                                })
-                              : eligibleFeats.map((feat) => {
-                                  const isSelected = feat.id === pickedId
-                                  const featCard = (
+                                        {feat.name}
+                                      </p>
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                        {feat.level_requirement && feat.level_requirement > 1 && (
+                                          <span>Lvl {feat.level_requirement}+</span>
+                                        )}
+                                        {feat.repeatable && (
+                                          <span className="text-primary">Repeatable</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+
+                              if (cardViewMode !== "cinematic") {
+                                return <div key={feat.id}>{featCard}</div>
+                              }
+
+                              return (
+                                <div key={feat.id} className="flex items-stretch gap-1">
+                                  {featCard}
+                                  {feat.description?.trim() ? (
                                     <button
                                       type="button"
+                                      aria-label={`About ${feat.name}`}
                                       onClick={() =>
-                                        selectPick(isSelected ? null : feat.id)
+                                        setDetailsModal({ type: "feat", item: feat })
                                       }
-                                      className={`rounded-lg border-2 text-left transition-all ${
-                                        cardViewMode === "cinematic" ? "flex-1 p-3" : "w-full px-2.5 py-1.5"
-                                      } ${
-                                        isSelected
-                                          ? "border-secondary bg-secondary/10"
-                                          : "border-border bg-card hover:border-secondary/50"
-                                      }`}
+                                      className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
                                     >
-                                      <div
-                                        className={`flex items-start ${
-                                          cardViewMode === "cinematic" ? "gap-2.5" : "gap-2"
-                                        }`}
-                                      >
-                                        {cardViewMode === "cinematic" && (
-                                          <GameIcon
-                                            name={getCompendiumItemIcon(
-                                              "feats",
-                                              feat as unknown as unknown as Record<string, unknown>,
-                                            )}
-                                            className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
-                                          />
-                                        )}
-                                        <div className="min-w-0">
-                                          <p
-                                            className={`font-semibold text-foreground ${
-                                              cardViewMode === "cinematic" ? "text-sm" : "text-xs"
-                                            }`}
-                                          >
-                                            {feat.name}
-                                          </p>
-                                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                            {feat.level_requirement && feat.level_requirement > 1 && (
-                                              <span>Lvl {feat.level_requirement}+</span>
-                                            )}
-                                            {feat.repeatable && (
-                                              <span className="text-primary">Repeatable</span>
-                                            )}
-                          </div>
-                                        </div>
-                                      </div>
+                                      <Info className="h-4 w-4" />
                                     </button>
-                                  )
-
-                                  if (cardViewMode !== "cinematic") {
-                                    return (
-                                      <div key={feat.id}>{featCard}</div>
-                                    )
-                                  }
-
-                                  return (
-                                    <div key={feat.id} className="flex items-stretch gap-1">
-                                      {featCard}
-                                      {feat.description?.trim() ? (
-                                        <button
-                                          type="button"
-                                          aria-label={`About ${feat.name}`}
-                                          onClick={() =>
-                                            setDetailsModal({ type: "feat", item: feat })
-                                          }
-                                          className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                                        >
-                                          <Info className="h-4 w-4" />
-                                        </button>
-                                      ) : null}
-                                    </div>
-                                  )
-                                })}
+                                  ) : null}
+                                </div>
+                              )
+                            })}
                           </div>
-                          {!usesCatalog &&
-                            eligibleFeats.length === 0 &&
-                            !featsLoadError &&
-                            feats.length > 0 && (
-                            <p className="text-xs text-muted-foreground">No eligible feats for this slot.</p>
-                          )}
-                          {usesCatalog && catalogOptions.length === 0 && (
-                          <p className="text-xs text-muted-foreground">
-                              No options available. Seed SRD content or open Compendium → Abilities to
-                              verify Metamagic / Eldritch Invocation catalogs.
+                          {eligibleFeats.length === 0 && !featsLoadError && feats.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              No eligible feats for this slot.
                             </p>
                           )}
-                          {pickedLabel && (
+                          {picked && (
                             <p className="text-xs text-muted-foreground mt-2">
                               Selected:{" "}
-                              <span className="font-semibold text-foreground">{pickedLabel}</span>
+                              <span className="font-semibold text-foreground">{picked.name}</span>
                             </p>
                           )}
                           {picked && isAsiFeat(picked) && (
@@ -3233,10 +3243,10 @@ export default function BuilderPageClient() {
                               />
                             </div>
                           ) : null}
-                          {pickedId && (picked || pickedLabel) ? (
+                          {pickedId && picked ? (
                             <ModifierPlayerChoicePanel
                               sourceKey={featChoicePickKey(slot.key)}
-                              sourceLabel={picked?.name ?? pickedLabel ?? "Selected feat"}
+                              sourceLabel={picked.name}
                               slots={modifierPlayerChoiceSlots}
                               picks={modifierPlayerPicks}
                               spells={spells}
@@ -3244,14 +3254,14 @@ export default function BuilderPageClient() {
                               unavailableOptions={[...getTakenSkills(skillPickSources)]}
                               {...modifierExpertisePickerProps}
                               onChange={(slotKey, selected) => {
-                                const slot = modifierPlayerChoiceSlots.find(
+                                const slotEntry = modifierPlayerChoiceSlots.find(
                                   (entry) => entry.slotKey === slotKey,
                                 )
-                                if (!slot) return
+                                if (!slotEntry) return
                                 setModifierPlayerPicks((prev) =>
                                   setModifierPlayerPickValue(
                                     prev,
-                                    slot,
+                                    slotEntry,
                                     modifierPlayerChoiceSlots,
                                     selected,
                                   ),
@@ -3348,6 +3358,7 @@ export default function BuilderPageClient() {
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
+                        cardShape={useCinematicPortraitCards ? "portrait" : "wide"}
                         imageCrop="top"
                         onSelect={selectSpecies}
                         onLearnMore={() => setDetailsModal({ type: "species", item: sp })}
@@ -3637,12 +3648,22 @@ export default function BuilderPageClient() {
                       pageCount: backgroundPageCount,
                       safePage: safeBackgroundPage,
                     } = paginateList(filteredBackgrounds, backgroundPickerPage, pickerPageSize)
-                    const backgroundsToShow = useSwipeVisualPicker ? filteredBackgrounds : visibleBackgrounds
 
                     return (
                       <>
+                        <PickerGridPagination
+                          page={safeBackgroundPage}
+                          pageCount={backgroundPageCount}
+                          onPrevious={() => setBackgroundPickerPage((p) => Math.max(0, p - 1))}
+                          onNext={() =>
+                            setBackgroundPickerPage((p) => Math.min(backgroundPageCount - 1, p + 1))
+                          }
+                          previousLabel="Previous backgrounds"
+                          nextLabel="Next backgrounds"
+                          className={cn("mb-2 mt-0", cinematicPickerPaginationClass)}
+                        />
                         <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
-                          {backgroundsToShow.map((bg) => {
+                          {visibleBackgrounds.map((bg) => {
                         const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
                         const accent = getCompendiumItemAccentColor(bg as unknown as Record<string, unknown>)
                         const isSelected = character.background_id === bg.id
@@ -4091,7 +4112,7 @@ export default function BuilderPageClient() {
                     }
                   >
                     {asiAllocatorVariant === "visual" && selectedBackgroundCardImage ? (
-                      <div className="relative -mx-4 -mt-4 mb-3 aspect-[21/9] max-h-28 overflow-hidden">
+                      <div className="relative -mx-4 -mt-4 mb-3 aspect-[21/9] max-h-[11.2rem] overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={selectedBackgroundCardImage}
@@ -4618,6 +4639,10 @@ export default function BuilderPageClient() {
                                 safePage,
                               } = paginateList(levelSpells, page, spellPickerPageSize)
 
+                              const spellPickerSwipe =
+                                cardViewMode === "cinematic" && useSwipeVisualPicker
+                              const spellsToShow = spellPickerSwipe ? levelSpells : pageItems
+
                               return (
                                 <div key={`${casterClass.id}-${level}`}>
                               <p className="text-xs font-bold text-primary uppercase mb-2">
@@ -4626,8 +4651,15 @@ export default function BuilderPageClient() {
                                       ({levelSpells.length})
                                     </span>
                               </p>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {pageItems.map((spell) => {
+                              <SwipeVisualPicker
+                                enabled={spellPickerSwipe}
+                                className={
+                                  cardViewMode === "cinematic"
+                                    ? getCinematicSpellPickerContainerClass()
+                                    : "grid grid-cols-2 md:grid-cols-3 gap-2"
+                                }
+                              >
+                                    {spellsToShow.map((spell) => {
                                       const selected = classSpellIds.includes(spell.id)
                                       const selectable = canSelectSpell(
                                         spell,
@@ -4636,64 +4668,54 @@ export default function BuilderPageClient() {
                                         spellLimits,
                                         casterClass.name,
                                       )
-                                      return (
-                                  <label
-                                    key={spell.id}
-                                          className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                                            selected
-                                              ? "border-secondary bg-secondary/10 cursor-pointer"
-                                              : selectable
-                                                ? "border-border bg-card hover:border-secondary/50 cursor-pointer"
-                                                : "border-border bg-card opacity-50 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                            checked={selected}
-                                            disabled={!selectable}
-                                      onChange={(e) => {
-                                              setSpellPicksByClassId((prev) => {
-                                                const current = prev[casterClass.id] ?? []
-                                                const next = e.target.checked
-                                                  ? [...current, spell.id]
-                                                  : current.filter((id) => id !== spell.id)
-                                                return { ...prev, [casterClass.id]: next }
-                                              })
-                                      }}
-                                      className="sr-only"
-                                    />
-                                          <div
-                                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                              selected
-                                                ? "bg-secondary border-secondary"
-                                                : "border-muted-foreground"
-                                            }`}
-                                          >
-                                            {selected && <Check className="w-2.5 h-2.5 text-white" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm text-foreground truncate">
-                                              {spell.name}
-                                            </p>
-                                      <p className="text-xs text-muted-foreground">{spell.school}</p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
+                                      const toggleSpellPick = () => {
+                                        if (!selectable && !selected) return
+                                        setSpellPicksByClassId((prev) => {
+                                          const current = prev[casterClass.id] ?? []
+                                          const next = selected
+                                            ? current.filter((id) => id !== spell.id)
+                                            : [...current, spell.id]
+                                          return { ...prev, [casterClass.id]: next }
+                                        })
+                                      }
+                                      const openSpellDetails = () =>
                                         setDetailsModal({ type: "spell", item: spell })
-                                      }}
-                                      className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
-                                    >
-                                      <Info className="w-3 h-3" />
-                                    </button>
-                                  </label>
+
+                                      if (
+                                        cardViewMode === "cinematic" &&
+                                        resolveSpellCardImageUrl(spell)
+                                      ) {
+                                        const accent = getCompendiumItemAccentColor(
+                                          spell as unknown as Record<string, unknown>,
+                                        )
+                                        return (
+                                          <SpellSelectionCard
+                                            key={spell.id}
+                                            spell={spell}
+                                            accentColor={accent}
+                                            selected={selected}
+                                            selectable={selectable}
+                                            onToggle={toggleSpellPick}
+                                            onDetails={openSpellDetails}
+                                          />
+                                        )
+                                      }
+
+                                      return (
+                                        <BuilderSpellCompactPick
+                                          key={spell.id}
+                                          spell={spell}
+                                          selected={selected}
+                                          selectable={selectable}
+                                          onToggle={toggleSpellPick}
+                                          onDetails={openSpellDetails}
+                                        />
                                       )
                                     })}
-                              </div>
+                              </SwipeVisualPicker>
                                   {pageCount > 1 && (
                                     <PickerGridPagination
+                                      className={spellPickerSwipe ? "max-sm:hidden" : undefined}
                                       page={safePage}
                                       pageCount={pageCount}
                                       onPrevious={() =>
@@ -5343,6 +5365,7 @@ export default function BuilderPageClient() {
               onClose={close}
               item={cls}
               imageCrop="top"
+              panelWidth="portrait"
               enableCardImage
               subtitle={cls.source || "Custom"}
               tagline={getCompendiumCardBlurb(cls).toUpperCase()}
@@ -5356,7 +5379,7 @@ export default function BuilderPageClient() {
               accentColor={accent}
               detailScroll={false}
             >
-              <div className="grid h-full gap-3 overflow-hidden md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.1fr)_minmax(0,1.05fr)] md:gap-4">
+              <div className="grid h-full grid-cols-2 gap-3 overflow-hidden md:gap-4">
                 <div className="min-w-0 overflow-hidden">
                   <p className={cn("text-[10px] font-bold uppercase tracking-widest", accentStyles.cardFooterText)}>
                     Class highlights
@@ -5366,7 +5389,7 @@ export default function BuilderPageClient() {
                     {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
                   </p>
                   <ClassComplexityDisplay cls={cls} className="mt-2" labelClassName={accentStyles.cardFooterText} />
-                    </div>
+                </div>
                 <div className="min-w-0 overflow-hidden">
                   <h3 className="font-serif text-sm font-bold text-white">Class features</h3>
                   {baseFeatures.length > 0 ? (
@@ -5379,14 +5402,15 @@ export default function BuilderPageClient() {
                   ) : (
                     <p className="mt-1 text-[11px] text-white/70">No class features listed.</p>
                   )}
-                </div>
-                <div className="min-w-0 overflow-hidden">
                   {classSubclasses.length > 0 ? (
-                    <ul className="space-y-1">
+                    <ul className="mt-2 space-y-1">
                       {classSubclasses.map((subclass) => (
                         <li key={subclass.id} className="min-w-0">
                           <p className="text-[11px] font-semibold leading-tight text-white/90">
                             {subclass.name}
+                            <span className="ml-1 text-[9px] font-bold uppercase tracking-wide text-white/45">
+                              Subclass
+                            </span>
                           </p>
                           {subclass.description ? (
                             <p className="text-[10px] leading-snug text-white/60 line-clamp-1">
@@ -5396,11 +5420,9 @@ export default function BuilderPageClient() {
                         </li>
                       ))}
                     </ul>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-white/70">No subclasses listed.</p>
-                    )}
-                  </div>
-                  </div>
+                  ) : null}
+                </div>
+              </div>
             </CompendiumDetailOverlay>
           )
         }
@@ -5418,6 +5440,7 @@ export default function BuilderPageClient() {
               onClose={close}
               item={sp}
               imageCrop="top"
+              panelWidth="portrait-species"
               enableCardImage
               subtitle={sp.source || "Custom"}
               tagline={getCompendiumCardBlurb(sp).toUpperCase()}
@@ -5470,10 +5493,6 @@ export default function BuilderPageClient() {
 
         if (detailsModal.type === "background") {
           const bg = item as Background
-          const abilityText = formatBackgroundAbilityBonuses(bg.ability_bonuses)
-          const equipmentText = formatBackgroundEquipment(bg)
-          const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
-          const grantedSpellLines = formatBackgroundGrantedSpells(bg, spells)
           return (
             <CompendiumDetailOverlay
               open
@@ -5483,51 +5502,9 @@ export default function BuilderPageClient() {
               subtitle={bg.source || "Custom"}
               tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
               accentColor={accent}
+              detailScroll={false}
             >
-              {bg.description?.trim() && <RichTextContent html={bg.description} />}
-              {abilityText && (
-                <div className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">Ability Scores</p>
-                  <p className="text-sm">{abilityText}</p>
-                </div>
-              )}
-              {bg.skill_proficiencies && bg.skill_proficiencies.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">Skills</p>
-                  <p className="text-sm">{bg.skill_proficiencies.join(", ")}</p>
-                  </div>
-              )}
-              {getBackgroundProficiencySections(bg).map((section) => (
-                <div key={section.label} className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">{section.label}</p>
-                  <p className="text-sm">{section.items.join(", ")}</p>
-                    </div>
-              ))}
-              {bg.feat_granted && (
-                <div className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">Origin Feat</p>
-                  <p className="text-sm font-semibold">{bg.feat_granted}</p>
-                  {grantedFeat?.description && (
-                    <RichTextContent html={grantedFeat.description} className="text-sm mt-1" />
-                  )}
-                </div>
-              )}
-              {grantedSpellLines.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">Granted Spells</p>
-                  <ul className="text-sm space-y-1">
-                    {grantedSpellLines.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {equipmentText && (
-                <div className="mt-4">
-                  <p className="text-xs uppercase text-white/50 mb-1">Starting Equipment</p>
-                  <p className="text-sm whitespace-pre-wrap">{equipmentText}</p>
-                </div>
-              )}
+              <BackgroundDetailStrip background={bg} feats={feats} spells={spells} />
             </CompendiumDetailOverlay>
           )
         }
@@ -5539,8 +5516,9 @@ export default function BuilderPageClient() {
               open
               onClose={close}
               item={spell}
-              enableCardImage={false}
               subtitle={spell.school}
+              imageCrop="top"
+              panelWidth={cardViewMode === "cinematic" ? "portrait-spell" : "default"}
               tags={[
                 { label: spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`, emphasis: true },
                 ...(spell.concentration ? [{ label: "CONCENTRATION" }] : []),

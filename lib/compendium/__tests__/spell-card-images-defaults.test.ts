@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { enrichSrdSpellRow } from "@/lib/compendium/enrich-srd-spells"
+import { enrichSrdSpellRow, resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
 import {
   BUNDLED_SPELL_CARD_IMAGE_NAMES,
   defaultSpellCardImageUrl,
@@ -47,5 +47,15 @@ describe("spell card image defaults", () => {
       card_image_url: custom,
     })
     expect(row.card_image_url).toBe(custom)
+  })
+
+  it("resolveSpellCardImageUrl falls back to bundled art by name", () => {
+    expect(resolveSpellCardImageUrl({ name: "Eldritch Blast" })).toMatch(/eldritch-blast\.png$/)
+    expect(
+      resolveSpellCardImageUrl({
+        name: "Fire Bolt",
+        card_image_url: "https://example.com/custom.png",
+      }),
+    ).toBe("https://example.com/custom.png")
   })
 })
