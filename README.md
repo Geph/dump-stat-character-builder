@@ -15,17 +15,10 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 ### Character Builder
 - **Step-by-step character creation** — Guided workflow through species, class, ability scores, background, gear, spells, and details
 - **Multi-class support** — Build characters with multiple classes and track levels independently
-- **Editable class levels** — Type a class level directly (Enter/Escape/blur to commit) instead of only stepping it; subclass selections clear automatically when a level drops below the subclass threshold
-- **Player-choice modifiers everywhere** — Skill/expertise picks, tool & instrument choices, languages, weapon-mastery selections, and feat grants surface as interactive choices at the step where they apply (class, species Origin, or background)
-- **Species options at Origin** — Species that offer a size choice (e.g. Human/Tiefling Small or Medium), skill proficiencies, languages (Common + choices from the Standard Languages table), or an Origin feat present those picks inline
-- **Weapon Mastery UI** — One dropdown per mastery slot with an info overlay explaining each property; switch between a **compact** list and a **visual** weapon-icon grid (default selectable in settings); the same weapon icons appear on mundane equipment cards in the compendium
-- **Dual wield & two-weapon fighting** — Equip a Light weapon in the off-hand; TWF rules apply on the sheet with a damage-roll menu (advantage/disadvantage, versatile dice, no-mod options)
+- **Player-choice modifiers everywhere** — Skill/expertise picks, tool & instrument choices, languages, weapon-mastery selections, and feat grants surface as interactive choices at the step where they apply
 - **Real-time preview** — Live character sheet with Summary, Combat, Features, Companion / Beast Form, and Custom tabs
 - **Point buy & standard array** — Multiple methods for determining ability scores
-- **Repeatable feats** — Feats marked repeatable can fill more than one milestone slot; duplicate ASI feats combine into a shared bonus pool on the Abilities step
-- **Background proficiencies** — Tools, vehicles, weapons, armor, and languages from backgrounds flow into preview and saved characters
-- **Special actions from features** — Features that let you make a check with an alternate ability (e.g. Barbarian *Primal Knowledge* — Strength for certain skills while raging) appear as roll-able actions on the sheet
-- **Automatic calculations** — HP, AC, weapon attacks, saving throws, skills, and modifiers calculated automatically, including property-qualified proficiencies (e.g. Monk's "Martial weapons that have the Light property")
+- **Automatic calculations** — HP, AC, weapon attacks, saving throws, skills, and modifiers calculated automatically
 
 ### Compendium
 - **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
@@ -56,7 +49,6 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 
 ### Import
 - **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including all 13 mundane armor types); **no AI**
-- **Web import** — Paste a supported wiki URL; server fetches HTML and parses it deterministically (**no AI**)
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 - **Foundry VTT import** — Paste or upload Foundry `dnd5e` item exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e))
@@ -199,12 +191,11 @@ pnpm srd:build
 
 ### 7. AI import (optional — compendium import only)
 
-**AI is used only for compendium import** (PDF upload and optional server-side text extraction). The character builder, character sheet, derived stats, SRD seed, Foundry VTT import, web URL import, Dump Stat JSON bundles, and BYO LLM clipboard workflow do **not** call any AI APIs.
+**AI is used only for compendium import** (PDF upload and optional server-side text extraction). The character builder, character sheet, derived stats, SRD seed, Foundry VTT import, Dump Stat JSON bundles, and BYO LLM clipboard workflow do **not** call any AI APIs.
 
 | Path | Uses server AI? |
 |------|-----------------|
 | SRD seed (`POST /api/seed`) | No — bundled JSON |
-| Web import (wiki URLs) | No — HTML fetch + deterministic parsers |
 | Dump Stat JSON (file or paste) | No |
 | Foundry VTT JSON | No |
 | Clipboard BYO LLM | No — you run an external LLM and paste JSON |
@@ -244,7 +235,7 @@ OPENAI_API_KEY=sk-your-key-here
 # IMPORT_AI_MODEL=gpt-4o-mini
 ```
 
-Restart the dev server after changing keys. Without any provider key, seed, web URLs, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or the Clipboard **Import with server AI** action returns a configuration error.
+Restart the dev server after changing keys. Without any provider key, seed, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or the Clipboard **Import with server AI** action returns a configuration error.
 
 **Import page UI:** The Clipboard tab always shows the BYO LLM workflow (paste text → copy prompt → paste JSON). When server AI is configured, an expandable **server AI extraction** section also appears on Clipboard and PDF tabs (provider/model override stored in browser localStorage). API keys always stay on the server.
 
@@ -254,15 +245,14 @@ Restart the dev server after changing keys. Without any provider key, seed, web 
 
 ## Import formats
 
-Dump Stat supports six compendium import paths:
+Dump Stat supports five compendium import paths:
 
 | Method | Input | AI? | Best for |
 |--------|--------|-----|----------|
 | **SRD seed** | Button / `POST /api/seed` | No | Official SRD baseline |
-| **Web import** | Wiki URL (e.g. dnd2024.wikidot.com) | No | Single species/class/spell/feat/background pages |
 | **Dump Stat JSON** | `.json` file or pasted JSON | No | Homebrew with full `linkedModifiers`, repeatable imports |
 | **Foundry VTT JSON** | `dnd5e` item/pack export (file or pasted) | No | Migrating items, feats, spells, classes from Foundry |
-| **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, wiki copy-paste, copied stat blocks |
+| **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, website copy-paste, copied stat blocks |
 | **PDF import** | Uploaded PDF (+ optional page range) | Optional server AI | Same as text; also accepts JSON export files (no AI) |
 
 ### Dump Stat JSON export
@@ -314,7 +304,7 @@ pnpm dlx tsx scripts/build-ua-villainous-export.ts
 
 The **Clipboard** tab is the primary import path for pasted text:
 
-1. Paste raw source text (from a PDF copy, wiki, or document).
+1. Paste raw source text (from a PDF copy, website, or document).
 2. Copy the **extraction prompt** and **JSON template** (matched to your content-type hint).
 3. Run the prompt in ChatGPT, Claude, Gemini, or any LLM — using your own API key or subscription.
 4. Paste the model's JSON output back into Dump Stat and click **Import JSON**.
@@ -324,12 +314,6 @@ The prompt includes **clean PDF / paste guidelines** (keep level tables intact, 
 **Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs (hidden when no provider is configured). The BYO prompt/template workflow remains available either way.
 
 **Dump Stat JSON export** — if the pasted text is a valid `dump-stat-export` bundle, it imports directly without LLM extraction (same as file upload; extraction mode `byo-json`).
-
-### Web import (no AI)
-
-Paste a URL from a supported wiki host (currently **dnd2024.wikidot.com**). The server fetches the page HTML and runs deterministic parsers — species, classes, spells, feats, and backgrounds auto-detect from the URL path, or you can set a content-type hint. Requires a hosted instance with database access (not available in static/GitHub Pages mode).
-
-Imported rows use source **Text Import** or **PDF Import** and replace same-name rows from that source on re-import.
 
 ### PDF import (optional server AI)
 
@@ -541,7 +525,7 @@ No database server required. Data lives in the visitor's browser.
 
 **Static mode includes:** builder, characters, compendium, bundled SRD on first visit, JSON pack import/export.
 
-**Static mode excludes:** PDF/text server AI import, web URL import, server seed API. JSON paste (Dump Stat exports, Foundry, BYO LLM) still works. Use JSON exports from a hosted instance to share custom content.
+**Static mode excludes:** PDF/text server AI import, server seed API. JSON paste (Dump Stat exports, Foundry, BYO LLM) still works. Use JSON exports from a hosted instance to share custom content.
 
 Environment variables for static builds are documented in [.env.example](.env.example).
 
@@ -584,7 +568,7 @@ app/
 ├── builder/              # Character builder
 ├── characters/           # Character list and sheets
 ├── compendium/           # Content browser and editors
-├── import/               # PDF, text, and web import
+├── import/               # PDF and text import
 └── api/                  # REST routes (seed, import, data, characters)
 
 lib/
@@ -681,6 +665,12 @@ Compendium icons are from [game-icons.net](https://game-icons.net/) (thousands o
 ### Fonts
 
 Solbera’s D&D Fonts by Solbera / Ryrok, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — see [Solbera D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/).
+
+### Trademarks & privacy
+
+All product names, logos, and brands are property of their respective owners. All company, product, and service names used in this project are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.
+
+Dump Stat does not collect personal identification data. Character and compendium data stay in your browser or your own database when you host the app yourself.
 
 ## Links
 
