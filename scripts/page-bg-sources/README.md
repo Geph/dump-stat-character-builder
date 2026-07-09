@@ -47,6 +47,14 @@ Output at **1200×675** WebP.
 
 Output at **1200×900** WebP. Missing sources keep any existing output.
 
+## GitHub README hero
+
+| Source file | Output |
+|-------------|--------|
+| `hero.png` | `public/images/features/hero.webp` |
+
+Output capped at **1400×1200** WebP (aspect preserved).
+
 ## Why not attach in chat?
 
 Cursor compresses and downsizes images pasted into chat. Copy originals into this folder instead.

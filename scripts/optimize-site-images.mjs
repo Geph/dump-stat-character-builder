@@ -27,6 +27,10 @@ const FEATURE_HEIGHT = Number(process.env.FEATURE_HEIGHT ?? 675)
 const SPLASH_WIDTH = Number(process.env.SPLASH_WIDTH ?? 1200)
 const SPLASH_HEIGHT = Number(process.env.SPLASH_HEIGHT ?? 900)
 
+/** GitHub README hero — preserve aspect, cap max dimensions. */
+const README_HERO_MAX_WIDTH = Number(process.env.README_HERO_MAX_WIDTH ?? 1400)
+const README_HERO_MAX_HEIGHT = Number(process.env.README_HERO_MAX_HEIGHT ?? 1200)
+
 const EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"]
 
 /** theme id → candidate source basenames (first match wins). */
@@ -91,6 +95,29 @@ async function encodeWebp(input, output, width, height) {
   const outKb = (fs.statSync(output).size / 1024).toFixed(1)
   const action =
     (inputMeta.width ?? 0) > width || (inputMeta.height ?? 0) > height ? "downscaled" : "encoded"
+
+  return { inputMeta, outMeta, inputKb, outKb, action }
+}
+
+async function encodeWebpFitInside(input, output, maxWidth, maxHeight) {
+  const inputMeta = await sharp(input).metadata()
+  const inputKb = (fs.statSync(input).size / 1024).toFixed(1)
+
+  await sharp(input)
+    .resize(maxWidth, maxHeight, {
+      fit: "inside",
+      kernel: sharp.kernel.lanczos3,
+      withoutEnlargement: true,
+    })
+    .webp({ quality: WEBP_QUALITY, effort: 6 })
+    .toFile(output)
+
+  const outMeta = await sharp(output).metadata()
+  const outKb = (fs.statSync(output).size / 1024).toFixed(1)
+  const action =
+    (inputMeta.width ?? 0) > maxWidth || (inputMeta.height ?? 0) > maxHeight
+      ? "downscaled"
+      : "encoded"
 
   return { inputMeta, outMeta, inputKb, outKb, action }
 }
@@ -183,6 +210,23 @@ for (const [basename, candidates] of Object.entries(SPLASH_SOURCES)) {
   console.log(
     `  ${basename}.webp  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
   )
+}
+
+console.log("\nREADME hero → public/images/features/")
+const readmeHeroInput = resolveSourcePath(["hero", "readme-hero"])
+if (readmeHeroInput) {
+  const output = path.join(FEATURE_OUT, "hero.webp")
+  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeWebpFitInside(
+    readmeHeroInput,
+    output,
+    README_HERO_MAX_WIDTH,
+    README_HERO_MAX_HEIGHT,
+  )
+  console.log(
+    `  hero.webp  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+  )
+} else {
+  console.log("  − hero: no source (keeping existing output if any)")
 }
 
 if (missing > 0) {
