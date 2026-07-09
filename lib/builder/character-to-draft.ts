@@ -12,6 +12,7 @@ import {
   inferClassSkillPicks,
   inferSpellPicksByClassId,
 } from "@/lib/builder/infer-builder-picks"
+import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
 
 export function characterToDraft(character: Character): CharacterDraft {
   return {
@@ -126,6 +127,6 @@ export function characterToBuilderState(
     currentHp: character.hit_points ?? character.hit_point_max ?? null,
     tempHp: 0,
     editingCharacterId: character.id,
-    cardViewMode: "dense",
+    cardViewMode: layoutToCardViewMode(getBuilderLayout()),
   }
 }

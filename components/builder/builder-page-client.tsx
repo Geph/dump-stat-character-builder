@@ -142,7 +142,7 @@ import {
   proficientSkillsInBuilder,
 } from "@/lib/builder/choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
-import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
+import { getBuilderLayout, layoutToCardViewMode, cardViewModeToLayout, setBuilderLayout, BUILDER_LAYOUT_CHANGE_EVENT } from "@/lib/site-settings/builder-layout"
 import { APP_PRESENTATION_MODE_CHANGE_EVENT, isCompactOnlyPresentation } from "@/lib/site-settings/app-presentation-mode"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
@@ -657,11 +657,27 @@ export default function BuilderPageClient() {
     const syncPresentation = () => {
       if (isCompactOnlyPresentation()) {
         setCardViewMode("dense")
+        return
       }
+      setCardViewMode(layoutToCardViewMode(getBuilderLayout()))
     }
     window.addEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
-    return () => window.removeEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+    window.addEventListener(BUILDER_LAYOUT_CHANGE_EVENT, syncPresentation)
+    return () => {
+      window.removeEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+      window.removeEventListener(BUILDER_LAYOUT_CHANGE_EVENT, syncPresentation)
+    }
   }, [])
+
+  const applyCardViewMode = useCallback(
+    (mode: "dense" | "cinematic") => {
+      setCardViewMode(mode)
+      if (!isCompactOnlyPresentation()) {
+        setBuilderLayout(cardViewModeToLayout(mode))
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     setSpellLevelPages({})
@@ -2413,7 +2429,7 @@ export default function BuilderPageClient() {
                     type="button"
                     title="Visual cards"
                     aria-pressed={cardViewMode === "cinematic"}
-                    onClick={() => setCardViewMode("cinematic")}
+                    onClick={() => applyCardViewMode("cinematic")}
                     className={`flex items-center gap-1 px-2.5 py-2 text-xs font-semibold transition-colors ${
                       cardViewMode === "cinematic"
                         ? "bg-primary text-primary-foreground"
@@ -2427,7 +2443,7 @@ export default function BuilderPageClient() {
                     type="button"
                     title="Compact list cards"
                     aria-pressed={cardViewMode === "dense"}
-                    onClick={() => setCardViewMode("dense")}
+                    onClick={() => applyCardViewMode("dense")}
                     className={`flex items-center gap-1 px-2.5 py-2 text-xs font-semibold transition-colors border-l border-border ${
                       cardViewMode === "dense"
                         ? "bg-primary text-primary-foreground"

@@ -1,4 +1,6 @@
 /** Global preference for how the builder renders pickers and choice grids. */
+import { getAppPresentationMode } from "@/lib/site-settings/app-presentation-mode"
+
 export type BuilderLayout = "visual" | "compact"
 
 /** The builder's internal card-view value maps 1:1 to the global layout preference. */
@@ -23,7 +25,8 @@ export function cardViewModeToLayout(mode: BuilderCardViewMode): BuilderLayout {
 export function getBuilderLayout(): BuilderLayout {
   if (typeof localStorage === "undefined") return DEFAULT_BUILDER_LAYOUT
   const stored = localStorage.getItem(BUILDER_LAYOUT_STORAGE_KEY)
-  return isBuilderLayout(stored) ? stored : DEFAULT_BUILDER_LAYOUT
+  if (isBuilderLayout(stored)) return stored
+  return getAppPresentationMode() === "compact-only" ? "compact" : "visual"
 }
 
 export function setBuilderLayout(layout: BuilderLayout): void {
