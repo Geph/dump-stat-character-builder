@@ -8,7 +8,8 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 |------|----------|
 | `hero/rotating-01.webp` … `rotating-04.webp` | Home page hero — random background on each visit |
 | `backgrounds/library-stats.jpeg` | Home page “library stats” section background |
-| `features/*.webp` | Home feature cards + README preview row — run `pnpm images:optimize` from sources in `scripts/page-bg-sources/` |
+| `features/hero.png` | GitHub README hero graphic |
+| `features/*.webp` | Home feature cards — run `pnpm images:optimize` from sources in `scripts/page-bg-sources/` |
 
 ## Adding or changing images
 

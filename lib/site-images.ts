@@ -38,9 +38,5 @@ export const STARTING_EQUIPMENT_CARD_IMAGES = {
   gold: withBasePath("/images/builder/starting-equipment-gold.png"),
 } as const
 
-/** README preview row — three feature card graphics */
-export const README_PREVIEW_IMAGES = [
-  FEATURE_CARD_IMAGES.characterCreation,
-  FEATURE_CARD_IMAGES.compendium,
-  FEATURE_CARD_IMAGES.characterSheet,
-] as const
+/** GitHub README hero graphic (repo-relative path, not Pages basePath) */
+export const README_HERO_IMAGE = "/images/features/hero.png"
