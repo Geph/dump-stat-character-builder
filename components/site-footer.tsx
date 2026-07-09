@@ -83,6 +83,16 @@ export function SiteFooter({ id = "site-footer", className }: SiteFooterProps) {
                 Dump Stat does not collect personal identification data. Character and compendium data stay in
                 your browser or your own database when you host the app yourself.
               </p>
+              <p className="text-xs leading-snug pt-1">
+                <a
+                  href={GITHUB_REPO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  View Dump Stat on GitHub
+                </a>
+              </p>
             </div>
           </div>
         </div>
@@ -101,17 +111,6 @@ export function SiteFooter({ id = "site-footer", className }: SiteFooterProps) {
             )}
           />
         </button>
-
-        <p className="pb-1 text-center text-xs text-muted-foreground">
-          <a
-            href={GITHUB_REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            View Dump Stat on GitHub
-          </a>
-        </p>
       </div>
     </footer>
   )
