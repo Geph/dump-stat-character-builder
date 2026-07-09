@@ -144,6 +144,33 @@ const newItemButtonLabels: Record<ContentType, string> = {
   abilities: "New Custom Ability",
 }
 
+/** Drop duplicate browse rows (repeated imports / animation ghosts). */
+function dedupeCompendiumBrowseRows<T extends { id?: string; name?: string }>(
+  tab: CompendiumContentType,
+  rows: T[],
+): T[] {
+  const seenIds = new Set<string>()
+  const seenSubclassKeys = new Set<string>()
+  const result: T[] = []
+
+  for (const row of rows) {
+    const id = String(row.id ?? "")
+    if (id) {
+      if (seenIds.has(id)) continue
+      seenIds.add(id)
+    }
+    if (tab === "subclasses") {
+      const subclass = row as unknown as Subclass
+      const key = `${subclass.class_id ?? ""}:${String(subclass.name ?? "").trim().toLowerCase()}`
+      if (seenSubclassKeys.has(key)) continue
+      seenSubclassKeys.add(key)
+    }
+    result.push(row)
+  }
+
+  return result
+}
+
 const CustomClassSpellListDialog = dynamic(
   () =>
     import("@/components/compendium/custom-class-spell-list-dialog").then((mod) => ({
@@ -368,59 +395,80 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     new Set(spellData.map((s) => s.level))
   ).sort((a, b) => a - b)
 
-  const filteredContent = (content[activeTab] as { name: string }[]).filter((item) => {
+  const filteredContent = useMemo(() => {
     const query = searchQuery.toLowerCase()
-    if (activeTab === "class_resources") {
-      const resource = item as ClassResourceRow
-      const className = classNamesById[resource.class_id] ?? ""
-      const haystack = `${resource.name} ${resource.resource_key} ${className}`.toLowerCase()
-      if (!haystack.includes(query)) return false
-      if (classResourceFilterClassId !== "all" && resource.class_id !== classResourceFilterClassId) return false
+    const rows = (content[activeTab] as { id?: string; name: string }[]).filter((item) => {
+      if (activeTab === "class_resources") {
+        const resource = item as ClassResourceRow
+        const className = classNamesById[resource.class_id] ?? ""
+        const haystack = `${resource.name} ${resource.resource_key} ${className}`.toLowerCase()
+        if (!haystack.includes(query)) return false
+        if (classResourceFilterClassId !== "all" && resource.class_id !== classResourceFilterClassId) {
+          return false
+        }
+        return true
+      }
+      if (!item.name?.toLowerCase().includes(query)) return false
+      if (activeTab === "spells") {
+        const spell = item as Spell
+        const spellClasses = spell.classes ?? []
+        if (spellFilterClass === UNASSIGNED_SPELL_CLASS) {
+          if (spellClasses.length > 0) return false
+        } else if (spellFilterClass !== "all" && !spellClasses.includes(spellFilterClass)) {
+          return false
+        }
+        if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
+        if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
+      }
+      if (activeTab === "feats") {
+        const feat = item as Feat
+        const category = feat.category || "General"
+        if (featFilterCategory !== "all" && category !== featFilterCategory) return false
+      }
+      if (activeTab === "equipment") {
+        const eq = item as Equipment
+        if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
+      }
+      if (activeTab === "magic_items") {
+        const eq = item as Equipment
+        if (
+          magicItemFilterCategory !== "all" &&
+          (eq.magic_item_category ?? "").toLowerCase() !== magicItemFilterCategory.toLowerCase()
+        ) {
+          return false
+        }
+      }
+      if (activeTab === "languages") {
+        const language = item as Language
+        if (languageFilterPool !== "all" && language.pool !== languageFilterPool) return false
+      }
+      if (activeTab === "tools") {
+        const tool = item as Tool
+        if (toolFilterGroup !== "all" && tool.tool_group !== toolFilterGroup) return false
+      }
+      if (activeTab === "backgrounds" && backgroundFilterAbilities.length > 0) {
+        if (!backgroundMatchesAbilityFilter(item as Background, backgroundFilterAbilities)) return false
+      }
       return true
-    }
-    if (!item.name?.toLowerCase().includes(query)) return false
-    if (activeTab === "spells") {
-      const spell = item as Spell
-      const spellClasses = spell.classes ?? []
-      if (spellFilterClass === UNASSIGNED_SPELL_CLASS) {
-        if (spellClasses.length > 0) return false
-      } else if (spellFilterClass !== "all" && !spellClasses.includes(spellFilterClass)) {
-        return false
-      }
-      if (spellFilterLevel !== "all" && spell.level !== Number(spellFilterLevel)) return false
-      if (spellFilterSchool !== "all" && spell.school !== spellFilterSchool) return false
-    }
-    if (activeTab === "feats") {
-      const feat = item as Feat
-      const category = feat.category || "General"
-      if (featFilterCategory !== "all" && category !== featFilterCategory) return false
-    }
-    if (activeTab === "equipment") {
-      const eq = item as Equipment
-      if (equipmentFilterCategory !== "all" && eq.category !== equipmentFilterCategory) return false
-    }
-    if (activeTab === "magic_items") {
-      const eq = item as Equipment
-      if (
-        magicItemFilterCategory !== "all" &&
-        (eq.magic_item_category ?? "").toLowerCase() !== magicItemFilterCategory.toLowerCase()
-      ) {
-        return false
-      }
-    }
-    if (activeTab === "languages") {
-      const language = item as Language
-      if (languageFilterPool !== "all" && language.pool !== languageFilterPool) return false
-    }
-    if (activeTab === "tools") {
-      const tool = item as Tool
-      if (toolFilterGroup !== "all" && tool.tool_group !== toolFilterGroup) return false
-    }
-    if (activeTab === "backgrounds" && backgroundFilterAbilities.length > 0) {
-      if (!backgroundMatchesAbilityFilter(item as Background, backgroundFilterAbilities)) return false
-    }
-    return true
-  })
+    })
+
+    return dedupeCompendiumBrowseRows(activeTab, rows)
+  }, [
+    activeTab,
+    backgroundFilterAbilities,
+    classNamesById,
+    classResourceFilterClassId,
+    content,
+    equipmentFilterCategory,
+    featFilterCategory,
+    languageFilterPool,
+    magicItemFilterCategory,
+    searchQuery,
+    spellFilterClass,
+    spellFilterLevel,
+    spellFilterSchool,
+    toolFilterGroup,
+  ])
 
   const equipmentData = content.equipment as unknown as Equipment[]
   const magicItemData = content.magic_items as unknown as Equipment[]
@@ -757,10 +805,88 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       ? compendiumPortraitListGradientClass(activeTab, cardImage)
       : undefined
 
+    const cardActions = (
+      <div className="flex items-center gap-1 shrink-0">
+        {canCopy && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              void handleCopyItem(data)
+            }}
+            disabled={copyingId === (data.id as string)}
+            className={cn(
+              "flex items-center justify-center w-8 h-8 rounded-full border transition-colors hover:bg-muted disabled:opacity-50",
+              cardImage
+                ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
+                : `border-border text-muted-foreground hover:text-foreground ${accentStyles.editHover}`,
+            )}
+            title="Make a copy"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        )}
+        <Link
+          href={editPath}
+          className={cn(
+            "flex items-center justify-center w-8 h-8 shrink-0 rounded-full border transition-colors",
+            cardImage
+              ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
+              : `border-border text-muted-foreground ${accentStyles.editHover}`,
+          )}
+          title="Edit"
+        >
+          <Edit className="w-4 h-4" />
+        </Link>
+      </div>
+    )
+
+    const cardTitle = (
+      <h3
+        className={cn(
+          "font-bold cursor-pointer leading-tight flex items-center gap-1.5",
+          cardImage
+            ? cn(
+                portraitGraphicCard ? "text-2xl" : "text-[1.6875rem]",
+                "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]",
+              )
+            : "text-lg text-foreground",
+          accentStyles.titleHover,
+        )}
+        onClick={() => setSelectedItem(item)}
+      >
+        {activeTab === "class_resources"
+          ? (classNamesById[castCompendiumRow<ClassResourceRow>(data).class_id] ?? "Unknown class")
+          : (data.name as string)}
+        {activeTab === "abilities" && isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="inline-flex text-primary"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="About system catalog"
+              >
+                <Info className="w-4 h-4" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-sm">
+              {getSystemCatalogMeta(data.id as string)?.info ?? MODIFIER_CATALOG_INFO}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </h3>
+    )
+
+    const cardIcon = !hideCardIcon ? (
+      <div className={cn("w-10 h-10 shrink-0", cardImage ? accentStyles.imageCardIconText : accentStyles.iconText)}>
+        <GameIcon name={iconName} className="w-10 h-10" />
+      </div>
+    ) : null
+
     return (
       <motion.div
-        key={data.id as string}
-        layoutId={data.id as string}
+        key={`${activeTab}-${data.id as string}`}
+        layoutId={`${activeTab}-${data.id as string}`}
         className={cn(
           "relative overflow-hidden rounded-2xl border-2 transition-colors",
           portraitGraphicCard && CLASS_CARD_ASPECT_CLASS,
@@ -790,81 +916,32 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               "[&_.text-foreground]:text-white [&_.text-muted-foreground]:text-white/75 [&_.text-primary]:text-primary [&_.text-secondary]:text-secondary [&_.text-warning]:text-warning [&_.text-orange]:text-orange [&_.text-lime]:text-lime [&_.text-magenta]:text-magenta [&_.text-accent]:text-accent [&_.bg-muted]:bg-black/40 [&_.bg-muted]:text-white/90",
           )}
         >
-        <div className="flex items-start justify-between mb-2 gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            {!hideCardIcon ? (
-              <div className={cn("w-10 h-10 shrink-0", cardImage ? accentStyles.imageCardIconText : accentStyles.iconText)}>
-                <GameIcon name={iconName} className="w-10 h-10" />
+        {!cardImage ? (
+          <>
+            <div className="mb-2 space-y-2 sm:hidden">
+              <div className="flex items-start justify-between gap-2">
+                {cardIcon}
+                {cardActions}
               </div>
-            ) : null}
-            <h3 
-              className={cn(
-                "font-bold cursor-pointer leading-tight flex items-center gap-1.5",
-                cardImage
-                  ? cn(
-                      portraitGraphicCard ? "text-2xl" : "text-[1.6875rem]",
-                      "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]",
-                    )
-                  : "text-lg text-foreground",
-                accentStyles.titleHover,
-              )}
-              onClick={() => setSelectedItem(item)}
-            >
-              {activeTab === "class_resources"
-                ? (classNamesById[castCompendiumRow<ClassResourceRow>(data).class_id] ?? "Unknown class")
-                : (data.name as string)}
-              {activeTab === "abilities" && isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className="inline-flex text-primary"
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label="About system catalog"
-                    >
-                      <Info className="w-4 h-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-sm">
-                    {getSystemCatalogMeta(data.id as string)?.info ?? MODIFIER_CATALOG_INFO}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </h3>
+              {cardTitle}
+            </div>
+            <div className="mb-2 hidden items-start justify-between gap-2 sm:flex">
+              <div className="flex min-w-0 items-center gap-3">
+                {cardIcon}
+                {cardTitle}
+              </div>
+              {cardActions}
+            </div>
+          </>
+        ) : (
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              {cardIcon}
+              {cardTitle}
+            </div>
+            {cardActions}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {canCopy && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void handleCopyItem(data)
-                }}
-                disabled={copyingId === (data.id as string)}
-                className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full border transition-colors hover:bg-muted disabled:opacity-50",
-                  cardImage
-                    ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
-                    : `border-border text-muted-foreground hover:text-foreground ${accentStyles.editHover}`,
-                )}
-                title="Make a copy"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
-            )}
-            <Link
-              href={editPath}
-              className={cn(
-                "flex items-center justify-center w-8 h-8 shrink-0 rounded-full border transition-colors",
-                cardImage
-                  ? "border-white/25 bg-black/30 text-white/85 hover:bg-black/45 hover:text-white"
-                  : `border-border text-muted-foreground ${accentStyles.editHover}`,
-              )}
-              title="Edit"
-            >
-              <Edit className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
+        )}
         {activeTab === "classes" && (
           <div className="flex gap-2 flex-wrap">
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
@@ -1113,15 +1190,30 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
             <p className={pageHeaderSubtitleClass}>Browse and edit all available D&D content</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+          <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:gap-2 sm:self-start">
+            <label className="sr-only" htmlFor="compendium-mobile-tab-select">
+              Compendium section
+            </label>
+            <select
+              id="compendium-mobile-tab-select"
+              value={activeTab}
+              onChange={(event) => setActiveTab(event.target.value as ContentType)}
+              className="min-w-0 flex-1 rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none sm:hidden"
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label} ({tabCounts[tab.id]})
+                </option>
+              ))}
+            </select>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center justify-center w-12 h-12 bg-card border-2 border-border rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-12 sm:w-12"
                   aria-label="Compendium section options"
                 >
-                  <Settings className="w-5 h-5" />
+                  <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -1148,7 +1240,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               <button
                 type="button"
                 onClick={() => setSpellListDialogOpen(true)}
-                className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-card border-2 border-border text-foreground rounded-xl font-semibold hover:bg-muted transition-colors whitespace-nowrap"
+                className="hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 border-border bg-card px-5 py-3 font-semibold text-foreground transition-colors hover:bg-muted sm:inline-flex"
               >
                 <Upload className="w-5 h-5 shrink-0" />
                 Upload class spell list
@@ -1156,10 +1248,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
             <Link
               href={compendiumEditHref(activeTab, "new")}
-              className="inline-flex w-max shrink-0 items-center gap-2 px-5 py-3 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+              className="inline-flex max-w-[42vw] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
             >
-              <Plus className="w-5 h-5 shrink-0" />
-              {newItemButtonLabels[activeTab]}
+              <Plus className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+              <span className="truncate">{newItemButtonLabels[activeTab]}</span>
             </Link>
           </div>
         </div>
@@ -1302,8 +1394,8 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           </div>
         )}
 
-        {/* Tabs — content type selection */}
-        <div id="compendium-tabs" className="flex flex-wrap gap-1.5 mb-4">
+        {/* Tabs — content type selection (desktop) */}
+        <div id="compendium-tabs" className="mb-4 hidden flex-wrap gap-1.5 sm:flex">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -1660,7 +1752,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           />
         ) : (
           <div className={compendiumBrowseGridClass(activeTab)}>
-            <AnimatePresence>
+            <AnimatePresence mode="popLayout">
               {filteredContent.map(renderContentCard)}
             </AnimatePresence>
           </div>

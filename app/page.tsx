@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
+import { WelcomeSplashOverlay } from "@/components/home/welcome-splash-overlay"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { SiteFooter } from "@/components/site-footer"
 import Link from "next/link"
 import { BookOpen, Upload, ArrowRight, Sword, Shield, Wand2 } from "lucide-react"
 import { createClient } from "@/lib/db/client"
+import { cn } from "@/lib/utils"
 import {
   FEATURE_CARD_IMAGES,
   HERO_ROTATING_IMAGES,
@@ -36,20 +39,20 @@ const features = [
       "Browse and edit classes, subclasses, species, spells, feats, equipment, and class resources. Toggle SRD entries on or off and add your own homebrew.",
   },
   {
-    href: "/import",
-    image: FEATURE_CARD_IMAGES.importContent,
-    imageAlt: "Import External Content",
-    title: "Import External Content",
-    description:
-      "Paste text, upload PDFs, or drop in Dump Stat JSON—AI extracts structured compendium data from homebrew documents and web sources.",
-  },
-  {
     href: "/characters",
     image: FEATURE_CARD_IMAGES.characterSheet,
     imageAlt: "Interactive Character Sheet",
     title: "Interactive Character Sheet",
     description:
       "Play at the table with clickable d20 rolls, editable HP and temp HP, spell slot tracking, conditions, and weapon attack and damage rollers.",
+  },
+  {
+    href: "/import",
+    image: FEATURE_CARD_IMAGES.importContent,
+    imageAlt: "Import External Content",
+    title: "Import External Content",
+    description:
+      "Bring your own LLM to convert pasted text, PDF's or Foundry exports into structured compendium JSON files for custom classes and more.",
   },
   {
     href: "/characters",
@@ -65,7 +68,7 @@ const features = [
     imageAlt: "Export and Database",
     title: "Export and Database",
     description:
-      "Store compendium data in your browser (IndexedDB) or MySQL when hosted. Export compendium items and characters to JSON for backup and use elsewhere.",
+      "Store data in your browser locally or MySQL for access anywhere when hosted. Backup and share characters and custom compendium content.",
   },
 ]
 
@@ -86,6 +89,7 @@ type LibraryStats = {
 }
 
 export default function HomePage() {
+  const { isCompactOnly } = useAppPresentationMode()
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
@@ -154,24 +158,36 @@ export default function HomePage() {
 
   return (
     <div id="home-root" className="min-h-screen bg-background flex flex-col">
+      <WelcomeSplashOverlay />
       <MainNav />
 
       <main id="home-main">
         {/* Hero Section */}
         <section
           id="hero-section"
-          className="relative overflow-hidden pt-[170px] pb-20 px-4"
-          style={{
-            backgroundImage: `url(${heroBackgroundUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center top",
-            backgroundRepeat: "no-repeat",
-          }}
+          className={cn(
+            "relative overflow-hidden pt-[170px] pb-20 px-4",
+            isCompactOnly && "bg-gradient-to-b from-primary/15 via-card-lighter to-background",
+          )}
+          style={
+            isCompactOnly
+              ? undefined
+              : {
+                  backgroundImage: `url(${heroBackgroundUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center top",
+                  backgroundRepeat: "no-repeat",
+                }
+          }
         >
-          {/* Dark overlay so text stays readable */}
-          <div className="absolute inset-0 bg-background/50 pointer-events-none" />
-          {/* Subtle bottom fade into background */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+          {!isCompactOnly ? (
+            <>
+              <div className="absolute inset-0 bg-background/50 pointer-events-none" />
+              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-card/30 pointer-events-none" />
+          )}
 
           <div className="max-w-4xl mx-auto text-center relative z-20">
             <motion.div
@@ -267,21 +283,34 @@ export default function HomePage() {
                     href={feature.href}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card-lighter"
                   >
-                    <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={feature.image}
-                        alt={feature.imageAlt}
-                        className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
-                      />
-                    </div>
+                    {!isCompactOnly ? (
+                      <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={feature.image}
+                          alt={feature.imageAlt}
+                          className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full shrink-0 border-b border-border bg-primary/10 px-6 py-4">
+                        <h3
+                          className="text-lg font-bold text-foreground group-hover:text-primary transition-colors"
+                          style={{ fontFamily: "var(--font-display)" }}
+                        >
+                          {feature.title}
+                        </h3>
+                      </div>
+                    )}
                     <div className="flex flex-col items-center p-6">
-                      <h3
-                        className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors"
-                        style={{ fontFamily: "var(--font-display)" }}
-                      >
-                        {feature.title}
-                      </h3>
+                      {!isCompactOnly ? (
+                        <h3
+                          className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors"
+                          style={{ fontFamily: "var(--font-display)" }}
+                        >
+                          {feature.title}
+                        </h3>
+                      ) : null}
                       <p className="text-muted-foreground text-sm">{feature.description}</p>
                     </div>
                   </Link>
@@ -294,16 +323,24 @@ export default function HomePage() {
         {/* Library Stats Section */}
         <section
           id="library-stats-section"
-          className="py-20 px-4 border-t border-border relative overflow-hidden"
-          style={{
-            backgroundImage: `url(${LIBRARY_STATS_BACKGROUND})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
+          className={cn(
+            "py-20 px-4 border-t border-border relative overflow-hidden",
+            isCompactOnly && "bg-gradient-to-b from-card-lighter to-background",
+          )}
+          style={
+            isCompactOnly
+              ? undefined
+              : {
+                  backgroundImage: `url(${LIBRARY_STATS_BACKGROUND})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+          }
         >
-          {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-background/55 pointer-events-none" />
+          {!isCompactOnly ? (
+            <div className="absolute inset-0 bg-background/55 pointer-events-none" />
+          ) : null}
           <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}

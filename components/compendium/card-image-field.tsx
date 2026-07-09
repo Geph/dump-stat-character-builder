@@ -2,6 +2,7 @@
 
 import { useRef } from "react"
 import { ImageIcon, X } from "lucide-react"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
   CARD_IMAGE_ASPECT_LABEL,
   CARD_IMAGE_RECOMMENDED,
@@ -40,7 +41,9 @@ export function CardImageField({
   layout = "default",
   className,
 }: CardImageFieldProps) {
+  const { isCompactOnly } = useAppPresentationMode()
   const inputRef = useRef<HTMLInputElement>(null)
+  if (isCompactOnly) return null
   const preview = normalizeCardImageUrl(value)
   const aspectClass = imageAspect === "21/9" ? WIDE_CARD_ASPECT_CLASS : CLASS_CARD_ASPECT_CLASS
   const previewImageClass =

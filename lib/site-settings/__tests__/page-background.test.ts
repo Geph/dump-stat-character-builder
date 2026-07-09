@@ -32,6 +32,6 @@ describe("page background upload", () => {
   })
 
   it("uses predictable bundled asset paths per theme", () => {
-    expect(themePageBackgroundAssetPath("arcane")).toBe("/images/page-backgrounds/arcane.png")
+    expect(themePageBackgroundAssetPath("arcane")).toBe("/images/page-backgrounds/arcane.webp")
   })
 })

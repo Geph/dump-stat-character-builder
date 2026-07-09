@@ -2,7 +2,7 @@ import type { AppThemeId } from "@/lib/themes/app-themes"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const themePageBackground = (themeId: AppThemeId) =>
-  withBasePath(`/images/page-backgrounds/${themeId}.png`)
+  withBasePath(`/images/page-backgrounds/${themeId}.webp`)
 
 /**
  * Bundled page-background art per color theme (2:3 portrait).

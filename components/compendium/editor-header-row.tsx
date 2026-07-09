@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react"
 import { GameIconPicker } from "@/components/game-icon-picker"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { CompendiumThemeColorPicker } from "@/components/compendium/theme-color-picker"
 import { SourceLinkField } from "@/components/compendium/source-link-field"
 import { CardImageField } from "@/components/compendium/card-image-field"
@@ -56,6 +57,7 @@ export function CompendiumEditorHeaderRow({
   cardImagePlacement = "below",
   afterName,
 }: CompendiumEditorHeaderRowProps) {
+  const { isCompactOnly } = useAppPresentationMode()
   const gridCols = afterName
     ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
     : "grid-cols-1 md:grid-cols-3"
@@ -104,7 +106,7 @@ export function CompendiumEditorHeaderRow({
         />
       </div>
     </div>
-    {onCardImageUrlChange && cardImagePlacement === "below" ? (
+    {onCardImageUrlChange && cardImagePlacement === "below" && !isCompactOnly ? (
       <CardImageField
         value={cardImageUrl}
         onChange={onCardImageUrlChange}

@@ -1,2 +1,2 @@
-# Theme default page backgrounds (2:3 portrait WebP).
-# Set paths in lib/site-settings/theme-page-backgrounds.ts after adding files here.
+# Theme default page backgrounds (2:3 portrait WebP, 1200×1800).
+# Regenerate with: pnpm images:optimize (sources in scripts/page-bg-sources/).

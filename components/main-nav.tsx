@@ -3,20 +3,26 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { Users, BookOpen, Upload, Sparkles, Home, LayoutDashboard } from "lucide-react"
+import { Users, BookOpen, Upload, NotebookText, Home, LayoutDashboard } from "lucide-react"
 import { GlobalSettingsMenu } from "@/components/settings/global-settings-menu"
+import { useGmDashboardNav } from "@/components/settings/use-gm-dashboard-nav"
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/builder", label: "Builder", icon: Sparkles },
+  { href: "/builder", label: "Builder", icon: NotebookText },
   { href: "/characters", label: "Characters", icon: Users },
-  { href: "/dashboard", label: "GM Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "GM Dashboard", icon: LayoutDashboard, beta: true as const },
   { href: "/compendium", label: "Compendium", icon: BookOpen },
   { href: "/import", label: "Import", icon: Upload },
 ]
 
 export function MainNav() {
   const pathname = usePathname()
+  const { enabled: gmDashboardNavEnabled } = useGmDashboardNav()
+
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== "/dashboard" || gmDashboardNavEnabled,
+  )
 
   return (
     <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-lg border-b border-border">
@@ -49,7 +55,7 @@ export function MainNav() {
 
           <div className="flex items-center gap-2 shrink-0">
           <nav className="flex items-center gap-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = pathname === item.href ||
                 (item.href !== "/" && pathname.startsWith(item.href))
               const Icon = item.icon
@@ -66,7 +72,14 @@ export function MainNav() {
                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}>
                     <Icon className="w-4 h-4" />
-                    <span className="hidden md:inline">{item.label}</span>
+                    <span className="hidden md:inline">
+                      {item.label}
+                      {"beta" in item && item.beta ? (
+                        <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                          (beta)
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
                   {isActive && (
                     <motion.div

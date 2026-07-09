@@ -4,6 +4,7 @@ import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import { isCommonModifiersCatalogAbility } from "@/lib/compendium/modifier-catalog"
+import { areCompendiumImagesEnabled } from "@/lib/site-settings/app-presentation-mode"
 import { isSrdSource } from "@/lib/srd/source"
 
 /** Card / detail hero art — URL or data URL. */
@@ -97,6 +98,7 @@ export function resolveCompendiumCardImageUrl(
   item: CompendiumCardVisual & Record<string, unknown>,
   tab: CompendiumContentType | null | undefined,
 ): string | null {
+  if (!areCompendiumImagesEnabled()) return null
   if (tab != null && !compendiumItemSupportsCardImage(tab, item)) return null
   return getCompendiumCardImageUrl(item)
 }
