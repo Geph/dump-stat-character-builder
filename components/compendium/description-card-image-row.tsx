@@ -3,6 +3,7 @@
 import { CardImageField } from "@/components/compendium/card-image-field"
 import { CompendiumEditorSection } from "@/components/compendium/compendium-editor-section"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import type { CompendiumCardImageCrop } from "@/lib/compendium/card-image"
 import { pageOverlayPanelClass, pageOverlayPanelTitleClass } from "@/lib/compendium/editor-field-styles"
 import { cn } from "@/lib/utils"
@@ -24,9 +25,20 @@ export function CompendiumDescriptionCardImageRow({
   onCardImageUrlChange,
   cardImageCrop = "center",
 }: CompendiumDescriptionCardImageRowProps) {
+  const { isCompactOnly } = useAppPresentationMode()
+
   return (
-    <CompendiumEditorSection title="Description & card art" collapsible defaultOpen>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+    <CompendiumEditorSection
+      title={isCompactOnly ? "Description" : "Description & card art"}
+      collapsible
+      defaultOpen
+    >
+      <div
+        className={cn(
+          "grid gap-4 items-stretch",
+          isCompactOnly ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2",
+        )}
+      >
         <section
           className={cn(
             pageOverlayPanelClass,
@@ -43,14 +55,16 @@ export function CompendiumDescriptionCardImageRow({
             />
           </div>
         </section>
-        <CardImageField
-          value={cardImageUrl}
-          onChange={onCardImageUrlChange}
-          imageAspect="3/4"
-          imageCrop={cardImageCrop}
-          layout="paired"
-          className="min-w-0"
-        />
+        {!isCompactOnly ? (
+          <CardImageField
+            value={cardImageUrl}
+            onChange={onCardImageUrlChange}
+            imageAspect="3/4"
+            imageCrop={cardImageCrop}
+            layout="paired"
+            className="min-w-0"
+          />
+        ) : null}
       </div>
     </CompendiumEditorSection>
   )

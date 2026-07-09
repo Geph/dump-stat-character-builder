@@ -143,6 +143,8 @@ import {
 } from "@/lib/builder/choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
+import { APP_PRESENTATION_MODE_CHANGE_EVENT, isCompactOnlyPresentation } from "@/lib/site-settings/app-presentation-mode"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
   clearBuilderDraft,
   loadBuilderDraft,
@@ -356,6 +358,7 @@ const EMPTY_CHARACTER = BUILDER_EMPTY_CHARACTER
 
 export default function BuilderPageClient() {
   const router = useRouter()
+  const { isCompactOnly } = useAppPresentationMode()
   const [currentStep, setCurrentStep] = useState(1)
   const [maxStepReached, setMaxStepReached] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -643,6 +646,22 @@ export default function BuilderPageClient() {
     setSpeciesPickerPage(0)
     setBackgroundPickerPage(0)
   }, [cardViewMode, pickerPageSize])
+
+  useEffect(() => {
+    if (isCompactOnly) {
+      setCardViewMode("dense")
+    }
+  }, [isCompactOnly])
+
+  useEffect(() => {
+    const syncPresentation = () => {
+      if (isCompactOnlyPresentation()) {
+        setCardViewMode("dense")
+      }
+    }
+    window.addEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+    return () => window.removeEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+  }, [])
 
   useEffect(() => {
     setSpellLevelPages({})
@@ -2388,6 +2407,7 @@ export default function BuilderPageClient() {
                 >
                   Clear All
                 </button>
+                {!isCompactOnly ? (
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     type="button"
@@ -2418,6 +2438,7 @@ export default function BuilderPageClient() {
                     <span className="hidden sm:inline">Compact</span>
                   </button>
                 </div>
+                ) : null}
               </div>
 
               <div className="flex flex-col items-end gap-2">
@@ -4950,7 +4971,7 @@ export default function BuilderPageClient() {
             id="builder-preview"
             className={`lg:col-span-2 ${mobilePanel === "steps" ? "hidden lg:block" : ""}`}
           >
-            <div className="builder-preview-panel bg-card rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 flex flex-col min-h-[720px] lg:h-[calc(100vh-7rem)] lg:min-h-0">
+            <div className="builder-preview-panel bg-card/85 rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 flex flex-col min-h-[720px] lg:h-[calc(100vh-7rem)] lg:min-h-0">
               {/* Header with name, classes and hit die */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-black text-foreground truncate" style={{ fontFamily: "var(--font-display)" }}>

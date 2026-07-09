@@ -1,6 +1,10 @@
 # Dump Stat
 
-![Dump Stat — 5E compatible character creator](./public/images/readme/hero.png)
+<p align="center">
+  <img src="./public/images/features/character-creation.webp" alt="Character builder" width="31%" />
+  <img src="./public/images/features/compendium.webp" alt="Compendium" width="31%" />
+  <img src="./public/images/features/character-sheet.webp" alt="Interactive character sheet" width="31%" />
+</p>
 
 A modern 5E compatible character builder and compendium built with Next.js and MySQL.
 

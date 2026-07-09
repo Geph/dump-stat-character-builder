@@ -5,6 +5,8 @@ import { ChevronUp } from "lucide-react"
 import { SrdAttribution } from "@/components/srd-attribution"
 import { cn } from "@/lib/utils"
 
+const GITHUB_REPO_URL = "https://github.com/Geph/dump-stat-character-builder"
+
 type SiteFooterProps = {
   id?: string
   className?: string
@@ -15,22 +17,7 @@ export function SiteFooter({ id = "site-footer", className }: SiteFooterProps) {
 
   return (
     <footer id={id} className={className ?? "mt-auto shrink-0 w-full py-5 px-4 border-t border-border bg-card"}>
-      <div className="max-w-6xl mx-auto flex flex-col-reverse">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-center gap-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Attribution and Legal
-          <ChevronUp
-            className={cn(
-              "size-3.5 shrink-0 transition-transform duration-200",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-
+      <div className="max-w-6xl mx-auto flex flex-col">
         <div
           className={cn(
             "grid transition-[grid-template-rows] duration-200 ease-out",
@@ -87,9 +74,44 @@ export function SiteFooter({ id = "site-footer", className }: SiteFooterProps) {
                 Not affiliated with or endorsed by Wizards of the Coast. &ldquo;Dungeons &amp; Dragons&rdquo; and
                 related marks are trademarks of Wizards of the Coast LLC.
               </p>
+              <p className="text-xs leading-snug">
+                All product names, logos, and brands are property of their respective owners. All company,
+                product, and service names used in this graphic are for identification purposes only. Use of
+                these names, logos, and brands does not imply endorsement.
+              </p>
+              <p className="text-xs leading-snug">
+                Dump Stat does not collect personal identification data. Character and compendium data stay in
+                your browser or your own database when you host the app yourself.
+              </p>
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-center gap-2 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Attribution and Legal
+          <ChevronUp
+            className={cn(
+              "size-3.5 shrink-0 transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+
+        <p className="pb-1 text-center text-xs text-muted-foreground">
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            View Dump Stat on GitHub
+          </a>
+        </p>
       </div>
     </footer>
   )
