@@ -39,4 +39,4 @@ export const STARTING_EQUIPMENT_CARD_IMAGES = {
 } as const
 
 /** GitHub README hero graphic (repo-relative path, not Pages basePath) */
-export const README_HERO_IMAGE = "/images/features/hero.png"
+export const README_HERO_IMAGE = "/images/features/hero.webp"

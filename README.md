@@ -1,10 +1,10 @@
 # Dump Stat
 
-![Dump Stat — 5E compatible character creator](./public/images/features/hero.png)
+![Dump Stat — 5E compatible character creator](./public/images/features/hero.webp)
 
 A modern 5E compatible character builder and compendium built with Next.js and MySQL.
 
-**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content is exposed to homebrew, so anything Dump Stat ships, you can recreate, retune, or replace without touching code.
+**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can be used to process your own imported content.
 
 ## Features
 
