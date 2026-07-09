@@ -5,15 +5,21 @@ import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImageIcon } from "lucide-react"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { withBasePath } from "@/lib/config/deploy-mode"
 import {
   isWelcomeSplashSuppressed,
   setWelcomeSplashSuppressed,
 } from "@/lib/site-settings/welcome-splash"
-import { setAppPresentationMode } from "@/lib/site-settings/app-presentation-mode"
-import { setBuilderLayout } from "@/lib/site-settings/builder-layout"
+import {
+  APP_PRESENTATION_MODE_STORAGE_KEY,
+  setAppPresentationMode,
+} from "@/lib/site-settings/app-presentation-mode"
+import {
+  BUILDER_LAYOUT_STORAGE_KEY,
+  setBuilderLayout,
+} from "@/lib/site-settings/builder-layout"
+import { clearBuilderDraft } from "@/lib/builder/draft-storage"
 
 type VersionOption = {
   id: string
@@ -75,6 +81,9 @@ const VERSION_OPTIONS: VersionOption[] = [
   },
 ]
 
+const SPLASH_LINK_CLASS =
+  "block text-inherit no-underline hover:text-inherit hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded-lg"
+
 function VersionOptionCard({
   option,
   onChoose,
@@ -86,68 +95,84 @@ function VersionOptionCard({
   const isExternalLink = option.href.startsWith("http")
   const openInNewTab = isExternalLink && !option.sameTab
 
+  const handleActivate = () => {
+    onChoose(option.id)
+  }
+
+  const imageBlock = option.imageSrc ? (
+    <div
+      className={cn(
+        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden rounded-t-xl",
+        option.imageBackgroundClass ?? "bg-muted",
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={option.imageSrc}
+        alt=""
+        className={cn(
+          "h-full w-full",
+          option.imageObjectFit === "cover" ? "object-cover object-top" : "object-contain p-4",
+        )}
+      />
+    </div>
+  ) : (
+    <div
+      className={cn(
+        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center rounded-t-xl bg-gradient-to-br",
+        option.placeholderClass,
+      )}
+      aria-hidden
+    >
+      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border/60 bg-background/70 shadow-inner">
+        <Icon className="h-10 w-10 text-muted-foreground" />
+      </div>
+      <span className="absolute bottom-2 right-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        Placeholder
+      </span>
+    </div>
+  )
+
+  const titleBlock = (
+    <h3
+      className="px-4 pt-3 text-xl font-bold text-foreground sm:text-2xl"
+      style={{ fontFamily: "var(--font-display)" }}
+    >
+      {option.title}
+    </h3>
+  )
+
+  const linkedHeader = isExternalLink ? (
+    <a
+      href={option.href}
+      target={openInNewTab ? "_blank" : undefined}
+      rel={openInNewTab ? "noopener noreferrer" : undefined}
+      className={SPLASH_LINK_CLASS}
+      onClick={handleActivate}
+    >
+      {imageBlock}
+      {titleBlock}
+    </a>
+  ) : (
+    <Link
+      href={option.href}
+      className={SPLASH_LINK_CLASS}
+      onClick={(event) => {
+        event.preventDefault()
+        handleActivate()
+      }}
+    >
+      {imageBlock}
+      {titleBlock}
+    </Link>
+  )
+
   return (
     <article className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      {option.imageSrc ? (
-        <div
-          className={cn(
-            "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden",
-            option.imageBackgroundClass ?? "bg-muted",
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={option.imageSrc}
-            alt=""
-            className={cn(
-              "h-full w-full",
-              option.imageObjectFit === "cover"
-                ? "object-cover object-top"
-                : "object-contain p-4",
-            )}
-          />
-        </div>
-      ) : (
-        <div
-          className={cn(
-            "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center bg-gradient-to-br",
-            option.placeholderClass,
-          )}
-          aria-hidden
-        >
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border/60 bg-background/70 shadow-inner">
-            <Icon className="h-10 w-10 text-muted-foreground" />
-          </div>
-          <span className="absolute bottom-2 right-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Placeholder
-          </span>
-        </div>
-      )}
-
-      <div className="flex min-h-0 flex-1 flex-col p-4 text-center">
-        <h3
-          className="text-xl font-bold text-foreground sm:text-2xl"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {option.title}
-        </h3>
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{option.description}</p>
-        <Button asChild className="mt-4 w-full" variant="outline">
-          <Link
-            href={option.href}
-            target={openInNewTab ? "_blank" : undefined}
-            rel={openInNewTab ? "noopener noreferrer" : undefined}
-            onClick={(event) => {
-              onChoose(option.id)
-              if (!isExternalLink) {
-                event.preventDefault()
-              }
-            }}
-          >
-            Choose
-          </Link>
-        </Button>
-      </div>
+      {linkedHeader}
+      <p className="px-4 pb-4 pt-2 text-center text-sm leading-relaxed text-muted-foreground">
+        {option.description}
+      </p>
     </article>
   )
 }
@@ -158,8 +183,15 @@ export function WelcomeSplashOverlay() {
   const [isNarrow, setIsNarrow] = useState(false)
 
   useEffect(() => {
-    if (!isWelcomeSplashSuppressed()) {
-      setOpen(true)
+    if (isWelcomeSplashSuppressed()) return
+    setOpen(true)
+    if (typeof localStorage !== "undefined") {
+      if (!localStorage.getItem(APP_PRESENTATION_MODE_STORAGE_KEY)) {
+        setAppPresentationMode("visual-compact")
+      }
+      if (!localStorage.getItem(BUILDER_LAYOUT_STORAGE_KEY)) {
+        setBuilderLayout("visual")
+      }
     }
   }, [])
 
@@ -186,9 +218,11 @@ export function WelcomeSplashOverlay() {
       if (id === "visual-compact") {
         setAppPresentationMode("visual-compact")
         setBuilderLayout("visual")
+        clearBuilderDraft()
       } else if (id === "compact-only") {
         setAppPresentationMode("compact-only")
         setBuilderLayout("compact")
+        clearBuilderDraft()
       }
       dismiss(dontShowAgain)
     },
@@ -233,23 +267,23 @@ export function WelcomeSplashOverlay() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 8 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="relative z-[1] flex h-[70vh] w-[70vw] max-h-[900px] max-w-[1100px] min-h-[420px] min-w-[min(100%,320px)] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 bg-card shadow-2xl"
+            className="relative z-[1] flex w-[70vw] max-h-[min(85vh,680px)] max-w-[1100px] min-w-[min(100%,320px)] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 bg-card shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="pointer-events-none absolute inset-3 rounded-xl border border-primary/20" aria-hidden />
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-8 sm:py-8">
+            <div className="flex min-h-0 flex-col overflow-y-auto px-5 py-4 sm:px-8 sm:py-5">
               <header className="shrink-0 text-center">
                 <h2
                   id="welcome-splash-title"
-                  className="text-3xl font-bold text-foreground sm:text-4xl md:text-5xl"
+                  className="text-3xl font-bold text-foreground sm:text-4xl"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   Choose your app version
                 </h2>
                 <p
                   id="welcome-splash-description"
-                  className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:max-w-none lg:whitespace-nowrap"
+                  className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:max-w-none lg:whitespace-nowrap"
                 >
                   This app was developed with use of{" "}
                   <a
@@ -266,11 +300,11 @@ export function WelcomeSplashOverlay() {
                 </p>
               </header>
 
-              <div className="mt-6 min-h-0 flex-1 sm:mt-8">
+              <div className="mt-4 sm:mt-5">
                 <SwipeVisualPicker
                   enabled={isNarrow}
                   className={cn(
-                    "h-full gap-4",
+                    "gap-4",
                     "max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overscroll-x-contain max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:[touch-action:pan-x]",
                     "sm:grid sm:grid-cols-3 sm:items-stretch",
                   )}
@@ -281,7 +315,7 @@ export function WelcomeSplashOverlay() {
                 </SwipeVisualPicker>
               </div>
 
-              <label className="mt-5 flex shrink-0 cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground sm:mt-6">
+              <label className="mt-4 flex shrink-0 cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground sm:mt-5">
                 <input
                   type="checkbox"
                   checked={dontShowAgain}
