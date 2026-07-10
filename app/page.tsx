@@ -251,7 +251,7 @@ export default function HomePage() {
         </section>
 
         {/* Features Section */}
-        <section id="features-section" className="py-20 px-6 md:px-10 lg:px-12 border-t border-border bg-card-lighter relative">
+        <section id="features-section" className="relative border-t border-border bg-card/70 py-20 px-6 backdrop-blur-sm md:px-10 lg:px-12">
           {/* Inset purple border */}
           <div className="absolute inset-6 md:inset-8 lg:inset-10 border-2 border-primary/30 rounded-xl pointer-events-none" />
           <div className="max-w-6xl mx-auto relative z-10 px-4 md:px-6">
@@ -281,7 +281,7 @@ export default function HomePage() {
                 >
                   <Link
                     href={feature.href}
-                    className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card-lighter"
+                    className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card/75 backdrop-blur text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     {!isCompactOnly ? (
                       <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">

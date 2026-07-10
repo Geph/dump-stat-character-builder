@@ -17,7 +17,8 @@ export const pageOverlayPanelHintClass = "text-xs text-foreground/80 mt-1 leadin
 export const pageOverlayPanelMetaClass = "text-xs text-foreground/72"
 
 /** Stat/count line under page titles. */
-export const pageHeaderStatBadgeClass = "text-muted-foreground text-lg"
+export const pageHeaderStatBadgeClass =
+  "inline-flex items-center rounded-lg border border-border/40 bg-card/75 backdrop-blur px-2.5 py-0.5 text-sm font-semibold text-foreground shadow-sm"
 
 /** Back/navigation link on content pages. */
 export const pageBackLinkClass =

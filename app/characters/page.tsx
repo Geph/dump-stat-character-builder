@@ -393,7 +393,7 @@ export default function CharactersPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-card rounded-2xl border-2 border-border hover:border-primary/50 transition-colors group overflow-hidden"
+                className="rounded-2xl border-2 border-border hover:border-primary/50 transition-colors group overflow-hidden"
               >
                 {/* Large Portrait as main focus */}
                 <Link href={characterSheetHref(character.id)} className="block relative aspect-square">
@@ -427,7 +427,7 @@ export default function CharactersPage() {
                 </Link>
                 
                 {/* Character Info - Below the image */}
-                <div className="p-4">
+                <div className="p-4 bg-card/75 backdrop-blur">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={characterSheetHref(character.id)} className="min-w-0 flex-1">
                       <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">

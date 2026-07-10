@@ -267,12 +267,12 @@ export function WelcomeSplashOverlay() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 8 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="relative z-[1] flex w-[70vw] max-h-[min(85vh,680px)] max-w-[1100px] min-w-[min(100%,320px)] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 bg-card shadow-2xl"
+            className="relative z-[1] flex w-[70vw] max-h-[min(85vh,680px)] max-w-[1100px] min-w-[min(100%,320px)] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="pointer-events-none absolute inset-3 rounded-xl border border-primary/20" aria-hidden />
 
-            <div className="flex min-h-0 flex-col overflow-y-auto px-5 py-4 sm:px-8 sm:py-5">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-card/85 backdrop-blur-sm px-5 py-4 sm:px-8 sm:py-5">
               <header className="shrink-0 text-center">
                 <h2
                   id="welcome-splash-title"
