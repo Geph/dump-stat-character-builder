@@ -4987,7 +4987,7 @@ export default function BuilderPageClient() {
             id="builder-preview"
             className={`lg:col-span-2 ${mobilePanel === "steps" ? "hidden lg:block" : ""}`}
           >
-            <div className="builder-preview-panel bg-card/85 rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 flex flex-col min-h-[720px] lg:h-[calc(100vh-7rem)] lg:min-h-0">
+            <div className="builder-preview-panel bg-card/75 backdrop-blur rounded-2xl border-2 border-border p-4 lg:sticky lg:top-24 flex flex-col min-h-[720px] lg:h-[calc(100vh-7rem)] lg:min-h-0">
               {/* Header with name, classes and hit die */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-black text-foreground truncate" style={{ fontFamily: "var(--font-display)" }}>

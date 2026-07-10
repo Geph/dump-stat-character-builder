@@ -808,7 +808,7 @@ export default function ImportPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card/80 rounded-2xl border-2 border-border overflow-hidden"
+          className="bg-card/75 backdrop-blur rounded-2xl border-2 border-border overflow-hidden"
         >
           {/* Tab bar */}
           <div

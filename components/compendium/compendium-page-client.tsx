@@ -806,7 +806,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       : undefined
 
     const cardActions = (
-      <div className="flex items-center gap-1 shrink-0">
+      <div
+        className={cn(
+          "flex items-center gap-1 shrink-0",
+          portraitGraphicCard && "max-sm:absolute max-sm:top-3 max-sm:right-3 max-sm:z-20",
+        )}
+      >
         {canCopy && (
           <button
             type="button"
@@ -890,7 +895,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         className={cn(
           "relative overflow-hidden rounded-2xl border-2 transition-colors",
           portraitGraphicCard && CLASS_CARD_ASPECT_CLASS,
-          cardMinHeightClass ?? (!portraitGraphicCard ? "bg-card" : null),
+          cardMinHeightClass ?? (!cardImage ? "bg-card/30 backdrop-blur-sm" : null),
           enabled
             ? `border-primary/40 ${accentStyles.hoverBorder}`
             : "border-border/50 opacity-50 grayscale saturate-0 hover:opacity-60",

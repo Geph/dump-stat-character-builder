@@ -13,6 +13,12 @@ type SwipeVisualPickerProps = {
   enabled?: boolean
 }
 
+const SWIPE_EDGE_FADE_LEFT_CLASS =
+  "pointer-events-none absolute inset-y-0 left-0 z-[2] w-10 max-sm:block sm:hidden bg-gradient-to-r from-card from-15% via-card/55 to-transparent"
+
+const SWIPE_EDGE_FADE_RIGHT_CLASS =
+  "pointer-events-none absolute inset-y-0 right-0 z-[2] w-10 max-sm:block sm:hidden bg-gradient-to-l from-card from-15% via-card/55 to-transparent"
+
 export function SwipeVisualPicker({ children, className, enabled = false }: SwipeVisualPickerProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showHint, setShowHint] = useState(true)
@@ -60,8 +66,8 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
   const animatedChildren = Children.map(children, (child, index) => (
     <motion.div
       key={index}
-      initial={{ opacity: 0, x: 28 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.35), ease: "easeOut" }}
       className={swipeItemClass}
     >
@@ -70,7 +76,7 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
   ))
 
   return (
-    <div className="relative max-sm:pt-7">
+    <div className="relative max-sm:overflow-hidden max-sm:pt-7">
       {showHint && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center max-sm:flex sm:hidden">
           <motion.div
@@ -85,21 +91,13 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
         </div>
       )}
 
-      {canScrollLeft && (
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-8 bg-gradient-to-r from-background/90 to-transparent max-sm:block sm:hidden"
-          aria-hidden
-        />
-      )}
-      {canScrollRight && (
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-background/90 to-transparent max-sm:block sm:hidden"
-          aria-hidden
-        />
-      )}
+      <div className="relative max-sm:overflow-hidden">
+        {canScrollLeft && <div className={SWIPE_EDGE_FADE_LEFT_CLASS} aria-hidden />}
+        {canScrollRight && <div className={SWIPE_EDGE_FADE_RIGHT_CLASS} aria-hidden />}
 
-      <div ref={scrollRef} className={cn(className, "max-sm:scroll-px-4")}>
-        {animatedChildren}
+        <div ref={scrollRef} className={cn(className, "max-sm:min-w-0")}>
+          {animatedChildren}
+        </div>
       </div>
     </div>
   )
