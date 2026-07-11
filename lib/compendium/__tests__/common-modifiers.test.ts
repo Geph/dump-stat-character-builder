@@ -395,6 +395,9 @@ describe("canonical SRD feature choices", () => {
     for (const [className, featureName] of [
       ["Cleric", "Improved Blessed Strikes"],
       ["Druid", "Improved Elemental Fury"],
+      ["Barbarian", "Improved Brutal Strike"],
+      ["Rogue", "Improved Cunning Strike"],
+      ["Fighter", "Superior Critical"],
     ] as const) {
       const enriched = enrichClassFeatureWithModifierPresets(className, baseFeature(featureName))
       expect(enriched.isChoice ?? false).toBe(false)
@@ -404,6 +407,35 @@ describe("canonical SRD feature choices", () => {
       expect(characteristicTypes).not.toContain("feature_option_picker")
       expect(characteristicTypes).not.toContain("bonus_damage_riders")
     }
+  })
+
+  it("wires Sorcery Incarnate as a bonus-action 2 SP activation of Innate Sorcery", () => {
+    const enriched = enrichClassFeatureWithModifierPresets(
+      "Sorcerer",
+      baseFeature("Sorcery Incarnate", 7),
+    )
+    expect(enriched.activation?.bonusAction).toBe(true)
+    expect(enriched.limitedUses).toEqual({
+      type: "class_resource",
+      classResourceKey: "sorcery_points",
+      classResourceAmount: 2,
+    })
+
+    const uses = enriched.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "uses")
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses.type).toBe("class_resource")
+      expect(uses.uses.classResourceKey).toBe("sorcery_points")
+      expect(uses.uses.classResourceAmount).toBe(2)
+    }
+
+    const effects = enriched.linkedModifiers?.flatMap(
+      (instance) => instance.activation?.effects ?? [],
+    )
+    const buff = effects?.find((effect) => effect.kind === "self_buff_caster")
+    expect(buff?.casterBuffLabel).toMatch(/Innate Sorcery/i)
   })
 
   it("wires Hunter's Prey with Colossus Slayer and Horde Breaker options", () => {

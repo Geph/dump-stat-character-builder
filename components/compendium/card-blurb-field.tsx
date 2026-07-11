@@ -12,6 +12,8 @@ type CardBlurbFieldProps = {
   hint?: string
   placeholder?: string
   className?: string
+  /** Textarea rows; default 3. Use 2 for compact placement under a description. */
+  rows?: number
 }
 
 export function CardBlurbField({
@@ -21,6 +23,7 @@ export function CardBlurbField({
   hint = "Short text shown on selection cards in the builder (2 lines max).",
   placeholder = "A one- or two-sentence hook that fits on the card…",
   className,
+  rows = 3,
 }: CardBlurbFieldProps) {
   const length = value.length
   const overLimit = length > COMPENDIUM_CARD_BLURB_MAX_LENGTH
@@ -47,9 +50,12 @@ export function CardBlurbField({
           onChange(e.target.value.slice(0, COMPENDIUM_CARD_BLURB_MAX_LENGTH))
         }
         maxLength={COMPENDIUM_CARD_BLURB_MAX_LENGTH}
-        rows={3}
+        rows={rows}
         placeholder={placeholder}
-        className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground text-sm leading-relaxed focus:outline-none focus:border-primary resize-y min-h-[80px]"
+        className={cn(
+          "w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground text-sm leading-relaxed focus:outline-none focus:border-primary resize-y",
+          rows <= 2 ? "min-h-[3.5rem]" : "min-h-[80px]",
+        )}
       />
     </div>
   )

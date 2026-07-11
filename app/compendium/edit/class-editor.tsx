@@ -483,36 +483,39 @@ export default function ClassEditorPage({ id }: { id: string }) {
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
             cardImageCrop="top"
+            descriptionExtras={
+              <>
+                <CardBlurbField
+                  value={form.card_blurb}
+                  onChange={(card_blurb) => setForm({ ...form, card_blurb })}
+                  placeholder="A master of weapons and armor who adapts to any martial role…"
+                  rows={2}
+                />
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Complexity
+                  </label>
+                  <select
+                    value={form.complexity}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        complexity: e.target.value as ClassComplexity | "",
+                      })
+                    }
+                    className="w-full md:w-48 px-4 py-2.5 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Not set</option>
+                    {CLASS_COMPLEXITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {formatClassComplexityPhrase(option.value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            }
           />
-
-          <CardBlurbField
-            value={form.card_blurb}
-            onChange={(card_blurb) => setForm({ ...form, card_blurb })}
-            placeholder="A master of weapons and armor who adapts to any martial role…"
-          />
-
-          <CompendiumEditorPanel title="Complexity">
-            <label className="block text-sm font-semibold text-foreground mb-2">
-              Complexity
-            </label>
-            <select
-              value={form.complexity}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  complexity: e.target.value as ClassComplexity | "",
-                })
-              }
-              className="w-full md:w-48 px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="">Not set</option>
-              {CLASS_COMPLEXITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {formatClassComplexityPhrase(option.value)}
-                </option>
-              ))}
-            </select>
-          </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Proficiencies">
           <div className="space-y-4">
