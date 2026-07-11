@@ -5,6 +5,7 @@ import { Settings, ExternalLink, Bug } from "lucide-react"
 import Link from "next/link"
 import { useAppTheme, APP_THEMES } from "@/components/providers/app-theme-provider"
 import {
+  getAppVersion,
   getDeployMode,
   getStorageLabel,
 } from "@/lib/config/deploy-mode"
@@ -144,9 +145,11 @@ export function GlobalSettingsMenu() {
             </TabsContent>
 
             <TabsContent value="general" className="mt-0 space-y-6">
-              <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
-                <p className="text-sm font-semibold text-foreground">Deployment</p>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
+                <p className="text-xs font-semibold text-foreground">Deployment</p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] leading-tight">
+                  <dt className="text-muted-foreground">Version</dt>
+                  <dd className="font-medium text-foreground tabular-nums">{getAppVersion()}</dd>
                   <dt className="text-muted-foreground">Mode</dt>
                   <dd className="font-medium text-foreground">{getDeployMode()}</dd>
                   <dt className="text-muted-foreground">Storage</dt>

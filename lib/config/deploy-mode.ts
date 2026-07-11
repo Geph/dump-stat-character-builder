@@ -1,3 +1,5 @@
+import packageJson from "@/package.json"
+
 export type DeployMode = "hosted" | "static"
 
 function readDeployMode(): DeployMode {
@@ -55,4 +57,9 @@ export function usesIndexedDbStorage(): boolean {
 
 export function getStorageLabel(): string {
   return isStaticDeploy() ? "Browser (IndexedDB)" : "MySQL (server)"
+}
+
+/** App version from package.json (kept in sync with VERSION via bump script). */
+export function getAppVersion(): string {
+  return packageJson.version
 }

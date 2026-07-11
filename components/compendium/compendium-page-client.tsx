@@ -809,7 +809,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       <div
         className={cn(
           "flex items-center gap-1 shrink-0",
-          cardImage && "absolute top-3 right-3 z-20",
+          cardImage ? "absolute top-3 right-3 z-20" : "ml-4",
         )}
       >
         {canCopy && (
@@ -849,13 +849,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     const cardTitle = (
       <h3
         className={cn(
-          "font-bold cursor-pointer leading-tight flex items-center gap-1.5",
+          "font-bold cursor-pointer leading-tight inline-flex items-center gap-1.5",
           cardImage
             ? cn(
                 portraitGraphicCard ? "text-2xl" : "text-[1.6875rem]",
                 "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]",
               )
-            : "text-lg text-foreground",
+            : "min-w-0 flex-[1_1_8rem] break-words text-lg text-foreground",
           accentStyles.titleHover,
         )}
         onClick={() => setSelectedItem(item)}
@@ -931,7 +931,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               {cardTitle}
             </div>
             <div className="mb-2 hidden items-start justify-between gap-2 sm:flex">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
                 {cardIcon}
                 {cardTitle}
               </div>
