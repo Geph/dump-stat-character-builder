@@ -91,6 +91,18 @@ export const ImportMechanicSchema = z.object({
   targetCreatureTypes: z.array(z.string()).optional(),
   requiresSheetToggle: z.string().optional(),
   sheetToggleLabel: z.string().optional(),
+  /** Alternate ability for skill checks / saves / weapon rolls. */
+  alternateAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
+  alternateSkills: z.array(z.string()).optional(),
+  alternateSaves: z.array(z.string()).optional(),
+  weaponAbilityAppliesTo: z.enum(["attack", "damage", "both"]).optional(),
+  weaponAbilityScope: z.enum(["all", "melee", "ranged", "finesse", "specific"]).optional(),
+  weaponNames: z.array(z.string()).optional(),
+  fromSaveAbility: z.enum(["any", "STR", "DEX", "CON", "INT", "WIS", "CHA"]).optional(),
+  toSaveAbility: z.enum(USES_ABILITY_CODES).optional(),
+  forcedSaveScope: z.enum(["your_spells", "your_features", "all"]).optional(),
+  restoreResourceKey: z.string().optional(),
+  restoreResourceAmount: z.number().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>

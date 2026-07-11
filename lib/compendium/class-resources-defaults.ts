@@ -157,7 +157,10 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
         type: "at_level",
         atLevelMode: "tier",
         dieType: "d6",
-        recharges: SHORT_OR_LONG_REST,
+        recharges: [
+          { rest: "short_rest", amount: 1 },
+          { rest: "long_rest" },
+        ],
         atLevelTable: [
           { level: 3, count: 4 },
           { level: 5, count: 6 },
@@ -217,7 +220,10 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
         type: "at_level",
         atLevelMode: "tier",
         dieType: "d6",
-        recharges: SHORT_OR_LONG_REST,
+        recharges: [
+          { rest: "short_rest", amount: 1 },
+          { rest: "long_rest" },
+        ],
         atLevelTable: [
           { level: 3, count: 4 },
           { level: 5, count: 6 },

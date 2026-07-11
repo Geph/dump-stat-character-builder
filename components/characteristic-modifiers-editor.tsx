@@ -1538,6 +1538,174 @@ function ModifierFields({
         </div>
       )
 
+    case "saving_throw_alternate_ability":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Remaps which ability modifier you use for the listed saving throws (e.g. Intelligence
+            instead of Wisdom).
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Use ability modifier</label>
+            <select
+              value={mod.ability}
+              onChange={(e) =>
+                onChange({ ...mod, ability: e.target.value as typeof mod.ability })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Saves to remap (leave empty for all saves)
+            </p>
+            <TagInput
+              values={mod.saves}
+              onChange={(saves) => onChange({ ...mod, saves })}
+              suggestions={SAVING_THROW_NAMES}
+              placeholder="Add save..."
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Condition (optional)
+            </label>
+            <input
+              type="text"
+              value={mod.conditionLabel ?? ""}
+              onChange={(e) =>
+                onChange({ ...mod, conditionLabel: e.target.value || undefined })
+              }
+              placeholder="e.g. While concentrating"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )
+
+    case "forced_save_ability_remap":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            When your features force a saving throw of one ability, remaps it to another (targets
+            make the remapped save).
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">From</label>
+            <select
+              value={mod.fromAbility}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  fromAbility: e.target.value as typeof mod.fromAbility,
+                })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="any">Any</option>
+              {(["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const).map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability}
+                </option>
+              ))}
+            </select>
+            <label className="text-sm text-muted-foreground">To</label>
+            <select
+              value={mod.toAbility}
+              onChange={(e) =>
+                onChange({ ...mod, toAbility: e.target.value as typeof mod.toAbility })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {(["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const).map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Scope</label>
+            <select
+              value={mod.scope}
+              onChange={(e) =>
+                onChange({ ...mod, scope: e.target.value as typeof mod.scope })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="your_features">Your features</option>
+              <option value="your_spells">Your spells</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+        </div>
+      )
+
+    case "weapon_ability_override":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Substitutes the ability used for weapon attack and/or damage rolls (Hex Warrior,
+            Shillelagh). This replaces STR/DEX — it does not add a second ability bonus.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Ability</label>
+            <select
+              value={mod.ability}
+              onChange={(e) =>
+                onChange({ ...mod, ability: e.target.value as typeof mod.ability })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability.charAt(0).toUpperCase() + ability.slice(1)}
+                </option>
+              ))}
+            </select>
+            <label className="text-sm text-muted-foreground">Applies to</label>
+            <select
+              value={mod.appliesTo}
+              onChange={(e) =>
+                onChange({ ...mod, appliesTo: e.target.value as typeof mod.appliesTo })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="both">Attack &amp; damage</option>
+              <option value="attack">Attack only</option>
+              <option value="damage">Damage only</option>
+            </select>
+            <label className="text-sm text-muted-foreground">Weapons</label>
+            <select
+              value={mod.scope}
+              onChange={(e) =>
+                onChange({ ...mod, scope: e.target.value as typeof mod.scope })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="all">All weapons</option>
+              <option value="melee">Melee</option>
+              <option value="ranged">Ranged</option>
+              <option value="finesse">Finesse</option>
+              <option value="specific">Named weapons</option>
+            </select>
+          </div>
+          {mod.scope === "specific" && (
+            <TagInput
+              values={mod.weaponNames ?? []}
+              onChange={(weaponNames) => onChange({ ...mod, weaponNames })}
+              placeholder="Add weapon name..."
+            />
+          )}
+        </div>
+      )
+
     case "custom_skill":
       return (
         <div className="space-y-3">

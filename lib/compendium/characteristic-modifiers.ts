@@ -247,6 +247,21 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Let certain skill checks use a different ability (e.g. Primal Knowledge: STR while raging)",
   },
   {
+    value: "saving_throw_alternate_ability",
+    label: "Alternate Ability for Saving Throws",
+    hint: "Use a different ability for listed saves (e.g. use Intelligence instead of Wisdom)",
+  },
+  {
+    value: "forced_save_ability_remap",
+    label: "Remap Forced Save Ability",
+    hint: "When your features force a save of one ability, use another instead (e.g. Int instead of Wis)",
+  },
+  {
+    value: "weapon_ability_override",
+    label: "Weapon Attack/Damage Ability",
+    hint: "Use a chosen ability for weapon attack and/or damage rolls (Hex Warrior, Shillelagh)",
+  },
+  {
     value: "custom_skill",
     label: "Custom Skill",
     hint: "Named skill with chosen ability and optional expertise (not in the SRD list)",
@@ -345,6 +360,42 @@ export interface SkillCheckAlternateAbilityCharacteristic extends Characteristic
   /** Skills whose ability checks can be made with the alternate ability (empty = any skill). */
   skills: string[]
   /** Optional condition gating the substitution (e.g. "While your Rage is active"). */
+  conditionLabel?: string
+}
+
+export interface SavingThrowAlternateAbilityCharacteristic extends CharacteristicModifierBase {
+  type: "saving_throw_alternate_ability"
+  /** Ability whose modifier replaces the listed saves' governing ability. */
+  ability: AbilityScoreKey
+  /**
+   * Saves to remapped (ability score keys or display names). Empty = all saves use this ability.
+   * Example: ["wisdom"] with ability "intelligence" → Int instead of Wis for Wisdom saves.
+   */
+  saves: string[]
+  conditionLabel?: string
+}
+
+export interface ForcedSaveAbilityRemapCharacteristic extends CharacteristicModifierBase {
+  type: "forced_save_ability_remap"
+  /** Save ability your features normally force (empty / "any" = all forced saves). */
+  fromAbility: AbilityModifierKey | "any"
+  /** Ability the target uses instead. */
+  toAbility: AbilityModifierKey
+  /** What effects this remaps. */
+  scope: "your_spells" | "your_features" | "all"
+  conditionLabel?: string
+}
+
+export type WeaponAbilityAppliesTo = "attack" | "damage" | "both"
+export type WeaponAbilityScope = "all" | "melee" | "ranged" | "finesse" | "specific"
+
+export interface WeaponAbilityOverrideCharacteristic extends CharacteristicModifierBase {
+  type: "weapon_ability_override"
+  ability: AbilityScoreKey
+  appliesTo: WeaponAbilityAppliesTo
+  scope: WeaponAbilityScope
+  /** When scope is "specific", match these weapon names (case-insensitive). */
+  weaponNames?: string[]
   conditionLabel?: string
 }
 
@@ -982,6 +1033,9 @@ export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
   | SkillCheckAlternateAbilityCharacteristic
+  | SavingThrowAlternateAbilityCharacteristic
+  | ForcedSaveAbilityRemapCharacteristic
+  | WeaponAbilityOverrideCharacteristic
   | CustomSkillCharacteristic
   | ListCharacteristic
   | WeaponProficienciesCharacteristic
@@ -1043,6 +1097,25 @@ export function createCharacteristicModifier(
       return { id, type, entries: [] }
     case "skill_check_alternate_ability":
       return { id, type, ability: "strength", skills: [] }
+    case "saving_throw_alternate_ability":
+      return { id, type, ability: "intelligence", saves: ["wisdom"] }
+    case "forced_save_ability_remap":
+      return {
+        id,
+        type,
+        fromAbility: "WIS",
+        toAbility: "INT",
+        scope: "your_features",
+      }
+    case "weapon_ability_override":
+      return {
+        id,
+        type,
+        ability: "charisma",
+        appliesTo: "both",
+        scope: "all",
+        weaponNames: [],
+      }
     case "custom_skill":
       return { id, type, name: "", ability: "intelligence", expertise: false }
     case "languages":
@@ -1724,6 +1797,9 @@ export type AggregatedCharacteristics = {
   criticalHitMinimumByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   attunementSlots: number | null
   auras: AuraCharacteristic[]
+  weaponAbilityOverrides: WeaponAbilityOverrideCharacteristic[]
+  savingThrowAlternateAbilities: SavingThrowAlternateAbilityCharacteristic[]
+  forcedSaveAbilityRemaps: ForcedSaveAbilityRemapCharacteristic[]
   bonusDamageRiders: BonusDamageRidersCharacteristic[]
   savingThrowTriggers: SavingThrowTriggerCharacteristic[]
   onHitTriggers: OnHitTriggerCharacteristic[]
@@ -1737,6 +1813,7 @@ export type AggregatedCharacteristics = {
   spellsKnown: AggregatedSpellsKnown[]
   spellListAccess: string[]
   spellcastingAbility: AbilityScoreKey | null
+  telepathy: { rangeFeet: number; label?: string } | null
   craftableItems: CraftableItemEntry[]
   heldItemsCapBonus: number
   heldItemsCapAbility: AbilityScoreKey | null
@@ -1808,6 +1885,9 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   criticalHitMinimumByLevel: [],
   attunementSlots: null,
   auras: [],
+  weaponAbilityOverrides: [],
+  savingThrowAlternateAbilities: [],
+  forcedSaveAbilityRemaps: [],
   bonusDamageRiders: [],
   savingThrowTriggers: [],
   onHitTriggers: [],
@@ -1821,6 +1901,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   spellsKnown: [],
   spellListAccess: [],
   spellcastingAbility: null,
+  telepathy: null,
   craftableItems: [],
   heldItemsCapBonus: 0,
   heldItemsCapAbility: null,
@@ -2160,6 +2241,28 @@ export function aggregateCharacteristics(
           pushUnique(result.conditionImmunities, mod.conditionImmunities)
         }
         break
+      case "weapon_ability_override":
+        result.weaponAbilityOverrides.push(mod)
+        break
+      case "saving_throw_alternate_ability":
+        result.savingThrowAlternateAbilities.push(mod)
+        break
+      case "forced_save_ability_remap":
+        result.forcedSaveAbilityRemaps.push(mod)
+        break
+      case "telepathy": {
+        const rangeFeet =
+          mod.rangeFeetPerLevel != null && characterLevel > 0
+            ? mod.rangeFeetPerLevel * characterLevel
+            : mod.rangeMiles != null
+              ? Math.round(mod.rangeMiles * 5280)
+              : mod.rangeFeet
+        const previous = result.telepathy?.rangeFeet ?? 0
+        if (rangeFeet > previous) {
+          result.telepathy = { rangeFeet, label: mod.label }
+        }
+        break
+      }
       case "bonus_damage_riders": {
         const resolved = resolveBonusDamageRidersAtLevel(mod, characterLevel)
         const appliesKey = (resolved.appliesTo ?? "").trim().toLowerCase()

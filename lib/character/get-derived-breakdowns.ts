@@ -383,14 +383,18 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
 
   for (const save of derived.saves) {
     const key = `save:${save.ability}` as const
+    const governing = save.governingAbility ?? save.ability
     recorder.addSimple(
       key,
       {
         sourceType: "ability",
-        source: save.ability,
-        label: save.ability.charAt(0).toUpperCase() + save.ability.slice(1),
+        source: governing,
+        label:
+          governing === save.ability
+            ? save.ability.charAt(0).toUpperCase() + save.ability.slice(1)
+            : `${governing.charAt(0).toUpperCase() + governing.slice(1)} (alternate)`,
       },
-      derived.abilityMods[save.ability],
+      derived.abilityMods[governing],
     )
     if (save.proficient) {
       recorder.addSimple(
@@ -401,6 +405,17 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
           label: "Proficiency",
         },
         derived.proficiencyBonus,
+      )
+    }
+    if (save.auraBonus) {
+      recorder.addSimple(
+        key,
+        {
+          sourceType: "feature",
+          source: "Aura",
+          label: "Aura save bonus",
+        },
+        save.auraBonus,
       )
     }
   }
@@ -418,9 +433,8 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     }
   }
 
-  const spellClass = inputs.classes.find((cls) => cls.spellcasting)
-  const abilityKey = resolveSpellcastingAbilityKey(spellClass?.spellcasting?.ability ?? null)
-  if (abilityKey && spellClass) {
+  const primaryCasting = derived.spellcasting[0]
+  if (primaryCasting) {
     recorder.add("spellSaveDc", { sourceType: "base", source: "Base", label: "Base", amount: 8 })
     recorder.add("spellSaveDc", {
       sourceType: "class",
@@ -430,10 +444,36 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     })
     recorder.add("spellSaveDc", {
       sourceType: "ability",
-      source: abilityKey,
-      label: abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1),
-      amount: derived.abilityMods[abilityKey],
+      source: primaryCasting.ability,
+      label: primaryCasting.abilityLabel,
+      amount: primaryCasting.abilityMod,
     })
+    if (primaryCasting.saveDcFeatureBonus !== 0) {
+      recorder.add("spellSaveDc", {
+        sourceType: "feature",
+        source: "Features",
+        label: "Feature bonuses",
+        amount: primaryCasting.saveDcFeatureBonus,
+      })
+    }
+  } else {
+    const spellClass = inputs.classes.find((cls) => cls.spellcasting)
+    const abilityKey = resolveSpellcastingAbilityKey(spellClass?.spellcasting?.ability ?? null)
+    if (abilityKey && spellClass) {
+      recorder.add("spellSaveDc", { sourceType: "base", source: "Base", label: "Base", amount: 8 })
+      recorder.add("spellSaveDc", {
+        sourceType: "class",
+        source: "Proficiency",
+        label: "Proficiency",
+        amount: derived.proficiencyBonus,
+      })
+      recorder.add("spellSaveDc", {
+        sourceType: "ability",
+        source: abilityKey,
+        label: abilityKey.charAt(0).toUpperCase() + abilityKey.slice(1),
+        amount: derived.abilityMods[abilityKey],
+      })
+    }
   }
 
   if (derived.equippedWeaponAttack) {

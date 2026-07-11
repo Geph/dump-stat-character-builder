@@ -602,27 +602,51 @@ function parseAbilityScoreKeyFromWord(word: string): "STR" | "DEX" | "CON" | "IN
   return map[normalized] ?? null
 }
 
-function buildWarriorSpiritTurnStartModifier(
+function buildTurnStartResourceRestoreModifier(
   ctx: DetectFeatureContext,
   text: string,
 ): LinkedModifierInstance | null {
   const match = text.match(
-    /regain\s+(\d+)\s+ki\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
+    /regain\s+(\d+)\s+([a-z][a-z\s-]{0,40}?)\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
   )
   if (!match) return null
   const amount = parseInt(match[1], 10) || 1
+  const resourcePhrase = match[2].trim().toLowerCase()
   const blockedByConditions = /incapacitated/i.test(text) ? ["Incapacitated"] : []
+
+  let restoreResourceKey = "ki_points"
+  let labelResource = "Ki"
+  if (/psi\s*die|psi\s*dice|psionic\s+energy/i.test(resourcePhrase)) {
+    restoreResourceKey = "psionic_energy_dice"
+    labelResource = "Psionic Energy Die"
+  } else if (/focus/i.test(resourcePhrase)) {
+    restoreResourceKey = "focus_points"
+    labelResource = "Focus"
+  } else if (/sorcery/i.test(resourcePhrase)) {
+    restoreResourceKey = "sorcery_points"
+    labelResource = "Sorcery Point"
+  } else if (/ki|focus point/i.test(resourcePhrase)) {
+    restoreResourceKey = "ki_points"
+    labelResource = "Ki"
+  }
 
   return charInstance(newInstanceId(), characteristicCatalogRefId("turn_start_trigger"), [
     {
-      id: modId(instanceKey(ctx, "warriors_spirit")),
+      id: modId(instanceKey(ctx, "turn_start_restore")),
       type: "turn_start_trigger",
-      restoreResourceKey: "ki_points",
+      restoreResourceKey,
       restoreResourceAmount: amount,
       blockedByConditions,
-      label: `Regain ${amount} Ki at turn start`,
+      label: `Regain ${amount} ${labelResource} at turn start`,
     },
   ])
+}
+
+function buildWarriorSpiritTurnStartModifier(
+  ctx: DetectFeatureContext,
+  text: string,
+): LinkedModifierInstance | null {
+  return buildTurnStartResourceRestoreModifier(ctx, text)
 }
 
 function buildTechniqueOnHitModifier(
@@ -1951,5 +1975,12 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     scope: "full",
     test: /regain\s+\d+\s+ki\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
     build: (_match, ctx, text) => buildWarriorSpiritTurnStartModifier(ctx, text),
+  },
+  {
+    id: "resource.turn_start_regain_pool",
+    confidence: "high",
+    scope: "full",
+    test: /regain\s+\d+\s+(?:psi\s*(?:die|dice)|psionic\s+energy(?:\s+dice?)?|focus(?:\s+points?)?|sorcery\s+points?)\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
+    build: (_match, ctx, text) => buildTurnStartResourceRestoreModifier(ctx, text),
   },
 ]

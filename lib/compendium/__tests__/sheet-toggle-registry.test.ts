@@ -17,6 +17,9 @@ describe("sheet-toggle-registry", () => {
 
   it("resolves optional psion toggles by id", () => {
     expect(getSheetToggleDefinition("in_combat_or_high_stakes")?.sourceType).toBe("class_feature")
+    expect(getSheetToggleDefinition("first_turn_of_combat")?.label).toBe("First turn of combat")
+    expect(getSheetToggleDefinition("while_concentrating")?.id).toBe("while_concentrating")
+    expect(getSheetToggleDefinition("while_flying")?.id).toBe("while_flying")
   })
 
   it("recognizes magic item toggle ids", () => {

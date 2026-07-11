@@ -72,7 +72,6 @@ import {
   isShieldItem,
   isWeaponItem,
 } from "@/lib/compendium/combat-stats"
-import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
@@ -1355,9 +1354,6 @@ export default function BuilderPageClient() {
     })
   }, [abilityScorePoolGrants.map((grant) => `${grant.allocationKey}:${grant.points}`).join("|")])
   
-  // Get proficiency bonus based on total level
-  const proficiencyBonus = Math.floor((totalLevel - 1) / 4) + 2
-  
   // Get all classes the character has levels in
   const resolvedPrimaryClassId = resolvePrimaryClassId(
     primaryClassId,
@@ -1607,8 +1603,18 @@ export default function BuilderPageClient() {
   const allSpellIds = [...new Set([...mergedSpellIds, ...grantedSpellIds])]
 
   const characterDerived = useMemo(
-    () =>
-      computeDerivedCharacter({
+    () => {
+      const resolvedFeatures = characterClasses.flatMap((cls) => {
+        const classFeatures = (cls.features ?? []).filter(
+          (feature) => (feature.level ?? 1) <= cls.level,
+        )
+        const subclass = subclasses.find((sc) => sc.id === subclassByClassId[cls.id]) ?? null
+        const subclassFeatures = (subclass?.features ?? []).filter(
+          (feature) => (feature.level ?? 1) <= cls.level,
+        )
+        return [...classFeatures, ...subclassFeatures]
+      })
+      return computeDerivedCharacter({
         baseAbilityScores: {
           strength: character.strength,
           dexterity: character.dexterity,
@@ -1647,7 +1653,9 @@ export default function BuilderPageClient() {
         modifierCatalog,
         feats,
         customAbilities,
-      }),
+        resolvedFeatures,
+      })
+    },
     [
       character.strength,
       character.dexterity,
@@ -1685,8 +1693,19 @@ export default function BuilderPageClient() {
       modifierCatalog,
       feats,
       customAbilities,
+      activeClassLevels,
+      activeClassAddOrder,
     ],
   )
+  const proficiencyBonus = characterDerived.proficiencyBonus
+  const derivedSkills = characterDerived.skills
+  const derivedSaves = characterDerived.saves
+  const derivedSpellcasting = characterDerived.spellcasting
+  const primarySpellcasting =
+    derivedSpellcasting.find((entry) => entry.classId === primaryClass?.id) ??
+    derivedSpellcasting[0] ??
+    null
+
 
   const effectiveAbilityScores = characterDerived.abilityScores
   const abilityMods = characterDerived.abilityMods
@@ -1800,6 +1819,16 @@ export default function BuilderPageClient() {
         modifierCatalog,
         feats,
         customAbilities,
+        resolvedFeatures: characterClasses.flatMap((cls) => {
+          const classFeatures = (cls.features ?? []).filter(
+            (feature) => (feature.level ?? 1) <= cls.level,
+          )
+          const subclass = subclasses.find((sc) => sc.id === subclassByClassId[cls.id]) ?? null
+          const subclassFeatures = (subclass?.features ?? []).filter(
+            (feature) => (feature.level ?? 1) <= cls.level,
+          )
+          return [...classFeatures, ...subclassFeatures]
+        }),
       }
       const derived = computeDerivedCharacter(buildInputs)
       const snapshot = buildCharacterSaveSnapshot(buildInputs, derived)
@@ -5095,11 +5124,15 @@ export default function BuilderPageClient() {
                         </div>
                         <div className="grid grid-cols-1 gap-0.5 text-xs">
                           {SKILLS_DATA.map((skill) => {
-                            const isProficient = effectiveSkillProficiencies.includes(skill.name)
-                            const hasExpertise = effectiveSkillExpertise.includes(skill.name)
+                            const derivedSkill = derivedSkills.find((entry) => entry.name === skill.name)
+                            const isProficient =
+                              derivedSkill?.proficient ?? effectiveSkillProficiencies.includes(skill.name)
+                            const hasExpertise =
+                              derivedSkill?.expertise ?? effectiveSkillExpertise.includes(skill.name)
                             const mod =
+                              derivedSkill?.bonus ??
                               abilityMods[skill.ability] +
-                              (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
+                                (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
                             const abilityAbbr = skill.ability.slice(0, 3).toUpperCase()
                             return (
                               <div key={skill.name} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
@@ -5191,8 +5224,15 @@ export default function BuilderPageClient() {
                         </div>
                         <div className="grid grid-cols-2 gap-x-2 text-[9px]">
                           {ABILITY_NAMES.map((ability) => {
-                            const isProficient = savingThrowProficiencies.includes(ability.charAt(0).toUpperCase() + ability.slice(1))
-                            const mod = abilityMods[ability] + (isProficient ? proficiencyBonus : 0)
+                            const derivedSave = derivedSaves.find((entry) => entry.ability === ability)
+                            const isProficient =
+                              derivedSave?.proficient ??
+                              savingThrowProficiencies.includes(
+                                ability.charAt(0).toUpperCase() + ability.slice(1),
+                              )
+                            const mod =
+                              derivedSave?.bonus ??
+                              abilityMods[ability] + (isProficient ? proficiencyBonus : 0)
                             return (
                               <div key={ability} className={`flex justify-between ${isProficient ? "text-foreground font-bold" : "text-muted-foreground"}`}>
                                 <span>{ability.slice(0, 3).toUpperCase()}</span>
@@ -5203,33 +5243,27 @@ export default function BuilderPageClient() {
                         </div>
                       </div>
 
-                      {primaryClass?.spellcasting &&
-                        (() => {
-                          const spellKey = resolveSpellcastingAbilityKey(primaryClass.spellcasting.ability)
-                          if (!spellKey) return null
-                          const spellMod = abilityMods[spellKey]
-                          return (
+                      {primarySpellcasting && (
                     <div className="p-2 bg-magenta/10 rounded-lg">
                               <p className="text-[9px] text-magenta uppercase font-bold mb-1">
-                                Spellcasting ({primaryClass.spellcasting.ability})
+                                Spellcasting ({primarySpellcasting.abilityLabel})
                               </p>
                       <div className="grid grid-cols-2 gap-2 text-center">
                         <div>
                           <p className="text-[8px] text-muted-foreground">Spell Save DC</p>
                                   <p className="text-lg font-black text-magenta">
-                                    {8 + proficiencyBonus + spellMod}
+                                    {primarySpellcasting.saveDc}
                           </p>
                         </div>
                         <div>
                           <p className="text-[8px] text-muted-foreground">Spell Attack</p>
                                   <p className="text-lg font-black text-magenta">
-                                    +{proficiencyBonus + spellMod}
+                                    +{primarySpellcasting.attackBonus}
                           </p>
                         </div>
                       </div>
                     </div>
-                          )
-                        })()}
+                      )}
                   </div>
                   </div>
                 </div>

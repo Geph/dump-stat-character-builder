@@ -33,6 +33,11 @@ export const AI_MECHANIC_KINDS = [
   "grant_feat",
   "spellcasting_ability",
   "attunement_slots",
+  "skill_check_alternate_ability",
+  "saving_throw_alternate_ability",
+  "forced_save_ability_remap",
+  "weapon_ability_override",
+  "turn_start_resource_restore",
 ] as const
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
@@ -305,6 +310,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "regain 1 Ki at the start of each of your turns in combat, so long as you are not Incapacitated",
     ],
     notes: "restoreResourceKey + restoreResourceAmount; blockedByConditions when Incapacitated mentioned",
+  },
+  {
+    ruleId: "resource.turn_start_regain_pool",
+    trigger: "description",
+    catalog: "cat_char_turn_start_trigger",
+    examples: [
+      "regain 1 Psi Die at the start of each of your turns",
+      "regain 1 psionic energy die at the start of each of your turns",
+    ],
+    notes: "Generalized turn-start restore for Psi Dice / Focus / Sorcery Points",
+    mechanicsKind: "turn_start_resource_restore",
   },
   {
     ruleId: "technique.on_hit_once_per_turn",
@@ -878,6 +894,11 @@ function formatMechanicsCheatsheet(): string {
     "- check_roll_modifier: checkRollMode advantage, checkCategory save|skill|ability|attack|initiative, checkAbility/checkSkills",
     "- extra_attack: (no extra fields)",
     `- grant_feat: featCategories ${JSON.stringify(FEAT_CATEGORIES_FOR_IMPORT)}, featCount 1`,
+    "- skill_check_alternate_ability: alternateAbility strength|…; alternateSkills [\"Insight\"]; optional requiresSheetToggle",
+    "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
+    "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",
+    "- weapon_ability_override: alternateAbility charisma; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional",
+    "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
   ]
   return lines.join("\n")

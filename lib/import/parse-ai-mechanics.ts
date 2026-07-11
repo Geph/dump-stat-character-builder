@@ -21,6 +21,7 @@ import type {
   DetectionConfidence,
 } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
+import { createModifierLimitation } from "@/lib/compendium/modifier-limitations"
 import type { UsesConfig } from "@/lib/types"
 
 const VALID_CHARACTERISTIC_KINDS = new Set(
@@ -106,6 +107,23 @@ function buildFromMechanic(
           },
         ],
       }),
+    }
+  }
+
+  if (mechanic.kind === "turn_start_resource_restore") {
+    if (!mechanic.restoreResourceKey || mechanic.restoreResourceAmount == null) return null
+    return {
+      ruleId: "ai.turn_start_resource_restore",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("turn_start_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "turn_start_restore")),
+          type: "turn_start_trigger",
+          restoreResourceKey: mechanic.restoreResourceKey,
+          restoreResourceAmount: mechanic.restoreResourceAmount,
+        },
+      ]),
     }
   }
 
@@ -489,6 +507,80 @@ function buildFromMechanic(
               mechanic.attunementTotal != null
                 ? `Attune to ${mechanic.attunementTotal} magic items`
                 : `+${mechanic.attunementBonus} attunement slots`,
+          },
+        ]),
+      }
+    }
+    case "skill_check_alternate_ability": {
+      if (!mechanic.alternateAbility) return null
+      return {
+        ruleId: "ai.skill_check_alternate_ability",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("skill_check_alternate_ability"), [
+          {
+            id: modId(instanceKey(ctx, "skill_alt_ability")),
+            type: "skill_check_alternate_ability",
+            ability: mechanic.alternateAbility,
+            skills: mechanic.alternateSkills ?? [],
+            ...(mechanic.requiresSheetToggle
+              ? { limitations: [createModifierLimitation({
+                  kind: "sheet_toggle",
+                  rule: "requires_active",
+                  value: mechanic.requiresSheetToggle,
+                })] }
+              : {}),
+          },
+        ]),
+      }
+    }
+    case "saving_throw_alternate_ability": {
+      if (!mechanic.alternateAbility) return null
+      return {
+        ruleId: "ai.saving_throw_alternate_ability",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("saving_throw_alternate_ability"), [
+          {
+            id: modId(instanceKey(ctx, "save_alt_ability")),
+            type: "saving_throw_alternate_ability",
+            ability: mechanic.alternateAbility,
+            saves: mechanic.alternateSaves ?? [],
+          },
+        ]),
+      }
+    }
+    case "forced_save_ability_remap": {
+      if (!mechanic.toSaveAbility) return null
+      return {
+        ruleId: "ai.forced_save_ability_remap",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("forced_save_ability_remap"), [
+          {
+            id: modId(instanceKey(ctx, "forced_save_remap")),
+            type: "forced_save_ability_remap",
+            fromAbility: (mechanic.fromSaveAbility as "any" | "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA") ?? "any",
+            toAbility: mechanic.toSaveAbility,
+            scope: mechanic.forcedSaveScope ?? "your_features",
+          },
+        ]),
+      }
+    }
+    case "weapon_ability_override": {
+      if (!mechanic.alternateAbility) return null
+      return {
+        ruleId: "ai.weapon_ability_override",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("weapon_ability_override"), [
+          {
+            id: modId(instanceKey(ctx, "weapon_ability")),
+            type: "weapon_ability_override",
+            ability: mechanic.alternateAbility,
+            appliesTo: mechanic.weaponAbilityAppliesTo ?? "both",
+            scope: mechanic.weaponAbilityScope ?? "all",
+            weaponNames: mechanic.weaponNames ?? [],
           },
         ]),
       }

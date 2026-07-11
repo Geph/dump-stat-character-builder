@@ -4360,7 +4360,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Gloom Stalker Spells": [alwaysPreparedSpells("Gloom Stalker spells")],
   "*::Dread Ambusher": {
     linkedModifiers: [
-      speedAdd(10, "Ambusher's Leap: +10 ft. Speed first turn"),
+      speedAdd(10, "Ambusher's Leap: +10 ft. Speed first turn", [
+        requiresActiveToggleLimitation("first_turn_of_combat"),
+      ]),
       checkBonus("dread_ambusher_init", {
         category: "initiative",
         bonusConfig: { mode: "ability_modifier", ability: "WIS" },

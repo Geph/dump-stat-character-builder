@@ -77,6 +77,35 @@ export type SaveBonus = {
   ability: AbilityScoreKey
   proficient: boolean
   bonus: number
+  /** Ability actually used when an alternate-ability characteristic remaps this save. */
+  governingAbility?: AbilityScoreKey
+  /** Extra bonus from self-affecting auras (e.g. Aura of Protection). */
+  auraBonus?: number
+}
+
+export type DerivedSpellcastingEntry = {
+  classId: string
+  className: string
+  ability: AbilityScoreKey
+  abilityLabel: string
+  abilityMod: number
+  /** Final spell save DC including feature bonuses (e.g. Innate Sorcery). */
+  saveDc: number
+  attackBonus: number
+  /** Portion of saveDc from FeatureEffect spell_save_dc bonuses (already included). */
+  saveDcFeatureBonus: number
+}
+
+export type DerivedForcedSaveRemap = {
+  fromAbility: string
+  toAbility: string
+  scope: "your_spells" | "your_features" | "all"
+  label?: string
+}
+
+export type DerivedTelepathy = {
+  rangeFeet: number
+  label?: string
 }
 
 export type WeaponAttackDerived = {
@@ -84,6 +113,10 @@ export type WeaponAttackDerived = {
   damageDisplay: string
   /** Itemized contributions whose values sum to `attackBonus`. */
   attackBreakdown: StatBreakdownPart[]
+  /** Ability modifier used for attack rolls (after weapon ability overrides). */
+  attackAbilityMod: number
+  /** Ability modifier used for damage rolls (after weapon ability overrides). */
+  damageAbilityMod: number
 }
 
 /** A single labeled contribution to a derived statistic (e.g. Armor Class). */
@@ -117,6 +150,8 @@ export type DerivedCharacter = {
   /** All movement modes (walk, fly, swim, etc.) when present. */
   speeds: import("@/lib/character/resolve-all-speeds").CharacterSpeedEntry[]
   passivePerception: number
+  passiveInsight: number
+  passiveInvestigation: number
   skillProficiencies: string[]
   skillExpertise: string[]
   toolProficiencies: string[]
@@ -127,6 +162,16 @@ export type DerivedCharacter = {
   skills: SkillBonus[]
   tools: ToolBonus[]
   saves: SaveBonus[]
+  spellcasting: DerivedSpellcastingEntry[]
+  forcedSaveRemaps: DerivedForcedSaveRemap[]
+  telepathy: DerivedTelepathy | null
+  restReplacement: {
+    restHours: number
+    replacesLongRest: boolean
+    description: string
+  } | null
+  magicalSleepImmunity: boolean
+  noSleepRequired: boolean
   equippedWeaponAttack: WeaponAttackDerived | null
   equippedOffHandWeaponAttack: WeaponAttackDerived | null
   attunementSlots: number
