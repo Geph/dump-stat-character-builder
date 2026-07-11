@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { enrichMonkClassFeatures, remapKiResourceKey } from "@/lib/import/enrich-monk-class-features"
+import { enrichMonkClassFeatures, remapKiResourceKey } from "@/lib/import/enrichment-presets"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
 import { detectFeatureModifiers } from "@/lib/import/detect-feature-modifiers"
 import { enrichImportedClassRow } from "@/lib/import/enrich-import-classes"

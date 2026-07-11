@@ -7,9 +7,10 @@ import {
 } from "@/lib/import/detect-feature-modifiers"
 import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
-import { enrichAlchemistFeatures } from "@/lib/import/enrich-alchemist-features"
-import { enrichInvestigatorFeatures } from "@/lib/import/enrich-investigator-features"
-import { enrichPsionArchetypeFeatures } from "@/lib/import/enrich-psion-archetype-features"
+import {
+  applyImportEnrichmentPresets,
+  remapKiKeysOnFeatRows,
+} from "@/lib/import/enrichment-presets"
 import {
   attachReferencedSpellsFromSupplements,
   enrichSubclassSpellTablesOnImport,
@@ -18,7 +19,6 @@ import {
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
-import { enrichMonkClassFeatures, remapKiKeysOnFeatRows } from "@/lib/import/enrich-monk-class-features"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
@@ -255,7 +255,5 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   )
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 
-  return enrichInvestigatorFeatures(
-    enrichAlchemistFeatures(enrichPsionArchetypeFeatures(enrichImportChoiceFeatures(withSubclassSpells))),
-  )
+  return applyImportEnrichmentPresets(enrichImportChoiceFeatures(withSubclassSpells))
 }

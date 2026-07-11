@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { enrichPsionArchetypeFeatures } from "@/lib/import/enrich-psion-archetype-features"
+import { enrichPsionArchetypeFeatures } from "@/lib/import/enrichment-presets"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("enrichPsionArchetypeFeatures", () => {

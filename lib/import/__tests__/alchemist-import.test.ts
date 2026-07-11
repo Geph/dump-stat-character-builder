@@ -4,7 +4,7 @@ import { resolveRechargeRuleAmount } from "@/lib/compendium/normalize-uses-confi
 import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formulas"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
-import { enrichAlchemistFeatures } from "@/lib/import/enrich-alchemist-features"
+import { enrichAlchemistFeatures } from "@/lib/import/enrichment-presets"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { collectImportProposals } from "@/lib/import/import-proposals"
 import { parseCraftableItemsTable } from "@/lib/import/parse-craftable-items-table"

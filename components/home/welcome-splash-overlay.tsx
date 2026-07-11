@@ -1,10 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState, type ReactNode } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { ImageIcon } from "lucide-react"
+import { ChevronDown, ImageIcon } from "lucide-react"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
+import { getCinematicSpellPickerContainerClass } from "@/lib/builder/picker-pagination"
 import { cn } from "@/lib/utils"
 import { withBasePath } from "@/lib/config/deploy-mode"
 import {
@@ -84,6 +92,40 @@ const VERSION_OPTIONS: VersionOption[] = [
 const SPLASH_LINK_CLASS =
   "block text-inherit no-underline hover:text-inherit hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded-lg"
 
+/** Phone-only control that scrolls the splash dialog to the next input section. */
+function ScrollToNextSectionButton({
+  scrollContainerRef,
+  targetRef,
+  label = "Scroll to next",
+}: {
+  scrollContainerRef: RefObject<HTMLElement | null>
+  targetRef: RefObject<HTMLElement | null>
+  label?: string
+}) {
+  return (
+    <div className="mt-3 flex justify-center sm:hidden">
+      <button
+        type="button"
+        onClick={() => {
+          const container = scrollContainerRef.current
+          const target = targetRef.current
+          if (!container || !target) return
+          const top =
+            target.getBoundingClientRect().top -
+            container.getBoundingClientRect().top +
+            container.scrollTop -
+            12
+          container.scrollTo({ top, behavior: "smooth" })
+        }}
+        className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:text-foreground"
+      >
+        {label}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      </button>
+    </div>
+  )
+}
+
 function VersionOptionCard({
   option,
   onChoose,
@@ -102,7 +144,7 @@ function VersionOptionCard({
   const imageBlock = option.imageSrc ? (
     <div
       className={cn(
-        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden rounded-t-xl",
+        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden rounded-t-xl max-sm:aspect-[3/2]",
         option.imageBackgroundClass ?? "bg-muted",
       )}
     >
@@ -119,7 +161,7 @@ function VersionOptionCard({
   ) : (
     <div
       className={cn(
-        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center rounded-t-xl bg-gradient-to-br",
+        "relative flex aspect-[4/3] w-full shrink-0 items-center justify-center rounded-t-xl bg-gradient-to-br max-sm:aspect-[3/2]",
         option.placeholderClass,
       )}
       aria-hidden
@@ -180,7 +222,8 @@ function VersionOptionCard({
 export function WelcomeSplashOverlay() {
   const [open, setOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
-  const [isNarrow, setIsNarrow] = useState(false)
+  const scrollBodyRef = useRef<HTMLDivElement>(null)
+  const nextInputRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isWelcomeSplashSuppressed()) return
@@ -195,23 +238,12 @@ export function WelcomeSplashOverlay() {
     }
   }, [])
 
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)")
-    const sync = () => setIsNarrow(mq.matches)
-    sync()
-    mq.addEventListener("change", sync)
-    return () => mq.removeEventListener("change", sync)
+  const dismiss = useCallback((persistSuppress: boolean) => {
+    if (persistSuppress) {
+      setWelcomeSplashSuppressed(true)
+    }
+    setOpen(false)
   }, [])
-
-  const dismiss = useCallback(
-    (persistSuppress: boolean) => {
-      if (persistSuppress) {
-        setWelcomeSplashSuppressed(true)
-      }
-      setOpen(false)
-    },
-    [],
-  )
 
   const handleChoose = useCallback(
     (id: string) => {
@@ -249,7 +281,7 @@ export function WelcomeSplashOverlay() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="welcome-splash-title"
@@ -267,16 +299,19 @@ export function WelcomeSplashOverlay() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 8 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="relative z-[1] flex w-[70vw] max-h-[min(85vh,680px)] max-w-[1100px] min-w-[min(100%,320px)] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 shadow-2xl"
+            className="relative z-[1] flex w-full max-h-[min(92vh,720px)] max-w-[1100px] flex-col overflow-hidden rounded-2xl border-2 border-primary/30 shadow-2xl sm:w-[70vw] sm:max-h-[min(85vh,680px)] sm:min-w-[min(100%,320px)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="pointer-events-none absolute inset-3 rounded-xl border border-primary/20" aria-hidden />
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-card/85 backdrop-blur-sm px-5 py-4 sm:px-8 sm:py-5">
+            <div
+              ref={scrollBodyRef}
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-card/85 backdrop-blur-sm px-4 py-4 sm:px-8 sm:py-5"
+            >
               <header className="shrink-0 text-center">
                 <h2
                   id="welcome-splash-title"
-                  className="text-3xl font-bold text-foreground sm:text-4xl"
+                  className="text-2xl font-bold text-foreground sm:text-4xl"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   Choose your app version
@@ -300,30 +335,39 @@ export function WelcomeSplashOverlay() {
                 </p>
               </header>
 
-              <div className="mt-4 sm:mt-5">
+              <section className="mt-4 sm:mt-5" aria-label="App version choices">
                 <SwipeVisualPicker
-                  enabled={isNarrow}
-                  className={cn(
-                    "gap-4",
-                    "max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overscroll-x-contain max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:[touch-action:pan-x]",
-                    "sm:grid sm:grid-cols-3 sm:items-stretch",
-                  )}
+                  // Always enabled so phone snap wrappers exist on first paint; CSS keeps
+                  // swipe chrome and layout phone-only (`max-sm`).
+                  enabled
+                  className={cn(getCinematicSpellPickerContainerClass(), "sm:items-stretch")}
                 >
                   {VERSION_OPTIONS.map((option) => (
                     <VersionOptionCard key={option.id} option={option} onChoose={handleChoose} />
                   ))}
                 </SwipeVisualPicker>
-              </div>
 
-              <label className="mt-4 flex shrink-0 cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground sm:mt-5">
-                <input
-                  type="checkbox"
-                  checked={dontShowAgain}
-                  onChange={(event) => setDontShowAgain(event.target.checked)}
-                  className="size-4 rounded border-border accent-primary"
+                <ScrollToNextSectionButton
+                  scrollContainerRef={scrollBodyRef}
+                  targetRef={nextInputRef}
+                  label="Scroll to next"
                 />
-                Don&apos;t show this again
-              </label>
+              </section>
+
+              <div
+                ref={nextInputRef}
+                className="mt-4 scroll-mt-3 pb-1 sm:mt-5"
+              >
+                <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={dontShowAgain}
+                    onChange={(event) => setDontShowAgain(event.target.checked)}
+                    className="size-4 rounded border-border accent-primary"
+                  />
+                  Don&apos;t show this again
+                </label>
+              </div>
             </div>
           </motion.div>
         </motion.div>
