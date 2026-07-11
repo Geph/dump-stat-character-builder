@@ -5,6 +5,7 @@ import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import { isCommonModifiersCatalogAbility } from "@/lib/compendium/modifier-catalog"
 import { areCompendiumImagesEnabled } from "@/lib/site-settings/app-presentation-mode"
+import { getBuilderLayout } from "@/lib/site-settings/builder-layout"
 import { isSrdSource } from "@/lib/srd/source"
 
 /** Card / detail hero art — URL or data URL. */
@@ -94,11 +95,21 @@ export function compendiumItemSupportsCardImage(
   return true
 }
 
+/**
+ * Browse/detail card art follows Compact Only (splash) and the shared Visual/Compact
+ * layout preference used by the builder and compendium.
+ */
+export function areBrowseCardImagesEnabled(): boolean {
+  if (typeof window === "undefined") return true
+  if (!areCompendiumImagesEnabled()) return false
+  return getBuilderLayout() === "visual"
+}
+
 export function resolveCompendiumCardImageUrl(
   item: CompendiumCardVisual & Record<string, unknown>,
   tab: CompendiumContentType | null | undefined,
 ): string | null {
-  if (!areCompendiumImagesEnabled()) return null
+  if (!areBrowseCardImagesEnabled()) return null
   if (tab != null && !compendiumItemSupportsCardImage(tab, item)) return null
   return getCompendiumCardImageUrl(item)
 }

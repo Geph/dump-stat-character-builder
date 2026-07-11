@@ -1,4 +1,4 @@
-/** Global preference for how the builder renders pickers and choice grids. */
+/** Global preference for Visual vs Compact cards in the builder and compendium. */
 import { getAppPresentationMode } from "@/lib/site-settings/app-presentation-mode"
 
 export type BuilderLayout = "visual" | "compact"
