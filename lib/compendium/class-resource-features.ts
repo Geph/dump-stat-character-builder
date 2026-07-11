@@ -42,6 +42,8 @@ function fx(id: string, partial: Omit<FeatureEffect, "id">): FeatureEffect {
 type ResourceFeaturePreset = {
   featureName: string
   resourceKey?: string
+  /** When set with resourceKey, spent amount per activation (default 1). */
+  resourceAmount?: number
   activation?: FeatureActivation | null
   linkedModifiers: LinkedModifierInstance[]
 }
@@ -325,6 +327,28 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
       ],
     },
     {
+      featureName: "Sorcery Incarnate",
+      resourceKey: "sorcery_points",
+      resourceAmount: 2,
+      activation: { bonusAction: true },
+      linkedModifiers: [
+        modInstance("modinst_sorcery_incarnate", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
+          fx("fx_sorcery_incarnate", {
+            kind: "self_buff_caster",
+            casterBuffLabel: "Innate Sorcery (via Sorcery Incarnate)",
+          }),
+        ]),
+        modInstance("modinst_sorcery_incarnate_spend", CLASS_RESOURCE_FX_CATALOG.classResource, [
+          fx("fx_sorcery_incarnate_spend", {
+            kind: "class_resource",
+            classResourceKey: "sorcery_points",
+            classResourceChange: "reduce",
+            classResourceAmount: 2,
+          }),
+        ]),
+      ],
+    },
+    {
       featureName: "Metamagic",
       resourceKey: "sorcery_points",
       linkedModifiers: [
@@ -468,8 +492,12 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
   },
 ]
 
-function classResourceUses(resourceKey: string): UsesConfig {
-  return { type: "class_resource", classResourceKey: resourceKey }
+function classResourceUses(resourceKey: string, amount?: number): UsesConfig {
+  return {
+    type: "class_resource",
+    classResourceKey: resourceKey,
+    ...(amount != null ? { classResourceAmount: amount } : {}),
+  }
 }
 
 function featureHasResourceBinding(feature: Feature): boolean {
@@ -490,7 +518,7 @@ function applyResourcePreset(feature: Feature, preset: ResourceFeaturePreset): F
 
   const limitedUses =
     preset.resourceKey && !featureHasResourceBinding(feature)
-      ? classResourceUses(preset.resourceKey)
+      ? classResourceUses(preset.resourceKey, preset.resourceAmount)
       : feature.limitedUses
 
   return syncModifierRefs({

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Plus, X } from "lucide-react"
 import {
+  defaultBonusByLevelEntry,
   defaultCritByLevelEntry,
   type BonusByLevelEntry,
 } from "@/lib/compendium/bonus-by-level"
@@ -3146,6 +3147,193 @@ function BonusDamageRidersCharacteristicEditor({
           }
           className="w-16 px-2 py-1 bg-background border border-border rounded text-center"
         />
+        <span className="text-xs text-muted-foreground">(fallback when no level tiers)</span>
+      </div>
+      <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-foreground">Max riders by level</label>
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                ...mod,
+                maxRidersPerUseByLevel: [
+                  ...(mod.maxRidersPerUseByLevel ?? []),
+                  {
+                    level:
+                      (mod.maxRidersPerUseByLevel?.at(-1)?.level ?? mod.maxRidersPerUseByLevel?.[0]?.level ?? 1) +
+                      4,
+                    count: mod.maxRidersPerUse ?? 1,
+                  },
+                ],
+              })
+            }
+            className="text-xs text-primary hover:underline"
+          >
+            + Add tier
+          </button>
+        </div>
+        {(mod.maxRidersPerUseByLevel ?? []).length === 0 ? (
+          <p className="text-xs text-muted-foreground">Uses max riders per use above at all levels.</p>
+        ) : (
+          (mod.maxRidersPerUseByLevel ?? []).map((row, idx) => (
+            <div key={idx} className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">At level</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={row.level}
+                onChange={(e) => {
+                  const next = [...(mod.maxRidersPerUseByLevel ?? [])]
+                  next[idx] = { ...row, level: parseInt(e.target.value, 10) || 1 }
+                  onChange({ ...mod, maxRidersPerUseByLevel: next })
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+              />
+              <span className="text-xs text-muted-foreground">max</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={row.count}
+                onChange={(e) => {
+                  const next = [...(mod.maxRidersPerUseByLevel ?? [])]
+                  next[idx] = { ...row, count: parseInt(e.target.value, 10) || 1 }
+                  onChange({ ...mod, maxRidersPerUseByLevel: next })
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    maxRidersPerUseByLevel: (mod.maxRidersPerUseByLevel ?? []).filter((_, i) => i !== idx),
+                  })
+                }
+                className="p-1 text-muted-foreground hover:text-destructive"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-foreground">Automatic bonus by level</label>
+          <button
+            type="button"
+            onClick={() =>
+              onChange({
+                ...mod,
+                automaticBonusByLevel: [
+                  ...(mod.automaticBonusByLevel ?? []),
+                  defaultBonusByLevelEntry(
+                    (mod.automaticBonusByLevel?.at(-1)?.level ?? 1) + 4,
+                  ),
+                ],
+              })
+            }
+            className="text-xs text-primary hover:underline"
+          >
+            + Add tier
+          </button>
+        </div>
+        {(mod.automaticBonusByLevel ?? []).length === 0 ? (
+          <p className="text-xs text-muted-foreground">No level-scaled automatic bonus (e.g. Brutal Strike +1d10).</p>
+        ) : (
+          (mod.automaticBonusByLevel ?? []).map((row, idx) => (
+            <div key={idx} className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">At level</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={row.level}
+                onChange={(e) => {
+                  const next = [...(mod.automaticBonusByLevel ?? [])]
+                  next[idx] = { ...row, level: parseInt(e.target.value, 10) || 1 }
+                  onChange({ ...mod, automaticBonusByLevel: next })
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+              />
+              <select
+                value={row.mode}
+                onChange={(e) => {
+                  const next = [...(mod.automaticBonusByLevel ?? [])]
+                  next[idx] = {
+                    ...row,
+                    mode: e.target.value as BonusByLevelEntry["mode"],
+                  }
+                  onChange({ ...mod, automaticBonusByLevel: next })
+                }}
+                className="px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
+              >
+                <option value="fixed">Fixed</option>
+                <option value="dice">Dice</option>
+              </select>
+              {row.mode === "dice" ? (
+                <>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={row.dieCount ?? 1}
+                    onChange={(e) => {
+                      const next = [...(mod.automaticBonusByLevel ?? [])]
+                      next[idx] = { ...row, dieCount: parseInt(e.target.value, 10) || 1 }
+                      onChange({ ...mod, automaticBonusByLevel: next })
+                    }}
+                    className="w-14 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+                  />
+                  <select
+                    value={row.dieType ?? "d6"}
+                    onChange={(e) => {
+                      const next = [...(mod.automaticBonusByLevel ?? [])]
+                      next[idx] = {
+                        ...row,
+                        dieType: e.target.value as BonusByLevelEntry["dieType"],
+                      }
+                      onChange({ ...mod, automaticBonusByLevel: next })
+                    }}
+                    className="px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
+                  >
+                    {["d4", "d6", "d8", "d10", "d12"].map((die) => (
+                      <option key={die} value={die}>
+                        {die}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <input
+                  type="number"
+                  value={row.fixed ?? 0}
+                  onChange={(e) => {
+                    const next = [...(mod.automaticBonusByLevel ?? [])]
+                    next[idx] = { ...row, fixed: parseInt(e.target.value, 10) || 0 }
+                    onChange({ ...mod, automaticBonusByLevel: next })
+                  }}
+                  className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    automaticBonusByLevel: (mod.automaticBonusByLevel ?? []).filter((_, i) => i !== idx),
+                  })
+                }
+                className="p-1 text-muted-foreground hover:text-destructive"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
       {riders.map((rider, idx) => (
         <div key={`${rider.name}-${idx}`} className="space-y-2 p-2 bg-background rounded-lg border border-border">
@@ -3172,6 +3360,23 @@ function BonusDamageRidersCharacteristicEditor({
               placeholder="1d6"
               className="w-20 px-2 py-1.5 bg-card border border-border rounded text-sm"
             />
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={rider.unlocksAtLevel ?? ""}
+              onChange={(e) => {
+                const next = [...riders]
+                next[idx] = {
+                  ...rider,
+                  unlocksAtLevel: e.target.value ? parseInt(e.target.value, 10) : null,
+                }
+                onChange({ ...mod, riders: next })
+              }}
+              placeholder="Lv"
+              title="Unlocks at class level"
+              className="w-14 px-2 py-1.5 bg-card border border-border rounded text-sm text-center"
+            />
             <button
               type="button"
               onClick={() => onChange({ ...mod, riders: riders.filter((_, i) => i !== idx) })}
@@ -3191,6 +3396,35 @@ function BonusDamageRidersCharacteristicEditor({
             placeholder="Description"
             className="w-full px-2 py-1.5 bg-card border border-border rounded text-sm"
           />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input
+              type="text"
+              value={rider.costResourceKey ?? ""}
+              onChange={(e) => {
+                const next = [...riders]
+                next[idx] = { ...rider, costResourceKey: e.target.value || null }
+                onChange({ ...mod, riders: next })
+              }}
+              placeholder="Cost resource key (e.g. sneak_attack)"
+              className="w-full px-2 py-1.5 bg-card border border-border rounded text-sm"
+            />
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={rider.costResourceAmount ?? ""}
+              onChange={(e) => {
+                const next = [...riders]
+                next[idx] = {
+                  ...rider,
+                  costResourceAmount: e.target.value ? parseInt(e.target.value, 10) : null,
+                }
+                onChange({ ...mod, riders: next })
+              }}
+              placeholder="Resource amount"
+              className="w-full px-2 py-1.5 bg-card border border-border rounded text-sm"
+            />
+          </div>
         </div>
       ))}
       <button
@@ -3198,7 +3432,7 @@ function BonusDamageRidersCharacteristicEditor({
         onClick={() =>
           onChange({
             ...mod,
-            riders: [...riders, { name: "", costDice: null, description: null }],
+            riders: [...riders, { name: "", costDice: null, description: null, unlocksAtLevel: null }],
           })
         }
         className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg"

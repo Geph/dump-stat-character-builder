@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { CardImageField } from "@/components/compendium/card-image-field"
 import { CompendiumEditorSection } from "@/components/compendium/compendium-editor-section"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
@@ -15,6 +16,8 @@ type CompendiumDescriptionCardImageRowProps = {
   cardImageUrl: string | null
   onCardImageUrlChange: (url: string | null) => void
   cardImageCrop?: CompendiumCardImageCrop
+  /** Extra controls under the description in the left column (e.g. card blurb, complexity). */
+  descriptionExtras?: ReactNode
 }
 
 export function CompendiumDescriptionCardImageRow({
@@ -24,6 +27,7 @@ export function CompendiumDescriptionCardImageRow({
   cardImageUrl,
   onCardImageUrlChange,
   cardImageCrop = "center",
+  descriptionExtras,
 }: CompendiumDescriptionCardImageRowProps) {
   const { isCompactOnly } = useAppPresentationMode()
 
@@ -46,7 +50,7 @@ export function CompendiumDescriptionCardImageRow({
           )}
         >
           <h3 className={pageOverlayPanelTitleClass}>Description</h3>
-          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex min-h-[12rem] flex-1 flex-col">
             <RichTextEditor
               value={description}
               onChange={onDescriptionChange}
@@ -54,6 +58,11 @@ export function CompendiumDescriptionCardImageRow({
               fillHeight
             />
           </div>
+          {descriptionExtras ? (
+            <div className="shrink-0 space-y-3 border-t border-border/60 pt-3">
+              {descriptionExtras}
+            </div>
+          ) : null}
         </section>
         {!isCompactOnly ? (
           <CardImageField

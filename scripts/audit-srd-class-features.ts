@@ -45,6 +45,10 @@ const ALLOWED_UNMATCHED = new Set([
   "Improved Blessed Strikes",
   // Level-up marker; damage scales via bonusByLevel on the level-7 Elemental Fury choice.
   "Improved Elemental Fury",
+  // Level-up markers; riders and caps scale on Brutal Strike / Cunning Strike base features.
+  "Improved Brutal Strike",
+  "Improved Cunning Strike",
+  "Superior Critical",
 ])
 
 function couldHaveModifier(feature: Feature): boolean {

@@ -2,6 +2,10 @@ import type { UsesConfig } from "@/lib/types"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { normalizeBonusByLevel } from "@/lib/compendium/bonus-by-level"
+import {
+  mergeBonusDamageRiders,
+  resolveBonusDamageRidersAtLevel,
+} from "@/lib/compendium/resolve-bonus-damage-riders"
 import { SPECIES_SIZES } from "@/lib/compendium/constants"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import {
@@ -714,6 +718,11 @@ export interface BonusDamageRiderEntry {
   description?: string | null
   saveAbility?: string | null
   conditionOnFailedSave?: string | null
+  /** Rider option becomes available at this class level (default 1). */
+  unlocksAtLevel?: number | null
+  /** Spend from a class resource pool instead of (or in addition to) costDice. */
+  costResourceKey?: string | null
+  costResourceAmount?: number | null
 }
 
 export type BonusDamageRiderTrigger = "on_hit" | "on_crit"
@@ -722,10 +731,14 @@ export interface BonusDamageRidersCharacteristic extends CharacteristicModifierB
   type: "bonus_damage_riders"
   riders: BonusDamageRiderEntry[]
   maxRidersPerUse?: number | null
+  /** Tier table for max optional riders per use (highest tier at or below class level). */
+  maxRidersPerUseByLevel?: { level: number; count: number }[] | null
   appliesTo?: string | null
   /** When riders is empty, automatic bonus applied on hit or crit (e.g. +level on crit). */
   triggerOn?: BonusDamageRiderTrigger | null
   automaticBonus?: import("@/lib/compendium/roll-bonus-config").RollBonusConfig | null
+  /** Automatic bonus dice/value that scales by class level (e.g. Brutal Strike +1d10 → +2d10). */
+  automaticBonusByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[] | null
 }
 
 /** Nested common-modifier effect fired by a trigger characteristic. */
@@ -1103,7 +1116,14 @@ export function createCharacteristicModifier(
     case "aura":
       return { id, type, radiusFeet: 10, affectsSelf: true, affectsAllies: true }
     case "bonus_damage_riders":
-      return { id, type, riders: [], maxRidersPerUse: 1 }
+      return {
+        id,
+        type,
+        riders: [],
+        maxRidersPerUse: 1,
+        maxRidersPerUseByLevel: [],
+        automaticBonusByLevel: [],
+      }
     case "saving_throw_trigger":
       return { id, type, triggerOn: "make", saveAbility: null, targetScope: "self", effect: null }
     case "on_hit_trigger":
@@ -1265,10 +1285,17 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as BonusDamageRidersCharacteristic
     return {
       ...raw,
-      riders: raw.riders ?? [],
+      riders: (raw.riders ?? []).map((rider) => ({
+        ...rider,
+        unlocksAtLevel: rider.unlocksAtLevel ?? null,
+        costResourceKey: rider.costResourceKey ?? null,
+        costResourceAmount: rider.costResourceAmount ?? null,
+      })),
       maxRidersPerUse: raw.maxRidersPerUse ?? 1,
+      maxRidersPerUseByLevel: raw.maxRidersPerUseByLevel ?? [],
       triggerOn: raw.triggerOn ?? "on_hit",
       automaticBonus: raw.automaticBonus ?? null,
+      automaticBonusByLevel: raw.automaticBonusByLevel ?? [],
     }
   }
 
@@ -2133,9 +2160,24 @@ export function aggregateCharacteristics(
           pushUnique(result.conditionImmunities, mod.conditionImmunities)
         }
         break
-      case "bonus_damage_riders":
-        result.bonusDamageRiders.push(mod)
+      case "bonus_damage_riders": {
+        const resolved = resolveBonusDamageRidersAtLevel(mod, characterLevel)
+        const appliesKey = (resolved.appliesTo ?? "").trim().toLowerCase()
+        const existingIdx = result.bonusDamageRiders.findIndex((entry) =>
+          appliesKey
+            ? (entry.appliesTo ?? "").trim().toLowerCase() === appliesKey
+            : entry.id === resolved.id,
+        )
+        if (existingIdx >= 0) {
+          result.bonusDamageRiders[existingIdx] = mergeBonusDamageRiders(
+            result.bonusDamageRiders[existingIdx],
+            resolved,
+          )
+        } else {
+          result.bonusDamageRiders.push(resolved)
+        }
         break
+      }
       case "saving_throw_trigger":
         result.savingThrowTriggers.push(mod)
         break

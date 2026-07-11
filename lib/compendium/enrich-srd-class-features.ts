@@ -1,4 +1,5 @@
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import { extractUsesConfig } from "@/lib/compendium/characteristic-modifiers"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
@@ -332,6 +333,32 @@ function criticalHitRange(minimum: number, label?: string): LinkedModifierInstan
       type: "attack_roll_modifiers",
       entries: [{ bonus: 0, target: "all" }],
       criticalHitMinimum: minimum,
+      label,
+    },
+  ])
+}
+
+function criticalHitRangeByLevel(
+  baseMinimum: number,
+  byLevel: { level: number; minimum: number }[],
+  label?: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_crit_${baseMinimum}_by_level`, FEAT_MODIFIER_CATALOG.attackRollModifiers, [
+    {
+      id: modId(`crit_${baseMinimum}_by_level`),
+      type: "attack_roll_modifiers",
+      entries: [
+        {
+          bonus: 0,
+          target: "all",
+          criticalHitMinimum: baseMinimum,
+          criticalHitMinimumByLevel: byLevel.map(({ level, minimum }) => ({
+            level,
+            mode: "fixed" as const,
+            fixed: minimum,
+          })),
+        },
+      ],
       label,
     },
   ])
@@ -1796,9 +1823,20 @@ function monkFocusMenu(): LinkedModifierInstance {
 
 function bonusRidersPreset(
   instanceKey: string,
-  riders: { name: string; costDice?: string; description?: string }[],
+  riders: {
+    name: string
+    costDice?: string
+    description?: string
+    unlocksAtLevel?: number
+    costResourceKey?: string
+    costResourceAmount?: number
+  }[],
   maxRidersPerUse = 1,
   appliesTo?: string,
+  options?: {
+    maxRidersPerUseByLevel?: { level: number; count: number }[]
+    automaticBonusByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  },
 ): LinkedModifierInstance {
   return charInstance(`modinst_riders_${instanceKey}`, BONUS_DAMAGE_RIDERS_CATALOG_ID, [
     {
@@ -1808,8 +1846,13 @@ function bonusRidersPreset(
         name: rider.name,
         costDice: rider.costDice ?? null,
         description: rider.description ?? null,
+        unlocksAtLevel: rider.unlocksAtLevel ?? null,
+        costResourceKey: rider.costResourceKey ?? null,
+        costResourceAmount: rider.costResourceAmount ?? null,
       })),
       maxRidersPerUse,
+      maxRidersPerUseByLevel: options?.maxRidersPerUseByLevel ?? [],
+      automaticBonusByLevel: options?.automaticBonusByLevel ?? [],
       appliesTo: appliesTo ?? null,
     },
   ])
@@ -1827,14 +1870,50 @@ function normalizePreset(preset: ClassFeatureModifierPreset): {
 }
 
 const CUNNING_STRIKE_RIDERS = [
-  { name: "Poison", costDice: "1d6", description: "Target makes CON save or is Poisoned" },
-  { name: "Trip", costDice: "1d6", description: "Target makes DEX save or is Prone" },
-  { name: "Withdraw", costDice: "1d6", description: "Move half speed without opportunity attacks" },
+  {
+    name: "Poison",
+    costResourceKey: "sneak_attack",
+    costResourceAmount: 1,
+    description: "Target makes CON save or is Poisoned",
+    unlocksAtLevel: 5,
+  },
+  {
+    name: "Trip",
+    costResourceKey: "sneak_attack",
+    costResourceAmount: 1,
+    description: "Target makes DEX save or is Prone",
+    unlocksAtLevel: 5,
+  },
+  {
+    name: "Withdraw",
+    costResourceKey: "sneak_attack",
+    costResourceAmount: 1,
+    description: "Move half speed without opportunity attacks",
+    unlocksAtLevel: 5,
+  },
 ]
 
 const BRUTAL_STRIKE_RIDERS = [
-  { name: "Forceful Blow", costDice: "1d10", description: "Push target 15 ft." },
-  { name: "Staggering Blow", costDice: "1d10", description: "Target has Disadvantage on next save" },
+  {
+    name: "Forceful Blow",
+    description: "Push target 15 ft.; move half speed toward target without provoking Opportunity Attacks",
+    unlocksAtLevel: 9,
+  },
+  {
+    name: "Hamstring Blow",
+    description: "Target Speed −15 ft. until start of your next turn",
+    unlocksAtLevel: 9,
+  },
+  {
+    name: "Staggering Blow",
+    description: "Target has Disadvantage on next save; no Opportunity Attacks until your next turn",
+    unlocksAtLevel: 13,
+  },
+  {
+    name: "Sundering Blow",
+    description: "Next attack against target by another creature gains +5",
+    unlocksAtLevel: 13,
+  },
 ]
 
 const ALL_SAVES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
@@ -1967,8 +2046,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     checkRollFloor("stroke_of_luck", { category: "other", below: 19, setTo: 20 }),
     usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Stroke of Luck"),
   ],
-  "*::Improved Critical": [criticalHitRange(19, "Critical hit on 19–20")],
-  "*::Superior Critical": [criticalHitRange(18, "Critical hit on 18–20")],
+  "*::Improved Critical": [
+    criticalHitRangeByLevel(19, [{ level: 15, minimum: 18 }], "Critical hit on 19–20 (18–20 at level 15+)"),
+  ],
+  "*::Superior Critical": [],
   "*::Remarkable Athlete": [
     checkAdvantage("remarkable_athlete_init", { category: "initiative" }),
     checkAdvantage("remarkable_athlete_athletics", {
@@ -2143,10 +2224,26 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: mysticArcanumPreset(),
   },
   "*::Sorcery Incarnate": {
+    activation: { bonusAction: true },
     linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "sorcery_points",
+          classResourceAmount: 2,
+        },
+        "Activate Innate Sorcery (2 Sorcery Points)",
+      ),
       fxInstance("modinst_sorcery_incarnate", SELF_BUFF_CASTER_CATALOG_ID, {
         bonusAction: true,
-        effects: [{ id: modId("sorcery_incarnate"), kind: "self_buff_caster", casterBuffLabel: "Sorcery Incarnate" }],
+        effects: [
+          {
+            id: modId("sorcery_incarnate"),
+            kind: "self_buff_caster",
+            casterBuffLabel:
+              "Innate Sorcery (via Sorcery Incarnate; up to 2 Metamagic options per spell while active)",
+          },
+        ],
       }),
     ],
   },
@@ -2161,26 +2258,47 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     bonusRidersPreset(
       "devious_strikes",
       [
-        ...CUNNING_STRIKE_RIDERS,
-        { name: "Daze", costDice: "2d6", description: "Target makes CON save or has Disadvantage on next attack" },
-        { name: "Knock Out", costDice: "6d6", description: "Target makes CON save or falls Unconscious" },
+        {
+          name: "Daze",
+          costResourceKey: "sneak_attack",
+          costResourceAmount: 1,
+          description: "Target makes CON save or has Disadvantage on next attack",
+          unlocksAtLevel: 11,
+        },
+        {
+          name: "Knock Out",
+          costResourceKey: "sneak_attack",
+          costResourceAmount: 2,
+          description: "Target makes CON save or falls Unconscious",
+          unlocksAtLevel: 11,
+        },
       ],
       2,
       "Sneak Attack",
     ),
   ],
   "*::Cunning Strike": [
-    bonusRidersPreset("cunning_strike", CUNNING_STRIKE_RIDERS, 1, "Sneak Attack"),
+    bonusRidersPreset("cunning_strike", CUNNING_STRIKE_RIDERS, 1, "Sneak Attack", {
+      maxRidersPerUseByLevel: [
+        { level: 5, count: 1 },
+        { level: 11, count: 2 },
+      ],
+    }),
   ],
-  "*::Improved Cunning Strike": [
-    bonusRidersPreset("improved_cunning_strike", CUNNING_STRIKE_RIDERS, 2, "Sneak Attack"),
-  ],
+  "*::Improved Cunning Strike": [],
   "*::Brutal Strike": [
-    bonusRidersPreset("brutal_strike", BRUTAL_STRIKE_RIDERS, 1, "Reckless Attack"),
+    bonusRidersPreset("brutal_strike", BRUTAL_STRIKE_RIDERS, 1, "Reckless Attack", {
+      maxRidersPerUseByLevel: [
+        { level: 9, count: 1 },
+        { level: 17, count: 2 },
+      ],
+      automaticBonusByLevel: [
+        { level: 9, mode: "dice", dieCount: 1, dieType: "d10" },
+        { level: 17, mode: "dice", dieCount: 2, dieType: "d10" },
+      ],
+    }),
   ],
-  "*::Improved Brutal Strike": [
-    bonusRidersPreset("improved_brutal_strike", BRUTAL_STRIKE_RIDERS, 2, "Reckless Attack"),
-  ],
+  "*::Improved Brutal Strike": [],
   "*::Relentless Rage": {
     activation: {
       onDropToZeroHp: true,
@@ -5517,6 +5635,15 @@ function mergePresetModifiers(
     next = {
       ...next,
       activation: { ...(next.activation ?? {}), ...activationPatch },
+    }
+  }
+
+  if (!next.limitedUses) {
+    const usesFromChars = extractUsesConfig(
+      (next.linkedModifiers ?? []).flatMap((entry) => entry.characteristics ?? []),
+    )
+    if (usesFromChars) {
+      next = { ...next, limitedUses: usesFromChars }
     }
   }
 
