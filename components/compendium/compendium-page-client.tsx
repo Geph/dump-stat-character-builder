@@ -809,7 +809,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       <div
         className={cn(
           "flex items-center gap-1 shrink-0",
-          portraitGraphicCard && "max-sm:absolute max-sm:top-3 max-sm:right-3 max-sm:z-20",
+          cardImage && "absolute top-3 right-3 z-20",
         )}
       >
         {canCopy && (
@@ -895,7 +895,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         className={cn(
           "relative overflow-hidden rounded-2xl border-2 transition-colors",
           portraitGraphicCard && CLASS_CARD_ASPECT_CLASS,
-          cardMinHeightClass ?? (!cardImage ? "bg-card/30 backdrop-blur-sm" : null),
+          cardMinHeightClass ?? (!cardImage ? "bg-card/55 backdrop-blur-sm" : null),
           enabled
             ? `border-primary/40 ${accentStyles.hoverBorder}`
             : "border-border/50 opacity-50 grayscale saturate-0 hover:opacity-60",
@@ -1717,14 +1717,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             ))}
           </div>
         ) : filteredContent.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-10 h-10 text-muted-foreground" />
+          <div className="flex justify-center py-16">
+            <div className="w-fit max-w-full rounded-2xl border-2 border-border bg-card/80 px-8 py-10 text-center shadow-lg backdrop-blur-md">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                <BookOpen className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h3 className="mb-2 text-xl font-bold text-foreground">No content found</h3>
+              <p className="text-muted-foreground">
+                {searchQuery ? "Try a different search term" : "Import content from the Import page"}
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">No content found</h3>
-            <p className="text-muted-foreground">
-              {searchQuery ? "Try a different search term" : "Import content from the Import page"}
-            </p>
           </div>
         ) : activeTab === "equipment" || activeTab === "magic_items" ? (
           <div className="space-y-8">

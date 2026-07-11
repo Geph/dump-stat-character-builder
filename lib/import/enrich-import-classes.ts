@@ -7,12 +7,11 @@ import { detectPointPoolSpellcastingFromText } from "@/lib/import/detect-point-p
 import { detectSpecialAbilityFromText } from "@/lib/import/detect-special-ability"
 import { detectSpellcastingAbilityFromText } from "@/lib/import/detect-governing-ability"
 import { parseStartingEquipmentFromText } from "@/lib/import/parse-starting-equipment"
-import { enrichAlternateSorcererFeatures } from "@/lib/import/enrich-alternate-sorcerer-features"
 import {
-  enrichAlternateRangerFeatures,
+  enrichClassFeaturesWithPresets,
   mergeAlternateRangerClassResources,
-} from "@/lib/import/enrich-alternate-ranger-features"
-import { enrichMonkClassFeatures, remapKiResourceKey } from "@/lib/import/enrich-monk-class-features"
+  remapKiResourceKey,
+} from "@/lib/import/enrichment-presets"
 import { enrichPointPoolClassResources, remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { extractMulticlassSection } from "@/lib/import/parse-multiclass-section"
@@ -354,20 +353,14 @@ export function enrichImportedClassRow(
     resourceKeys.endurance ||
     explicitResources?.some((resource) => resource.class_name === className)
 
-  const nextFeatures = enrichAlternateRangerFeatures(
-    enrichMonkClassFeatures(
-      enrichAlternateSorcererFeatures(
-        enrichPsionicTalentGrantFeatures(
-          shouldLink
-            ? linkResourceCostsOnFeatures(features, resourceKeys)
-            : features.map((feature) => normalizeFeatureRow(feature)),
-        ),
-        className,
-        row.spellcasting,
-      ),
-      className,
+  const nextFeatures = enrichClassFeaturesWithPresets(
+    enrichPsionicTalentGrantFeatures(
+      shouldLink
+        ? linkResourceCostsOnFeatures(features, resourceKeys)
+        : features.map((feature) => normalizeFeatureRow(feature)),
     ),
     className,
+    row.spellcasting,
   )
 
   let description = typeof row.description === "string" ? row.description : null

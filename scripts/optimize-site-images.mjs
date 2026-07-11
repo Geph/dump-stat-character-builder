@@ -4,12 +4,16 @@ import sharp from "sharp"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const ASSETS = process.env.PAGE_BG_SOURCES ?? path.join(ROOT, "scripts", "page-bg-sources")
+const SUBCLASS_CARD_SOURCES =
+  process.env.SUBCLASS_CARD_SOURCES ?? path.join(ROOT, "scripts", "subclass-card-sources")
 const PAGE_BG_OUT = path.join(ROOT, "public", "images", "page-backgrounds")
 const HERO_OUT = path.join(ROOT, "public", "images", "hero")
 const FEATURE_OUT = path.join(ROOT, "public", "images", "features")
 const SPLASH_OUT = path.join(ROOT, "public", "images", "welcome-splash")
+const SUBCLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "subclasses")
 
 const WEBP_QUALITY = Number(process.env.SITE_IMAGE_QUALITY ?? 85)
+const CARD_JPEG_QUALITY = Number(process.env.CARD_JPEG_QUALITY ?? 82)
 
 /** Bundled page background WebP — downscale from full-res sources, never upscale. */
 const PAGE_BG_WIDTH = Number(process.env.PAGE_BG_WIDTH ?? 1200)
@@ -30,6 +34,10 @@ const SPLASH_HEIGHT = Number(process.env.SPLASH_HEIGHT ?? 900)
 /** GitHub README hero — preserve aspect, cap max dimensions. */
 const README_HERO_MAX_WIDTH = Number(process.env.README_HERO_MAX_WIDTH ?? 1400)
 const README_HERO_MAX_HEIGHT = Number(process.env.README_HERO_MAX_HEIGHT ?? 1200)
+
+/** Compendium portrait card art — matches class/species bundled defaults. */
+const CARD_WIDTH = Number(process.env.CARD_WIDTH ?? 771)
+const CARD_HEIGHT = Number(process.env.CARD_HEIGHT ?? 1024)
 
 const EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"]
 
@@ -67,10 +75,26 @@ const SPLASH_SOURCES = {
   "no-ai": ["no-ai", "No-AI"],
 }
 
-function resolveSourcePath(basenames) {
+/** SRD subclass card art slugs (output basename = source basename). */
+const SUBCLASS_CARD_SLUGS = [
+  "path-of-the-berserker",
+  "college-of-lore",
+  "life-domain",
+  "circle-of-the-land",
+  "champion",
+  "warrior-of-the-open-hand",
+  "oath-of-devotion",
+  "hunter",
+  "thief",
+  "draconic-sorcery",
+  "fiend-patron",
+  "evoker",
+]
+
+function resolveSourcePath(basenames, assetsDir = ASSETS) {
   for (const base of basenames) {
     for (const ext of EXTENSIONS) {
-      const candidate = path.join(ASSETS, `${base}${ext}`)
+      const candidate = path.join(assetsDir, `${base}${ext}`)
       if (fs.existsSync(candidate)) return candidate
     }
   }
@@ -122,10 +146,35 @@ async function encodeWebpFitInside(input, output, maxWidth, maxHeight) {
   return { inputMeta, outMeta, inputKb, outKb, action }
 }
 
+/** Portrait card art — JPEG bytes under a .png extension (matches class/species defaults). */
+async function encodeCardJpeg(input, output, width, height) {
+  const inputMeta = await sharp(input).metadata()
+  const inputKb = (fs.statSync(input).size / 1024).toFixed(1)
+
+  await sharp(input)
+    .resize(width, height, {
+      fit: "cover",
+      position: "centre",
+      kernel: sharp.kernel.lanczos3,
+    })
+    .jpeg({ quality: CARD_JPEG_QUALITY, mozjpeg: true })
+    .toFile(output)
+
+  const outMeta = await sharp(output).metadata()
+  const outKb = (fs.statSync(output).size / 1024).toFixed(1)
+  const action =
+    (inputMeta.width ?? 0) !== width || (inputMeta.height ?? 0) !== height
+      ? "resized"
+      : "encoded"
+
+  return { inputMeta, outMeta, inputKb, outKb, action }
+}
+
 fs.mkdirSync(PAGE_BG_OUT, { recursive: true })
 fs.mkdirSync(HERO_OUT, { recursive: true })
 fs.mkdirSync(FEATURE_OUT, { recursive: true })
 fs.mkdirSync(SPLASH_OUT, { recursive: true })
+fs.mkdirSync(SUBCLASS_CARD_OUT, { recursive: true })
 
 let missing = 0
 
@@ -228,6 +277,33 @@ if (readmeHeroInput) {
 } else {
   console.log("  − hero: no source (keeping existing output if any)")
 }
+
+console.log("\nSubclass card art → public/images/compendium/subclasses/")
+let subclassMissing = 0
+for (const slug of SUBCLASS_CARD_SLUGS) {
+  const input = resolveSourcePath([slug], SUBCLASS_CARD_SOURCES)
+  const output = path.join(SUBCLASS_CARD_OUT, `${slug}.png`)
+  if (!input) {
+    if (fs.existsSync(output)) {
+      console.log(`  − ${slug}: no source (keeping existing output)`)
+    } else {
+      console.error(`  ✗ ${slug}: missing source`)
+      subclassMissing += 1
+    }
+    continue
+  }
+
+  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
+    input,
+    output,
+    CARD_WIDTH,
+    CARD_HEIGHT,
+  )
+  console.log(
+    `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+  )
+}
+if (subclassMissing > 0) missing += subclassMissing
 
 if (missing > 0) {
   process.exitCode = 1

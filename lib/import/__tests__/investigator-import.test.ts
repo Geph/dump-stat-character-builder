@@ -9,7 +9,7 @@ import { onHitTriggerMatchesTarget, targetConditionMatches } from "@/lib/compend
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import { fxInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
 import { enrichImportedClassList } from "@/lib/import/enrich-import-classes"
-import { enrichInvestigatorFeatures } from "@/lib/import/enrich-investigator-features"
+import { enrichInvestigatorFeatures } from "@/lib/import/enrichment-presets"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { detectSpellcastingAbilityFromText } from "@/lib/import/detect-governing-ability"
 import type { Equipment, Feature } from "@/lib/types"

@@ -28,3 +28,8 @@ public/icons/manifest.json
 scripts/page-bg-sources/*
 !scripts/page-bg-sources/README.md
 !scripts/page-bg-sources/.gitkeep
+
+# Full-res subclass card sources (optimized outputs in public/ are committed)
+scripts/subclass-card-sources/*
+!scripts/subclass-card-sources/README.md
+!scripts/subclass-card-sources/.gitkeep

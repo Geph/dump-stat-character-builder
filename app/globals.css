@@ -328,8 +328,8 @@
   --primary-foreground: oklch(0.98 0.01 90);
   --secondary: oklch(0.68 0.1 75);
   --secondary-foreground: oklch(0.18 0.03 45);
-  --accent: oklch(0.48 0.08 25);
-  --accent-foreground: oklch(0.98 0.01 90);
+  --accent: oklch(0.68 0.09 25);
+  --accent-foreground: oklch(0.18 0.03 45);
   --lime: oklch(0.72 0.1 130);
   --lime-foreground: oklch(0.18 0.03 45);
   --lemon: oklch(0.8 0.12 95);
