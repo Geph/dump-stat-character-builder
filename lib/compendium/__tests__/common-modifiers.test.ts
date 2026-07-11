@@ -412,7 +412,7 @@ describe("canonical SRD feature choices", () => {
   it("wires Sorcery Incarnate as a bonus-action 2 SP activation of Innate Sorcery", () => {
     const enriched = enrichClassFeatureWithModifierPresets(
       "Sorcerer",
-      baseFeature("Sorcery Incarnate", 7),
+      { ...baseFeature("Sorcery Incarnate"), level: 7 },
     )
     expect(enriched.activation?.bonusAction).toBe(true)
     expect(enriched.limitedUses).toEqual({

@@ -232,7 +232,9 @@ function applyPresetToFeature(
       feature: feature as Feature,
       row: feature as unknown as Record<string, unknown>,
     })
-    return (result.feature as FeatureLike) ?? (result.row as FeatureLike) ?? feature
+    return (result.feature as unknown as FeatureLike | undefined)
+      ?? (result.row as unknown as FeatureLike | undefined)
+      ?? feature
   }
 
   return applyOperations(feature, preset.operations, {
@@ -418,8 +420,8 @@ export function applyImportEnrichmentPresets(
           } as FeatureLike
           for (const preset of presets.filter((p) => p.target === "proposal_ability")) {
             row = applyPresetToFeature(row, preset, {
-              className: ability.source_name,
-              sourceName: ability.source_name,
+              className: ability.source_name ?? undefined,
+              sourceName: ability.source_name ?? undefined,
             })
           }
           const synced = row.linkedModifiers?.length
