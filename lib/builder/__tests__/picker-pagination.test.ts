@@ -32,11 +32,12 @@ describe("getFeatSpellGrantPickerPageSize", () => {
 })
 
 describe("getSubclassesForClass", () => {
-  it("deduplicates subclasses for a class", () => {
+  it("deduplicates subclasses for a class by id and name", () => {
     const classId = "warlock-id"
     const rows = [
       { id: "fiend-1", class_id: classId, name: "Fiend Patron" },
       { id: "fiend-1", class_id: classId, name: "Fiend Patron" },
+      { id: "fiend-2", class_id: classId, name: "Fiend Patron" },
       { id: "archfey", class_id: classId, name: "Archfey Patron" },
       { id: "other", class_id: "other-class", name: "Other" },
     ] as const

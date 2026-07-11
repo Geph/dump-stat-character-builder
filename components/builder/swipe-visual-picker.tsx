@@ -21,7 +21,8 @@ const SWIPE_EDGE_FADE_RIGHT_CLASS =
 
 export function SwipeVisualPicker({ children, className, enabled = false }: SwipeVisualPickerProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [showHint, setShowHint] = useState(true)
+  // Optimistic so the hint is present on first paint for swipeable carousels.
+  const [hasOverflow, setHasOverflow] = useState(true)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -32,6 +33,7 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
 
     const update = () => {
       const overflow = el.scrollWidth > el.clientWidth + 4
+      setHasOverflow(overflow)
       setCanScrollLeft(overflow && el.scrollLeft > 8)
       setCanScrollRight(overflow && el.scrollLeft < el.scrollWidth - el.clientWidth - 8)
     }
@@ -45,17 +47,6 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
       ro.disconnect()
     }
   }, [enabled, children])
-
-  useEffect(() => {
-    if (!enabled) return
-    const el = scrollRef.current
-    if (!el) return
-    const onScroll = () => {
-      if (el.scrollLeft > 12) setShowHint(false)
-    }
-    el.addEventListener("scroll", onScroll, { passive: true })
-    return () => el.removeEventListener("scroll", onScroll)
-  }, [enabled])
 
   if (!enabled) {
     return <div className={className}>{children}</div>
@@ -76,8 +67,8 @@ export function SwipeVisualPicker({ children, className, enabled = false }: Swip
   ))
 
   return (
-    <div className="relative max-sm:overflow-hidden max-sm:pt-7">
-      {showHint && (
+    <div className={cn("relative max-sm:overflow-hidden", hasOverflow && "max-sm:pt-7")}>
+      {hasOverflow && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center max-sm:flex sm:hidden">
           <motion.div
             animate={{ x: [-5, 5, -5] }}

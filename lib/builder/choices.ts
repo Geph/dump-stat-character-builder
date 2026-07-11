@@ -63,12 +63,18 @@ export function buildSkillPickSources(params: {
 export const SUBCLASS_LEVEL = 3
 
 export function getSubclassesForClass(subclasses: Subclass[], classId: string): Subclass[] {
-  const seen = new Set<string>()
+  const seenIds = new Set<string>()
+  const seenNames = new Set<string>()
   return subclasses.filter((subclass) => {
     if (subclass.class_id !== classId) return false
-    const key = subclass.id?.trim() || subclass.name.trim().toLowerCase()
-    if (!key || seen.has(key)) return false
-    seen.add(key)
+    const id = subclass.id?.trim()
+    const nameKey = subclass.name.trim().toLowerCase()
+    if (!id && !nameKey) return false
+    // Drop exact id repeats and same-name rows (e.g. re-seeded duplicates with new ids).
+    if (id && seenIds.has(id)) return false
+    if (nameKey && seenNames.has(nameKey)) return false
+    if (id) seenIds.add(id)
+    if (nameKey) seenNames.add(nameKey)
     return true
   })
 }

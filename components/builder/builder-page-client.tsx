@@ -2518,7 +2518,7 @@ export default function BuilderPageClient() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 max-sm:gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2537,9 +2537,10 @@ export default function BuilderPageClient() {
                                     removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
                                   }
                                 }}
-                                className="p-1 bg-muted hover:bg-destructive/20 rounded"
+                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-destructive/20 rounded"
+                                aria-label={`Decrease ${cls?.name ?? "class"} level`}
                               >
-                                <Minus className="w-3 h-3" />
+                                <Minus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
                               </button>
                               <ClassLevelInput
                                 value={cl.level}
@@ -2558,7 +2559,7 @@ export default function BuilderPageClient() {
                                   }
                                   setClassLevels(newLevels)
                                 }}
-                                className="w-8 text-center font-bold text-sm bg-background border border-border rounded px-0.5 py-0.5 focus:outline-none focus:border-primary"
+                                className="w-8 max-sm:w-11 text-center font-bold text-sm max-sm:text-base bg-background border border-border rounded px-0.5 py-0.5 max-sm:py-1.5 focus:outline-none focus:border-primary"
                               />
                               <button
                                 type="button"
@@ -2570,9 +2571,10 @@ export default function BuilderPageClient() {
                                   }
                                 }}
                                 disabled={totalLevel >= 20}
-                                className="p-1 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
+                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
+                                aria-label={`Increase ${cls?.name ?? "class"} level`}
                               >
-                                <Plus className="w-3 h-3" />
+                                <Plus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
                               </button>
                             </div>
                             <button
@@ -2815,12 +2817,19 @@ export default function BuilderPageClient() {
                               <h4 className="font-bold text-sm text-foreground mb-2">
                                 Subclass (Level {SUBCLASS_LEVEL}+)
                               </h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <SwipeVisualPicker
+                                enabled={useSwipeVisualPicker}
+                                className={
+                                  useSwipeVisualPicker
+                                    ? getCinematicPickerContainerClass()
+                                    : "grid grid-cols-1 sm:grid-cols-2 gap-2"
+                                }
+                              >
                                 {classSubclasses.map((subclass) => {
                                   const isSelected = subclassByClassId[entry.classId] === subclass.id
                                   return (
                                     <button
-                                      key={subclass.id}
+                                      key={subclass.id || subclass.name}
                                       type="button"
                                       onClick={() =>
                                         setSubclassByClassId((prev) => {
@@ -2834,9 +2843,9 @@ export default function BuilderPageClient() {
                                           return next
                                         })
                                       }
-                                      className={`p-3 rounded-lg border-2 text-left transition-all ${
-                            isSelected
-                              ? "border-primary bg-primary/10"
+                                      className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                                        isSelected
+                                          ? "border-primary bg-primary/10"
                                           : "border-border bg-card hover:border-primary/40"
                                       }`}
                                     >
@@ -2851,7 +2860,7 @@ export default function BuilderPageClient() {
                                     </button>
                                   )
                                 })}
-                              </div>
+                              </SwipeVisualPicker>
                             </div>
                           )}
 
@@ -5404,8 +5413,7 @@ export default function BuilderPageClient() {
           const cls = item as DndClass
           const accentStyles = compendiumAccentColorStyles(accent)
           const baseFeatures = getClassDetailBaseFeatures(cls)
-          const classSubclasses = subclasses
-            .filter((subclass) => subclass.class_id === cls.id)
+          const classSubclasses = getSubclassesForClass(subclasses, cls.id)
             .sort((a, b) => a.name.localeCompare(b.name))
           const complexityBadge = getClassComplexityHeroBadge(cls)
           return (
