@@ -61,9 +61,20 @@ export function buildWeaponDamageExpression(params: {
   dice: string
   includeAbilityModifier: boolean
   flatDamageBonus?: number
+  overrides?: import("@/lib/compendium/characteristic-modifiers").WeaponAbilityOverrideCharacteristic[] | null
 }): string {
-  const { weapon, abilityMods, dice, includeAbilityModifier, flatDamageBonus = 0 } = params
-  const { mod: abilityMod } = getWeaponAttackAbility(weapon, abilityMods)
+  const {
+    weapon,
+    abilityMods,
+    dice,
+    includeAbilityModifier,
+    flatDamageBonus = 0,
+    overrides,
+  } = params
+  const { mod: abilityMod } = getWeaponAttackAbility(weapon, abilityMods, {
+    overrides,
+    forRoll: "damage",
+  })
   const appliedMod = includeAbilityModifier ? abilityMod : abilityMod < 0 ? abilityMod : 0
   const totalMod = appliedMod + flatDamageBonus
   const modSuffix =

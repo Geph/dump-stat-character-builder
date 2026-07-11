@@ -45,7 +45,6 @@ import {
   characterHasTwoWeaponFighting,
   defaultOffHandIncludesAbilityMod,
 } from "@/lib/compendium/two-weapon-fighting"
-import { getWeaponAttackAbility } from "@/lib/compendium/combat-stats"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
@@ -124,7 +123,6 @@ import {
   EXHAUSTION_MAX_LEVEL,
   getExhaustionEffectSummary,
 } from "@/lib/srd/exhaustion-effects"
-import { collectFeatureRollBonuses } from "@/lib/character/collect-limited-feature-effects"
 import { BLOODIED_DESCRIPTION, isBloodied } from "@/lib/character/bloodied"
 import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
 import {
@@ -1482,14 +1480,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         attack: derived.equippedWeaponAttack,
         hand: "main" as const,
         defaultIncludeAbilityModifier: true,
-        abilityModifier: getWeaponAttackAbility(equippedWeapon, derived.abilityMods).mod,
+        abilityModifier: derived.equippedWeaponAttack.damageAbilityMod,
       })
     }
     if (equippedOffHandWeapon && derived?.equippedOffHandWeaponAttack) {
-      const abilityMod = getWeaponAttackAbility(
-        equippedOffHandWeapon,
-        derived.abilityMods,
-      ).mod
+      const abilityMod = derived.equippedOffHandWeaponAttack.damageAbilityMod
       cards.push({
         weapon: equippedOffHandWeapon,
         attack: derived.equippedOffHandWeaponAttack,
@@ -1753,8 +1748,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       spellcastingClass?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
     const spellcastingAbilityKey = resolveSpellcastingAbilityKey(spellcastingAbilityLabel)
     const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
-    const spellSaveDc = spellcastingAbilityKey ? 8 + proficiencyBonus + spellAbilityMod : null
-    const spellAttackMod = spellcastingAbilityKey ? proficiencyBonus + spellAbilityMod : null
+    const primarySpellcasting = derived?.spellcasting?.[0]
+    const spellSaveDc =
+      primarySpellcasting?.saveDc ??
+      (spellcastingAbilityKey ? 8 + proficiencyBonus + spellAbilityMod : null)
+    const spellAttackMod =
+      primarySpellcasting?.attackBonus ??
+      (spellcastingAbilityKey ? proficiencyBonus + spellAbilityMod : null)
     const ctx = {
       abilityMods,
       proficiencyBonus,
@@ -1902,65 +1902,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const spellSaveDcEntries = useMemo(() => {
-    const abilityMods = derived?.abilityMods ?? {
-      strength: 0,
-      dexterity: 0,
-      constitution: 0,
-      intelligence: 0,
-      wisdom: 0,
-      charisma: 0,
-    }
-    const proficiencyBonus =
-      derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2
-    const castingClasses = classDetails.filter((detail) => detail.class?.spellcasting?.ability)
-    const limitationCtx = {
-      activeConditions,
-      activeSheetToggles: activeSheetToggleSet,
-      equippedArmor: limitationEquipment.armor,
-      equippedShield: limitationEquipment.shield,
-      currentHp,
-      proficiencyBonus,
-      abilityMods,
-      characterLevel: derived?.totalLevel ?? character?.level ?? 1,
-    }
-    const sorcererSaveDcBonus = collectFeatureRollBonuses(
-      sheetClassFeatures,
-      { kind: "spell_save_dc" },
-      limitationCtx,
-    ).total
-    return castingClasses.flatMap((detail) => {
-      const abilityKey = resolveSpellcastingAbilityKey(detail.class!.spellcasting!.ability)
-      if (!abilityKey) return []
-      const className = detail.class!.name
-      const baseDc = 8 + proficiencyBonus + abilityMods[abilityKey]
-      const bonus = /^sorcerer$/i.test(className) ? sorcererSaveDcBonus : 0
-      return [
-        {
-          id: detail.row.class_id,
-          className,
-          label:
-            castingClasses.length > 1
-              ? `Spell Save DC (${className} · ${ABILITY_LABELS[abilityKey]})`
-              : "Spell Save DC",
-          dc: baseDc + bonus,
-          baseDc,
-          bonus,
-          abilityKey,
-        },
-      ]
-    })
-  }, [
-    classDetails,
-    derived?.abilityMods,
-    derived?.proficiencyBonus,
-    derived?.totalLevel,
-    character?.level,
-    activeConditions,
-    activeSheetToggleSet,
-    limitationEquipment,
-    currentHp,
-    sheetClassFeatures,
-  ])
+    const casting = derived?.spellcasting ?? []
+    return casting.map((entry) => ({
+      id: entry.classId,
+      className: entry.className,
+      label:
+        casting.length > 1
+          ? `Spell Save DC (${entry.className} · ${ABILITY_LABELS[entry.ability]})`
+          : "Spell Save DC",
+      dc: entry.saveDc,
+      baseDc: entry.saveDc - entry.saveDcFeatureBonus,
+      bonus: entry.saveDcFeatureBonus,
+      abilityKey: entry.ability,
+    }))
+  }, [derived?.spellcasting])
 
   const partitionedToolProficiencies = useMemo(
     () =>
@@ -2063,9 +2018,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const spellcastingAbilityLabel =
     spellcastingClass?.spellcasting?.ability ?? character.subclasses?.spellcasting?.ability
   const spellcastingAbilityKey = resolveSpellcastingAbilityKey(spellcastingAbilityLabel)
-  const hasSpellcasting = Boolean(spellcastingAbilityLabel && spellcastingAbilityKey)
-  const spellAbilityMod = spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0
-  const spellAttackMod = hasSpellcasting ? proficiencyBonus + spellAbilityMod : null
+  const primarySpellcasting = derived?.spellcasting?.[0]
+  const hasSpellcasting = Boolean(
+    primarySpellcasting || (spellcastingAbilityLabel && spellcastingAbilityKey),
+  )
+  const spellAbilityMod =
+    primarySpellcasting?.abilityMod ??
+    (spellcastingAbilityKey ? abilityMods[spellcastingAbilityKey] : 0)
+  const spellAttackMod =
+    primarySpellcasting?.attackBonus ??
+    (hasSpellcasting ? proficiencyBonus + spellAbilityMod : null)
   const innateSorceryBuffActive =
     isSorcerer && activeSheetToggleSet.has("while_innate_sorcery_active")
   const combatStatHighlightClass = innateSorceryBuffActive
@@ -2074,19 +2036,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const formatMod = (mod: number) => (mod >= 0 ? `+${mod}` : `${mod}`)
 
-  const isPerceptionProficient =
-    derived?.skillProficiencies.includes("Perception") ??
-    character.skill_proficiencies?.includes("Perception") ??
-    false
-  const hasPerceptionExpertise =
-    derived?.skillExpertise.includes("Perception") ??
-    character.skill_expertise?.includes("Perception") ??
-    false
-  const passivePerception =
-    derived?.passivePerception ??
-    10 +
-      abilityMods.wisdom +
-      (isPerceptionProficient ? proficiencyBonus * (hasPerceptionExpertise ? 2 : 1) : 0)
+  const passivePerception = derived?.passivePerception ?? 10 + abilityMods.wisdom
+  const passiveInsight = derived?.passiveInsight ?? 10 + abilityMods.wisdom
+  const passiveInvestigation = derived?.passiveInvestigation ?? 10 + abilityMods.intelligence
+  const derivedSaves = derived?.saves ?? []
+  const telepathy = derived?.telepathy ?? null
+  const restReplacement = derived?.restReplacement ?? null
+  const magicalSleepImmunity = derived?.magicalSleepImmunity ?? false
+  const noSleepRequired = derived?.noSleepRequired ?? false
+  const forcedSaveRemaps = derived?.forcedSaveRemaps ?? []
+  const hasSenseNotes =
+    Boolean(telepathy) ||
+    Boolean(restReplacement) ||
+    magicalSleepImmunity ||
+    noSleepRequired ||
+    forcedSaveRemaps.length > 0
 
   const alwaysPreparedSpellIds = (() => {
     const ids = new Set<string>()
@@ -2657,6 +2621,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         />
                       </span>
                     </div>
+                    <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium min-w-0">
+                      <span className="truncate">Passive Insight</span>
+                      <span className="font-bold tabular-nums shrink-0">{passiveInsight}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium min-w-0">
+                      <span className="truncate">Passive Investigation</span>
+                      <span className="font-bold tabular-nums shrink-0">{passiveInvestigation}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2721,7 +2693,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   {!weaponProficiencies.length &&
                   !armorProficiencies.length &&
                   !(character.tool_proficiencies ?? []).length &&
-                  !(character.languages ?? []).length ? (
+                  !(character.languages ?? []).length &&
+                  !hasSenseNotes ? (
                     <span className="text-xs text-muted-foreground">None listed</span>
                   ) : (
                     <div className="space-y-3">
@@ -2807,6 +2780,41 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                         </div>
                       )}
+                      {hasSenseNotes ? (
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 space-y-1.5">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                            Senses & Rest
+                          </p>
+                          {telepathy ? (
+                            <p className="text-xs text-foreground">
+                              {telepathy.label?.trim() || `Telepathy ${telepathy.rangeFeet} ft.`}
+                            </p>
+                          ) : null}
+                          {restReplacement ? (
+                            <p className="text-xs text-foreground">
+                              {restReplacement.description ||
+                                `${restReplacement.restHours}-hour rest${
+                                  restReplacement.replacesLongRest ? " (replaces long rest)" : ""
+                                }`}
+                            </p>
+                          ) : null}
+                          {magicalSleepImmunity ? (
+                            <p className="text-xs text-foreground">Immune to magical sleep</p>
+                          ) : null}
+                          {noSleepRequired ? (
+                            <p className="text-xs text-foreground">Does not require sleep</p>
+                          ) : null}
+                          {forcedSaveRemaps.map((remap, index) => (
+                            <p
+                              key={`forced-save-remap-${remap.fromAbility}-${remap.toAbility}-${index}`}
+                              className="text-xs text-foreground"
+                            >
+                              {remap.label?.trim() ||
+                                `Forced saves: ${remap.fromAbility} → ${remap.toAbility} (${remap.scope.replace(/_/g, " ")})`}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -3005,10 +3013,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 lg:gap-1.5 flex-1 min-w-0">
                       {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
                         (ability) => {
-                          const isProficient = savingThrowProficiencies.includes(ability)
+                          const abilityKey = ability.toLowerCase() as AbilityScoreKey
+                          const derivedSave = derivedSaves.find((entry) => entry.ability === abilityKey)
+                          const isProficient =
+                            derivedSave?.proficient ?? savingThrowProficiencies.includes(ability)
                           const mod =
-                            abilityMods[ability.toLowerCase() as keyof typeof abilityMods] +
-                            (isProficient ? proficiencyBonus : 0)
+                            derivedSave?.bonus ??
+                            abilityMods[abilityKey] + (isProficient ? proficiencyBonus : 0)
                           return (
                             <div
                               key={ability}
@@ -3018,6 +3029,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             >
                               <span className="min-w-0 font-semibold tabular-nums tracking-wide">
                                 {ABILITY_LABELS[ability.toLowerCase()]}
+                                {derivedSave?.governingAbility
+                                  ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
+                                  : ""}
                               </span>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="font-bold tabular-nums">{formatMod(mod)}</span>
@@ -3026,7 +3040,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                   title={`Roll ${ability} save`}
                                   rollContext={{
                                     kind: "save",
-                                    ability: ability.toLowerCase() as AbilityScoreKey,
+                                    ability: abilityKey,
                                   }}
                                 />
                               </div>
@@ -3172,19 +3186,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     <StatExplainPopover
                                       title="Spell Save DC"
                                       total={entry.dc}
-                                      contributions={[
-                                        ...breakdownLines(statBreakdowns, "spellSaveDc"),
-                                        ...(entry.bonus > 0
-                                          ? [
-                                              {
-                                                sourceType: "feature" as const,
-                                                source: "Innate Sorcery",
-                                                label: "Innate Sorcery",
-                                                amount: entry.bonus,
-                                              },
-                                            ]
-                                          : []),
-                                      ]}
+                                      contributions={breakdownLines(statBreakdowns, "spellSaveDc")}
                                     />
                                   ) : null}
                                 </span>

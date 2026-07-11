@@ -1,5 +1,8 @@
 import type { Equipment } from "@/lib/types"
-import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  AbilityScoreKey,
+  WeaponAbilityOverrideCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import { propertiesToStringArray } from "@/lib/compendium/equipment-properties"
 
 export type AbilityMods = {
@@ -109,11 +112,34 @@ export function getWeaponAbilityMod(weapon: Equipment, abilityMods: AbilityMods)
  * Which ability the weapon's attack/damage uses, with the resolved modifier and a
  * human-readable label (used for roll breakdown tooltips). Ranged weapons use Dexterity,
  * Finesse weapons use the higher of Strength/Dexterity, and everything else uses Strength.
+ * Optional overrides (Hex Warrior / Shillelagh) replace that default when they match.
  */
 export function getWeaponAttackAbility(
   weapon: Equipment,
   abilityMods: AbilityMods,
+  options?: {
+    overrides?: WeaponAbilityOverrideCharacteristic[] | null
+    forRoll?: "attack" | "damage"
+  },
 ): { ability: AbilityScoreKey; mod: number; label: string } {
+  const forRoll = options?.forRoll ?? "attack"
+  const override = findMatchingWeaponAbilityOverride(weapon, options?.overrides, forRoll)
+  if (override) {
+    const labels: Record<AbilityScoreKey, string> = {
+      strength: "Strength",
+      dexterity: "Dexterity",
+      constitution: "Constitution",
+      intelligence: "Intelligence",
+      wisdom: "Wisdom",
+      charisma: "Charisma",
+    }
+    return {
+      ability: override.ability,
+      mod: abilityMods[override.ability],
+      label: labels[override.ability],
+    }
+  }
+
   const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
   if (isRanged) {
     return { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity" }
@@ -124,6 +150,43 @@ export function getWeaponAttackAbility(
       : { ability: "strength", mod: abilityMods.strength, label: "Strength (Finesse)" }
   }
   return { ability: "strength", mod: abilityMods.strength, label: "Strength" }
+}
+
+function findMatchingWeaponAbilityOverride(
+  weapon: Equipment,
+  overrides: WeaponAbilityOverrideCharacteristic[] | null | undefined,
+  forRoll: "attack" | "damage",
+): WeaponAbilityOverrideCharacteristic | null {
+  if (!overrides?.length) return null
+  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
+  const isMelee = weapon.subcategory?.toLowerCase().includes("melee") ?? !isRanged
+  const weaponName = weapon.name.trim().toLowerCase()
+
+  for (const override of overrides) {
+    if (override.appliesTo !== "both" && override.appliesTo !== forRoll) continue
+    let matches = false
+    switch (override.scope) {
+      case "all":
+        matches = true
+        break
+      case "melee":
+        matches = isMelee
+        break
+      case "ranged":
+        matches = isRanged
+        break
+      case "finesse":
+        matches = hasWeaponProperty(weapon, "finesse")
+        break
+      case "specific": {
+        const names = (override.weaponNames ?? []).map((n) => n.trim().toLowerCase()).filter(Boolean)
+        matches = names.some((name) => name === weaponName)
+        break
+      }
+    }
+    if (matches) return override
+  }
+  return null
 }
 
 function weaponNameMatchesProficiency(proficiency: string, weaponName: string): boolean {
@@ -183,6 +246,7 @@ export function calculateWeaponAttack(
   abilityMods: AbilityMods,
   proficiencyBonus: number,
   isProficient: boolean,
+  overrides?: WeaponAbilityOverrideCharacteristic[] | null,
 ): {
   attackBonus: number
   damageDisplay: string
@@ -195,10 +259,18 @@ export function calculateWeaponAttack(
   const dice = match?.[1]?.trim() ?? damageText
   const damageType = match?.[2]?.trim() || weapon.damage_type || ""
 
-  const { mod: abilityMod, label: abilityLabel } = getWeaponAttackAbility(weapon, abilityMods)
+  const { mod: abilityMod, label: abilityLabel } = getWeaponAttackAbility(weapon, abilityMods, {
+    overrides,
+    forRoll: "attack",
+  })
+  const damageAbility = getWeaponAttackAbility(weapon, abilityMods, {
+    overrides,
+    forRoll: "damage",
+  })
   const attackBonus = abilityMod + (isProficient ? proficiencyBonus : 0)
+  const damageMod = damageAbility.mod
   const modSuffix =
-    abilityMod === 0 ? "" : abilityMod > 0 ? ` + ${abilityMod}` : ` - ${Math.abs(abilityMod)}`
+    damageMod === 0 ? "" : damageMod > 0 ? ` + ${damageMod}` : ` - ${Math.abs(damageMod)}`
   const damageDisplay = `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()
 
   const attackBreakdown = [{ label: abilityLabel, value: abilityMod }]

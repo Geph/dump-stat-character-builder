@@ -26,6 +26,9 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
 /** Feature-specific toggles resolvable by id but not shown on every character sheet. */
 export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "in_combat_or_high_stakes", label: "In combat / high-stakes", sourceType: "class_feature" },
+  { id: "first_turn_of_combat", label: "First turn of combat", sourceType: "class_feature" },
+  { id: "while_concentrating", label: "Concentrating", sourceType: "class_feature" },
+  { id: "while_flying", label: "Flying", sourceType: "class_feature" },
 ]
 
 export const EDITOR_SHEET_TOGGLE_OPTIONS: SheetToggleDefinition[] = [

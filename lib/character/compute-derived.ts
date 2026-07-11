@@ -70,6 +70,9 @@ import type {
   CharacterBuildInputs,
   CharacterSaveSnapshot,
   DerivedCharacter,
+  DerivedForcedSaveRemap,
+  DerivedSpellcastingEntry,
+  DerivedTelepathy,
   SaveBonus,
   SkillBonus,
   StatBreakdownPart,
@@ -79,8 +82,10 @@ import type {
 import {
   collectFeatureDamageBonuses,
   collectFeatureRollBonuses,
+  computeRollBonusAmount,
 } from "@/lib/character/collect-limited-feature-effects"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
+import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Acrobatics", ability: "dexterity" },
@@ -114,11 +119,13 @@ function buildWeaponAttackDerived(
     includeAbilityModifier?: boolean
   },
 ): WeaponAttackDerived | null {
+  const overrides = params.aggregatedCharacteristics.weaponAbilityOverrides
   const base = calculateWeaponAttack(
     weapon,
     params.abilityMods,
     params.proficiencyBonus,
     isWeaponProficient(weapon, params.weaponProficiencies),
+    overrides,
   )
   if (!base) return null
 
@@ -152,12 +159,28 @@ function buildWeaponAttackDerived(
           dice: damageDice,
           includeAbilityModifier: params.includeAbilityModifier,
           flatDamageBonus: damageBonus,
+          overrides,
         })
       : damageBonus > 0
         ? `${base.damageDisplay} + ${damageBonus}`
         : base.damageDisplay
 
-  return { attackBonus, damageDisplay, attackBreakdown }
+  const attackAbility = getWeaponAttackAbility(weapon, params.abilityMods, {
+    overrides,
+    forRoll: "attack",
+  })
+  const damageAbility = getWeaponAttackAbility(weapon, params.abilityMods, {
+    overrides,
+    forRoll: "damage",
+  })
+
+  return {
+    attackBonus,
+    damageDisplay,
+    attackBreakdown,
+    attackAbilityMod: attackAbility.mod,
+    damageAbilityMod: damageAbility.mod,
+  }
 }
 
 function abilityModsFromScores(scores: Record<AbilityScoreKey, number>) {
@@ -214,6 +237,90 @@ export function calculateBaseMaxHp(
     }
   }
   return Math.max(Number.isFinite(hp) ? hp : 8 + conMod, 1)
+}
+
+function passiveSkillScore(
+  skillName: string,
+  ability: AbilityScoreKey,
+  abilityMods: Record<AbilityScoreKey, number>,
+  skillProficiencies: string[],
+  skillExpertise: string[],
+  proficiencyBonus: number,
+): number {
+  return (
+    10 +
+    abilityMods[ability] +
+    (skillProficiencies.includes(skillName)
+      ? proficiencyBonus * (skillExpertise.includes(skillName) ? 2 : 1)
+      : 0)
+  )
+}
+
+function buildSpellcastingEntries(params: {
+  classLevels: { classId: string; level: number }[]
+  classes: DndClass[]
+  abilityMods: Record<AbilityScoreKey, number>
+  proficiencyBonus: number
+  aggregatedSpellcastingAbility: AbilityScoreKey | null
+  resolvedFeatures: import("@/lib/types").Feature[]
+  featureLimitationCtx: import("@/lib/compendium/modifier-limitations").LimitationEvaluationContext
+  characterLevel: number
+}): DerivedSpellcastingEntry[] {
+  const saveDcFeatureBonus =
+    params.resolvedFeatures.length > 0
+      ? collectFeatureRollBonuses(
+          params.resolvedFeatures,
+          { kind: "spell_save_dc" },
+          {
+            ...params.featureLimitationCtx,
+            proficiencyBonus: params.proficiencyBonus,
+            abilityMods: params.abilityMods,
+            characterLevel: params.characterLevel,
+          },
+        ).total
+      : 0
+
+  const entries: DerivedSpellcastingEntry[] = []
+  for (const row of params.classLevels) {
+    const cls = params.classes.find((entry) => entry.id === row.classId)
+    if (!cls?.spellcasting?.ability) continue
+    const ability =
+      resolveSpellcastingAbilityKey(cls.spellcasting.ability) ??
+      params.aggregatedSpellcastingAbility
+    if (!ability) continue
+    const abilityMod = params.abilityMods[ability]
+    const abilityLabel =
+      ability.charAt(0).toUpperCase() + ability.slice(1)
+    entries.push({
+      classId: cls.id,
+      className: cls.name,
+      ability,
+      abilityLabel,
+      abilityMod,
+      saveDcFeatureBonus,
+      saveDc: 8 + params.proficiencyBonus + abilityMod + saveDcFeatureBonus,
+      attackBonus: params.proficiencyBonus + abilityMod,
+    })
+  }
+  return entries
+}
+
+function buildForcedSaveRemaps(
+  remaps: import("@/lib/compendium/characteristic-modifiers").ForcedSaveAbilityRemapCharacteristic[],
+): DerivedForcedSaveRemap[] {
+  return remaps.map((remap) => ({
+    fromAbility: remap.fromAbility,
+    toAbility: remap.toAbility,
+    scope: remap.scope,
+    label: remap.label,
+  }))
+}
+
+function buildTelepathyDerived(
+  telepathy: AggregatedCharacteristics["telepathy"],
+): DerivedTelepathy | null {
+  if (!telepathy) return null
+  return { rangeFeet: telepathy.rangeFeet, label: telepathy.label }
 }
 
 function resolveWalkSpeed(inputs: CharacterBuildInputs, aggregatedSpeed: Record<string, number>) {
@@ -319,20 +426,62 @@ function buildToolBonuses(
   })
 }
 
+function saveMatchesAlternateList(saveAbility: AbilityScoreKey, saves: string[]): boolean {
+  if (!saves.length) return true
+  const label = saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1)
+  return saves.some((entry) => {
+    const normalized = entry.trim().toLowerCase()
+    return normalized === saveAbility || normalized === label.toLowerCase()
+  })
+}
+
+function resolveGoverningSaveAbility(
+  saveAbility: AbilityScoreKey,
+  alternates: AggregatedCharacteristics["savingThrowAlternateAbilities"],
+): AbilityScoreKey {
+  for (const alt of alternates) {
+    if (saveMatchesAlternateList(saveAbility, alt.saves ?? [])) {
+      return alt.ability
+    }
+  }
+  return saveAbility
+}
+
 function buildSaveBonuses(
   proficiencyBonus: number,
   abilityMods: Record<AbilityScoreKey, number>,
   savingThrowProficiencies: string[],
+  aggregated: AggregatedCharacteristics,
+  characterLevel: number,
 ): SaveBonus[] {
+  let auraBonus = 0
+  for (const aura of aggregated.auras) {
+    if (aura.affectsSelf === false) continue
+    if (!aura.saveBonusConfig) continue
+    auraBonus += computeRollBonusAmount(aura.saveBonusConfig, {
+      proficiencyBonus,
+      abilityMods,
+      characterLevel,
+    })
+  }
+
   return ABILITY_SCORE_KEYS.map((ability) => {
     const label = ability.charAt(0).toUpperCase() + ability.slice(1)
     const proficient = savingThrowProficiencies.some(
       (entry) => entry.toLowerCase() === ability || entry.toLowerCase() === label.toLowerCase(),
     )
+    const governingAbility = resolveGoverningSaveAbility(
+      ability,
+      aggregated.savingThrowAlternateAbilities,
+    )
+    const abilityPart = abilityMods[governingAbility]
+    const profPart = proficient ? proficiencyBonus : 0
     return {
       ability,
       proficient,
-      bonus: abilityMods[ability] + (proficient ? proficiencyBonus : 0),
+      governingAbility: governingAbility !== ability ? governingAbility : undefined,
+      auraBonus: auraBonus !== 0 ? auraBonus : undefined,
+      bonus: abilityPart + profPart + auraBonus,
     }
   })
 }
@@ -610,12 +759,30 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     proficiencyBonus,
   )
 
-  const passivePerception =
-    10 +
-    abilityMods.wisdom +
-    (skillProficiencies.includes("Perception")
-      ? proficiencyBonus * (skillExpertise.includes("Perception") ? 2 : 1)
-      : 0)
+  const passivePerception = passiveSkillScore(
+    "Perception",
+    "wisdom",
+    abilityMods,
+    skillProficiencies,
+    skillExpertise,
+    proficiencyBonus,
+  )
+  const passiveInsight = passiveSkillScore(
+    "Insight",
+    "wisdom",
+    abilityMods,
+    skillProficiencies,
+    skillExpertise,
+    proficiencyBonus,
+  )
+  const passiveInvestigation = passiveSkillScore(
+    "Investigation",
+    "intelligence",
+    abilityMods,
+    skillProficiencies,
+    skillExpertise,
+    proficiencyBonus,
+  )
 
   const featureLimitationCtx = {
     activeConditions: inputs.activeConditions,
@@ -625,6 +792,18 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     currentHp: inputs.currentHp,
   }
   const resolvedFeatures = inputs.resolvedFeatures ?? []
+  const spellcasting = buildSpellcastingEntries({
+    classLevels: inputs.classLevels,
+    classes: inputs.classes,
+    abilityMods,
+    proficiencyBonus,
+    aggregatedSpellcastingAbility: aggregatedCharacteristics.spellcastingAbility,
+    resolvedFeatures,
+    featureLimitationCtx,
+    characterLevel: totalLevel,
+  })
+  const forcedSaveRemaps = buildForcedSaveRemaps(aggregatedCharacteristics.forcedSaveAbilityRemaps)
+  const telepathy = buildTelepathyDerived(aggregatedCharacteristics.telepathy)
   const featureDamageBonus =
     resolvedFeatures.length > 0
       ? collectFeatureDamageBonuses(resolvedFeatures, {
@@ -657,7 +836,10 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       ? buildWeaponAttackDerived(equippedOffHandWeapon, {
           ...weaponAttackContext,
           includeAbilityModifier: defaultOffHandIncludesAbilityMod(
-            getWeaponAttackAbility(equippedOffHandWeapon, abilityMods).mod,
+            getWeaponAttackAbility(equippedOffHandWeapon, abilityMods, {
+              overrides: aggregatedCharacteristics.weaponAbilityOverrides,
+              forRoll: "attack",
+            }).mod,
             hasTwoWeaponFighting,
           ),
         })
@@ -666,7 +848,10 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
             ...weaponAttackContext,
             weaponProficiencies: [],
             includeAbilityModifier: defaultOffHandIncludesAbilityMod(
-              getWeaponAttackAbility(equippedOffHandWeapon, abilityMods).mod,
+              getWeaponAttackAbility(equippedOffHandWeapon, abilityMods, {
+                overrides: aggregatedCharacteristics.weaponAbilityOverrides,
+                forRoll: "attack",
+              }).mod,
               hasTwoWeaponFighting,
             ),
           })
@@ -686,6 +871,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     speed,
     speeds,
     passivePerception,
+    passiveInsight,
+    passiveInvestigation,
     skillProficiencies,
     skillExpertise,
     toolProficiencies,
@@ -714,7 +901,19 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       aggregatedCharacteristics.toolExpertise,
       aggregatedCharacteristics.toolExpertiseAll,
     ),
-    saves: buildSaveBonuses(proficiencyBonus, abilityMods, savingThrowProficiencies),
+    saves: buildSaveBonuses(
+      proficiencyBonus,
+      abilityMods,
+      savingThrowProficiencies,
+      aggregatedCharacteristics,
+      totalLevel,
+    ),
+    spellcasting,
+    forcedSaveRemaps,
+    telepathy,
+    restReplacement: aggregatedCharacteristics.restReplacement,
+    magicalSleepImmunity: aggregatedCharacteristics.magicalSleepImmunity,
+    noSleepRequired: aggregatedCharacteristics.noSleepRequired,
     equippedWeaponAttack,
     equippedOffHandWeaponAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,

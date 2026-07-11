@@ -428,4 +428,274 @@ describe("save vs preview invariant", () => {
     expect(thieves?.expertise).toBe(true)
     expect(thieves?.bonus).toBe(derived.abilityMods.dexterity + derived.proficiencyBonus * 2)
   })
+
+  it("applies Aura of Protection CHA save bonus to all saves", () => {
+    const auraFeat = {
+      id: "feat_aura",
+      name: "Aura of Protection",
+      description: "",
+      category: "General",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: makeLinked([
+        {
+          id: "aura_prot",
+          type: "aura",
+          radiusFeet: 10,
+          affectsSelf: true,
+          affectsAllies: true,
+          saveBonusConfig: {
+            mode: "ability_modifier",
+            ability: "CHA",
+            resultFloor: { mode: "fixed", fixed: 1 },
+          },
+        },
+      ]),
+      icon: null,
+      source: "SRD",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 16,
+        },
+        selectedFeatIds: [auraFeat.id],
+        feats: [auraFeat],
+      }),
+    )
+
+    for (const save of derived.saves) {
+      expect(save.auraBonus).toBe(3)
+      expect(save.bonus).toBe(derived.abilityMods[save.ability] + 3)
+    }
+  })
+
+  it("substitutes weapon attack/damage ability when overridden", () => {
+    const hexFeat = {
+      id: "feat_hex",
+      name: "Hex Warrior",
+      description: "",
+      category: "General",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: makeLinked([
+        {
+          id: "hex_weapon",
+          type: "weapon_ability_override",
+          ability: "charisma",
+          appliesTo: "both",
+          scope: "melee",
+        },
+      ]),
+      icon: null,
+      source: "test",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 8,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 16,
+        },
+        classLevels: [{ classId: fighterClass.id, level: 1 }],
+        classes: [fighterClass],
+        primaryClassId: fighterClass.id,
+        selectedFeatIds: [hexFeat.id],
+        feats: [hexFeat],
+        equipment: [longswordEquipment as unknown as Equipment],
+        equippedWeaponId: longswordEquipment.id,
+      }),
+    )
+
+    // CHA +3 + PB +2 = 5 (not STR -1 + PB)
+    expect(derived.equippedWeaponAttack?.attackBonus).toBe(5)
+    expect(derived.equippedWeaponAttack?.damageDisplay).toMatch(/\+ 3/)
+  })
+
+  it("remaps Wisdom saves to Intelligence when alternate ability is set", () => {
+    const mindFeat = {
+      id: "feat_mind",
+      name: "Iron Intellect",
+      description: "",
+      category: "General",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: makeLinked([
+        {
+          id: "wis_to_int",
+          type: "saving_throw_alternate_ability",
+          ability: "intelligence",
+          saves: ["wisdom"],
+        },
+      ]),
+      icon: null,
+      source: "test",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 16,
+          wisdom: 8,
+          charisma: 10,
+        },
+        selectedFeatIds: [mindFeat.id],
+        feats: [mindFeat],
+      }),
+    )
+
+    const wis = derived.saves.find((save) => save.ability === "wisdom")
+    expect(wis?.governingAbility).toBe("intelligence")
+    expect(wis?.bonus).toBe(3)
+  })
+
+  it("exposes spellcasting DC/attack and passive skills on DerivedCharacter", () => {
+    const wizardClass = {
+      id: "class_wizard",
+      name: "Wizard",
+      hit_die: 6,
+      saving_throws: ["Intelligence", "Wisdom"],
+      features: [
+        {
+          name: "Arcane Focus",
+          level: 1,
+          description: "",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_focus_dc",
+              catalogRefId: "cat_fx_check_roll_modifier",
+              activation: {
+                effects: [
+                  {
+                    id: "fx_focus_dc",
+                    kind: "check_roll_modifier",
+                    checkRollMode: "bonus",
+                    checkCategory: "spell_save_dc",
+                    bonusConfig: { mode: "fixed", fixed: 2 },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      spellcasting: { ability: "Intelligence", preparation: "prepared" },
+    } as unknown as import("@/lib/types").DndClass
+
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 16,
+          wisdom: 14,
+          charisma: 10,
+        },
+        classLevels: [{ classId: wizardClass.id, level: 1 }],
+        classes: [wizardClass],
+        primaryClassId: wizardClass.id,
+        extraSkillProficiencies: ["Perception", "Insight"],
+        resolvedFeatures: wizardClass.features as import("@/lib/types").Feature[],
+      }),
+    )
+
+    expect(derived.spellcasting).toHaveLength(1)
+    expect(derived.spellcasting[0]).toMatchObject({
+      ability: "intelligence",
+      abilityMod: 3,
+      saveDcFeatureBonus: 2,
+      saveDc: 8 + 2 + 3 + 2,
+      attackBonus: 2 + 3,
+    })
+    expect(derived.passivePerception).toBe(10 + 2 + 2)
+    expect(derived.passiveInsight).toBe(10 + 2 + 2)
+    expect(derived.passiveInvestigation).toBe(10 + 3)
+  })
+
+  it("exposes telepathy, rest replacement, and forced save remaps", () => {
+    const senseFeat = {
+      id: "feat_senses",
+      name: "Mind & Trance",
+      description: "",
+      category: "General",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: makeLinked([
+        {
+          id: "telepathy",
+          type: "telepathy",
+          rangeFeet: 60,
+          label: "Telepathy 60 ft.",
+        },
+        {
+          id: "trance",
+          type: "rest_replacement",
+          restHours: 4,
+          replacesLongRest: true,
+          description: "Trance 4 hours",
+        },
+        {
+          id: "sleep_immune",
+          type: "magical_sleep_immunity",
+          noSleepRequired: true,
+        },
+        {
+          id: "force_int",
+          type: "forced_save_ability_remap",
+          fromAbility: "WIS",
+          toAbility: "INT",
+          scope: "your_spells",
+          label: "Spells force INT saves",
+        },
+      ]),
+      icon: null,
+      source: "test",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        selectedFeatIds: [senseFeat.id],
+        feats: [senseFeat],
+      }),
+    )
+
+    expect(derived.telepathy).toEqual({ rangeFeet: 60, label: "Telepathy 60 ft." })
+    expect(derived.restReplacement).toMatchObject({
+      restHours: 4,
+      replacesLongRest: true,
+      description: "Trance 4 hours",
+    })
+    expect(derived.magicalSleepImmunity).toBe(true)
+    expect(derived.noSleepRequired).toBe(true)
+    expect(derived.forcedSaveRemaps).toEqual([
+      {
+        fromAbility: "WIS",
+        toAbility: "INT",
+        scope: "your_spells",
+        label: "Spells force INT saves",
+      },
+    ])
+  })
 })
