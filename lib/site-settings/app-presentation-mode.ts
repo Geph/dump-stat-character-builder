@@ -29,7 +29,7 @@ export function isCompactOnlyPresentation(): boolean {
   return getAppPresentationMode() === "compact-only"
 }
 
-/** Compendium browse, builder pickers, and editors suppress card art when compact-only. */
+/** Compendium browse and editors suppress card art when compact-only. Visual/Compact layout is enforced separately via areBrowseCardImagesEnabled. */
 export function areCompendiumImagesEnabled(): boolean {
   if (typeof window === "undefined") return true
   return !isCompactOnlyPresentation()

@@ -33,13 +33,13 @@ const BUILDER_LAYOUT_OPTIONS = [
   {
     id: "visual" as const,
     label: "Visual",
-    description: "Icon grids and cards for classes, weapons, and feats.",
+    description: "Card art and richer pickers in the builder and compendium.",
     icon: Sparkles,
   },
   {
     id: "compact" as const,
     label: "Compact",
-    description: "Dense lists and dropdowns that fit more on screen.",
+    description: "Dense lists without card art so more fits on screen.",
     icon: LayoutGrid,
   },
 ]
@@ -158,11 +158,11 @@ export function GlobalSettingsMenu() {
               </div>
 
               <div>
-                <p className="text-sm font-semibold text-foreground">Builder layout</p>
+                <p className="text-sm font-semibold text-foreground">Card layout</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {isCompactOnly
-                    ? "Compact Only mode keeps the builder in dense list view."
-                    : "Default presentation for the character builder. You can still toggle it per session inside the builder."}
+                    ? "Compact Only mode keeps the builder and compendium in dense list view."
+                    : "Default Visual or Compact presentation for the character builder and compendium. You can still toggle it on those pages."}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {BUILDER_LAYOUT_OPTIONS.filter((option) => !isCompactOnly || option.id === "compact").map((option) => {

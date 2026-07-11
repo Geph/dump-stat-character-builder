@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   compendiumBrowseGridClass,
   COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
@@ -153,5 +153,25 @@ describe("resolveCompendiumCardImageUrl", () => {
     expect(resolveCompendiumCardImageUrl(item, "classes")).toBe(item.card_image_url)
     expect(resolveCompendiumCardImageUrl(item, "spells")).toBe(item.card_image_url)
     expect(resolveCompendiumCardImageUrl(item, "magic_items")).toBe(item.card_image_url)
+  })
+
+  it("hides card art when the shared layout preference is compact", () => {
+    const store = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+    }
+    vi.stubGlobal("window", { localStorage: storage })
+    vi.stubGlobal("localStorage", storage)
+    store.set("dump-stat-builder-layout", "compact")
+    expect(resolveCompendiumCardImageUrl(item, "classes")).toBeNull()
+    store.set("dump-stat-builder-layout", "visual")
+    expect(resolveCompendiumCardImageUrl(item, "classes")).toBe(item.card_image_url)
+    vi.unstubAllGlobals()
   })
 })

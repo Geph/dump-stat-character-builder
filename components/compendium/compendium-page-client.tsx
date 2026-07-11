@@ -12,7 +12,7 @@ import {
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
@@ -66,6 +66,7 @@ import {
   CLASS_CARD_ASPECT_CLASS,
   COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS,
   COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS,
+  areBrowseCardImagesEnabled,
   compendiumBrowseGridClass,
   compendiumCardImageCropForType,
   compendiumItemSupportsCardImage,
@@ -75,6 +76,8 @@ import {
   resolveCompendiumCardImageUrl,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
+import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import {
   COMMON_MODIFIERS_CATALOG_ID,
@@ -181,6 +184,8 @@ const CustomClassSpellListDialog = dynamic(
 export default function CompendiumPageClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { layout: cardLayout, setLayout: setCardLayout } = useBuilderLayout()
+  const { isCompactOnly } = useAppPresentationMode()
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [spellListDialogOpen, setSpellListDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -1251,6 +1256,54 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 Upload class spell list
               </button>
             )}
+            <div
+              id="compendium-search"
+              className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+            >
+              {!isCompactOnly ? (
+                <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
+                  <button
+                    type="button"
+                    title="Visual cards"
+                    aria-pressed={cardLayout === "visual"}
+                    onClick={() => setCardLayout("visual")}
+                    className={`flex items-center gap-1 px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
+                      cardLayout === "visual"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Visual</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Compact list cards"
+                    aria-pressed={cardLayout === "compact"}
+                    onClick={() => setCardLayout("compact")}
+                    className={`flex items-center gap-1 border-l border-border px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
+                      cardLayout === "compact"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Compact</span>
+                  </button>
+                </div>
+              ) : null}
+              <div className="relative w-28 shrink-0 sm:w-36">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3 sm:h-4 sm:w-4" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Search content"
+                  className="w-full rounded-lg border-2 border-border bg-card py-2 pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none sm:pl-9 sm:pr-3"
+                />
+              </div>
+            </div>
             <Link
               href={compendiumEditHref(activeTab, "new")}
               className="inline-flex max-w-[42vw] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
@@ -1693,17 +1746,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               </div>
             )}
           </div>
-
-          <div id="compendium-search" className="relative w-full sm:w-1/3 shrink-0 sm:ml-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search content..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm bg-card border-2 border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-            />
-          </div>
         </div>
 
         {/* Content Grid */}
@@ -1786,10 +1828,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   : "portrait"
               : "default"
           }
-          enableCardImage={compendiumItemSupportsCardImage(
-            activeTab,
-            selectedItem as unknown as Record<string, unknown>,
-          )}
+          enableCardImage={
+            areBrowseCardImagesEnabled() &&
+            compendiumItemSupportsCardImage(
+              activeTab,
+              selectedItem as unknown as Record<string, unknown>,
+            )
+          }
           item={
             activeTab === "class_resources"
               ? {
