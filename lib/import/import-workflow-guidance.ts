@@ -15,76 +15,62 @@ export type ImportWorkflow = {
   notes?: string[]
 }
 
+/** Short rule shown outside collapsed panels. */
+export const ONE_CLASS_AT_A_TIME_WARNING =
+  "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are not likely to work — use a page range or split the extract."
+
 export const MULTI_FILE_IMPORT_TIP =
-  "Import supporting libraries before the class and subclass files that reference them. SRD spells resolve from your seeded compendium — you only need homebrew spell JSON for non-SRD names."
+  "Libraries before the class: non-SRD spells, psionic disciplines/powers, exploit/maneuver lists, and similar pickers should be extracted and imported first so the class can wire to them. Then do one class chapter (core + subclasses). Use page ranges to skip other classes — not to split a class from its own subclasses."
 
 export const JSON_ARRAY_IMPORT_TIP =
-  "You can paste a JSON array of import objects in Step 2 — e.g. [{\"spells\": [...]}, {\"classes\": [...]}, {\"subclasses\": [...]}] — and Dump Stat will merge them into one batch before wiring."
+  "You can paste a JSON array of import objects in Step 2 — e.g. [{\"abilities\": [...]}, {\"spells\": [...]}, {\"classes\": [...]}, {\"subclasses\": [...]}] — and Dump Stat will merge them into one batch before wiring. Put library objects before the class object when combining passes."
 
 export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {
     id: "spellcasting-class",
     title: "Spellcasting classes (Witch, Inventor, full casters)",
     summary:
-      "Subclass always-prepared tables and class spell lists need spell definitions available when modifiers are wired.",
+      "Import homebrew spells / class spell lists first, then one pass for the class chapter (core + subclasses). Subclass always-prepared tables wire cleanly when those spells already exist.",
     examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters"],
     steps: [
       {
-        label: "Homebrew spell libraries",
-        hint: "Third-party or author spell JSON (e.g. kibbles-spells-parsed.json, valdas-spells-201-231.json)",
+        label: "Spells and class spell lists first",
+        hint: "Non-SRD spells and class spell lists (content types Spells or Class Spell Lists). Skip if everything is SRD-seeded.",
         contentType: "spells",
       },
       {
-        label: "Class spell list (PHB table)",
-        hint: "Paste an \"Artificer Spell List\" section with Spell / School / Special columns — use content type Class Spell Lists for zero-AI parsing",
-        contentType: "spell_lists",
-      },
-      {
-        label: "Class spell list stub (optional)",
-        hint: "Spell list JSON with class name tags when split from the class PDF",
-        contentType: "spells",
-      },
-      {
-        label: "Class",
-        hint: "Core features, spellcasting, and class_resources[] pools",
+        label: "Class chapter (core + subclasses)",
+        hint: "One PDF/text pass for the class and its subclasses together — staged review covers both.",
         contentType: "classes",
       },
       {
-        label: "Subclasses",
-        hint: "Subclass features with HTML spell tables in descriptions",
-        contentType: "subclasses",
-      },
-      {
-        label: "Choice options (if separate)",
-        hint: "Grand hex options, invocations, etc. as abilities[] or feats[]",
+        label: "Extra custom ability menus (only if separate)",
+        hint: "Rare: ability pickers that live outside the class PDF — import as abilities[] / feats[] after the class if they were not in the chapter pass",
         contentType: "abilities",
       },
     ],
     notes: [
-      "SRD spells (Burning Hands, Fireball, etc.) do not need a separate import if your compendium is SRD-seeded.",
-      "Hex cantrips and similar entries bundled in a subclass file’s spells[] array are merged automatically.",
+      "SRD spells do not need a separate import if your compendium is SRD-seeded.",
+      "Cantrips bundled in a subclass file’s spells[] array are merged automatically.",
+      "One class per pass — page-range out any other classes in the same book.",
     ],
   },
   {
     id: "psion-disciplines",
     title: "Psionic classes (KibblesTasty Psion)",
     summary:
-      "Discipline packages, discipline powers, and psi-point pools are often split across multiple JSON files.",
-    examples: ["KibblesTasty Psion", "psion-disciplines.json + psion-class.json"],
+      "Extract Psionic Disciplines and powers from the PDF first (even if they appear later in the book), import that library, then extract the Psion class + archetypes. Class features and psi costs wire to disciplines that already exist.",
+    examples: ["KibblesTasty Psion"],
     steps: [
       {
-        label: "Disciplines & powers",
-        hint: "Discipline passive features, psionic powers (spells[]), and import_proposals.custom_abilities",
+        label: "Disciplines & powers first",
+        hint: "Point the LLM at the Psionic Disciplines / powers section — abilities[], related spells[], and import_proposals.custom_abilities. Do this before the class chapter.",
         contentType: "abilities",
       },
       {
-        label: "KibblesTasty Psion class",
-        hint: "Psi Points, Psi Limit, Psionic Disciplines feature, archetype choices",
+        label: "Psion class chapter (core + archetypes)",
+        hint: "Psi Points, Psi Limit, Psionic Disciplines feature, and archetypes/subclasses — after the discipline library is in (or in the same JSON array after the library object)",
         contentType: "classes",
-      },
-      {
-        label: "Archetypes / subclasses (if separate)",
-        contentType: "subclasses",
       },
       {
         label: "Discipline feats (if bundled separately)",
@@ -92,31 +78,27 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
       },
     ],
     notes: [
-      "Psi-point augment options (Fortifying, Savage, etc.) are parsed into psionic_augments on each discipline power at import.",
+      "In the Psion PDF, disciplines often follow the class text — still extract them as pass 1; use a page range or an explicit “disciplines only” instruction.",
+      "Psi-point augment options are parsed into psionic_augments on each discipline power at import.",
       "On the character sheet, open a psionic power to pick augments before casting; total psi cost is logged with the cast.",
-      "Base activation costs like “expend 2 psi points” auto-wire to the psi_points resource when phrasing matches.",
     ],
   },
   {
     id: "martial-exploits",
     title: "Martial exploit classes (Laserllama Alt Fighter, etc.)",
     summary:
-      "Exploit dice on the level table, exploit techniques, and the core class are easiest to wire when imported in dependency order.",
+      "Same pattern as Psion: extract the exploit / maneuver library first, then the class chapter (level table + subclasses).",
     examples: ["Laserllama Alternate Fighter", "MCDM classes with technique lists"],
     steps: [
       {
-        label: "Exploit / maneuver library (if separate)",
-        hint: "Custom abilities[] entries or feats[] for individual exploits",
+        label: "Exploit / maneuver library first",
+        hint: "Custom abilities[] or feats[] for individual exploits — even when they appear later in the PDF than the class",
         contentType: "abilities",
       },
       {
-        label: "Class with level table",
-        hint: "Exploit Dice, Exploit Die size, Exploits Known columns + Martial Exploits feature",
+        label: "Class chapter (level table + subclasses)",
+        hint: "Exploit Dice columns, Martial Exploits feature, and subclasses after the library exists",
         contentType: "classes",
-      },
-      {
-        label: "Subclasses (if separate)",
-        contentType: "subclasses",
       },
     ],
     notes: [
@@ -127,22 +109,24 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {
     id: "inventor-upgrades",
     title: "Artificer-style upgrade classes (Inventor)",
-    summary: "Upgrade pickers and companion stat blocks may ship separately from the core class.",
+    summary:
+      "Homebrew spells first when needed, then the Inventor class chapter. Upgrade pickers that ship as a separate library should come before the class when possible.",
     examples: ["Kibbles Inventor"],
     steps: [
       {
-        label: "Spell list / homebrew spells (if any)",
+        label: "Spells and class spell lists (if any)",
+        hint: "Non-SRD spells your Inventor features rely on",
         contentType: "spells",
       },
       {
-        label: "Inventor class",
-        hint: "Upgrades resource, specialization choices",
-        contentType: "classes",
+        label: "Upgrade / companion library (if separate)",
+        hint: "abilities[] with companion_stat_block or upgrade pickers that are not inside the class chapter",
+        contentType: "abilities",
       },
       {
-        label: "Subclasses + upgrade features",
-        hint: "Golem Companion and similar abilities[] with companion_stat_block",
-        contentType: "subclasses",
+        label: "Inventor class chapter (core + subclasses)",
+        hint: "Upgrades resource, specialization choices, and subclass features",
+        contentType: "classes",
       },
     ],
   },

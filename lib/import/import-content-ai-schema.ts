@@ -19,6 +19,8 @@ const ChoiceOptionsAiSchema = z.object({
     z.object({
       name: z.string(),
       description: z.string(),
+      prerequisite: z.string().nullable(),
+      repeatable: z.boolean().nullable(),
     }),
   ),
 })
@@ -54,7 +56,13 @@ const ImportMechanicAiSchema = z.object({
   visionRangeFeet: z.number().nullable(),
   usesFixed: z.number().nullable(),
   usesAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
-  usesRecharge: z.enum(["short_rest", "long_rest", "both"]).nullable(),
+  usesRecharge: z.enum(["short_rest", "long_rest", "both", "until_item_consumed"]).nullable(),
+  classResourceKey: z.string().nullable(),
+  classResourceCost: z.number().nullable(),
+  classResourceCostMode: z
+    .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
+    .nullable(),
+  classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
   checkRollMode: z.enum(["advantage", "disadvantage"]).nullable(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).nullable(),
   checkAbility: z
@@ -84,6 +92,15 @@ const ImportMechanicAiSchema = z.object({
   targetCreatureTypes: z.array(z.string()).nullable(),
   requiresSheetToggle: z.string().nullable(),
   sheetToggleLabel: z.string().nullable(),
+  restoreResourceKey: z.string().nullable(),
+  restoreResourceAmount: z.number().nullable(),
+  grantResourceKey: z.string().nullable(),
+  grantAmount: z.number().nullable(),
+  grantAmountByLevel: z
+    .array(z.object({ level: z.number(), amount: z.number() }))
+    .nullable(),
+  expiresEndOfTurn: z.boolean().nullable(),
+  usageRestriction: z.string().nullable(),
 })
 
 const ClassFeatureAiSchema = z.object({
@@ -170,12 +187,37 @@ const AbilityAiSchema = z.object({
       "background",
       "feat",
       "item",
+      "compendium",
       "class_feature",
       "subclass_feature",
     ])
     .nullable(),
   source_name: z.string().nullable(),
   level_requirement: z.number().nullable(),
+  mechanics: z.array(ImportMechanicAiSchema).nullable(),
+  ability_role: z
+    .enum([
+      "discipline",
+      "psionic_power",
+      "talent_pool",
+      "class_talent",
+      "knack",
+      "upgrade",
+      "bomb_formula",
+      "discovery",
+      "alchemist_bomb",
+    ])
+    .nullable(),
+  casting_time: z.string().nullable(),
+  execution: z.string().nullable(),
+  eligible_classes: z.array(z.string()).nullable(),
+  range: z.string().nullable(),
+  components: z.array(z.string()).nullable(),
+  duration: z.string().nullable(),
+  concentration: z.boolean().nullable(),
+  prerequisite: z.string().nullable(),
+  repeatable: z.boolean().nullable(),
+  source_page: z.number().nullable(),
 })
 
 const ProposedCustomAbilityAiSchema = AbilityAiSchema.extend({
@@ -242,6 +284,8 @@ const FeatAiSchema = z.object({
   prerequisite: z.string().nullable(),
   category: z.string().nullable(),
   level_requirement: z.number().nullable().optional(),
+  isChoice: z.boolean().nullable(),
+  choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 
@@ -487,7 +531,7 @@ function normalizeAbilitySourceType(
   if (!sourceType) return null
   if (sourceType === "class_feature") return "class"
   if (sourceType === "subclass_feature") return "subclass"
-  const allowed = ["class", "subclass", "species", "background", "feat", "item"] as const
+  const allowed = ["class", "subclass", "species", "background", "feat", "item", "compendium"] as const
   return (allowed as readonly string[]).includes(sourceType)
     ? (sourceType as (typeof allowed)[number])
     : null
@@ -567,6 +611,9 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         description: feat.description,
         prerequisite: feat.prerequisite,
         category: feat.category,
+        level_requirement: feat.level_requirement,
+        isChoice: feat.isChoice === true ? true : undefined,
+        choices: feat.choices ?? undefined,
         mechanics: normalizeMechanics(feat.mechanics),
       }),
     ) as NonNullable<ImportContent["feats"]>
@@ -592,10 +639,16 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.abilities?.length) {
-    content.abilities = raw.abilities.map((ability) => ({
-      ...ability,
-      source_type: normalizeAbilitySourceType(ability.source_type),
-    }))
+    content.abilities = raw.abilities.map((ability) => {
+      const { ability_role: _abilityRole, source_type: _sourceType, mechanics: _mechanics, ...rest } =
+        ability
+      return omitNull({
+        ...rest,
+        source_type: normalizeAbilitySourceType(ability.source_type),
+        mechanics: normalizeMechanics(ability.mechanics),
+        ability_role: ability.ability_role ?? undefined,
+      })
+    }) as NonNullable<ImportContent["abilities"]>
   }
 
   if (raw.import_proposals) {
@@ -618,10 +671,33 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           definition: ability.definition,
           name: ability.name,
           description: ability.description,
-          source_type: ability.source_type,
+          source_type: normalizeAbilitySourceType(ability.source_type),
           source_name: ability.source_name,
           level_requirement: ability.level_requirement,
-          choices: ability.choices ?? undefined,
+          ability_role: ability.ability_role ?? undefined,
+          casting_time: ability.casting_time ?? undefined,
+          execution: ability.execution ?? undefined,
+          eligible_classes: ability.eligible_classes ?? undefined,
+          range: ability.range ?? undefined,
+          components: ability.components ?? undefined,
+          duration: ability.duration ?? undefined,
+          concentration: ability.concentration ?? undefined,
+          prerequisite: ability.prerequisite ?? undefined,
+          repeatable: ability.repeatable ?? undefined,
+          choices: ability.choices
+            ? {
+                category: ability.choices.category,
+                count: ability.choices.count,
+                options: ability.choices.options.map((option) =>
+                  omitNull({
+                    name: option.name,
+                    description: option.description,
+                    prerequisite: option.prerequisite ?? undefined,
+                    repeatable: option.repeatable ?? undefined,
+                  }),
+                ),
+              }
+            : undefined,
         }),
       ) as NonNullable<NonNullable<ImportContent["import_proposals"]>["custom_abilities"]>
     }

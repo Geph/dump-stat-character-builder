@@ -1,7 +1,9 @@
+import { applyKnownEquipmentNameWiring } from "@/lib/import/enrichment-presets/builders"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   detectFeatureModifiers,
   mergeFeatureModifierDetections,
+  modifierInstanceFingerprint,
   type DetectFeatureContext,
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
@@ -97,12 +99,75 @@ function enrichFeatures(
 ): Feature[] | undefined {
   if (!features?.length) return features
   return features.map((feature) =>
-    enrichFeatureLike(feature as ImportMechanicsCarrier, {
+    enrichChoiceOptionModifiers(
+      enrichFeatureLike(feature as ImportMechanicsCarrier, {
+        ...ctx,
+        featureName: feature.name,
+        level: feature.level,
+      }) as unknown as Feature,
+      ctx,
+    ),
+  )
+}
+
+/**
+ * Run phrase detection on each choice option's description and attach linkedModifiers
+ * to the option. Strip matching detections from the parent feature so list prose in the
+ * parent description does not apply pack-wide (e.g. Wolf advantage on Rage of the Wilds).
+ */
+function enrichChoiceOptionModifiers(
+  feature: Feature,
+  ctx: Omit<DetectFeatureContext, "featureName">,
+): Feature {
+  if (!feature.isChoice || !feature.choices?.options?.length) return feature
+
+  const optionFingerprints = new Set<string>()
+  const options = feature.choices.options.map((option) => {
+    const detections = detectFeatureModifiers(option.description ?? "", {
       ...ctx,
-      featureName: feature.name,
+      featureName: `${feature.name}:${option.name}`,
       level: feature.level,
-    }),
-  ) as unknown as Feature[]
+    })
+    if (!detections.length) return option
+
+    const existing = option.linkedModifiers ?? []
+    const existingFp = new Set(existing.map(modifierInstanceFingerprint))
+    const toAdd = detections
+      .map((entry) => entry.instance)
+      .filter((instance) => {
+        const fp = modifierInstanceFingerprint(instance)
+        if (existingFp.has(fp)) return false
+        optionFingerprints.add(fp)
+        return true
+      })
+
+    for (const detection of detections) {
+      optionFingerprints.add(modifierInstanceFingerprint(detection.instance))
+    }
+
+    if (!toAdd.length) return option
+    return syncModifierRefs({
+      ...option,
+      linkedModifiers: [...existing, ...toAdd],
+    })
+  })
+
+  if (optionFingerprints.size === 0) {
+    return {
+      ...feature,
+      choices: { ...feature.choices, options },
+    }
+  }
+
+  const parentMods = (feature.linkedModifiers ?? []).filter(
+    (instance) => !optionFingerprints.has(modifierInstanceFingerprint(instance)),
+  )
+
+  return syncModifierRefs({
+    ...feature,
+    linkedModifiers: parentMods,
+    choices: { ...feature.choices, options },
+  })
 }
 
 function enrichTraits(
@@ -154,7 +219,7 @@ function enrichEquipmentRows(
   const normalized = normalizeEquipmentRows(
     equipment.map((row) => ({ ...row })) as unknown as Record<string, unknown>[],
   ) as NonNullable<ImportContent["equipment"]>
-  return normalized.map((item) => {
+  const withPhraseWiring = normalized.map((item) => {
     const description = item.description ?? ""
     if (!description.trim()) return item
     const enriched = enrichFeatureLike(
@@ -182,7 +247,10 @@ function enrichEquipmentRows(
       modifierRefs: enriched.modifierRefs,
       importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
     }
-  }) as unknown as ImportContent["equipment"]
+  }) as unknown as NonNullable<ImportContent["equipment"]>
+
+  // Name recognition only — never invents rows or item prose.
+  return applyKnownEquipmentNameWiring(withPhraseWiring)
 }
 
 /** Run AI mechanics parsing + mechanical phrase detection on importable features. */
@@ -247,6 +315,26 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
 
   if (content.equipment?.length) {
     next.equipment = enrichEquipmentRows(content.equipment)
+  }
+
+  if (content.abilities?.length) {
+    next.abilities = content.abilities.map((ability) => {
+      const enriched = enrichFeatureLike(ability as ImportMechanicsCarrier, {
+        contentKind: "ability",
+        sourceName: ability.source_name ?? ability.name,
+        featureName: ability.name,
+        level: ability.level_requirement ?? undefined,
+      })
+      return {
+        ...ability,
+        linkedModifiers: enriched.linkedModifiers,
+        modifierRefs: enriched.modifierRefs,
+        importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
+        companion_stat_block:
+          (enriched as ImportMechanicsCarrier).companion_stat_block ??
+          ability.companion_stat_block,
+      }
+    }) as ImportContent["abilities"]
   }
 
   const withSpells = attachReferencedSpellsFromSupplements(

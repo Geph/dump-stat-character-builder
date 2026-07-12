@@ -10,6 +10,7 @@ function stripHtml(text: string): string {
 
 function parseCastingHeaders(description: string): {
   casting_time?: string
+  execution?: string
   range?: string
   components?: string[]
   duration?: string
@@ -19,6 +20,8 @@ function parseCastingHeaders(description: string): {
   const headers: ReturnType<typeof parseCastingHeaders> = {}
   const castingMatch = plain.match(/\bCasting Time:\s*([^\n]+)/i)
   if (castingMatch) headers.casting_time = castingMatch[1].trim()
+  const executionMatch = plain.match(/\b(?:Execution|Activation|Trigger):\s*([^\n<]+)/i)
+  if (executionMatch) headers.execution = executionMatch[1].trim()
   const rangeMatch = plain.match(/\bRange:\s*([^\n]+)/i)
   if (rangeMatch) headers.range = rangeMatch[1].trim()
   const componentsMatch = plain.match(/\bComponents?:\s*([^\n]+)/i)
@@ -84,6 +87,18 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     ...row,
     ...next,
     ...headers,
+    ...(typeof row.execution === "string" && row.execution.trim()
+      ? { execution: row.execution.trim() }
+      : headers.execution
+        ? { execution: headers.execution }
+        : {}),
+    ...(Array.isArray(row.eligible_classes)
+      ? {
+          eligible_classes: (row.eligible_classes as unknown[]).filter(
+            (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+          ),
+        }
+      : {}),
     ...(uses ? { uses } : {}),
     prerequisites:
       (typeof row.prerequisite === "string" ? row.prerequisite : null) ??

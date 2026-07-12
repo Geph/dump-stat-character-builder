@@ -38,6 +38,7 @@ export const AI_MECHANIC_KINDS = [
   "forced_save_ability_remap",
   "weapon_ability_override",
   "turn_start_resource_restore",
+  "turn_start_bonus_grant",
 ] as const
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
@@ -410,6 +411,15 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'checkCategory: "skill", checkSkills from parenthetical',
   },
   {
+    ruleId: "resistance.damage.except",
+    trigger: "description",
+    catalog: "cat_char_damage_resistance",
+    examples: [
+      "Resistance to every damage type except Force, Necrotic, Psychic, and Radiant",
+    ],
+    mechanicsKind: "damage_resistance",
+  },
+  {
     ruleId: "resistance.damage",
     trigger: "description",
     catalog: "cat_char_damage_resistance",
@@ -567,6 +577,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'spellNames: ["Druidcraft"]',
   },
   {
+    ruleId: "spell.can_cast_named",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You can cast the Beast Sense and Speak with Animals spells but only as Rituals",
+      "You can cast the Commune with Nature spell but only as a Ritual",
+    ],
+    mechanicsKind: "spells_known",
+    notes: 'spellNames + castAsRitual: true when "only as Ritual(s)"; castingAbility from companion sentence',
+  },
+  {
     ruleId: "spell.cantrip.choice",
     trigger: "description",
     catalog: "cat_char_spells_known",
@@ -660,6 +681,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_ac",
     examples: ["+1 AC while raging"],
     notes: "Requires sheet Rage toggle (requiresSheetToggle: while_raging).",
+  },
+  {
+    ruleId: "action.bonus.dash_disengage.while_raging",
+    trigger: "description",
+    catalog: "cat_fx_movement_option",
+    examples: [
+      "take the Disengage and Dash actions as part of that Bonus Action",
+      "While your Rage is active, you can take a Bonus Action to take both of those actions",
+    ],
+    notes:
+      "Bonus Action activation with while_raging requirement; single sheet action (not separate Dash/Disengage cards).",
   },
   {
     ruleId: "damage.scaling.die_by_level",
@@ -798,7 +830,7 @@ export const SRD_PRESET_FEATURE_NAMES = [
   "Tactical Master",
 ] as const
 
-/** Patterns from homebrew imports (Gunslinger, KibblesTasty Psion, Alternate Fighter, Dancer). */
+/** Patterns from homebrew imports (Gunslinger, point-pool casters, Alternate Fighter, Dancer). */
 export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Gunslinger / martial homebrew",
@@ -810,11 +842,13 @@ export const HOMEBREW_WIRING_PATTERNS = [
     ],
   },
   {
-    source: "KibblesTasty Psion / point-pool casters",
+    source: "Point-pool casters (e.g. Psion)",
     guidance: [
       "Psi Points + Psi Limit as separate class_resources (pool vs per-use cap).",
       "Disciplines / talents: isChoice + choices.options[] for player picks; keep psi costs in each option description.",
+      "Distinguish Discipline Talents (nested on the discipline) from Class Talents (ability_role class_talent) — distinct choices.category and resourceKey.",
       "Use import_proposals.custom_abilities for discipline systems needing builder UI.",
+      "Ephemeral turn-start free points that expire unused and have spend restrictions: mechanics kind turn_start_bonus_grant (not turn_start_resource_restore).",
     ],
   },
   {
@@ -876,7 +910,7 @@ function formatMechanicsCheatsheet(): string {
     `Allowed kind values: ${AI_MECHANIC_KINDS.join(", ")}`,
     "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
-    "- spells_known: spellNames [\"Druidcraft\"]; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters",
+    "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters",
     "- tool_proficiencies: tools [\"Smith's Tools\"]; grantExpertise true for doubled tool checks",
     "- attunement_slots: attunementTotal 4 (sets cap) OR attunementBonus 1 (adds to default 3)",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
@@ -890,7 +924,8 @@ function formatMechanicsCheatsheet(): string {
     "- condition_immunity: conditions [\"Charmed\"]",
     "- speed: speedType walk|fly|swim|climb, speedFeet 10",
     "- vision: visionRangeFeet 60",
-    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both; OR usesAbility WIS",
+    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed; OR usesAbility WIS. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed (note what resolves the lock in description).",
+    "- uses / check_roll_modifier resource spend caps: classResourceKey + classResourceCostMode fixed (default, use classResourceCost) | up_to_proficiency_bonus | up_to_ability_modifier (pair with classResourceCostAbility). Use when the source caps spend per use by a scaling value — e.g. \"expend Exploit Dice (up to your Proficiency Bonus)\" — not a separate Limit class_resource.",
     "- check_roll_modifier: checkRollMode advantage, checkCategory save|skill|ability|attack|initiative, checkAbility/checkSkills",
     "- extra_attack: (no extra fields)",
     `- grant_feat: featCategories ${JSON.stringify(FEAT_CATEGORIES_FOR_IMPORT)}, featCount 1`,
@@ -898,7 +933,10 @@ function formatMechanicsCheatsheet(): string {
     "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
     "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",
     "- weapon_ability_override: alternateAbility charisma; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional",
-    "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1",
+    "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap",
+    "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"can only be spent on discipline powers, not talents or spell recreation\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
+    "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
+    "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
   ]
   return lines.join("\n")
@@ -913,8 +951,9 @@ Dump Stat maps features, traits, and feats to reusable catalog entries. Use TWO 
 1. PRIMARY — Keep mechanical sentences verbatim in description (phrase matcher below).
 2. OPTIONAL — Add mechanics[] when wording is unusual, split across clauses, or you want an explicit hint.
 
-Feat milestones (ASI, Fighting Style, Epic Boon): never isChoice — use feature name and/or grant_feat phrasing.
+Feat milestones (ASI, Fighting Style feat, Epic Boon): never isChoice — use feature name and/or grant_feat phrasing.
 Player picks between named options (Hunter's Prey, Dance Style, Psionic Discipline): isChoice + choices, not grant_feat.
+Feats that grant a pick from an ability catalog (discipline / class talent / exploit list): isChoice + choices with exact option names — this is NOT a grant_feat milestone.
 
 Catalog ids (generated at import — never emit in JSON):
 - Passive: cat_char_* (skills, ac, grant_feat, uses, speed, …)
@@ -955,6 +994,22 @@ Hundreds of additional SRD features wire when names match the seeded compendium 
     "featCategories": ["Fighting Style"],
     "featCount": 1,
     "sourcePhrase": "You gain a Fighting Style feat of your choice.",
+    "confidence": "high"
+  }]
+}
+
+Example ephemeral turn-start bonus grant (not a pool refill):
+{
+  "level": 6,
+  "name": "Psionic Empowerment",
+  "description": "At the start of each of your turns, you gain 2 psi points that last until the end of your turn. These points can only be spent on discipline powers, not talents or spell recreation.",
+  "mechanics": [{
+    "kind": "turn_start_bonus_grant",
+    "grantResourceKey": "psi_points",
+    "grantAmount": 2,
+    "expiresEndOfTurn": true,
+    "usageRestriction": "can only be spent on discipline powers, not talents or spell recreation",
+    "sourcePhrase": "At the start of each of your turns, you gain 2 psi points that last until the end of your turn.",
     "confidence": "high"
   }]
 }`,

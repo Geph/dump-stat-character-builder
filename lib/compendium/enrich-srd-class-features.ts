@@ -928,6 +928,69 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
     }
   }
 
+  if (name === "Rage of the Wilds") {
+    const ALL_BUT_BEAR = [
+      "Acid",
+      "Bludgeoning",
+      "Cold",
+      "Fire",
+      "Lightning",
+      "Piercing",
+      "Poison",
+      "Slashing",
+      "Thunder",
+    ]
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Rage of the Wilds",
+        count: 1,
+        options: [
+          {
+            name: "Bear",
+            description:
+              "While your Rage is active, you have Resistance to every damage type except Force, Necrotic, Psychic, and Radiant.",
+            linkedModifiers: [
+              charInstance("modinst_wilds_bear_res", FEAT_MODIFIER_CATALOG.damageResistance, [
+                {
+                  id: modId("wilds_bear_res"),
+                  type: "damage_resistance",
+                  damageTypes: ALL_BUT_BEAR,
+                  requiresSheetToggle: "while_raging",
+                  label: "Bear: resistance to all damage except Force, Necrotic, Psychic, and Radiant (while raging)",
+                },
+              ]),
+            ],
+          },
+          {
+            name: "Eagle",
+            description:
+              "When you activate your Rage, you can take the Disengage and Dash actions as part of that Bonus Action. While your Rage is active, you can take a Bonus Action to take both of those actions.",
+            linkedModifiers: [
+              fxInstance("modinst_wilds_eagle_dash", FEAT_MODIFIER_CATALOG.movementOption, {
+                bonusAction: true,
+                requirements: [{ kind: "while_raging" }],
+                effects: [
+                  {
+                    id: modId("wilds_eagle_dash"),
+                    kind: "movement_option",
+                    label: "Take the Disengage and Dash actions",
+                  },
+                ],
+              }),
+            ],
+          },
+          {
+            name: "Wolf",
+            description:
+              "While your Rage is active, your allies have Advantage on attack rolls against any enemy of yours within 5 feet of you.",
+          },
+        ],
+      },
+    }
+  }
+
   if (name === "Blessed Strikes") {
     return {
       ...feature,

@@ -1441,8 +1441,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         species: character?.species ?? null,
         backgroundFeature: character?.backgrounds?.feature ?? null,
         customAbilities: sheetCustomAbilities,
+        featureChoicePicks,
       }),
-    [classDetails, character?.species, character?.backgrounds?.feature, sheetCustomAbilities],
+    [
+      classDetails,
+      character?.species,
+      character?.backgrounds?.feature,
+      sheetCustomAbilities,
+      featureChoicePicks,
+    ],
   )
 
   const combatActions = useMemo(

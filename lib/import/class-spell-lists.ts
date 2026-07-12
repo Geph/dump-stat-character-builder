@@ -23,6 +23,12 @@ export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated 
 - Spells may also appear on standard class lists; include all applicable class names in classes.
 - Extract full spell entries (level, school, casting time, etc.) when descriptions are present in the document.`
 
+export const SPELL_SCHOOL_IMPORT_HINT = `Spell schools (school field on spells[]):
+- Use the school name exactly as written in the source.
+- Standard SRD schools: Abjuration, Conjuration, Divination, Enchantment, Evocation, Illusion, Necromancy, Transmutation.
+- When the source names a novel or homebrew school of magic, preserve it on school — examples: Duromancy, Chronomancy, Void Magic, Blood Magic, Sangromancy. Do not remap novel schools to the nearest SRD school.
+- Do not invent novel school names for ordinary SRD spells; use the school's listed school when that is what the source says.`
+
 type ImportedClassWithSpellList = {
   name: string
   spell_list?: string[] | null

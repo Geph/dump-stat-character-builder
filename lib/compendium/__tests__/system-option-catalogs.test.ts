@@ -3,7 +3,9 @@ import {
   buildDefaultWeaponMasteryOptions,
   ensureSystemOptionCatalogs,
   getSystemCatalogDefaultIcon,
+  LEGACY_SCHOOLS_OF_MAGIC_CATALOG_ID,
   SYSTEM_CATALOG_DEFAULT_ICONS,
+  SYSTEM_OPTION_CATALOG_IDS,
   WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
 } from "@/lib/compendium/system-option-catalogs"
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
@@ -11,6 +13,7 @@ import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 function mockDb(existingRows: Record<string, Record<string, unknown> | null>) {
   const inserts: Record<string, unknown>[] = []
   const updates: { id: string; patch: Record<string, unknown> }[] = []
+  const deletes: string[] = []
 
   const from = vi.fn((table: string) => {
     if (table !== "custom_abilities") throw new Error(`unexpected table ${table}`)
@@ -30,6 +33,12 @@ function mockDb(existingRows: Record<string, Record<string, unknown> | null>) {
           return { error: null }
         }),
       })),
+      delete: vi.fn(() => ({
+        eq: vi.fn(async (_col: string, id: string) => {
+          deletes.push(id)
+          return { error: null }
+        }),
+      })),
     }
   })
 
@@ -37,6 +46,7 @@ function mockDb(existingRows: Record<string, Record<string, unknown> | null>) {
     db: { from } as never,
     inserts,
     updates,
+    deletes,
   }
 }
 
@@ -44,6 +54,13 @@ describe("ensureSystemOptionCatalogs", () => {
   it("defines default icons for all system catalogs", () => {
     expect(SYSTEM_CATALOG_DEFAULT_ICONS[COMMON_MODIFIERS_CATALOG_ID]).toBe("hammer-nails")
     expect(getSystemCatalogDefaultIcon(WEAPON_MASTERY_PROPERTIES_CATALOG_ID)).toBe("winged-sword")
+    expect(SYSTEM_OPTION_CATALOG_IDS).not.toContain(LEGACY_SCHOOLS_OF_MAGIC_CATALOG_ID)
+  })
+
+  it("deletes the legacy Schools of Magic catalog row", async () => {
+    const { db, deletes } = mockDb({})
+    await ensureSystemOptionCatalogs(db)
+    expect(deletes).toContain(LEGACY_SCHOOLS_OF_MAGIC_CATALOG_ID)
   })
 
   it("inserts the Weapon Mastery Properties catalog when missing", async () => {

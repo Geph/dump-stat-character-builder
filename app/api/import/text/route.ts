@@ -26,8 +26,22 @@ export async function POST(request: NextRequest) {
     if (authError) return authError
 
     const body = await request.json()
-    const { text, contentType, confirmImport, pendingContent, proposalSelections, renameMap, collisionResolutionMap, collisions, materialSource, cardArtUrlMap } =
-      body
+    const {
+      text,
+      contentType,
+      confirmImport,
+      pendingContent,
+      proposalSelections,
+      renameMap,
+      collisionResolutionMap,
+      collisions,
+      materialSource,
+      cardArtUrlMap,
+      customAbilityCategory,
+      classResourceLabels,
+      subclassMatchName,
+      subclassMatchClassName,
+    } = body
     const aiOverride = parseImportAiOverride(body)
     const importMode = body.importMode as string | undefined
 
@@ -48,7 +62,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const { totalImported, breakdown, warnings, report } = await finalizeImportedContent(
+      const { totalImported, breakdown, warnings, report, discoveredSpellSchools } =
+        await finalizeImportedContent(
         pendingContent,
         {
           classResourceIds: proposalSelections?.classResourceIds ?? [],
@@ -67,6 +82,7 @@ export async function POST(request: NextRequest) {
         breakdown,
         warnings: warnings.length > 0 ? warnings : undefined,
         report,
+        discoveredSpellSchools,
       })
     }
 
@@ -125,7 +141,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Please provide more text content to parse" }, { status: 400 })
     }
 
-    const systemPrompt = buildImportSystemPrompt(contentType)
+    const systemPrompt = buildImportSystemPrompt(contentType, {
+      customSystems: {
+        abilityCategory: typeof customAbilityCategory === "string" ? customAbilityCategory : "",
+        classResourceLabels: typeof classResourceLabels === "string" ? classResourceLabels : "",
+      },
+      subclassMatch:
+        typeof subclassMatchName === "string" &&
+        subclassMatchName.trim() &&
+        typeof subclassMatchClassName === "string" &&
+        subclassMatchClassName.trim()
+          ? { name: subclassMatchName.trim(), className: subclassMatchClassName.trim() }
+          : null,
+    })
 
     const aiConfigError = getImportAiConfigError(aiOverride)
     if (aiConfigError) {

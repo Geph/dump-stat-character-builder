@@ -16,11 +16,7 @@ import {
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
-
-const SPELL_SCHOOLS = [
-  "Abjuration", "Conjuration", "Divination", "Enchantment",
-  "Evocation", "Illusion", "Necromancy", "Transmutation"
-]
+import { getSpellSchools, SPELL_SCHOOLS_CHANGE_EVENT } from "@/lib/compendium/schools-of-magic"
 
 const SPELL_CLASSES = [
   "Bard", "Cleric", "Druid", "Paladin", "Ranger", 
@@ -98,6 +94,7 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
   const [error, setError] = useState<string | null>(null)
   const [customClasses, setCustomClasses] = useState<{ id: string; name: string }[]>([])
   const [otherClassListOpen, setOtherClassListOpen] = useState(false)
+  const [spellSchools, setSpellSchools] = useState<string[]>(() => getSpellSchools())
   const router = useRouter()
 
   const isStandardSpellClass = (name: string) =>
@@ -110,6 +107,17 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     params.then(({ id }) => setId(id))
   }, [params])
+
+  useEffect(() => {
+    const syncSchools = () => setSpellSchools(getSpellSchools())
+    syncSchools()
+    window.addEventListener(SPELL_SCHOOLS_CHANGE_EVENT, syncSchools)
+    window.addEventListener("storage", syncSchools)
+    return () => {
+      window.removeEventListener(SPELL_SCHOOLS_CHANGE_EVENT, syncSchools)
+      window.removeEventListener("storage", syncSchools)
+    }
+  }, [])
 
   useEffect(() => {
     const fetchCustomClasses = async () => {
@@ -402,18 +410,13 @@ export default function SpellEditorPage({ params }: { params: Promise<{ id: stri
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                School
-              </label>
-              <select
+              <DropdownOrOtherField
+                label="School"
                 value={form.school}
-                onChange={(e) => setForm({ ...form, school: e.target.value })}
-                className={compendiumFieldClass}
-              >
-                {SPELL_SCHOOLS.map((school) => (
-                  <option key={school} value={school}>{school}</option>
-                ))}
-              </select>
+                onChange={(school) => setForm({ ...form, school })}
+                options={spellSchools.map((school) => ({ value: school, label: school }))}
+                otherPlaceholder="Custom school"
+              />
             </div>
             <label className="flex items-center gap-2 cursor-pointer min-h-[50px] pb-1">
               <input

@@ -12,7 +12,7 @@ import {
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid } from "lucide-react"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid, Info } from "lucide-react"
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export-format"
+import { stripHtml } from "@/lib/import/normalize-equipment"
 import {
   getCompendiumItemIcon,
   isCompendiumContentType,
@@ -89,7 +90,6 @@ import {
   getSystemCatalogMeta,
   SYSTEM_OPTION_CATALOG_IDS,
 } from "@/lib/compendium/system-option-catalogs"
-import { Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import {
@@ -97,6 +97,12 @@ import {
   backgroundMatchesAbilityFilter,
 } from "@/lib/compendium/background-ability-filter"
 import type { AbilityModifierKey } from "@/lib/compendium/characteristic-modifiers"
+import { SpellSchoolsEditorOverlay } from "@/components/compendium/spell-schools-editor-overlay"
+import {
+  getSpellSchools,
+  resetSpellSchoolsToDefault,
+  SPELL_SCHOOLS_CHANGE_EVENT,
+} from "@/lib/compendium/schools-of-magic"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 
 type ContentType = CompendiumContentType
@@ -221,6 +227,8 @@ export default function CompendiumPageClient() {
   const [spellFilterClass, setSpellFilterClass] = useState<string>("all")
   const [spellFilterLevel, setSpellFilterLevel] = useState<string>("all")
   const [spellFilterSchool, setSpellFilterSchool] = useState<string>("all")
+  const [spellSchools, setSpellSchoolsState] = useState<string[]>(() => getSpellSchools())
+  const [spellSchoolsEditorOpen, setSpellSchoolsEditorOpen] = useState(false)
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
@@ -250,6 +258,17 @@ export default function CompendiumPageClient() {
       setActiveTab(tab)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const syncSchools = () => setSpellSchoolsState(getSpellSchools())
+    syncSchools()
+    window.addEventListener(SPELL_SCHOOLS_CHANGE_EVENT, syncSchools)
+    window.addEventListener("storage", syncSchools)
+    return () => {
+      window.removeEventListener(SPELL_SCHOOLS_CHANGE_EVENT, syncSchools)
+      window.removeEventListener("storage", syncSchools)
+    }
+  }, [])
 
   // Fetch counts for all tabs (fast) and full data only for active tab
   useEffect(() => {
@@ -393,9 +412,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     new Set(spellData.flatMap((s) => s.classes ?? [])),
   ).sort()
   const hasUnassignedSpells = spellData.some((s) => !(s.classes ?? []).length)
-  const spellSchoolOptions = Array.from(
-    new Set(spellData.map((s) => s.school).filter(Boolean))
-  ).sort()
+  const spellSchoolOptions = spellSchools
   const spellLevelOptions = Array.from(
     new Set(spellData.map((s) => s.level))
   ).sort((a, b) => a - b)
@@ -631,6 +648,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           }
           return next
         })
+        if (activeTab === "spells") {
+          resetSpellSchoolsToDefault()
+          setSpellSchoolsState(getSpellSchools())
+          setSpellFilterSchool("all")
+        }
       } else {
         const db = createClient()
         const resolved = tableName(activeTab)
@@ -650,6 +672,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           }
           return next
         })
+        if (activeTab === "spells") {
+          resetSpellSchoolsToDefault()
+          setSpellSchoolsState(getSpellSchools())
+          setSpellFilterSchool("all")
+        }
       }
       await refreshTabCounts()
       await refreshActiveTabContent()
@@ -1148,7 +1175,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
             {!isCommonModifiersCatalogAbility(castCompendiumRow<{ id?: string; is_system?: boolean }>(data)) && (
               <p className="text-sm text-muted-foreground line-clamp-2">
-                {castCompendiumRow<{ description?: string }>(data).description}
+                {stripHtml(castCompendiumRow<{ description?: string }>(data).description ?? "").replace(
+                  /\s+/g,
+                  " ",
+                )}
               </p>
             )}
             {activeTab === "abilities" &&
@@ -1323,6 +1353,18 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           }}
         />
 
+        <SpellSchoolsEditorOverlay
+          open={spellSchoolsEditorOpen}
+          onClose={() => setSpellSchoolsEditorOpen(false)}
+          onSaved={(schools) => {
+            setSpellSchoolsState(schools)
+            if (spellFilterSchool !== "all" && !schools.includes(spellFilterSchool)) {
+              setSpellFilterSchool("all")
+            }
+            void refreshActiveTabContent()
+          }}
+        />
+
         {/* Clear All Confirmation Dialog */}
         {clearConfirmOpen && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -1352,6 +1394,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 )}
                 {activeTab === "abilities" && (
                   <> The system <strong className="text-foreground">Common Modifier Effects</strong> catalog will be recreated automatically with default entries.</>
+                )}
+                {activeTab === "spells" && (
+                  <> The <strong className="text-foreground">Schools of Magic</strong> list will reset to the SRD defaults.</>
                 )}{" "}
                 Other sections will not be affected.
               </p>
@@ -1596,6 +1641,15 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                       <option key={school} value={school}>{school}</option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setSpellSchoolsEditorOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                    title="Edit schools of magic"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Edit Schools of Magic</span>
+                  </button>
                 </div>
 
                 {(spellFilterClass !== "all" || spellFilterLevel !== "all" || spellFilterSchool !== "all") && (

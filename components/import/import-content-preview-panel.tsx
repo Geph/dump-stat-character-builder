@@ -13,9 +13,15 @@ type ImportContentPreviewPanelProps = {
   content: ImportContent
   previewSummary?: string
   showModifierReviewHint?: boolean
+  /** When set, only these preview section keys are shown (staged review). */
+  sectionKeys?: readonly string[]
+  /** Hide the global preview summary (useful when reviewing one stage at a time). */
+  hideSummary?: boolean
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
+  classes: BookOpen,
+  subclasses: Users,
   spells: ScrollText,
   equipment: Package,
   feats: BookOpen,
@@ -84,21 +90,29 @@ export function ImportContentPreviewPanel({
   content,
   previewSummary,
   showModifierReviewHint = false,
+  sectionKeys,
+  hideSummary = false,
 }: ImportContentPreviewPanelProps) {
-  const sections = useMemo(() => collectImportContentPreview(content), [content])
+  const sections = useMemo(
+    () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
+    [content, sectionKeys],
+  )
 
-  if (!sections.length && !previewSummary && !showModifierReviewHint) return null
+  const visibleSummary = hideSummary ? undefined : previewSummary
+  if (!sections.length && !visibleSummary && !showModifierReviewHint) return null
 
   return (
     <section className="space-y-4 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
       <div>
         <p className="font-semibold text-foreground">Review before import</p>
-        {previewSummary ? (
-          <p className="mt-1 text-muted-foreground">{previewSummary}</p>
+        {visibleSummary ? (
+          <p className="mt-1 text-muted-foreground">{visibleSummary}</p>
         ) : null}
         {sections.length > 0 ? (
           <p className="mt-1 text-muted-foreground">
-            Check parsed spells, equipment, and other content below before confirming.
+            {sectionKeys
+              ? "Check the parsed entries for this stage before continuing."
+              : "Check parsed content below before confirming."}
           </p>
         ) : null}
         {showModifierReviewHint ? (

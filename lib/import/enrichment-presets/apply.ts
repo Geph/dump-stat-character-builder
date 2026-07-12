@@ -345,21 +345,6 @@ export function applyImportEnrichmentPresets(
   let next: ImportContent = { ...content }
   const presets = presetsForPacks(packs)
 
-  for (const seed of getContentSeeds()) {
-    if (!packs.has(seed.pack)) continue
-    if (!seed.seedEquipment) continue
-    const trinkets = seed.seedEquipment()
-    const existingEquipment = [...(next.equipment ?? [])]
-    const existingNames = new Set(existingEquipment.map((row) => row.name.toLowerCase()))
-    for (const item of trinkets) {
-      if (!existingNames.has(item.name.toLowerCase())) {
-        existingEquipment.push(item)
-        existingNames.add(item.name.toLowerCase())
-      }
-    }
-    if (existingEquipment.length) next = { ...next, equipment: existingEquipment }
-  }
-
   if (next.classes?.length) {
     next = {
       ...next,

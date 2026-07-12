@@ -20,7 +20,7 @@ Replaces class-specific enricher modules with declarative presets under
 | Alchemist | Reagent Synthesis description note | (b) | |
 | Investigator | Finisher / Improved Finisher on-hit triggers | (b) | Named presets |
 | Investigator | Holy Trinkets note + clear limitedUses | (b) | |
-| Investigator | Seed Amulet / Ankh / Rune magic items | (b) | Content seed |
+| Investigator | Name-match wire Amulet / Ankh / Rune effects | (b) | Recognition only — no content seed |
 | Investigator | Rushed Incantation limitedUses | (b) | |
 | Investigator | Exploit Weakness stub + note | (b) | |
 | Investigator | Enigma Arcane → innate arcanum preset | (b) | Reuses SRD factory |

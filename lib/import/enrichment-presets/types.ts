@@ -130,8 +130,6 @@ export type EnrichmentHook = (ctx: EnrichmentHookContext) => EnrichmentHookConte
 export type ContentSeed = {
   id: string
   pack: string
-  /** Merge equipment rows if missing by name. */
-  seedEquipment?: () => NonNullable<ImportContent["equipment"]>
   /** Append class resource when class matches and a named feature exists. */
   seedClassResource?: {
     className: string | RegExp

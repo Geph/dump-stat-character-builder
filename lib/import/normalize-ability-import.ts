@@ -71,6 +71,10 @@ export function normalizeAbilityImportRow(raw: RawAbilityRow): Record<string, un
     description,
     ...(psionic_augments ? { psionic_augments } : {}),
     ...(typeof raw.casting_time === "string" ? { casting_time: raw.casting_time } : {}),
+    ...(typeof raw.execution === "string" ? { execution: raw.execution } : {}),
+    ...(coerceStringArray(raw.eligible_classes)
+      ? { eligible_classes: coerceStringArray(raw.eligible_classes) }
+      : {}),
     ...(typeof raw.range === "string" ? { range: raw.range } : {}),
     ...(components ? { components } : {}),
     ...(typeof raw.duration === "string" ? { duration: raw.duration } : {}),

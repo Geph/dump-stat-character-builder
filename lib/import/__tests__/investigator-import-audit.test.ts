@@ -121,7 +121,7 @@ describe("Investigator class import wiring", () => {
     const content = enrichImportContentModifiers(loadInvestigatorFixture())
     const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as unknown as import("@/lib/types").Feature | undefined
     expect(holy?.limitedUses).toBeUndefined()
-    expect(content.equipment?.some((row) => row.name === "Restorative Ankh")).toBe(true)
+    expect(content.equipment ?? []).toEqual([])
   })
 
   it("detects trinket spend phrasing", () => {

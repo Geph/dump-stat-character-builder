@@ -1,6 +1,5 @@
 import type { ContentSeed, EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
 import {
-  buildInvestigatorHolyTrinkets,
   buildQuarryClassResource,
 } from "@/lib/import/enrichment-presets/builders"
 
@@ -32,7 +31,7 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
       { op: "clearLimitedUses" },
       {
         op: "appendDescription",
-        text: "Core trinkets (Amulet of Warding, Restorative Ankh, Rune of Banishment) are compendium Magic Items funded by your shared Trinkets pool.",
+        text: "When matching trinket items are present in this import (recognized by name), Dump Stat wires them to spend from your shared Trinkets pool. Item text itself must come from your source — Dump Stat does not invent or store those entries.",
       },
     ],
   },
@@ -109,13 +108,7 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
   },
 ]
 
-export const INVESTIGATOR_SEEDS: ContentSeed[] = [
-  {
-    id: "investigator.seed.holy_trinkets",
-    pack: "investigator",
-    seedEquipment: buildInvestigatorHolyTrinkets,
-  },
-]
+export const INVESTIGATOR_SEEDS: ContentSeed[] = []
 
 export const PSION_PRESETS: EnrichmentPreset[] = [
   {

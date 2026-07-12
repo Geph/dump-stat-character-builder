@@ -4,6 +4,18 @@ import { useMemo, useState } from "react"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ImportAiSettings, type ImportAiSettingsValue } from "@/components/import/import-ai-settings"
 import {
+  ImportSubclassMatchSelect,
+  type ImportSubclassMatchValue,
+} from "@/components/import/import-subclass-match-select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   buildByoExtractionPrompt,
   buildByoFullPrompt,
   CLEAN_SOURCE_TEXT_GUIDELINES,
@@ -11,6 +23,8 @@ import {
   templateJsonString,
   type ByoPdfPageScope,
 } from "@/lib/import/byo-import-kit"
+import { listImportedCompendiumSources } from "@/lib/compendium/list-imported-sources"
+import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import {
   Check,
   ChevronDown,
@@ -19,6 +33,7 @@ import {
   Download,
   FileText,
   Info,
+  Library,
   Loader2,
   Type,
 } from "lucide-react"
@@ -28,6 +43,13 @@ type ClipboardImportPanelProps = {
   onContentTypeChange: (value: string) => void
   materialSource: string
   onMaterialSourceChange: (value: string) => void
+  customAbilityCategory: string
+  onCustomAbilityCategoryChange: (value: string) => void
+  classResourceLabels: string
+  onClassResourceLabelsChange: (value: string) => void
+  /** Optional existing subclass to match in the extraction prompt. */
+  subclassMatch: ImportSubclassMatchValue | null
+  onSubclassMatchChange: (value: ImportSubclassMatchValue | null) => void
   sourceText: string
   onSourceTextChange: (value: string) => void
   jsonText: string
@@ -54,6 +76,12 @@ export function ClipboardImportPanel({
   onContentTypeChange,
   materialSource,
   onMaterialSourceChange,
+  customAbilityCategory,
+  onCustomAbilityCategoryChange,
+  classResourceLabels,
+  onClassResourceLabelsChange,
+  subclassMatch,
+  onSubclassMatchChange,
   sourceText,
   onSourceTextChange,
   jsonText,
@@ -71,6 +99,42 @@ export function ClipboardImportPanel({
   const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
   const [pdfPageStart, setPdfPageStart] = useState("")
   const [pdfPageEnd, setPdfPageEnd] = useState("")
+  const [existingSources, setExistingSources] = useState<string[]>([])
+  const [loadingExistingSources, setLoadingExistingSources] = useState(false)
+  const [existingSourcesError, setExistingSourcesError] = useState<string | null>(null)
+
+  const loadExistingSources = async () => {
+    setLoadingExistingSources(true)
+    setExistingSourcesError(null)
+    try {
+      const sources = await listImportedCompendiumSources()
+      setExistingSources(sources)
+    } catch (err) {
+      setExistingSources([])
+      setExistingSourcesError(err instanceof Error ? err.message : "Could not load sources.")
+    } finally {
+      setLoadingExistingSources(false)
+    }
+  }
+
+  const customSystems = useMemo(
+    () =>
+      contentType === "abilities"
+        ? {
+            abilityCategory: customAbilityCategory,
+            classResourceLabels,
+          }
+        : undefined,
+    [contentType, customAbilityCategory, classResourceLabels],
+  )
+
+  const subclassMatchHint = useMemo(
+    () =>
+      contentType === "subclasses" && subclassMatch
+        ? { name: subclassMatch.name, className: subclassMatch.className }
+        : undefined,
+    [contentType, subclassMatch],
+  )
 
   const pdfPageScopeForPrompt = useMemo((): ByoPdfPageScope => {
     if (pdfPageScope !== "range") return { mode: "all" }
@@ -87,13 +151,20 @@ export function ClipboardImportPanel({
       buildByoExtractionPrompt(contentType, {
         pdfUpload: true,
         pageScope: pdfPageScopeForPrompt,
+        customSystems,
+        subclassMatch: subclassMatchHint,
       }),
-    [contentType, pdfPageScopeForPrompt],
+    [contentType, pdfPageScopeForPrompt, customSystems, subclassMatchHint],
   )
 
   const handleCopy = async (kind: "prompt" | "full") => {
     const text =
-      kind === "prompt" ? pdfExtractionPrompt : buildByoFullPrompt(sourceText, contentType)
+      kind === "prompt"
+        ? pdfExtractionPrompt
+        : buildByoFullPrompt(sourceText, contentType, {
+            customSystems,
+            subclassMatch: subclassMatchHint,
+          })
     const ok = await copyText(text)
     if (ok) {
       setCopied(kind)
@@ -115,57 +186,191 @@ export function ClipboardImportPanel({
 
   return (
     <div className="space-y-8">
-      <div className="space-y-1.5">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <ImportContentTypeHintSelect
-            value={contentType}
-            onChange={onContentTypeChange}
-            focusRingClassName="focus:ring-lime"
-          />
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
-            <label
-              htmlFor="import-material-source"
-              className="text-sm font-medium text-muted-foreground shrink-0"
-            >
-              Compendium source label:
-            </label>
-            <input
-              id="import-material-source"
-              type="text"
-              value={materialSource}
-              onChange={(event) => onMaterialSourceChange(event.target.value)}
-              placeholder="e.g. Gunslinger (Third Party), MCDM, Homebrew"
-              className="flex-1 min-w-[160px] px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
-            />
-          </div>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Step 0 — Set import defaults</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose a content type hint, source label, and optional custom ability / resource names,
+            then review multi-file order before extracting.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Source label is stored on imported entries so you can filter by book or homebrew name.
-        </p>
-      </div>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <ImportContentTypeHintSelect
+              value={contentType}
+              onChange={onContentTypeChange}
+              focusRingClassName="focus:ring-lime"
+            />
+            {contentType === "subclasses" ? (
+              <ImportSubclassMatchSelect
+                value={subclassMatch}
+                onChange={onSubclassMatchChange}
+                focusRingClassName="focus:ring-lime"
+                enabled
+              />
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+              <label
+                htmlFor="import-material-source"
+                className="text-sm font-medium text-muted-foreground shrink-0"
+              >
+                Compendium source label:
+              </label>
+              <input
+                id="import-material-source"
+                type="text"
+                value={materialSource}
+                onChange={(event) => onMaterialSourceChange(event.target.value)}
+                placeholder="e.g. Gunslinger (Third Party), MCDM, Homebrew"
+                className="flex-1 min-w-[140px] px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+              />
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (open) void loadExistingSources()
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-lime"
+                  >
+                    <Library className="h-3.5 w-3.5" aria-hidden />
+                    Match existing
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-64 w-64 overflow-y-auto">
+                  <DropdownMenuLabel>Imported sources (excludes SRD / System)</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {loadingExistingSources ? (
+                    <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Loading…
+                    </div>
+                  ) : existingSourcesError ? (
+                    <p className="px-2 py-2 text-xs text-destructive">{existingSourcesError}</p>
+                  ) : existingSources.length === 0 ? (
+                    <p className="px-2 py-2 text-xs text-muted-foreground leading-relaxed">
+                      No non-SRD sources in the compendium yet. Type a new label above.
+                    </p>
+                  ) : (
+                    existingSources.map((source) => (
+                      <DropdownMenuItem
+                        key={source}
+                        className="cursor-pointer"
+                        onSelect={() => onMaterialSourceChange(source)}
+                      >
+                        {source}
+                        {source === materialSource ? (
+                          <Check className="ml-auto h-3.5 w-3.5 text-primary" aria-hidden />
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Source label is stored on imported entries so you can filter by book or homebrew name.
+            Use Match existing to reuse a label already on your homebrew content (SRD and System excluded).
+            {contentType === "subclasses" ? (
+              <>
+                {" "}
+                When importing subclasses, optionally match a subclass so the extraction prompt
+                locks <span className="font-medium text-foreground">class_name</span>
+                {subclassMatch ? (
+                  <>
+                    {" "}
+                    to{" "}
+                    <span className="font-medium text-foreground">{subclassMatch.className}</span>
+                  </>
+                ) : null}
+                .
+              </>
+            ) : null}
+          </p>
+        </div>
 
-      <div className="rounded-xl border border-border bg-muted/30">
-        <button
-          type="button"
-          onClick={() => setShowGuidelines((open) => !open)}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-foreground"
-        >
-          <span className="flex items-center gap-2">
-            <Info className="h-4 w-4 text-lime" />
-            Clean source text guidelines (PDF &amp; paste)
-          </span>
-          {showGuidelines ? (
-            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-        </button>
-        {showGuidelines ? (
-          <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {CLEAN_SOURCE_TEXT_GUIDELINES}
+        {contentType === "abilities" ? (
+          <div className="space-y-3 rounded-xl border border-border bg-muted/25 p-3.5">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Custom ability systems (optional)</p>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                Name the library section and resource pools you expect. These labels go into the
+                extraction prompt so the LLM can find the high-rank abilities section (after by-level
+                features) and group packages correctly — leave blank to skip.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="import-ability-category"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Ability category
+                </label>
+                <input
+                  id="import-ability-category"
+                  type="text"
+                  value={customAbilityCategory}
+                  onChange={(event) => onCustomAbilityCategoryChange(event.target.value)}
+                  placeholder="Exploits, Maneuvers, Psionic Disciplines, Hexes…"
+                  className="w-full px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Overall header for the library (e.g. Psionic Disciplines → Enhancement Discipline →
+                  powers). Blank = none.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="import-class-resource-labels"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Class resources
+                </label>
+                <input
+                  id="import-class-resource-labels"
+                  type="text"
+                  value={classResourceLabels}
+                  onChange={(event) => onClassResourceLabelsChange(event.target.value)}
+                  placeholder="Psi Points, Grit, Exploit Dice, Reagents…"
+                  className="w-full px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Comma-separated pool names the library spends. Blank = none.
+                </p>
+              </div>
+            </div>
           </div>
         ) : null}
-      </div>
+
+        <ImportWorkflowGuidancePanel />
+
+        <div className="rounded-xl border border-border bg-muted/30">
+          <button
+            type="button"
+            onClick={() => setShowGuidelines((open) => !open)}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <Info className="h-4 w-4 text-lime" />
+              Clean source text guidelines (PDF &amp; paste)
+            </span>
+            {showGuidelines ? (
+              <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+          </button>
+          {showGuidelines ? (
+            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+              {CLEAN_SOURCE_TEXT_GUIDELINES}
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       <section className="space-y-4">
         <div>
@@ -245,8 +450,10 @@ export function ClipboardImportPanel({
                 </div>
               ) : null}
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Page scope and <span className="font-mono">source_page</span> tagging instructions
-                are included in the copied prompt.
+                Use a page range to skip other classes or chapters. Prefer keeping a class and its
+                subclasses in the same pass — staged review walks them in order. Scope notes and{" "}
+                <span className="font-mono">source_page</span> tagging are included in the copied
+                prompt.
               </p>
             </div>
 
@@ -314,7 +521,7 @@ export function ClipboardImportPanel({
         </div>
 
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Option C
             </p>
@@ -322,14 +529,22 @@ export function ClipboardImportPanel({
               Skip the LLM — download the JSON template and fill it in by hand.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleDownloadTemplate}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60 shrink-0"
-          >
-            <Download className="h-4 w-4" />
-            Download JSON template
-          </button>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <ImportContentTypeHintSelect
+              value={contentType}
+              onChange={onContentTypeChange}
+              focusRingClassName="focus:ring-lime"
+              label="Template type:"
+            />
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted/60"
+            >
+              <Download className="h-4 w-4" />
+              Download JSON template
+            </button>
+          </div>
         </div>
       </section>
 

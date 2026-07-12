@@ -9,7 +9,6 @@ import { charInstance, fxInstance, modId, usesInstance } from "@/lib/compendium/
 import type { NamedModifierPreset } from "@/lib/import/enrichment-presets/types"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
-import type { ImportContent } from "@/lib/import/content-schema"
 import type { UsesConfig } from "@/lib/types"
 
 const REAGENTS_KEY = "reagents"
@@ -295,88 +294,106 @@ export function enrichReagentResourceUses(uses: UsesConfig): UsesConfig {
   return { ...uses, recharges }
 }
 
-function holyTrinketEquipment(
-  name: string,
-  description: string,
-  activation: ReturnType<typeof fxInstance>,
-): NonNullable<ImportContent["equipment"]>[number] {
+function holyTrinketPoolSpend(label: string): LinkedModifierInstance {
+  return usesInstance(
+    createModifierInstanceId(),
+    {
+      type: "class_resource",
+      classResourceKey: TRINKETS_KEY,
+      classResourceAmount: 1,
+    },
+    label,
+  )
+}
+
+/**
+ * Name → mechanical wiring for Investigator holy trinkets.
+ * Recognition only — never invents equipment rows or ships item prose.
+ * When an import already includes these item names, attach pool spend + activations.
+ */
+export type KnownEquipmentNameWiring = {
+  magic_effects: LinkedModifierInstance[]
+}
+
+export function investigatorHolyTrinketWiringByName(): Record<string, KnownEquipmentNameWiring> {
   return {
-    name,
-    category: "Adventuring Gear",
-    subcategory: null,
-    description: `Wondrous Item, uncommon (requires attunement by an Investigator)\n\n${description}`,
-    magic_item_category: "Wondrous Item",
-    rarity: "Uncommon",
-    requires_attunement: true,
-    magic_effects: [
-      usesInstance(
-        createModifierInstanceId(),
-        {
-          type: "class_resource",
-          classResourceKey: TRINKETS_KEY,
-          classResourceAmount: 1,
-        },
-        name,
-      ),
-      activation,
-    ],
+    "amulet of warding": {
+      magic_effects: [
+        holyTrinketPoolSpend("Amulet of Warding"),
+        fxInstance("modinst_amulet_of_warding", "cat_fx_boost_ac", {
+          bonusAction: true,
+          effects: [
+            {
+              id: modId("amulet_of_warding"),
+              kind: "boost_ac",
+              bonusConfig: {
+                mode: "ability_modifier",
+                ability: "INT",
+                minimum: 1,
+              } as import("@/lib/compendium/roll-bonus-config").RollBonusConfig,
+              label: "Amulet of Warding",
+            },
+          ],
+        }),
+      ],
+    },
+    "restorative ankh": {
+      magic_effects: [
+        holyTrinketPoolSpend("Restorative Ankh"),
+        fxInstance("modinst_restorative_ankh", "cat_fx_heal_self", {
+          bonusAction: true,
+          effects: [
+            {
+              id: modId("restorative_ankh"),
+              kind: "heal_self",
+              healMode: "character_level",
+              healLevelMultiplier: 1,
+              healAbility: "INT",
+              label: "Restorative Ankh",
+            },
+          ],
+        }),
+      ],
+    },
+    "rune of banishment": {
+      magic_effects: [
+        holyTrinketPoolSpend("Rune of Banishment"),
+        fxInstance("modinst_rune_of_banishment", "cat_fx_force_save_control", {
+          bonusAction: true,
+          effects: [
+            {
+              id: modId("rune_of_banishment"),
+              kind: "force_save_control",
+              saveAbility: "Charisma",
+              label: "Rune of Banishment",
+            },
+          ],
+        }),
+      ],
+    },
   }
 }
 
-export function buildInvestigatorHolyTrinkets(): NonNullable<ImportContent["equipment"]> {
-  return [
-    holyTrinketEquipment(
-      "Amulet of Warding",
-      "As a Bonus Action, place a divine ward on a creature within 60 feet. Until the start of your next turn, that creature gains a bonus to AC and saving throws equal to your Intelligence modifier (minimum +1).",
-      fxInstance("modinst_amulet_of_warding", "cat_fx_boost_ac", {
-        bonusAction: true,
-        effects: [
-          {
-            id: modId("amulet_of_warding"),
-            kind: "boost_ac",
-            bonusConfig: {
-              mode: "ability_modifier",
-              ability: "INT",
-              minimum: 1,
-            } as import("@/lib/compendium/roll-bonus-config").RollBonusConfig,
-            label: "Amulet of Warding",
-          },
-        ],
-      }),
-    ),
-    holyTrinketEquipment(
-      "Restorative Ankh",
-      "As a Bonus Action, a creature within 60 feet regains Hit Points equal to your Investigator level plus your Intelligence modifier.",
-      fxInstance("modinst_restorative_ankh", "cat_fx_heal_self", {
-        bonusAction: true,
-        effects: [
-          {
-            id: modId("restorative_ankh"),
-            kind: "heal_self",
-            healMode: "character_level",
-            healLevelMultiplier: 1,
-            healAbility: "INT",
-            label: "Restorative Ankh",
-          },
-        ],
-      }),
-    ),
-    holyTrinketEquipment(
-      "Rune of Banishment",
-      "As a Bonus Action, one creature within 60 feet must succeed on a Charisma saving throw against your spell save DC or be banished (Incapacitated, speed 0) until the start of your next turn.",
-      fxInstance("modinst_rune_of_banishment", "cat_fx_force_save_control", {
-        bonusAction: true,
-        effects: [
-          {
-            id: modId("rune_of_banishment"),
-            kind: "force_save_control",
-            saveAbility: "Charisma",
-            label: "Rune of Banishment",
-          },
-        ],
-      }),
-    ),
-  ]
+/** Apply known-name equipment wiring onto existing import rows only (no row creation). */
+export function applyKnownEquipmentNameWiring<T extends { name: string }>(rows: T[]): T[] {
+  const wiring = investigatorHolyTrinketWiringByName()
+  return rows.map((row) => {
+    const key = row.name.trim().toLowerCase()
+    const match = wiring[key]
+    if (!match) return row
+    const existing = ((row as { magic_effects?: LinkedModifierInstance[] | null }).magic_effects ??
+      []) as LinkedModifierInstance[]
+    const hasTrinketSpend = existing.some((effect) =>
+      effect.characteristics?.some(
+        (char) =>
+          char.type === "uses" &&
+          char.uses?.type === "class_resource" &&
+          char.uses.classResourceKey === TRINKETS_KEY,
+      ),
+    )
+    if (hasTrinketSpend) return row
+    return { ...row, magic_effects: [...existing, ...match.magic_effects] }
+  })
 }
 
 export function buildQuarryClassResource(className: string) {

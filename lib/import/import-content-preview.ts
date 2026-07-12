@@ -135,6 +135,73 @@ function previewEquipment(content: ImportContent): ImportContentPreviewSection |
   return { key: "equipment", label: "Equipment & magic items", items }
 }
 
+function previewClasses(content: ImportContent): ImportContentPreviewSection | null {
+  const classes = content.classes
+  if (!classes?.length) return null
+
+  const items = classes.map((row) => {
+    const details: ImportContentPreviewDetail[] = [
+      { label: "Hit die", value: `d${row.hit_die}` },
+    ]
+    if (row.primary_ability?.length) {
+      details.push({ label: "Primary", value: row.primary_ability.join(", ") })
+    }
+    if (row.saving_throws?.length) {
+      details.push({ label: "Saves", value: row.saving_throws.join(", ") })
+    }
+    const featureCount = row.features?.length ?? 0
+    if (featureCount > 0) {
+      details.push({
+        label: "Features",
+        value: `${featureCount} feature${featureCount === 1 ? "" : "s"}`,
+      })
+    }
+    const badges: string[] = []
+    if (row.spellcasting?.ability) badges.push("Spellcasting")
+    if (row.complexity) badges.push(row.complexity)
+
+    return {
+      id: `class:${row.name}`,
+      name: row.name,
+      details,
+      badges,
+      descriptionSnippet: snippet(row.description),
+    }
+  })
+
+  return { key: "classes", label: "Classes", items }
+}
+
+function previewSubclasses(content: ImportContent): ImportContentPreviewSection | null {
+  const subclasses = content.subclasses
+  if (!subclasses?.length) return null
+
+  const items = [...subclasses]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((row) => {
+      const details: ImportContentPreviewDetail[] = [
+        { label: "Class", value: row.class_name },
+      ]
+      const featureCount = row.features?.length ?? 0
+      if (featureCount > 0) {
+        details.push({
+          label: "Features",
+          value: `${featureCount} feature${featureCount === 1 ? "" : "s"}`,
+        })
+      }
+
+      return {
+        id: `subclass:${row.class_name}:${row.name}`,
+        name: row.name,
+        details,
+        badges: [],
+        descriptionSnippet: snippet(row.description),
+      }
+    })
+
+  return { key: "subclasses", label: "Subclasses", items }
+}
+
 function previewFeats(content: ImportContent): ImportContentPreviewSection | null {
   const feats = content.feats
   if (!feats?.length) return null
@@ -210,15 +277,24 @@ function previewBackgrounds(content: ImportContent): ImportContentPreviewSection
   return { key: "backgrounds", label: "Backgrounds", items }
 }
 
-/** Structured preview rows for spells, equipment, feats, and other non-class import content. */
-export function collectImportContentPreview(content: ImportContent): ImportContentPreviewSection[] {
-  return [
-    previewSpells(content),
-    previewEquipment(content),
-    previewFeats(content),
+/** Structured preview rows in staged-import order. */
+export function collectImportContentPreview(
+  content: ImportContent,
+  options?: { sectionKeys?: readonly string[] },
+): ImportContentPreviewSection[] {
+  const sections = [
+    previewClasses(content),
     previewSpecies(content),
     previewBackgrounds(content),
+    previewSubclasses(content),
+    previewFeats(content),
+    previewSpells(content),
+    previewEquipment(content),
   ].filter((section): section is ImportContentPreviewSection => section != null)
+
+  if (!options?.sectionKeys) return sections
+  const allowed = new Set(options.sectionKeys)
+  return sections.filter((section) => allowed.has(section.key))
 }
 
 export function importContentPreviewLimit(): number {

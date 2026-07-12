@@ -11,7 +11,13 @@ import type { Feature } from "@/lib/types"
 export type { DetectionConfidence, FeatureModifierRule }
 
 export type DetectFeatureContext = {
-  contentKind: "class_feature" | "subclass_feature" | "species_trait" | "feat" | "background_feature"
+  contentKind:
+    | "class_feature"
+    | "subclass_feature"
+    | "species_trait"
+    | "feat"
+    | "background_feature"
+    | "ability"
   sourceName?: string
   featureName?: string
   level?: number

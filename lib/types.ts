@@ -653,6 +653,13 @@ export interface CustomAbility {
   /** Psi-point empower options (KibblesTasty Psion psionic powers). */
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
+  /**
+   * Activation cost/timing from an Execution / Activation / Trigger line
+   * (exploits, maneuvers, techniques — distinct from casting_time).
+   */
+  execution?: string | null
+  /** Classes named as able to learn this ability (shared library entries). */
+  eligible_classes?: string[] | null
   range?: string | null
   components?: string[] | null
   duration?: string | null
@@ -660,11 +667,12 @@ export interface CustomAbility {
   isChoice?: boolean
   choices?: FeatureChoice | null
   level_requirement?: number | null
-  /** discipline | psionic_power | talent_pool | knack | bomb_formula | discovery | alchemist_bomb — guides builder aggregation. */
+  /** discipline | psionic_power | talent_pool | class_talent | knack | bomb_formula | discovery | alchemist_bomb — guides builder aggregation. */
   ability_role?:
     | "discipline"
     | "psionic_power"
     | "talent_pool"
+    | "class_talent"
     | "knack"
     | "upgrade"
     | "bomb_formula"

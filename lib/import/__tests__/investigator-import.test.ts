@@ -12,6 +12,7 @@ import { enrichImportedClassList } from "@/lib/import/enrich-import-classes"
 import { enrichInvestigatorFeatures } from "@/lib/import/enrichment-presets"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { detectSpellcastingAbilityFromText } from "@/lib/import/detect-governing-ability"
+import type { ImportContent } from "@/lib/import/content-schema"
 import type { Equipment, Feature } from "@/lib/types"
 
 const trinketItem = {
@@ -44,19 +45,74 @@ const trinketItem = {
 }
 
 describe("Investigator trinket magic items", () => {
-  it("imports three core trinkets as compendium equipment with shared pool cost", () => {
-    const enriched = enrichInvestigatorFeatures({ classes: [{ name: "Investigator", description: "", hit_die: 8, primary_ability: ["Intelligence"], features: [] }] })
-    const names = (enriched.equipment ?? []).map((row) => row.name)
-    expect(names).toEqual(
-      expect.arrayContaining(["Amulet of Warding", "Restorative Ankh", "Rune of Banishment"]),
-    )
-    const amulet = enriched.equipment?.find((row) => row.name === "Amulet of Warding")
+  it("wires imported holy trinkets by name without inventing item prose", () => {
+    const enriched = enrichImportContentModifiers({
+      classes: [
+        {
+          name: "Investigator",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [],
+        },
+      ],
+      equipment: [
+        {
+          name: "Amulet of Warding",
+          category: "Adventuring Gear",
+          subcategory: null,
+          description: "User-sourced item text from the PDF.",
+          cost: null,
+        },
+      ],
+    } as ImportContent)
+    expect(enriched.equipment).toHaveLength(1)
+    const amulet = enriched.equipment?.[0]
+    expect(amulet?.description).toBe("User-sourced item text from the PDF.")
     const uses = readActivationUsesFromEquipment(amulet as Equipment)
     expect(uses).toMatchObject({
       type: "class_resource",
       classResourceKey: "trinkets",
       classResourceAmount: 1,
     })
+  })
+
+  it("does not invent Investigator trinkets for unrelated imports", () => {
+    const enriched = enrichImportContentModifiers({
+      abilities: [
+        {
+          name: "Enhancement Discipline",
+          description: "Psionic discipline",
+          source_type: "class",
+          source_name: "Psion",
+          level_requirement: 1,
+        },
+      ],
+      class_resources: [
+        {
+          class_name: "Psion",
+          resource_key: "psi_points",
+          name: "Psi Points",
+          description: null,
+        },
+      ],
+    } as ImportContent)
+    expect(enriched.equipment ?? []).toEqual([])
+  })
+
+  it("does not invent holy trinkets from class-only Investigator imports", () => {
+    const enriched = enrichInvestigatorFeatures({
+      classes: [
+        {
+          name: "Investigator",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [],
+        },
+      ],
+    } as ImportContent)
+    expect(enriched.equipment ?? []).toEqual([])
   })
 
   it("activating a trinket debits the shared Trinkets pool", () => {
@@ -210,6 +266,6 @@ describe("Investigator import integration", () => {
     } as unknown as import("@/lib/import/content-schema").ImportContent)
     const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as unknown as Feature | undefined
     expect(holy?.limitedUses).toBeUndefined()
-    expect(content.equipment?.some((row) => row.name === "Amulet of Warding")).toBe(true)
+    expect(content.equipment ?? []).toEqual([])
   })
 })

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ClipboardImportPanel } from "@/components/import/clipboard-import-panel"
+import { ImportSubclassMatchSelect } from "@/components/import/import-subclass-match-select"
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import { ImportContentPreviewPanel } from "@/components/import/import-content-preview-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
@@ -34,6 +35,7 @@ import {
   runClientByoJsonImport,
   type ClientByoImportSuccessResult,
 } from "@/lib/import/client-byo-import"
+import { mergeImportedSpellSchools } from "@/lib/compendium/schools-of-magic"
 import { seedLocalSrd } from "@/lib/data/local-seed"
 import {
   importDumpStatExportItemsLocal,
@@ -47,11 +49,19 @@ import {
   Loader2,
   ClipboardPaste,
   Info,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import type { ImportReport } from "@/lib/import/build-import-report"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { ImportStage } from "@/lib/import/import-staging"
+import {
+  IMPORT_STAGE_CARD_ART_SECTIONS,
+  IMPORT_STAGE_COLLISION_KINDS,
+  IMPORT_STAGE_PREVIEW_KEYS,
+  importModifierMatchesStage,
+  type ImportStage,
+} from "@/lib/import/import-staging"
 import type {
   ImportProposalSelections,
   ImportProposalSet,
@@ -106,6 +116,13 @@ export default function ImportPage() {
   const [jsonImportText, setJsonImportText] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
   const [importMaterialSource, setImportMaterialSource] = useState("Custom")
+  const [customAbilityCategory, setCustomAbilityCategory] = useState("")
+  const [classResourceLabels, setClassResourceLabels] = useState("")
+  const [subclassMatch, setSubclassMatch] = useState<{
+    id: string
+    name: string
+    className: string
+  } | null>(null)
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
   const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
@@ -128,6 +145,8 @@ export default function ImportPage() {
   const [collisionResolutionMap, setCollisionResolutionMap] =
     useState<ImportCollisionResolutionMap>({})
   const [cardArtUrlMap, setCardArtUrlMap] = useState<ImportCardArtUrlMap>({})
+  const [reviewStageIndex, setReviewStageIndex] = useState(0)
+  const [importSourceOpen, setImportSourceOpen] = useState(true)
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [fileInputKey, setFileInputKey] = useState(0)
   const [showAiInfo, setShowAiInfo] = useState(false)
@@ -166,15 +185,50 @@ export default function ImportPage() {
     [pendingImport],
   )
 
+  const stagedReview = Boolean(
+    pendingImport?.stagingSummary && pendingImport.stages.length > 0,
+  )
+  const activeReviewStage = stagedReview
+    ? pendingImport!.stages[
+        Math.min(Math.max(reviewStageIndex, 0), pendingImport!.stages.length - 1)
+      ]
+    : null
+  const isLastReviewStage = stagedReview
+    ? reviewStageIndex >= pendingImport!.stages.length - 1
+    : true
+
+  const stageCollisions = useMemo(() => {
+    if (!pendingImport) return []
+    if (!activeReviewStage) return pendingImport.collisions
+    const kinds = new Set(IMPORT_STAGE_COLLISION_KINDS[activeReviewStage.id])
+    return pendingImport.collisions.filter((collision) => kinds.has(collision.kind))
+  }, [pendingImport, activeReviewStage])
+
+  const stageModifierRows = useMemo(() => {
+    if (!activeReviewStage) return modifierReviewRows
+    return modifierReviewRows.filter((row) =>
+      importModifierMatchesStage(row.sourceLabel, activeReviewStage.id),
+    )
+  }, [modifierReviewRows, activeReviewStage])
+
+  const stagePreviewKeys = activeReviewStage
+    ? IMPORT_STAGE_PREVIEW_KEYS[activeReviewStage.id]
+    : undefined
+  const stageCardArtSections = activeReviewStage
+    ? IMPORT_STAGE_CARD_ART_SECTIONS[activeReviewStage.id]
+    : undefined
+
   useEffect(() => {
     if (!pendingImport) {
       hadPendingImportRef.current = false
       setCardArtUrlMap({})
+      setReviewStageIndex(0)
       return
     }
 
     if (!hadPendingImportRef.current) {
       hadPendingImportRef.current = true
+      setReviewStageIndex(0)
       setCardArtUrlMap(buildInitialImportCardArtUrlMap(pendingImport.content))
       return
     }
@@ -193,6 +247,11 @@ export default function ImportPage() {
     if (!pendingImport) return
     reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [pendingImport])
+
+  const isReviewingImport = Boolean(pendingImport)
+  useEffect(() => {
+    setImportSourceOpen(!isReviewingImport)
+  }, [isReviewingImport])
 
   useEffect(() => {
     if (!importReport) return
@@ -267,8 +326,13 @@ export default function ImportPage() {
       breakdown?: Record<string, number>
       count?: number
       pagesParsed?: { from?: number; to?: number; total?: number }
+      discoveredSpellSchools?: string[]
     } | ClientByoImportSuccessResult,
   ) => {
+    const addedSchools =
+      "discoveredSpellSchools" in data && data.discoveredSpellSchools?.length
+        ? mergeImportedSpellSchools(data.discoveredSpellSchools)
+        : []
     setImportReport(data.report ?? null)
     const breakdownText = data.breakdown
       ? Object.entries(data.breakdown)
@@ -280,9 +344,14 @@ export default function ImportPage() {
       "pagesParsed" in data && data.pagesParsed?.from
         ? ` (pages ${data.pagesParsed.from}–${data.pagesParsed.to} of ${data.pagesParsed.total})`
         : ""
+    const schoolsText =
+      addedSchools.length > 0
+        ? ` Added school${addedSchools.length === 1 ? "" : "s"} of magic: ${addedSchools.join(", ")}.`
+        : ""
     setMessage(
-      data.report?.headline ??
-        `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`,
+      (data.report?.headline ??
+        `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`) +
+        schoolsText,
     )
     resetImportForm()
   }
@@ -384,6 +453,10 @@ export default function ImportPage() {
     formData.append("contentType", pdfContentType)
     formData.append("contentTypeHint", pdfContentTypeHint)
     formData.append("pageScope", pdfPageScope)
+    if (pdfContentTypeHint === "subclasses" && subclassMatch) {
+      formData.append("subclassMatchName", subclassMatch.name)
+      formData.append("subclassMatchClassName", subclassMatch.className)
+    }
     if (pdfPageScope === "range") {
       formData.append("pageStart", pdfPageStart)
       formData.append("pageEnd", pdfPageEnd)
@@ -480,6 +553,14 @@ export default function ImportPage() {
           contentType: textContentType,
           importMode: payload.importMode,
           materialSource: importMaterialSource,
+          customAbilityCategory:
+            textContentType === "abilities" ? customAbilityCategory.trim() || undefined : undefined,
+          classResourceLabels:
+            textContentType === "abilities" ? classResourceLabels.trim() || undefined : undefined,
+          subclassMatchName:
+            textContentType === "subclasses" ? subclassMatch?.name : undefined,
+          subclassMatchClassName:
+            textContentType === "subclasses" ? subclassMatch?.className : undefined,
           ...(payload.importMode === "server-ai" ? importAiRequestBody(importAiSettings) : {}),
         }),
       })
@@ -713,10 +794,6 @@ export default function ImportPage() {
           )}
         </div>
 
-        <div className="mb-6">
-          <ImportWorkflowGuidancePanel />
-        </div>
-
         {foundryGuidance ? (
           <div className="mb-6">
             <FoundryImportGuidancePanel
@@ -750,43 +827,58 @@ export default function ImportPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-6 scroll-mt-24 space-y-4"
           >
-            {pendingImport.tokenSavings ? (
-              <ImportTokenSavingsSummary savings={pendingImport.tokenSavings} />
-            ) : null}
             {pendingImport.stagingSummary ? (
               <ImportStagingPanel
                 stages={pendingImport.stages}
                 summary={pendingImport.stagingSummary}
+                activeIndex={reviewStageIndex}
+                onActiveIndexChange={setReviewStageIndex}
               />
             ) : null}
+            {pendingImport.tokenSavings ? (
+              <ImportTokenSavingsSummary savings={pendingImport.tokenSavings} />
+            ) : null}
             <ImportCollisionPanel
-              collisions={pendingImport.collisions}
+              key={activeReviewStage ? `collisions-${activeReviewStage.id}` : "collisions"}
+              collisions={stageCollisions}
               value={renameMap}
               onChange={setRenameMap}
               resolutionMap={collisionResolutionMap}
               onResolutionChange={setCollisionResolutionMap}
             />
             <ImportContentPreviewPanel
+              key={activeReviewStage ? `preview-${activeReviewStage.id}` : "preview"}
               content={pendingImport.content}
               previewSummary={pendingImport.previewSummary}
-              showModifierReviewHint={modifierReviewRows.length > 0}
+              showModifierReviewHint={
+                !stagedReview && modifierReviewRows.length > 0
+              }
+              sectionKeys={stagePreviewKeys}
+              hideSummary={stagedReview}
             />
-            <ImportModifierReviewPanel
-              rows={modifierReviewRows}
-              onRemoveModifier={handleRemoveModifierPreview}
-              variant="review"
-            />
+            {(!stagedReview || stageModifierRows.length > 0) && (
+              <ImportModifierReviewPanel
+                key={activeReviewStage ? `modifiers-${activeReviewStage.id}` : "modifiers"}
+                rows={stageModifierRows}
+                onRemoveModifier={handleRemoveModifierPreview}
+                variant="review"
+              />
+            )}
             <ImportCardArtPanel
+              key={activeReviewStage ? `card-art-${activeReviewStage.id}` : "card-art"}
               content={pendingImport.content}
               value={cardArtUrlMap}
               onChange={setCardArtUrlMap}
+              sections={stageCardArtSections}
             />
-            <ImportProposalPanel
-              proposals={pendingImport.proposals}
-              confirming={confirmingImport}
-              onConfirm={handleConfirmImport}
-              onCancel={clearPendingImport}
-            />
+            {isLastReviewStage ? (
+              <ImportProposalPanel
+                proposals={pendingImport.proposals}
+                confirming={confirmingImport}
+                onConfirm={handleConfirmImport}
+                onCancel={clearPendingImport}
+              />
+            ) : null}
           </motion.div>
         )}
 
@@ -810,41 +902,66 @@ export default function ImportPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-card/75 backdrop-blur rounded-2xl border-2 border-border overflow-hidden"
         >
-          {/* Tab bar */}
-          <div
-            role="tablist"
-            aria-label="Import source"
-            className="flex gap-1 p-2 bg-muted/40 border-b border-border"
-          >
-            {IMPORT_TABS.map((tab) => {
-              const Icon = tab.icon
-              const isActive = activeTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                    isActive
-                      ? "bg-background text-foreground shadow-sm border border-border/60"
-                      : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
+          {isReviewingImport ? (
+            <button
+              type="button"
+              onClick={() => setImportSourceOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+              aria-expanded={importSourceOpen}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">Import source</p>
+                <p className="text-xs text-muted-foreground">
+                  {importSourceOpen
+                    ? "Hide Clipboard / PDF tools while reviewing"
+                    : "Collapsed while you review — expand to change source or start over"}
+                </p>
+              </div>
+              {importSourceOpen ? (
+                <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
+            </button>
+          ) : null}
 
-          <div className="p-6">
-            <AnimatePresence mode="wait">
-              {activeTab === "pack" && (
-                <motion.div
-                  key="pack"
-                  role="tabpanel"
+          {(!isReviewingImport || importSourceOpen) && (
+            <>
+              {/* Tab bar */}
+              <div
+                role="tablist"
+                aria-label="Import source"
+                className={`flex gap-1 p-2 bg-muted/40 ${isReviewingImport ? "border-t border-border" : ""} border-b border-border`}
+              >
+                {IMPORT_TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
+                        isActive
+                          ? "bg-background text-foreground shadow-sm border border-border/60"
+                          : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : ""}`} />
+                      {tab.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="p-6">
+                <AnimatePresence mode="wait">
+                  {activeTab === "pack" && (
+                    <motion.div
+                      key="pack"
+                      role="tabpanel"
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 8 }}
@@ -903,6 +1020,12 @@ export default function ImportPage() {
                     onContentTypeChange={setTextContentType}
                     materialSource={importMaterialSource}
                     onMaterialSourceChange={setImportMaterialSource}
+                    customAbilityCategory={customAbilityCategory}
+                    onCustomAbilityCategoryChange={setCustomAbilityCategory}
+                    classResourceLabels={classResourceLabels}
+                    onClassResourceLabelsChange={setClassResourceLabels}
+                    subclassMatch={subclassMatch}
+                    onSubclassMatchChange={setSubclassMatch}
                     sourceText={textContent}
                     onSourceTextChange={setTextContent}
                     jsonText={jsonImportText}
@@ -978,6 +1101,8 @@ export default function ImportPage() {
                   )}
 
                   <div className="space-y-3">
+                    <ImportWorkflowGuidancePanel />
+
                     {serverAiEnabled ? (
                       <ImportAiSettings value={importAiSettings} onChange={setImportAiSettings} />
                     ) : null}
@@ -987,6 +1112,14 @@ export default function ImportPage() {
                       onChange={setPdfContentTypeHint}
                       focusRingClassName="focus:ring-orange"
                     />
+                    {pdfContentTypeHint === "subclasses" ? (
+                      <ImportSubclassMatchSelect
+                        value={subclassMatch}
+                        onChange={setSubclassMatch}
+                        focusRingClassName="focus:ring-orange"
+                        enabled
+                      />
+                    ) : null}
 
                     <div className="flex flex-wrap gap-4 items-center">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -1111,6 +1244,8 @@ export default function ImportPage() {
 
             </AnimatePresence>
           </div>
+            </>
+          )}
         </motion.div>
       </main>
       <SiteFooter />

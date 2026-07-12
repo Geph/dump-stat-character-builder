@@ -25,6 +25,7 @@ import {
   insertRowsLocal,
   listRowsLocal,
 } from "@/lib/import/detect-import-collisions-local"
+import { collectSpellSchoolsFromImportContent } from "@/lib/compendium/schools-of-magic"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
 
 function stampSource<T extends Record<string, unknown>>(row: T, importerSource: string): T {
@@ -302,5 +303,12 @@ export async function persistImportedContentLocal(
     foundryMeta: foundryMeta as FoundryImportMeta | undefined,
   })
 
-  return { totalImported, breakdown, warnings, report }
+  const discoveredSpellSchools = collectSpellSchoolsFromImportContent(sanitized)
+  return {
+    totalImported,
+    breakdown,
+    warnings,
+    report,
+    ...(discoveredSpellSchools.length > 0 ? { discoveredSpellSchools } : {}),
+  }
 }

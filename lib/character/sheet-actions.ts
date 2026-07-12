@@ -1,3 +1,4 @@
+import { featureChoiceKey } from "@/lib/builder/choices"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
@@ -295,60 +296,113 @@ function suppressParentForMovementExpansions(
   return !hasNonMovementEffect
 }
 
-function pushFeatureActions(
+function pushActivatableItemActions(
   actions: SheetActionEntry[],
-  features: ActivatableItem[] | undefined,
+  feature: ActivatableItem,
   levelCap: number,
   sourceLabel: string,
   idPrefix: string,
   classId: string | null,
 ) {
-  for (const feature of features ?? []) {
-    if ((feature.level ?? 1) > levelCap) continue
-    const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
-    const movementExpansions = collectMovementOptionExpansions(feature)
-    const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
+  if ((feature.level ?? 1) > levelCap) return
+  const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
+  const movementExpansions = collectMovementOptionExpansions(feature)
+  const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
 
-    if (!suppressParent) {
-      const kinds = inferActivatableActionKinds(feature)
-      if (kinds.length) {
-        const category = inferActivatableActionCategory(feature)
-        if (
-          (category !== "combat" || display.combatActions) &&
-          (category !== "utility" || display.abilitiesActions)
-        ) {
-          actions.push({
-            id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
-            name: feature.name,
-            sourceLabel,
-            kinds,
-            category,
-            limitedUses: feature.limitedUses,
-            classLevel: levelCap,
-            description: feature.description ?? null,
-            classId,
-            classResourceKey: resolveActionResourceKey(feature),
-          })
-        }
+  if (!suppressParent) {
+    const kinds = inferActivatableActionKinds(feature)
+    if (kinds.length) {
+      const category = inferActivatableActionCategory(feature)
+      if (
+        (category !== "combat" || display.combatActions) &&
+        (category !== "utility" || display.abilitiesActions)
+      ) {
+        actions.push({
+          id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
+          name: feature.name,
+          sourceLabel,
+          kinds,
+          category,
+          limitedUses: feature.limitedUses,
+          classLevel: levelCap,
+          description: feature.description ?? null,
+          classId,
+          classResourceKey: resolveActionResourceKey(feature),
+        })
       }
     }
+  }
 
-    for (const expansion of movementExpansions) {
-      if (expansion.category === "combat" && !display.combatActions) continue
-      if (expansion.category === "utility" && !display.abilitiesActions) continue
-      actions.push({
-        id: `${idPrefix}:${feature.level ?? 1}:${feature.name}:movement:${expansion.actionKey}`,
-        name: expansion.name,
-        sourceLabel: feature.name,
-        kinds: expansion.kinds,
-        category: expansion.category,
-        limitedUses: feature.limitedUses,
-        classLevel: levelCap,
-        description: expansion.description,
-        classId,
-        classResourceKey: resolveActionResourceKey(feature),
-      })
-    }
+  for (const expansion of movementExpansions) {
+    if (expansion.category === "combat" && !display.combatActions) continue
+    if (expansion.category === "utility" && !display.abilitiesActions) continue
+    actions.push({
+      id: `${idPrefix}:${feature.level ?? 1}:${feature.name}:movement:${expansion.actionKey}`,
+      name: expansion.name,
+      sourceLabel: feature.name,
+      kinds: expansion.kinds,
+      category: expansion.category,
+      limitedUses: feature.limitedUses,
+      classLevel: levelCap,
+      description: expansion.description,
+      classId,
+      classResourceKey: resolveActionResourceKey(feature),
+    })
+  }
+}
+
+/** When a feature choice is picked, surface option-level bonus/actions (e.g. Eagle). */
+function pushPickedChoiceOptionActions(
+  actions: SheetActionEntry[],
+  feature: Feature,
+  levelCap: number,
+  sourceLabel: string,
+  idPrefix: string,
+  classId: string | null,
+  featureChoicePicks: Record<string, string[]> | undefined,
+) {
+  if (!classId || !featureChoicePicks) return
+  if (!feature.isChoice || !feature.choices?.options?.length) return
+  const picks = featureChoicePicks[featureChoiceKey(classId, feature.name, feature.level)] ?? []
+  for (const pick of picks) {
+    const option = feature.choices.options.find((entry) => entry.name === pick)
+    if (!option) continue
+    pushActivatableItemActions(
+      actions,
+      {
+        name: option.name,
+        description: option.description,
+        level: feature.level,
+        linkedModifiers: option.linkedModifiers,
+      },
+      levelCap,
+      sourceLabel,
+      `${idPrefix}:opt`,
+      classId,
+    )
+  }
+}
+
+function pushFeatureActions(
+  actions: SheetActionEntry[],
+  features: Feature[] | ActivatableItem[] | undefined,
+  levelCap: number,
+  sourceLabel: string,
+  idPrefix: string,
+  classId: string | null,
+  featureChoicePicks?: Record<string, string[]>,
+) {
+  for (const feature of features ?? []) {
+    pushActivatableItemActions(actions, feature, levelCap, sourceLabel, idPrefix, classId)
+    pushPickedChoiceOptionActions(
+      actions,
+      feature as Feature,
+      levelCap,
+      sourceLabel,
+      idPrefix,
+      classId,
+      featureChoicePicks,
+    )
   }
 }
 
@@ -436,8 +490,10 @@ export function collectSheetActions(params: {
   species: Species | null
   backgroundFeature?: ActivatableItem | null
   customAbilities?: CustomAbility[]
+  featureChoicePicks?: Record<string, string[]>
 }): SheetActionEntry[] {
   const actions: SheetActionEntry[] = []
+  const featureChoicePicks = params.featureChoicePicks
 
   for (const entry of params.classDetails) {
     const className = entry.class?.name ?? "Class"
@@ -448,6 +504,7 @@ export function collectSheetActions(params: {
       className,
       entry.row.class_id,
       entry.row.class_id,
+      featureChoicePicks,
     )
     if (entry.subclass) {
       pushFeatureActions(
@@ -457,6 +514,7 @@ export function collectSheetActions(params: {
         entry.subclass.name,
         `sub-${entry.subclass.id}`,
         entry.row.class_id,
+        featureChoicePicks,
       )
     }
   }

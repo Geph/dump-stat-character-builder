@@ -38,6 +38,7 @@ function stampSource<T extends Record<string, unknown>>(row: T, importerSource: 
   }
 }
 
+import { collectSpellSchoolsFromImportContent } from "@/lib/compendium/schools-of-magic"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
 
 export type { PersistImportResult } from "@/lib/import/persist-import-types"
@@ -335,5 +336,12 @@ export async function persistImportedContent(
     foundryMeta,
   })
 
-  return { totalImported, breakdown, warnings, report }
+  const discoveredSpellSchools = collectSpellSchoolsFromImportContent(sanitized)
+  return {
+    totalImported,
+    breakdown,
+    warnings,
+    report,
+    ...(discoveredSpellSchools.length > 0 ? { discoveredSpellSchools } : {}),
+  }
 }

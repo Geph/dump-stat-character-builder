@@ -416,4 +416,61 @@ describe("collectSheetActions", () => {
     const channel = utilityOnly.find((action) => action.name === "Channel Divinity")
     expect(channel?.category).toBe("utility")
   })
+
+  it("surfaces a picked choice option with bonus-action modifiers (Eagle)", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [],
+          3,
+          {
+            subclassFeatures: [
+              {
+                level: 3,
+                name: "Rage of the Wilds",
+                description: "Choose Bear, Eagle, or Wolf.",
+                isChoice: true,
+                choices: {
+                  category: "Rage Option",
+                  count: 1,
+                  options: [
+                    {
+                      name: "Eagle",
+                      description:
+                        "While your Rage is active, you can take a Bonus Action to take the Disengage and Dash actions.",
+                      linkedModifiers: [
+                        {
+                          instanceId: "modinst_eagle",
+                          catalogRefId: "cat_fx_movement_option",
+                          activation: {
+                            bonusAction: true,
+                            requirements: [{ kind: "while_raging" }],
+                            effects: [
+                              {
+                                id: "fx_eagle",
+                                kind: "movement_option",
+                                label: "Take the Disengage and Dash actions",
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ),
+      ],
+      species: null,
+      featureChoicePicks: {
+        "class-1:L3:Rage of the Wilds": ["Eagle"],
+      },
+    })
+    const eagle = actions.find((action) => action.name === "Eagle")
+    expect(eagle).toBeTruthy()
+    expect(eagle?.kinds).toEqual(["bonus"])
+    expect(eagle?.description).toContain("Disengage and Dash")
+  })
 })

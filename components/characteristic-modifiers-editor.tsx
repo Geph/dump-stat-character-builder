@@ -1333,6 +1333,18 @@ function SpellsKnownEditor({
             <label className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
               <input
                 type="checkbox"
+                checked={!!entry.castAsRitual}
+                onChange={(e) => {
+                  const spells = [...mod.spells]
+                  spells[idx] = { ...entry, castAsRitual: e.target.checked }
+                  onChange({ ...mod, spells })
+                }}
+              />
+              Cast as Ritual
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+              <input
+                type="checkbox"
                 checked={entry.prepared !== false}
                 onChange={(e) => {
                   const spells = [...mod.spells]

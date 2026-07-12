@@ -29,11 +29,24 @@ export type ImportUnmatchedFeatureEntry = {
   featureLevel?: number
 }
 
-type FeatureCarrier = Feature & {
+type FeatureCarrier = Omit<Feature, "level"> & {
+  /** Class/subclass features use level; abilities may use level_requirement instead. */
+  level?: number
   importModifierMeta?: ImportModifierMeta[]
 }
 
-function featureHasLinkedModifiers(feature: Feature): boolean {
+function abilityAsFeatureCarrier(
+  ability: NonNullable<ImportContent["abilities"]>[number],
+): FeatureCarrier {
+  return {
+    ...(ability as unknown as FeatureCarrier),
+    name: ability.name,
+    description: ability.description,
+    level: ability.level_requirement ?? undefined,
+  }
+}
+
+function featureHasLinkedModifiers(feature: FeatureCarrier): boolean {
   if ((feature.linkedModifiers?.length ?? 0) > 0) return true
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) return true
   if (feature.companion_stat_block) return true
@@ -100,6 +113,13 @@ export function collectUnmatchedModifierFeatures(
 
   for (const feat of content.feats ?? []) {
     collectUnmatchedFromFeature(`Feat: ${feat.name}`, feat as unknown as Feature, entries)
+  }
+
+  for (const ability of content.abilities ?? []) {
+    const label = ability.source_name
+      ? `Ability: ${ability.name} (${ability.source_name})`
+      : `Ability: ${ability.name}`
+    collectUnmatchedFromFeature(label, abilityAsFeatureCarrier(ability) as unknown as Feature, entries)
   }
 
   return entries
@@ -202,6 +222,14 @@ export function collectImportModifierReview(content: ImportContent): ImportModif
     )
   }
 
+  for (const ability of content.abilities ?? []) {
+    const label = ability.source_name
+      ? `Ability: ${ability.name} (${ability.source_name})`
+      : `Ability: ${ability.name}`
+    const carrier = abilityAsFeatureCarrier(ability)
+    pushReviewRow(rows, label, carrier, previewFromFeature(label, carrier))
+  }
+
   return rows
 }
 
@@ -239,6 +267,13 @@ export function collectImportModifierPreviews(content: ImportContent): ImportMod
 
   for (const feat of content.feats ?? []) {
     previews.push(...previewFromFeature(`Feat: ${feat.name}`, feat as FeatureCarrier))
+  }
+
+  for (const ability of content.abilities ?? []) {
+    const label = ability.source_name
+      ? `Ability: ${ability.name} (${ability.source_name})`
+      : `Ability: ${ability.name}`
+    previews.push(...previewFromFeature(label, abilityAsFeatureCarrier(ability)))
   }
 
   return previews
@@ -342,7 +377,18 @@ export function removeImportModifierPreview(
       feat.name !== featName
         ? feat
         : removeModifierFromFeature(feat as FeatureCarrier, instanceId),
-    )
+    ) as ImportContent["feats"]
+    return next
+  }
+
+  if (sourceLabel.startsWith("Ability: ")) {
+    const abilityLabel = sourceLabel.slice("Ability: ".length)
+    const abilityName = abilityLabel.replace(/\s+\([^)]+\)$/, "")
+    next.abilities = content.abilities?.map((ability) =>
+      ability.name !== abilityName
+        ? ability
+        : removeModifierFromFeature(abilityAsFeatureCarrier(ability), instanceId),
+    ) as ImportContent["abilities"]
   }
 
   return next as unknown as ImportContent

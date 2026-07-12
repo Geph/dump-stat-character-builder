@@ -1,17 +1,10 @@
 import { stripHtml } from "@/lib/import/normalize-equipment"
+import { DEFAULT_SPELL_SCHOOL_NAMES } from "@/lib/compendium/schools-of-magic"
 
 const SPELL_NAME_SPLIT = /\s*,\s*|\s+and\s+|\s*;\s*/g
 
-export const SPELL_SCHOOLS = [
-  "Abjuration",
-  "Conjuration",
-  "Divination",
-  "Enchantment",
-  "Evocation",
-  "Illusion",
-  "Necromancy",
-  "Transmutation",
-] as const
+/** Fixed SRD set for import parsers that need a stable regex. */
+export const SPELL_SCHOOLS = DEFAULT_SPELL_SCHOOL_NAMES
 
 const SPELL_SCHOOL_PATTERN = SPELL_SCHOOLS.join("|")
 
