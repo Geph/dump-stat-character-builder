@@ -11,6 +11,7 @@ import {
   collectImportCardArtTargets,
   countImportCardArtUrls,
   importCardArtUsesPortraitArt,
+  type ImportCardArtSection,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
 import { normalizeCardImageUrl } from "@/lib/compendium/card-image"
@@ -20,6 +21,8 @@ type ImportCardArtPanelProps = {
   content: ImportContent
   value: ImportCardArtUrlMap
   onChange: (map: ImportCardArtUrlMap) => void
+  /** When set, only these card-art sections are shown (staged review). */
+  sections?: readonly ImportCardArtSection[]
 }
 
 function CardArtRow({
@@ -85,8 +88,18 @@ function CardArtRow({
   )
 }
 
-export function ImportCardArtPanel({ content, value, onChange }: ImportCardArtPanelProps) {
-  const targets = useMemo(() => collectImportCardArtTargets(content), [content])
+export function ImportCardArtPanel({
+  content,
+  value,
+  onChange,
+  sections,
+}: ImportCardArtPanelProps) {
+  const targets = useMemo(() => {
+    const all = collectImportCardArtTargets(content)
+    if (!sections) return all
+    const allowed = new Set(sections)
+    return all.filter((target) => allowed.has(target.section))
+  }, [content, sections])
   const [expanded, setExpanded] = useState(targets.length <= 6)
   const [query, setQuery] = useState("")
 

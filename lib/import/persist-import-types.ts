@@ -5,4 +5,6 @@ export type PersistImportResult = {
   breakdown: Record<string, number>
   warnings: string[]
   report?: ImportReport
+  /** School labels found on imported spells[] (client merges novel ones into Spells filters). */
+  discoveredSpellSchools?: string[]
 }

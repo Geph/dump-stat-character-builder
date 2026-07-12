@@ -37,6 +37,7 @@ export type ClientByoImportSuccessResult = {
   breakdown: Record<string, number>
   warnings?: string[]
   report?: ImportReport
+  discoveredSpellSchools?: string[]
 }
 
 export type ClientByoImportResult = ClientByoImportReviewResult | ClientByoImportSuccessResult
@@ -79,6 +80,7 @@ export async function runClientByoJsonImport(
     breakdown: result.breakdown,
     warnings: result.warnings.length > 0 ? result.warnings : undefined,
     report: result.report,
+    discoveredSpellSchools: result.discoveredSpellSchools,
   }
 }
 
@@ -113,5 +115,6 @@ export async function confirmClientByoJsonImport(params: {
     breakdown: result.breakdown,
     warnings: result.warnings.length > 0 ? result.warnings : undefined,
     report: result.report,
+    discoveredSpellSchools: result.discoveredSpellSchools,
   }
 }

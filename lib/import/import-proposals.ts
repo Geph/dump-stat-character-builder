@@ -24,6 +24,7 @@ function normalizeProposalSourceType(
     "background",
     "feat",
     "item",
+    "compendium",
   ]
   return allowed.includes(sourceType as ImportProposalCustomAbility["sourceType"])
     ? (sourceType as ImportProposalCustomAbility["sourceType"])
@@ -48,14 +49,16 @@ export type ImportProposalCustomAbility = {
   description: string
   prerequisite?: string | null
   repeatable?: boolean
-  sourceType: "class" | "subclass" | "species" | "background" | "feat" | "item" | null
+  sourceType: "class" | "subclass" | "species" | "background" | "feat" | "item" | "compendium" | null
   sourceName: string | null
   levelRequirement: number | null
   talentCount?: number
   choices?: import("@/lib/types").FeatureChoice | null
-  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "knack" | "upgrade" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
+  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "class_talent" | "knack" | "upgrade" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
+  execution?: string | null
+  eligible_classes?: string[] | null
   range?: string | null
   components?: string[] | null
   duration?: string | null
@@ -98,6 +101,13 @@ type AiProposalAbility = {
   source_name?: string | null
   level_requirement?: number | null
   ability_role?: ImportProposalCustomAbility["abilityRole"]
+  casting_time?: string | null
+  execution?: string | null
+  eligible_classes?: string[] | null
+  range?: string | null
+  components?: string[] | null
+  duration?: string | null
+  concentration?: boolean
   choices?: {
     category?: string
     count?: number
@@ -437,6 +447,13 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
             : /\btalent/i.test(ability.choices?.category ?? ability.name)
               ? "talent_pool"
               : "discipline"),
+      casting_time: ability.casting_time ?? null,
+      execution: ability.execution ?? null,
+      eligible_classes: ability.eligible_classes ?? null,
+      range: ability.range ?? null,
+      components: ability.components ?? null,
+      duration: ability.duration ?? null,
+      concentration: ability.concentration,
       source: "ai",
     })
   }
@@ -800,6 +817,8 @@ export function applyProposalSelections(
     ...(row.abilityRole ? { ability_role: row.abilityRole } : {}),
     ...(row.psionic_augments ? { psionic_augments: row.psionic_augments } : {}),
     ...(row.casting_time ? { casting_time: row.casting_time } : {}),
+    ...(row.execution ? { execution: row.execution } : {}),
+    ...(row.eligible_classes?.length ? { eligible_classes: row.eligible_classes } : {}),
     ...(row.range ? { range: row.range } : {}),
     ...(row.components ? { components: row.components } : {}),
     ...(row.duration ? { duration: row.duration } : {}),

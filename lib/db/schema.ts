@@ -212,6 +212,8 @@ export const customAbilities = mysqlTable("custom_abilities", {
     import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig
   >(),
   casting_time: varchar("casting_time", { length: 128 }),
+  execution: varchar("execution", { length: 255 }),
+  eligible_classes: json("eligible_classes").$type<string[]>(),
   range: varchar("range", { length: 255 }),
   components: json("components").$type<string[]>(),
   duration: varchar("duration", { length: 255 }),

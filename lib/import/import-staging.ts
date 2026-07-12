@@ -1,4 +1,6 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportCardArtSection } from "@/lib/import/import-card-art"
+import type { ImportCollisionKind } from "@/lib/import/import-collisions"
 
 export type ImportStageId =
   | "core"
@@ -14,6 +16,59 @@ export type ImportStage = {
   description: string
   counts: Record<string, number>
   total: number
+}
+
+/** Preview section keys shown for each stage (order matches staged review). */
+export const IMPORT_STAGE_PREVIEW_KEYS: Record<ImportStageId, readonly string[]> = {
+  core: ["classes", "species", "backgrounds"],
+  subclasses: ["subclasses"],
+  feats: ["feats"],
+  spells: ["spells"],
+  equipment: ["equipment"],
+  proposals: [],
+}
+
+export const IMPORT_STAGE_COLLISION_KINDS: Record<ImportStageId, readonly ImportCollisionKind[]> = {
+  core: ["class", "species", "background"],
+  subclasses: [],
+  feats: ["feat"],
+  spells: ["spell"],
+  equipment: [],
+  proposals: ["ability"],
+}
+
+export const IMPORT_STAGE_CARD_ART_SECTIONS: Record<
+  ImportStageId,
+  readonly ImportCardArtSection[]
+> = {
+  core: ["classes", "species", "backgrounds"],
+  subclasses: ["subclasses"],
+  feats: [],
+  spells: ["spells"],
+  equipment: ["equipment"],
+  proposals: ["abilities"],
+}
+
+export function importModifierMatchesStage(
+  sourceLabel: string,
+  stageId: ImportStageId,
+): boolean {
+  switch (stageId) {
+    case "core":
+      return (
+        sourceLabel.startsWith("Class: ") ||
+        sourceLabel.startsWith("Species: ") ||
+        sourceLabel.startsWith("Background: ")
+      )
+    case "subclasses":
+      return sourceLabel.startsWith("Subclass: ")
+    case "feats":
+      return sourceLabel.startsWith("Feat: ")
+    case "proposals":
+      return sourceLabel.startsWith("Ability: ")
+    default:
+      return false
+  }
 }
 
 const LARGE_IMPORT_THRESHOLDS = {

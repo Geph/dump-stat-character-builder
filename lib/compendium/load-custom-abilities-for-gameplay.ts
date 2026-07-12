@@ -7,7 +7,8 @@ import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data
 
 /**
  * Custom abilities shown in the builder/sheet, plus system option catalogs
- * (Metamagic, Eldritch Invocations, Weapon Mastery Properties) used for feat picks and mastery rules.
+ * (Metamagic, Eldritch Invocations, Weapon Mastery Properties)
+ * used for feat picks and mastery rules.
  * Call `ensureModifierCatalog` / `loadModifierCatalog` first so catalogs exist.
  */
 export async function loadCustomAbilitiesForGameplay(

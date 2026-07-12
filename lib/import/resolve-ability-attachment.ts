@@ -53,11 +53,16 @@ export function resolveAbilityAttachmentRow(
     (typeof row.source_name === "string" ? row.source_name : null) ??
     (typeof row.attached_to_id === "string" ? row.attached_to_id : null)
 
-  if (!sourceType || !sourceName) return row
+  if (!sourceType || !sourceName) {
+    const { source_type: _st, source_name: _sn, ...rest } = row
+    return rest
+  }
 
   const attachType = normalizeAttachType(sourceType.trim())
-  if (!attachType) return row
-
+  if (!attachType) {
+    const { source_type: _st, source_name: _sn, ...rest } = row
+    return rest
+  }
   const { source_type: _st, source_name: _sn, ...rest } = row
   return {
     ...rest,

@@ -48,6 +48,7 @@ function titleCaseWords(value: string): string {
 function usesRechargesFromImport(
   recharge: ImportMechanic["usesRecharge"],
 ): UsesConfig["recharges"] {
+  if (recharge === "until_item_consumed") return undefined
   if (recharge === "short_rest") return [{ rest: "short_rest" }]
   if (recharge === "both") return [{ rest: "short_rest" }, { rest: "long_rest" }]
   return [{ rest: "long_rest" }]
@@ -125,6 +126,11 @@ function buildFromMechanic(
         },
       ]),
     }
+  }
+
+  // Captured in BYO mechanics[] for review; runtime wiring for ephemeral grants is not implemented yet.
+  if (mechanic.kind === "turn_start_bonus_grant") {
+    return null
   }
 
   if (!VALID_CHARACTERISTIC_KINDS.has(mechanic.kind)) return null
@@ -265,9 +271,11 @@ function buildFromMechanic(
             spells: spellNames.map((name) => ({
               spellId: spellNamePlaceholder(name),
               alwaysPrepared: mechanic.alwaysPrepared ?? true,
+              castAsRitual: mechanic.castAsRitual || undefined,
             })),
             choiceGrants,
             alwaysPrepared: mechanic.alwaysPrepared ?? (spellNames.length > 0 ? true : undefined),
+            castingAbility: mechanic.spellcastingAbility,
             label: mechanic.spellChoiceLabel,
           },
         ]),
@@ -443,6 +451,20 @@ function buildFromMechanic(
     }
     case "uses": {
       if (isReactionRechargePhrase(matchedPhrase)) return null
+      if (mechanic.usesRecharge === "until_item_consumed") {
+        const uses: UsesConfig = {
+          type: "special",
+          specialDescription:
+            mechanic.sourcePhrase?.trim() ||
+            "Spent resource cannot be regained until the crafted item is spent or destroyed",
+        }
+        return {
+          ruleId: "ai.uses",
+          confidence: aiConfidence(mechanic),
+          matchedPhrase,
+          instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
+        }
+      }
       const uses: UsesConfig = mechanic.usesAbility
         ? {
             type: "ability_modifier",

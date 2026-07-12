@@ -334,6 +334,19 @@ describe("detectFeatureModifiers", () => {
         expect(char?.spells?.[0]?.spellId).toContain("Druidcraft")
       },
     },
+    {
+      label: "ritual-only named spells",
+      text: "You can cast the Beast Sense and Speak with Animals spells but only as Rituals. Wisdom is your spellcasting ability for them.",
+      ruleId: "spell.can_cast_named",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.can_cast_named")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.every((entry) => entry.castAsRitual)).toBe(true)
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {
@@ -428,6 +441,32 @@ describe("enrichImportContentModifiers", () => {
     }
     expect(feat.linkedModifiers?.length).toBeGreaterThan(0)
     expect(feat.modifierRefs).toContain("cat_char_damage_resistance")
+  })
+
+  it("wires Common Modifiers on imported abilities from description phrasing", () => {
+    const enriched = enrichImportContentModifiers({
+      abilities: [
+        {
+          name: "Mind Leech",
+          description:
+            "As an action, assault a creature's mind. You must expend 2 psi points to use this power.",
+          source_type: "class",
+          source_name: "Psion",
+          level_requirement: 1,
+        },
+      ],
+    } as ImportContent)
+
+    const ability = enriched.abilities?.[0] as {
+      linkedModifiers?: Array<{
+        characteristics?: Array<{ type?: string; uses?: { classResourceKey?: string } }>
+      }>
+    }
+    expect(ability.linkedModifiers?.length).toBeGreaterThan(0)
+    const usesChar = ability.linkedModifiers
+      ?.flatMap((row) => row.characteristics ?? [])
+      .find((char) => char.type === "uses" && char.uses?.classResourceKey === "psi_points")
+    expect(usesChar).toBeTruthy()
   })
 })
 

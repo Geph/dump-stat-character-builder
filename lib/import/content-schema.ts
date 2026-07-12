@@ -50,7 +50,14 @@ export const ImportMechanicSchema = z.object({
   visionRangeFeet: z.number().optional(),
   usesFixed: z.number().optional(),
   usesAbility: z.enum(USES_ABILITY_CODES).optional(),
-  usesRecharge: z.enum(["short_rest", "long_rest", "both"]).optional(),
+  usesRecharge: z.enum(["short_rest", "long_rest", "both", "until_item_consumed"]).optional(),
+  /** Cap how many units of a class resource may be spent per use. */
+  classResourceKey: z.string().optional(),
+  classResourceCost: z.number().optional(),
+  classResourceCostMode: z
+    .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
+    .optional(),
+  classResourceCostAbility: z.enum(USES_ABILITY_CODES).optional(),
   checkRollMode: z.enum(["advantage", "disadvantage"]).optional(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
@@ -85,6 +92,7 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   spellChoiceLabel: z.string().optional(),
   alwaysPrepared: z.boolean().optional(),
+  castAsRitual: z.boolean().optional(),
   spellcastingAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
   attunementTotal: z.number().optional(),
   attunementBonus: z.number().optional(),
@@ -103,6 +111,14 @@ export const ImportMechanicSchema = z.object({
   forcedSaveScope: z.enum(["your_spells", "your_features", "all"]).optional(),
   restoreResourceKey: z.string().optional(),
   restoreResourceAmount: z.number().optional(),
+  /** turn_start_bonus_grant — resource these bonus units count as (often same as the main pool key). */
+  grantResourceKey: z.string().optional(),
+  grantAmount: z.number().optional(),
+  grantAmountByLevel: z
+    .array(z.object({ level: z.number(), amount: z.number() }))
+    .optional(),
+  expiresEndOfTurn: z.boolean().optional(),
+  usageRestriction: z.string().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
@@ -115,7 +131,7 @@ export const ChoiceOptionsSchema = z.object({
       name: z.string(),
       description: z.string(),
       prerequisite: z.string().nullable().optional(),
-      repeatable: z.boolean().optional(),
+      repeatable: z.boolean().nullable().optional(),
     }),
   ),
   optionsSource: z
@@ -127,10 +143,11 @@ export const ChoiceOptionsSchema = z.object({
       "class_bomb_formulas",
       "class_discoveries",
     ])
+    .nullable()
     .optional(),
   resourceKey: z.string().nullable().optional(),
   swappableOnRest: z.boolean().optional(),
-  swapRestType: z.enum(["short", "long"]).optional(),
+  swapRestType: z.enum(["short", "long"]).nullable().optional(),
 })
 
 export const SpeciesTraitSchema = z.object({
@@ -172,6 +189,9 @@ export const FeatImportSchema = z.object({
   prerequisite: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
   level_requirement: z.number().nullable().optional(),
+  /** Ability-catalog picks (discipline / class talent / exploit). Not for ASI / Fighting Style / Epic Boon milestones. */
+  isChoice: z.boolean().optional(),
+  choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
 })
 
@@ -340,7 +360,31 @@ export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feat
 - Extract Languages into proficiencies.languages (e.g. ["One language of your choice"]).
 - Extract Equipment into starting_equipment as { name, quantity } items and starting_gold for GP in a belt pouch (e.g. starting_gold: 10).
 - Assign each Feature to the background whose toolset/theme it matches — do not attach a feature to the wrong background because of PDF column flow.
-- Omit chapter running heads, page numbers, nav ribbons, and d6 Ideals/Bonds/Flaws/Personality Trait tables from descriptions.`
+- Do not copy d6 Ideals/Bonds/Flaws/Personality Trait tables into descriptions.`
+
+/** Cross-cutting name consistency for multi-pass library ↔ class/feat imports. */
+export const NAME_SOURCE_MATCHING_HINT = `Name and source matching (multi-pass imports)
+
+Custom ability libraries (disciplines, talents, exploits, upgrades, fusion/combo abilities, etc.) are often imported in a separate pass from the class or feat that references them. You do not need to resolve or embed those references yourself — the importer matches them by name after the fact. What you must do is be exact and consistent: use the identical name string, verbatim from the source text, every time an ability is named — whether it's the full write-up, a short grant reference in a class table/feature, or a prerequisite string on a feat or another ability. Also keep source_type/source_name consistent for the same ability across passes (e.g. always attribute a class-level talent to the class, not sometimes to a subclass it happens to be gated behind). If a name is capitalized or punctuated inconsistently in the source (e.g. running headers vs. body text), prefer the spelling used in the ability's own heading.
+
+Undefined class-specific terms (cross-pass flags):
+If an ability references a derived stat, resource, or term that reads as class-specific (capitalized, mechanically load-bearing — e.g. "Leadership modifier," "Ki save DC") and that term is not defined anywhere in the current extraction pass, do not silently treat it as ordinary prose. Note it in the entry's definition using the exact term as written (e.g. "References Warlord's Leadership modifier, defined in the class chapter") so a later pass that defines it can match by name.
+
+Action-economy gates vs resource spends:
+Some abilities in a resource-pool library are gated by action economy rather than spending that pool (e.g. "forgo an attack to issue this Order" with no Exploit Die spent). Do not assume every custom ability in an Exploit/Psi/maneuver library spends the pool — check each entry's own trigger / Execution text.`
+
+/** Applies to every content type — not only backgrounds. */
+export const GENERAL_SOURCE_CLEANUP_HINT = `Source text cleanup (all content types)
+- Omit chapter running heads, page numbers, and nav ribbons from every description field.
+- Repeated running-head or footer text (e.g. a pipe-separated list of section names) must never be copied into description, regardless of what you are extracting.`
+
+/** Marker legends near spell/option tables (homebrew vs SRD). */
+export const MARKER_LEGEND_SCAN_HINT = `Footnote / marker legends near tables
+Before extracting spell tables or option lists, check for a legend, footnote, or "Special Cases" callout near them that defines a marker (superscript letter, dagger, asterisk, etc.) attached to some names but not others. These markers commonly distinguish homebrew/custom entries (which need full extraction from this document) from standard SRD entries (which should resolve against the existing compendium and not be re-extracted). If you find such a marker, note in your own extraction which names carried it, and extract full entries only for those.`
+
+/** Brief grant + full write-up = one ability. */
+export const DUPLICATE_ABILITY_MERGE_HINT = `Duplicate references / same-ability merge
+The same ability is sometimes introduced twice in a source — once as a brief grant reference (a bullet inside another ability's list, or a one-line mention) and again later as a full write-up with its own heading and rules text (e.g. under a "Special Powers" or appendix-style section). These are one ability, not two. If you encounter a name you've already extracted, use the fuller/more detailed version as the entry's description and don't emit a second custom_abilities row — reuse the identical name string so the importer's own matching (see Name and source matching) doesn't need to deduplicate on your behalf.`
 
 export const EquipmentImportSchema = z.object({
   name: z.string(),
@@ -366,12 +410,24 @@ export const AbilityImportSchema = z.object({
   description: z.string(),
   prerequisite: z.string().nullable().optional(),
   repeatable: z.boolean().optional(),
-  source_type: z.enum(["class", "subclass", "species", "background", "feat", "item"]).nullable(),
+  source_type: z
+    .enum(["class", "subclass", "species", "background", "feat", "item", "compendium"])
+    .nullable(),
   source_name: z.string().nullable(),
   level_requirement: z.number().nullable(),
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
   psionic_augments: z.unknown().optional(),
   casting_time: z.string().nullable().optional(),
+  /**
+   * Activation cost/timing when the source labels it explicitly (Execution / Activation / Trigger).
+   * Distinct from casting_time (spell/psionic casting headers).
+   */
+  execution: z.string().nullable().optional(),
+  /**
+   * Every class/subclass named as able to learn this ability when the source lists one or more.
+   * Prefer this over collapsing multiple class names into source_name or prerequisite.
+   */
+  eligible_classes: z.array(z.string()).nullable().optional(),
   range: z.string().nullable().optional(),
   components: z.array(z.string()).nullable().optional(),
   duration: z.string().nullable().optional(),
@@ -383,6 +439,7 @@ export const AbilityImportSchema = z.object({
       "discipline",
       "psionic_power",
       "talent_pool",
+      "class_talent",
       "knack",
       "upgrade",
       "bomb_formula",
@@ -524,7 +581,9 @@ export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose 
 - Set isChoice: true on the trait or class feature (use null when not a choice)
 - Populate choices with { category, count, options: [{ name, description }] } or null when not applicable
 - Keep rules text in description; list each selectable option in choices.options
-- For feat picks (ASI, Epic Boon, fighting style feats), do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring)`
+- Put each option's mechanical rules in that option's description (not only in the parent feature list). Dump Stat wires Common Modifiers per option from option descriptions (resistance, speeds, darkvision, etc.) and strips duplicates from the parent.
+- Feat milestones that grant another feat (ASI, Epic Boon, Fighting Style feat picks): do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring). Never model those milestones as isChoice + choices.
+- If a feat grants a choice from a custom ability catalog that a class or subclass also draws from (a discipline, a class-level talent list, an exploit list, etc.) rather than granting a new feat pick, use isChoice: true with choices.options listing each eligible entry by its exact name (see Name and source matching). This is different from grant_feat milestones — the feat is granting a pick from an ability system, not another feat.`
 
 export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the source labels them:
 - "Origin" for Origin Feats (1st-level background-style feats)
@@ -536,14 +595,14 @@ Do not embed the category name only in description — use the category field.
 When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
-- Set class_name to the exact parent class (e.g. "Druid", "Fighter", "Sorcerer", "KibblesTasty Psion")
+- Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion")
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present`
 
 export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice):
 - Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, etc.)
-- Set class_name to the parent class (e.g. "KibblesTasty Psion")
+- Set class_name to the exact parent class name from the source headers/table (e.g. "Psion")
 - resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit")
 - name: display name from the table header (e.g. "Psi Points")
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
@@ -552,9 +611,11 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
-export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. KibblesTasty Psion, Gunslinger):
+export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Designer> <Class Name>, Gunslinger):
+- Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
+- That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
-- Put each subclass/archetype/path in subclasses[] with class_name set to the parent class
+- Put each subclass/archetype/path in subclasses[] with class_name set to that same parent class name
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
 - Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror { description, options: [{ label, items: [{ name, quantity }] }] }
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
@@ -567,6 +628,15 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
-- For Inventor-style upgrades, put generic unrestricted upgrades as one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred.
-- For disciplines with talents, include choices { category, count, options: [{ name, description, prerequisite?, repeatable? }] } and mention talent count in definition
+- For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.
+- Talent pools (three patterns — do not conflate):
+  1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).
+  2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; wire the class feature with a distinct choices.category (e.g. "Class Talents") and resourceKey (e.g. class_talents_known). Capture level/subclass gates in options[].prerequisite or the row's prerequisite.
+  3) Feat-gated / combo talents: also ability_role: "class_talent" with prerequisite naming the feat and any required disciplines/talents (exact names — see Name and source matching).
+- Specialization on a discipline package: if the package offers a mutually exclusive one-time sub-choice when first gained (often labeled "Specialization"), use choices: { category: "Specialization", count: 1, options: [...] } on the package, separate from any Talents choice. Put replacement Alternate Effects tables on the specialization option's description; keep only the default/base table on the parent package description.
+- For disciplines with nested talents, include EVERY talent from that discipline's list in choices.options. Put each leaf labeled Psionic power as its own custom_abilities proposal with ability_role: "psionic_power" (casting headers + augment lists in description) — do NOT put those powers in spells[] and do not mash power text into the discipline package description.
+- For exploit/maneuver libraries, one custom_abilities proposal per exploit; degree headers (1st-Degree Exploits, …) are NOT ability rows.
+- Populate execution (verbatim Execution/Activation/Trigger line) and eligible_classes (every named learnable class) on exploit-style leaves; keep prerequisite for real prerequisites only (ability scores, skills/tools, level) — see Custom ability library structure.
+- When a section/tier intro states a recharge, cost, level gate, or activation rule for every entry beneath it, copy that rule onto each leaf's own fields (do not leave it only in the section header).
+- Crafted-consumable abilities (bombs, traps, poisons): one custom_abilities row covering craft + consumable rules; usesRecharge "until_item_consumed" when the spent resource is locked until the item is used/destroyed — do not split into equipment[] unless the schema treats player-crafted consumables as inventory.
 - Do NOT also duplicate the same entries in class_resources[] or abilities[] — proposals are reviewed first; omit level tables from class description`

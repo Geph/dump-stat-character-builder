@@ -6,6 +6,7 @@ import {
   parseImportAiOverride,
 } from "@/lib/import/import-route-utils"
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { formatSubclassMatchImportHint } from "@/lib/import/subclass-match-import-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 import { CLASS_SPELL_LIST_IMPORT_HINT } from "@/lib/import/class-spell-lists"
 import {
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
     const pageScope = formData.get("pageScope") as string | null
     const pageStart = formData.get("pageStart") as string | null
     const pageEnd = formData.get("pageEnd") as string | null
+    const subclassMatchName = formData.get("subclassMatchName") as string | null
+    const subclassMatchClassName = formData.get("subclassMatchClassName") as string | null
     const aiProvider = formData.get("aiProvider") as string | null
     const aiModel = formData.get("aiModel") as string | null
     const aiOverride = parseImportAiOverride({ aiProvider, aiModel })
@@ -195,6 +198,17 @@ export async function POST(request: NextRequest) {
       systemPrompt += `\n\nFocus specifically on extracting content related to: ${specificContent}. Only extract content that matches this specification.`
     }
     systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentTypeHint)
+    const subclassMatchHint = formatSubclassMatchImportHint(
+      typeof subclassMatchName === "string" &&
+        subclassMatchName.trim() &&
+        typeof subclassMatchClassName === "string" &&
+        subclassMatchClassName.trim()
+        ? { name: subclassMatchName.trim(), className: subclassMatchClassName.trim() }
+        : null,
+    )
+    if (subclassMatchHint) {
+      systemPrompt = `${systemPrompt}\n\n${subclassMatchHint}`
+    }
 
     const pageRangeNote = pageRange
       ? `\n\nNote: Text was extracted from pages ${pageRange.first}–${pageRange.last} of ${totalPages} total pages.`
@@ -256,7 +270,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
-    const { totalImported, breakdown, warnings, report } = await persistImportedContent(
+    const { totalImported, breakdown, warnings, report, discoveredSpellSchools } =
+      await persistImportedContent(
       prepared.content,
       "PDF Import",
     )
@@ -271,6 +286,7 @@ export async function POST(request: NextRequest) {
       warnings: warnings.length > 0 ? warnings : undefined,
       report: report ? { ...report, tokenSavings } : undefined,
       tokenSavings,
+      discoveredSpellSchools,
     })
   } catch (error) {
     console.error("PDF import error:", error)

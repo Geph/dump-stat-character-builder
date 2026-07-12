@@ -1,13 +1,26 @@
 import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
-import { CLASS_SPELL_LIST_IMPORT_HINT } from "@/lib/import/class-spell-lists"
+import { CLASS_SPELL_LIST_IMPORT_HINT, SPELL_SCHOOL_IMPORT_HINT } from "@/lib/import/class-spell-lists"
+import {
+  CUSTOM_ABILITY_LIBRARY_STRUCTURE_HINT,
+  formatCustomSystemsImportHint,
+  type CustomSystemsImportHints,
+} from "@/lib/import/custom-systems-import-hints"
+import {
+  formatSubclassMatchImportHint,
+  type SubclassMatchImportHint,
+} from "@/lib/import/subclass-match-import-hints"
 import {
   CHOICE_EXTRACTION_HINT,
   CLASS_RESOURCE_IMPORT_HINT,
   CUSTOM_CLASS_IMPORT_HINT,
+  DUPLICATE_ABILITY_MERGE_HINT,
   FEAT_CATEGORY_IMPORT_HINT,
+  GENERAL_SOURCE_CLEANUP_HINT,
   IMPORT_PROPOSALS_HINT,
+  MARKER_LEGEND_SCAN_HINT,
   MECHANICS_IMPORT_HINT,
+  NAME_SOURCE_MATCHING_HINT,
   SUBCLASS_IMPORT_HINT,
   BACKGROUND_LEGACY_IMPORT_HINT,
 } from "@/lib/import/content-schema"
@@ -31,6 +44,14 @@ For equipment: use cost { amount, unit } separate from name; strip HTML/markdown
 
 Keep mechanical rules text in feature descriptions. Optionally add mechanics[] per feature for explicit Common Modifier hints (see below).
 
+${GENERAL_SOURCE_CLEANUP_HINT}
+
+${NAME_SOURCE_MATCHING_HINT}
+
+${MARKER_LEGEND_SCAN_HINT}
+
+${DUPLICATE_ABILITY_MERGE_HINT}
+
 ${RICH_TEXT_TABLE_HINT}
 
 ${CHOICE_EXTRACTION_HINT}
@@ -49,8 +70,32 @@ ${IMPORT_PROPOSALS_HINT}
 
 ${MECHANICS_IMPORT_HINT}
 
-${CLASS_SPELL_LIST_IMPORT_HINT}`
+${CLASS_SPELL_LIST_IMPORT_HINT}
 
-export function buildImportSystemPrompt(contentTypeHint?: string | null): string {
-  return appendContentTypeHintToPrompt(IMPORT_BASE_SYSTEM_PROMPT, contentTypeHint)
+${SPELL_SCHOOL_IMPORT_HINT}`
+
+export type ImportSystemPromptOptions = {
+  customSystems?: CustomSystemsImportHints
+  subclassMatch?: SubclassMatchImportHint | null
+}
+
+export function buildImportSystemPrompt(
+  contentTypeHint?: string | null,
+  options?: ImportSystemPromptOptions,
+): string {
+  const base = appendContentTypeHintToPrompt(IMPORT_BASE_SYSTEM_PROMPT, contentTypeHint)
+  const customSystemsHint = formatCustomSystemsImportHint(options?.customSystems)
+  const subclassMatchHint = formatSubclassMatchImportHint(options?.subclassMatch)
+  const hint = contentTypeHint?.trim().toLowerCase()
+  const parts = [base]
+  if (customSystemsHint) {
+    parts.push(customSystemsHint)
+  } else if (hint === "abilities") {
+    // Abilities imports always get hierarchy examples even without Step 0 labels.
+    parts.push(CUSTOM_ABILITY_LIBRARY_STRUCTURE_HINT)
+  }
+  if (subclassMatchHint) {
+    parts.push(subclassMatchHint)
+  }
+  return parts.join("\n\n")
 }

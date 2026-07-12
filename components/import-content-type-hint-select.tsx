@@ -4,16 +4,19 @@ type ImportContentTypeHintSelectProps = {
   value: string
   onChange: (value: string) => void
   focusRingClassName?: string
+  /** Defaults to "Content type hint:". */
+  label?: string
 }
 
 export function ImportContentTypeHintSelect({
   value,
   onChange,
   focusRingClassName = "focus:ring-primary",
+  label = "Content type hint:",
 }: ImportContentTypeHintSelectProps) {
   return (
     <div className="flex flex-wrap gap-2 items-center">
-      <label className="text-sm font-medium text-muted-foreground">Content type hint:</label>
+      <label className="text-sm font-medium text-muted-foreground">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

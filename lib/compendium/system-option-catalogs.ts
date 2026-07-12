@@ -2,7 +2,6 @@ import {
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
-import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import {
   firstClauseOfWeaponMasteryRule,
   WEAPON_MASTERY_DESCRIPTIONS,
@@ -31,6 +30,9 @@ export const WEAPON_MASTERY_PROPERTIES_CATALOG_NAME = "Weapon Mastery Properties
 
 export const WEAPON_MASTERY_PROPERTIES_CATALOG_INFO =
   "Reusable Weapon Mastery property templates (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex). Referenced by Weapon Mastery class features and weapon properties.mastery; add homebrew properties here."
+
+/** Legacy id — removed in favor of a localStorage school list; deleted on ensure. */
+export const LEGACY_SCHOOLS_OF_MAGIC_CATALOG_ID = "00000000-0000-4000-8000-000000000005"
 
 export const SYSTEM_OPTION_CATALOG_IDS = [
   METAMAGIC_OPTIONS_CATALOG_ID,
@@ -158,6 +160,7 @@ export function buildDefaultEldritchInvocations(): ModifierCatalogEntry[] {
   )
 }
 
+
 export function getSystemCatalogMeta(id: string): { name: string; info: string } | null {
   if (id === METAMAGIC_OPTIONS_CATALOG_ID) {
     return { name: METAMAGIC_OPTIONS_CATALOG_NAME, info: METAMAGIC_OPTIONS_CATALOG_INFO }
@@ -254,9 +257,12 @@ export function buildEldritchInvocationsCatalogRow(): Record<string, unknown> {
   }
 }
 
+
 export async function ensureSystemOptionCatalogs(
   db: ReturnType<typeof import("@/lib/db/client").createClient>,
 ): Promise<void> {
+  await db.from("custom_abilities").delete().eq("id", LEGACY_SCHOOLS_OF_MAGIC_CATALOG_ID)
+
   const rows = [
     { id: METAMAGIC_OPTIONS_CATALOG_ID, build: buildMetamagicOptionsCatalogRow, defaults: buildDefaultMetamagicOptions },
     { id: ELDRITCH_INVOCATIONS_CATALOG_ID, build: buildEldritchInvocationsCatalogRow, defaults: buildDefaultEldritchInvocations },

@@ -1,36 +1,41 @@
 import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
 import type { ImportContentTypeHint } from "@/lib/import/content-type-hints"
+import type { CustomSystemsImportHints } from "@/lib/import/custom-systems-import-hints"
+import type { SubclassMatchImportHint } from "@/lib/import/subclass-match-import-hints"
 
 export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from PDF or web)
 
 For best extraction results, your source text should:
-- Include one primary content type per run when possible (e.g. a full class, one subclass, or a spell list section)
-- Keep level progression tables in the source so the importer can read features and class resources from them
-- Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Risk Dice, Ki, etc.) in class_resources[]
+- One class per pass only (that class + its subclasses is OK). Never extract multiple unrelated classes in one JSON
+- Libraries before class: non-SRD spells, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter
+- Prefer one class chapter per class pass: the core class and its subclasses together (staged review covers them in order)
+- Keep level progression tables in the source so the importer can read features and class_resources[] from them
+- Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Ki, Rage, Sorcery Points, etc.) in class_resources[]
 - Keep feature headings with their full description paragraphs (e.g. "Fighting Style" followed by rules text)
 - Preserve mechanical sentences in descriptions (proficiencies, AC formulas, resistances, limited uses, feat grants) so Common Modifiers auto-wire; add mechanics[] when phrasing is non-standard
+- Omit chapter running heads, page numbers, and nav ribbons from pasted text when you can — never leave them in description fields
 - Preserve HTML <table> blocks for subclass spell lists in feature descriptions when present
-- Use a single class or subclass name consistently (match SRD names when importing into an SRD-seeded compendium)
-- Avoid mixing unrelated chapters (equipment tables + feats + multiple classes in one paste)
+- Use a single class or subclass name consistently (match SRD names when importing into an SRD-seeded compendium; for homebrew use the source's own header name, not a designer-prefixed invention)
+- Avoid mixing unrelated chapters (equipment tables + feats + multiple unrelated classes in one paste)
 
 PDF tips:
 - Copy text from a vector PDF when possible; scanned images need OCR first
-- If the PDF has page headers/footers, they are OK — importers strip obvious boilerplate
-- For long PDFs, import one chapter or page range at a time with the content-type hint set correctly
-- Homebrew class PDFs with a level table + feature sections work well; Dump Stat may parse them with zero AI when structure is clean
+- Page headers/footers are OK — importers strip obvious boilerplate
+- Page ranges: skip other classes, or isolate a library section (e.g. Psionic Disciplines) before the class chapter — do not use them to split a class from its own subclasses
+- Class PDFs with a level table plus feature sections often parse with zero AI when structure is clean
 
-Multi-file homebrew (spellcasters, KibblesTasty Psion, Martial Exploits):
-- Import supporting libraries before classes and subclasses that reference them (spell JSON, discipline powers, exploit lists, then class, then subclasses)
-- You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers
-- SRD spell names resolve from your seeded compendium; only import homebrew spell files for third-party names`
+Multi-file homebrew (spellcasters, psionics, martial exploits, and similar):
+- Import supporting libraries before the class that references them, then the class chapter, then any leftover custom systems
+- You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers (put library objects first)
+- SRD spell names resolve from your seeded compendium; only import homebrew spells for non-SRD names`
 
 const JSON_OUTPUT_RULES = `Output format (required)
 
 Return ONLY valid JSON — no markdown fences, no commentary before or after.
 Use null for optional fields you do not have data for.
 Omit empty top-level arrays entirely, or set them to null.
-Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import.
-Optionally add mechanics[] on features, traits, or feats for explicit modifier hints (see Common Modifier wiring).
+Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import from description phrasing (and optional mechanics[]) on features, traits, feats, equipment, and abilities.
+Optionally add mechanics[] on features, traits, feats, or abilities for explicit modifier hints when phrasing is non-standard (see Common Modifier wiring).
 When extracting from a PDF, add source_page (integer, 1-based PDF page) on features[], traits[], spells[], feats[], and abilities[] when identifiable. Omit when unknown.`
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
@@ -41,14 +46,15 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
   backgrounds:
     "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment, starting_gold, feat_granted, ability_bonuses, and feature. Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
-  spells: "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description.",
+  spells:
+    "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
   spell_lists:
-    "Focus on class spell list tables (Spell / School / Special columns). Populate classes[] with spell_list (all spell names) and spells[] with level, school, concentration, components (M when Special includes M), and classes set to the list's class name.",
+    "Focus on class spell list tables (Spell / School / Special columns). Populate classes[] with spell_list (all spell names) and spells[] with level, school, concentration, components (M when Special includes M), and classes set to the list's class name. Preserve novel school names from the School column when present.",
   feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
   equipment:
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
   abilities:
-    "Focus on abilities[] (custom builder abilities, invocations, disciplines, fighting-style pickers, companion stat blocks) and class_resources[] (level-scaled pools such as Ki, Risk Dice, or Psionic Power). Set source_type and source_name on abilities to tie them to a class or subclass.",
+    "Focus on custom ability libraries and class_resources[]. Split hierarchy (do not mash): category label (not a row) → mid-level packages → leaf powers / class_talent rows + nested Discipline Talents in choices. Prefer import_proposals.custom_abilities[] for discipline packages (ability_role discipline), psionic powers (ability_role psionic_power — NOT spells[]), class-level/feat-gated talents (ability_role class_talent), exploits, and upgrades. Distinguish Discipline Talents vs Class Talents category/resourceKey. Set source_type and source_name consistently. Keep spend phrasing (expend N psi points, expend one Exploit Die). See Custom ability library structure examples.",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
 }
 
@@ -60,13 +66,17 @@ export type ByoExtractionPromptOptions = {
   /** Include PDF upload workflow instructions and page scope. */
   pdfUpload?: boolean
   pageScope?: ByoPdfPageScope
+  /** Optional labels for custom ability libraries and class resource pools. */
+  customSystems?: CustomSystemsImportHints
+  /** Optional match to an existing subclass (locks class_name / name in the prompt). */
+  subclassMatch?: SubclassMatchImportHint | null
 }
 
 function formatPdfUploadBlock(pageScope?: ByoPdfPageScope): string {
   const scopeLine =
     pageScope?.mode === "range"
-      ? `Page scope: Extract ONLY from PDF pages ${pageScope.start}–${pageScope.end} (1-based, inclusive). Ignore content outside this range.`
-      : "Page scope: Extract from the full uploaded PDF."
+      ? `Page scope: Prefer extracting from PDF pages ${pageScope.start}–${pageScope.end} (1-based, inclusive). If that span is a class chapter, include the core class and its subclasses together. Tighten the range only when you intentionally want a subset (e.g. one subclass) or to exclude a different class.`
+      : "Page scope: Extract from the uploaded PDF. Prefer one class chapter at a time when the book has multiple classes; include that class and its subclasses in the same extraction."
 
   return `PDF upload workflow
 
@@ -198,6 +208,18 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         description: "A bright streak flashes to a point you choose within range.",
         classes: ["Sorcerer", "Wizard"],
       },
+      {
+        name: "Temporal Stitch",
+        level: 2,
+        school: "Chronomancy",
+        casting_time: "1 action",
+        range: "Touch",
+        components: ["V", "S"],
+        duration: "Concentration, up to 1 minute",
+        concentration: true,
+        description: "You briefly rewind a wound on a creature you touch.",
+        classes: ["Wizard"],
+      },
     ],
   },
   spell_lists: {
@@ -265,22 +287,112 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
     ],
   },
   abilities: {
-    abilities: [
-      {
-        name: "Psionic Discipline",
-        description: "Choose one discipline you know. You can manifest its powers using psionic energy.",
-        source_type: "class",
-        source_name: "KibblesTasty Psion",
-        level_requirement: 1,
-      },
-    ],
+    import_proposals: {
+      custom_abilities: [
+        {
+          proposal_id: "enhancement_discipline",
+          name: "Enhancement Discipline",
+          ability_role: "discipline",
+          definition:
+            "Discipline package with Enhancing Skill; talent options; Alternate Effects. Power: Enhancing Surge (separate row).",
+          description:
+            "<p>Enhancement is the ability to interact with a creature's nature and abilities with your psionic power.</p><p><strong>Enhancing Skill:</strong> Whenever you make an ability check using Strength or Dexterity, you can add 1d4 to the result.</p>",
+          choices: {
+            category: "Discipline Talents",
+            count: 1,
+            options: [
+              {
+                name: "Body Control",
+                prerequisite: "5th-level Psion",
+                description: "You can cast alter self at will, without expending a spell slot or psi points.",
+              },
+              {
+                name: "Enhanced Regrowth",
+                description: "You gain the cure wounds spell, and can cast it by expending psi points.",
+              },
+            ],
+          },
+          source_type: "class",
+          source_name: "Psion",
+          level_requirement: 1,
+        },
+        {
+          proposal_id: "enhancing_surge",
+          name: "Enhancing Surge",
+          ability_role: "psionic_power",
+          definition: "Psionic power from Enhancement Discipline.",
+          description:
+            "<p>You empower the body of a target creature you can see with your psionics.</p><p>You can spend psi points up to your per use limit to add the following modifiers to Enhancing Surge (you can add multiple modifiers).</p><ul><li><strong>Fortifying (1+ psi points):</strong> The target gains an extra 1d6 temporary hit points for each point spent.</li><li><strong>Resilient (3 psi points):</strong> The target gains resistance to all damage until the start of your next turn.</li></ul>",
+          casting_time: "1 action",
+          range: "60 feet",
+          components: ["S"],
+          duration: "1 round",
+          concentration: false,
+          source_type: "class",
+          source_name: "Psion",
+          level_requirement: 1,
+        },
+        {
+          proposal_id: "inland_eye",
+          name: "Inland Eye",
+          ability_role: "class_talent",
+          definition: "Class-level talent (not gated by a specific discipline).",
+          description: "<p>You gain blindsight out to a short range while concentrating on a psionic power.</p>",
+          prerequisite: "5th-level Psion",
+          source_type: "class",
+          source_name: "Psion",
+          level_requirement: 5,
+        },
+        {
+          proposal_id: "crushing_grip",
+          name: "Crushing Grip",
+          definition: "1st-degree exploit. Expend one Exploit Die on a successful Grapple.",
+          description:
+            "<p><strong>Execution:</strong> On a successful Grapple</p><p><strong>Prerequisites:</strong> Strength 11, Athletics</p><p>When you Grapple a target, you can expend one Exploit Die to enhance your grip…</p>",
+          execution: "On a successful Grapple",
+          prerequisite: "Strength 11, Athletics",
+          eligible_classes: ["Barbarian", "Fighter"],
+          source_type: "compendium",
+          source_name: null,
+          level_requirement: 2,
+        },
+        {
+          proposal_id: "gadgetsmith_airburst_mine",
+          name: "Airburst Mine",
+          ability_role: "upgrade",
+          definition: "Gadgetsmith unrestricted upgrade gadget.",
+          description:
+            "You create a mechanical device capable of producing a devastating blast. Once used, this gadget can't be used again until you finish a short or long rest.",
+          source_type: "subclass",
+          source_name: "Gadgetsmith",
+          level_requirement: 3,
+          repeatable: false,
+        },
+      ],
+    },
     class_resources: [
       {
-        class_name: "KibblesTasty Psion",
+        class_name: "Psion",
         resource_key: "psi_points",
-        name: "Psionic Power",
-        description: "Psionic energy points from the class table.",
-        uses: { type: "at_level", atLevelTable: [{ level: 1, count: 2 }] },
+        name: "Psi Points",
+        description: "Spendable pool for psionic powers and alternate effects.",
+        uses: {
+          type: "at_level",
+          atLevelMode: "tier",
+          atLevelTable: [{ level: 1, count: 1 }],
+          recharges: ["short_rest", "long_rest"],
+        },
+      },
+      {
+        class_name: "Psion",
+        resource_key: "psi_limit",
+        name: "Psi Limit",
+        description: "Maximum psi points you can spend on a single use.",
+        uses: {
+          type: "special",
+          atLevelMode: "tier",
+          atLevelTable: [{ level: 1, count: 1 }],
+        },
       },
     ],
   },
@@ -305,7 +417,12 @@ export function buildByoExtractionPrompt(
   const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all ?? ""
   const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
 
-  const sections = [buildImportSystemPrompt(contentTypeHint)]
+  const sections = [
+    buildImportSystemPrompt(contentTypeHint, {
+      customSystems: options?.customSystems,
+      subclassMatch: options?.subclassMatch,
+    }),
+  ]
 
   if (options?.pdfUpload) {
     sections.push("", formatPdfUploadBlock(options.pageScope))
@@ -329,9 +446,10 @@ export function buildByoExtractionPrompt(
 export function buildByoFullPrompt(
   sourceText: string,
   contentTypeHint?: string | null,
+  options?: ByoExtractionPromptOptions,
 ): string {
   const trimmed = sourceText.trim()
-  const instructions = buildByoExtractionPrompt(contentTypeHint)
+  const instructions = buildByoExtractionPrompt(contentTypeHint, options)
   if (!trimmed) return instructions
   return `${instructions}\n\n---\n\nSource text to extract:\n\n${trimmed}`
 }

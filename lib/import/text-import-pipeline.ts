@@ -63,7 +63,8 @@ export async function runTextImportPipeline(
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
-    const { totalImported, breakdown, warnings, report } = await persistImportedContent(
+    const { totalImported, breakdown, warnings, report, discoveredSpellSchools } =
+      await persistImportedContent(
       foundryMeta ? { ...prepared.content, foundryImportMeta: foundryMeta } : prepared.content,
       materialSource,
     )
@@ -76,6 +77,7 @@ export async function runTextImportPipeline(
       report: report ? { ...report, tokenSavings } : undefined,
       tokenSavings,
       extractionMode: tokenSavings?.extractionMode ?? "byo-json",
+      discoveredSpellSchools,
     })
   } catch (error) {
     console.error("Text import pipeline error:", error)

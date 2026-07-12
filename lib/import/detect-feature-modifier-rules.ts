@@ -128,6 +128,13 @@ function newInstanceId(): string {
   return createModifierInstanceId()
 }
 
+function textMentionsWhileRaging(text: string): boolean {
+  return (
+    /\bwhile\s+(?:your\s+)?rage\s+is\s+active\b/i.test(text) ||
+    /\bwhile\s+(?:you\s+are\s+)?raging\b/i.test(text)
+  )
+}
+
 function grantFeatInstance(categories: FeatPickCategory[], label: string): LinkedModifierInstance {
   return buildGrantFeatModifier(categories, label, newInstanceId())
 }
@@ -271,6 +278,26 @@ function buildCheckRollModifier(
   })
 }
 
+function parseSpellNameList(fragment: string): string[] {
+  const cleaned = fragment
+    .replace(/^the\s+/i, "")
+    .replace(/\s+spells?$/i, "")
+    .trim()
+  if (!cleaned) return []
+  return cleaned
+    .split(/\s*,\s*|\s+and\s+/i)
+    .map((part) => part.trim().replace(/^the\s+/i, ""))
+    .filter((part) => part.length > 1)
+}
+
+function parseCastingAbilityFromText(text: string): AbilityScoreKey | null {
+  const match = text.match(
+    /\b(Intelligence|Wisdom|Charisma)(?:,\s*(?:Intelligence|Wisdom|Charisma))*\s+is your spellcasting ability\b/i,
+  )
+  if (!match) return null
+  return parseAbilityWord(match[1])
+}
+
 function parseDamageTypes(fragment: string): string[] {
   const lower = fragment.toLowerCase()
   return DAMAGE_TYPES.filter((type) => lower.includes(type)).map(
@@ -361,7 +388,7 @@ function normalizeSpeedTypeWord(word: string): "climb" | "swim" | "fly" | "walk"
 
 function parseSpeedTypesEqualToWalk(text: string): ("climb" | "swim" | "fly")[] {
   const match = text.match(
-    /((?:a\s+)?(?:climb(?:ing)?|swim(?:ming)?|fly(?:ing)?)(?:\s+speed)?(?:\s+and\s+(?:a\s+)?(?:climb(?:ing)?|swim(?:ming)?|fly(?:ing)?)(?:\s+speed)?)*)\s+equal to your (?:walking|walk)\s+speed/i,
+    /((?:a\s+)?(?:climb(?:ing)?|swim(?:ming)?|fly(?:ing)?)(?:\s+speed)?(?:\s+and\s+(?:a\s+)?(?:climb(?:ing)?|swim(?:ming)?|fly(?:ing)?)(?:\s+speed)?)*)\s+equal to your (?:(?:walking|walk)\s+)?speed\b/i,
   )
   if (!match) return []
   const types: ("climb" | "swim" | "fly")[] = []
@@ -1238,11 +1265,15 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "check.advantage.attack",
     confidence: "medium",
     test: /\badvantage\s+on\s+attack\s+rolls?\b/i,
-    build: (_match, ctx) =>
-      buildCheckRollModifier(ctx, "atk_adv", {
+    build: (_match, ctx, text) => {
+      // Ally/enemy pack-tactics style auras are not self check modifiers.
+      if (/\b(?:your\s+)?allies\s+have\s+advantage\b/i.test(text)) return null
+      if (/\benemies\b[\s\S]{0,80}\bdisadvantage\s+on\s+attack\s+rolls?\b/i.test(text)) return null
+      return buildCheckRollModifier(ctx, "atk_adv", {
         checkRollMode: "advantage",
         checkCategory: "attack",
-      }),
+      })
+    },
   },
   {
     id: "check.advantage.ability",
@@ -1323,10 +1354,36 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "resistance.damage.except",
+    confidence: "high",
+    test: /\bresistance\s+to\s+(?:every|all)\s+damage\s+types?\s+except\s+([^.;\n]+)/i,
+    build: (match, ctx, text) => {
+      const excepted = new Set(parseDamageTypes(match[1]).map((type) => type.toLowerCase()))
+      const types = DAMAGE_TYPES.filter((type) => !excepted.has(type)).map(
+        (type) => type.charAt(0).toUpperCase() + type.slice(1),
+      )
+      if (!types.length) return null
+      const whileRaging = textMentionsWhileRaging(text)
+      return charInstance(newInstanceId(), characteristicCatalogRefId("damage_resistance"), [
+        {
+          id: modId(instanceKey(ctx, "resistance_except")),
+          type: "damage_resistance",
+          damageTypes: types,
+          requiresSheetToggle: whileRaging ? "while_raging" : undefined,
+          label: whileRaging
+            ? `Resistance to all damage except ${match[1].trim()} (while raging)`
+            : `Resistance to all damage except ${match[1].trim()}`,
+        },
+      ])
+    },
+  },
+  {
     id: "resistance.damage",
     confidence: "high",
     test: /\bresistance\s+to\s+([^.;\n]+?)\s+damage\b/i,
     build: (match, ctx) => {
+      if (/\b(?:every|all)\s+damage\s+types?\s+except\b/i.test(match[0])) return null
+      if (/\bexcept\b/i.test(match[1])) return null
       const types = parseDamageTypes(match[1])
       if (!types.length) return null
       return charInstance(newInstanceId(), characteristicCatalogRefId("damage_resistance"), [
@@ -1438,7 +1495,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "vision.darkvision",
     confidence: "high",
-    test: /\bdarkvision(?:\s+(?:within|of))?\s+(\d+)\s+feet\b/i,
+    test: /\bdarkvision(?:\s+(?:within|of|with\s+a\s+range\s+of))?\s+(\d+)\s+feet\b/i,
     build: (match, ctx) => {
       const rangeFeet = parseInt(match[1], 10)
       if (!Number.isFinite(rangeFeet)) return null
@@ -1777,6 +1834,34 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "spell.can_cast_named",
+    confidence: "high",
+    scope: "full",
+    test: /\byou can cast(?:\s+the)?\s+(.+?)\s+spells?\b/i,
+    build: (match, ctx, text) => {
+      const ritualOnly = /\bbut only as(?:\s+a)?\s+rituals?\b/i.test(text)
+      if (!ritualOnly && /\bat will\b/i.test(text)) return null
+      if (!ritualOnly && /\bwithout(?:\s+expending)?\s+a\s+spell\s+slot\b/i.test(match[0])) return null
+      const names = parseSpellNameList(match[1])
+      if (!names.length) return null
+      const castingAbility = parseCastingAbilityFromText(text) ?? undefined
+      return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+        {
+          id: modId(instanceKey(ctx, "can_cast_named")),
+          type: "spells_known",
+          spells: names.map((name) => ({
+            spellId: spellNamePlaceholder(name),
+            alwaysPrepared: true,
+            castAsRitual: ritualOnly || undefined,
+          })),
+          alwaysPrepared: true,
+          castingAbility,
+          label: ritualOnly ? `${names.join(", ")} (ritual only)` : names.join(", "),
+        },
+      ])
+    },
+  },
+  {
     id: "spell.cantrip.choice",
     confidence: "high",
     test:
@@ -1866,6 +1951,27 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: `+${bonus} AC while raging`,
         },
       ])
+    },
+  },
+  {
+    id: "action.bonus.dash_disengage.while_raging",
+    confidence: "high",
+    scope: "full",
+    test: /\b(?:disengage and dash|dash and disengage)\b/i,
+    build: (_match, ctx, text) => {
+      if (!/\bbonus\s+action\b/i.test(text)) return null
+      if (!/\brage\b/i.test(text)) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("movement_option"), {
+        bonusAction: true,
+        requirements: [{ kind: "while_raging" }],
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "dash_disengage_raging")),
+            kind: "movement_option",
+            label: "Take the Disengage and Dash actions",
+          } satisfies FeatureEffect,
+        ],
+      })
     },
   },
   {

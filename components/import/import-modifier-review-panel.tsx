@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ModifierWiringRegistryCoverageLine } from "@/components/import/modifier-wiring-registry-coverage-line"
 import type { ImportModifierReviewRow } from "@/lib/import/import-modifier-previews"
-import { AlertTriangle, CheckCircle2, Link2, Sparkles, X } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Link2, Sparkles, X } from "lucide-react"
 
 type ImportModifierReviewPanelProps = {
   rows: ImportModifierReviewRow[]
@@ -23,6 +23,105 @@ const SOURCE_LABELS = {
   foundry_effect: "Foundry Active Effect",
 } as const
 
+type SourceGroup = [string, ImportModifierReviewRow[]]
+
+function isPagedSourceLabel(sourceLabel: string): boolean {
+  return sourceLabel.startsWith("Subclass: ") || sourceLabel.startsWith("Species: ")
+}
+
+function SourceGroupCard({
+  sourceLabel,
+  items,
+  onRemoveModifier,
+}: {
+  sourceLabel: string
+  items: ImportModifierReviewRow[]
+  onRemoveModifier?: (previewId: string) => void
+}) {
+  return (
+    <li className="rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {sourceLabel}
+      </p>
+      <ul className="space-y-2">
+        {items.map((row) => (
+          <li
+            key={row.id}
+            className={`rounded-lg border px-3 py-2 ${
+              row.status === "wired"
+                ? "border-success/25 bg-success/5"
+                : "border-destructive/35 bg-destructive/5"
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {row.status === "wired" ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+              )}
+              <span className="font-medium text-foreground">
+                {row.featureName}
+                {row.featureLevel != null ? (
+                  <span className="ml-1 text-muted-foreground">· L{row.featureLevel}</span>
+                ) : null}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  row.status === "wired"
+                    ? "bg-success/15 text-success"
+                    : "bg-destructive/15 text-destructive"
+                }`}
+              >
+                {row.status === "wired" ? "Wired" : "Not wired"}
+              </span>
+            </div>
+
+            {row.modifiers.length > 0 ? (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {row.modifiers.map((entry) => (
+                  <li key={entry.id}>
+                    <div
+                      className={`inline-flex max-w-full items-start gap-1 rounded-full border px-2.5 py-1 text-xs ${CONFIDENCE_STYLES[entry.confidence]}`}
+                      title={entry.matchedPhrase}
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium">{entry.summary}</span>
+                        <span className="ml-1 opacity-80">
+                          · {SOURCE_LABELS[entry.source]} · {entry.confidence}
+                        </span>
+                      </span>
+                      {entry.source === "ai" ? (
+                        <Sparkles className="mt-0.5 h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                      ) : null}
+                      {onRemoveModifier ? (
+                        <button
+                          type="button"
+                          aria-label={`Remove ${entry.summary} from ${entry.featureName}`}
+                          className="rounded-full p-0.5 hover:bg-background/60"
+                          onClick={() => onRemoveModifier(entry.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 max-w-md truncate text-[10px] text-muted-foreground">
+                      {entry.matchedPhrase}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1.5 text-xs text-destructive/90">
+                No common modifier linked — add effects in the compendium editor after import.
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </li>
+  )
+}
+
 export function ImportModifierReviewPanel({
   rows,
   onRemoveModifier,
@@ -35,9 +134,29 @@ export function ImportModifierReviewPanel({
       list.push(row)
       map.set(row.sourceLabel, list)
     }
-    return [...map.entries()]
+    return [...map.entries()] as SourceGroup[]
   }, [rows])
 
+  const { pagedGroups, otherGroups } = useMemo(() => {
+    const paged: SourceGroup[] = []
+    const other: SourceGroup[] = []
+    for (const group of grouped) {
+      if (isPagedSourceLabel(group[0])) paged.push(group)
+      else other.push(group)
+    }
+    return { pagedGroups: paged, otherGroups: other }
+  }, [grouped])
+
+  const pageOneAtATime = pagedGroups.length > 1
+  const [pageIndex, setPageIndex] = useState(0)
+
+  useEffect(() => {
+    setPageIndex((current) =>
+      pagedGroups.length === 0 ? 0 : Math.min(current, pagedGroups.length - 1),
+    )
+  }, [pagedGroups.length])
+
+  const activePagedGroup = pageOneAtATime ? pagedGroups[pageIndex] ?? null : null
   const wiredCount = rows.filter((row) => row.status === "wired").length
   const unwiredCount = rows.length - wiredCount
 
@@ -49,7 +168,7 @@ export function ImportModifierReviewPanel({
           <p className="font-semibold text-foreground">Modifier wiring review</p>
           <p className="mt-1 text-muted-foreground">
             {variant === "review"
-              ? "Auto-wiring runs on import; finish any “Not wired” rows in the compendium editor (Modifier effects on each feature), then save."
+              ? "Auto-wiring runs on import; finish any “Not wired” rows in the compendium editor (modifier effects on each feature), then save."
               : "Summary of modifier auto-wiring from this import."}
           </p>
           {rows.length > 0 ? (
@@ -59,6 +178,14 @@ export function ImportModifierReviewPanel({
               <span className={`font-medium ${unwiredCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
                 {unwiredCount} not wired
               </span>
+              {pageOneAtATime ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-muted-foreground">
+                    Reviewing {pagedGroups.length} subclasses/species one at a time
+                  </span>
+                </>
+              ) : null}
             </p>
           ) : (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -71,90 +198,95 @@ export function ImportModifierReviewPanel({
       </div>
 
       {rows.length > 0 ? (
-      <ul className="space-y-3">
-        {grouped.map(([sourceLabel, items]) => (
-          <li key={sourceLabel} className="rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {sourceLabel}
-            </p>
-            <ul className="space-y-2">
-              {items.map((row) => (
-                <li
-                  key={row.id}
-                  className={`rounded-lg border px-3 py-2 ${
-                    row.status === "wired"
-                      ? "border-success/25 bg-success/5"
-                      : "border-destructive/35 bg-destructive/5"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    {row.status === "wired" ? (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-                    )}
-                    <span className="font-medium text-foreground">
-                      {row.featureName}
-                      {row.featureLevel != null ? (
-                        <span className="ml-1 text-muted-foreground">· L{row.featureLevel}</span>
-                      ) : null}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                        row.status === "wired"
-                          ? "bg-success/15 text-success"
-                          : "bg-destructive/15 text-destructive"
+        <div className="space-y-3">
+          {pageOneAtATime && activePagedGroup ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {pageIndex + 1} of {pagedGroups.length}
+                  </span>
+                  <span className="mx-1.5">·</span>
+                  {activePagedGroup[0]}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={pageIndex <= 0}
+                    onClick={() => setPageIndex((index) => Math.max(0, index - 1))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pageIndex >= pagedGroups.length - 1}
+                    onClick={() =>
+                      setPageIndex((index) => Math.min(pagedGroups.length - 1, index + 1))
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    Next
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              </div>
+              <ul className="space-y-3">
+                <SourceGroupCard
+                  sourceLabel={activePagedGroup[0]}
+                  items={activePagedGroup[1]}
+                  onRemoveModifier={onRemoveModifier}
+                />
+              </ul>
+              <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Subclass or species">
+                {pagedGroups.map(([label], index) => {
+                  const short =
+                    label.replace(/^Subclass:\s*/i, "").replace(/^Species:\s*/i, "") || label
+                  const active = index === pageIndex
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      title={label}
+                      onClick={() => setPageIndex(index)}
+                      className={`max-w-[12rem] truncate rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       }`}
                     >
-                      {row.status === "wired" ? "Wired" : "Not wired"}
-                    </span>
-                  </div>
+                      {short}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : pagedGroups.length === 1 ? (
+            <ul className="space-y-3">
+              <SourceGroupCard
+                sourceLabel={pagedGroups[0]![0]}
+                items={pagedGroups[0]![1]}
+                onRemoveModifier={onRemoveModifier}
+              />
+            </ul>
+          ) : null}
 
-                  {row.modifiers.length > 0 ? (
-                    <ul className="mt-2 flex flex-wrap gap-2">
-                      {row.modifiers.map((entry) => (
-                        <li key={entry.id}>
-                          <div
-                            className={`inline-flex max-w-full items-start gap-1 rounded-full border px-2.5 py-1 text-xs ${CONFIDENCE_STYLES[entry.confidence]}`}
-                            title={entry.matchedPhrase}
-                          >
-                            <span className="min-w-0">
-                              <span className="font-medium">{entry.summary}</span>
-                              <span className="ml-1 opacity-80">
-                                · {SOURCE_LABELS[entry.source]} · {entry.confidence}
-                              </span>
-                            </span>
-                            {entry.source === "ai" ? (
-                              <Sparkles className="mt-0.5 h-3 w-3 shrink-0 opacity-70" aria-hidden />
-                            ) : null}
-                            {onRemoveModifier ? (
-                              <button
-                                type="button"
-                                aria-label={`Remove ${entry.summary} from ${entry.featureName}`}
-                                className="rounded-full p-0.5 hover:bg-background/60"
-                                onClick={() => onRemoveModifier(entry.id)}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 max-w-md truncate text-[10px] text-muted-foreground">
-                            {entry.matchedPhrase}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-1.5 text-xs text-destructive/90">
-                      No common modifier linked — add effects in the compendium editor after import.
-                    </p>
-                  )}
-                </li>
+          {otherGroups.length > 0 ? (
+            <ul className="space-y-3">
+              {otherGroups.map(([sourceLabel, items]) => (
+                <SourceGroupCard
+                  key={sourceLabel}
+                  sourceLabel={sourceLabel}
+                  items={items}
+                  onRemoveModifier={onRemoveModifier}
+                />
               ))}
             </ul>
-          </li>
-        ))}
-      </ul>
+          ) : null}
+        </div>
       ) : null}
     </section>
   )

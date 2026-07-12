@@ -700,6 +700,8 @@ export interface SpellsKnownEntry {
   alwaysPrepared?: boolean
   /** Class level when this always-prepared spell unlocks (subclass spell tables). */
   unlocksAtClassLevel?: number
+  /** May only be cast as a Ritual (e.g. Animal Speaker / Nature Speaker). */
+  castAsRitual?: boolean
 }
 
 export interface SpellsKnownCharacteristic extends CharacteristicModifierBase {
