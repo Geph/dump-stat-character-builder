@@ -117,7 +117,9 @@ export function LinkedModifiersEditor({
 
   return (
     <div className="space-y-3">
-      {label && <label className="block text-xs font-semibold text-foreground">{label}</label>}
+      {label && (
+        <label className="mt-3 block text-xs font-semibold text-foreground">{label}</label>
+      )}
 
       {value.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">{emptyMessage}</p>

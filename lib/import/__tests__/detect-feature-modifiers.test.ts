@@ -360,6 +360,7 @@ describe("detectFeatureModifiers", () => {
     "As a bonus action, you can dash.",
     "Your spellcasting ability is Intelligence.",
     "You can cast the detect magic spell at will.",
+    "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without expending a spell slot, and you must finish a Long Rest before you do so again.",
   ]
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {
