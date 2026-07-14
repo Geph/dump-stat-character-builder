@@ -48,7 +48,21 @@ export const AI_MECHANIC_KINDS = [
   "temporary_hit_points",
   "weapon_reach_modifier",
   "extra_weapon_mastery",
+  "damage_reduction",
+  "movement_grant",
 ] as const
+
+/**
+ * Catalog suffixes that appear in the INDEX but intentionally have no mechanics[].kind
+ * (ASI pool phrases, movement options, pickers, etc.). Everything else with a concrete
+ * cat_char_* / cat_fx_* suffix must declare mechanicsKind in AI_MECHANIC_KINDS.
+ */
+export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
+  "ability_scores",
+  "movement_option",
+  "feature_option_picker",
+  "*",
+])
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
 
@@ -287,7 +301,8 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "whenever you are forced to make an Intelligence, Wisdom, or Charisma saving throw, you gain a bonus to your roll equal to your Exploit Die",
     ],
     mechanicsKind: "check_roll_modifier",
-    notes: 'bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey }',
+    notes:
+      'bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey }. Also use for damage rolls (checkCategory omitted / damageDiceFromResourceDie) and multi-beneficiary rolls: targets self|self_and_allies_in_range|chosen_creatures (rangeFeet when not self). Example: roll Bardic Inspiration die for Initiative for you and nearby allies — does not expend the die unless the prose says so.',
   },
   {
     ruleId: "resource.free_use_on_roll",
@@ -695,6 +710,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     trigger: "description",
     catalog: "cat_char_ac",
     examples: ["+1 AC while wearing armor"],
+    mechanicsKind: "ac",
     notes: "Sets requiresArmor on flat AC bonus.",
   },
   {
@@ -702,6 +718,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     trigger: "description",
     catalog: "cat_char_ac",
     examples: ["+1 AC while raging"],
+    mechanicsKind: "ac",
     notes: "Requires sheet Rage toggle (requiresSheetToggle: while_raging).",
   },
   {
@@ -731,15 +748,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "When you're subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail",
     ],
     notes:
-      "Scoped defensive save (Dex, no damage on success). NOT saving_throw_trigger — that is for reactive abilities.",
+      'mode: "evasion" (no damage on Dex save success, half on fail). NOT saving_throw_trigger — that is for reactive abilities. Renamed reskins (Leading Evasion): set basedOnSrdFeature: "Evasion".',
+    mechanicsKind: "damage_reduction",
   },
   {
     ruleId: "defensive.flat_damage_reduction",
     trigger: "description",
     catalog: "cat_char_damage_reduction",
     examples: ["you can reduce the damage taken by 2"],
+    mechanicsKind: "damage_reduction",
     notes:
-      "Flat damage reduction (e.g. Warden Mystic Bulwark). Defaults to Bludgeoning/Piercing/Slashing; widen damageTypes for all-damage variants. Requires a numeric amount — phrasing like 'reduce the damage by the amount rolled' is intentionally ignored.",
+      'mode: "flat"; reductionAmount N; damageTypes optional (default B/P/S). Requires a numeric amount — phrasing like "reduce the damage by the amount rolled" is intentionally ignored.',
   },
   {
     ruleId: "spellcasting.ability",
@@ -808,7 +827,9 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     trigger: "feature_name",
     catalog: "cat_fx_damage_reduction",
     examples: ["Evasion"],
-    notes: "Rogue/Monk/Gunslinger — include SRD prose in description when possible.",
+    mechanicsKind: "damage_reduction",
+    notes:
+      'Exact name "Evasion". Renamed reskins: basedOnSrdFeature: "Evasion" + mechanics damage_reduction mode evasion when party-sharing / extra gates differ.',
   },
   {
     ruleId: "weapon.mastery_by_name",
@@ -870,6 +891,17 @@ export const HOMEBREW_WIRING_PATTERNS = [
     ],
   },
   {
+    source: "Bard colleges (Dance / Glamour patterns)",
+    guidance: [
+      "Renamed SRD features (Leading Evasion ≈ Evasion): set basedOnSrdFeature: \"Evasion\" so name-based auto-wire applies; put party-sharing / extra gates in description and/or mechanics[].",
+      "Beguiling Magic / Mantle of Majesty alternate refresh: ALWAYS wire base usesFixed + usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an early restore — alternateRefresh is additive. Spell-slot restore: alternateRefresh.spendSpellSlotMinLevel (e.g. 3). Resource restore: spendResourceKey + spendAmount (e.g. bardic_inspiration).",
+      "Temp HP from Bardic Inspiration die × N (Mantle of Inspiration): temporary_hit_points with amountScaling class_resource_die, classResourceKey bardic_inspiration, amountMultiplier 2, targetCount by Charisma modifier.",
+      "Roll class-resource die as damage or multi-target Initiative (Bardic Damage / Tandem Footwork): check_roll_modifier or damage_roll_modifiers with bonusConfig dieScaling class_resource + targets.",
+      "Dexterity instead of Strength for Unarmed Strikes: weapon_ability_override (worked example in cheat sheet).",
+      "One-off movement without OA (Inspiring Movement / Mantle of Inspiration tail): movement_grant — not speed.",
+    ],
+  },
+  {
     source: "Gunslinger / martial homebrew",
     guidance: [
       "Extract Risk Dice, Weapon Mastery, Exploit Dice, Superiority Dice, etc. as class_resources[] from the level table (resource_key snake_case).",
@@ -915,7 +947,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
   },
 ] as const
 
-/** Content that should stay narrative — do not force mechanics[] unless a clear passive bonus exists. */
+/** Leave narrative-only — do not force mechanics[] unless a clear passive bonus exists. */
 export const NARRATIVE_ONLY_GUIDANCE = [
   "Spellcasting progressions and spell-list tables (spells[] / description HTML tables — not modifiers).",
   "Subclass spell-list features (* Spells) — preserve HTML tables in description.",
@@ -924,6 +956,7 @@ export const NARRATIVE_ONLY_GUIDANCE = [
   "Reaction timing, advantage on specific story checks, or GM-adjudicated effects without standard phrasing.",
   "Reaction rerolls or once-per-long-rest reaction riders (e.g. reroll a low Deception check) — keep in description unless a catalog trigger exists; do NOT map to uses.",
   "Maneuver / discipline / invocation option lists — use isChoice + choices, not grant_feat.",
+  "Common Modifiers only cover effects on the character's own sheet — forced saves, conditions, or miss chances imposed on *other* creatures (e.g. attacker Charisma save or miss, Charm/Frighten on a target) always stay narrative. Do not invent mechanics[] kinds for those.",
 ]
 
 function formatWiringSection(title: string, entries: ModifierWiringEntry[]): string {
@@ -958,8 +991,10 @@ function formatMechanicsCheatsheet(): string {
     "- attack_roll_modifiers: attackBonus 2, attackTarget all|melee|ranged; criticalHitMinimum; criticalHitMinimumByLevel [{ level, fixed: minD20 }]",
     "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; grantAbilityModifierWhenMissing; bonusDiceWhenModifierIncluded \"1d8\"; scalingMode half_character_level_round_down|character_level|none (for \"plus half your Class level\" riders); damageTypeOptions [\"Necrotic\",\"Radiant\"] when the player picks the type at trigger time",
     "- damage_resistance: damageTypes [\"Fire\", \"Psychic\"]",
+    "- damage_reduction: reductionMode \"evasion\" (Dex-save half→none/half) OR \"flat\" with reductionAmount N; damageTypes optional for flat (default B/P/S). Kind must be damage_reduction — do not invent other names from cat_fx_damage_reduction / cat_char_damage_reduction.",
     "- condition_immunity: conditions [\"Charmed\"]",
     "- speed: speedType walk|fly|swim|climb, speedFeet 10; canHover true when fly speed allows hovering",
+    "- movement_grant: one-off movement (not a permanent speed increase). distanceMode fixed|fraction_of_speed|full_speed; distanceFeet when fixed; fraction 0.5 when half Speed; trigger freeform (e.g. \"bonus_action_spend_bardic\", \"reaction_on_mantle\"); targets self|self_and_chosen_ally|chosen_creatures_in_range; provokesOpportunityAttacks false when the source says it doesn't; optional classResourceKey/cost when spending BI etc.",
     "- vision: visionRangeFeet 60",
     "- telepathy: telepathyRangeFeet 120 (passive telepathic communication range)",
     "- initiative: initiativeMode ability_modifier|flat_bonus|add_proficiency; initiativeAbility charisma (for ability_modifier); initiativeFlatBonus N",
@@ -969,21 +1004,24 @@ function formatMechanicsCheatsheet(): string {
     "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
     "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] when the source lists named options",
-    "- temporary_hit_points: amount N OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier (pair classResourceKey / ability as needed); trigger on_activation|turn_start|on_use|on_hit; target self|chosen_creature_in_range|allies_in_range (rangeFeet when not self); expiresOnTriggerEnd true when THP ends with the gating state (e.g. while Rage is active)",
-    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost none|action|bonus_action|reaction } = spend another pool to restore one use early (Zealous Presence / Rage).",
+    "- temporary_hit_points: amount N OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier (pair classResourceKey / ability as needed); amountMultiplier 2 when \"two times the number rolled\"; trigger on_activation|turn_start|on_use|on_hit; target self|chosen_creature_in_range|allies_in_range (rangeFeet when not self); targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
+    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS. ALWAYS wire the base usesFixed/usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an alternate early refresh — alternateRefresh is additive, never a reason to omit the base wire. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost } for resource spends OR { spendSpellSlotMinLevel: 3, actionCost } for \"expend a level 3+ spell slot\".",
     "- uses / check_roll_modifier resource spend caps: classResourceKey + classResourceCostMode fixed (default, use classResourceCost) | up_to_proficiency_bonus | up_to_ability_modifier (pair with classResourceCostAbility). Use when the source caps spend per use by a scaling value — e.g. \"expend Exploit Dice (up to your Proficiency Bonus)\" — not a separate Limit class_resource.",
-    "- check_roll_modifier: checkRollMode advantage, checkCategory save|skill|ability|attack|initiative, checkAbility/checkSkills",
+    "- check_roll_modifier: checkRollMode advantage|disadvantage|bonus; checkCategory save|skill|ability|attack|initiative; checkAbility/checkSkills; conditionNote for non-enforcible qualifiers (\"that involves you dancing\") so imports flag manual review instead of silently over-granting; for class-resource die bonuses use bonusDiceFromResource / classResourceKey + targets self|self_and_allies_in_range|chosen_creatures",
+    "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; OR die from class resource (classResourceKey + amountScaling class_resource_die) for \"damage equal to a roll of your Bardic Inspiration die\" (note whether the die is expended); plusAbilityModifier true when \"+ your Dexterity modifier\"; targets when allies also benefit",
     "- extra_attack: (no extra fields)",
     `- grant_feat: featCategories ${JSON.stringify(FEAT_CATEGORIES_FOR_IMPORT)}, featCount 1`,
     "- skill_check_alternate_ability: alternateAbility strength|…; alternateSkills [\"Insight\"]; optional requiresSheetToggle",
     "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
     "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",
-    "- weapon_ability_override: alternateAbility charisma; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional",
+    "- weapon_ability_override: alternateAbility charisma|dexterity; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional. Examples: (1) Charisma for all weapon attacks while transformed; (2) Dexterity instead of Strength for Unarmed Strikes only → alternateAbility \"dexterity\", weaponAbilityAppliesTo \"attack\", weaponAbilityScope \"specific\", weaponNames [\"Unarmed Strike\"]",
     "- weapon_reach_modifier: reachBonusFeet 10; optional weaponPropertyFilter [\"Heavy\", \"Versatile\"] when only some melee weapons gain the reach",
     "- extra_weapon_mastery: masteryProperties [\"Push\", \"Topple\"] — apply these Weapon Mastery properties in addition to the weapon's normal mastery (not the tier-table known-count)",
     "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
     "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
     "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, concentrating, …) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them.",
+    "- Renamed / lightly-modified SRD features: set basedOnSrdFeature to the exact INDEX — SRD-standard feature name (e.g. \"Evasion\") while keeping the homebrew display name. Auto-wire applies the base; description/mechanics[] carry deltas (party share, extra gates).",
+    "- targetCount (shared): { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } for \"a number of creatures equal to your Charisma modifier (minimum of one)\" — use on temporary_hit_points, movement_grant, and similar targeted effects (not uses.ability_modifier, which is for use counts).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
   ]
   return lines.join("\n")
@@ -1004,7 +1042,8 @@ Feats that grant a pick from an ability catalog (discipline / class talent / exp
 
 Catalog ids (generated at import — never emit in JSON):
 - Passive: cat_char_* (skills, ac, grant_feat, uses, speed, …)
-- Active: cat_fx_* (extra_attack, check_roll_modifier, damage_reduction, …)`,
+- Active: cat_fx_* (extra_attack, check_roll_modifier, damage_reduction, …)
+Allowed mechanics[].kind values are listed in the cheat sheet below — use those exact strings (e.g. damage_reduction), not invented suffixes of catalog ids.`,
 
     formatWiringSection("INDEX — Feature name (works with blank class-table descriptions)", FEATURE_NAME_WIRING),
 
@@ -1012,7 +1051,8 @@ Catalog ids (generated at import — never emit in JSON):
 
     `INDEX — SRD-standard feature names (exact spelling auto-wires on import; prefer for equivalent homebrew):
 ${SRD_PRESET_FEATURE_NAMES.map((name) => `- ${name}`).join("\n")}
-Hundreds of additional SRD features wire when names match the seeded compendium — use official names when porting SRD content.`,
+Hundreds of additional SRD features wire when names match the seeded compendium — use official names when porting SRD content.
+When the homebrew name differs (e.g. "Leading Evasion"), keep that name and set basedOnSrdFeature to the exact SRD name above.`,
 
     `INDEX — Class resources (class_resources[], not feature modifiers):
 - Extract columns from level tables: Psi Points, Psi Limit, Rage, Ki, Risk Dice, Battle Dice, Weapon Mastery, Superiority Dice, Exploit Dice, Sorcery Points, Bardic Inspiration, etc.
@@ -1111,6 +1151,44 @@ export function assertModifierWiringRegistryComplete(): void {
         `modifier-wiring-registry: missing FEATURE_NAME_WIRING entry for rule "${rule.id}"`,
       )
     }
+  }
+
+  assertPhraseIndexMechanicsKindsCovered()
+}
+
+/**
+ * Fail when an INDEX catalog has no mechanicsKind that exists in AI_MECHANIC_KINDS.
+ * Prevents the model from inventing kind names from catalog ID suffixes (e.g. damage_reduction)
+ * that are documented in the INDEX but missing from Allowed kind values — then silently dropped.
+ */
+export function assertPhraseIndexMechanicsKindsCovered(): void {
+  const kinds = new Set<string>(AI_MECHANIC_KINDS)
+  const problems: string[] = []
+
+  for (const entry of [...DESCRIPTION_PHRASE_WIRING, ...FEATURE_NAME_WIRING]) {
+    const suffix = entry.catalog.replace(/^cat_(?:char|fx)_/, "")
+    if (AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES.has(suffix)) continue
+
+    if (entry.mechanicsKind) {
+      if (!kinds.has(entry.mechanicsKind)) {
+        problems.push(
+          `${entry.ruleId}: mechanicsKind "${entry.mechanicsKind}" is not in AI_MECHANIC_KINDS`,
+        )
+      }
+      continue
+    }
+
+    if (/^[a-z][a-z0-9_]*$/.test(suffix)) {
+      problems.push(
+        `${entry.ruleId}: catalog ${entry.catalog} has no mechanicsKind — add "${suffix}" (or the correct kind) to AI_MECHANIC_KINDS and set entry.mechanicsKind, or list "${suffix}" in AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES if it must stay narrative-only`,
+      )
+    }
+  }
+
+  if (problems.length) {
+    throw new Error(
+      `modifier-wiring-registry: INDEX / AI_MECHANIC_KINDS drift (${problems.length}):\n- ${problems.join("\n- ")}`,
+    )
   }
 }
 

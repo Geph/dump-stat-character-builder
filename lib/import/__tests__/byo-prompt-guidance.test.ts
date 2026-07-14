@@ -108,4 +108,22 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
       expect(COMMON_MODIFIERS_IMPORT_HINT).toContain(kind)
     }
   })
+
+  it("covers Dance/Glamour follow-up kinds and basedOnSrdFeature guidance", () => {
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("damage_reduction")
+    expect(prompt).toContain("reductionMode")
+    expect(prompt).toContain("basedOnSrdFeature")
+    expect(prompt).toContain("Leading Evasion")
+    expect(prompt).toContain("spendSpellSlotMinLevel")
+    expect(prompt).toContain("ALWAYS wire the base usesFixed")
+    expect(prompt).toContain("amountMultiplier")
+    expect(prompt).toContain("movement_grant")
+    expect(prompt).toContain("Unarmed Strike")
+    expect(prompt).toContain("conditionNote")
+    expect(prompt).toContain("targetCount")
+    expect(prompt).toContain("only cover effects on the character's own sheet")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- damage_reduction:")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- movement_grant:")
+  })
 })

@@ -55,11 +55,13 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   /** For usesRecharge on_resource_reactivation — resource/state whose activation refreshes the use (e.g. "rage"). */
   gatingResourceKey: z.string().optional(),
-  /** Spend another class resource to restore one use early (outside normal recharge). */
+  /** Spend another class resource OR a spell slot to restore one use early. */
   alternateRefresh: z
     .object({
-      spendResourceKey: z.string(),
-      spendAmount: z.number(),
+      spendResourceKey: z.string().optional(),
+      spendAmount: z.number().optional(),
+      /** Expend a spell slot of at least this level (e.g. 3 for "a level 3+ spell slot"). */
+      spendSpellSlotMinLevel: z.number().optional(),
       actionCost: z.enum(["none", "action", "bonus_action", "reaction"]),
     })
     .optional(),
@@ -70,10 +72,36 @@ export const ImportMechanicSchema = z.object({
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
     .optional(),
   classResourceCostAbility: z.enum(USES_ABILITY_CODES).optional(),
-  checkRollMode: z.enum(["advantage", "disadvantage"]).optional(),
+  checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).optional(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
+  /** Freeform qualifier that cannot be auto-enforced (e.g. "that involves you dancing"). */
+  conditionNote: z.string().optional(),
+  /** Shared multi-target / beneficiary scope for die bonuses, THP, movement, etc. */
+  targets: z
+    .enum(["self", "self_and_allies_in_range", "self_and_chosen_ally", "chosen_creatures", "chosen_creatures_in_range"])
+    .optional(),
+  targetCount: z
+    .object({
+      mode: z.enum(["ability_modifier", "fixed"]),
+      ability: z.enum(ABILITY_SCORE_KEYS).optional(),
+      minimum: z.number().optional(),
+      count: z.number().optional(),
+    })
+    .optional(),
+  /** When damage/check bonus comes from rolling a class resource die. */
+  plusAbilityModifier: z.boolean().optional(),
+  amountMultiplier: z.number().optional(),
+  /** damage_reduction */
+  reductionMode: z.enum(["evasion", "flat"]).optional(),
+  reductionAmount: z.number().optional(),
+  /** movement_grant */
+  distanceMode: z.enum(["fixed", "fraction_of_speed", "full_speed"]).optional(),
+  distanceFeet: z.number().optional(),
+  fraction: z.number().optional(),
+  trigger: z.string().optional(),
+  provokesOpportunityAttacks: z.boolean().optional(),
   featCategories: z
     .array(
       z.enum([
@@ -223,6 +251,8 @@ export const SpeciesTraitSchema = z.object({
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
+  /** Exact SRD-standard feature name when this trait is a renamed/lightly-modified port. */
+  basedOnSrdFeature: z.string().optional(),
 })
 
 export const ClassFeatureSchema = z.object({
@@ -232,6 +262,8 @@ export const ClassFeatureSchema = z.object({
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
+  /** Exact SRD-standard feature name when this feature is a renamed/lightly-modified port. */
+  basedOnSrdFeature: z.string().optional(),
   psionic_augments: z.unknown().optional(),
   sheetDisplay: z
     .object({

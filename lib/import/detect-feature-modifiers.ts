@@ -20,6 +20,8 @@ export type DetectFeatureContext = {
     | "ability"
   sourceName?: string
   featureName?: string
+  /** When set, feature-name rules also match this SRD-standard name (renamed ports). */
+  basedOnSrdFeature?: string
   level?: number
   classPrefix?: string
 }
@@ -146,32 +148,37 @@ function detectFeatureModifiersByName(
   ctx: DetectFeatureContext,
   description?: string,
 ): DetectedModifier[] {
-  const featureName = ctx.featureName?.trim()
-  if (!featureName) return []
+  const names = [ctx.featureName, ctx.basedOnSrdFeature]
+    .map((name) => name?.trim())
+    .filter((name): name is string => Boolean(name))
+  const uniqueNames = [...new Set(names)]
+  if (!uniqueNames.length) return []
 
   const results: DetectedModifier[] = []
   const seenFingerprints = new Set<string>()
   const desc = description?.trim() ?? ""
 
-  for (const rule of FEATURE_NAME_MODIFIER_RULES) {
-    if (!rule.test(featureName, ctx)) continue
-    if (
-      desc &&
-      rule.suppressWhenDescriptionMatches?.some((pattern) => pattern.test(desc))
-    ) {
-      continue
+  for (const featureName of uniqueNames) {
+    for (const rule of FEATURE_NAME_MODIFIER_RULES) {
+      if (!rule.test(featureName, ctx)) continue
+      if (
+        desc &&
+        rule.suppressWhenDescriptionMatches?.some((pattern) => pattern.test(desc))
+      ) {
+        continue
+      }
+      const instance = rule.build(ctx)
+      if (!instance) continue
+      const fingerprint = modifierInstanceFingerprint(instance)
+      if (seenFingerprints.has(fingerprint)) continue
+      seenFingerprints.add(fingerprint)
+      results.push({
+        ruleId: rule.id,
+        confidence: rule.confidence,
+        matchedPhrase: featureName,
+        instance,
+      })
     }
-    const instance = rule.build(ctx)
-    if (!instance) continue
-    const fingerprint = modifierInstanceFingerprint(instance)
-    if (seenFingerprints.has(fingerprint)) continue
-    seenFingerprints.add(fingerprint)
-    results.push({
-      ruleId: rule.id,
-      confidence: rule.confidence,
-      matchedPhrase: featureName,
-      instance,
-    })
   }
 
   return results
