@@ -149,6 +149,28 @@ function parsePlainTextTableLines(text: string): SubclassSpellTableRow[] {
   return parsed
 }
 
+/**
+ * PDF-to-text extraction commonly drops all whitespace between table cells, so a
+ * "Cleric Level / Prepared Spells" table collapses into one run like
+ * "...Prepared Spells3Aid, Bless, Cure Wounds, Lesser Restoration5Mass Healing Word...".
+ * Recover rows by treating "<= 2 digits immediately followed by a capitalized spell
+ * name run>" as a level boundary — spell names never start with a digit, and prose
+ * digits (30-foot, 2d10, 9th) are never followed directly by an uppercase letter, so
+ * this doesn't false-positive outside genuine glued-together tables.
+ */
+function parseSquishedInlineTableLines(text: string): SubclassSpellTableRow[] {
+  const parsed: SubclassSpellTableRow[] = []
+  const re = /(\d{1,2})\s*([A-Z][\s\S]*?)(?=\d{1,2}[A-Z]|$)/g
+  let match
+  while ((match = re.exec(text))) {
+    const level = parseLevelCell(match[1])
+    const spellNames = splitSpellNames(match[2])
+    if (level == null || spellNames.length === 0) continue
+    parsed.push({ unlocksAtClassLevel: level, spellNames })
+  }
+  return parsed
+}
+
 /** Whether a subclass feature likely describes an always-prepared spell table. */
 export function isSubclassSpellTableFeature(featureName: string, description: string): boolean {
   if (!SPELLS_FEATURE_NAME_RE.test(featureName)) return false
@@ -156,6 +178,7 @@ export function isSubclassSpellTableFeature(featureName: string, description: st
   if (/<table/i.test(text)) return true
   if (parseProseSpellRows(text).length > 0) return true
   if (parsePlainTextTableLines(text).length > 0) return true
+  if (parseSquishedInlineTableLines(text).length > 0) return true
   return /\b(?:prepared|always have)\b.*\bspell/i.test(text)
 }
 
@@ -175,6 +198,10 @@ export function parseSubclassSpellTable(description: string): ParsedSubclassSpel
 
   if (rows.length === 0) {
     rows = parseProseSpellRows(text)
+  }
+
+  if (rows.length === 0) {
+    rows = parseSquishedInlineTableLines(text)
   }
 
   if (rows.length === 0) return null

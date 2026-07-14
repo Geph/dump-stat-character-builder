@@ -112,6 +112,14 @@ function buildTemporaryHitPointsEffect(
   instanceId: string,
   matchedPhrase: string,
 ): DetectedModifier | null {
+  // `trigger` is a real schema field (used by movement_grant) that models sometimes mis-key
+  // thpTrigger onto — if it's set without thpTrigger, treat this as an unrecognized explicit
+  // trigger rather than silently defaulting to "on_activation" for a case the source didn't
+  // actually describe (see the Improved Warding Flare case: mis-keyed trigger/target produced
+  // a bogus "activate for temp HP" effect instead of not wiring at all).
+  if (mechanic.thpTrigger == null && mechanic.trigger) {
+    return null
+  }
   const trigger = mechanic.thpTrigger ?? "on_activation"
   const target = mechanic.thpTarget ?? "self"
   if ((trigger !== "on_activation" && trigger !== "on_use") || target !== "self") {
