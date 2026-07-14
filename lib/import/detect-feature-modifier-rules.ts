@@ -287,7 +287,16 @@ function parseSpellNameList(fragment: string): string[] {
   return cleaned
     .split(/\s*,\s*|\s+and\s+/i)
     .map((part) => part.trim().replace(/^the\s+/i, ""))
-    .filter((part) => part.length > 1)
+    .filter((part) => part.length > 1 && looksLikeNamedSpell(part))
+}
+
+/** Reject chooser / pool phrasing that is not a concrete spell title. */
+function looksLikeNamedSpell(name: string): boolean {
+  if (/\d/.test(name)) return false
+  if (/^(one|two|three|four|five|six|a|an|any)\b/i.test(name)) return false
+  if (/\b(of your|that you|level|prepared|from your|circle|domain|oath)\b/i.test(name)) return false
+  if (!/^[A-Za-z]/.test(name)) return false
+  return true
 }
 
 function parseCastingAbilityFromText(text: string): AbilityScoreKey | null {
@@ -1841,7 +1850,9 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: (match, ctx, text) => {
       const ritualOnly = /\bbut only as(?:\s+a)?\s+rituals?\b/i.test(text)
       if (!ritualOnly && /\bat will\b/i.test(text)) return null
-      if (!ritualOnly && /\bwithout(?:\s+expending)?\s+a\s+spell\s+slot\b/i.test(match[0])) return null
+      // Natural Recovery-style: "cast … without exhausting / without a slot" is an ability,
+      // not always-prepared named spells. Check full text — the capture ends at "spell(s)".
+      if (!ritualOnly && /\bwithout(?:\s+expending)?\s+a\s+spell\s+slot\b/i.test(text)) return null
       const names = parseSpellNameList(match[1])
       if (!names.length) return null
       const castingAbility = parseCastingAbilityFromText(text) ?? undefined
