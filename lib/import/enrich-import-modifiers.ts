@@ -32,6 +32,7 @@ type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T 
 type ImportMechanicsCarrier = {
   name: string
   description: string
+  basedOnSrdFeature?: string
   mechanics?: import("@/lib/import/content-schema").ImportMechanic[]
   linkedModifiers?: Feature["linkedModifiers"]
   modifierRefs?: Feature["modifierRefs"]
@@ -43,9 +44,32 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
   item: T,
   ctx: DetectFeatureContext,
 ): T {
-  const baseFeature = enrichWildcardFeaturePresets(item as unknown as Feature) as unknown as T
+  const basedOn = item.basedOnSrdFeature?.trim()
+  let baseFeature = enrichWildcardFeaturePresets(item as unknown as Feature) as unknown as T
+  if (basedOn && basedOn !== item.name.trim()) {
+    const aliasPresets = enrichWildcardFeaturePresets({
+      ...(item as unknown as Feature),
+      name: basedOn,
+    })
+    if ((aliasPresets.linkedModifiers?.length ?? 0) > 0) {
+      const existing = baseFeature.linkedModifiers ?? []
+      const existingIds = new Set(existing.map((entry) => entry.instanceId))
+      const toAdd = (aliasPresets.linkedModifiers ?? []).filter(
+        (entry) => !existingIds.has(entry.instanceId),
+      )
+      if (toAdd.length) {
+        baseFeature = syncModifierRefs({
+          ...(baseFeature as unknown as Feature),
+          linkedModifiers: [...existing, ...toAdd],
+        }) as unknown as T
+      }
+    }
+  }
   const aiDetections = aiMechanicsToDetections(baseFeature.mechanics, ctx)
-  const detectorDetections = detectFeatureModifiers(baseFeature.description ?? "", ctx)
+  const detectorDetections = detectFeatureModifiers(baseFeature.description ?? "", {
+    ...ctx,
+    basedOnSrdFeature: basedOn || ctx.basedOnSrdFeature,
+  })
   if (!aiDetections.length && !detectorDetections.length) {
     if (
       isCompanionStatBlockFeature(baseFeature as unknown as Feature) &&
@@ -103,6 +127,7 @@ function enrichFeatures(
       enrichFeatureLike(feature as ImportMechanicsCarrier, {
         ...ctx,
         featureName: feature.name,
+        basedOnSrdFeature: (feature as ImportMechanicsCarrier).basedOnSrdFeature,
         level: feature.level,
       }) as unknown as Feature,
       ctx,

@@ -62,8 +62,9 @@ const ImportMechanicAiSchema = z.object({
   gatingResourceKey: z.string().nullable(),
   alternateRefresh: z
     .object({
-      spendResourceKey: z.string(),
-      spendAmount: z.number(),
+      spendResourceKey: z.string().nullable(),
+      spendAmount: z.number().nullable(),
+      spendSpellSlotMinLevel: z.number().nullable(),
       actionCost: z.enum(["none", "action", "bonus_action", "reaction"]),
     })
     .nullable(),
@@ -73,12 +74,41 @@ const ImportMechanicAiSchema = z.object({
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
     .nullable(),
   classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
-  checkRollMode: z.enum(["advantage", "disadvantage"]).nullable(),
+  checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).nullable(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).nullable(),
   checkAbility: z
     .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
     .nullable(),
   checkSkills: z.array(z.string()).nullable(),
+  conditionNote: z.string().nullable(),
+  targets: z
+    .enum([
+      "self",
+      "self_and_allies_in_range",
+      "self_and_chosen_ally",
+      "chosen_creatures",
+      "chosen_creatures_in_range",
+    ])
+    .nullable(),
+  targetCount: z
+    .object({
+      mode: z.enum(["ability_modifier", "fixed"]),
+      ability: z
+        .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+        .nullable(),
+      minimum: z.number().nullable(),
+      count: z.number().nullable(),
+    })
+    .nullable(),
+  plusAbilityModifier: z.boolean().nullable(),
+  amountMultiplier: z.number().nullable(),
+  reductionMode: z.enum(["evasion", "flat"]).nullable(),
+  reductionAmount: z.number().nullable(),
+  distanceMode: z.enum(["fixed", "fraction_of_speed", "full_speed"]).nullable(),
+  distanceFeet: z.number().nullable(),
+  fraction: z.number().nullable(),
+  trigger: z.string().nullable(),
+  provokesOpportunityAttacks: z.boolean().nullable(),
   featCategories: z
     .array(
       z.enum([
@@ -102,6 +132,33 @@ const ImportMechanicAiSchema = z.object({
   targetCreatureTypes: z.array(z.string()).nullable(),
   requiresSheetToggle: z.string().nullable(),
   sheetToggleLabel: z.string().nullable(),
+  languages: z.array(z.string()).nullable(),
+  languageChoiceCount: z.number().nullable(),
+  choicePool: z.enum(["standard", "standard_and_rare"]).nullable(),
+  spellNames: z.array(z.string()).nullable(),
+  spellChoiceGrants: z
+    .array(
+      z.object({
+        level: z.number(),
+        count: z.number(),
+        unlocksAtClassLevel: z.number().nullable(),
+      }),
+    )
+    .nullable(),
+  spellChoiceLabel: z.string().nullable(),
+  alwaysPrepared: z.boolean().nullable(),
+  castAsRitual: z.boolean().nullable(),
+  alternateAbility: z
+    .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+    .nullable(),
+  alternateSkills: z.array(z.string()).nullable(),
+  alternateSaves: z.array(z.string()).nullable(),
+  weaponAbilityAppliesTo: z.enum(["attack", "damage", "both"]).nullable(),
+  weaponAbilityScope: z.enum(["all", "melee", "ranged", "finesse", "specific"]).nullable(),
+  weaponNames: z.array(z.string()).nullable(),
+  fromSaveAbility: z.enum(["any", "STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
+  toSaveAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
+  forcedSaveScope: z.enum(["your_spells", "your_features", "all"]).nullable(),
   restoreResourceKey: z.string().nullable(),
   restoreResourceAmount: z.number().nullable(),
   grantResourceKey: z.string().nullable(),
@@ -156,6 +213,7 @@ const ClassFeatureAiSchema = z.object({
   isChoice: z.boolean().nullable(),
   choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
+  basedOnSrdFeature: z.string().nullable(),
 })
 
 const SpeciesTraitAiSchema = z.object({
@@ -164,6 +222,7 @@ const SpeciesTraitAiSchema = z.object({
   isChoice: z.boolean().nullable(),
   choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
+  basedOnSrdFeature: z.string().nullable(),
 })
 
 const SpellcastingAiSchema = z.object({
@@ -541,6 +600,7 @@ function normalizeFeatureLike(
     isChoice: feature.isChoice === true ? true : undefined,
     choices: feature.choices ?? undefined,
     mechanics: normalizeMechanics(feature.mechanics),
+    basedOnSrdFeature: feature.basedOnSrdFeature ?? undefined,
   })
   return next as ImportContent["classes"] extends (infer T)[] | undefined
     ? T extends { features: (infer F)[] }
@@ -609,6 +669,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           isChoice: trait.isChoice === true ? true : undefined,
           choices: trait.choices ?? undefined,
           mechanics: normalizeMechanics(trait.mechanics),
+          basedOnSrdFeature: trait.basedOnSrdFeature ?? undefined,
         }),
       ),
     })) as NonNullable<ImportContent["species"]>

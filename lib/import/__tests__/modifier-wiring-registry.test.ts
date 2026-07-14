@@ -35,4 +35,8 @@ describe("modifier-wiring-registry", () => {
     expect(coverage.isComplete).toBe(true)
     expect(formatModifierWiringRegistryCoverage(coverage)).toMatch(/BYO wiring index:/)
   })
+
+  it("keeps AI_MECHANIC_KINDS in sync with every INDEX catalog that documents a kind", () => {
+    expect(() => assertModifierWiringRegistryComplete()).not.toThrow()
+  })
 })

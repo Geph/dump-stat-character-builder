@@ -22,6 +22,7 @@ import type {
 } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { createModifierLimitation } from "@/lib/compendium/modifier-limitations"
+import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import type { UsesConfig } from "@/lib/types"
 
 const VALID_CHARACTERISTIC_KINDS = new Set(
@@ -302,9 +303,39 @@ function buildFromMechanic(
   if (
     mechanic.kind === "temporary_hit_points" ||
     mechanic.kind === "weapon_reach_modifier" ||
-    mechanic.kind === "extra_weapon_mastery"
+    mechanic.kind === "extra_weapon_mastery" ||
+    mechanic.kind === "movement_grant"
   ) {
     return null
+  }
+
+  if (mechanic.kind === "damage_reduction") {
+    const mode = mechanic.reductionMode ?? (mechanic.reductionAmount != null ? "flat" : "evasion")
+    if (mode === "flat") {
+      const amount = mechanic.reductionAmount
+      if (amount == null || !(amount > 0)) return null
+      return {
+        ruleId: "ai.damage_reduction.flat",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("damage_reduction"), [
+          {
+            id: modId(instanceKey(ctx, "damage_reduction")),
+            type: "damage_reduction",
+            amount,
+            damageTypes: mechanic.damageTypes?.length
+              ? mechanic.damageTypes
+              : ["Bludgeoning", "Piercing", "Slashing"],
+          },
+        ]),
+      }
+    }
+    return {
+      ruleId: "ai.damage_reduction.evasion",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: buildEvasionModifier(instanceId),
+    }
   }
 
   if (!VALID_CHARACTERISTIC_KINDS.has(mechanic.kind)) return null
