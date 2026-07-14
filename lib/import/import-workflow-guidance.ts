@@ -28,7 +28,7 @@ export const JSON_ARRAY_IMPORT_TIP =
 export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {
     id: "spellcasting-class",
-    title: "Spellcasting classes (Witch, Inventor, full casters)",
+    title: "Spellcasting classes (Witch, full casters)",
     summary:
       "Import homebrew spells / class spell lists first, then one pass for the class chapter (core + subclasses). Subclass always-prepared tables wire cleanly when those spells already exist.",
     examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters"],
