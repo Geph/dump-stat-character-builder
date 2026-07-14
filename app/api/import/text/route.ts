@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
       cardArtUrlMap,
       customAbilityCategory,
       classResourceLabels,
-      subclassMatchName,
       subclassMatchClassName,
     } = body
     const aiOverride = parseImportAiOverride(body)
@@ -147,11 +146,8 @@ export async function POST(request: NextRequest) {
         classResourceLabels: typeof classResourceLabels === "string" ? classResourceLabels : "",
       },
       subclassMatch:
-        typeof subclassMatchName === "string" &&
-        subclassMatchName.trim() &&
-        typeof subclassMatchClassName === "string" &&
-        subclassMatchClassName.trim()
-          ? { name: subclassMatchName.trim(), className: subclassMatchClassName.trim() }
+        typeof subclassMatchClassName === "string" && subclassMatchClassName.trim()
+          ? { className: subclassMatchClassName.trim() }
           : null,
     })
 

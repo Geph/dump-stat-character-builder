@@ -34,6 +34,8 @@ function normalizeProposalSourceType(
 export type ImportProposalClassResource = {
   id: string
   className: string
+  /** Present when the pool is subclass-scoped rather than a base-class table column. */
+  subclassName?: string | null
   resourceKey: string
   name: string
   definition: string
@@ -83,6 +85,7 @@ export type ImportProposalSelections = {
 type AiProposalResource = {
   proposal_id?: string
   class_name: string
+  subclass_name?: string | null
   resource_key: string
   name: string
   definition?: string
@@ -306,6 +309,7 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
         ? `resource:${slugId(resource.proposal_id)}`
         : undefined,
       className: resource.class_name,
+      subclassName: resource.subclass_name ?? null,
       resourceKey: resource.resource_key,
       name: resource.name,
       definition:
@@ -469,6 +473,7 @@ function collectExplicitResources(
   for (const resource of (content.class_resources ?? []) as ClassResourceImportRow[]) {
     pushResource(into.classResources, seenResources, {
       className: resource.class_name,
+      subclassName: resource.subclass_name ?? null,
       resourceKey: resource.resource_key,
       name: resource.name,
       definition:

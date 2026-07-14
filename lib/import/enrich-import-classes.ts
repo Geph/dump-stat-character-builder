@@ -25,6 +25,7 @@ import { enrichImportedWeaponMasteryFromColumn } from "@/lib/compendium/weapon-m
 
 export type ClassResourceImportRow = {
   class_name: string
+  subclass_name?: string
   resource_key: string
   name: string
   description?: string | null

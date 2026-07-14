@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react"
 import {
-  listCompendiumSubclassMatchOptions,
-  type CompendiumSubclassMatchOption,
-} from "@/lib/compendium/list-compendium-subclasses"
+  listCompendiumClassMatchOptions,
+  type CompendiumClassMatchOption,
+} from "@/lib/compendium/list-compendium-classes"
 import { Loader2 } from "lucide-react"
 
 export type ImportSubclassMatchValue = {
   id: string
-  name: string
   className: string
 }
 
@@ -27,7 +26,7 @@ export function ImportSubclassMatchSelect({
   focusRingClassName = "focus:ring-primary",
   enabled = true,
 }: ImportSubclassMatchSelectProps) {
-  const [options, setOptions] = useState<CompendiumSubclassMatchOption[]>([])
+  const [options, setOptions] = useState<CompendiumClassMatchOption[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,14 +39,14 @@ export function ImportSubclassMatchSelect({
     let cancelled = false
     setLoading(true)
     setError(null)
-    void listCompendiumSubclassMatchOptions()
+    void listCompendiumClassMatchOptions()
       .then((next) => {
         if (!cancelled) setOptions(next)
       })
       .catch((err) => {
         if (cancelled) return
         setOptions([])
-        setError(err instanceof Error ? err.message : "Could not load subclasses.")
+        setError(err instanceof Error ? err.message : "Could not load classes.")
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -64,7 +63,7 @@ export function ImportSubclassMatchSelect({
           htmlFor="import-subclass-match"
           className="text-sm font-medium text-muted-foreground"
         >
-          Match subclass (optional):
+          Match Class
         </label>
         <select
           id="import-subclass-match"
@@ -76,9 +75,7 @@ export function ImportSubclassMatchSelect({
               return
             }
             const option = options.find((entry) => entry.id === id)
-            onChange(
-              option ? { id: option.id, name: option.name, className: option.className } : null,
-            )
+            onChange(option ? { id: option.id, className: option.name } : null)
           }}
           disabled={loading}
           className={`px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 ${focusRingClassName} max-w-[min(100%,22rem)]`}
@@ -86,7 +83,7 @@ export function ImportSubclassMatchSelect({
           <option value="">None — detect from source</option>
           {options.map((option) => (
             <option key={option.id} value={option.id}>
-              {option.name} ({option.className})
+              {option.name}
             </option>
           ))}
         </select>

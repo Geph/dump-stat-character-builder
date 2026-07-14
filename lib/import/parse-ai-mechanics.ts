@@ -1,4 +1,4 @@
-import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import type { AbilityModifierKey, AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
 import { CHARACTERISTIC_MODIFIER_TYPE_OPTIONS } from "@/lib/compendium/characteristic-modifiers"
@@ -45,10 +45,26 @@ function titleCaseWords(value: string): string {
     .join(" ")
 }
 
+function abilityScoreToModifierKey(
+  ability: AbilityScoreKey | null | undefined,
+): AbilityModifierKey {
+  const map: Record<AbilityScoreKey, AbilityModifierKey> = {
+    strength: "STR",
+    dexterity: "DEX",
+    constitution: "CON",
+    intelligence: "INT",
+    wisdom: "WIS",
+    charisma: "CHA",
+  }
+  return ability ? map[ability] : "CHA"
+}
+
 function usesRechargesFromImport(
   recharge: ImportMechanic["usesRecharge"],
 ): UsesConfig["recharges"] {
-  if (recharge === "until_item_consumed") return undefined
+  if (recharge === "until_item_consumed" || recharge === "on_resource_reactivation") {
+    return undefined
+  }
   if (recharge === "short_rest") return [{ rest: "short_rest" }]
   if (recharge === "both") return [{ rest: "short_rest" }, { rest: "long_rest" }]
   return [{ rest: "long_rest" }]
@@ -130,6 +146,164 @@ function buildFromMechanic(
 
   // Captured in BYO mechanics[] for review; runtime wiring for ephemeral grants is not implemented yet.
   if (mechanic.kind === "turn_start_bonus_grant") {
+    return null
+  }
+
+  if (mechanic.kind === "turn_start_trigger") {
+    return {
+      ruleId: "ai.turn_start_trigger",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("turn_start_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "turn_start")),
+          type: "turn_start_trigger",
+          ...(mechanic.hpBelowFraction != null ? { hpBelowFraction: mechanic.hpBelowFraction } : {}),
+          ...(mechanic.restoreResourceKey
+            ? {
+                restoreResourceKey: mechanic.restoreResourceKey,
+                restoreResourceAmount: mechanic.restoreResourceAmount ?? 1,
+              }
+            : {}),
+          ...(mechanic.grantResourceKey
+            ? {
+                accrueResourceKey: mechanic.grantResourceKey,
+                accrueResourceAmount: mechanic.grantAmount ?? 1,
+              }
+            : {}),
+          ...(mechanic.blockedByConditions?.length
+            ? { blockedByConditions: mechanic.blockedByConditions }
+            : {}),
+          ...(mechanic.requiresSheetToggle
+            ? { requiresSheetToggle: mechanic.requiresSheetToggle as never }
+            : {}),
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "on_hit_trigger") {
+    return {
+      ruleId: "ai.on_hit_trigger",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("on_hit_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "on_hit")),
+          type: "on_hit_trigger",
+          triggerOn: mechanic.triggerOn ?? "hit",
+          oncePerTurn: mechanic.oncePerTurn ?? false,
+          ...(mechanic.spendResourceKey
+            ? {
+                spendResourceKey: mechanic.spendResourceKey,
+                spendResourceAmount: mechanic.spendResourceAmount ?? 1,
+              }
+            : {}),
+          ...(mechanic.maximizeWeaponDamage
+            ? {
+                maximizeWeaponDamage: true,
+                maximizeWeaponDamageAtLevel: mechanic.maximizeWeaponDamageAtLevel ?? null,
+              }
+            : {}),
+          ...(mechanic.requiresSheetToggle
+            ? { requiresSheetToggle: mechanic.requiresSheetToggle as never }
+            : {}),
+          // Dice / scaling / damageTypeOptions remain on the ImportMechanic for review when
+          // nested bonus-damage wiring is incomplete.
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "initiative") {
+    const mode = mechanic.initiativeMode ?? "flat_bonus"
+    return {
+      ruleId: "ai.initiative",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("initiative"), [
+        {
+          id: modId(instanceKey(ctx, "initiative")),
+          type: "initiative",
+          mode,
+          ...(mode === "flat_bonus" ? { flatBonus: mechanic.initiativeFlatBonus ?? 1 } : {}),
+          ...(mode === "ability_modifier"
+            ? {
+                ability: abilityScoreToModifierKey(mechanic.initiativeAbility),
+                bonus: 0,
+              }
+            : {}),
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "telepathy") {
+    if (mechanic.telepathyRangeFeet == null) return null
+    return {
+      ruleId: "ai.telepathy",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("telepathy"), [
+        {
+          id: modId(instanceKey(ctx, "telepathy")),
+          type: "telepathy",
+          rangeFeet: mechanic.telepathyRangeFeet,
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "unarmed_strike_damage") {
+    if (!mechanic.dieByLevel?.length) return null
+    const dieByLevel = mechanic.dieByLevel.map((entry) => {
+      const match = entry.die.match(/^(\d+)d(\d+)$/i)
+      return {
+        level: entry.level,
+        mode: "dice" as const,
+        dieCount: match ? parseInt(match[1], 10) : 1,
+        dieType: (match ? `d${match[2]}` : "d8") as "d4" | "d6" | "d8" | "d10" | "d12",
+      }
+    })
+    return {
+      ruleId: "ai.unarmed_strike_damage",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("unarmed_strike_damage"), [
+        {
+          id: modId(instanceKey(ctx, "unarmed_die")),
+          type: "unarmed_strike_damage",
+          dieByLevel,
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "resource_ability_menu") {
+    const resourceKey = mechanic.classResourceKey ?? mechanic.spendResourceKey
+    if (!resourceKey) return null
+    return {
+      ruleId: "ai.resource_ability_menu",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("resource_ability_menu"), [
+        {
+          id: modId(instanceKey(ctx, "resource_menu")),
+          type: "resource_ability_menu",
+          resourceKey,
+          waiveResourceCost: mechanic.waiveResourceCost ?? false,
+          options: (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
+        },
+      ]),
+    }
+  }
+
+  // Accepted in mechanics[] for import review / future wiring (no stable characteristic mapping yet).
+  if (
+    mechanic.kind === "temporary_hit_points" ||
+    mechanic.kind === "weapon_reach_modifier" ||
+    mechanic.kind === "extra_weapon_mastery"
+  ) {
     return null
   }
 
@@ -429,6 +603,9 @@ function buildFromMechanic(
             speedType: mechanic.speedType ?? "walk",
             mode: "add",
             value: mechanic.speedFeet,
+            ...(mechanic.canHover && (mechanic.speedType ?? "walk") === "fly"
+              ? { customType: "hover" }
+              : {}),
           },
         ]),
       }
@@ -465,6 +642,21 @@ function buildFromMechanic(
           instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
         }
       }
+      if (mechanic.usesRecharge === "on_resource_reactivation") {
+        const gate = mechanic.gatingResourceKey?.trim() || "resource"
+        const uses: UsesConfig = {
+          type: "special",
+          specialDescription:
+            mechanic.sourcePhrase?.trim() ||
+            `Refreshes when ${gate} is (re)activated`,
+        }
+        return {
+          ruleId: "ai.uses.on_resource_reactivation",
+          confidence: aiConfidence(mechanic),
+          matchedPhrase,
+          instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
+        }
+      }
       const uses: UsesConfig = mechanic.usesAbility
         ? {
             type: "ability_modifier",
@@ -476,6 +668,7 @@ function buildFromMechanic(
             fixedAmount: mechanic.usesFixed ?? 1,
             recharges: usesRechargesFromImport(mechanic.usesRecharge),
           }
+      // alternateRefresh is retained on the ImportMechanic for review; UsesConfig has no field yet.
       return {
         ruleId: "ai.uses",
         confidence: aiConfidence(mechanic),

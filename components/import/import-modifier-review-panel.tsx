@@ -9,6 +9,8 @@ type ImportModifierReviewPanelProps = {
   rows: ImportModifierReviewRow[]
   onRemoveModifier?: (previewId: string) => void
   variant?: "review" | "report"
+  /** Nested inside Staged import — omit the outer bordered shell. */
+  embedded?: boolean
 }
 
 const CONFIDENCE_STYLES = {
@@ -126,6 +128,7 @@ export function ImportModifierReviewPanel({
   rows,
   onRemoveModifier,
   variant = "review",
+  embedded = false,
 }: ImportModifierReviewPanelProps) {
   const grouped = useMemo(() => {
     const map = new Map<string, ImportModifierReviewRow[]>()
@@ -160,8 +163,12 @@ export function ImportModifierReviewPanel({
   const wiredCount = rows.filter((row) => row.status === "wired").length
   const unwiredCount = rows.length - wiredCount
 
+  const shellClass = embedded
+    ? "space-y-4 text-sm"
+    : "space-y-4 rounded-xl border border-border bg-background/80 p-4 text-sm"
+
   return (
-    <section className="space-y-4 rounded-xl border border-border bg-background/80 p-4 text-sm">
+    <section className={shellClass}>
       <div className="flex items-start gap-2">
         <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">

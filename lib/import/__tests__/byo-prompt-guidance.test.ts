@@ -74,4 +74,38 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     // Psion single-class pattern still uses source_name
     expect(prompt).toContain('"source_name": "Psion"')
   })
+
+  it("covers World Tree / Zealot mechanics[] kinds and class_resource scoping", () => {
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("on_hit_trigger")
+    expect(prompt).toContain("temporary_hit_points")
+    expect(prompt).toContain("turn_start_trigger")
+    expect(prompt).toContain("resource_ability_menu")
+    expect(prompt).toContain("unarmed_strike_damage")
+    expect(prompt).toContain("telepathy")
+    expect(prompt).toContain("initiative")
+    expect(prompt).toContain("alternateRefresh")
+    expect(prompt).toContain("on_resource_reactivation")
+    expect(prompt).toContain("gatingResourceKey")
+    expect(prompt).toContain("subclass_name")
+    expect(prompt).toContain("Warrior of the Gods Dice")
+    expect(prompt).toContain("new_toggles")
+    expect(prompt).toContain("half_character_level_round_down")
+    expect(prompt).toContain("weapon_reach_modifier")
+    expect(prompt).toContain("extra_weapon_mastery")
+    expect(prompt).toContain("canHover")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Divine Fury")
+    // Every phrase-index catalog that previously lacked a kind is now documentable
+    for (const kind of [
+      "on_hit_trigger",
+      "turn_start_trigger",
+      "resource_ability_menu",
+      "unarmed_strike_damage",
+      "initiative",
+      "telepathy",
+    ] as const) {
+      expect(COMMON_MODIFIERS_IMPORT_HINT).toContain(`- ${kind}:`)
+      expect(COMMON_MODIFIERS_IMPORT_HINT).toContain(kind)
+    }
+  })
 })
