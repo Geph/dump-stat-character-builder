@@ -113,6 +113,7 @@ export function D20RollButton({
           proficiencyBonus: rollCtx.featureEffectContext.proficiencyBonus,
           abilityMods: rollCtx.featureEffectContext.abilityMods,
           characterLevel: rollCtx.featureEffectContext.characterLevel,
+          classResourceDieSides: rollCtx.featureEffectContext.classResourceDieSides,
           skillProficient,
         }).total
       : 0

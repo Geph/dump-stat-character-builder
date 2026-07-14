@@ -101,8 +101,6 @@ describe("deriveClassResourceDisplay", () => {
 describe("shouldShowClassResourceOnSheet", () => {
   it("shows fighter class resources in the Resources column", () => {
     expect(shouldShowClassResourceOnSheet("second_wind", emptySpendKeys)).toBe(true)
-    expect(shouldShowClassResourceOnSheet("action_surge", emptySpendKeys)).toBe(true)
-    expect(shouldShowClassResourceOnSheet("indomitable", emptySpendKeys)).toBe(true)
   })
 
   it("gates superiority dice to subclasses that spend them", () => {

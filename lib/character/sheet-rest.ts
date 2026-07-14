@@ -15,6 +15,7 @@ import {
 } from "@/lib/compendium/spell-slots"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
+import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 
 export function shouldResetSpellSlotsOnRest(table: SpellSlotTable, rest: RestType): boolean {
   if (rest === "long_rest") return true
@@ -148,12 +149,16 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
   }
 
   const nextActions = { ...usedActionUsesById }
+  const seenShareKeys = new Set<string>()
   for (const action of sheetActions) {
     if (!action.limitedUses) continue
     const max = resolveUsesAtLevel(action.limitedUses, action.classLevel, resolveContext)
     if (max == null || max <= 0) continue
-    const current = nextActions[action.id] ?? 0
-    nextActions[action.id] = applyUsesRest(current, action.limitedUses, rest, max).used
+    const trackingId = resolveActionUsesTrackingKey(action)
+    if (seenShareKeys.has(trackingId)) continue
+    seenShareKeys.add(trackingId)
+    const current = nextActions[trackingId] ?? 0
+    nextActions[trackingId] = applyUsesRest(current, action.limitedUses, rest, max).used
   }
 
   const result: SheetRestResult = {

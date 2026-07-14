@@ -70,6 +70,7 @@ import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
+import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-resource-die"
 import {
   applyTurnStartTriggers,
   collectTurnStartTriggers,
@@ -1227,6 +1228,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return [...entries, ...collectFeatureUsesResources(classDetails, modifierCatalog)]
   }, [classDetails, modifierCatalog])
 
+  const classResourceDieSides = useMemo(
+    () => buildClassResourceDieSidesMap(classDetails),
+    [classDetails],
+  )
+
   const classResourceSpendKeys = useMemo(() => {
     const keys = new Set<string>()
     for (const entry of classDetails) {
@@ -2144,6 +2150,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             },
             characterLevel: character?.level ?? 1,
             currentHp,
+            classResourceDieSides,
           },
         }}
       >

@@ -49,6 +49,9 @@ export function featureShowsOnSheetTab(feature: Feature): boolean {
 
 /** Stamp explicit sheetDisplay from current wiring (used when enriching SRD content). */
 export function applyFeatureSheetDisplay(feature: Feature): Feature {
+  if (feature.sheetDisplay && typeof feature.sheetDisplay === "object") {
+    return feature
+  }
   return {
     ...feature,
     sheetDisplay: inferFeatureSheetDisplay(feature),

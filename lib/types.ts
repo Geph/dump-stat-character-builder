@@ -595,15 +595,22 @@ export interface UsesConfig {
   classResourceKey?: string
   /** When type is class_resource — uses spent per activation (default: 1) */
   classResourceAmount?: number
+  /**
+   * Shared spend bucket across features that draw from the same self-contained
+   * pool (e.g. Innate Sorcery + Abyssal Rupture). When set, sheet tracking uses
+   * this key instead of the individual action id.
+   */
+  useShareKey?: string | null
   atLevelTable?: UsesAtLevel[]
   /** How at_level rows are interpreted (default tier). */
   atLevelMode?: "tier" | "multiply_level"
   /** @deprecated — use recharges */
   recharge?: RestType | null
   recharges?: RechargeRule[]
+  /** @deprecated Pool size is tracked by uses (fixed / ability / at_level). Prefer dieType + dieSidesByLevel for die size. */
   dieCount?: number
   dieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
-  /** Die sides (e.g. 8 for d8) at each class level — pairs with atLevelTable pool counts. */
+  /** Die sides (e.g. 8 for d8) at each class level — pairs with atLevelTable / ability_modifier pool counts. */
   dieSidesByLevel?: UsesAtLevel[]
   /**
    * Restore uses when rolling initiative. true = full pool; number = partial restore.

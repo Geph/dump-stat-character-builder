@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { buildWeaponMasteryModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { SUBCLASS_GATED_CLASS_RESOURCES } from "@/lib/compendium/subclass-gated-class-resources"
 import { describeWeaponProperty, describeWeaponRange } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
 import type { CharacterBuildInputs } from "@/lib/character/types"
@@ -165,5 +166,53 @@ describe("buildWeaponSheetContext", () => {
     )
 
     expect(rangedContext.appliedModifiers.some((entry) => entry.name === "Archery")).toBe(true)
+  })
+
+  it("resolves a class-resource damage rider to the current die size (Superiority Dice)", () => {
+    const superiorityDice = SUBCLASS_GATED_CLASS_RESOURCES.find(
+      (entry) => entry.resource.id === "superiority_dice",
+    )!.resource
+
+    const context = buildWeaponSheetContext(
+      mace,
+      {
+        ...baseInputs,
+        classLevels: [{ classId: "fighter", level: 10 }],
+        classes: [{ ...baseInputs.classes[0], class_resources: [superiorityDice] }],
+        modifierCatalog: [
+          {
+            id: "cat_char_bonus_damage_riders",
+            name: "Bonus Damage Riders",
+            group: "Attack & damage",
+            characteristics: [
+              {
+                id: "mod_precision_attack",
+                type: "bonus_damage_riders",
+                label: "Precision Attack",
+                riders: [],
+                appliesTo: "all",
+                automaticBonus: {
+                  mode: "die",
+                  dieScaling: "class_resource",
+                  classResourceKey: "superiority_dice",
+                },
+              },
+            ],
+          },
+        ],
+        feats: [
+          {
+            id: "precision_attack",
+            name: "Precision Attack",
+            modifierRefs: ["cat_char_bonus_damage_riders"],
+          } as never,
+        ],
+        selectedFeatIds: ["precision_attack"],
+      },
+      ["Simple weapons"],
+    )
+
+    const rider = context.appliedModifiers.find((entry) => entry.name === "Precision Attack")
+    expect(rider?.description).toBe("1d10 (superiority_dice die)")
   })
 })

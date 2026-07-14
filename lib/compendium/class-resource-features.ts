@@ -1,7 +1,7 @@
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { defaultRollBonusConfig } from "@/lib/compendium/roll-bonus-config"
-import type { Feature, FeatureActivation, FeatureEffect, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureActivation, FeatureEffect, FeatureSheetDisplay, UsesConfig } from "@/lib/types"
 
 /** Catalog entry ids from buildDefaultModifierCatalog (cat_fx_*). */
 export const CLASS_RESOURCE_FX_CATALOG = {
@@ -39,11 +39,50 @@ function fx(id: string, partial: Omit<FeatureEffect, "id">): FeatureEffect {
   return { id, ...partial }
 }
 
+/** Former class-resource keys now owned by feature limitedUses. */
+const FEATURE_OWNED_FORMER_RESOURCE_KEYS = new Set([
+  "action_surge",
+  "indomitable",
+  "innate_sorcery",
+])
+
+export const ACTION_SURGE_FEATURE_USES: UsesConfig = {
+  type: "at_level",
+  atLevelMode: "tier",
+  recharges: [{ rest: "short_rest" }],
+  atLevelTable: [
+    { level: 2, count: 1 },
+    { level: 17, count: 2 },
+  ],
+}
+
+export const INDOMITABLE_FEATURE_USES: UsesConfig = {
+  type: "at_level",
+  atLevelMode: "tier",
+  recharges: [{ rest: "long_rest" }],
+  useShareKey: "indomitable",
+  atLevelTable: [
+    { level: 9, count: 1 },
+    { level: 13, count: 2 },
+    { level: 17, count: 3 },
+  ],
+}
+
+export const INNATE_SORCERY_FEATURE_USES: UsesConfig = {
+  type: "fixed",
+  fixedAmount: 2,
+  recharges: [{ rest: "long_rest" }],
+  useShareKey: "innate_sorcery",
+}
+
 type ResourceFeaturePreset = {
   featureName: string
   resourceKey?: string
   /** When set with resourceKey, spent amount per activation (default 1). */
   resourceAmount?: number
+  /** Self-contained uses owned by the feature (not a class_resources row). */
+  featureUses?: UsesConfig
+  sheetDisplay?: FeatureSheetDisplay
   activation?: FeatureActivation | null
   linkedModifiers: LinkedModifierInstance[]
 }
@@ -222,8 +261,9 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
     },
     {
       featureName: "Action Surge",
-      resourceKey: "action_surge",
+      featureUses: ACTION_SURGE_FEATURE_USES,
       activation: { action: true },
+      sheetDisplay: { featuresTab: true, combatActions: true, abilitiesActions: false },
       linkedModifiers: [
         modInstance("modinst_action_surge", CLASS_RESOURCE_FX_CATALOG.extraAction, [
           fx("fx_action_surge", { kind: "extra_action" }),
@@ -232,8 +272,9 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
     },
     {
       featureName: "Indomitable",
-      resourceKey: "indomitable",
+      featureUses: INDOMITABLE_FEATURE_USES,
       activation: { reaction: true },
+      sheetDisplay: { featuresTab: true, combatActions: true, abilitiesActions: false },
       linkedModifiers: [
         modInstance("modinst_indomitable", CLASS_RESOURCE_FX_CATALOG.checkBonus, [
           fx("fx_indomitable", {
@@ -317,7 +358,7 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
   Sorcerer: [
     {
       featureName: "Innate Sorcery",
-      resourceKey: "innate_sorcery",
+      featureUses: INNATE_SORCERY_FEATURE_USES,
       activation: { bonusAction: true },
       linkedModifiers: [
         modInstance("modinst_innate_sorcery", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
@@ -381,6 +422,7 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
   parentClass: string
   featureName: string
   resourceKey?: string
+  featureUses?: UsesConfig
   linkedModifiers?: LinkedModifierInstance[]
   activation?: FeatureActivation | null
 }> = [
@@ -425,7 +467,7 @@ export const SRD_SUBCLASS_RESOURCE_FEATURE_PRESETS: Array<{
   {
     parentClass: "Sorcerer",
     featureName: "Abyssal Rupture",
-    resourceKey: "innate_sorcery",
+    featureUses: INNATE_SORCERY_FEATURE_USES,
     activation: { bonusAction: true },
     linkedModifiers: [
       modInstance("modinst_abyssal_rupture", CLASS_RESOURCE_FX_CATALOG.selfBuffCaster, [
@@ -511,20 +553,46 @@ function featureHasLinkedModifiers(feature: Feature): boolean {
   return Boolean(feature.linkedModifiers?.length || feature.modifierRefs?.length)
 }
 
+function isObsoleteFeatureOwnedResourceBinding(feature: Feature): boolean {
+  return (
+    feature.limitedUses?.type === "class_resource" &&
+    Boolean(
+      feature.limitedUses.classResourceKey &&
+        FEATURE_OWNED_FORMER_RESOURCE_KEYS.has(feature.limitedUses.classResourceKey),
+    )
+  )
+}
+
+function resolvePresetLimitedUses(
+  feature: Feature,
+  preset: ResourceFeaturePreset,
+): UsesConfig | null | undefined {
+  if (preset.featureUses) {
+    if (!feature.limitedUses || isObsoleteFeatureOwnedResourceBinding(feature)) {
+      return preset.featureUses
+    }
+    return feature.limitedUses
+  }
+  if (preset.resourceKey && !featureHasResourceBinding(feature)) {
+    return classResourceUses(preset.resourceKey, preset.resourceAmount)
+  }
+  return feature.limitedUses
+}
+
 function applyResourcePreset(feature: Feature, preset: ResourceFeaturePreset): Feature {
-  if (featureHasResourceBinding(feature) && featureHasLinkedModifiers(feature)) {
+  if (
+    !preset.featureUses &&
+    featureHasResourceBinding(feature) &&
+    featureHasLinkedModifiers(feature)
+  ) {
     return feature
   }
 
-  const limitedUses =
-    preset.resourceKey && !featureHasResourceBinding(feature)
-      ? classResourceUses(preset.resourceKey, preset.resourceAmount)
-      : feature.limitedUses
-
   return syncModifierRefs({
     ...feature,
-    limitedUses: limitedUses ?? null,
+    limitedUses: resolvePresetLimitedUses(feature, preset) ?? null,
     activation: feature.activation ?? preset.activation ?? null,
+    sheetDisplay: feature.sheetDisplay ?? preset.sheetDisplay,
     linkedModifiers: featureHasLinkedModifiers(feature)
       ? feature.linkedModifiers
       : preset.linkedModifiers,

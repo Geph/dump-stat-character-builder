@@ -16,6 +16,7 @@ import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Langu
 import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool } from "@/lib/types"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
+import { filterCompendiumClassResourcesBySubclasses } from "@/lib/compendium/subclass-gated-class-resources"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import {
   COMPENDIUM_TOGGLE_LABELS,
@@ -380,12 +381,16 @@ export default function CompendiumPageClient() {
       }
 
       if (activeTab === "class_resources") {
-        const { data: classes } = await db.from("classes").select("id, name").order("name")
+        const [{ data: classes }, { data: subclasses }] = await Promise.all([
+          db.from("classes").select("id, name").order("name"),
+          db.from("subclasses").select("*").order("name").limit(500),
+        ])
         setClassNamesById(
           Object.fromEntries(
             asCompendiumRows<{ id: string; name: string }>(classes).map((cls) => [cls.id, cls.name]),
           ),
         )
+        setSubclassesForClasses(asCompendiumRows(subclasses) as unknown as Subclass[])
       }
 
       setLoading(false)
@@ -419,7 +424,17 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
   const filteredContent = useMemo(() => {
     const query = searchQuery.toLowerCase()
-    const rows = (content[activeTab] as { id?: string; name: string }[]).filter((item) => {
+    const classResourceRows =
+      activeTab === "class_resources"
+        ? filterCompendiumClassResourcesBySubclasses(
+            content.class_resources as ClassResourceRow[],
+            classNamesById,
+            subclassesForClasses,
+          )
+        : null
+    const sourceRows =
+      classResourceRows ?? (content[activeTab] as { id?: string; name: string }[])
+    const rows = sourceRows.filter((item) => {
       if (activeTab === "class_resources") {
         const resource = item as ClassResourceRow
         const className = classNamesById[resource.class_id] ?? ""
@@ -489,6 +504,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     spellFilterClass,
     spellFilterLevel,
     spellFilterSchool,
+    subclassesForClasses,
     toolFilterGroup,
   ])
 

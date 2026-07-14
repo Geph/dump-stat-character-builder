@@ -57,7 +57,15 @@ export function rollBonusFromLegacy(bonusAmount: number | null | undefined): Rol
   return { mode: "fixed", fixed: bonusAmount }
 }
 
-export function formatRollBonusSummary(config: RollBonusConfig | null | undefined): string {
+export type FormatRollBonusSummaryOptions = {
+  /** Current die size (sides) per class-resource key — lets "die" + "class_resource" resolve to real notation. */
+  classResourceDieSides?: Record<string, number>
+}
+
+export function formatRollBonusSummary(
+  config: RollBonusConfig | null | undefined,
+  options?: FormatRollBonusSummaryOptions,
+): string {
   if (!config) return "—"
   switch (config.mode) {
     case "fixed":
@@ -70,7 +78,11 @@ export function formatRollBonusSummary(config: RollBonusConfig | null | undefine
       return `×${config.multiplier ?? 1} (${config.ability ? `${config.ability} mod` : "proficiency"})`
     case "die":
       if (config.dieScaling === "class_resource" && config.classResourceKey) {
-        return `${config.classResourceKey} die`
+        const sides = options?.classResourceDieSides?.[config.classResourceKey]
+        const dieCount = config.dieCount ?? 1
+        return sides != null
+          ? `${dieCount}d${sides} (${config.classResourceKey} die)`
+          : `${config.classResourceKey} die`
       }
       if (config.dieCount && config.dieType) {
         return config.dieScaling === "by_level"

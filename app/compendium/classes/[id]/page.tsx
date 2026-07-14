@@ -868,26 +868,6 @@ export default function ClassEditorPage({ params }: { params: Promise<{ id: stri
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-foreground mb-1">
-                            Die Count
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={feature.limitedUses.dieCount ?? ""}
-                            onChange={(e) => {
-                              const newFeatures = [...form.features]
-                              newFeatures[index] = {
-                                ...newFeatures[index],
-                                limitedUses: { ...feature.limitedUses!, dieCount: e.target.value ? parseInt(e.target.value) : undefined }
-                              }
-                              setForm({ ...form, features: newFeatures })
-                            }}
-                            className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs text-center"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-foreground mb-1">
                             Die Type
                           </label>
                           <select

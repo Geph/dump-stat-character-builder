@@ -82,6 +82,72 @@ function isReactionRechargePhrase(phrase: string): boolean {
   )
 }
 
+const HEAL_DIE_TYPES = new Set(["d4", "d6", "d8", "d10", "d12", "d20"])
+
+function parseHealDiceExpression(
+  dice: string,
+): { count: number; dieType: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" } | null {
+  const match = dice.trim().match(/^(\d+)\s*d\s*(\d+)$/i)
+  if (!match) return null
+  const dieType = `d${match[2]}`
+  if (!HEAL_DIE_TYPES.has(dieType)) return null
+  return { count: parseInt(match[1], 10), dieType: dieType as "d4" | "d6" | "d8" | "d10" | "d12" | "d20" }
+}
+
+/**
+ * `temporary_hit_points` mechanics[] wiring, scoped to the common case: the feature is
+ * activated and the character gains temp HP. Two axes are intentionally left unwired (return
+ * null) because there's no matching character-sheet mechanism yet, not because they're rare:
+ *  - thpTrigger "turn_start"/"on_hit" — turn_start_trigger/on_hit_trigger characteristics have
+ *    no "grant temp HP" field, only resource restore/spend.
+ *  - thpTarget other than "self" — the sheet models one character; there's no "ally" or "chosen
+ *    creature" state to grant temp HP to (existing SRD presets that describe granting temp HP to
+ *    allies, e.g. Mantle of Inspiration, only encode it in the effect's label text).
+ *  - amountScaling "class_resource_die" — the resource's die size isn't carried on the mechanic,
+ *    so there's no general way to size the temp HP; hardcoded presets set this by hand instead.
+ */
+function buildTemporaryHitPointsEffect(
+  mechanic: ImportMechanic,
+  ctx: DetectFeatureContext,
+  instanceId: string,
+  matchedPhrase: string,
+): DetectedModifier | null {
+  const trigger = mechanic.thpTrigger ?? "on_activation"
+  const target = mechanic.thpTarget ?? "self"
+  if ((trigger !== "on_activation" && trigger !== "on_use") || target !== "self") {
+    return null
+  }
+
+  const dice = mechanic.amountDice ? parseHealDiceExpression(mechanic.amountDice) : null
+  const healPatch =
+    mechanic.amountScaling === "ability_modifier" && mechanic.ability
+      ? { healMode: "ability_modifier" as const, healAbility: abilityScoreToModifierKey(mechanic.ability) }
+      : mechanic.amountScaling === "character_level"
+        ? { healMode: "character_level" as const, healLevelMultiplier: mechanic.amount ?? 1 }
+        : dice
+          ? { healMode: "dice" as const, healDiceCount: dice.count, healDieType: dice.dieType }
+          : mechanic.amount != null
+            ? { healMode: "fixed" as const, healFixed: mechanic.amount }
+            : null
+  if (!healPatch) return null
+
+  return {
+    ruleId: "ai.temporary_hit_points",
+    confidence: aiConfidence(mechanic),
+    matchedPhrase,
+    instance: fxInstance(instanceId, effectCatalogRefId("grant_temp_hp"), {
+      effects: [
+        {
+          id: modId(instanceKey(ctx, "temp_hp")),
+          kind: "grant_temp_hp",
+          tempHpTrigger: "on_action",
+          ...healPatch,
+        },
+      ],
+    }),
+  }
+}
+
 function buildFromMechanic(
   mechanic: ImportMechanic,
   ctx: DetectFeatureContext,
@@ -299,9 +365,12 @@ function buildFromMechanic(
     }
   }
 
+  if (mechanic.kind === "temporary_hit_points") {
+    return buildTemporaryHitPointsEffect(mechanic, ctx, instanceId, matchedPhrase)
+  }
+
   // Accepted in mechanics[] for import review / future wiring (no stable characteristic mapping yet).
   if (
-    mechanic.kind === "temporary_hit_points" ||
     mechanic.kind === "weapon_reach_modifier" ||
     mechanic.kind === "extra_weapon_mastery" ||
     mechanic.kind === "movement_grant"
@@ -699,7 +768,24 @@ function buildFromMechanic(
             fixedAmount: mechanic.usesFixed ?? 1,
             recharges: usesRechargesFromImport(mechanic.usesRecharge),
           }
-      // alternateRefresh is retained on the ImportMechanic for review; UsesConfig has no field yet.
+      // "Spend another resource to restore a use" — UsesConfig.restoreByResource/restoreBySpellSlot
+      // already exist and are exercised by hand-written presets (e.g. Beguiling Magic rider); the
+      // schema just never routed alternateRefresh into them. actionCost has no matching UsesConfig
+      // field (restores are modeled as passive bookkeeping, not their own activatable ability) and
+      // is intentionally left off.
+      const alternateRefresh = mechanic.alternateRefresh
+      if (alternateRefresh?.spendSpellSlotMinLevel != null) {
+        uses.restoreBySpellSlot = {
+          minSpellLevel: alternateRefresh.spendSpellSlotMinLevel,
+          restores: 1,
+        }
+      } else if (alternateRefresh?.spendResourceKey) {
+        uses.restoreByResource = {
+          resourceKey: alternateRefresh.spendResourceKey,
+          resourceAmount: alternateRefresh.spendAmount ?? 1,
+          restores: 1,
+        }
+      }
       return {
         ruleId: "ai.uses",
         confidence: aiConfidence(mechanic),

@@ -966,6 +966,11 @@ export interface ResourceAbilityMenuOption {
   /** Waive resourceCost when character's element specialization matches. */
   waiveWhenSpecializedElement?: "cold" | "fire" | "lightning" | null
   effect?: NestedModifierEffect | null
+  /**
+   * Structured bonus this option grants (e.g. add the menu's resource die to AC or damage).
+   * Lets the sheet show a computed value ("1d8") instead of only free-text description.
+   */
+  bonusConfig?: import("@/lib/compendium/roll-bonus-config").RollBonusConfig | null
 }
 
 export interface ResourceAbilityMenuCharacteristic extends CharacteristicModifierBase {

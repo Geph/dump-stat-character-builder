@@ -20,6 +20,7 @@ import {
   resolvePsiResourceKeyForClass,
   type ClassResourceImportRow,
 } from "@/lib/import/enrich-import-classes"
+import { buildGatedClassResourceRowsForSubclass } from "@/lib/compendium/subclass-gated-class-resources"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
@@ -215,6 +216,38 @@ export async function persistImportedContent(
       await insertRows("subclasses", enrichedSubclasses)
       breakdown.subclasses = enrichedSubclasses.length
       totalImported += enrichedSubclasses.length
+
+      const gatedResourceRows: Record<string, unknown>[] = []
+      for (let index = 0; index < enrichedSubclasses.length; index++) {
+        const row = enrichedSubclasses[index]!
+        const sourceRow = subclassesWithIds[index]!
+        gatedResourceRows.push(
+          ...buildGatedClassResourceRowsForSubclass(
+            sourceRow.class_id,
+            sourceRow.class_name,
+            String(row.name ?? ""),
+            source,
+          ),
+        )
+      }
+      const uniqueGatedByKey = new Map<string, Record<string, unknown>>()
+      for (const resource of gatedResourceRows) {
+        uniqueGatedByKey.set(
+          `${resource.class_id as string}:${resource.resource_key as string}`,
+          resource,
+        )
+      }
+      for (const resource of uniqueGatedByKey.values()) {
+        await deleteWhere("class_resources", [
+          { op: "eq", column: "class_id", value: resource.class_id as string },
+          { op: "eq", column: "resource_key", value: resource.resource_key as string },
+        ])
+      }
+      if (uniqueGatedByKey.size > 0) {
+        await insertRows("class_resources", [...uniqueGatedByKey.values()])
+        breakdown.class_resources = (breakdown.class_resources ?? 0) + uniqueGatedByKey.size
+        totalImported += uniqueGatedByKey.size
+      }
     }
   }
 

@@ -13,6 +13,7 @@ import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
 import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
 import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
 import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
+import { rollDice } from "@/lib/dice/roll-die"
 import type { Feature, FeatureEffect } from "@/lib/types"
 
 export type ActiveFeatureEffect = {
@@ -30,6 +31,8 @@ export type FeatureEffectCollectContext = LimitationEvaluationContext & {
   rollTags?: string[]
   rollContext?: RollContext
   skillProficient?: boolean
+  /** Current die size (sides) per class-resource key — e.g. { superiority_dice: 8 }. */
+  classResourceDieSides?: Record<string, number>
 }
 
 function effectMatchesConditionScope(effect: FeatureEffect, ctx: FeatureEffectCollectContext): boolean {
@@ -69,12 +72,34 @@ export function collectActiveCharacteristics<T extends { limitations?: import("@
   return mods.filter((mod) => modifierLimitationsMet(mod, ctx))
 }
 
+function dieTypeToSides(dieType: RollBonusConfig["dieType"]): number | null {
+  if (!dieType) return null
+  const match = dieType.match(/^d(\d+)$/i)
+  if (!match) return null
+  const sides = parseInt(match[1], 10)
+  return Number.isFinite(sides) ? sides : null
+}
+
+/** Resolve the rollable die size for a "die" mode RollBonusConfig, given class-resource sizes on hand. */
+function resolveRollBonusDieSides(
+  config: RollBonusConfig,
+  classResourceDieSides: Record<string, number> | undefined,
+): number | null {
+  if (config.dieScaling === "class_resource") {
+    if (!config.classResourceKey) return null
+    return classResourceDieSides?.[config.classResourceKey] ?? null
+  }
+  return dieTypeToSides(config.dieType)
+}
+
 export function computeRollBonusAmount(
   config: RollBonusConfig | null | undefined,
   params: {
     proficiencyBonus: number
     abilityMods: Record<AbilityScoreKey, number>
     characterLevel: number
+    /** Current die size (sides) per class-resource key, for "die" + "class_resource" bonuses. */
+    classResourceDieSides?: Record<string, number>
   },
 ): number {
   if (!config) return 0
@@ -102,6 +127,11 @@ export function computeRollBonusAmount(
     case "character_level":
       amount = params.characterLevel
       break
+    case "die": {
+      const sides = resolveRollBonusDieSides(config, params.classResourceDieSides)
+      amount = sides != null ? rollDice(config.dieCount ?? 1, sides) : 0
+      break
+    }
     default:
       amount = 0
   }
@@ -145,6 +175,7 @@ export function collectFeatureRollBonuses(
       charisma: 0,
     },
     characterLevel: ctx.characterLevel ?? 1,
+    classResourceDieSides: ctx.classResourceDieSides,
   }
 
   for (const { featureName, effect } of active) {

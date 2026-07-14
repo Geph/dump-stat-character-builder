@@ -29,6 +29,10 @@ import {
 import type { Feature, FeatureActivation, FeatureChoice, UsesConfig } from "@/lib/types"
 import type { ToolChoicePool } from "@/lib/compendium/srd-tools"
 import { toolNamesForPools } from "@/lib/compendium/tool-options"
+import {
+  INDOMITABLE_FEATURE_USES,
+  INNATE_SORCERY_FEATURE_USES,
+} from "@/lib/compendium/class-resource-features"
 
 const GAIN_INSPIRATION_CATALOG_ID = "cat_other_gain_inspiration"
 const CHECK_ROLL_MODIFIER_CATALOG_ID = "cat_fx_check_roll_modifier"
@@ -1853,7 +1857,7 @@ export function innateArcanumPresetForClass(
 
 export function innateSorceryPreset(): LinkedModifierInstance[] {
   return [
-    usesPool({ type: "fixed", fixedAmount: 2, recharges: [{ rest: "long_rest" }] }, "Innate Sorcery"),
+    usesPool(INNATE_SORCERY_FEATURE_USES, "Innate Sorcery"),
     fxInstance("modinst_innate_sorcery", SELF_BUFF_CASTER_CATALOG_ID, {
       bonusAction: true,
       effects: [{ id: modId("innate_sorcery"), kind: "self_buff_caster", casterBuffLabel: "Innate Sorcery" }],
@@ -2247,10 +2251,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "Sorcerer::Demonic Sorcery::Abyssal Rupture": {
     activation: { bonusAction: true },
     linkedModifiers: [
-      usesPool(
-        { type: "class_resource", classResourceKey: "innate_sorcery", classResourceAmount: 1 },
-        "Extends Innate Sorcery",
-      ),
+      usesPool(INNATE_SORCERY_FEATURE_USES, "Extends Innate Sorcery"),
     ],
   },
   "Sorcerer::Demonic Sorcery::Abyssal Explosion": {
@@ -3621,8 +3622,16 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           type: "resource_ability_menu",
           resourceKey: "bardic_inspiration",
           options: [
-            { name: "Defense", description: "Reaction: add BI die to AC vs one attack" },
-            { name: "Offense", description: "After hit: add BI die to damage" },
+            {
+              name: "Defense",
+              description: "Reaction: add BI die to AC vs one attack",
+              bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "bardic_inspiration" },
+            },
+            {
+              name: "Offense",
+              description: "After hit: add BI die to damage",
+              bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "bardic_inspiration" },
+            },
           ],
         },
       ]),
@@ -3819,6 +3828,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Shared Resilience": {
     linkedModifiers: [
+      usesPool(INDOMITABLE_FEATURE_USES, "Indomitable"),
       charInstance("modinst_shared_resilience", SAVING_THROW_TRIGGER_CATALOG_ID, [
         {
           id: modId("shared_resilience"),
@@ -3826,8 +3836,6 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           triggerOn: "ally_fails",
           targetScope: "allied_creature",
           useReaction: true,
-          spendResourceKey: "indomitable",
-          spendResourceAmount: 1,
           effect: { catalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID },
           label: "Ally rerolls failed save with bonus equal to Fighter level",
         },
