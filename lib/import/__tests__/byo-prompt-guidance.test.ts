@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildByoExtractionPrompt } from "@/lib/import/byo-import-kit"
+import { buildByoExtractionPrompt, CLEAN_SOURCE_TEXT_GUIDELINES } from "@/lib/import/byo-import-kit"
 import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
 import {
   CHOICE_EXTRACTION_HINT,
@@ -125,5 +125,12 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("only cover effects on the character's own sheet")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- damage_reduction:")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- movement_grant:")
+  })
+
+  it("tells the LLM to reconstruct domain-spell tables that lost whitespace in PDF extraction (Cleric domains audit)", () => {
+    expect(CLEAN_SOURCE_TEXT_GUIDELINES).toContain("lost its whitespace")
+    expect(CLEAN_SOURCE_TEXT_GUIDELINES).toContain("Cleric LevelPrepared Spells3Aid")
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("lost its whitespace")
   })
 })

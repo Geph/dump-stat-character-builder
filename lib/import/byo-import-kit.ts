@@ -14,7 +14,7 @@ For best extraction results, your source text should:
 - Keep feature headings with their full description paragraphs (e.g. "Fighting Style" followed by rules text)
 - Preserve mechanical sentences in descriptions (proficiencies, AC formulas, resistances, limited uses, feat grants) so Common Modifiers auto-wire; add mechanics[] when phrasing is non-standard
 - Omit chapter running heads, page numbers, and nav ribbons from pasted text when you can — never leave them in description fields
-- Preserve HTML <table> blocks for subclass spell lists in feature descriptions when present
+- Preserve HTML <table> blocks for subclass spell lists in feature descriptions when present. If the source text lost its whitespace/line breaks (common with PDF copy-paste, e.g. "Cleric LevelPrepared Spells3Aid, Bless, Cure Wounds5Mass Healing Word..." with no gap between the level number and the spell names), reconstruct it into a real <table> with one <tr> per class level rather than pasting the squished run of text — the importer cannot reliably re-split a level number from a spell name without a delimiter
 - Use a single class or subclass name consistently (match SRD names when importing into an SRD-seeded compendium; for homebrew use the source's own header name, not a designer-prefixed invention)
 - Avoid mixing unrelated chapters (equipment tables + feats + multiple unrelated classes in one paste)
 

@@ -138,6 +138,28 @@ describe("aiMechanicsToDetections", () => {
     ).toEqual([])
   })
 
+  it("does not wire temporary_hit_points when the LLM mis-keys thpTrigger as generic `trigger` (Improved Warding Flare, Cleric domains audit)", () => {
+    // Real-world case: the LLM emitted `trigger: "on_use"` / `target: "chosen_creature_in_range"`
+    // instead of `thpTrigger` / `thpTarget`. Before the guard, thpTrigger/thpTarget silently
+    // defaulted to "on_activation"/"self" and produced a bogus self-targeted "activate for temp
+    // HP" effect on a feature that isn't independently activatable and doesn't target self at all.
+    expect(
+      aiMechanicsToDetections(
+        [
+          {
+            kind: "temporary_hit_points",
+            amountDice: "2d6",
+            amountScaling: "ability_modifier",
+            ability: "wisdom",
+            trigger: "on_use",
+            sourcePhrase: "give the target of the triggering attack temporary hit points",
+          },
+        ],
+        { contentKind: "subclass_feature", featureName: "Improved Warding Flare" },
+      ),
+    ).toEqual([])
+  })
+
   it("still does not wire movement_grant (accepted in schema, no characteristic mapping yet)", () => {
     expect(
       aiMechanicsToDetections(

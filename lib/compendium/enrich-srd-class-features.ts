@@ -3344,7 +3344,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     activation: { bonusAction: true },
     linkedModifiers: [
       usesPool(
-        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        {
+          type: "ability_modifier",
+          abilityModifier: "WIS",
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
         "War Priest",
       ),
       fxInstance("modinst_war_priest", "cat_fx_bonus_action_attack", {

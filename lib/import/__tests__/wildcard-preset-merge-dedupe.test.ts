@@ -18,6 +18,14 @@ function armorProficiencyInstances(feature: Feature | undefined) {
   )
 }
 
+function usesInstances(feature: Feature | undefined) {
+  return (
+    feature?.linkedModifiers?.filter((instance) =>
+      instance.characteristics?.some((char) => char.type === "uses"),
+    ) ?? []
+  )
+}
+
 function extraAttackEffects(feature: Feature | undefined) {
   return (
     feature?.linkedModifiers?.flatMap(
@@ -113,6 +121,26 @@ describe("wildcard preset merge dedupes against AI mechanics", () => {
         (instance) => instance.catalogRefId === "cat_char_weapon_proficiencies",
       ),
     ).toBe(true)
+  })
+
+  it("War Priest preset matches the 2024 short-or-long-rest recharge (Cleric domains audit)", () => {
+    // The 2024 PHB grants War Priest's uses back on a Short OR Long Rest. The preset
+    // previously hardcoded long_rest only; since presets merge before AI mechanics and the
+    // `uses` fingerprint ignores recharge, a stale preset would silently beat a correct
+    // AI-mechanics recharge hint. Assert the preset itself is correct — not just that AI wins.
+    const feature = enrichWildcardFeaturePresets({
+      level: 3,
+      name: "War Priest",
+      description:
+        "As a Bonus Action, you can make one attack with a weapon or an Unarmed Strike. You can use this Bonus Action a number of times equal to your Wisdom modifier (minimum of once). You regain all expended uses when you finish a Short or Long Rest.",
+    })
+
+    const uses = usesInstances(feature)
+    expect(uses).toHaveLength(1)
+    const char = uses[0]?.characteristics?.find((c) => c.type === "uses") as
+      | { uses?: { recharges?: { rest: string }[] } }
+      | undefined
+    expect(char?.uses?.recharges).toEqual([{ rest: "short_rest" }, { rest: "long_rest" }])
   })
 
   it("treats Medium Armor and Medium armor as the same armor_proficiencies fingerprint", () => {
