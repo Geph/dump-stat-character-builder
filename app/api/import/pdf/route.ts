@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
     const pageScope = formData.get("pageScope") as string | null
     const pageStart = formData.get("pageStart") as string | null
     const pageEnd = formData.get("pageEnd") as string | null
-    const subclassMatchName = formData.get("subclassMatchName") as string | null
     const subclassMatchClassName = formData.get("subclassMatchClassName") as string | null
     const aiProvider = formData.get("aiProvider") as string | null
     const aiModel = formData.get("aiModel") as string | null
@@ -199,11 +198,8 @@ export async function POST(request: NextRequest) {
     }
     systemPrompt = appendContentTypeHintToPrompt(systemPrompt, contentTypeHint)
     const subclassMatchHint = formatSubclassMatchImportHint(
-      typeof subclassMatchName === "string" &&
-        subclassMatchName.trim() &&
-        typeof subclassMatchClassName === "string" &&
-        subclassMatchClassName.trim()
-        ? { name: subclassMatchName.trim(), className: subclassMatchClassName.trim() }
+      typeof subclassMatchClassName === "string" && subclassMatchClassName.trim()
+        ? { className: subclassMatchClassName.trim() }
         : null,
     )
     if (subclassMatchHint) {

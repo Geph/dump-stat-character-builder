@@ -1,117 +1,203 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import {
   IMPORT_WORKFLOWS,
   JSON_ARRAY_IMPORT_TIP,
   MULTI_FILE_IMPORT_TIP,
   ONE_CLASS_AT_A_TIME_WARNING,
 } from "@/lib/import/import-workflow-guidance"
-import { AlertTriangle, ChevronDown, ChevronUp, Layers } from "lucide-react"
+import { CLEAN_SOURCE_TEXT_GUIDELINES } from "@/lib/import/byo-import-kit"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
+import { AlertTriangle, BookOpen, ChevronRight, Layers } from "lucide-react"
+
+type GuidanceTopic = "one-class" | "import-order" | "clean-source"
+
+const TOPIC_BUTTONS: {
+  id: GuidanceTopic
+  title: string
+  blurb: string
+  icon: typeof AlertTriangle
+  accent: string
+}[] = [
+  {
+    id: "one-class",
+    title: "One class at a time",
+    blurb: "Why multi-class extracts fail",
+    icon: AlertTriangle,
+    accent: "text-amber-700 dark:text-amber-300",
+  },
+  {
+    id: "import-order",
+    title: "Import order",
+    blurb: "Libraries first, then class + subclasses",
+    icon: Layers,
+    accent: "text-sky-700 dark:text-sky-300",
+  },
+  {
+    id: "clean-source",
+    title: "Clean source text guidelines",
+    blurb: "PDF & paste tips for better extraction",
+    icon: BookOpen,
+    accent: "text-lime",
+  },
+]
+
+function GuidanceDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  contentClassName,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description: string
+  children: ReactNode
+  contentClassName?: string
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={cn("gap-0 overflow-hidden p-0 sm:max-w-lg", contentClassName)}>
+        <DialogHeader className="border-b border-border px-6 py-4 text-left pr-12">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4 text-sm">{children}</div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function ImportWorkflowGuidancePanel() {
-  const [open, setOpen] = useState(false)
+  const [topic, setTopic] = useState<GuidanceTopic | null>(null)
   const [activeId, setActiveId] = useState(IMPORT_WORKFLOWS[0]?.id ?? "")
-
   const active = IMPORT_WORKFLOWS.find((workflow) => workflow.id === activeId) ?? IMPORT_WORKFLOWS[0]
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3.5 py-3 text-sm">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-        <div className="min-w-0 space-y-1">
-          <p className="font-semibold text-foreground">One class at a time</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {ONE_CLASS_AT_A_TIME_WARNING}
-          </p>
-        </div>
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Import tips</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {TOPIC_BUTTONS.map((entry) => {
+          const Icon = entry.icon
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => setTopic(entry.id)}
+              className="inline-flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background/80 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 sm:min-w-[12rem]"
+            >
+              <Icon className={cn("h-4 w-4 shrink-0", entry.accent)} aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">{entry.title}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  {entry.blurb}
+                </span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
+          )
+        })}
       </div>
 
-      <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-sky-500/10 transition-colors"
-        >
-          <span className="flex items-start gap-2.5 min-w-0">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
-            <span className="min-w-0">
-              <span className="block font-semibold">Import order</span>
-              <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
-                Dependencies like spells or abilities first, then class and subclasses section
-              </span>
-            </span>
-          </span>
-          {open ? (
-            <ChevronUp className="h-4 w-4 shrink-0 text-sky-700/70 dark:text-sky-300/70" />
-          ) : (
-            <ChevronDown className="h-4 w-4 shrink-0 text-sky-700/70 dark:text-sky-300/70" />
-          )}
-        </button>
+      <GuidanceDialog
+        open={topic === "one-class"}
+        onOpenChange={(open) => setTopic(open ? "one-class" : null)}
+        title="One class at a time"
+        description="Keep each import pass focused on a single class chapter."
+      >
+        <p className="leading-relaxed text-muted-foreground">{ONE_CLASS_AT_A_TIME_WARNING}</p>
+      </GuidanceDialog>
 
-        {open ? (
-          <div className="space-y-4 border-t border-sky-500/25 px-4 py-4">
-            <p className="text-xs text-muted-foreground leading-relaxed">{MULTI_FILE_IMPORT_TIP}</p>
-            <p className="text-xs text-muted-foreground leading-relaxed flex gap-2">
-              <Layers className="h-3.5 w-3.5 shrink-0 mt-0.5 text-sky-700 dark:text-sky-300" />
-              <span>{JSON_ARRAY_IMPORT_TIP}</span>
-            </p>
+      <GuidanceDialog
+        open={topic === "import-order"}
+        onOpenChange={(open) => setTopic(open ? "import-order" : null)}
+        title="Import order"
+        description="Dependencies like spells or abilities first, then class and subclasses."
+        contentClassName="sm:max-w-xl"
+      >
+        <div className="space-y-4">
+          <p className="leading-relaxed text-muted-foreground">{MULTI_FILE_IMPORT_TIP}</p>
+          <p className="flex gap-2 leading-relaxed text-muted-foreground">
+            <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-700 dark:text-sky-300" />
+            <span>{JSON_ARRAY_IMPORT_TIP}</span>
+          </p>
 
-            <div className="flex flex-wrap gap-2">
-              {IMPORT_WORKFLOWS.map((workflow) => (
-                <button
-                  key={workflow.id}
-                  type="button"
-                  onClick={() => setActiveId(workflow.id)}
-                  className={
-                    workflow.id === active?.id
-                      ? "rounded-lg border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-semibold text-foreground"
-                      : "rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60"
-                  }
-                >
-                  {workflow.title.split("(")[0].trim()}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {IMPORT_WORKFLOWS.map((workflow) => (
+              <button
+                key={workflow.id}
+                type="button"
+                onClick={() => setActiveId(workflow.id)}
+                className={
+                  workflow.id === active?.id
+                    ? "rounded-lg border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-semibold text-foreground"
+                    : "rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60"
+                }
+              >
+                {workflow.title.split("(")[0].trim()}
+              </button>
+            ))}
+          </div>
 
-            {active ? (
-              <div className="rounded-lg border border-border bg-background/80 p-4 space-y-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">{active.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{active.summary}</p>
-                  {active.examples.length ? (
-                    <p className="text-[11px] text-muted-foreground mt-2">
-                      Examples: {active.examples.join(", ")}
-                    </p>
-                  ) : null}
-                </div>
-
-                <ol className="space-y-2 text-sm">
-                  {active.steps.map((step, index) => (
-                    <li key={step.label} className="flex gap-2">
-                      <span className="font-bold text-lime shrink-0">{index + 1}.</span>
-                      <span>
-                        <span className="font-medium text-foreground">{step.label}</span>
-                        {step.hint ? (
-                          <span className="text-muted-foreground"> — {step.hint}</span>
-                        ) : null}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-
-                {active.notes?.length ? (
-                  <ul className="text-[11px] text-muted-foreground space-y-1.5 list-disc pl-4 leading-relaxed">
-                    {active.notes.map((note) => (
-                      <li key={note}>{note}</li>
-                    ))}
-                  </ul>
+          {active ? (
+            <div className="space-y-3 border-t border-border pt-4">
+              <div>
+                <h3 className="font-semibold text-foreground">{active.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{active.summary}</p>
+                {active.examples.length ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Examples: {active.examples.join(", ")}
+                  </p>
                 ) : null}
               </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+
+              <ol className="space-y-2">
+                {active.steps.map((step, index) => (
+                  <li key={step.label} className="flex gap-2">
+                    <span className="shrink-0 font-bold text-lime">{index + 1}.</span>
+                    <span>
+                      <span className="font-medium text-foreground">{step.label}</span>
+                      {step.hint ? (
+                        <span className="text-muted-foreground"> — {step.hint}</span>
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+
+              {active.notes?.length ? (
+                <ul className="list-disc space-y-1.5 pl-4 text-[11px] leading-relaxed text-muted-foreground">
+                  {active.notes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </GuidanceDialog>
+
+      <GuidanceDialog
+        open={topic === "clean-source"}
+        onOpenChange={(open) => setTopic(open ? "clean-source" : null)}
+        title="Clean source text guidelines"
+        description="Prep PDF text and pastes so extraction stays reliable."
+        contentClassName="sm:max-w-xl"
+      >
+        <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
+          {CLEAN_SOURCE_TEXT_GUIDELINES}
+        </pre>
+      </GuidanceDialog>
     </div>
   )
 }

@@ -50,7 +50,19 @@ export const ImportMechanicSchema = z.object({
   visionRangeFeet: z.number().optional(),
   usesFixed: z.number().optional(),
   usesAbility: z.enum(USES_ABILITY_CODES).optional(),
-  usesRecharge: z.enum(["short_rest", "long_rest", "both", "until_item_consumed"]).optional(),
+  usesRecharge: z
+    .enum(["short_rest", "long_rest", "both", "until_item_consumed", "on_resource_reactivation"])
+    .optional(),
+  /** For usesRecharge on_resource_reactivation — resource/state whose activation refreshes the use (e.g. "rage"). */
+  gatingResourceKey: z.string().optional(),
+  /** Spend another class resource to restore one use early (outside normal recharge). */
+  alternateRefresh: z
+    .object({
+      spendResourceKey: z.string(),
+      spendAmount: z.number(),
+      actionCost: z.enum(["none", "action", "bonus_action", "reaction"]),
+    })
+    .optional(),
   /** Cap how many units of a class resource may be spent per use. */
   classResourceKey: z.string().optional(),
   classResourceCost: z.number().optional(),
@@ -119,9 +131,64 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   expiresEndOfTurn: z.boolean().optional(),
   usageRestriction: z.string().optional(),
+  /** on_hit_trigger */
+  triggerOn: z.enum(["hit", "crit"]).optional(),
+  oncePerTurn: z.boolean().optional(),
+  maximizeWeaponDamage: z.boolean().optional(),
+  maximizeWeaponDamageAtLevel: z.number().optional(),
+  spendResourceKey: z.string().optional(),
+  spendResourceAmount: z.number().optional(),
+  automaticBonusMode: z
+    .enum(["character_level", "half_character_level_round_down", "none"])
+    .optional(),
+  scalingMode: z
+    .enum(["none", "character_level", "half_character_level_round_down"])
+    .optional(),
+  damageTypeOptions: z.array(z.string()).optional(),
+  /** initiative */
+  initiativeMode: z.enum(["flat_bonus", "add_proficiency", "ability_modifier"]).optional(),
+  initiativeAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
+  initiativeFlatBonus: z.number().optional(),
+  /** telepathy */
+  telepathyRangeFeet: z.number().optional(),
+  /** unarmed_strike_damage */
+  dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).optional(),
+  /** resource_ability_menu */
+  waiveResourceCost: z.boolean().optional(),
+  menuAbilityNames: z.array(z.string()).optional(),
+  /** temporary_hit_points */
+  amount: z.number().optional(),
+  amountDice: z.string().optional(),
+  amountScaling: z
+    .enum(["character_level", "class_resource_die", "ability_modifier"])
+    .optional(),
+  ability: z.enum(ABILITY_SCORE_KEYS).optional(),
+  thpTrigger: z.enum(["on_activation", "turn_start", "on_use", "on_hit"]).optional(),
+  thpTarget: z.enum(["self", "chosen_creature_in_range", "allies_in_range"]).optional(),
+  rangeFeet: z.number().optional(),
+  expiresOnTriggerEnd: z.boolean().optional(),
+  /** speed hover */
+  canHover: z.boolean().optional(),
+  /** turn_start_trigger */
+  hpBelowFraction: z.number().optional(),
+  blockedByConditions: z.array(z.string()).optional(),
+  /** weapon_reach_modifier */
+  reachBonusFeet: z.number().optional(),
+  weaponPropertyFilter: z.array(z.string()).optional(),
+  /** extra_weapon_mastery */
+  masteryProperties: z.array(z.string()).optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>
+
+/** Declared once on a class/subclass before features reference it via requiresSheetToggle. */
+export const NewToggleImportSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  grantingFeature: z.string(),
+})
+
+export type NewToggleImport = z.infer<typeof NewToggleImportSchema>
 
 export const ChoiceOptionsSchema = z.object({
   category: z.string(),
@@ -181,6 +248,7 @@ export const SubclassImportSchema = z.object({
   description: z.string().nullable(),
   card_image_url: z.string().nullable().optional(),
   features: z.array(ClassFeatureSchema),
+  new_toggles: z.array(NewToggleImportSchema).optional(),
 })
 
 export const FeatImportSchema = z.object({
@@ -319,6 +387,7 @@ export const ClassImportSchema = z.object({
     })
     .nullable()
     .optional(),
+  new_toggles: z.array(NewToggleImportSchema).optional(),
 })
 
 export const BackgroundImportSchema = z.object({
@@ -508,6 +577,8 @@ const UsesConfigImportSchema = z.object({
 
 export const ClassResourceImportSchema = z.object({
   class_name: z.string(),
+  /** When the pool is granted entirely by a subclass feature (not the base class table). */
+  subclass_name: z.string().optional(),
   resource_key: z.string(),
   name: z.string(),
   description: z.string().nullable().optional(),
@@ -598,13 +669,16 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion")
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
 - Include all subclass features with their gain level
-- Spell list features should keep HTML tables in description when present`
+- Spell list features should keep HTML tables in description when present
+- When a feature invents a new transformation / conditional state (e.g. "while in this form"), declare it once under new_toggles: [{ key: "rage_of_the_gods_form", name: "Rage of the Gods", grantingFeature: "Rage of the Gods" }] — then reference that key via requiresSheetToggle in mechanics[]. Do not invent unmatched toggle keys inside individual features.`
 
 export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice):
 - Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, etc.)
 - Set class_name to the exact parent class name from the source headers/table (e.g. "Psion")
-- resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit")
+- When the pool is introduced entirely inside a subclass feature (not on the base class level table), also set subclass_name to that subclass's exact name (e.g. "Path of the Zealot") so the pool is not implied for every member of the parent class
+- resource_key: lowercase snake_case (e.g. "psi_points", "psi_limit", "warrior_of_the_gods_dice")
 - name: display name from the table header (e.g. "Psi Points")
+- When a level-scaling pool has no formal name in the source (referred to only as "the pool" / "your pool"), derive the display name from the granting feature (e.g. "Warrior of the Gods" → "Warrior of the Gods Dice") so repeated extractions converge — do not invent a flavor name
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
 - **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges (short_rest and/or long_rest)
 - **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
@@ -623,7 +697,8 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 
 export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation before creating compendium entries):
 - Identify every class resource pool you find (Psi Points, Psi Limit, Rage, Ki, Sorcery Points, etc.)
-- Put each in import_proposals.class_resources[] with proposal_id (snake_case), class_name, resource_key, name, uses, and definition
+- Put each in import_proposals.class_resources[] with proposal_id (snake_case), class_name, optional subclass_name (when the pool is subclass-only), resource_key, name, uses, and definition
+- When the source never names the pool formally, derive name from the granting feature (see Class resource import rules) so proposal_id / name stay stable across re-imports
 - definition: 1–3 sentences explaining what the pool is, how it is spent, and typical recharge — shown to the user before import
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)

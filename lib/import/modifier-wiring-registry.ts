@@ -39,6 +39,15 @@ export const AI_MECHANIC_KINDS = [
   "weapon_ability_override",
   "turn_start_resource_restore",
   "turn_start_bonus_grant",
+  "turn_start_trigger",
+  "on_hit_trigger",
+  "resource_ability_menu",
+  "unarmed_strike_damage",
+  "initiative",
+  "telepathy",
+  "temporary_hit_points",
+  "weapon_reach_modifier",
+  "extra_weapon_mastery",
 ] as const
 
 export type WiringTrigger = "description" | "feature_name" | "mechanics" | "srd_preset_name"
@@ -255,7 +264,9 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "Whenever you score a critical hit with a weapon attack you deal bonus damage equal to your Fighter level.",
     ],
-    notes: 'triggerOn: "on_crit", automaticBonus: { mode: "character_level" }',
+    mechanicsKind: "on_hit_trigger",
+    notes:
+      'Use on_hit_trigger with triggerOn: "crit" + automaticBonus / bonusDice (bonus_damage_riders catalog). Once-per-turn riders like Divine Fury also use on_hit_trigger.',
   },
   {
     ruleId: "damage.crit.maximize",
@@ -264,6 +275,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "At 15th level, when you score a critical hit with a weapon attack, you can maximize the damage instead of rolling.",
     ],
+    mechanicsKind: "on_hit_trigger",
     notes: 'triggerOn: "crit", maximizeWeaponDamage: true, maximizeWeaponDamageAtLevel',
   },
   {
@@ -284,6 +296,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "you can use feat of strength or heroic fortitude without expending an Exploit Die",
     ],
+    mechanicsKind: "resource_ability_menu",
     notes: "waiveResourceCost: true, appliesOnRollKinds, appliesOnAbilities, menu options",
   },
   {
@@ -301,7 +314,9 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "If you begin your turn with less than half of your hit points remaining, but at least 1 hit point, you regain hit points equal to 5 + your Constitution modifier.",
     ],
-    notes: "hpBelowFraction: 0.5, nested heal_self fixed + ability modifier",
+    mechanicsKind: "turn_start_trigger",
+    notes:
+      "Prefer turn_start_trigger for general turn-start effects (heal, grant temp HP, nested effects). hpBelowFraction: 0.5 for low-HP gate.",
   },
   {
     ruleId: "resource.turn_start_regain_ki",
@@ -310,7 +325,9 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "regain 1 Ki at the start of each of your turns in combat, so long as you are not Incapacitated",
     ],
-    notes: "restoreResourceKey + restoreResourceAmount; blockedByConditions when Incapacitated mentioned",
+    mechanicsKind: "turn_start_resource_restore",
+    notes:
+      "Narrow restore kind when the effect ONLY refills a pool; otherwise use turn_start_trigger. blockedByConditions when Incapacitated mentioned.",
   },
   {
     ruleId: "resource.turn_start_regain_pool",
@@ -327,8 +344,13 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "technique.on_hit_once_per_turn",
     trigger: "description",
     catalog: "cat_char_on_hit_trigger",
-    examples: ["once per turn when you hit a creature with an attack, you can spend 1 Ki to deal extra damage"],
-    notes: "oncePerTurn: true, spendResourceKey: ki_points",
+    examples: [
+      "once per turn when you hit a creature with an attack, you can spend 1 Ki to deal extra damage",
+      "the first creature you hit on each of your turns while your Rage is active takes extra damage equal to 1d6 plus half your Barbarian level",
+    ],
+    mechanicsKind: "on_hit_trigger",
+    notes:
+      "oncePerTurn: true; optional spendResourceKey; bonusDice / scalingMode / damageTypeOptions for riders like Divine Fury",
   },
   {
     ruleId: "check.advantage.initiative",
@@ -345,7 +367,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "You gain a bonus to Initiative rolls equal to your Charisma modifier (minimum bonus of +1).",
     ],
-    mechanicsKind: "initiative" as (typeof AI_MECHANIC_KINDS)[number],
+    mechanicsKind: "initiative",
     notes: 'mode: "ability_modifier"',
   },
   {
@@ -445,9 +467,9 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "speed.fly",
     trigger: "description",
     catalog: "cat_char_speed",
-    examples: ["fly speed of 30 feet"],
+    examples: ["fly speed of 30 feet", "a Fly Speed equal to your Speed and can hover"],
     mechanicsKind: "speed",
-    notes: 'speedType: "fly"',
+    notes: 'speedType: "fly"; set canHover: true when the source says you can hover',
   },
   {
     ruleId: "speed.swim",
@@ -479,7 +501,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     trigger: "description",
     catalog: "cat_char_telepathy",
     examples: ["You have telepathy with a range of 120 feet"],
-    mechanicsKind: "telepathy" as (typeof AI_MECHANIC_KINDS)[number],
+    mechanicsKind: "telepathy",
   },
   {
     ruleId: "vision.darkvision",
@@ -698,6 +720,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     trigger: "description",
     catalog: "cat_char_unarmed_strike_damage",
     examples: ["at 3rd level the die becomes 1d8", "at 5th level ... 2d6"],
+    mechanicsKind: "unarmed_strike_damage",
     notes: "Parses multiple at-level die tiers into dieByLevel.",
   },
   {
@@ -748,8 +771,10 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "it can choose to grant you the following benefits",
       "while raging",
       "while below half hit points",
+      "while in this form",
     ],
-    notes: 'requiresSheetToggle on mechanics[] — medium confidence; confirm in import review.',
+    notes:
+      'requiresSheetToggle on mechanics[] — use a standard key (while_raging, etc.) OR a key declared once under new_toggles on the class/subclass. Never invent a one-off toggle key inside a single feature without declaring it.',
   },
 ]
 
@@ -832,6 +857,18 @@ export const SRD_PRESET_FEATURE_NAMES = [
 
 /** Patterns from homebrew imports (Gunslinger, point-pool casters, Alternate Fighter, Dancer). */
 export const HOMEBREW_WIRING_PATTERNS = [
+  {
+    source: "Barbarian subclasses (World Tree / Zealot patterns)",
+    guidance: [
+      "Once-per-turn Rage riders (Divine Fury): mechanics kind on_hit_trigger with oncePerTurn, bonusDice, scalingMode half_character_level_round_down, damageTypeOptions when the type is chosen at use, requiresSheetToggle while_raging.",
+      "Temp HP on Rage (Vitality Surge) or turn-start ally THP (Life-Giving Force): temporary_hit_points with amountScaling / amountDice, trigger, and target.",
+      "Spend Rage to refresh a long-rest feature early (Zealous Presence): uses + alternateRefresh { spendResourceKey: \"rage\", spendAmount: 1, actionCost: \"none\" }.",
+      "Once per active Rage (Fanatical Focus): usesRecharge on_resource_reactivation + gatingResourceKey \"rage\".",
+      "Subclass-only dice pools with no table name (Warrior of the Gods): class_resources with subclass_name + name derived from the feature (\"Warrior of the Gods Dice\").",
+      "Transformation forms (Rage of the Gods): declare new_toggles once on the subclass, then gate flight/resistance/reactions with requiresSheetToggle.",
+      "Extra Weapon Mastery property alongside the normal one (Battering Roots): extra_weapon_mastery; +reach on Heavy/Versatile: weapon_reach_modifier.",
+    ],
+  },
   {
     source: "Gunslinger / martial homebrew",
     guidance: [
@@ -919,12 +956,21 @@ function formatMechanicsCheatsheet(): string {
     "- ac: acBase 10 + acAbilities [\"dexterity\",\"wisdom\"] OR acFlatBonus 1",
     "- hit_points: hpMode per_level, hpValue 1",
     "- attack_roll_modifiers: attackBonus 2, attackTarget all|melee|ranged; criticalHitMinimum; criticalHitMinimumByLevel [{ level, fixed: minD20 }]",
-    "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; grantAbilityModifierWhenMissing; bonusDiceWhenModifierIncluded \"1d8\"",
+    "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; grantAbilityModifierWhenMissing; bonusDiceWhenModifierIncluded \"1d8\"; scalingMode half_character_level_round_down|character_level|none (for \"plus half your Class level\" riders); damageTypeOptions [\"Necrotic\",\"Radiant\"] when the player picks the type at trigger time",
     "- damage_resistance: damageTypes [\"Fire\", \"Psychic\"]",
     "- condition_immunity: conditions [\"Charmed\"]",
-    "- speed: speedType walk|fly|swim|climb, speedFeet 10",
+    "- speed: speedType walk|fly|swim|climb, speedFeet 10; canHover true when fly speed allows hovering",
     "- vision: visionRangeFeet 60",
-    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed; OR usesAbility WIS. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed (note what resolves the lock in description).",
+    "- telepathy: telepathyRangeFeet 120 (passive telepathic communication range)",
+    "- initiative: initiativeMode ability_modifier|flat_bonus|add_proficiency; initiativeAbility charisma (for ability_modifier); initiativeFlatBonus N",
+    "- unarmed_strike_damage: dieByLevel [{ level: 3, die: \"1d8\" }, { level: 5, die: \"2d6\" }] — martial-arts-style die ladder",
+    "- on_hit_trigger: triggerOn hit|crit; oncePerTurn true/false; bonusDice \"1d6\"; optional automaticBonusMode character_level|half_character_level_round_down; damageType / damageTypeOptions; spendResourceKey + spendResourceAmount; requiresSheetToggle when gated (e.g. while_raging). Use for Divine Fury–style once-per-turn extra damage riders and crit maximize/bonus riders.",
+    "- turn_start_trigger: general turn-start effect (heal, grant temp HP via nested text, etc.). Optional hpBelowFraction 0.5, restoreResourceKey/Amount, grantResourceKey/Amount, blockedByConditions. Prefer the narrow kinds below when the effect is ONLY a pool refill or ephemeral bonus grant.",
+    "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
+    "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
+    "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] when the source lists named options",
+    "- temporary_hit_points: amount N OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier (pair classResourceKey / ability as needed); trigger on_activation|turn_start|on_use|on_hit; target self|chosen_creature_in_range|allies_in_range (rangeFeet when not self); expiresOnTriggerEnd true when THP ends with the gating state (e.g. while Rage is active)",
+    "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost none|action|bonus_action|reaction } = spend another pool to restore one use early (Zealous Presence / Rage).",
     "- uses / check_roll_modifier resource spend caps: classResourceKey + classResourceCostMode fixed (default, use classResourceCost) | up_to_proficiency_bonus | up_to_ability_modifier (pair with classResourceCostAbility). Use when the source caps spend per use by a scaling value — e.g. \"expend Exploit Dice (up to your Proficiency Bonus)\" — not a separate Limit class_resource.",
     "- check_roll_modifier: checkRollMode advantage, checkCategory save|skill|ability|attack|initiative, checkAbility/checkSkills",
     "- extra_attack: (no extra fields)",
@@ -933,10 +979,11 @@ function formatMechanicsCheatsheet(): string {
     "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
     "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",
     "- weapon_ability_override: alternateAbility charisma; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional",
-    "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap",
-    "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"can only be spent on discipline powers, not talents or spell recreation\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
+    "- weapon_reach_modifier: reachBonusFeet 10; optional weaponPropertyFilter [\"Heavy\", \"Versatile\"] when only some melee weapons gain the reach",
+    "- extra_weapon_mastery: masteryProperties [\"Push\", \"Topple\"] — apply these Weapon Mastery properties in addition to the weapon's normal mastery (not the tier-table known-count)",
     "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
     "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
+    "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, concentrating, …) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them.",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
   ]
   return lines.join("\n")
@@ -970,14 +1017,24 @@ Hundreds of additional SRD features wire when names match the seeded compendium 
     `INDEX — Class resources (class_resources[], not feature modifiers):
 - Extract columns from level tables: Psi Points, Psi Limit, Rage, Ki, Risk Dice, Battle Dice, Weapon Mastery, Superiority Dice, Exploit Dice, Sorcery Points, Bardic Inspiration, etc.
 - resource_key: snake_case (risk_dice, weapon_mastery, psi_points)
+- name: display name from the table header (e.g. "Psi Points")
+- When a level-scaling pool has NO formal name (source only says "the pool" / "your pool"), derive the display name from the granting feature (e.g. Warrior of the Gods → "Warrior of the Gods Dice") so re-extractions converge — do not invent flavor names
 - uses.type: at_level with atLevelTable [{ level, count }] from the table
-- Mention spend/regain in feature descriptions for automatic limited-use linking`,
+- Set class_name to the parent class. When the pool is introduced entirely in a subclass feature (not on the base class table), also set subclass_name to that subclass's exact name so it is not implied for every member of the class
+- Mention spend/regain in feature descriptions for automatic limited-use linking
+- Alternate early refresh (spend Rage to recharge Zealous Presence): uses.alternateRefresh on the feature's uses mechanic, not a second class_resource`,
 
     "INDEX — Homebrew patterns",
     ...HOMEBREW_WIRING_PATTERNS.flatMap((pattern) => [
       `${pattern.source}:`,
       ...pattern.guidance.map((line) => `- ${line}`),
     ]),
+
+    "INDEX — Sheet toggles (new_toggles[]):",
+    "- Standard toggles (while_raging, concentrating, …) need no declaration — use requiresSheetToggle directly.",
+    "- When a feature invents a new transformation / conditional state (\"while in this form\", Rage of the Gods, etc.), add ONE entry under new_toggles on the class or subclass: { key: \"rage_of_the_gods_form\", name: \"Rage of the Gods\", grantingFeature: \"Rage of the Gods\" }.",
+    "- Derive key as snake_case from the feature name. Sub-benefits (flight, resistance, reaction) then set requiresSheetToggle to that same key.",
+    "- Do not invent mismatched keys silently inside individual mechanics[] rows — declare once, then reference.",
 
     "Leave narrative-only (no mechanics[] unless a clear bonus phrase exists):",
     ...NARRATIVE_ONLY_GUIDANCE.map((line) => `- ${line}`),
@@ -1010,6 +1067,24 @@ Example ephemeral turn-start bonus grant (not a pool refill):
     "expiresEndOfTurn": true,
     "usageRestriction": "can only be spent on discipline powers, not talents or spell recreation",
     "sourcePhrase": "At the start of each of your turns, you gain 2 psi points that last until the end of your turn.",
+    "confidence": "high"
+  }]
+}
+
+Example once-per-turn on-hit rider (Divine Fury–style):
+{
+  "level": 3,
+  "name": "Divine Fury",
+  "description": "You can channel divine fury into your weapon strikes. On each of your turns while your Rage is active, the first creature you hit with a weapon takes extra damage equal to 1d6 + half your Barbarian level (round down). Choose Necrotic or Radiant for the damage type each time.",
+  "mechanics": [{
+    "kind": "on_hit_trigger",
+    "triggerOn": "hit",
+    "oncePerTurn": true,
+    "bonusDice": "1d6",
+    "scalingMode": "half_character_level_round_down",
+    "damageTypeOptions": ["Necrotic", "Radiant"],
+    "requiresSheetToggle": "while_raging",
+    "sourcePhrase": "the first creature you hit with a weapon takes extra damage equal to 1d6 + half your Barbarian level",
     "confidence": "high"
   }]
 }`,

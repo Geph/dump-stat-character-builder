@@ -56,7 +56,17 @@ const ImportMechanicAiSchema = z.object({
   visionRangeFeet: z.number().nullable(),
   usesFixed: z.number().nullable(),
   usesAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
-  usesRecharge: z.enum(["short_rest", "long_rest", "both", "until_item_consumed"]).nullable(),
+  usesRecharge: z
+    .enum(["short_rest", "long_rest", "both", "until_item_consumed", "on_resource_reactivation"])
+    .nullable(),
+  gatingResourceKey: z.string().nullable(),
+  alternateRefresh: z
+    .object({
+      spendResourceKey: z.string(),
+      spendAmount: z.number(),
+      actionCost: z.enum(["none", "action", "bonus_action", "reaction"]),
+    })
+    .nullable(),
   classResourceKey: z.string().nullable(),
   classResourceCost: z.number().nullable(),
   classResourceCostMode: z
@@ -101,6 +111,42 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   expiresEndOfTurn: z.boolean().nullable(),
   usageRestriction: z.string().nullable(),
+  triggerOn: z.enum(["hit", "crit"]).nullable(),
+  oncePerTurn: z.boolean().nullable(),
+  maximizeWeaponDamage: z.boolean().nullable(),
+  maximizeWeaponDamageAtLevel: z.number().nullable(),
+  spendResourceKey: z.string().nullable(),
+  spendResourceAmount: z.number().nullable(),
+  automaticBonusMode: z
+    .enum(["character_level", "half_character_level_round_down", "none"])
+    .nullable(),
+  scalingMode: z.enum(["none", "character_level", "half_character_level_round_down"]).nullable(),
+  damageTypeOptions: z.array(z.string()).nullable(),
+  initiativeMode: z.enum(["flat_bonus", "add_proficiency", "ability_modifier"]).nullable(),
+  initiativeAbility: z
+    .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+    .nullable(),
+  initiativeFlatBonus: z.number().nullable(),
+  telepathyRangeFeet: z.number().nullable(),
+  dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).nullable(),
+  waiveResourceCost: z.boolean().nullable(),
+  menuAbilityNames: z.array(z.string()).nullable(),
+  amount: z.number().nullable(),
+  amountDice: z.string().nullable(),
+  amountScaling: z.enum(["character_level", "class_resource_die", "ability_modifier"]).nullable(),
+  ability: z
+    .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+    .nullable(),
+  thpTrigger: z.enum(["on_activation", "turn_start", "on_use", "on_hit"]).nullable(),
+  thpTarget: z.enum(["self", "chosen_creature_in_range", "allies_in_range"]).nullable(),
+  rangeFeet: z.number().nullable(),
+  expiresOnTriggerEnd: z.boolean().nullable(),
+  canHover: z.boolean().nullable(),
+  hpBelowFraction: z.number().nullable(),
+  blockedByConditions: z.array(z.string()).nullable(),
+  reachBonusFeet: z.number().nullable(),
+  weaponPropertyFilter: z.array(z.string()).nullable(),
+  masteryProperties: z.array(z.string()).nullable(),
 })
 
 const ClassFeatureAiSchema = z.object({
@@ -163,8 +209,15 @@ const UsesConfigAiSchema = z.object({
     .nullable(),
 })
 
+const NewToggleAiSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  grantingFeature: z.string(),
+})
+
 const ClassResourceAiSchema = z.object({
   class_name: z.string(),
+  subclass_name: z.string().nullable(),
   resource_key: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -261,6 +314,7 @@ const ClassAiSchema = z.object({
   spell_list: z.array(z.string()).nullable(),
   starting_equipment_groups: z.array(StartingEquipmentGroupAiSchema).nullable(),
   starting_gold: z.number().nullable(),
+  new_toggles: z.array(NewToggleAiSchema).nullable(),
 })
 
 const SubclassAiSchema = z.object({
@@ -268,6 +322,7 @@ const SubclassAiSchema = z.object({
   class_name: z.string(),
   description: z.string().nullable(),
   features: z.array(ClassFeatureAiSchema),
+  new_toggles: z.array(NewToggleAiSchema).nullable(),
 })
 
 const SpeciesAiSchema = z.object({
@@ -519,6 +574,7 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
       spell_list: row.spell_list,
       starting_equipment_groups: row.starting_equipment_groups,
       starting_gold: row.starting_gold,
+      new_toggles: row.new_toggles?.length ? row.new_toggles : undefined,
     }),
     ...(spellcasting && Object.keys(spellcasting).length ? { spellcasting } : {}),
   } as NonNullable<ImportContent["classes"]>[number]
@@ -563,13 +619,18 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.class_resources?.length) {
-    content.class_resources = raw.class_resources.map((resource) => ({
-      class_name: resource.class_name,
-      resource_key: resource.resource_key,
-      name: resource.name,
-      uses: normalizeUsesConfig(resource.uses),
-      ...omitNull({ description: resource.description }),
-    }))
+    content.class_resources = raw.class_resources.map((resource) => {
+      const row: NonNullable<ImportContent["class_resources"]>[number] = {
+        class_name: resource.class_name,
+        resource_key: resource.resource_key,
+        name: resource.name,
+        uses: normalizeUsesConfig(resource.uses),
+      }
+      if (resource.description != null) row.description = resource.description
+      const subclassName = resource.subclass_name?.trim()
+      if (subclassName) row.subclass_name = subclassName
+      return row
+    })
   }
 
   if (raw.subclasses?.length) {
@@ -578,6 +639,9 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
       class_name: subclass.class_name,
       description: subclass.description,
       features: subclass.features.map(normalizeFeatureLike),
+      ...omitNull({
+        new_toggles: subclass.new_toggles?.length ? subclass.new_toggles : undefined,
+      }),
     }))
   }
 
@@ -654,15 +718,22 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   if (raw.import_proposals) {
     const proposals: NonNullable<ImportContent["import_proposals"]> = {}
     if (raw.import_proposals.class_resources?.length) {
-      proposals.class_resources = raw.import_proposals.class_resources.map((resource) => ({
-        proposal_id: resource.proposal_id,
-        definition: resource.definition,
-        class_name: resource.class_name,
-        resource_key: resource.resource_key,
-        name: resource.name,
-        uses: normalizeUsesConfig(resource.uses),
-        ...omitNull({ description: resource.description }),
-      }))
+      proposals.class_resources = raw.import_proposals.class_resources.map((resource) => {
+        const row: NonNullable<
+          NonNullable<ImportContent["import_proposals"]>["class_resources"]
+        >[number] = {
+          proposal_id: resource.proposal_id,
+          definition: resource.definition,
+          class_name: resource.class_name,
+          resource_key: resource.resource_key,
+          name: resource.name,
+          uses: normalizeUsesConfig(resource.uses),
+        }
+        if (resource.description != null) row.description = resource.description
+        const subclassName = resource.subclass_name?.trim()
+        if (subclassName) row.subclass_name = subclassName
+        return row
+      })
     }
     if (raw.import_proposals.custom_abilities?.length) {
       proposals.custom_abilities = raw.import_proposals.custom_abilities.map((ability) =>

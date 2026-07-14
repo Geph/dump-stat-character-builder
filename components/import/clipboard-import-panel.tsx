@@ -18,7 +18,6 @@ import {
 import {
   buildByoExtractionPrompt,
   buildByoFullPrompt,
-  CLEAN_SOURCE_TEXT_GUIDELINES,
   downloadTemplateFilename,
   templateJsonString,
   type ByoPdfPageScope,
@@ -32,7 +31,6 @@ import {
   ClipboardCopy,
   Download,
   FileText,
-  Info,
   Library,
   Loader2,
   Type,
@@ -93,7 +91,6 @@ export function ClipboardImportPanel({
   onImportJson,
   onServerAiImport,
 }: ClipboardImportPanelProps) {
-  const [showGuidelines, setShowGuidelines] = useState(false)
   const [showServerAi, setShowServerAi] = useState(false)
   const [copied, setCopied] = useState<"prompt" | "full" | null>(null)
   const [pdfPageScope, setPdfPageScope] = useState<"all" | "range">("all")
@@ -131,7 +128,7 @@ export function ClipboardImportPanel({
   const subclassMatchHint = useMemo(
     () =>
       contentType === "subclasses" && subclassMatch
-        ? { name: subclassMatch.name, className: subclassMatch.className }
+        ? { className: subclassMatch.className }
         : undefined,
     [contentType, subclassMatch],
   )
@@ -277,7 +274,7 @@ export function ClipboardImportPanel({
             {contentType === "subclasses" ? (
               <>
                 {" "}
-                When importing subclasses, optionally match a subclass so the extraction prompt
+                When importing subclasses, optionally match a class so the extraction prompt
                 locks <span className="font-medium text-foreground">class_name</span>
                 {subclassMatch ? (
                   <>
@@ -347,29 +344,6 @@ export function ClipboardImportPanel({
         ) : null}
 
         <ImportWorkflowGuidancePanel />
-
-        <div className="rounded-xl border border-border bg-muted/30">
-          <button
-            type="button"
-            onClick={() => setShowGuidelines((open) => !open)}
-            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-foreground"
-          >
-            <span className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-lime" />
-              Clean source text guidelines (PDF &amp; paste)
-            </span>
-            {showGuidelines ? (
-              <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-            )}
-          </button>
-          {showGuidelines ? (
-            <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-              {CLEAN_SOURCE_TEXT_GUIDELINES}
-            </div>
-          ) : null}
-        </div>
       </section>
 
       <section className="space-y-4">
