@@ -53,10 +53,14 @@ function clauseSegments(text: string): string[] {
 }
 
 export function modifierInstanceFingerprint(instance: LinkedModifierInstance): string {
+  const normalizeList = (values: string[] | undefined) =>
+    (values ?? []).map((value) => value.toLowerCase()).join(",")
+
   const char = instance.characteristics?.[0]
   if (char) {
     if (char.type === "skills") {
-      const skills = char.entries?.map((entry) => entry.skill).sort().join(",") ?? "any"
+      const skills =
+        char.entries?.map((entry) => entry.skill.toLowerCase()).sort().join(",") ?? "any"
       return `${instance.catalogRefId}:skills:${skills}:${char.choiceCount ?? ""}`
     }
     if (char.type === "ac") {
@@ -69,10 +73,10 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
       return `${instance.catalogRefId}:attack:${JSON.stringify(char.entries ?? [])}`
     }
     if (char.type === "damage_resistance") {
-      return `${instance.catalogRefId}:res:${(char.damageTypes ?? []).join(",")}`
+      return `${instance.catalogRefId}:res:${normalizeList(char.damageTypes)}`
     }
     if (char.type === "condition_immunity") {
-      return `${instance.catalogRefId}:immune:${(char.conditions ?? []).join(",")}`
+      return `${instance.catalogRefId}:immune:${normalizeList(char.conditions)}`
     }
     if (char.type === "speed") {
       return `${instance.catalogRefId}:speed:${char.speedType}:${char.value}`
@@ -84,16 +88,16 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
       return `${instance.catalogRefId}:uses:${char.uses?.type}:${char.uses?.fixedAmount ?? ""}:${char.uses?.abilityModifier ?? ""}`
     }
     if (char.type === "tool_proficiencies" || char.type === "armor_proficiencies") {
-      return `${instance.catalogRefId}:${char.type}:${(char.values ?? []).join(",")}`
+      return `${instance.catalogRefId}:${char.type}:${normalizeList(char.values)}`
     }
     if (char.type === "weapon_proficiencies") {
-      return `${instance.catalogRefId}:weapons:${char.mode}:${(char.values ?? []).join(",")}`
+      return `${instance.catalogRefId}:weapons:${char.mode}:${normalizeList(char.values)}`
     }
     if (char.type === "saving_throws") {
-      return `${instance.catalogRefId}:saves:${(char.values ?? []).join(",")}`
+      return `${instance.catalogRefId}:saves:${normalizeList(char.values)}`
     }
     if (char.type === "languages") {
-      return `${instance.catalogRefId}:lang:${(char.values ?? []).join(",")}:${char.choiceCount ?? ""}`
+      return `${instance.catalogRefId}:lang:${normalizeList(char.values)}:${char.choiceCount ?? ""}`
     }
     if (char.type === "spells_known") {
       const spellIds = (char.spells ?? []).map((entry) => entry.spellId).join(",")
@@ -114,6 +118,39 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
     return `${instance.catalogRefId}:${fx.kind ?? "fx"}`
   }
   return `${instance.catalogRefId}:fx`
+}
+
+function proficiencyListValues(instance: LinkedModifierInstance): string[] | null {
+  const char = instance.characteristics?.[0]
+  if (char?.type !== "armor_proficiencies" && char?.type !== "tool_proficiencies") return null
+  return (char.values ?? []).map((value) => value.toLowerCase())
+}
+
+/**
+ * True when `candidate` matches an existing fingerprint, or (for armor/tool
+ * proficiency lists) every value is already covered by existing instances of
+ * the same type — so detector partials like "Medium armor" alone do not pile
+ * onto a Martial Training preset that already includes Medium armor + Shields.
+ */
+export function isModifierRedundantAgainst(
+  candidate: LinkedModifierInstance,
+  existing: LinkedModifierInstance[],
+): boolean {
+  const fingerprint = modifierInstanceFingerprint(candidate)
+  if (existing.some((entry) => modifierInstanceFingerprint(entry) === fingerprint)) {
+    return true
+  }
+
+  const candidateValues = proficiencyListValues(candidate)
+  if (!candidateValues?.length) return false
+
+  const candidateType = candidate.characteristics?.[0]?.type
+  const covered = new Set<string>()
+  for (const entry of existing) {
+    if (entry.characteristics?.[0]?.type !== candidateType) continue
+    for (const value of proficiencyListValues(entry) ?? []) covered.add(value)
+  }
+  return candidateValues.every((value) => covered.has(value))
 }
 
 function runRulesOnSegment(
@@ -236,10 +273,9 @@ export function mergeDetectionsIntoFeature(
   if (!detections.length) return feature
 
   const existing = feature.linkedModifiers ?? []
-  const existingFingerprints = new Set(existing.map(modifierInstanceFingerprint))
   const toAdd = detections
     .map((entry) => entry.instance)
-    .filter((instance) => !existingFingerprints.has(modifierInstanceFingerprint(instance)))
+    .filter((instance) => !isModifierRedundantAgainst(instance, existing))
 
   if (!toAdd.length) return feature
 
@@ -264,6 +300,7 @@ export function mergeFeatureModifierDetections(
     for (const detection of batch) {
       const fingerprint = modifierInstanceFingerprint(detection.instance)
       if (seenFingerprints.has(fingerprint)) continue
+      if (isModifierRedundantAgainst(detection.instance, current.linkedModifiers ?? [])) continue
       const beforeCount = current.linkedModifiers?.length ?? 0
       current = mergeDetectionsIntoFeature(current, [detection])
       const afterCount = current.linkedModifiers?.length ?? 0

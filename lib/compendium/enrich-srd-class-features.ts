@@ -7,6 +7,7 @@ import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
 import { applyBlindsensePresetOverride } from "@/lib/import/apply-blindsense-preset-override"
 import { shouldSkipWildcardPreset } from "@/lib/import/resolve-wildcard-preset-conflict"
+import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import {
   buildEvasionModifier,
@@ -5686,8 +5687,12 @@ function mergePresetModifiers(
   let next: Feature = feature
   if (additions.length) {
     const existing = feature.linkedModifiers ?? []
-    const existingInstanceIds = new Set(existing.map((entry) => entry.instanceId))
-    const toAdd = additions.filter((entry) => !existingInstanceIds.has(entry.instanceId))
+    // Semantic fingerprints (same catalog + effective values), not instanceId —
+    // presets use fixed ids while AI/detector paths mint new ones each import.
+    // Also skip armor/tool list entries whose values are already covered.
+    const toAdd = additions.filter(
+      (entry) => !isModifierRedundantAgainst(entry, existing),
+    )
     if (toAdd.length) {
       next = syncModifierRefs({
         ...next,
