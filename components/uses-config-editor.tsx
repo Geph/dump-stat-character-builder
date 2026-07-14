@@ -259,7 +259,9 @@ export function UsesConfigEditor({
           </select>
           {value.atLevelMode === "multiply_level" && (
             <p className="text-xs text-muted-foreground mt-1">
-              Uses = character level × the count value (e.g. Monk Focus = level × 1, Lay on Hands = level × 5).
+              Pool size = character level × the multiplier below (e.g. Lay on Hands = level × 5,
+              Monk Focus = level × 1). The “At level” column is only needed if the multiplier
+              itself changes at higher levels.
             </p>
           )}
         </div>
@@ -268,7 +270,9 @@ export function UsesConfigEditor({
       {value.type === "at_level" && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-semibold text-foreground">Uses by Level</label>
+            <label className="block text-sm font-semibold text-foreground">
+              {value.atLevelMode === "multiply_level" ? "Multiplier by level" : "Uses by Level"}
+            </label>
             <button
               type="button"
               onClick={() => {
@@ -304,7 +308,9 @@ export function UsesConfigEditor({
                     </option>
                   ))}
                 </select>
-                <span className="text-sm text-muted-foreground">uses:</span>
+                <span className="text-sm text-muted-foreground">
+                  {value.atLevelMode === "multiply_level" ? "×" : "uses:"}
+                </span>
                 <input
                   type="number"
                   min={1}
@@ -332,7 +338,7 @@ export function UsesConfigEditor({
             {(value.atLevelTable?.length ?? 0) === 0 && (
               <p className="text-sm text-muted-foreground italic">
                 {value.atLevelMode === "multiply_level"
-                  ? "Add one row with the per-level multiplier (e.g. count 5 for Lay on Hands)."
+                  ? "Add one row with the per-level multiplier (e.g. count 5 for Lay on Hands → pool = 5 × Paladin level)."
                   : "Add rows to define uses at each level tier."}
               </p>
             )}
@@ -443,26 +449,11 @@ export function UsesConfigEditor({
               At this level and above, activations do not consume uses (e.g. free exploits).
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Resource Die Count</label>
-              <input
-                type="number"
-                min={0}
-                max={20}
-                value={value.dieCount ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    dieCount: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                  })
-                }
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                placeholder="e.g. 2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">Resource Die Type</label>
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Resource die type
+              </label>
               <select
                 value={value.dieType || ""}
                 onChange={(e) =>
@@ -471,16 +462,103 @@ export function UsesConfigEditor({
                     dieType: (e.target.value as UsesConfig["dieType"]) || null,
                   })
                 }
-                className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                className="w-full max-w-xs px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
               >
-                <option value="">None</option>
+                <option value="">None (uses are not dice)</option>
                 {DIE_TYPES.map((die) => (
                   <option key={die} value={die}>
                     {die}
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                For pools of dice (Bardic Inspiration, Superiority Dice, Exploit Dice), die count is
+                the uses tracker above — set die type / side progression here.
+              </p>
             </div>
+            {value.dieType ? (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-foreground">
+                    Die sides by level
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const table = value.dieSidesByLevel || []
+                      const nextLevel =
+                        table.length > 0 ? Math.max(...table.map((t) => t.level)) + 1 : 1
+                      const sides = parseInt(String(value.dieType).replace(/^d/i, ""), 10) || 6
+                      onChange({
+                        ...value,
+                        dieSidesByLevel: [
+                          ...table,
+                          { level: Math.min(nextLevel, 20), count: sides },
+                        ],
+                      })
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Row
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {(value.dieSidesByLevel || []).map((row, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground w-16">At level</span>
+                      <select
+                        value={row.level}
+                        onChange={(e) => {
+                          const table = [...(value.dieSidesByLevel || [])]
+                          table[idx] = { ...row, level: parseInt(e.target.value, 10) }
+                          onChange({ ...value, dieSidesByLevel: table })
+                        }}
+                        className="w-20 px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
+                      >
+                        {LEVELS.map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            {lvl}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-sm text-muted-foreground">d</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={20}
+                        value={row.count}
+                        onChange={(e) => {
+                          const table = [...(value.dieSidesByLevel || [])]
+                          table[idx] = { ...row, count: parseInt(e.target.value, 10) || 6 }
+                          onChange({ ...value, dieSidesByLevel: table })
+                        }}
+                        className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const table = (value.dieSidesByLevel || []).filter((_, i) => i !== idx)
+                          onChange({
+                            ...value,
+                            dieSidesByLevel: table.length ? table : undefined,
+                          })
+                        }}
+                        className="p-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {(value.dieSidesByLevel?.length ?? 0) === 0 && (
+                    <p className="text-sm text-muted-foreground italic">
+                      Optional ladder (e.g. Bardic Inspiration d6→d8→d10→d12). Empty = always use the
+                      die type above.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

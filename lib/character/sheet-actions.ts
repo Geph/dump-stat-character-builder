@@ -312,7 +312,13 @@ function pushActivatableItemActions(
   if (!suppressParent) {
     const kinds = inferActivatableActionKinds(feature)
     if (kinds.length) {
-      const category = inferActivatableActionCategory(feature)
+      const inferredCategory = inferActivatableActionCategory(feature)
+      const category: SheetActionCategory =
+        display.combatActions && !display.abilitiesActions
+          ? "combat"
+          : display.abilitiesActions && !display.combatActions
+            ? "utility"
+            : inferredCategory
       if (
         (category !== "combat" || display.combatActions) &&
         (category !== "utility" || display.abilitiesActions)

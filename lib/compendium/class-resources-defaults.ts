@@ -50,8 +50,19 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "bardic_inspiration",
       name: "Bardic Inspiration",
       description:
-        "Spent when you grant Bardic Inspiration to a creature (Bonus Action). The target can add your die to one ability check, attack roll, or saving throw. Uses equal to Charisma modifier (minimum 1). Recharges on a long rest.",
-      uses: { type: "ability_modifier", abilityModifier: "CHA", recharges: LONG_REST },
+        "Spent when you grant Bardic Inspiration to a creature (Bonus Action). The inspiration die starts at d6 and becomes d8 at level 5, d10 at level 10, and d12 at level 15. Uses equal to Charisma modifier (minimum 1). Recharges on a long rest.",
+      uses: {
+        type: "ability_modifier",
+        abilityModifier: "CHA",
+        recharges: LONG_REST,
+        dieType: "d6",
+        dieSidesByLevel: [
+          { level: 1, count: 6 },
+          { level: 5, count: 8 },
+          { level: 10, count: 10 },
+          { level: 15, count: 12 },
+        ],
+      },
     },
     SPELL_SLOTS_FULL,
   ],
@@ -100,77 +111,6 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
         "Spent when you use Second Wind (Bonus Action) to regain Hit Points (1d10 + Fighter level). 2 uses per short rest.",
       uses: { type: "fixed", fixedAmount: 2, recharges: SHORT_REST },
     },
-    {
-      id: "action_surge",
-      name: "Action Surge",
-      description:
-        "Spent when you use Action Surge to take one additional Action on your turn. 1 use at level 2, 2 uses at level 17. Recharges on a short rest.",
-      uses: {
-        type: "at_level",
-        atLevelMode: "tier",
-        recharges: SHORT_REST,
-        atLevelTable: [
-          { level: 2, count: 1 },
-          { level: 17, count: 2 },
-        ],
-      },
-    },
-    {
-      id: "indomitable",
-      name: "Indomitable",
-      description:
-        "Spent when you use Indomitable to turn a failed saving throw into a success. 1 use at 9th level, 2 at 13th, 3 at 17th. Recharges on a long rest.",
-      uses: {
-        type: "at_level",
-        atLevelMode: "tier",
-        recharges: [{ rest: "long_rest" }],
-        atLevelTable: [
-          { level: 9, count: 1 },
-          { level: 13, count: 2 },
-          { level: 17, count: 3 },
-        ],
-      },
-    },
-    {
-      id: "superiority_dice",
-      name: "Superiority Dice",
-      description:
-        "Spent when you use a Battle Master maneuver. Four d8s at level 3, five at level 7, six at level 15. Die becomes d10 at level 10 and d12 at level 18. Recharges on a short or long rest.",
-      uses: {
-        type: "at_level",
-        atLevelMode: "tier",
-        dieType: "d8",
-        recharges: SHORT_OR_LONG_REST,
-        atLevelTable: [
-          { level: 3, count: 4 },
-          { level: 7, count: 5 },
-          { level: 15, count: 6 },
-        ],
-      },
-    },
-    {
-      id: "psionic_energy_dice",
-      name: "Psionic Energy Dice",
-      description:
-        "Spent on Psi Warrior powers (Protective Field, Psionic Strike, Telekinetic Movement, and similar). Pool size and die size scale by Fighter level. Regain one die on a short rest and all dice on a long rest.",
-      uses: {
-        type: "at_level",
-        atLevelMode: "tier",
-        dieType: "d6",
-        recharges: [
-          { rest: "short_rest", amount: 1 },
-          { rest: "long_rest" },
-        ],
-        atLevelTable: [
-          { level: 3, count: 4 },
-          { level: 5, count: 6 },
-          { level: 9, count: 8 },
-          { level: 11, count: 8 },
-          { level: 13, count: 10 },
-          { level: 17, count: 12 },
-        ],
-      },
-    },
   ],
   Monk: [
     {
@@ -210,31 +150,7 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
   Ranger: [
     SPELL_SLOTS_HALF,
   ],
-  Rogue: [
-    {
-      id: "psionic_energy_dice",
-      name: "Psionic Energy Dice",
-      description:
-        "Spent on Soulknife psionic powers (Psi-Bolstered Knack, Psychic Whispers, Homing Strikes, and similar). Pool size and die size scale by Rogue level. Regain one die on a short rest and all dice on a long rest.",
-      uses: {
-        type: "at_level",
-        atLevelMode: "tier",
-        dieType: "d6",
-        recharges: [
-          { rest: "short_rest", amount: 1 },
-          { rest: "long_rest" },
-        ],
-        atLevelTable: [
-          { level: 3, count: 4 },
-          { level: 5, count: 6 },
-          { level: 9, count: 8 },
-          { level: 11, count: 8 },
-          { level: 13, count: 10 },
-          { level: 17, count: 12 },
-        ],
-      },
-    },
-  ],
+  Rogue: [],
   Sorcerer: [
     {
       id: "sorcery_points",
@@ -247,13 +163,6 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
         recharges: LONG_REST,
         atLevelTable: [{ level: 1, count: 1 }],
       },
-    },
-    {
-      id: "innate_sorcery",
-      name: "Innate Sorcery",
-      description:
-        "Spent when you activate Innate Sorcery (Bonus Action) for 1 minute of enhanced spellcasting. 2 uses per long rest.",
-      uses: { type: "fixed", fixedAmount: 2, recharges: LONG_REST },
     },
     SPELL_SLOTS_FULL,
   ],

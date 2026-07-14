@@ -327,9 +327,13 @@ describe("collectSheetActions", () => {
             description: "Take one additional action on your turn.",
             activation: { action: true },
             limitedUses: {
-              type: "class_resource",
-              classResourceKey: "action_surge",
-              classResourceAmount: 1,
+              type: "at_level",
+              atLevelMode: "tier",
+              recharges: [{ rest: "short_rest" }],
+              atLevelTable: [
+                { level: 2, count: 1 },
+                { level: 17, count: 2 },
+              ],
             },
             linkedModifiers: [
               {
@@ -345,7 +349,8 @@ describe("collectSheetActions", () => {
     })
     const surge = actions.find((a) => a.name === "Action Surge")
     expect(surge?.category).toBe("combat")
-    expect(surge?.classResourceKey).toBe("action_surge")
+    expect(surge?.classResourceKey).toBeNull()
+    expect(surge?.limitedUses?.type).toBe("at_level")
   })
 
   it("expands Cunning Action into bonus-action Dash, Disengage, and Hide on the combat tab", () => {

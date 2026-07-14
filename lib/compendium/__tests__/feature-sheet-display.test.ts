@@ -26,7 +26,22 @@ describe("feature sheet display", () => {
       name: "Action Surge",
       description: "On your turn, you can take one additional action.",
       activation: { action: true },
-      limitedUses: { type: "class_resource", classResourceKey: "action_surge" },
+      limitedUses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        recharges: [{ rest: "short_rest" }],
+        atLevelTable: [
+          { level: 2, count: 1 },
+          { level: 17, count: 2 },
+        ],
+      },
+      linkedModifiers: [
+        {
+          instanceId: "modinst_action_surge",
+          catalogRefId: "cat_fx_extra_action",
+          activation: { effects: [{ id: "fx1", kind: "extra_action" }] },
+        },
+      ],
     }
     expect(inferFeatureSheetDisplay(feature as unknown as import("@/lib/character/sheet-actions").ActivatableItem)).toEqual({
       featuresTab: true,

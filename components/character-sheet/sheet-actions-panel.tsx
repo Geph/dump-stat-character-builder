@@ -20,6 +20,7 @@ import {
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
+import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import type { UsesConfig } from "@/lib/types"
 
 type SheetActionsPanelProps = {
@@ -243,11 +244,12 @@ export function SheetActionsPanel({
     }
     const max = resolveActionMax(action.limitedUses, action.classLevel, resolveContext)
     if (max != null && max > 0) {
+      const trackingId = resolveActionUsesTrackingKey(action)
       return {
         max,
-        used: usedByActionId[action.id] ?? 0,
+        used: usedByActionId[trackingId] ?? 0,
         setUsed: (next) =>
-          onUsedChange({ ...usedByActionId, [action.id]: Math.min(max, Math.max(0, next)) }),
+          onUsedChange({ ...usedByActionId, [trackingId]: Math.min(max, Math.max(0, next)) }),
       }
     }
     return null

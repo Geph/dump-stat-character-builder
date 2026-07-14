@@ -9,6 +9,7 @@ import {
   resolveUsesAtLevel,
   type ResolveUsesContext,
 } from "@/lib/compendium/resolve-uses-config"
+import { SUBCLASS_GATED_CLASS_RESOURCE_KEYS } from "@/lib/compendium/subclass-gated-class-resources"
 
 export type ClassResourceDisplayMode = "tracker" | "static" | "hidden"
 
@@ -20,17 +21,10 @@ export const HIDDEN_CLASS_RESOURCE_IDS = new Set([
 ])
 
 /** Fighter resources surfaced on the Combat Actions panel. */
-export const ACTION_PANEL_CLASS_RESOURCE_IDS = new Set([
-  "second_wind",
-  "action_surge",
-  "indomitable",
-])
+export const ACTION_PANEL_CLASS_RESOURCE_IDS = new Set(["second_wind"])
 
 /** Only show in the Resources column when subclass/content spends this pool. */
-export const SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS = new Set([
-  "superiority_dice",
-  "psionic_energy_dice",
-])
+export const SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS = SUBCLASS_GATED_CLASS_RESOURCE_KEYS
 
 export function shouldShowClassResourceOnSheet(
   resourceId: string,

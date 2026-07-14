@@ -605,6 +605,7 @@ const UsesConfigImportSchema = z.object({
       restores: z.number(),
     })
     .optional(),
+  useShareKey: z.string().optional(),
 })
 
 export const ClassResourceImportSchema = z.object({

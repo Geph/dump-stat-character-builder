@@ -10,6 +10,8 @@ export type SheetFeatureEffectContext = {
   abilityMods: Record<AbilityScoreKey, number>
   characterLevel: number
   currentHp?: number
+  /** Current die size (sides) per class-resource key — e.g. { superiority_dice: 8 }. */
+  classResourceDieSides?: Record<string, number>
 }
 
 export type SheetRollContextValue = LimitationEvaluationContext & {

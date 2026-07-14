@@ -1,3 +1,5 @@
+import { attachClassDetails, classLevelsToRows } from "@/lib/character/character-classes"
+import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-resource-die"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import {
   aggregateCharacteristics,
@@ -107,6 +109,7 @@ function describeAttackEntry(entry: RollModifierEntry): string {
 function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
+  classResourceDieSides: Record<string, number>,
 ): WeaponSheetAppliedModifier[] {
   const properties = getWeaponPropertyTags(weapon)
   const applied: WeaponSheetAppliedModifier[] = []
@@ -164,7 +167,9 @@ function collectAppliedModifiers(
       if (riderMod.automaticBonus) {
         applied.push({
           name: mod.label ?? "On-hit rider",
-          description: formatRollBonusSummary(riderMod.automaticBonus) || "Bonus damage on hit",
+          description:
+            formatRollBonusSummary(riderMod.automaticBonus, { classResourceDieSides }) ||
+            "Bonus damage on hit",
           sourceType: readModifierSource(mod)?.sourceType,
         })
       } else if (riderMod.riders?.length) {
@@ -268,6 +273,15 @@ export function buildWeaponSheetContext(
   const allMods = [...builderMods, ...equipmentMagicMods]
   aggregateCharacteristics(allMods)
 
+  const classRows = classLevelsToRows(
+    inputs.classLevels,
+    inputs.subclassByClassId,
+    inputs.classAddOrder ?? [],
+  )
+  const classResourceDieSides = buildClassResourceDieSidesMap(
+    attachClassDetails(classRows, inputs.classes, inputs.subclasses),
+  )
+
   const masteryCatalogEntries = weaponMasteryCatalogEntriesFromAbilities(inputs.customAbilities)
   const masteryName = getWeaponMastery(weapon)
   const masteryDescription = masteryName
@@ -286,6 +300,6 @@ export function buildWeaponSheetContext(
     masteryName,
     masteryDescription,
     masteryActive,
-    appliedModifiers: collectAppliedModifiers(weapon, allMods),
+    appliedModifiers: collectAppliedModifiers(weapon, allMods, classResourceDieSides),
   }
 }

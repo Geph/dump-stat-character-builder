@@ -60,7 +60,6 @@ describe("getClassDetailHeroBadges", () => {
     expect(getClassDetailHeroBadges(cls)).toEqual([
       { label: "WEAPON MASTERY" },
       { label: "SECOND WIND", emphasis: true },
-      { label: "ACTION SURGE", emphasis: true },
     ])
   })
 })

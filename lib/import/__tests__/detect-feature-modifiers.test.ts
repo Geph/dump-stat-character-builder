@@ -3,7 +3,9 @@ import type { CharacteristicModifier } from "@/lib/compendium/characteristic-mod
 import {
   detectFeatureModifiers,
   mergeDetectionsIntoFeature,
+  mergeFeatureModifierDetections,
 } from "@/lib/import/detect-feature-modifiers"
+import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
@@ -373,6 +375,32 @@ describe("detectFeatureModifiers", () => {
     const detections = detectFeatureModifiers(text, baseCtx)
     const skillDetections = detections.filter((entry) => entry.ruleId === "proficiency.skills.list")
     expect(skillDetections).toHaveLength(1)
+  })
+
+  it("dedupes across path 1 (AI) and path 2 (phrase detector) despite differing casing", () => {
+    // No wildcard preset involved here — this isolates the fingerprint case-sensitivity fix to
+    // the AI-vs-detector merge path itself, not just the wildcard-preset path. The phrase rule
+    // hardcodes "Medium armor" while the AI path title-cases to "Medium Armor".
+    const ctx = { ...baseCtx, featureName: "Homebrew Armor Training" }
+    const aiDetections = aiMechanicsToDetections(
+      [{ kind: "armor_proficiencies", armor: ["Medium Armor"], confidence: "high" }],
+      ctx,
+    )
+    const detectorDetections = detectFeatureModifiers(
+      "You gain proficiency with medium armor.",
+      ctx,
+    )
+    expect(detectorDetections.some((d) => d.ruleId === "proficiency.armor.medium")).toBe(true)
+
+    const merged = mergeFeatureModifierDetections(
+      { name: ctx.featureName, description: "", linkedModifiers: [] } as unknown as Feature,
+      aiDetections,
+      detectorDetections,
+    )
+    const armorInstances = (merged.linkedModifiers ?? []).filter(
+      (instance) => instance.characteristics?.[0]?.type === "armor_proficiencies",
+    )
+    expect(armorInstances).toHaveLength(1)
   })
 
   it("mergeDetectionsIntoFeature preserves existing linked modifiers", () => {

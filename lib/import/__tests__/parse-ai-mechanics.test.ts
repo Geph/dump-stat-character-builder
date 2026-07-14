@@ -74,6 +74,124 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
+  it("wires a fixed-amount, on-activation, self-target temporary_hit_points mechanic", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "temporary_hit_points",
+          amount: 5,
+          sourcePhrase: "you gain 5 temporary hit points",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Test Class", featureName: "Bolstering Strike" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.temporary_hit_points")
+    expect(detections[0]?.instance.catalogRefId).toBe("cat_fx_grant_temp_hp")
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect?.kind).toBe("grant_temp_hp")
+    expect(effect?.healMode).toBe("fixed")
+    expect(effect?.healFixed).toBe(5)
+  })
+
+  it("wires amountDice and amountScaling variants of temporary_hit_points", () => {
+    const dice = aiMechanicsToDetections(
+      [{ kind: "temporary_hit_points", amountDice: "2d6" }],
+      { contentKind: "class_feature", featureName: "Dice THP" },
+    )
+    const diceEffect = dice[0]?.instance.activation?.effects?.[0]
+    expect(diceEffect?.healMode).toBe("dice")
+    expect(diceEffect?.healDiceCount).toBe(2)
+    expect(diceEffect?.healDieType).toBe("d6")
+
+    const byLevel = aiMechanicsToDetections(
+      [{ kind: "temporary_hit_points", amountScaling: "character_level", amount: 1 }],
+      { contentKind: "class_feature", featureName: "Level-Scaled THP" },
+    )
+    const levelEffect = byLevel[0]?.instance.activation?.effects?.[0]
+    expect(levelEffect?.healMode).toBe("character_level")
+    expect(levelEffect?.healLevelMultiplier).toBe(1)
+
+    const byAbility = aiMechanicsToDetections(
+      [{ kind: "temporary_hit_points", amountScaling: "ability_modifier", ability: "constitution" }],
+      { contentKind: "class_feature", featureName: "CON-Scaled THP" },
+    )
+    const abilityEffect = byAbility[0]?.instance.activation?.effects?.[0]
+    expect(abilityEffect?.healMode).toBe("ability_modifier")
+    expect(abilityEffect?.healAbility).toBe("CON")
+  })
+
+  it("does not wire temporary_hit_points triggers/targets the sheet can't apply yet", () => {
+    // turn_start / on_hit triggers have no "grant temp HP" field on those characteristics.
+    expect(
+      aiMechanicsToDetections(
+        [{ kind: "temporary_hit_points", amount: 5, thpTrigger: "turn_start" }],
+        { contentKind: "class_feature", featureName: "Turn Start THP" },
+      ),
+    ).toEqual([])
+    // Granting temp HP to another creature has no target on a single-character sheet.
+    expect(
+      aiMechanicsToDetections(
+        [{ kind: "temporary_hit_points", amount: 5, thpTarget: "allies_in_range" }],
+        { contentKind: "class_feature", featureName: "Ally THP" },
+      ),
+    ).toEqual([])
+  })
+
+  it("still does not wire movement_grant (accepted in schema, no characteristic mapping yet)", () => {
+    expect(
+      aiMechanicsToDetections(
+        [{ kind: "movement_grant", distanceMode: "fraction_of_speed", fraction: 0.5 }],
+        { contentKind: "class_feature", featureName: "Guiding Hand" },
+      ),
+    ).toEqual([])
+  })
+
+  it("wires alternateRefresh (spend another resource to restore a use) onto UsesConfig", () => {
+    const byResource = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          usesFixed: 1,
+          usesRecharge: "long_rest",
+          alternateRefresh: {
+            spendResourceKey: "bardic_inspiration",
+            spendAmount: 1,
+            actionCost: "none",
+          },
+          sourcePhrase: "you can restore it by expending a Bardic Inspiration",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Homebrew Rider" },
+    )
+    const uses = byResource[0]?.instance.characteristics?.[0]
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses?.restoreByResource).toEqual({
+        resourceKey: "bardic_inspiration",
+        resourceAmount: 1,
+        restores: 1,
+      })
+    }
+
+    const bySpellSlot = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          usesAbility: "WIS",
+          usesRecharge: "short_rest",
+          alternateRefresh: { spendSpellSlotMinLevel: 1, actionCost: "none" },
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Homebrew Quarry" },
+    )
+    const usesBySlot = bySpellSlot[0]?.instance.characteristics?.[0]
+    expect(usesBySlot?.type).toBe("uses")
+    if (usesBySlot?.type === "uses") {
+      expect(usesBySlot.uses?.restoreBySpellSlot).toEqual({ minSpellLevel: 1, restores: 1 })
+    }
+  })
+
   it("wires requiresSheetToggle on damage modifiers from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [
