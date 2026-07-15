@@ -185,8 +185,15 @@ export const ImportMechanicSchema = z.object({
     .enum(["none", "character_level", "half_character_level_round_down"])
     .optional(),
   damageTypeOptions: z.array(z.string()).optional(),
-  /** initiative */
-  initiativeMode: z.enum(["flat_bonus", "add_proficiency", "ability_modifier"]).optional(),
+  /**
+   * initiative. "ability_modifier" REPLACES the roll's governing ability (e.g. some feature
+   * says initiative uses INT instead of DEX). "add_ability_modifier" ADDS the ability on top of
+   * the normal DEX-based roll — use this for "you can add your Wisdom modifier to the roll"
+   * phrasing (Ranger's Dread Ambusher, etc.), which is the far more common wording.
+   */
+  initiativeMode: z
+    .enum(["flat_bonus", "add_proficiency", "ability_modifier", "add_ability_modifier"])
+    .optional(),
   initiativeAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
   initiativeFlatBonus: z.number().optional(),
   /** telepathy */

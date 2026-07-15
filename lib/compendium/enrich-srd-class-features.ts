@@ -1191,17 +1191,13 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
           {
             name: "Multiattack Defense",
             description:
-              "When a creature hits you with an attack, you gain a +4 bonus to AC against all subsequent attacks from that creature for the rest of the turn.",
+              "When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.",
             linkedModifiers: [
-              charInstance("modinst_multiattack_defense", "cat_char_ac", [
-                {
-                  id: modId("multiattack_defense"),
-                  type: "ac",
-                  mode: "flat_bonus",
-                  flatBonus: 4,
-                  label: "+4 AC vs. subsequent attacks from same creature this turn",
-                },
-              ]),
+              // 2024 SRD: disadvantage on the attacker's *other* attacks this turn, not the
+              // 2014 rules' flat +4 AC — corrected during the Ranger subclass audit.
+              incomingAttackMode("multiattack_defense", "disadvantage", {
+                conditions: ["Other attacks this turn from a creature that already hit you"],
+              }),
             ],
           },
           {
@@ -4468,7 +4464,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Dreadful Strikes": {
     linkedModifiers: [
       onHitTriggerPreset("dreadful_strikes", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
-      extraDamageOnHit("dreadful_strikes_psychic", "1d4"),
+      // "increases to 1d6 when you reach Ranger level 11" — was stuck at a flat 1d4.
+      extraDamageOnHitByLevel("dreadful_strikes_psychic", [
+        { level: 3, dice: "1d4" },
+        { level: 11, dice: "1d6" },
+      ]),
     ],
   },
   "*::Otherworldly Glamour": {
