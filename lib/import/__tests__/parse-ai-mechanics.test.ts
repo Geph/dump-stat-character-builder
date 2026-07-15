@@ -580,6 +580,43 @@ describe("aiMechanicsToDetections", () => {
       value: "peerless_athlete_active",
     })
   })
+
+  it("wires initiative add_ability_modifier as additive, distinct from the replacing ability_modifier mode (Ranger's Dread Ambusher)", () => {
+    const additive = aiMechanicsToDetections(
+      [
+        {
+          kind: "initiative",
+          initiativeMode: "add_ability_modifier",
+          initiativeAbility: "wisdom",
+          sourcePhrase: "you can add your Wisdom modifier to the roll",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Ranger", featureName: "Dread Ambusher" },
+    )
+    expect(additive).toHaveLength(1)
+    const additiveChar = additive[0]?.instance.characteristics?.[0]
+    expect(additiveChar?.type).toBe("initiative")
+    if (additiveChar?.type === "initiative") {
+      expect(additiveChar.mode).toBe("add_ability_modifier")
+      expect(additiveChar.ability).toBe("WIS")
+    }
+
+    const replacing = aiMechanicsToDetections(
+      [
+        {
+          kind: "initiative",
+          initiativeMode: "ability_modifier",
+          initiativeAbility: "intelligence",
+          sourcePhrase: "initiative now uses your Intelligence modifier instead of Dexterity",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Test", featureName: "Tactical Mind" },
+    )
+    const replacingChar = replacing[0]?.instance.characteristics?.[0]
+    if (replacingChar?.type === "initiative") {
+      expect(replacingChar.mode).toBe("ability_modifier")
+    }
+  })
 })
 
 describe("import modifier review helpers", () => {

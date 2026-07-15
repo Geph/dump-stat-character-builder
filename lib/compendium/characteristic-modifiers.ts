@@ -482,6 +482,8 @@ export type InitiativeCharacteristicMode =
   | "flat_bonus"
   | "add_proficiency"
   | "ability_modifier"
+  /** Adds another ability's modifier on top of (not instead of) the normal DEX-based roll. */
+  | "add_ability_modifier"
 
 export interface InitiativeCharacteristic extends CharacteristicModifierBase {
   type: "initiative"
@@ -1815,6 +1817,8 @@ export type AggregatedCharacteristics = {
   initiativeIncludeProficiency: boolean
   initiativeAbility: AbilityModifierKey | null
   initiativeAbilityBonus: number
+  /** Ability modifiers added on top of the normal initiative roll (e.g. Dread Ambusher's WIS). */
+  initiativeAdditionalAbilities: AbilityModifierKey[]
   vision: { type: string; rangeFeet: number }[]
   speed: Record<string, number>
   /** Climb/swim/fly speeds that mirror walking speed (Peak Athlete). */
@@ -1905,6 +1909,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   initiativeIncludeProficiency: false,
   initiativeAbility: null,
   initiativeAbilityBonus: 0,
+  initiativeAdditionalAbilities: [],
   vision: [],
   speed: {},
   speedEqualToWalk: [],
@@ -2154,6 +2159,8 @@ export function aggregateCharacteristics(
         } else if (mod.mode === "ability_modifier") {
           result.initiativeAbility = mod.ability ?? "DEX"
           result.initiativeAbilityBonus = mod.bonus ?? 0
+        } else if (mod.mode === "add_ability_modifier" && mod.ability) {
+          result.initiativeAdditionalAbilities.push(mod.ability)
         }
         break
       case "vision": {
@@ -2457,6 +2464,9 @@ export function computeInitiative(
     init =
       abilityMods[abilityModifierKeyToScoreKey(aggregated.initiativeAbility)] +
       aggregated.initiativeAbilityBonus
+  }
+  for (const ability of aggregated.initiativeAdditionalAbilities) {
+    init += abilityMods[abilityModifierKeyToScoreKey(ability)]
   }
   init += aggregated.initiativeFlatBonus
   if (aggregated.initiativeIncludeProficiency) init += proficiencyBonus

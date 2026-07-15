@@ -397,7 +397,7 @@ function buildFromMechanic(
           type: "initiative",
           mode,
           ...(mode === "flat_bonus" ? { flatBonus: mechanic.initiativeFlatBonus ?? 1 } : {}),
-          ...(mode === "ability_modifier"
+          ...(mode === "ability_modifier" || mode === "add_ability_modifier"
             ? {
                 ability: abilityScoreToModifierKey(mechanic.initiativeAbility),
                 bonus: 0,
