@@ -1,6 +1,18 @@
+import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { DndClass } from "@/lib/types"
 import { usesPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+
+/**
+ * A class row's effective spellcasting config: the class's own spellcasting, or (when the class
+ * itself doesn't cast) its subclass's granted spellcasting — e.g. Fighter has none, but Eldritch
+ * Knight (subclass) grants third-caster spell slots.
+ */
+export function resolveEffectiveClassSpellcasting(
+  entry: Pick<CharacterClassDetail, "class" | "subclass">,
+): DndClass["spellcasting"] | null {
+  return entry.class?.spellcasting ?? entry.subclass?.spellcasting ?? null
+}
 
 /** Map SRD spellcasting ability labels (including "Dexterity and Wisdom") to a score key. */
 export function resolveSpellcastingAbilityKey(

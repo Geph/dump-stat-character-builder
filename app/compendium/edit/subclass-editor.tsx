@@ -9,7 +9,14 @@ import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
 } from "@/components/compendium/compendium-editor-section"
-import type { DndClass, Feature, FeatureChoice, ClassResource, ClassResourceRow } from "@/lib/types"
+import type {
+  DndClass,
+  Feature,
+  FeatureChoice,
+  ClassResource,
+  ClassResourceRow,
+  NewToggleDeclaration,
+} from "@/lib/types"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
@@ -42,6 +49,8 @@ interface SubclassFormData {
   icon: string | null
   accent_color: string | null
   card_image_url: string | null
+  /** Preserved on load/save; no dedicated editor UI yet — see requiresSheetToggle on mechanics. */
+  new_toggles: NewToggleDeclaration[] | null
 }
 
 const defaultSubclass: SubclassFormData = {
@@ -55,6 +64,7 @@ const defaultSubclass: SubclassFormData = {
   icon: null,
   accent_color: null,
   card_image_url: null,
+  new_toggles: null,
 }
 
 export default function SubclassEditorPage({ id }: { id: string }) {
@@ -110,6 +120,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
               icon: (row.icon as string | null) ?? null,
               accent_color: (row.accent_color as string | null) ?? null,
               card_image_url: (row.card_image_url as string | null) ?? null,
+              new_toggles: (row.new_toggles as NewToggleDeclaration[] | null) ?? null,
             })
             setHasSpellcasting(!!row.spellcasting)
           }

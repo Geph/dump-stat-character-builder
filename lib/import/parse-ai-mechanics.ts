@@ -75,6 +75,39 @@ function aiConfidence(mechanic: ImportMechanic): DetectionConfidence {
   return mechanic.confidence ?? "medium"
 }
 
+/**
+ * Shared by the top-level `damage_roll_modifiers` mechanic and `on_hit_trigger`'s nested effect —
+ * both describe "extra NdM [damage type] damage" via the same characteristic shape. Returns null
+ * when there's no dice to report (bonusDice missing/blank).
+ */
+function buildDamageRollModifiersCharacteristic(
+  mechanic: ImportMechanic,
+  ctx: DetectFeatureContext,
+  idSuffix: string,
+  labelSuffix?: string,
+) {
+  const dice = mechanic.bonusDice?.trim()
+  if (!dice) return null
+  const damageType = mechanic.damageType ? titleCaseWords(mechanic.damageType) : undefined
+  const creatureTypes = mechanic.targetCreatureTypes?.map(titleCaseWords).filter(Boolean)
+  const entry = {
+    bonus: 0,
+    target: "all",
+    customTarget: `${dice}${damageType ? ` ${damageType}` : ""}`,
+    ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
+  }
+  const baseLabel = creatureTypes?.length
+    ? `Extra ${dice}${damageType ? ` ${damageType}` : ""} vs ${creatureTypes.join(", ")}`
+    : `Extra ${dice}${damageType ? ` ${damageType}` : ""} damage`
+  return {
+    id: modId(instanceKey(ctx, idSuffix)),
+    type: "damage_roll_modifiers" as const,
+    entries: [entry],
+    label: labelSuffix ? `${baseLabel} ${labelSuffix}` : baseLabel,
+    ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+  }
+}
+
 function isReactionRechargePhrase(phrase: string): boolean {
   return (
     /\bonce you take this reaction\b/i.test(phrase) ||
@@ -131,7 +164,14 @@ function buildTemporaryHitPointsEffect(
     mechanic.amountScaling === "ability_modifier" && mechanic.ability
       ? { healMode: "ability_modifier" as const, healAbility: abilityScoreToModifierKey(mechanic.ability) }
       : mechanic.amountScaling === "character_level"
-        ? { healMode: "character_level" as const, healLevelMultiplier: mechanic.amount ?? 1 }
+        ? {
+            // amountMultiplier is documented for class_resource_die doubling ("twice the number
+            // rolled"), but the cheatsheet's wording is easy to misread for character_level
+            // scaling too ("three times your level") — accept it as a fallback rather than
+            // silently granting 1x level when the LLM puts the multiplier there instead of amount.
+            healMode: "character_level" as const,
+            healLevelMultiplier: mechanic.amount ?? mechanic.amountMultiplier ?? 1,
+          }
         : dice
           ? { healMode: "dice" as const, healDiceCount: dice.count, healDieType: dice.dieType }
           : mechanic.amount != null
@@ -258,6 +298,17 @@ function buildFromMechanic(
   }
 
   if (mechanic.kind === "on_hit_trigger") {
+    // Bonus damage ("extra NdM [type] damage on hit") is described via the SAME
+    // damage_roll_modifiers shape used by the top-level mechanic — nested here as this
+    // trigger's `effect` so it actually shows up on the weapon attack line, gated by
+    // triggerOn/oncePerTurn/spendResourceKey on the outer trigger characteristic.
+    const nestedDamage = buildDamageRollModifiersCharacteristic(
+      mechanic,
+      ctx,
+      "on_hit_damage",
+      mechanic.oncePerTurn ? "(once per turn, on hit)" : "(on hit)",
+    )
+    const nestedInstanceId = nestedDamage ? instanceKey(ctx, "on_hit_damage_effect") : undefined
     return {
       ruleId: "ai.on_hit_trigger",
       confidence: aiConfidence(mechanic),
@@ -283,8 +334,17 @@ function buildFromMechanic(
           ...(mechanic.requiresSheetToggle
             ? { requiresSheetToggle: mechanic.requiresSheetToggle as never }
             : {}),
-          // Dice / scaling / damageTypeOptions remain on the ImportMechanic for review when
-          // nested bonus-damage wiring is incomplete.
+          ...(nestedDamage && nestedInstanceId
+            ? {
+                effect: {
+                  instanceId: nestedInstanceId,
+                  catalogRefId: characteristicCatalogRefId("damage_roll_modifiers"),
+                  characteristics: [nestedDamage],
+                },
+              }
+            : {}),
+          // damageTypeOptions (player-chosen damage type per use) remains on the ImportMechanic
+          // for review — there's no per-use damage-type-choice mechanism on this characteristic.
         },
       ]),
     }
@@ -554,6 +614,7 @@ function buildFromMechanic(
               spellId: spellNamePlaceholder(name),
               alwaysPrepared: mechanic.alwaysPrepared ?? true,
               castAsRitual: mechanic.castAsRitual || undefined,
+              unlocksAtClassLevel: mechanic.unlocksAtClassLevel,
             })),
             choiceGrants,
             alwaysPrepared: mechanic.alwaysPrepared ?? (spellNames.length > 0 ? true : undefined),
@@ -575,6 +636,7 @@ function buildFromMechanic(
               type: "ac",
               mode: "flat_bonus",
               flatBonus: mechanic.acFlatBonus,
+              ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
             },
           ]),
         }
@@ -602,6 +664,7 @@ function buildFromMechanic(
             mode: "ability_modifiers",
             base: mechanic.acBase,
             abilities,
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),
       }
@@ -638,27 +701,11 @@ function buildFromMechanic(
       }
     }
     case "damage_roll_modifiers": {
-      const dice = mechanic.bonusDice?.trim()
-      if (!dice) return null
-      const damageType = mechanic.damageType ? titleCaseWords(mechanic.damageType) : undefined
-      const creatureTypes = mechanic.targetCreatureTypes?.map(titleCaseWords).filter(Boolean)
-      const entry = {
-        bonus: 0,
-        target: "all",
-        customTarget: `${dice}${damageType ? ` ${damageType}` : ""}`,
-        ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
-      }
-      const characteristic = {
-        id: modId(instanceKey(ctx, "damage")),
-        type: "damage_roll_modifiers" as const,
-        entries: [entry],
-        label: creatureTypes?.length
-          ? `Extra ${dice}${damageType ? ` ${damageType}` : ""} vs ${creatureTypes.join(", ")}`
-          : `Extra ${dice}${damageType ? ` ${damageType}` : ""} damage`,
-        ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
-      }
+      const characteristic = buildDamageRollModifiersCharacteristic(mechanic, ctx, "damage")
+      if (!characteristic) return null
+      const hasCreatureTypes = characteristic.entries[0]?.onlyVsCreatureTypes?.length
       return {
-        ruleId: creatureTypes?.length ? "ai.damage.creature_type" : "ai.damage",
+        ruleId: hasCreatureTypes ? "ai.damage.creature_type" : "ai.damage",
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, characteristicCatalogRefId("damage_roll_modifiers"), [
@@ -699,7 +746,8 @@ function buildFromMechanic(
       }
     }
     case "speed": {
-      if (mechanic.speedFeet == null) return null
+      const isEqualToWalk = mechanic.speedMode === "equal_to_walk"
+      if (!isEqualToWalk && mechanic.speedFeet == null) return null
       return {
         ruleId: "ai.speed",
         confidence: aiConfidence(mechanic),
@@ -709,11 +757,12 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "speed")),
             type: "speed",
             speedType: mechanic.speedType ?? "walk",
-            mode: "add",
-            value: mechanic.speedFeet,
+            mode: isEqualToWalk ? "equal_to_walk" : "add",
+            value: isEqualToWalk ? 0 : (mechanic.speedFeet as number),
             ...(mechanic.canHover && (mechanic.speedType ?? "walk") === "fly"
               ? { customType: "hover" }
               : {}),
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),
       }

@@ -90,6 +90,24 @@ Cleric Level 	Prepared Spells
 
     expect(parseSubclassSpellTable(description)).toBeNull()
   })
+
+  it("flags multi-table 'choose a subtype' spell features instead of wiring the first table", () => {
+    // Circle of the Land Spells: one table per land type (Arid/Polar/Temperate/Tropical), player
+    // picks one each long rest. Picking any single table's spells to auto-wire would be wrong
+    // regardless of which one — this must be left unwired, not silently default to the first.
+    const description =
+      "<p>Whenever you finish a Long Rest, choose one type of land...</p>" +
+      "<h3>Arid Land</h3><table><tbody><tr><td>Druid Level</td><td>Circle Spells</td></tr>" +
+      "<tr><td>3</td><td>Blur, Burning Hands, Fire Bolt</td></tr></tbody></table>" +
+      "<h3>Polar Land</h3><table><tbody><tr><td>Druid Level</td><td>Circle Spells</td></tr>" +
+      "<tr><td>3</td><td>Fog Cloud, Hold Person, Ray of Frost</td></tr></tbody></table>"
+
+    const parsed = parseSubclassSpellTable(description)
+    expect(parsed?.ambiguousMultiTable).toBe(true)
+    expect(parsed?.tableCount).toBe(2)
+    expect(parsed?.rows).toEqual([])
+    expect(parsed?.allSpellNames).toEqual([])
+  })
 })
 
 describe("resolveSpellNamesToIds", () => {

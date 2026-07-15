@@ -33,6 +33,7 @@ import {
   PDF_IMPORT_MAX_BYTES,
   withPdfParseTimeout,
 } from "@/lib/import/pdf-import-limits"
+import { maxPdfPagesForContentTypeHint, validatePdfPageLimit } from "@/lib/import/import-source-limits"
 import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -158,6 +159,13 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
+    } else if (maxPdfPagesForContentTypeHint(contentTypeHint) != null) {
+      return NextResponse.json(
+        {
+          error: `Spell imports require a page range of at most ${maxPdfPagesForContentTypeHint(contentTypeHint)} pages.`,
+        },
+        { status: 400 },
+      )
     }
 
     let text: string
@@ -171,6 +179,14 @@ export async function POST(request: NextRequest) {
           { error: `End page ${pageRange.last} exceeds PDF length (${totalPages} pages).` },
           { status: 400 },
         )
+      }
+      const pageLimit = validatePdfPageLimit({
+        contentTypeHint,
+        pageRange,
+        totalPages,
+      })
+      if (!pageLimit.ok) {
+        return NextResponse.json({ error: pageLimit.message }, { status: 400 })
       }
     } catch (pdfError) {
       console.error("PDF parsing error:", pdfError)

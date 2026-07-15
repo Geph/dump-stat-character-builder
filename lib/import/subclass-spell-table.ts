@@ -9,6 +9,16 @@ export type ParsedSubclassSpellTable = {
   rows: SubclassSpellTableRow[]
   /** Spell names flattened across all rows. */
   allSpellNames: string[]
+  /**
+   * Set when the description contains more than one <table> (e.g. Circle of the Land's
+   * "choose one land type, consult that table" pattern — a separate table per subtype
+   * option rather than one fixed always-prepared list). Auto-wiring would have to pick
+   * one table arbitrarily and silently ignore the rest, which is wrong regardless of
+   * which one is picked, so rows are left empty and this is surfaced for manual review
+   * instead.
+   */
+  ambiguousMultiTable?: boolean
+  tableCount?: number
 }
 
 const SPELL_NAME_SPLIT = /\s*,\s*|\s+and\s+|\s*;\s*/g
@@ -187,9 +197,18 @@ export function parseSubclassSpellTable(description: string): ParsedSubclassSpel
   const text = description ?? ""
   let rows: SubclassSpellTableRow[] = []
 
-  const tableMatch = text.match(/<table[\s\S]*?<\/table>/i)
-  if (tableMatch) {
-    rows = parseTableRows(parseHtmlTableRows(tableMatch[0]))
+  const tableMatches = text.match(/<table[\s\S]*?<\/table>/gi)
+  if (tableMatches && tableMatches.length > 1) {
+    return {
+      rows: [],
+      allSpellNames: [],
+      ambiguousMultiTable: true,
+      tableCount: tableMatches.length,
+    }
+  }
+
+  if (tableMatches && tableMatches.length === 1) {
+    rows = parseTableRows(parseHtmlTableRows(tableMatches[0]))
   }
 
   if (rows.length === 0) {

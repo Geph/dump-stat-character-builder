@@ -54,6 +54,7 @@ import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-po
 import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
 import {
   getMulticlassSpellSlotTables,
+  resolveEffectiveClassSpellcasting,
   isConcentrationCondition,
   getActiveConcentration,
   formatSpellListGroupLabel,
@@ -135,6 +136,7 @@ import {
 import {
   applySheetToggleChange,
   PRIMORDIAL_ASPECT_TOGGLES,
+  sheetToggleDefinitionsFromNewToggles,
   type SheetToggleDefinition,
 } from "@/lib/compendium/sheet-toggle-registry"
 import {
@@ -1026,6 +1028,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     )
     if (hasElementalMind) dynamic.push(...PRIMORDIAL_ASPECT_TOGGLES)
     dynamic.push(...magicItemToggleDefinitions(magicItemPowers, equipmentById))
+    for (const entry of classDetails) {
+      dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.class?.new_toggles))
+      dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.subclass?.new_toggles))
+    }
     return buildCharacterSheetToggleDefinitions(referencedSheetToggleIds, dynamic)
   }, [classDetails, referencedSheetToggleIds, magicItemPowers, equipmentById])
 
@@ -1181,12 +1187,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (!classDetails.length) return []
     return getMulticlassSpellSlotTables(
       classDetails
-        .filter((entry) => entry.class?.spellcasting)
         .map((entry) => ({
-          className: entry.class!.name,
+          className: entry.class?.name ?? "",
           classLevel: entry.row.level,
-          spellcasting: entry.class!.spellcasting,
-        })),
+          spellcasting: resolveEffectiveClassSpellcasting(entry),
+        }))
+        .filter((entry) => entry.spellcasting),
     )
   }, [classDetails])
 
@@ -1623,6 +1629,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
     setUsedResourcesById(result.usedResourcesById)
     setAccumulatedResources(result.accumulatedResources)
+    if (result.currentHp !== currentHp) setCurrentHp(result.currentHp)
   }, [
     turnStartTriggers,
     usedResourcesById,

@@ -171,6 +171,8 @@ export async function persistImportedContent(
         name: sc.name,
         description: sc.description,
         features: sc.features,
+        new_toggles: sc.new_toggles ?? null,
+        spellcasting: sc.spellcasting ?? null,
         source,
         class_id: classIdMap.get(sc.class_name) || null,
         class_name: sc.class_name,

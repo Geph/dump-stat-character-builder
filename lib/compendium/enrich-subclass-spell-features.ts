@@ -96,7 +96,7 @@ export function enrichSubclassSpellTableFeatures(
     if (!isSubclassSpellTableFeature(name, description)) return feature
 
     const parsed = parseSubclassSpellTable(description)
-    if (!parsed) return feature
+    if (!parsed || parsed.ambiguousMultiTable) return feature
 
     const spellEntries: SpellsKnownEntry[] = []
     for (const tableRow of parsed.rows) {

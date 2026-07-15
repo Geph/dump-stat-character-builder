@@ -2,6 +2,11 @@ import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
 import type { ImportContentTypeHint } from "@/lib/import/content-type-hints"
 import type { CustomSystemsImportHints } from "@/lib/import/custom-systems-import-hints"
 import type { SubclassMatchImportHint } from "@/lib/import/subclass-match-import-hints"
+import {
+  PASTED_SOURCE_TEXT_MAX_CHARS,
+  SPELLS_PDF_MAX_PAGES,
+  maxPdfPagesForContentTypeHint,
+} from "@/lib/import/import-source-limits"
 
 export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from PDF or web)
 
@@ -17,11 +22,13 @@ For best extraction results, your source text should:
 - Preserve HTML <table> blocks for subclass spell lists in feature descriptions when present. If the source text lost its whitespace/line breaks (common with PDF copy-paste, e.g. "Cleric LevelPrepared Spells3Aid, Bless, Cure Wounds5Mass Healing Word..." with no gap between the level number and the spell names), reconstruct it into a real <table> with one <tr> per class level rather than pasting the squished run of text — the importer cannot reliably re-split a level number from a spell name without a delimiter
 - Use a single class or subclass name consistently (match SRD names when importing into an SRD-seeded compendium; for homebrew use the source's own header name, not a designer-prefixed invention)
 - Avoid mixing unrelated chapters (equipment tables + feats + multiple unrelated classes in one paste)
+- Stay under ${PASTED_SOURCE_TEXT_MAX_CHARS.toLocaleString()} characters of pasted source text so Plus-tier ChatGPT, Claude, and Gemini can take the combined prompt (about one class chapter or a short spell batch)
 
 PDF tips:
 - Copy text from a vector PDF when possible; scanned images need OCR first
 - Page headers/footers are OK — importers strip obvious boilerplate
 - Page ranges: skip other classes, or isolate a library section (e.g. Psionic Disciplines) before the class chapter — do not use them to split a class from its own subclasses
+- Spell PDF imports: at most ${SPELLS_PDF_MAX_PAGES} pages per pass
 - Class PDFs with a level table plus feature sections often parse with zero AI when structure is clean
 
 Multi-file homebrew (spellcasters, psionics, martial exploits, and similar):
@@ -70,13 +77,25 @@ export type ByoExtractionPromptOptions = {
   customSystems?: CustomSystemsImportHints
   /** Optional match to an existing subclass (locks class_name / name in the prompt). */
   subclassMatch?: SubclassMatchImportHint | null
+  /** Content-type hint used for page caps (e.g. spells → 15 pages). */
+  contentTypeHint?: string | null
 }
 
-function formatPdfUploadBlock(pageScope?: ByoPdfPageScope): string {
+function formatPdfUploadBlock(
+  pageScope?: ByoPdfPageScope,
+  contentTypeHint?: string | null,
+): string {
+  const maxPages = maxPdfPagesForContentTypeHint(contentTypeHint)
   const scopeLine =
     pageScope?.mode === "range"
-      ? `Page scope: Prefer extracting from PDF pages ${pageScope.start}–${pageScope.end} (1-based, inclusive). If that span is a class chapter, include the core class and its subclasses together. Tighten the range only when you intentionally want a subset (e.g. one subclass) or to exclude a different class.`
-      : "Page scope: Extract from the uploaded PDF. Prefer one class chapter at a time when the book has multiple classes; include that class and its subclasses in the same extraction."
+      ? `Page scope: Prefer extracting from PDF pages ${pageScope.start}–${pageScope.end} (1-based, inclusive). If that span is a class chapter, include the core class and its subclasses together. Tighten the range only when you intentionally want a subset (e.g. one subclass) or to exclude a different class.${
+          maxPages != null
+            ? ` Do not process more than ${maxPages} pages in this pass (${pageScope.end - pageScope.start + 1} pages selected).`
+            : ""
+        }`
+      : maxPages != null
+        ? `Page scope: Spell imports are limited to ${maxPages} pages per pass. Extract only a contiguous ${maxPages}-page window (or fewer); do not process the entire PDF if it is longer.`
+        : "Page scope: Extract from the uploaded PDF. Prefer one class chapter at a time when the book has multiple classes; include that class and its subclasses in the same extraction."
 
   return `PDF upload workflow
 
@@ -425,7 +444,10 @@ export function buildByoExtractionPrompt(
   ]
 
   if (options?.pdfUpload) {
-    sections.push("", formatPdfUploadBlock(options.pageScope))
+    sections.push(
+      "",
+      formatPdfUploadBlock(options.pageScope, contentTypeHint ?? options.contentTypeHint),
+    )
   }
 
   sections.push(

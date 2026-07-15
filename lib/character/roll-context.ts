@@ -4,6 +4,7 @@ export type RollKind =
   | "ability"
   | "skill"
   | "save"
+  | "death_save"
   | "attack"
   | "initiative"
   | "spell_attack"
@@ -21,6 +22,7 @@ export type RollContext = {
 
 export function rollContextLabel(context: RollContext): string {
   if (context.kind === "skill" && context.skillName) return context.skillName
+  if (context.kind === "death_save") return "Death save"
   if (context.ability) {
     const abbr = context.ability.slice(0, 3)
     const capitalized = abbr.charAt(0).toUpperCase() + abbr.slice(1)

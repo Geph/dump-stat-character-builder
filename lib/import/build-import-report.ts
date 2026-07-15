@@ -34,6 +34,9 @@ export type ImportReportSpellTable = {
   totalCount: number
   resolved: { name: string; unlocksAtClassLevel: number }[]
   missing: { name: string; unlocksAtClassLevel: number }[]
+  /** Multiple <table> blocks found (e.g. "choose a subtype" spell lists) — not auto-wired. */
+  ambiguousMultiTable?: boolean
+  tableCount?: number
 }
 
 export type ImportReportSubclassFeature = {
@@ -144,6 +147,19 @@ function analyzeSpellTableFeature(
   const parsed = parseSubclassSpellTable(description)
   if (!parsed) return undefined
 
+  if (parsed.ambiguousMultiTable) {
+    return {
+      featureName: feature.name ?? "Subclass Spells",
+      resolvedCount: 0,
+      missingCount: 0,
+      totalCount: 0,
+      resolved: [],
+      missing: [],
+      ambiguousMultiTable: true,
+      tableCount: parsed.tableCount,
+    }
+  }
+
   const resolved: { name: string; unlocksAtClassLevel: number }[] = []
   const missing: { name: string; unlocksAtClassLevel: number }[] = []
 
@@ -206,7 +222,11 @@ function analyzeSubclassFeature(
     )
   }
 
-  if (spellTable) {
+  if (spellTable?.ambiguousMultiTable) {
+    notes.push(
+      `Found ${spellTable.tableCount} separate spell tables (likely a choose-a-subtype pattern, e.g. Circle of the Land) — not auto-wired; needs manual review.`,
+    )
+  } else if (spellTable) {
     if (linkedSpellCount > 0) {
       notes.push(`Linked ${linkedSpellCount}/${spellTable.totalCount} always-prepared spells.`)
     } else if (spellTable.resolvedCount > 0) {

@@ -1,16 +1,39 @@
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportContent, NewToggleImport } from "@/lib/import/content-schema"
 import { markFeatureModifierReviewForPersist } from "@/lib/compendium/modifier-review"
 import type { Feature } from "@/lib/types"
 
 type StagingFeature = Feature & {
   mechanics?: unknown[]
   importModifierMeta?: unknown[]
+  new_toggles?: NewToggleImport[]
+}
+
+/**
+ * new_toggles belongs at the class/subclass level (sibling of features[]), but the LLM
+ * sometimes nests it inside the individual feature that needs it instead — hoist any of
+ * those up rather than silently dropping them (ClassFeatureSchema has no new_toggles field,
+ * so they'd otherwise vanish once the feature is normalized).
+ */
+function hoistNewTogglesFromFeatures(
+  features: unknown[] | undefined,
+  existing: NewToggleImport[] | undefined,
+): NewToggleImport[] | undefined {
+  const collected: NewToggleImport[] = [...(existing ?? [])]
+  for (const raw of features ?? []) {
+    const feature = raw as StagingFeature
+    for (const toggle of feature.new_toggles ?? []) {
+      if (!collected.some((entry) => entry.key === toggle.key)) {
+        collected.push(toggle)
+      }
+    }
+  }
+  return collected.length > 0 ? collected : existing
 }
 
 function stripFeatureStagingFields<T extends StagingFeature>(
   feature: T,
-): Omit<T, "mechanics" | "importModifierMeta"> {
-  const { mechanics: _mechanics, importModifierMeta: _meta, ...rest } = feature
+): Omit<T, "mechanics" | "importModifierMeta" | "new_toggles"> {
+  const { mechanics: _mechanics, importModifierMeta: _meta, new_toggles: _toggles, ...rest } = feature
   return rest
 }
 
@@ -29,6 +52,7 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
     next.classes = content.classes.map((cls) => ({
       ...cls,
       features: stripFeatures(cls.features) as typeof cls.features,
+      new_toggles: hoistNewTogglesFromFeatures(cls.features, cls.new_toggles),
     }))
   }
 
@@ -36,6 +60,7 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
     next.subclasses = content.subclasses.map((subclass) => ({
       ...subclass,
       features: stripFeatures(subclass.features) as typeof subclass.features,
+      new_toggles: hoistNewTogglesFromFeatures(subclass.features, subclass.new_toggles),
     }))
   }
 

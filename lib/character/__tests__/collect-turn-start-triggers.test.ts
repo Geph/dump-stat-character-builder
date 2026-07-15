@@ -81,4 +81,85 @@ describe("applyTurnStartTriggers", () => {
     })
     expect(result.accumulatedResources.influence_points?.value).toBe(1)
   })
+
+  it("heals ability_modifier + flat bonus while Bloodied and above 0 HP (Heroic Rally)", () => {
+    const healTrigger: TurnStartTriggerEntry = {
+      id: "heroic-rally",
+      name: "Heroic Rally",
+      classId: "fighter-1",
+      classLevel: 18,
+      trigger: {
+        id: "hr",
+        type: "turn_start_trigger",
+        healMode: "ability_modifier",
+        healAbility: "constitution",
+        healFlatBonus: 5,
+        hpBelowFraction: 0.5,
+        hpAtLeast: 1,
+      },
+    }
+    const result = applyTurnStartTriggers({
+      triggers: [healTrigger],
+      usedResourcesById: {},
+      resourceEntries: [],
+      resolveContext: { proficiencyBonus: 3, abilityModifiers: {} },
+      currentHp: 10,
+      maxHp: 30,
+      activeConditions: [],
+      abilityMods: { constitution: 2 },
+    })
+    expect(result.currentHp).toBe(17) // 10 + (5 + 2)
+  })
+
+  it("caps healing at maxHp", () => {
+    const healTrigger: TurnStartTriggerEntry = {
+      id: "heroic-rally",
+      name: "Heroic Rally",
+      classId: "fighter-1",
+      classLevel: 18,
+      trigger: {
+        id: "hr",
+        type: "turn_start_trigger",
+        healMode: "fixed",
+        healFixed: 100,
+        hpBelowFraction: 0.5,
+      },
+    }
+    const result = applyTurnStartTriggers({
+      triggers: [healTrigger],
+      usedResourcesById: {},
+      resourceEntries: [],
+      resolveContext: { proficiencyBonus: 3, abilityModifiers: {} },
+      currentHp: 10,
+      maxHp: 30,
+      activeConditions: [],
+    })
+    expect(result.currentHp).toBe(30)
+  })
+
+  it("does not heal when not Bloodied", () => {
+    const healTrigger: TurnStartTriggerEntry = {
+      id: "heroic-rally",
+      name: "Heroic Rally",
+      classId: "fighter-1",
+      classLevel: 18,
+      trigger: {
+        id: "hr",
+        type: "turn_start_trigger",
+        healMode: "fixed",
+        healFixed: 10,
+        hpBelowFraction: 0.5,
+      },
+    }
+    const result = applyTurnStartTriggers({
+      triggers: [healTrigger],
+      usedResourcesById: {},
+      resourceEntries: [],
+      resolveContext: { proficiencyBonus: 3, abilityModifiers: {} },
+      currentHp: 25,
+      maxHp: 30,
+      activeConditions: [],
+    })
+    expect(result.currentHp).toBe(25)
+  })
 })
