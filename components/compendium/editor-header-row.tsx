@@ -65,16 +65,16 @@ export function CompendiumEditorHeaderRow({
   return (
     <div className="space-y-4">
     <div className="flex flex-col sm:flex-row gap-4 items-start">
-      <div className="shrink-0 flex flex-col gap-3">
-        <div className="flex flex-col">
-          <span className="hidden sm:block text-sm font-semibold text-foreground mb-2 invisible select-none" aria-hidden>
-            Icon
-          </span>
+      <div className="shrink-0 flex flex-col gap-1">
+        <span className="hidden sm:block text-sm font-semibold text-foreground mb-2 invisible select-none" aria-hidden>
+          Icon
+        </span>
+        <div className="flex items-center gap-2">
           <GameIconPicker value={icon} onChange={onIconChange} inline />
+          {onAccentColorChange ? (
+            <CompendiumThemeColorPicker value={accentColor} onChange={onAccentColorChange} />
+          ) : null}
         </div>
-        {onAccentColorChange ? (
-          <CompendiumThemeColorPicker value={accentColor} onChange={onAccentColorChange} compact />
-        ) : null}
       </div>
       <div className={`flex-1 w-full min-w-0 grid ${gridCols} gap-4`}>
         <div>

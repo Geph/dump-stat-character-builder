@@ -422,7 +422,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               : {})}
           />
 
-          <CompendiumEditorPanel title="Category & cost">
+          <CompendiumEditorPanel title="Category & cost" defaultOpen>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -528,7 +528,7 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
           </div>
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Description">
+          <CompendiumEditorPanel title="Description" defaultOpen>
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}

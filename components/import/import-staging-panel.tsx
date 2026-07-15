@@ -8,7 +8,7 @@ import {
   pageOverlayPanelTitleClass,
 } from "@/lib/compendium/editor-field-styles"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, Layers } from "lucide-react"
+import { ChevronRight, Layers } from "lucide-react"
 
 export type ImportReviewPhase = "content" | "modifiers"
 
@@ -18,9 +18,7 @@ type ImportStagingPanelProps = {
   activeIndex: number
   phase: ImportReviewPhase
   hasModifiers: boolean
-  onPrevious: () => void
   onNext: () => void
-  canPrevious: boolean
   canNext: boolean
   /** Content review / collisions / card art for the active stage. */
   contentChildren: ReactNode
@@ -34,9 +32,7 @@ export function ImportStagingPanel({
   activeIndex,
   phase,
   hasModifiers,
-  onPrevious,
   onNext,
-  canPrevious,
   canNext,
   contentChildren,
   modifiersChildren,
@@ -133,31 +129,16 @@ export function ImportStagingPanel({
         {phase === "content" ? contentChildren : modifiersChildren}
       </div>
 
-      {canPrevious || canNext ? (
-        <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-3">
-          <button
-            type="button"
-            onClick={onPrevious}
-            disabled={!canPrevious}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-40"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-            Previous
-          </button>
-          <p className="text-[11px] text-muted-foreground">
-            {phase === "content" && hasModifiers
-              ? "Next: review modifier wiring"
-              : canNext
-                ? "Next: continue staged review"
-                : "Confirm below when ready"}
-          </p>
+      {canNext ? (
+        <div className="flex justify-end border-t border-border/70 pt-3">
           <button
             type="button"
             onClick={onNext}
-            disabled={!canNext}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
           >
-            Next
+            {phase === "content" && hasModifiers
+              ? "Next: review modifier wiring"
+              : "Next stage"}
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>

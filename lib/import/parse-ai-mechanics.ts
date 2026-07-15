@@ -23,7 +23,7 @@ import type {
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { createModifierLimitation } from "@/lib/compendium/modifier-limitations"
 import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
-import type { UsesConfig } from "@/lib/types"
+import type { FeatureActivation, UsesConfig } from "@/lib/types"
 
 const VALID_CHARACTERISTIC_KINDS = new Set(
   CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.map((option) => option.value),
@@ -236,6 +236,17 @@ function buildFromMechanic(
             checkCategory: mechanic.checkCategory ?? (mechanic.checkSkills?.length ? "skill" : "save"),
             checkAbility: mechanic.checkAbility ?? undefined,
             checkSkills: mechanic.checkSkills,
+            ...(mechanic.requiresSheetToggle
+              ? {
+                  limitations: [
+                    createModifierLimitation({
+                      kind: "sheet_toggle",
+                      rule: "requires_active",
+                      value: mechanic.requiresSheetToggle,
+                    }),
+                  ],
+                }
+              : {}),
           },
         ],
       }),
@@ -244,6 +255,22 @@ function buildFromMechanic(
 
   if (mechanic.kind === "turn_start_resource_restore") {
     if (!mechanic.restoreResourceKey || mechanic.restoreResourceAmount == null) return null
+    // See turn_start_trigger below — "hit_points"/"hp" means "heal", not a resource pool restore.
+    if (mechanic.restoreResourceKey === "hit_points" || mechanic.restoreResourceKey === "hp") {
+      return {
+        ruleId: "ai.turn_start_resource_restore.heal",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("turn_start_trigger"), [
+          {
+            id: modId(instanceKey(ctx, "turn_start_restore")),
+            type: "turn_start_trigger",
+            healMode: "fixed" as const,
+            healFixed: mechanic.restoreResourceAmount,
+          },
+        ]),
+      }
+    }
     return {
       ruleId: "ai.turn_start_resource_restore",
       confidence: aiConfidence(mechanic),
@@ -265,6 +292,12 @@ function buildFromMechanic(
   }
 
   if (mechanic.kind === "turn_start_trigger") {
+    // "hit_points"/"hp" isn't a class-resource pool — the LLM means "heal N HP at turn start"
+    // (Elder Champion's Regeneration, etc.), not a resource restore. Route it to the heal
+    // fields instead of restoreResourceKey, which would just no-op looking for a nonexistent
+    // "..._hit_points" resource row.
+    const isHitPointsRestore =
+      mechanic.restoreResourceKey === "hit_points" || mechanic.restoreResourceKey === "hp"
     return {
       ruleId: "ai.turn_start_trigger",
       confidence: aiConfidence(mechanic),
@@ -274,12 +307,14 @@ function buildFromMechanic(
           id: modId(instanceKey(ctx, "turn_start")),
           type: "turn_start_trigger",
           ...(mechanic.hpBelowFraction != null ? { hpBelowFraction: mechanic.hpBelowFraction } : {}),
-          ...(mechanic.restoreResourceKey
-            ? {
-                restoreResourceKey: mechanic.restoreResourceKey,
-                restoreResourceAmount: mechanic.restoreResourceAmount ?? 1,
-              }
-            : {}),
+          ...(isHitPointsRestore
+            ? { healMode: "fixed" as const, healFixed: mechanic.restoreResourceAmount ?? 1 }
+            : mechanic.restoreResourceKey
+              ? {
+                  restoreResourceKey: mechanic.restoreResourceKey,
+                  restoreResourceAmount: mechanic.restoreResourceAmount ?? 1,
+                }
+              : {}),
           ...(mechanic.grantResourceKey
             ? {
                 accrueResourceKey: mechanic.grantResourceKey,
@@ -437,13 +472,84 @@ function buildFromMechanic(
     return buildTemporaryHitPointsEffect(mechanic, ctx, instanceId, matchedPhrase)
   }
 
-  // Accepted in mechanics[] for import review / future wiring (no stable characteristic mapping yet).
-  if (
-    mechanic.kind === "weapon_reach_modifier" ||
-    mechanic.kind === "extra_weapon_mastery" ||
-    mechanic.kind === "movement_grant"
-  ) {
+  if (mechanic.kind === "weapon_reach_modifier") {
+    const reachBonusFeet = mechanic.reachBonusFeet
+    if (reachBonusFeet == null || !(reachBonusFeet > 0)) return null
+    return {
+      ruleId: "ai.weapon_reach_modifier",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("weapon_reach_modifier"), [
+        {
+          id: modId(instanceKey(ctx, "weapon_reach")),
+          type: "weapon_reach_modifier",
+          reachBonusFeet,
+          weaponPropertyFilter: mechanic.weaponPropertyFilter?.length ? mechanic.weaponPropertyFilter : undefined,
+          // Reach mechanics are overwhelmingly "your Unarmed Strike gains reach" (Elemental
+          // Attunement, etc.) rather than a filter on carried weapons — default true unless the
+          // source explicitly scoped this to specific weapon properties instead.
+          appliesToUnarmedStrike: !mechanic.weaponPropertyFilter?.length,
+          ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+        },
+      ]),
+    }
+  }
+
+  // extra_weapon_mastery: accepted in mechanics[] for import review only (no stable
+  // characteristic mapping yet — applying extra Weapon Mastery properties needs per-weapon
+  // mastery-slot bookkeeping this pipeline doesn't have).
+  if (mechanic.kind === "extra_weapon_mastery") {
     return null
+  }
+
+  if (mechanic.kind === "movement_grant") {
+    // Moving OTHER creatures (allies/chosen creatures) isn't modeled by movement_option, which
+    // is a self-only "extra movement option" effect — leave those for manual review.
+    if (mechanic.targets && mechanic.targets !== "self") return null
+
+    let moveDistanceMode: "speed" | "fixed" | "multiplier" | null = null
+    let moveDistanceFixed: number | undefined
+    let moveDistanceMultiplier: number | undefined
+    if (mechanic.distanceMode === "fixed" && mechanic.distanceFeet != null) {
+      moveDistanceMode = "fixed"
+      moveDistanceFixed = mechanic.distanceFeet
+    } else if (mechanic.distanceMode === "fraction_of_speed" && mechanic.fraction != null) {
+      moveDistanceMode = "multiplier"
+      moveDistanceMultiplier = mechanic.fraction
+    } else if (mechanic.distanceMode === "full_speed") {
+      moveDistanceMode = "speed"
+    }
+    if (!moveDistanceMode) return null
+
+    const trigger = mechanic.trigger?.toLowerCase() ?? ""
+    const activation: FeatureActivation = trigger.includes("bonus_action")
+      ? { bonusAction: true }
+      : trigger.includes("reaction")
+        ? { reaction: true }
+        : trigger.includes("action")
+          ? { action: true }
+          : {}
+
+    return {
+      ruleId: "ai.movement_grant",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: fxInstance(instanceId, effectCatalogRefId("movement_option"), {
+        ...activation,
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "movement_grant")),
+            kind: "movement_option",
+            moveDistanceMode,
+            ...(moveDistanceFixed != null ? { moveDistanceFixed } : {}),
+            ...(moveDistanceMultiplier != null ? { moveDistanceMultiplier } : {}),
+            ...(mechanic.teleport ? { movementTeleport: true } : {}),
+            ...(mechanic.provokesOpportunityAttacks === false ? { moveWithoutOpportunityAttacks: true } : {}),
+            label: matchedPhrase,
+          },
+        ],
+      }),
+    }
   }
 
   if (mechanic.kind === "damage_reduction") {
@@ -725,6 +831,7 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "resistance")),
             type: "damage_resistance",
             damageTypes: types,
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),
       }
@@ -741,6 +848,7 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "immune")),
             type: "condition_immunity",
             conditions,
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),
       }
@@ -814,17 +922,28 @@ function buildFromMechanic(
           instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
         }
       }
+      // "Spend N of class resource X" with no independent usesFixed/usesRecharge means the
+      // ability itself has no separate use cap — it's unlimited, gated only by resource
+      // availability (e.g. Hand of Healing: "expend 1 Focus Point", no per-rest cap of its own).
+      // Only take this branch when usesFixed/usesAbility weren't ALSO given — those mean there's
+      // a real cap on top of the resource cost (e.g. "3/long rest, or spend a resource to renew").
       const uses: UsesConfig = mechanic.usesAbility
         ? {
             type: "ability_modifier",
             abilityModifier: mechanic.usesAbility,
             recharges: usesRechargesFromImport(mechanic.usesRecharge),
           }
-        : {
-            type: "fixed",
-            fixedAmount: mechanic.usesFixed ?? 1,
-            recharges: usesRechargesFromImport(mechanic.usesRecharge),
-          }
+        : mechanic.usesFixed == null && mechanic.classResourceKey
+          ? {
+              type: "class_resource",
+              classResourceKey: mechanic.classResourceKey,
+              classResourceAmount: mechanic.classResourceCost ?? 1,
+            }
+          : {
+              type: "fixed",
+              fixedAmount: mechanic.usesFixed ?? 1,
+              recharges: usesRechargesFromImport(mechanic.usesRecharge),
+            }
       // "Spend another resource to restore a use" — UsesConfig.restoreByResource/restoreBySpellSlot
       // already exist and are exercised by hand-written presets (e.g. Beguiling Magic rider); the
       // schema just never routed alternateRefresh into them. actionCost has no matching UsesConfig

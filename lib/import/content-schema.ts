@@ -104,6 +104,9 @@ export const ImportMechanicSchema = z.object({
   fraction: z.number().optional(),
   trigger: z.string().optional(),
   provokesOpportunityAttacks: z.boolean().optional(),
+  /** movement_grant: true for "teleport to a space you can see" (ignores terrain/occupied
+   * spaces along the way); false/omitted for ordinary movement along the ground. */
+  teleport: z.boolean().optional(),
   featCategories: z
     .array(
       z.enum([

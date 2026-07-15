@@ -201,13 +201,70 @@ describe("aiMechanicsToDetections", () => {
     ).toEqual([])
   })
 
-  it("still does not wire movement_grant (accepted in schema, no characteristic mapping yet)", () => {
+  it("wires movement_grant (self-targeted) onto a movement_option fx effect", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "movement_grant",
+          distanceMode: "fixed",
+          distanceFeet: 60,
+          trigger: "bonus_action",
+          teleport: true,
+          provokesOpportunityAttacks: false,
+          sourcePhrase: "you can use a Bonus Action to teleport up to 60 feet",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Shadow Step" },
+    )
+    expect(detections).toHaveLength(1)
+    const instance = detections[0].instance as { activation?: { bonusAction?: boolean; effects?: unknown[] } }
+    expect(instance.activation?.bonusAction).toBe(true)
+    expect(instance.activation?.effects?.[0]).toMatchObject({
+      kind: "movement_option",
+      moveDistanceMode: "fixed",
+      moveDistanceFixed: 60,
+      movementTeleport: true,
+      moveWithoutOpportunityAttacks: true,
+    })
+  })
+
+  it("does not wire movement_grant when targeting other creatures (no characteristic mapping yet)", () => {
     expect(
       aiMechanicsToDetections(
-        [{ kind: "movement_grant", distanceMode: "fraction_of_speed", fraction: 0.5 }],
+        [
+          {
+            kind: "movement_grant",
+            distanceMode: "fraction_of_speed",
+            fraction: 0.5,
+            targets: "chosen_creatures_in_range",
+          },
+        ],
         { contentKind: "class_feature", featureName: "Guiding Hand" },
       ),
     ).toEqual([])
+  })
+
+  it("wires weapon_reach_modifier onto a weapon_reach_modifier characteristic", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "weapon_reach_modifier",
+          reachBonusFeet: 10,
+          weaponPropertyFilter: [],
+          requiresSheetToggle: "elemental_attunement_active",
+          sourcePhrase: "your reach is 10 feet greater than normal",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Elemental Attunement" },
+    )
+    expect(detections).toHaveLength(1)
+    const characteristics = (detections[0].instance as { characteristics?: unknown[] }).characteristics
+    expect(characteristics?.[0]).toMatchObject({
+      type: "weapon_reach_modifier",
+      reachBonusFeet: 10,
+      appliesToUnarmedStrike: true,
+      requiresSheetToggle: "elemental_attunement_active",
+    })
   })
 
   it("wires alternateRefresh (spend another resource to restore a use) onto UsesConfig", () => {
@@ -252,6 +309,53 @@ describe("aiMechanicsToDetections", () => {
     expect(usesBySlot?.type).toBe("uses")
     if (usesBySlot?.type === "uses") {
       expect(usesBySlot.uses?.restoreBySpellSlot).toEqual({ minSpellLevel: 1, restores: 1 })
+    }
+  })
+
+  it("wires a resource-cost-only `uses` mechanic (no usesFixed/usesRecharge) as unlimited, gated by class resource spend", () => {
+    // Hand of Healing (Monk, Warrior of Mercy): "expend 1 Focus Point" with no separate
+    // per-rest cap of its own — should NOT default to fixed 1/long rest.
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          classResourceKey: "focus_points",
+          classResourceCost: 1,
+          sourcePhrase: "you can expend 1 Focus Point to touch a creature and restore Hit Points",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Hand of Healing" },
+    )
+    const uses = detections[0]?.instance.characteristics?.[0]
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses).toEqual({
+        type: "class_resource",
+        classResourceKey: "focus_points",
+        classResourceAmount: 1,
+      })
+    }
+  })
+
+  it("still wires a fixed use cap when usesFixed is explicitly given alongside a class resource cost", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          usesFixed: 1,
+          usesRecharge: "long_rest",
+          classResourceKey: "focus_points",
+          classResourceCost: 4,
+          sourcePhrase: "expend 4 Focus Points; once per Long Rest",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Homebrew Capped Strike" },
+    )
+    const uses = detections[0]?.instance.characteristics?.[0]
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses?.type).toBe("fixed")
+      expect(uses.uses?.fixedAmount).toBe(1)
     }
   })
 
@@ -374,6 +478,107 @@ describe("aiMechanicsToDetections", () => {
     expect(flatDetections[0]?.instance.characteristics?.[0]?.requiresSheetToggle).toBe(
       "while_wild_shape",
     )
+  })
+
+  it("wires turn_start_trigger restoreResourceKey 'hit_points' as a heal, not a resource restore (Elder Champion's Regeneration)", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "turn_start_trigger",
+          restoreResourceKey: "hit_points",
+          restoreResourceAmount: 10,
+          requiresSheetToggle: "elder_champion_active",
+          sourcePhrase: "At the start of each of your turns, you regain 10 Hit Points.",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Paladin", featureName: "Elder Champion" },
+    )
+    expect(detections).toHaveLength(1)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("turn_start_trigger")
+    if (char?.type === "turn_start_trigger") {
+      expect(char.healMode).toBe("fixed")
+      expect(char.healFixed).toBe(10)
+      expect(char.restoreResourceKey).toBeUndefined()
+    }
+  })
+
+  it("wires turn_start_resource_restore restoreResourceKey 'hp' as a heal too", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "turn_start_resource_restore",
+          restoreResourceKey: "hp",
+          restoreResourceAmount: 5,
+          sourcePhrase: "regain 5 Hit Points at the start of your turn",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Test", featureName: "Regen" },
+    )
+    expect(detections).toHaveLength(1)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("turn_start_trigger")
+    if (char?.type === "turn_start_trigger") {
+      expect(char.healMode).toBe("fixed")
+      expect(char.healFixed).toBe(5)
+    }
+  })
+
+  it("threads requiresSheetToggle through damage_resistance and condition_immunity AI mechanics", () => {
+    const resistance = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_resistance",
+          damageTypes: ["Necrotic", "Psychic", "Radiant"],
+          requiresSheetToggle: "in_aura_of_protection",
+          sourcePhrase: "you and your allies have Resistance to Necrotic, Psychic, and Radiant damage",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Paladin", featureName: "Aura of Warding" },
+    )
+    expect(resistance[0]?.instance.characteristics?.[0]?.requiresSheetToggle).toBe(
+      "in_aura_of_protection",
+    )
+
+    const immunity = aiMechanicsToDetections(
+      [
+        {
+          kind: "condition_immunity",
+          conditions: ["Charmed"],
+          requiresSheetToggle: "in_aura_of_protection",
+          sourcePhrase: "Immunity to the Charmed condition while in your Aura of Protection",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Paladin", featureName: "Aura of Devotion" },
+    )
+    expect(immunity[0]?.instance.characteristics?.[0]?.requiresSheetToggle).toBe(
+      "in_aura_of_protection",
+    )
+  })
+
+  it("gates check_roll_modifier behind a sheet toggle via limitations (Peerless Athlete)", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "check_roll_modifier",
+          checkRollMode: "advantage",
+          checkCategory: "skill",
+          checkSkills: ["Athletics", "Acrobatics"],
+          requiresSheetToggle: "peerless_athlete_active",
+          sourcePhrase: "you have Advantage on Strength (Athletics) and Dexterity (Acrobatics) checks",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Paladin", featureName: "Peerless Athlete" },
+    )
+    expect(detections).toHaveLength(1)
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect?.checkSkills).toEqual(["Athletics", "Acrobatics"])
+    expect(effect?.limitations).toHaveLength(1)
+    expect(effect?.limitations?.[0]).toMatchObject({
+      kind: "sheet_toggle",
+      rule: "requires_active",
+      value: "peerless_athlete_active",
+    })
   })
 })
 

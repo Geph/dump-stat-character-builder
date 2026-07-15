@@ -919,9 +919,7 @@ export default function ImportPage() {
                 activeIndex={reviewStageIndex}
                 phase={reviewPhase}
                 hasModifiers={stageHasModifiers}
-                onPrevious={goPreviousReview}
                 onNext={goNextReview}
-                canPrevious={canGoPreviousReview}
                 canNext={canGoNextReview}
                 contentChildren={
                   <>

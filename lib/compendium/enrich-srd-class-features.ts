@@ -678,7 +678,10 @@ function extraDamageOnHitByLevel(
   })
 }
 
-function healSelfBonusAction(instanceKey: string): LinkedModifierInstance {
+function healSelfBonusAction(
+  instanceKey: string,
+  options?: { healAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"; label?: string },
+): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.healSelf, {
     bonusAction: true,
     effects: [
@@ -688,7 +691,8 @@ function healSelfBonusAction(instanceKey: string): LinkedModifierInstance {
         healMode: "dice",
         healDiceCount: 1,
         healDieType: "d6",
-        label: "Martial Arts die",
+        healAbility: options?.healAbility ?? null,
+        label: options?.label ?? "Martial Arts die",
       },
     ],
   })
@@ -2237,7 +2241,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Frenzy": [extraDamageOnHit("frenzy", "2d6")],
   "*::Radiant Strikes": [extraDamageOnHit("radiant_strikes", "2d8")],
-  "*::Wholeness of Body": [healSelfBonusAction("wholeness_of_body")],
+  "*::Wholeness of Body": [
+    healSelfBonusAction("wholeness_of_body", { healAbility: "WIS", label: "Martial Arts die + WIS" }),
+  ],
   "*::Dragon Wings": [
     speedTypeAdd("fly", 60, "Fly Speed 60 ft."),
     usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Dragon Wings"),
@@ -3180,13 +3186,14 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Quivering Palm": {
     linkedModifiers: [
+      // 2024 SRD: gated only by the 4-Focus-Point cost + "one creature at a time" (no
+      // separate per-rest use cap — that was a 2014-rules holdover, removed here).
       onHitTriggerPreset("quivering_palm", {
         appliesTo: "Unarmed Strike",
         spendResourceKey: "focus_points",
         spendResourceAmount: 4,
         effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
       }),
-      usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Quivering Palm kill"),
     ],
   },
 
@@ -4032,6 +4039,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             kind: "heal_self",
             healMode: "dice",
             healDiceCount: 1,
+            healAbility: "WIS",
             label: "Magic action: heal Martial Arts die + WIS (touch)",
           },
         ],
@@ -4072,6 +4080,23 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Elemental Attunement": [featureOptionPicker("Martial Form / Elemental Attunement")],
+  // SRD 2024 Warrior of the Elements' own "Elemental Attunement" (reach + elemental damage type
+  // swap) is unrelated to the "Martial Form" homebrew wildcard above — scope this key to the
+  // exact class/subclass so it wins resolvePresetKey's lookup instead of the generic one.
+  "Monk::Warrior of the Elements::Elemental Attunement": {
+    linkedModifiers: [
+      charInstance("modinst_elemental_attunement_reach", characteristicCatalogRefId("weapon_reach_modifier"), [
+        {
+          id: modId("elemental_attunement_reach"),
+          type: "weapon_reach_modifier",
+          reachBonusFeet: 10,
+          appliesToUnarmedStrike: true,
+          requiresSheetToggle: "elemental_attunement_active",
+          label: "+10 ft. reach on Unarmed Strikes while Elemental Attunement is active",
+        },
+      ]),
+    ],
+  },
   "*::Elemental Burst": {
     activation: { action: true },
     linkedModifiers: [
