@@ -242,6 +242,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "creature_size", label: "Change Size" },
   { value: "movement_effects", label: "Movement-Related Effects (Passive)" },
   {
+    value: "weapon_reach_modifier",
+    label: "Weapon Reach Modifier",
+    hint: "Bonus reach on matching weapons/Unarmed Strikes (Elemental Attunement, etc.)",
+  },
+  {
     value: "skill_check_alternate_ability",
     label: "Alternate Ability for Skill Checks",
     hint: "Let certain skill checks use a different ability (e.g. Primal Knowledge: STR while raging)",
@@ -502,6 +507,18 @@ export interface SpeedCharacteristic extends CharacteristicModifierBase {
   value: number
   valueByLevel?: BonusByLevelEntry[]
   customType?: string
+}
+
+export interface WeaponReachModifierCharacteristic extends CharacteristicModifierBase {
+  type: "weapon_reach_modifier"
+  reachBonusFeet: number
+  /**
+   * Weapon properties this bonus is scoped to (e.g. ["Reach"]). Empty/omitted = applies to
+   * all weapons and Unarmed Strikes the source's own gating (appliesToUnarmedStrike) allows.
+   */
+  weaponPropertyFilter?: string[]
+  /** Explicitly includes Unarmed Strikes even though they carry no weapon properties. */
+  appliesToUnarmedStrike?: boolean
 }
 
 export interface RollModifierEntry {
@@ -1059,6 +1076,7 @@ export type CharacteristicModifier =
   | InitiativeCharacteristic
   | VisionCharacteristic
   | SpeedCharacteristic
+  | WeaponReachModifierCharacteristic
   | AttackRollModifiersCharacteristic
   | DamageRollModifiersCharacteristic
   | UnarmedStrikeDamageCharacteristic
@@ -1150,6 +1168,8 @@ export function createCharacteristicModifier(
       return { id, type, visionType: "darkvision", rangeFeet: 60 }
     case "speed":
       return { id, type, speedType: "walk", mode: "add", value: 5 }
+    case "weapon_reach_modifier":
+      return { id, type, reachBonusFeet: 5, weaponPropertyFilter: [], appliesToUnarmedStrike: false }
     case "attack_roll_modifiers":
       return {
         id,
@@ -1801,6 +1821,7 @@ export type AggregatedCharacteristics = {
   speedEqualToWalk: string[]
   attackRollModifiers: AggregatedRollModifier[]
   damageRollModifiers: AggregatedRollModifier[]
+  weaponReachModifiers: WeaponReachModifierCharacteristic[]
   unarmedStrikeDie: UnarmedStrikeDie | null
   unarmedStrikeDieByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   unarmedStrikeDamageType: string | null
@@ -1889,6 +1910,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   speedEqualToWalk: [],
   attackRollModifiers: [],
   damageRollModifiers: [],
+  weaponReachModifiers: [],
   unarmedStrikeDie: null,
   unarmedStrikeDieByLevel: [],
   unarmedStrikeDamageType: null,
@@ -2165,6 +2187,9 @@ export function aggregateCharacteristics(
         }
         break
       }
+      case "weapon_reach_modifier":
+        result.weaponReachModifiers.push(mod)
+        break
       case "attack_roll_modifiers":
         result.attackRollModifiers.push(...mod.entries)
         if (mod.criticalHitMinimum != null) {

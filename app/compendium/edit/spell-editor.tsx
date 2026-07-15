@@ -324,7 +324,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
           />
 
-          <CompendiumEditorPanel title="On Class Spell List">
+          <CompendiumEditorPanel title="On Class Spell List" defaultOpen>
             <div className="flex flex-wrap gap-3 items-center">
               {SPELL_CLASSES.map((cls) => (
                 <label key={cls} className="flex items-center gap-2 cursor-pointer">
@@ -399,7 +399,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             )}
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Level, school & flags">
+          <CompendiumEditorPanel title="Level, school & flags" defaultOpen>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-2">
@@ -448,7 +448,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
           </div>
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Casting time, range & duration">
+          <CompendiumEditorPanel title="Casting time, range & duration" defaultOpen>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <DropdownOrOtherField
               label="Casting Time"
@@ -474,7 +474,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
           </div>
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Components">
+          <CompendiumEditorPanel title="Components" defaultOpen>
             <div className="flex gap-6 mb-3">
               {["V", "S", "M"].map((comp) => (
                 <label key={comp} className="flex items-center gap-2 cursor-pointer">
@@ -501,7 +501,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             )}
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Description">
+          <CompendiumEditorPanel title="Description" defaultOpen>
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
@@ -509,7 +509,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
             />
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="At Higher Levels">
+          <CompendiumEditorPanel title="At Higher Levels" defaultOpen>
             <RichTextEditor
               value={form.higher_levels}
               onChange={(higher_levels) => setForm({ ...form, higher_levels })}

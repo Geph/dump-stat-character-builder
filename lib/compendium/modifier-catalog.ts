@@ -89,6 +89,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   initiative: "Ability scores & checks",
   vision: "Movement & senses",
   speed: "Movement & senses",
+  weapon_reach_modifier: "Attack & damage",
   attack_roll_modifiers: "Attack & damage",
   damage_roll_modifiers: "Attack & damage",
   weapon_ability_override: "Attack & damage",

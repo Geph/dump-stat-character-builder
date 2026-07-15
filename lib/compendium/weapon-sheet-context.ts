@@ -8,6 +8,7 @@ import {
   type CharacteristicModifier,
   type DamageRollModifiersCharacteristic,
   type RollModifierEntry,
+  type WeaponReachModifierCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { collectEquipmentMagicCharacteristics } from "@/lib/compendium/equipment-magic-modifiers"
 import {
@@ -152,6 +153,23 @@ function collectAppliedModifiers(
           sourceType: readModifierSource(mod)?.sourceType,
         })
         break
+      }
+    }
+
+    if (mod.type === "weapon_reach_modifier") {
+      const reachMod = mod as WeaponReachModifierCharacteristic
+      const filter = reachMod.weaponPropertyFilter
+      const matches = filter?.length
+        ? filter.some((property) => properties.some((p) => normalizeToken(p) === normalizeToken(property)))
+        : // No property filter and scoped to Unarmed Strike only (the common case, e.g. Elemental
+          // Attunement) — doesn't apply to carried weapons at all.
+          !reachMod.appliesToUnarmedStrike && (weapon.subcategory ?? "").toLowerCase().includes("melee")
+      if (matches) {
+        applied.push({
+          name: mod.label ?? "Reach modifier",
+          description: `+${reachMod.reachBonusFeet} ft. reach`,
+          sourceType: readModifierSource(mod)?.sourceType,
+        })
       }
     }
 
