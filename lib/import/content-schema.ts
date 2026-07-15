@@ -47,6 +47,8 @@ export const ImportMechanicSchema = z.object({
   conditions: z.array(z.string()).optional(),
   speedType: z.enum(["walk", "fly", "swim", "climb"]).optional(),
   speedFeet: z.number().optional(),
+  /** "equal_to_walk" for "you gain a Swim/Fly/Climb Speed equal to your (walking) Speed" — speedFeet is ignored in that mode. */
+  speedMode: z.enum(["fixed", "equal_to_walk"]).optional(),
   visionRangeFeet: z.number().optional(),
   usesFixed: z.number().optional(),
   usesAbility: z.enum(USES_ABILITY_CODES).optional(),
@@ -121,6 +123,13 @@ export const ImportMechanicSchema = z.object({
   languageChoiceCount: z.number().optional(),
   choicePool: z.enum(["standard", "standard_and_rare"]).optional(),
   spellNames: z.array(z.string()).optional(),
+  /**
+   * Class level when the spellNames on THIS mechanic become always-prepared (subclass spell
+   * tables that emit one mechanic per level tier, e.g. "3 -> Cure Wounds, Moonbeam", "5 ->
+   * Conjure Animals"). Not the same as spellChoiceGrants[].unlocksAtClassLevel, which gates a
+   * player-chosen grant instead of a fixed list.
+   */
+  unlocksAtClassLevel: z.number().optional(),
   spellChoiceGrants: z
     .array(
       z.object({
@@ -274,6 +283,46 @@ export const ClassFeatureSchema = z.object({
     .optional(),
 })
 
+/**
+ * Shared by class-level and subclass-granted spellcasting (e.g. Eldritch Knight, Arcane
+ * Trickster) — a subclass can grant its own spell slots separate from its base class.
+ */
+export const ClassSpellcastingImportSchema = z.object({
+  ability: z.string(),
+  cantrips: z.number().optional(),
+  spells_known: z.number().optional(),
+  prepared: z.boolean().optional(),
+  progression: z
+    .array(
+      z.object({
+        level: z.number(),
+        cantrips: z.number(),
+        prepared: z.number(),
+        max_spell_level: z.number(),
+      }),
+    )
+    .optional(),
+  caster_progression: z.enum(["full", "half", "third", "pact"]).optional(),
+  explicit_slot_progression: z
+    .array(
+      z.object({
+        level: z.number(),
+        slots: z.array(z.number()),
+      }),
+    )
+    .nullable()
+    .optional(),
+  point_pool: z
+    .object({
+      resource_key: z.string(),
+      cost_by_level: z.record(z.string(), z.number()),
+      base_cost_cap_resource_key: z.string().optional(),
+      metamagic_cost_cap: z.enum(["proficiency_bonus"]).optional(),
+      replaces_spell_slots: z.boolean(),
+    })
+    .optional(),
+})
+
 export const SubclassImportSchema = z.object({
   name: z.string(),
   class_name: z.string(),
@@ -281,6 +330,12 @@ export const SubclassImportSchema = z.object({
   card_image_url: z.string().nullable().optional(),
   features: z.array(ClassFeatureSchema),
   new_toggles: z.array(NewToggleImportSchema).optional(),
+  /**
+   * Subclass-granted spellcasting (e.g. Eldritch Knight, Arcane Trickster) — supply
+   * `caster_progression` ("third" for these two) so the character sheet resolves spell slots.
+   * Most subclasses won't set this; only use it when the subclass itself grants spell slots.
+   */
+  spellcasting: ClassSpellcastingImportSchema.nullable().optional(),
 })
 
 export const FeatImportSchema = z.object({
@@ -328,44 +383,7 @@ export const ClassImportSchema = z.object({
     })
     .nullable()
     .optional(),
-  spellcasting: z
-    .object({
-      ability: z.string(),
-      cantrips: z.number().optional(),
-      spells_known: z.number().optional(),
-      prepared: z.boolean().optional(),
-      progression: z
-        .array(
-          z.object({
-            level: z.number(),
-            cantrips: z.number(),
-            prepared: z.number(),
-            max_spell_level: z.number(),
-          }),
-        )
-        .optional(),
-      caster_progression: z.enum(["full", "half", "third", "pact"]).optional(),
-      explicit_slot_progression: z
-        .array(
-          z.object({
-            level: z.number(),
-            slots: z.array(z.number()),
-          }),
-        )
-        .nullable()
-        .optional(),
-      point_pool: z
-        .object({
-          resource_key: z.string(),
-          cost_by_level: z.record(z.string(), z.number()),
-          base_cost_cap_resource_key: z.string().optional(),
-          metamagic_cost_cap: z.enum(["proficiency_bonus"]).optional(),
-          replaces_spell_slots: z.boolean(),
-        })
-        .optional(),
-    })
-    .nullable()
-    .optional(),
+  spellcasting: ClassSpellcastingImportSchema.nullable().optional(),
   features: z.array(ClassFeatureSchema),
   spell_list: z.array(z.string()).nullable().optional(),
   starting_equipment_groups: z
@@ -703,7 +721,8 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present
-- When a feature invents a new transformation / conditional state (e.g. "while in this form"), declare it once under new_toggles: [{ key: "rage_of_the_gods_form", name: "Rage of the Gods", grantingFeature: "Rage of the Gods" }] — then reference that key via requiresSheetToggle in mechanics[]. Do not invent unmatched toggle keys inside individual features.`
+- When a feature invents a new transformation / conditional state (e.g. "while in this form"), declare it once under new_toggles: [{ key: "rage_of_the_gods_form", name: "Rage of the Gods", grantingFeature: "Rage of the Gods" }] — then reference that key via requiresSheetToggle in mechanics[]. Do not invent unmatched toggle keys inside individual features.
+- When the SUBCLASS itself grants spell slots that the base class doesn't have (e.g. Eldritch Knight, Arcane Trickster — the "Spellcasting"/"Spell Slots" feature has its own slot table separate from any full-caster class), set the subclass's own spellcasting field: { ability, caster_progression }. Use caster_progression "third" for a table that starts at level 3 and grants its first 2nd-level slot around level 7 (Eldritch Knight/Arcane Trickster pattern); use "half" only if the table instead starts at level 2 and matches a half-caster's pace. If the table doesn't match either canonical shape, also set explicit_slot_progression: [{ level, slots: [1st,2nd,...] }, ...] read directly from the table. Do NOT set this for subclasses that just add spells known/prepared to an already-full-caster base class (e.g. Divine Soul Sorcerer) — that's already covered by the base class's own spellcasting.`
 
 export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice):
 - Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, etc.)
@@ -716,6 +735,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges (short_rest and/or long_rest)
 - **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
 - **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
+- When the table has a separate "Die Size" / "Die Type" column alongside the pool count (e.g. Psionic Energy Dice: d6→d8→d10→d12 as the Number column also grows), set uses.dieSidesByLevel: [{ level, count: <die sides as a number, e.g. 6/8/10/12> }, ...] in addition to atLevelTable — do not drop the die-size progression just because it scales separately from the count
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
 export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Designer> <Class Name>, Gunslinger):
@@ -736,6 +756,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
+- Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.
 - Talent pools (three patterns — do not conflate):
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).

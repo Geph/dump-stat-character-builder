@@ -15,6 +15,7 @@ import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import {
   getMulticlassSpellSlotTables,
+  resolveEffectiveClassSpellcasting,
   resolveSpellcastingAbilityKey,
   spellSlotTableKey,
   type SpellSlotTable,
@@ -164,12 +165,12 @@ function buildResourceLines(params: {
 
   const spellSlotTables = getMulticlassSpellSlotTables(
     classDetails
-      .filter((entry) => entry.class?.spellcasting)
       .map((entry) => ({
-        className: entry.class!.name,
+        className: entry.class?.name ?? "",
         classLevel: entry.row.level,
-        spellcasting: entry.class!.spellcasting,
-      })),
+        spellcasting: resolveEffectiveClassSpellcasting(entry),
+      }))
+      .filter((entry) => entry.spellcasting),
   )
 
   const primaryTable = spellSlotTables[0]

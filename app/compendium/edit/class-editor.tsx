@@ -16,7 +16,14 @@ import {
   CompendiumEditorToolbar,
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
-import type { FeatureChoice, Feature, ClassResource, ClassResourceRow, DndClass } from "@/lib/types"
+import type {
+  FeatureChoice,
+  Feature,
+  ClassResource,
+  ClassResourceRow,
+  DndClass,
+  NewToggleDeclaration,
+} from "@/lib/types"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { CardBlurbField } from "@/components/compendium/card-blurb-field"
 import { CLASS_COMPLEXITY_OPTIONS, formatClassComplexityPhrase, type ClassComplexity } from "@/lib/compendium/class-complexity"
@@ -82,6 +89,8 @@ interface ClassFormData {
   card_image_url: string | null
   source: string
   creator_url: string
+  /** Preserved on load/save; no dedicated editor UI yet — see requiresSheetToggle on mechanics. */
+  new_toggles: NewToggleDeclaration[] | null
 }
 
 const defaultClass: ClassFormData = {
@@ -104,6 +113,7 @@ const defaultClass: ClassFormData = {
   card_image_url: null,
   source: "Custom",
   creator_url: "",
+  new_toggles: null,
 }
 
 export default function ClassEditorPage({ id }: { id: string }) {
@@ -180,6 +190,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
               card_image_url: (row.card_image_url as string | null) ?? null,
               source: String(row.source ?? "Custom"),
               creator_url: String(row.creator_url ?? ""),
+              new_toggles: (row.new_toggles as NewToggleDeclaration[] | null) ?? null,
             })
             setHasSpellcasting(!!row.spellcasting)
             setClassResources(

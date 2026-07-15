@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ImportContentTypeHintSelect } from "@/components/import-content-type-hint-select"
 import { ImportAiSettings, type ImportAiSettingsValue } from "@/components/import/import-ai-settings"
 import {
@@ -22,6 +22,14 @@ import {
   templateJsonString,
   type ByoPdfPageScope,
 } from "@/lib/import/byo-import-kit"
+import {
+  PASTED_SOURCE_TEXT_MAX_CHARS,
+  SPELLS_PDF_MAX_PAGES,
+  formatSourceTextCharCount,
+  maxPdfPagesForContentTypeHint,
+  pageCountInRange,
+  validatePastedSourceTextLength,
+} from "@/lib/import/import-source-limits"
 import { listImportedCompendiumSources } from "@/lib/compendium/list-imported-sources"
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import {
@@ -100,6 +108,12 @@ export function ClipboardImportPanel({
   const [loadingExistingSources, setLoadingExistingSources] = useState(false)
   const [existingSourcesError, setExistingSourcesError] = useState<string | null>(null)
 
+  const spellPdfMaxPages = maxPdfPagesForContentTypeHint(contentType)
+
+  useEffect(() => {
+    if (spellPdfMaxPages != null) setPdfPageScope("range")
+  }, [spellPdfMaxPages])
+
   const loadExistingSources = async () => {
     setLoadingExistingSources(true)
     setExistingSourcesError(null)
@@ -134,14 +148,26 @@ export function ClipboardImportPanel({
   )
 
   const pdfPageScopeForPrompt = useMemo((): ByoPdfPageScope => {
-    if (pdfPageScope !== "range") return { mode: "all" }
+    if (pdfPageScope !== "range" && spellPdfMaxPages == null) return { mode: "all" }
     const start = parseInt(pdfPageStart, 10)
     const end = parseInt(pdfPageEnd, 10)
     if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
-      return { mode: "all" }
+      return spellPdfMaxPages != null ? { mode: "range", start: 1, end: spellPdfMaxPages } : { mode: "all" }
     }
     return { mode: "range", start, end }
-  }, [pdfPageScope, pdfPageStart, pdfPageEnd])
+  }, [pdfPageScope, pdfPageStart, pdfPageEnd, spellPdfMaxPages])
+
+  const pdfRangePageCount = useMemo(() => {
+    if (pdfPageScopeForPrompt.mode !== "range") return null
+    return pageCountInRange(pdfPageScopeForPrompt.start, pdfPageScopeForPrompt.end)
+  }, [pdfPageScopeForPrompt])
+
+  const pdfRangeOverLimit =
+    spellPdfMaxPages != null &&
+    pdfRangePageCount != null &&
+    pdfRangePageCount > spellPdfMaxPages
+
+  const sourceTextLimit = validatePastedSourceTextLength(sourceText)
 
   const pdfExtractionPrompt = useMemo(
     () =>
@@ -375,11 +401,14 @@ export function ClipboardImportPanel({
             <div className="space-y-2 flex-1">
               <p className="text-xs font-medium text-foreground">Pages to extract</p>
               <div className="flex flex-wrap gap-4 items-center">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label
+                  className={`flex items-center gap-2 ${spellPdfMaxPages != null ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                >
                   <input
                     type="radio"
                     name="byoPdfPageScope"
                     checked={pdfPageScope === "all"}
+                    disabled={spellPdfMaxPages != null}
                     onChange={() => setPdfPageScope("all")}
                     className="w-4 h-4 accent-lime"
                   />
@@ -414,7 +443,7 @@ export function ClipboardImportPanel({
                     <input
                       type="number"
                       min={1}
-                      placeholder="10"
+                      placeholder={spellPdfMaxPages != null ? String(spellPdfMaxPages) : "10"}
                       value={pdfPageEnd}
                       onChange={(event) => setPdfPageEnd(event.target.value)}
                       className="w-20 px-2 py-1.5 bg-muted rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
@@ -423,18 +452,30 @@ export function ClipboardImportPanel({
                   <span className="text-xs text-muted-foreground">1-based</span>
                 </div>
               ) : null}
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Use a page range to skip other classes or chapters. Prefer keeping a class and its
-                subclasses in the same pass — staged review walks them in order. Scope notes and{" "}
-                <span className="font-mono">source_page</span> tagging are included in the copied
-                prompt.
-              </p>
+              {spellPdfMaxPages != null ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Spell imports are limited to {SPELLS_PDF_MAX_PAGES} pages per pass
+                  {pdfRangeOverLimit && pdfRangePageCount != null
+                    ? ` — current range is ${pdfRangePageCount} pages.`
+                    : "."}
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Use a page range to skip other classes or chapters. Prefer keeping a class and its
+                  subclasses in the same pass — staged review walks them in order. Scope notes and{" "}
+                  <span className="font-mono">source_page</span> tagging are included in the copied
+                  prompt.
+                </p>
+              )}
             </div>
 
             <button
               type="button"
               onClick={() => handleCopy("prompt")}
-              disabled={pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim())}
+              disabled={
+                (pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim())) ||
+                pdfRangeOverLimit
+              }
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
             >
               {copied === "prompt" ? (
@@ -471,17 +512,23 @@ export function ClipboardImportPanel({
                 id="byo-source-text"
                 placeholder="Paste class features, spell text, species traits, or PDF-extracted text here..."
                 value={sourceText}
+                maxLength={PASTED_SOURCE_TEXT_MAX_CHARS}
                 onChange={(event) => onSourceTextChange(event.target.value)}
                 rows={6}
                 className="w-full px-3 py-2.5 bg-muted rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime resize-y font-mono text-sm min-h-[140px]"
               />
-              <p className="text-[11px] text-muted-foreground">{sourceText.length} characters</p>
+              <p
+                className={`text-[11px] ${sourceTextLimit.ok ? "text-muted-foreground" : "text-destructive"}`}
+              >
+                {formatSourceTextCharCount(sourceText.length)}
+                {!sourceTextLimit.ok ? ` — ${sourceTextLimit.message}` : ""}
+              </p>
             </div>
 
             <button
               type="button"
               onClick={() => handleCopy("full")}
-              disabled={!sourceText.trim()}
+              disabled={!sourceText.trim() || !sourceTextLimit.ok}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
             >
               {copied === "full" ? (
@@ -590,7 +637,7 @@ export function ClipboardImportPanel({
                 <button
                   type="button"
                   onClick={onServerAiImport}
-                  disabled={!sourceText.trim() || isProcessing}
+                  disabled={!sourceText.trim() || isProcessing || !sourceTextLimit.ok}
                   className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-orange/30 bg-orange/10 text-orange font-semibold text-sm hover:bg-orange/15 disabled:opacity-50"
                 >
                   {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

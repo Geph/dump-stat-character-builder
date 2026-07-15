@@ -46,7 +46,15 @@ export function featureEffectMatchesRollContext(
     return abilityNamesMatch(effect.checkAbility, context.ability)
   }
 
+  if (category === "death_save") return context.kind === "death_save"
+
   if (category === "save") {
+    if (context.kind === "death_save") {
+      // Death Saving Throws aren't tied to an ability score — only generic "advantage on all
+      // saving throws" effects (no checkAbility set) apply, not ability-specific ones (e.g.
+      // Wisdom saves). Effects scoped to death saves specifically should use "death_save".
+      return !effect.checkAbility
+    }
     if (context.kind !== "save") return false
     return abilityNamesMatch(effect.checkAbility, context.ability)
   }
@@ -97,6 +105,25 @@ export function collectFeatureRollModes(
   }
 
   return { mode: combineRollModes(modes), sources }
+}
+
+/** Lowest deathSaveCritThreshold across active features (e.g. Champion's Survivor: 18), or 20 if none. */
+export function collectDeathSaveCritThreshold(
+  features: Feature[],
+  limitationCtx: LimitationEvaluationContext = {},
+): number {
+  const active = collectActiveFeatureEffects(
+    features,
+    limitationCtx,
+    (effect) => effect.deathSaveCritThreshold != null,
+  )
+  let threshold = 20
+  for (const { effect } of active) {
+    if (effect.deathSaveCritThreshold != null) {
+      threshold = Math.min(threshold, effect.deathSaveCritThreshold)
+    }
+  }
+  return threshold
 }
 
 export function featureAlreadyGrantsCheckRoll(

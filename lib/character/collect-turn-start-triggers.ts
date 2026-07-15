@@ -6,6 +6,7 @@ import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/re
 import { accrueResource, tickAccumulatedResources } from "@/lib/character/real-time-recharge"
 import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
+import { rollDice } from "@/lib/dice/roll-die"
 import type { Feature, UsesConfig } from "@/lib/types"
 
 export type TurnStartTriggerEntry = {
@@ -91,6 +92,23 @@ function abilityModForKey(
   return abilityMods[key] ?? 0
 }
 
+const DIE_SIDES: Record<string, number> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 }
+
+function resolveTurnStartHealAmount(
+  trigger: TurnStartTriggerCharacteristic,
+  abilityMods: Record<string, number>,
+): number {
+  const base =
+    trigger.healMode === "ability_modifier"
+      ? abilityModForKey(trigger.healAbility, abilityMods)
+      : trigger.healMode === "dice" && trigger.healDiceCount && trigger.healDieType
+        ? rollDice(trigger.healDiceCount, DIE_SIDES[trigger.healDieType] ?? 0)
+        : trigger.healMode === "fixed"
+          ? trigger.healFixed ?? 0
+          : 0
+  return Math.max(0, base + (trigger.healFlatBonus ?? 0))
+}
+
 export function applyTurnStartTriggers(params: {
   triggers: TurnStartTriggerEntry[]
   usedResourcesById: Record<string, number>
@@ -105,11 +123,13 @@ export function applyTurnStartTriggers(params: {
 }): {
   usedResourcesById: Record<string, number>
   accumulatedResources: Record<string, AccumulatedResourceState>
+  currentHp: number
 } {
   const next = { ...params.usedResourcesById }
   let accumulated = tickAccumulatedResources(params.accumulatedResources ?? {})
   const toggles = params.activeSheetToggleIds ?? []
   const abilityMods = params.abilityMods ?? {}
+  let currentHp = params.currentHp
 
   for (const entry of params.triggers) {
     const trigger = entry.trigger
@@ -128,9 +148,17 @@ export function applyTurnStartTriggers(params: {
 
     if (trigger.hpBelowFraction != null && params.maxHp > 0) {
       const threshold = params.maxHp * trigger.hpBelowFraction
-      if (params.currentHp >= threshold) continue
+      if (currentHp >= threshold) continue
     }
-    if (trigger.hpAtLeast != null && params.currentHp < trigger.hpAtLeast) continue
+    if (trigger.hpAtLeast != null && currentHp < trigger.hpAtLeast) continue
+
+    if (trigger.healMode) {
+      const amount = resolveTurnStartHealAmount(trigger, abilityMods)
+      if (amount > 0 && params.maxHp > 0) {
+        currentHp = Math.min(params.maxHp, currentHp + amount)
+      }
+      continue
+    }
 
     if (
       trigger.accrueResourceKey &&
@@ -165,5 +193,5 @@ export function applyTurnStartTriggers(params: {
     }
   }
 
-  return { usedResourcesById: next, accumulatedResources: accumulated }
+  return { usedResourcesById: next, accumulatedResources: accumulated, currentHp }
 }

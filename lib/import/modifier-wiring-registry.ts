@@ -793,7 +793,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "while in this form",
     ],
     notes:
-      'requiresSheetToggle on mechanics[] — use a standard key (while_raging, etc.) OR a key declared once under new_toggles on the class/subclass. Never invent a one-off toggle key inside a single feature without declaring it.',
+      'requiresSheetToggle on mechanics[] — use a standard key (while_raging, while_wild_shape, etc.) OR a key declared once under new_toggles on the class/subclass. Never invent a one-off toggle key inside a single feature without declaring it.',
   },
 ]
 
@@ -980,7 +980,7 @@ function formatMechanicsCheatsheet(): string {
     `Allowed kind values: ${AI_MECHANIC_KINDS.join(", ")}`,
     "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
-    "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters",
+    "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters. For subclass spell tables that unlock more spells at higher levels (e.g. \"at level 5 you also always have Conjure Animals prepared\"), emit ONE spells_known mechanic PER level tier with unlocksAtClassLevel set to that tier's level — do not lump every tier's spells into one mechanic without it, or they'll all become available at the feature's own (lowest) level.",
     "- tool_proficiencies: tools [\"Smith's Tools\"]; grantExpertise true for doubled tool checks",
     "- attunement_slots: attunementTotal 4 (sets cap) OR attunementBonus 1 (adds to default 3)",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
@@ -993,7 +993,7 @@ function formatMechanicsCheatsheet(): string {
     "- damage_resistance: damageTypes [\"Fire\", \"Psychic\"]",
     "- damage_reduction: reductionMode \"evasion\" (Dex-save half→none/half) OR \"flat\" with reductionAmount N; damageTypes optional for flat (default B/P/S). Kind must be damage_reduction — do not invent other names from cat_fx_damage_reduction / cat_char_damage_reduction.",
     "- condition_immunity: conditions [\"Charmed\"]",
-    "- speed: speedType walk|fly|swim|climb, speedFeet 10; canHover true when fly speed allows hovering",
+    "- speed: speedType walk|fly|swim|climb, speedFeet 10; canHover true when fly speed allows hovering. For \"you gain a Swim/Fly/Climb Speed equal to your Speed\" (i.e. matches your walking speed, not a fixed number), use speedMode \"equal_to_walk\" instead of speedFeet.",
     "- movement_grant: one-off movement (not a permanent speed increase). distanceMode fixed|fraction_of_speed|full_speed; distanceFeet when fixed; fraction 0.5 when half Speed; trigger freeform (e.g. \"bonus_action_spend_bardic\", \"reaction_on_mantle\"); targets self|self_and_chosen_ally|chosen_creatures_in_range; provokesOpportunityAttacks false when the source says it doesn't; optional classResourceKey/cost when spending BI etc.",
     "- vision: visionRangeFeet 60",
     "- telepathy: telepathyRangeFeet 120 (passive telepathic communication range)",
@@ -1004,7 +1004,7 @@ function formatMechanicsCheatsheet(): string {
     "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
     "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] when the source lists named options",
-    "- temporary_hit_points: amount N OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier (pair classResourceKey / ability as needed); amountMultiplier 2 when \"two times the number rolled\"; thpTrigger on_activation|turn_start|on_use|on_hit (field name is thpTrigger, not trigger); thpTarget self|chosen_creature_in_range|allies_in_range (field name is thpTarget, not target; rangeFeet when not self); targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
+    "- temporary_hit_points: amount N (fixed) OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier. For amountScaling \"character_level\" (\"three times your level\"), put the per-level multiplier in amount (amount: 3), NOT amountMultiplier — amountMultiplier is ONLY for doubling/tripling a class_resource_die roll (\"twice the number rolled on your Bardic Inspiration die\": amountScaling class_resource_die, classResourceKey bardic_inspiration, amountMultiplier 2). For ability_modifier scaling, pair with ability. thpTrigger on_activation|turn_start|on_use|on_hit (field name is thpTrigger, not trigger); thpTarget self|chosen_creature_in_range|allies_in_range (field name is thpTarget, not target; rangeFeet when not self); targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
     "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS. ALWAYS wire the base usesFixed/usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an alternate early refresh — alternateRefresh is additive, never a reason to omit the base wire. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost } for resource spends OR { spendSpellSlotMinLevel: 3, actionCost } for \"expend a level 3+ spell slot\".",
     "- uses / check_roll_modifier resource spend caps: classResourceKey + classResourceCostMode fixed (default, use classResourceCost) | up_to_proficiency_bonus | up_to_ability_modifier (pair with classResourceCostAbility). Use when the source caps spend per use by a scaling value — e.g. \"expend Exploit Dice (up to your Proficiency Bonus)\" — not a separate Limit class_resource.",
     "- check_roll_modifier: checkRollMode advantage|disadvantage|bonus; checkCategory save|skill|ability|attack|initiative; checkAbility/checkSkills; conditionNote for non-enforcible qualifiers (\"that involves you dancing\") so imports flag manual review instead of silently over-granting; for class-resource die bonuses use bonusDiceFromResource / classResourceKey + targets self|self_and_allies_in_range|chosen_creatures",
@@ -1019,7 +1019,7 @@ function formatMechanicsCheatsheet(): string {
     "- extra_weapon_mastery: masteryProperties [\"Push\", \"Topple\"] — apply these Weapon Mastery properties in addition to the weapon's normal mastery (not the tier-table known-count)",
     "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
     "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
-    "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, concentrating, …) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them.",
+    "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, while_wild_shape, concentrating, …) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them. new_toggles goes on the class/subclass object itself (sibling of features[]) — never inside an individual feature.",
     "- Renamed / lightly-modified SRD features: set basedOnSrdFeature to the exact INDEX — SRD-standard feature name (e.g. \"Evasion\") while keeping the homebrew display name. Auto-wire applies the base; description/mechanics[] carry deltas (party share, extra gates).",
     "- targetCount (shared): { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } for \"a number of creatures equal to your Charisma modifier (minimum of one)\" — use on temporary_hit_points, movement_grant, and similar targeted effects (not uses.ability_modifier, which is for use counts).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
@@ -1071,7 +1071,7 @@ When the homebrew name differs (e.g. "Leading Evasion"), keep that name and set 
     ]),
 
     "INDEX — Sheet toggles (new_toggles[]):",
-    "- Standard toggles (while_raging, concentrating, …) need no declaration — use requiresSheetToggle directly.",
+    "- Standard toggles (while_raging, while_wild_shape, concentrating, …) need no declaration — use requiresSheetToggle directly.",
     "- When a feature invents a new transformation / conditional state (\"while in this form\", Rage of the Gods, etc.), add ONE entry under new_toggles on the class or subclass: { key: \"rage_of_the_gods_form\", name: \"Rage of the Gods\", grantingFeature: \"Rage of the Gods\" }.",
     "- Derive key as snake_case from the feature name. Sub-benefits (flight, resistance, reaction) then set requiresSheetToggle to that same key.",
     "- Do not invent mismatched keys silently inside individual mechanics[] rows — declare once, then reference.",

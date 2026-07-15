@@ -84,6 +84,13 @@ import {
   buildInitialImportCardArtUrlMap,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import {
+  SPELLS_PDF_MAX_PAGES,
+  maxPdfPagesForContentTypeHint,
+  pageCountInRange,
+  validatePdfPageLimit,
+  validatePastedSourceTextLength,
+} from "@/lib/import/import-source-limits"
 
 type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
 type ImportTab = "clipboard" | "pdf" | "pack"
@@ -163,6 +170,25 @@ export default function ImportPage() {
   const reviewRef = useRef<HTMLDivElement>(null)
   const reportRef = useRef<HTMLDivElement>(null)
   const hadPendingImportRef = useRef(false)
+
+  const spellPdfMaxPages = maxPdfPagesForContentTypeHint(pdfContentTypeHint)
+
+  useEffect(() => {
+    if (spellPdfMaxPages != null) setPdfPageScope("range")
+  }, [spellPdfMaxPages])
+
+  const pdfSpellRangePageCount = useMemo(() => {
+    if (spellPdfMaxPages == null || pdfPageScope !== "range") return null
+    const start = parseInt(pdfPageStart, 10)
+    const end = parseInt(pdfPageEnd, 10)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) return null
+    return pageCountInRange(start, end)
+  }, [spellPdfMaxPages, pdfPageScope, pdfPageStart, pdfPageEnd])
+
+  const pdfSpellRangeOverLimit =
+    spellPdfMaxPages != null &&
+    pdfSpellRangePageCount != null &&
+    pdfSpellRangePageCount > spellPdfMaxPages
 
   useEffect(() => {
     if (!canUseServerImport()) return
@@ -487,6 +513,22 @@ export default function ImportPage() {
         setMessage("Start page must be less than or equal to end page.")
         return
       }
+      const pageLimit = validatePdfPageLimit({
+        contentTypeHint: pdfContentTypeHint,
+        pageRange: { first: start, last: end },
+        totalPages: end,
+      })
+      if (!pageLimit.ok) {
+        setPdfStatus("error")
+        setMessage(pageLimit.message)
+        return
+      }
+    } else if (spellPdfMaxPages != null) {
+      setPdfStatus("error")
+      setMessage(
+        `Spell imports require a page range of at most ${spellPdfMaxPages} pages.`,
+      )
+      return
     }
 
     const formData = new FormData()
@@ -650,6 +692,12 @@ export default function ImportPage() {
 
   const handleServerAiImport = () => {
     if (!textContent.trim()) return
+    const sourceLimit = validatePastedSourceTextLength(textContent)
+    if (!sourceLimit.ok) {
+      setTextStatus("error")
+      setMessage(sourceLimit.message)
+      return
+    }
     void submitTextImport({ text: textContent, importMode: "server-ai" })
   }
 
@@ -1229,11 +1277,14 @@ export default function ImportPage() {
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-orange/80">Pages to import</p>
                       <div className="flex flex-wrap gap-4 items-center">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label
+                          className={`flex items-center gap-2 ${spellPdfMaxPages != null ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+                        >
                           <input
                             type="radio"
                             name="pdfPageScope"
                             checked={pdfPageScope === "all"}
+                            disabled={spellPdfMaxPages != null}
                             onChange={() => setPdfPageScope("all")}
                             className="w-4 h-4 accent-orange"
                           />
@@ -1268,7 +1319,7 @@ export default function ImportPage() {
                             <input
                               type="number"
                               min={1}
-                              placeholder="10"
+                              placeholder={spellPdfMaxPages != null ? String(spellPdfMaxPages) : "10"}
                               value={pdfPageEnd}
                               onChange={(e) => setPdfPageEnd(e.target.value)}
                               className="w-24 px-3 py-2 bg-muted rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-orange"
@@ -1277,6 +1328,14 @@ export default function ImportPage() {
                           <span className="text-xs text-muted-foreground">1-based page numbers</span>
                         </div>
                       )}
+                      {spellPdfMaxPages != null ? (
+                        <p className="text-xs text-muted-foreground">
+                          Spell imports are limited to {SPELLS_PDF_MAX_PAGES} pages per pass
+                          {pdfSpellRangeOverLimit && pdfSpellRangePageCount != null
+                            ? ` — current range is ${pdfSpellRangePageCount} pages.`
+                            : "."}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -1302,7 +1361,8 @@ export default function ImportPage() {
                           !pdfFile ||
                           pdfStatus === "processing" ||
                           pdfStatus === "uploading" ||
-                          (pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim()))
+                          (pdfPageScope === "range" && (!pdfPageStart.trim() || !pdfPageEnd.trim())) ||
+                          pdfSpellRangeOverLimit
                         }
                         className="flex items-center justify-center gap-2 px-6 py-3 bg-orange text-orange-foreground rounded-xl font-bold hover:bg-orange/90 transition-all glow-orange disabled:opacity-50"
                       >

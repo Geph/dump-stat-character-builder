@@ -12,6 +12,7 @@ export type SheetToggleDefinition = {
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "while_raging", label: "Raging", sourceType: "builtin" },
+  { id: "while_wild_shape", label: "Wild Shape", sourceType: "builtin" },
   { id: "while_innate_sorcery_active", label: "Innate Sorcery", sourceType: "builtin" },
   { id: "reckless_attack", label: "Attacking Recklessly", sourceType: "builtin" },
   { id: "form_of_dread", label: "Form of Dread", sourceType: "builtin" },
@@ -56,6 +57,21 @@ export const PRIMORDIAL_ASPECT_TOGGLES: SheetToggleDefinition[] = [
     exclusiveGroup: "primordial_aspect",
   },
 ]
+
+/** Converts a class/subclass's declared new_toggles into sheet toggle definitions. */
+export function sheetToggleDefinitionsFromNewToggles(
+  declarations: readonly { key: string; name: string; grantingFeature?: string | null }[] | null | undefined,
+): SheetToggleDefinition[] {
+  if (!declarations?.length) return []
+  return declarations
+    .filter((entry) => entry.key && entry.name)
+    .map((entry) => ({
+      id: entry.key,
+      label: entry.name,
+      sourceType: "class_feature" as const,
+      sourceId: entry.grantingFeature ?? undefined,
+    }))
+}
 
 const builtinById = new Map(BUILTIN_SHEET_TOGGLES.map((entry) => [entry.id, entry]))
 const optionalById = new Map(OPTIONAL_SHEET_TOGGLES.map((entry) => [entry.id, entry]))

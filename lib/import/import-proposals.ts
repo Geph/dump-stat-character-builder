@@ -273,9 +273,13 @@ function pushResource(
   seen: Set<string>,
   resource: Omit<ImportProposalClassResource, "id"> & { id?: string },
 ) {
-  const id = resource.id ?? resourceProposalId(resource.className, resource.resourceKey)
-  if (seen.has(id)) return
-  seen.add(id)
+  // Dedupe on (class, resource key) identity rather than the caller-supplied id — the same pool
+  // can arrive via class_resources[] (explicit) and import_proposals.class_resources[] (ai) with
+  // different id schemes even though IMPORT_PROPOSALS_HINT tells the model not to duplicate them.
+  const canonicalKey = resourceProposalId(resource.className, resource.resourceKey)
+  if (seen.has(canonicalKey)) return
+  seen.add(canonicalKey)
+  const id = resource.id ?? canonicalKey
   list.push({ ...resource, id })
 }
 

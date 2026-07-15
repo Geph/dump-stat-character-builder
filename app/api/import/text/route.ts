@@ -15,6 +15,7 @@ import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
+import { validatePastedSourceTextLength } from "@/lib/import/import-source-limits"
 import { requireMutationAuth } from "@/lib/api/require-mutation-auth"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -138,6 +139,11 @@ export async function POST(request: NextRequest) {
 
     if (!trimmedText || trimmedText.length < 20) {
       return NextResponse.json({ error: "Please provide more text content to parse" }, { status: 400 })
+    }
+
+    const sourceLimit = validatePastedSourceTextLength(trimmedText)
+    if (!sourceLimit.ok) {
+      return NextResponse.json({ error: sourceLimit.message }, { status: 400 })
     }
 
     const systemPrompt = buildImportSystemPrompt(contentType, {

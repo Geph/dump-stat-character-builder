@@ -1,5 +1,6 @@
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import type { AbilityScoreKey, CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import { extractUsesConfig } from "@/lib/compendium/characteristic-modifiers"
+import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
@@ -437,7 +438,16 @@ function usesPool(uses: UsesConfig, label?: string): LinkedModifierInstance {
 function checkAdvantage(
   instanceKey: string,
   options: {
-    category: "save" | "attack" | "initiative" | "ability" | "skill" | "spell_attack" | "spell_save_dc" | "other"
+    category:
+      | "save"
+      | "death_save"
+      | "attack"
+      | "initiative"
+      | "ability"
+      | "skill"
+      | "spell_attack"
+      | "spell_save_dc"
+      | "other"
     ability?: string | null
     skills?: string[]
     conditions?: string[]
@@ -540,6 +550,45 @@ function checkRollFloor(
       },
     ],
   })
+}
+
+/** Death Saving Throw rolls at or above `threshold` count as a natural 20 (e.g. Champion's Survivor). */
+function deathSaveCritThreshold(instanceKey: string, threshold: number): LinkedModifierInstance {
+  return fxInstance(`modinst_${instanceKey}`, CHECK_ROLL_MODIFIER_CATALOG_ID, {
+    effects: [
+      {
+        id: modId(instanceKey),
+        kind: "check_roll_modifier",
+        checkCategory: "death_save",
+        deathSaveCritThreshold: threshold,
+      },
+    ],
+  })
+}
+
+/** Regain HP at the start of the turn (e.g. Champion's Heroic Rally: 5 + CON mod while Bloodied). */
+function turnStartHeal(
+  instanceKey: string,
+  options: {
+    healAbility?: AbilityScoreKey | null
+    healFlatBonus?: number
+    hpBelowFraction?: number
+    hpAtLeast?: number
+    label?: string
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, characteristicCatalogRefId("turn_start_trigger"), [
+    {
+      id: modId(instanceKey),
+      type: "turn_start_trigger",
+      healMode: "ability_modifier",
+      healAbility: options.healAbility ?? null,
+      healFlatBonus: options.healFlatBonus ?? 0,
+      hpBelowFraction: options.hpBelowFraction ?? null,
+      hpAtLeast: options.hpAtLeast ?? null,
+      label: options.label,
+    },
+  ])
 }
 
 function checkAbilityFloor(
@@ -2129,8 +2178,16 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Additional Fighting Style": [grantFeat(["Fighting Style"], "Fighting Style feat")],
   "*::Survivor": [
     checkAdvantage("survivor_defy_death", {
-      category: "other",
+      category: "death_save",
       limitations: [requiresAtMostHpLimitation(0)],
+    }),
+    deathSaveCritThreshold("survivor_defy_death_crit", 18),
+    turnStartHeal("survivor_heroic_rally", {
+      healAbility: "constitution",
+      healFlatBonus: 5,
+      hpBelowFraction: 0.5,
+      hpAtLeast: 1,
+      label: "Heroic Rally (5 + CON mod while Bloodied)",
     }),
   ],
   "Sorcerer::Draconic Sorcery::Draconic Resilience": [

@@ -74,6 +74,47 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
+  it("wires on_hit_trigger's bonus damage as a nested damage_roll_modifiers effect (Psi Warrior's Psionic Strike)", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "on_hit_trigger",
+          triggerOn: "hit",
+          oncePerTurn: true,
+          bonusDice: "1d6",
+          damageType: "Force",
+          spendResourceKey: "psionic_energy_dice",
+          spendResourceAmount: 1,
+          sourcePhrase: "you can expend one Psionic Energy Die, rolling it and dealing Force damage",
+        },
+      ],
+      { contentKind: "subclass_feature", sourceName: "Psi Warrior", featureName: "Psionic Power" },
+    )
+    expect(detections).toHaveLength(1)
+    const trigger = detections[0]?.instance.characteristics?.[0]
+    expect(trigger?.type).toBe("on_hit_trigger")
+    if (trigger?.type !== "on_hit_trigger") throw new Error("expected on_hit_trigger")
+    expect(trigger.spendResourceKey).toBe("psionic_energy_dice")
+    expect(trigger.effect?.catalogRefId).toBe("cat_char_damage_roll_modifiers")
+    const nested = trigger.effect?.characteristics?.[0]
+    expect(nested?.type).toBe("damage_roll_modifiers")
+    if (nested?.type === "damage_roll_modifiers") {
+      expect(nested.entries[0]?.customTarget).toBe("1d6 Force")
+    }
+  })
+
+  it("omits the nested on_hit_trigger effect when no bonusDice is given", () => {
+    const detections = aiMechanicsToDetections(
+      [{ kind: "on_hit_trigger", triggerOn: "hit", sourcePhrase: "some untyped on-hit rider" }],
+      { contentKind: "class_feature", featureName: "Untyped Rider" },
+    )
+    const trigger = detections[0]?.instance.characteristics?.[0]
+    expect(trigger?.type).toBe("on_hit_trigger")
+    if (trigger?.type === "on_hit_trigger") {
+      expect(trigger.effect).toBeUndefined()
+    }
+  })
+
   it("wires a fixed-amount, on-activation, self-target temporary_hit_points mechanic", () => {
     const detections = aiMechanicsToDetections(
       [
@@ -234,6 +275,105 @@ describe("aiMechanicsToDetections", () => {
     expect(detections).toHaveLength(1)
     const mod = detections[0]?.instance.characteristics?.[0]
     expect(mod?.requiresSheetToggle).toBe("magic_item:abc:unyielding")
+  })
+
+  it("falls back to amountMultiplier for character_level temp HP scaling when amount is mis-keyed", () => {
+    // "You gain Temp HP equal to three times your Druid level" — the cheatsheet's wording around
+    // amountMultiplier ("2 when 'two times the number rolled'") is easy to misapply here instead
+    // of amount, which is what character_level scaling actually reads.
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "temporary_hit_points",
+          amountScaling: "character_level",
+          amountMultiplier: 3,
+          thpTrigger: "on_activation",
+          thpTarget: "self",
+          sourcePhrase: "You gain a number of Temporary Hit Points equal to three times your Druid level.",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Druid", featureName: "Circle Forms" },
+    )
+    expect(detections).toHaveLength(1)
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect?.healLevelMultiplier).toBe(3)
+  })
+
+  it("threads unlocksAtClassLevel through spells_known AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "spells_known",
+          spellNames: ["Conjure Animals"],
+          alwaysPrepared: true,
+          unlocksAtClassLevel: 5,
+          sourcePhrase: "always have the listed spells prepared.",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Druid", featureName: "Circle of the Moon Spells" },
+    )
+    expect(detections).toHaveLength(1)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("spells_known")
+    if (char?.type === "spells_known") {
+      expect(char.spells[0]?.unlocksAtClassLevel).toBe(5)
+    }
+  })
+
+  it("wires speedMode equal_to_walk instead of requiring a fixed speedFeet", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "speed",
+          speedType: "swim",
+          speedMode: "equal_to_walk",
+          requiresSheetToggle: "wrath_of_the_sea_active",
+          sourcePhrase: "you gain a Swim Speed equal to your Speed.",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Druid", featureName: "Aquatic Affinity" },
+    )
+    expect(detections).toHaveLength(1)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("speed")
+    if (char?.type === "speed") {
+      expect(char.mode).toBe("equal_to_walk")
+      expect(char.speedType).toBe("swim")
+    }
+    expect(char?.requiresSheetToggle).toBe("wrath_of_the_sea_active")
+  })
+
+  it("wires requiresSheetToggle on ac AI mechanics (formula and flat)", () => {
+    const formulaDetections = aiMechanicsToDetections(
+      [
+        {
+          kind: "ac",
+          acBase: 13,
+          acAbilities: ["wisdom"],
+          requiresSheetToggle: "while_wild_shape",
+          sourcePhrase: "your AC equals 13 plus your Wisdom modifier",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Druid", featureName: "Circle Forms" },
+    )
+    expect(formulaDetections[0]?.instance.characteristics?.[0]?.requiresSheetToggle).toBe(
+      "while_wild_shape",
+    )
+
+    const flatDetections = aiMechanicsToDetections(
+      [
+        {
+          kind: "ac",
+          acFlatBonus: 2,
+          requiresSheetToggle: "while_wild_shape",
+          sourcePhrase: "+2 AC while in this form",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Some Form" },
+    )
+    expect(flatDetections[0]?.instance.characteristics?.[0]?.requiresSheetToggle).toBe(
+      "while_wild_shape",
+    )
   })
 })
 

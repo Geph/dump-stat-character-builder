@@ -920,6 +920,14 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
   requiresSheetToggle?: SheetToggleKey
   /** Skip when any of these conditions are active (e.g. Incapacitated). */
   blockedByConditions?: string[]
+  /** Regain HP at the start of the turn (e.g. Champion's Heroic Rally: 5 + CON modifier while Bloodied). */
+  healMode?: "fixed" | "ability_modifier" | "dice" | null
+  healFixed?: number | null
+  healAbility?: AbilityScoreKey | null
+  healDiceCount?: number | null
+  healDieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
+  /** Added on top of healFixed/healAbility/healDiceCount (e.g. "5 + CON modifier" = healAbility CON + healFlatBonus 5). */
+  healFlatBonus?: number | null
   effect?: NestedModifierEffect | null
 }
 

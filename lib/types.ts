@@ -109,7 +109,18 @@ export interface FeatureEffect {
   /** e.g. rage bonus: +2 at level 1, +3 at 9 */
   bonusByLevel?: BonusByLevelEntry[]
   bonusDice?: string | null
-  checkCategory?: "ability" | "skill" | "attack" | "spell_attack" | "save" | "spell_save_dc" | "initiative" | "other" | null
+  checkCategory?:
+    | "ability"
+    | "skill"
+    | "attack"
+    | "spell_attack"
+    | "save"
+    /** Scoped to Death Saving Throws only (unlike "save", which also matches ability-specific saves). */
+    | "death_save"
+    | "spell_save_dc"
+    | "initiative"
+    | "other"
+    | null
   checkAbility?: string | null
   checkSkills?: string[]
   /** Conditions avoided or ended (typically with saving throws or ability checks). */
@@ -126,6 +137,11 @@ export interface FeatureEffect {
   checkRollFloorEnabled?: boolean
   checkRollFloorBelow?: number | null
   checkRollFloorSetTo?: number | null
+  /**
+   * check_roll_modifier, checkCategory "save": Death Saving Throw rolls at or above this value
+   * count as a natural 20 (e.g. Champion's Survivor — "18-20 counts as rolling a 20").
+   */
+  deathSaveCritThreshold?: number | null
   /** @deprecated Use bonusConfig */
   bonusAmount?: number | null
   bonusConfig?: RollBonusConfig | null
@@ -452,6 +468,31 @@ export interface SpellProgressionEntry {
   max_spell_level: number
 }
 
+/** Shared by DndClass.spellcasting and Subclass.spellcasting (e.g. Eldritch Knight, Arcane Trickster). */
+export interface ClassSpellcastingConfig {
+  ability: string
+  type?: "prepared" | "pact"
+  /** Explicit spell-slot progression. Overrides name-based heuristics when set. */
+  caster_progression?: "full" | "half" | "third" | "pact"
+  cantrips?: number
+  spells_known?: number
+  prepared?: boolean
+  spellbook?: boolean
+  pact_magic?: boolean
+  starts_at?: number
+  progression?: SpellProgressionEntry[]
+  /** Per-level spell slot counts from a class table (overrides SRD tables when set). */
+  explicit_slot_progression?: { level: number; slots: number[] }[] | null
+  /** Point-pool casting (e.g. Alternate Sorcerer) — spends class resource instead of slots. */
+  point_pool?: {
+    resource_key: string
+    cost_by_level: Record<number, number>
+    base_cost_cap_resource_key?: string
+    metamagic_cost_cap?: "proficiency_bonus"
+    replaces_spell_slots: boolean
+  } | null
+}
+
 export interface DndClass {
   id: string
   name: string
@@ -484,35 +525,22 @@ export interface DndClass {
   } | null
   features: Feature[]
   class_resources?: ClassResource[] | null
-  spellcasting: {
-    ability: string
-    type?: "prepared" | "pact"
-    /** Explicit spell-slot progression. Overrides name-based heuristics when set. */
-    caster_progression?: "full" | "half" | "third" | "pact"
-    cantrips?: number
-    spells_known?: number
-    prepared?: boolean
-    spellbook?: boolean
-    pact_magic?: boolean
-    starts_at?: number
-    progression?: SpellProgressionEntry[]
-    /** Per-level spell slot counts from a class table (overrides SRD tables when set). */
-    explicit_slot_progression?: { level: number; slots: number[] }[] | null
-    /** Point-pool casting (e.g. Alternate Sorcerer) — spends class resource instead of slots. */
-    point_pool?: {
-      resource_key: string
-      cost_by_level: Record<number, number>
-      base_cost_cap_resource_key?: string
-      metamagic_cost_cap?: "proficiency_bonus"
-      replaces_spell_slots: boolean
-    } | null
-  } | null
+  spellcasting: ClassSpellcastingConfig | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
+  /** Sheet toggles this class's features introduce (gated via requiresSheetToggle). */
+  new_toggles?: NewToggleDeclaration[] | null
+}
+
+/** A brand-new sheet-toggle state declared by a class/subclass (e.g. "Rage of the Gods" form). */
+export interface NewToggleDeclaration {
+  key: string
+  name: string
+  grantingFeature: string
 }
 
 export interface Subclass {
@@ -521,17 +549,16 @@ export interface Subclass {
   name: string
   description: string | null
   features: Feature[]
-  spellcasting?: {
-    ability: string
-    cantrips?: number
-    spells_known?: number
-  } | null
+  /** Subclass-granted spellcasting (e.g. Eldritch Knight, Arcane Trickster) — separate from the base class's own spellcasting. */
+  spellcasting?: ClassSpellcastingConfig | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null
   source: string
   creator_url: string | null
   created_at: string
+  /** Sheet toggles this subclass's features introduce (gated via requiresSheetToggle). */
+  new_toggles?: NewToggleDeclaration[] | null
 }
 
 // Uses configuration for abilities with limited uses
