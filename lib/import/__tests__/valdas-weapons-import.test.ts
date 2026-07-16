@@ -4,7 +4,7 @@ import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { normalizeAiImportContent } from "@/lib/import/import-content-ai-schema"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import {
-  hasHomebrewImportFixtures,
+  hasHomebrewFixture,
   homebrewFixturePath,
 } from "@/lib/import/__tests__/homebrew-fixture-path"
 
@@ -14,7 +14,7 @@ function loadFixture(name: string) {
   return readFileSync(path, "utf8")
 }
 
-describe.runIf(hasHomebrewImportFixtures)("Valda's Spire of Secrets weapons import", () => {
+describe.runIf(hasHomebrewFixture("valdas-weapons.json"))("Valda's Spire of Secrets weapons import", () => {
   it("parses valdas-weapons.json through the import pipeline", () => {
     const raw = loadFixture("valdas-weapons.json")
     const parsed = parseImportContentJson(raw)
