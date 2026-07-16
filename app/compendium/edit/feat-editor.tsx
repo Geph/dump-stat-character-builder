@@ -50,6 +50,7 @@ interface FeatFormData {
   description: string
   category: string
   level_requirement: number
+  prerequisite: string
   prerequisite_feat_ids: string[]
   prerequisite_class_ids: string[]
   prerequisite_species_ids: string[]
@@ -73,6 +74,7 @@ const defaultFeat: FeatFormData = {
   description: "",
   category: "General",
   level_requirement: 1,
+  prerequisite: "",
   prerequisite_feat_ids: [],
   prerequisite_class_ids: [],
   prerequisite_species_ids: [],
@@ -154,6 +156,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
               description: enriched.description || "",
               category: enriched.category || "General",
               level_requirement: enriched.level_requirement ?? 1,
+              prerequisite: enriched.prerequisite || "",
               prerequisite_feat_ids: enriched.prerequisite_feat_ids || [],
               prerequisite_class_ids: enriched.prerequisite_class_ids || [],
               prerequisite_species_ids: enriched.prerequisite_species_ids || [],
@@ -185,9 +188,10 @@ export default function FeatEditorPage({ id }: { id: string }) {
     setError(null)
 
     const db = createClient()
-    const { characteristics, creator_url, ...rest } = form
+    const { characteristics, creator_url, prerequisite, ...rest } = form
     const payload = {
       ...rest,
+      prerequisite: prerequisite.trim() || null,
       benefits: characteristics,
       creator_url: normalizeCreatorUrl(creator_url),
     }
@@ -544,6 +548,23 @@ export default function FeatEditorPage({ id }: { id: string }) {
                       allBackgrounds,
                       (id) => removePrereqId("prerequisite_background_ids", id),
                     )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="feat-prerequisite-other"
+                    className="block text-sm font-semibold text-foreground mb-2"
+                  >
+                    Other
+                  </label>
+                  <input
+                    id="feat-prerequisite-other"
+                    type="text"
+                    value={form.prerequisite}
+                    onChange={(e) => setForm({ ...form, prerequisite: e.target.value })}
+                    className="w-full px-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                    placeholder="e.g. Strength 13 or higher, proficiency with heavy armor"
+                  />
                 </div>
               </AccordionContent>
             </AccordionItem>

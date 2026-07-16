@@ -532,6 +532,18 @@ describe("detectFeatureModifiers by feature name", () => {
     ).toBe("asi_pool")
   })
 
+  it("wires PHB 2024 ASI feat body (or increase, without 'you can') as asi_pool", () => {
+    const phb =
+      "Increase one ability score of your choice by 2, or increase two ability scores of your choice by 1. This feat can’t increase an ability score above 20."
+    const detections = detectFeatureModifiers(phb, {
+      contentKind: "feat",
+      sourceName: "Ability Score Improvement",
+      featureName: "Ability Score Improvement",
+    })
+    expect(detections.some((entry) => entry.ruleId === "grant.asi_by_name")).toBe(false)
+    expect(detections.some((entry) => entry.ruleId === "grant.asi_classic")).toBe(true)
+  })
+
   it("keeps 2024 ASI phrasing on grant_feat", () => {
     const modern =
       "You gain the Ability Score Improvement feat or another feat of your choice for which you qualify."

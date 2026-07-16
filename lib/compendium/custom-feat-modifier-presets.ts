@@ -8,6 +8,7 @@ import {
   acBonus,
   armorProf,
   asiOne,
+  asiPool,
   attackMod,
   bonusActionAttackFx,
   castSpellFx,
@@ -21,6 +22,7 @@ import {
   forceSaveFx,
   grantTempHpFx,
   healingDicePool,
+  hitPerLevel,
   imposeDisadvantageFx,
   modifyCreatureFx,
   movementEffectsPassive,
@@ -36,19 +38,166 @@ import {
   spellsKnown,
   telepathyMod,
   toolProf,
+  toolsChoice,
   turnStartFx,
   unarmedDie,
   uses,
   visionMod,
   weaponProf,
+  FEAT_MODIFIER_CATALOG,
 } from "@/lib/compendium/feat-modifier-presets"
+import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
+import { SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
 
 const LORE_SKILLS = ["Arcana", "History", "Investigation", "Nature", "Religion"] as const
 const OBSERVER_SKILLS = ["Insight", "Investigation", "Perception"] as const
 const ELEMENTAL_DAMAGE_TYPES = ["Acid", "Cold", "Fire", "Lightning", "Thunder"] as const
 
-/** Non-SRD feat name → common modifier presets (PHB General + Fighting Style feats). */
+/** Artisan tools listed on the Crafter (Origin) Fast Crafting table. */
+const CRAFTER_ARTISAN_TOOLS = [
+  "Carpenter's Tools",
+  "Leatherworker's Tools",
+  "Mason's Tools",
+  "Potter's Tools",
+  "Smith's Tools",
+  "Tinker's Tools",
+  "Weaver's Tools",
+  "Woodcarver's Tools",
+] as const
+
+/** Non-SRD feat name → common modifier presets (PHB Origin + General + Fighting Style feats). */
 export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
+  // —— Origin ——
+  Alert: {
+    linkedModifiers: [
+      checkFx(
+        "alert_initiative",
+        {
+          kind: "check_bonus",
+          checkCategory: "initiative",
+          bonusConfig: { mode: "proficiency" },
+        },
+        {},
+      ),
+    ],
+  },
+
+  Crafter: {
+    linkedModifiers: [
+      toolsChoice("crafter_tools", 3, CRAFTER_ARTISAN_TOOLS, "Tool Proficiency: 3 Artisan's Tools from Fast Crafting table"),
+    ],
+  },
+
+  Healer: {
+    linkedModifiers: [
+      healingDicePool("healer_battle_medic", {
+        dieType: "d8",
+        activation: "action",
+        dicePerUseSource: "proficiency",
+        label: "Battle Medic: expend Healer's Kit use; target spends Hit Die + your PB",
+      }),
+      spellHealing("healer_rerolls", {
+        label: "Healing Rerolls: reroll 1s on healing dice from spells or Battle Medic",
+      }),
+    ],
+  },
+
+  Lucky: {
+    linkedModifiers: [
+      uses(
+        "lucky_points",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Luck Points (equal to Proficiency Bonus)",
+      ),
+      checkFx(
+        "lucky_advantage",
+        { kind: "check_advantage", checkCategory: "other" },
+        {},
+      ),
+      imposeDisadvantageFx("lucky_disadvantage"),
+    ],
+  },
+
+  "Magic Initiate": {
+    repeatable: true,
+    linkedModifiers: [
+      spellsKnown("magic_initiate_spells", {
+        choiceGrants: [
+          { level: 0, count: 2 },
+          { level: 1, count: 1 },
+        ],
+        spellListClassOptions: ["Cleric", "Druid", "Wizard"],
+        playerPicksSpellList: true,
+        label: "Magic Initiate spells",
+      }),
+      spellAbility("magic_initiate_ability", "Spellcasting ability: INT, WIS, or CHA (chosen with feat)"),
+      uses(
+        "magic_initiate_cast",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Cast chosen level-1 spell once without a slot",
+      ),
+    ],
+  },
+
+  Musician: {
+    linkedModifiers: [
+      toolsChoice(
+        "musician_instruments",
+        3,
+        SRD_MUSICAL_INSTRUMENTS,
+        "Instrument Training: proficiency with 3 Musical Instruments of your choice",
+      ),
+    ],
+  },
+
+  "Savage Attacker": {
+    linkedModifiers: [
+      riderFx("savage_attacker", { bonusDice: "reroll weapon damage once per turn" }),
+    ],
+  },
+
+  Skilled: {
+    repeatable: true,
+    linkedModifiers: [
+      skillChoice("skilled_skills", {
+        allowAnySkill: true,
+        sharedChoiceGroup: "skilled_proficiencies",
+        sharedChoiceCount: 3,
+        label: "Choose 3 skills or tools",
+      }),
+      charInstance("modinst_skilled_tools", FEAT_MODIFIER_CATALOG.toolProficiencies, [
+        {
+          id: modId("skilled_tools"),
+          type: "tool_proficiencies",
+          values: [],
+          choiceCount: 0,
+          sharedChoiceGroup: "skilled_proficiencies",
+          sharedChoiceCount: 3,
+        },
+      ]),
+    ],
+  },
+
+  "Tavern Brawler": {
+    linkedModifiers: [
+      unarmedDie("tavern_brawler_unarmed", "1d4", "Enhanced Unarmed Strike: 1d4 + STR"),
+      weaponProf("tavern_brawler_improvised", "specific", ["Improvised Weapons"], "Improvised Weaponry"),
+      onHitTrigger("tavern_brawler_push", {
+        appliesTo: "unarmed",
+        label: "Push: on Unarmed Strike hit as part of Attack, also push 5 ft (once/turn)",
+      }),
+    ],
+  },
+
+  Tough: {
+    linkedModifiers: [hitPerLevel("tough", 2, "+2 HP per character level")],
+  },
+
+  "Ability Score Improvement": {
+    repeatable: true,
+    linkedModifiers: [asiPool("modinst_asi", 2, "ASI: +2 to one ability or +1 to two")],
+  },
+
   Actor: {
     linkedModifiers: [
       asiOne("actor_asi", "+1 Charisma"),
@@ -170,7 +319,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       asiOne("durable_asi", "+1 Constitution"),
       checkFx(
         "durable_defy_death",
-        { kind: "check_advantage", checkCategory: "save", checkAbility: "Constitution" },
+        { kind: "check_advantage", checkCategory: "death_save" },
         {},
       ),
       healingDicePool("durable_recovery", {

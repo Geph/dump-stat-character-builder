@@ -39,10 +39,12 @@ import {
   ClipboardCopy,
   Download,
   FileText,
+  Info,
   Library,
   Loader2,
   Type,
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type ClipboardImportPanelProps = {
   contentType: string
@@ -217,8 +219,7 @@ export function ClipboardImportPanel({
             then review multi-file order before extracting.
           </p>
         </div>
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <ImportContentTypeHintSelect
               value={contentType}
               onChange={onContentTypeChange}
@@ -232,20 +233,44 @@ export function ClipboardImportPanel({
                 enabled
               />
             ) : null}
-            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
+            <div className="flex items-center gap-2 flex-1 min-w-[min(100%,18rem)]">
               <label
                 htmlFor="import-material-source"
-                className="text-sm font-medium text-muted-foreground shrink-0"
+                className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground shrink-0"
               >
-                Compendium source label:
+                Source
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-0.5 text-muted-foreground hover:text-foreground"
+                      aria-label="About compendium source labels"
+                    >
+                      <Info className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={6} className="max-w-[280px] text-left text-balance">
+                    Source label is stored on imported entries so you can filter by book or homebrew
+                    name. Use Match existing to reuse a label already on your homebrew content (SRD
+                    and System excluded).
+                    {contentType === "subclasses" ? (
+                      <>
+                        {" "}
+                        When importing subclasses, optionally match a class so the extraction prompt
+                        locks class_name
+                        {subclassMatch ? <> to {subclassMatch.className}</> : null}.
+                      </>
+                    ) : null}
+                  </TooltipContent>
+                </Tooltip>
               </label>
               <input
                 id="import-material-source"
                 type="text"
                 value={materialSource}
                 onChange={(event) => onMaterialSourceChange(event.target.value)}
-                placeholder="e.g. Gunslinger (Third Party), MCDM, Homebrew"
-                className="flex-1 min-w-[140px] px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
+                placeholder="e.g. MCDM, Homebrew"
+                className="flex-1 min-w-0 px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
               />
               <DropdownMenu
                 onOpenChange={(open) => {
@@ -294,26 +319,6 @@ export function ClipboardImportPanel({
               </DropdownMenu>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Source label is stored on imported entries so you can filter by book or homebrew name.
-            Use Match existing to reuse a label already on your homebrew content (SRD and System excluded).
-            {contentType === "subclasses" ? (
-              <>
-                {" "}
-                When importing subclasses, optionally match a class so the extraction prompt
-                locks <span className="font-medium text-foreground">class_name</span>
-                {subclassMatch ? (
-                  <>
-                    {" "}
-                    to{" "}
-                    <span className="font-medium text-foreground">{subclassMatch.className}</span>
-                  </>
-                ) : null}
-                .
-              </>
-            ) : null}
-          </p>
-        </div>
 
         {contentType === "abilities" ? (
           <div className="space-y-3 rounded-xl border border-border bg-muted/25 p-3.5">

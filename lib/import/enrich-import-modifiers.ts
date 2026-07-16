@@ -25,6 +25,8 @@ import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
+import { customFeatHasPresetRegistry } from "@/lib/compendium/custom-feat-modifier-presets"
+import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
 import type { Feature, Trait } from "@/lib/types"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
@@ -210,11 +212,26 @@ function enrichTraits(
   ) as unknown as Trait[]
 }
 
+function featHasKnownNamePreset(name: string): boolean {
+  return customFeatHasPresetRegistry(name) || name in FEAT_MODIFIER_PRESETS
+}
+
 function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | undefined {
   if (!feats?.length) return feats
   return feats.map((feat) => {
     const inferred = inferFeatImportFields(feat)
     const description = inferred.description ?? ""
+    // Named PHB/SRD feats have hand-written presets applied on load. Partial AI mechanics[]
+    // (or isChoice-only wiring) would persist as linkedModifiers and block those presets —
+    // prefer leaving modifiers empty so enrichCustomFeatRow / enrichSrdFeatRow can fill them.
+    if (featHasKnownNamePreset(inferred.name)) {
+      return {
+        ...inferred,
+        linkedModifiers: undefined,
+        modifierRefs: undefined,
+        importModifierMeta: undefined,
+      } as ImportFeatRow
+    }
     const enriched = enrichFeatureLike(
       {
         ...inferred,

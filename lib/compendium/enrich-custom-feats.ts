@@ -16,13 +16,11 @@ function featHasLinkedModifiers(row: Record<string, unknown>): boolean {
   return Array.isArray(refs) && refs.length > 0
 }
 
+/** True when the row already has linked modifiers (do not overwrite user/import wiring).
+ *  `isChoice` alone is NOT enough — LLM often emits isChoice for Resilient / Magic Initiate /
+ *  Elemental Adept while the hand preset has the real linkedModifiers / spellChoiceGrants. */
 function featHasModifierConfig(row: Record<string, unknown>): boolean {
-  if (featHasLinkedModifiers(row)) return true
-  if (Boolean(row.is_choice ?? row.isChoice)) {
-    const choices = row.choices as { options?: unknown[] } | null | undefined
-    return Array.isArray(choices?.options) && choices.options.length > 0
-  }
-  return false
+  return featHasLinkedModifiers(row)
 }
 
 function applyFeatMechanicalDetection(row: Record<string, unknown>): Record<string, unknown> {
@@ -87,6 +85,10 @@ export function enrichCustomFeatRow(row: Record<string, unknown>): Record<string
     const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
     return applyFeatMechanicalDetection({
       ...row,
+      // Drop LLM isChoice shells — presets wire choices via linkedModifiers (spell/skill picks).
+      is_choice: false,
+      isChoice: false,
+      choices: null,
       linked_modifiers: synced.linkedModifiers,
       linkedModifiers: synced.linkedModifiers,
       modifier_refs: synced.modifierRefs,
