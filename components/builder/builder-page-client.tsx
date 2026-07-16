@@ -58,7 +58,6 @@ import {
   magicInitiateListFromFeatGranted,
 } from "@/lib/compendium/background-origin-feat"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
-import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import {
   applyBackgroundProficienciesToDraft,
   getEffectiveArmorProficiencies,
@@ -226,6 +225,8 @@ import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
   buildOwnedFeatIds,
   isFeatEligibleForCategories,
+  isOriginSelectableCategory,
+  normalizeFeatCategory,
 } from "@/lib/builder/feat-selection"
 import {
   allSelectedAsiAllocationsValid,
@@ -987,7 +988,7 @@ export default function BuilderPageClient() {
   const originFeats = useMemo(
     () =>
       feats
-        .filter((feat) => normalizeFeatCategory(feat.category) === "Origin")
+        .filter((feat) => isOriginSelectableCategory(feat.category))
         .map((feat) => ({ id: feat.id, name: feat.name }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [feats],

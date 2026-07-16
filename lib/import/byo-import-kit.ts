@@ -55,7 +55,7 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment, starting_gold, feat_granted, ability_bonuses, and feature. Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
-  feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
+  feats: "Focus on feats[] with category (Origin, Dark Gift, General, Fighting Style, Epic Boon, Planar Pact) when known. Ravenloft Dark Gifts → Dark Gift, never Planar Pact.",
   equipment:
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
   abilities:

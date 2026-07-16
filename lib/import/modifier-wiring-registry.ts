@@ -77,7 +77,7 @@ export type ModifierWiringEntry = {
 }
 
 const FEAT_CATEGORIES_FOR_IMPORT = FEAT_PICK_CATEGORIES.filter((category) =>
-  ["Origin", "General", "Fighting Style", "Epic Boon", "Planar Pact", "Metamagic", "Mystic Technique", "Eldritch Invocation"].includes(
+  ["Origin", "Dark Gift", "General", "Fighting Style", "Epic Boon", "Planar Pact", "Metamagic", "Mystic Technique", "Eldritch Invocation"].includes(
     category,
   ),
 )

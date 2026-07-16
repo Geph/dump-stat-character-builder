@@ -115,6 +115,7 @@ export const ImportMechanicSchema = z.object({
     .array(
       z.enum([
         "Origin",
+        "Dark Gift",
         "General",
         "Fighting Style",
         "Epic Boon",
@@ -728,12 +729,14 @@ export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose 
 
 export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the source labels them:
 - "Origin" for Origin Feats (1st-level background-style feats)
+- "Dark Gift" for Ravenloft Dark Gift feats — NOT Planar Pact. Dark Gifts may be chosen whenever an Origin feat slot is offered (with DM permission). Headers like "Dark Gift Feat (Prerequisite: Ravenloft Campaign)" → category "Dark Gift".
 - "Epic Boon" for Epic Boons (19th+ level boons)
 - "Fighting Style" for fighting style options
-- "Planar Pact" for Planar Pact feats (mutually exclusive pact feats like Fey Pact, Infernal Pact)
+- "Planar Pact" for Planar Pact feats only (mutually exclusive pact feats like Fey Pact, Infernal Pact — "Can't Have Another Planar Pact Feat")
 - "General" for other feats (default when unclear)
 Do not embed the category name only in description — use the category field.
 When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).
+When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Planar Pact").
 For well-known PHB feats (Alert, Tough, Magic Initiate, Archery, War Caster, etc.), prefer omitting mechanics[] when unsure — name-matched presets apply on load. Partial wrong mechanics (e.g. vision without visionType blindsight, grant_feat on ASI, empty damage_roll_modifiers) are worse than none.`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:

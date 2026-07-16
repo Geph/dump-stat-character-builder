@@ -42,7 +42,7 @@ import {
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
 
-const FEAT_CATEGORIES = ["Origin", "General", "Fighting Style", "Epic Boon"] as const
+const FEAT_CATEGORIES = ["Origin", "Dark Gift", "General", "Fighting Style", "Epic Boon", "Planar Pact"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 
 interface FeatFormData {
@@ -408,6 +408,12 @@ export default function FeatEditorPage({ id }: { id: string }) {
               {form.category === "Origin" && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Origin feats can be taken at 1st level as part of a background.
+                </p>
+              )}
+              {form.category === "Dark Gift" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Dark Gift feats can be chosen whenever an Origin feat slot is offered (with DM
+                  permission).
                 </p>
               )}
             </div>

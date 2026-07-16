@@ -1073,7 +1073,8 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {activeTab === "feats" && (
           <div className="flex gap-2 flex-wrap">
             <span className={`text-xs px-2 py-1 rounded-full ${
-              castCompendiumRow<Feat>(data).category === "Origin"
+              castCompendiumRow<Feat>(data).category === "Origin" ||
+              castCompendiumRow<Feat>(data).category === "Dark Gift"
                 ? "bg-lime/10 text-lime"
                 : castCompendiumRow<Feat>(data).category === "Epic Boon"
                 ? "bg-magenta/10 text-magenta"

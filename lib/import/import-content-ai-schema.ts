@@ -115,6 +115,7 @@ const ImportMechanicAiSchema = z.object({
     .array(
       z.enum([
         "Origin",
+        "Dark Gift",
         "General",
         "Fighting Style",
         "Epic Boon",

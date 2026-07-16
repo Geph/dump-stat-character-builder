@@ -126,8 +126,8 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
       const db = createClient()
       const { data } = await db
         .from("feats")
-        .select("id, name")
-        .eq("category", "Origin")
+        .select("id, name, category")
+        .in("category", ["Origin", "Dark Gift"])
         .order("name")
       setOriginFeats(asCompendiumRows<{ id: string; name: string }>(data))
     }
@@ -628,7 +628,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
 
           <CompendiumEditorPanel
             title="Origin Feat Granted (D&D 2024)"
-            hint="Backgrounds grant a 1st-level Origin feat. Only Origin-category feats are listed."
+            hint="Backgrounds grant a 1st-level Origin feat (Dark Gifts are also listed — they may replace an Origin pick with DM permission)."
           >
             <OriginFeatGrantedSelect
               value={form.feat_granted}
@@ -637,7 +637,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             />
             {originFeats.length === 0 && (
               <p className="text-xs text-muted-foreground mt-1 italic">
-                No Origin feats found. Add feats with the &quot;Origin&quot; category to populate this list.
+                No Origin / Dark Gift feats found. Add feats with those categories to populate this list.
               </p>
             )}
           </CompendiumEditorPanel>
