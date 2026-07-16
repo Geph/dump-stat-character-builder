@@ -298,7 +298,7 @@ function vision(rangeFeet: number, visionType: "blindsight" | "darkvision" = "da
   ])
 }
 
-function damageResistance(types: string[] = [], label?: string): LinkedModifierInstance {
+function damageResistance(types: string[] = [], label?: string, limitations?: ModifierLimitation[]): LinkedModifierInstance {
   const key = label ?? (types.join("_") || "pick")
   return charInstance(`modinst_res_${key}`, FEAT_MODIFIER_CATALOG.damageResistance, [
     {
@@ -306,6 +306,20 @@ function damageResistance(types: string[] = [], label?: string): LinkedModifierI
       type: "damage_resistance",
       damageTypes: types,
       label,
+      limitations,
+    },
+  ])
+}
+
+function damageImmunity(types: string[], label?: string, limitations?: ModifierLimitation[]): LinkedModifierInstance {
+  const key = label ?? (types.join("_") || "pick")
+  return charInstance(`modinst_imm_${key}`, FEAT_MODIFIER_CATALOG.damageResistance, [
+    {
+      id: modId(`imm_${key}`),
+      type: "damage_immunity",
+      damageTypes: types,
+      label,
+      limitations,
     },
   ])
 }
@@ -3022,7 +3036,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         label: "Illusion spells: no verbal components; +60 ft. range on spells with 10+ ft. range",
       }),
       spellsKnownChar("improved_illusions_cantrip", {
-        spells: [{ spellId: "minor-illusion" }],
+        spells: [],
         spellListClassOptions: ["Wizard"],
         label: "Minor Illusion (extra cantrip if known); BA cast; sound and image together",
       }),
@@ -3493,7 +3507,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: [
       ...magicalTinkeringPreset(),
       spellsKnownChar("tinkers_magic_mending", {
-        spells: ["Mending"],
+        spells: [],
+        alwaysPrepared: true,
         label: "You know the Mending cantrip",
       }),
     ],
@@ -3625,6 +3640,20 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       spellHealingModifier("return_to_life", { maximizeOnlyAtZeroHp: true, maximizeHealingDice: true }),
     ],
   },
+  // Bundled feature name some sources use for Pull of Death + Return to Life together.
+  "*::Circle of Mortality": {
+    linkedModifiers: [
+      onHitTriggerPreset("pull_of_death", { effectCatalogRefId: "cat_fx_extra_damage_on_hit" }),
+      extraDamageOnHitByLevel("pull_of_death_necrotic", [
+        { level: 3, dice: "1d4" },
+        { level: 11, dice: "1d6" },
+      ]),
+      spellHealingModifier("circle_of_mortality_return_to_life", {
+        maximizeOnlyAtZeroHp: true,
+        maximizeHealingDice: true,
+      }),
+    ],
+  },
   "*::Warding Flare": {
     linkedModifiers: [
       usesPool(
@@ -3692,6 +3721,25 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     }),
   ],
   "*::Sentinel at Death's Door": [damageHalvingReactionPreset("sentinel_death_door", { cancelCritRiders: true })],
+  "*::Path to the Grave": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool({ type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 }, "Path to the Grave"),
+      fxInstance("modinst_path_to_grave", MODIFY_CREATURE_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("path_to_grave"),
+            kind: "modify_creature",
+            rollTarget: "enemy",
+            creatureModifyMode: "roll",
+            label:
+              "Curse until start of your next turn: target has Disadvantage on attack rolls and saves. End early on a hit to add extra Necrotic or Radiant damage equal to your Cleric level.",
+          },
+        ],
+      }),
+    ],
+  },
   "*::Psychic Feedback": {
     linkedModifiers: [
       failedRollTriggerPreset("psychic_feedback", {
@@ -3721,6 +3769,26 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       usesPoolWithRestore(
         { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
         "Keeper of Souls",
+        undefined,
+        { minSpellLevel: 6, restores: 1 },
+      ),
+    ],
+  },
+  // Bundled feature name some sources use for Enhanced Necromancy + Keeper of Souls together.
+  "*::Divine Reaper": {
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "Enhanced Necromancy (target a second creature)",
+      ),
+      onCreatureDeathTriggerPreset("divine_reaper_keeper_of_souls", {
+        creatureFilter: "enemy",
+        rangeFeet: 60,
+        effectCatalogRefId: "cat_fx_heal_from_pool",
+      }),
+      usesPoolWithRestore(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Divine Reaper (Keeper of Souls)",
         undefined,
         { minSpellLevel: 6, restores: 1 },
       ),
@@ -3761,6 +3829,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Great Old One Spells": [alwaysPreparedSpells("Great Old One Patron spells")],
   "*::Undead Spells": [alwaysPreparedSpells("Undead Patron spells")],
   "*::Form of Dread": {
+    activation: { bonusAction: true },
     linkedModifiers: [
       usesPool(
         { type: "ability_modifier", abilityModifier: "CHA", recharges: [{ rest: "long_rest" }] },
@@ -3771,6 +3840,50 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         "While Form of Dread is active",
         [requiresActiveToggleLimitation("form_of_dread")],
       ),
+      fxInstance("modinst_form_of_dread_temp_hp", GRANT_TEMP_HP_CATALOG_ID, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("form_of_dread_temp_hp"),
+            kind: "grant_temp_hp",
+            tempHpTrigger: "bonus_action",
+            healMode: "dice",
+            healDiceCount: 1,
+            healDieType: "d10",
+            label: "Facsimile of Life: Temp HP 1d10 + Warlock level on activation",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Necrotic Husk": {
+    linkedModifiers: [
+      damageResistance(["Necrotic"], "Necrotic Resilience"),
+      damageImmunity(["Necrotic"], "While Form of Dread is active", [
+        requiresActiveToggleLimitation("form_of_dread"),
+      ]),
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Unholy Resuscitation",
+      ),
+    ],
+  },
+  "*::Superior Dread": {
+    linkedModifiers: [
+      damageResistance(["Bludgeoning", "Piercing", "Slashing"], "Dread Resistance (while Form of Dread active)", [
+        requiresActiveToggleLimitation("form_of_dread"),
+      ]),
+      charInstance("modinst_ghostly_flight", "cat_char_speed", [
+        {
+          id: modId("ghostly_flight"),
+          type: "speed",
+          speedType: "fly",
+          mode: "equal_to_walk",
+          value: 0,
+          label: "Ghostly Flight: Fly Speed = Speed (hover) while Form of Dread active",
+          limitations: [requiresActiveToggleLimitation("form_of_dread")],
+        },
+      ]),
     ],
   },
 
@@ -4053,6 +4166,17 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
     ],
   },
+  "*::Channeler": {
+    linkedModifiers: [
+      spellsKnownChar("channeler_guidance", {
+        spells: [],
+        alwaysPrepared: true,
+        spellListClassOptions: ["Bard"],
+        label: "Guidance cantrip; range 60 ft.",
+      }),
+      toolsPreset("channeler", ["Gaming Set (playing cards)"], "Spiritual Focus tool proficiency"),
+    ],
+  },
   "*::Spirits from Beyond": {
     linkedModifiers: [
       charInstance("modinst_spirits_beyond", RESOURCE_ABILITY_MENU_CATALOG_ID, [
@@ -4064,6 +4188,21 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           options: [],
         },
       ]),
+    ],
+  },
+  "*::Empowered Channeling": {
+    linkedModifiers: [
+      spellsKnownChar("empowered_channeling_spirit_guardians", {
+        spells: [],
+        alwaysPrepared: true,
+        spellListClassOptions: ["Bard"],
+        freeCastPerLongRest: [{ spellName: "Spirit Guardians", count: 1 }],
+        label: "Always prepared; cast once without a slot per Long Rest (Half Cover option 1/rest)",
+      }),
+      usesPool(
+        { type: "special", specialDescription: "Power from Beyond: once/turn, +1d6 to a spell's damage or healing" },
+        "Power from Beyond",
+      ),
     ],
   },
   "*::Broad Inspiration": {
@@ -5072,6 +5211,12 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Whispers of the Dead": [skillChoice(1, "Whispers of the Dead proficiency (swap on rest)")],
+  "*::Voice of Death": [
+    usesPool(
+      { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+      "Voice of Death (cast Speak with Dead without a slot, using DEX)",
+    ),
+  ],
   "*::Tokens of the Departed": {
     linkedModifiers: [
       usesPool({ type: "fixed", fixedAmount: 2, recharges: [{ rest: "long_rest" }] }, "Soul trinkets"),
@@ -5520,7 +5665,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         "Restorative Reagents (Lesser Restoration)",
       ),
       spellsKnownChar("restorative_reagents", {
-        spells: ["Lesser Restoration"],
+        spells: [],
         alwaysPrepared: true,
         label: "Cast Lesser Restoration without a slot via Alchemist's Supplies (INT uses/LR)",
       }),
@@ -5536,7 +5681,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         effectCatalogRefId: "cat_fx_extra_damage_on_hit",
       }),
       spellsKnownChar("conjured_cauldron", {
-        spells: ["Tasha's Bubbling Cauldron"],
+        spells: [],
         alwaysPrepared: true,
         freeCastPerLongRest: [{ spellName: "Tasha's Bubbling Cauldron", count: 1 }],
         label: "Conjured Cauldron: cast Tasha's Bubbling Cauldron 1/Long Rest (no slot, no M)",
@@ -5714,7 +5859,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         "Illuminated Cartography (Faerie Fire)",
       ),
       spellsKnownChar("illuminated_cartography", {
-        spells: ["Faerie Fire"],
+        spells: [],
         alwaysPrepared: true,
         label: "Cast Faerie Fire without a slot (INT uses/LR via Illuminated Cartography)",
       }),
@@ -5772,7 +5917,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Reanimator Spells": [alwaysPreparedSpells("Reanimator spells")],
-  "*::Reanimator's Skillset": {
+  // Source text spells this "Reanimator's Skill Set" (two words) — kept as the canonical key.
+  "*::Reanimator's Skill Set": {
     linkedModifiers: [
       usesPool(
         { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
