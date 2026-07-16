@@ -536,6 +536,28 @@ export function collectSpeciesModifierPlayerChoiceSlots(
   return dedupeModifierPlayerChoiceSlots(slots)
 }
 
+/** Tool/language picks granted by a background feature (wired from proficiency choice phrases). */
+export function collectBackgroundModifierPlayerChoiceSlots(
+  background: import("@/lib/types").Background | null | undefined,
+  catalog: ModifierCatalogEntry[],
+): ModifierPlayerChoiceSlot[] {
+  if (!background?.feature || !background.id) return []
+  const mods = characteristicsFromLinkedModifiers(
+    catalog,
+    effectiveLinkedModifiers(
+      background.feature.linkedModifiers,
+      background.feature.modifierRefs,
+      catalog,
+    ),
+    background.feature.modifierRefs,
+  )
+  return slotsFromCharacteristics(
+    mods,
+    `background:${background.id}:feature`,
+    background.name,
+  )
+}
+
 export function collectModifierPlayerChoiceSlots(params: {
   featEntries: FeatSelectionEntry[]
   feats: Feat[]
@@ -549,6 +571,7 @@ export function collectModifierPlayerChoiceSlots(params: {
   featureChoicePicks?: Record<string, string[]>
   species?: Species | null
   speciesTraitPicks?: Record<string, string[]>
+  background?: import("@/lib/types").Background | null
 }): ModifierPlayerChoiceSlot[] {
   const {
     featEntries,
@@ -563,6 +586,7 @@ export function collectModifierPlayerChoiceSlots(params: {
     featureChoicePicks = {},
     species = null,
     speciesTraitPicks = {},
+    background = null,
   } = params
   const slots: ModifierPlayerChoiceSlot[] = []
 
@@ -607,6 +631,10 @@ export function collectModifierPlayerChoiceSlots(params: {
     slots.push(
       ...collectSpeciesModifierPlayerChoiceSlots(species, speciesTraitPicks, catalog),
     )
+  }
+
+  if (background) {
+    slots.push(...collectBackgroundModifierPlayerChoiceSlots(background, catalog))
   }
 
   return dedupeModifierPlayerChoiceSlots(slots)

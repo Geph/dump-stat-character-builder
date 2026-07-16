@@ -19,6 +19,7 @@ import {
 } from "@/lib/import/subclass-spell-table"
 import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { mergeFoundryIntoImportReport } from "@/lib/import/foundry-import-report"
+import { collectUnmatchedStartingEquipmentNames } from "@/lib/import/collect-unmatched-starting-equipment"
 import type { Feature } from "@/lib/types"
 
 export type ImportReportNextStep = {
@@ -445,6 +446,7 @@ export function buildImportReport(params: {
     (params.content.classes?.length ?? 0) > 0 ||
     (params.content.subclasses?.length ?? 0) > 0 ||
     (params.content.class_resources?.length ?? 0) > 0 ||
+    (params.content.backgrounds?.length ?? 0) > 0 ||
     params.skippedSubclasses.length > 0
 
   if (!hasDetail && params.totalImported === 0) return undefined
@@ -464,6 +466,15 @@ export function buildImportReport(params: {
   const autoWiredModifiers = collectImportModifierPreviews(params.content).length
   const unmatchedFeatures = collectUnmatchedModifierFeatures(params.content)
   const modifierReview = collectImportModifierReview(params.content)
+  const unmatchedEquipment = collectUnmatchedStartingEquipmentNames(params.content)
+
+  for (const missing of unmatchedEquipment) {
+    nextSteps.push({
+      severity: "action",
+      title: `Import or create equipment: ${missing.name}`,
+      detail: `Referenced by ${missing.sources.join(", ")} but not found in the equipment catalog.`,
+    })
+  }
 
   if (unmatchedFeatures.length > 0) {
     nextSteps.unshift({

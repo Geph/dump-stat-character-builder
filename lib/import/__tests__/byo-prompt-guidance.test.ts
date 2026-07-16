@@ -133,4 +133,11 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     const prompt = buildByoExtractionPrompt("subclasses")
     expect(prompt).toContain("lost its whitespace")
   })
+
+  it("forbids inventing ability_bonuses keys like desktop on backgrounds", () => {
+    const prompt = buildByoExtractionPrompt("backgrounds")
+    expect(prompt).toContain("never invent keys like desktop")
+    expect(prompt).toContain("strength|dexterity|constitution|intelligence|wisdom|charisma")
+    expect(buildImportSystemPrompt("backgrounds")).toContain('never invent keys like "desktop"')
+  })
 })

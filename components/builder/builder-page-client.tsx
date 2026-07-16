@@ -1200,6 +1200,7 @@ export default function BuilderPageClient() {
         featureChoicePicks,
         species: selectedSpecies,
         speciesTraitPicks,
+        background: selectedBackground,
       }),
     [
       featSelectionEntries,
@@ -1214,6 +1215,7 @@ export default function BuilderPageClient() {
       featureChoicePicks,
       selectedSpecies,
       speciesTraitPicks,
+      selectedBackground,
     ],
   )
 
@@ -2030,6 +2032,8 @@ export default function BuilderPageClient() {
             ) ||
             (character.species_id != null &&
               slot.sourceKey.startsWith(`species:${character.species_id}:`)) ||
+            (character.background_id != null &&
+              slot.sourceKey.startsWith(`background:${character.background_id}:`)) ||
             slot.sourceKey ===
               (backgroundGrantedFeat?.id
                 ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
@@ -2041,6 +2045,7 @@ export default function BuilderPageClient() {
       speciesFeatPickSlots,
       backgroundFeatPickSlots,
       character.species_id,
+      character.background_id,
       backgroundGrantedFeat?.id,
     ],
   )
@@ -3876,7 +3881,9 @@ export default function BuilderPageClient() {
                           setModifierPlayerPicks((prev) => {
                             const next = { ...prev }
                             for (const key of Object.keys(next)) {
-                              if (key.startsWith("feat:granted:")) delete next[key]
+                              if (key.startsWith("feat:granted:") || key.startsWith("background:")) {
+                                delete next[key]
+                              }
                             }
                             return next
                           })

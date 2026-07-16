@@ -52,7 +52,7 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
   backgrounds:
-    "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment, starting_gold, feat_granted, ability_bonuses, and feature. Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
+    "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment or starting_equipment_groups (Choose A/B), starting_gold, feat_granted, ability_bonuses, optional source, and feature. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
   feats: "Focus on feats[] with category (Origin, Dark Gift, General, Fighting Style, Epic Boon, Planar Pact) when known. Ravenloft Dark Gifts → Dark Gift, never Planar Pact.",
@@ -60,6 +60,8 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
   abilities:
     "Focus on custom ability libraries and class_resources[]. Split hierarchy (do not mash): category label (not a row) → mid-level packages → leaf powers / class_talent rows + nested Discipline Talents in choices. Prefer import_proposals.custom_abilities[] for discipline packages (ability_role discipline), psionic powers (ability_role psionic_power — NOT spells[]), class-level/feat-gated talents (ability_role class_talent), exploits, and upgrades. Distinguish Discipline Talents vs Class Talents category/resourceKey. Set source_type and source_name consistently. Keep spend phrasing (expend N psi points, expend one Exploit Die). See Custom ability library structure examples.",
+  invocations_metamagic:
+    "Focus on Eldritch Invocation, Metamagic, and similar pick-from-a-list option libraries. Route through the same custom abilities pipeline: one import_proposals.custom_abilities[] row per option (not section headers). Prefer ability_role knack when the class selects from a known pool (wire granting features with optionsSource class_knacks); otherwise omit ability_role. Capture prerequisites, level gates, and spend costs in description/prerequisite. Do not put these in feats[] or spells[].",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
 }
 
@@ -384,6 +386,33 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         },
       },
     ],
+  },
+  invocations_metamagic: {
+    import_proposals: {
+      custom_abilities: [
+        {
+          proposal_id: "agonizing_blast",
+          name: "Agonizing Blast",
+          definition: "Eldritch Invocation option.",
+          description:
+            "Choose one of your known warlock cantrips that deals damage. You can add your Charisma modifier to that spell's damage rolls.",
+          source_type: "class",
+          source_name: "Warlock",
+          level_requirement: 1,
+          prerequisite: "eldritch blast cantrip",
+        },
+        {
+          proposal_id: "careful_spell",
+          name: "Careful Spell",
+          definition: "Metamagic option.",
+          description:
+            "When you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a number of those creatures up to your Charisma modifier (minimum of one creature).",
+          source_type: "class",
+          source_name: "Sorcerer",
+          level_requirement: 2,
+        },
+      ],
+    },
   },
 }
 

@@ -1,4 +1,4 @@
-import { appendContentTypeHintToPrompt } from "@/lib/import/content-type-hints"
+import { appendContentTypeHintToPrompt, isCustomAbilitiesContentTypeHint } from "@/lib/import/content-type-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 import { CLASS_SPELL_LIST_IMPORT_HINT, SPELL_SCHOOL_IMPORT_HINT } from "@/lib/import/class-spell-lists"
 import {
@@ -30,7 +30,7 @@ export const IMPORT_BASE_SYSTEM_PROMPT = `You are a D&D 2024 content parser. Ext
 Important D&D 2024 rules:
 - "Species" is the new term (not "Race")
 - Backgrounds grant ability score bonuses (+2 to one, +1 to another, or +1/+1/+1)
-- For backgrounds, set ability_bonuses to an object listing eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed bonuses with +1/+2 values
+- For backgrounds, set ability_bonuses to an object listing eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed bonuses with +1/+2 values. Keys must be only: strength, dexterity, constitution, intelligence, wisdom, charisma — never invent keys like "desktop"
 - Backgrounds grant a 1st-level feat
 - Species no longer grant ability score bonuses
 - Class features are tied to specific levels
@@ -90,8 +90,8 @@ export function buildImportSystemPrompt(
   const parts = [base]
   if (customSystemsHint) {
     parts.push(customSystemsHint)
-  } else if (hint === "abilities") {
-    // Abilities imports always get hierarchy examples even without Step 0 labels.
+  } else if (isCustomAbilitiesContentTypeHint(hint)) {
+    // Abilities / invocations-metamagic imports always get hierarchy examples even without Step 0 labels.
     parts.push(CUSTOM_ABILITY_LIBRARY_STRUCTURE_HINT)
   }
   if (subclassMatchHint) {

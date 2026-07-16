@@ -1,5 +1,6 @@
 import type { Background, CharacterDraft } from "@/lib/types"
 import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
+import { isBackgroundProficiencyChoicePhrase } from "@/lib/compendium/wire-background-proficiency-choices"
 
 export const BACKGROUND_ARMOR_OPTIONS = [
   "Light armor",
@@ -33,22 +34,25 @@ export function normalizeBackgroundProficiencies(
   proficiencies: BackgroundProficiencies | null | undefined,
   legacyToolProficiencies?: string[] | null,
 ): BackgroundProficiencies {
+  const filterFixed = (items: string[] | null | undefined) =>
+    (items ?? []).filter((item) => item?.trim() && !isBackgroundProficiencyChoicePhrase(item))
+
   if (proficiencies && typeof proficiencies === "object") {
     return {
       tools: mergeProficiencyLists(
-        proficiencies.tools,
-        proficiencies.vehicles,
-        legacyToolProficiencies,
+        filterFixed(proficiencies.tools),
+        filterFixed(proficiencies.vehicles),
+        filterFixed(legacyToolProficiencies),
       ),
       vehicles: [],
       weapons: [...(proficiencies.weapons ?? [])],
       armor: [...(proficiencies.armor ?? [])],
-      languages: [...(proficiencies.languages ?? [])],
+      languages: filterFixed(proficiencies.languages),
     }
   }
   return {
     ...emptyBackgroundProficiencies(),
-    tools: [...(legacyToolProficiencies ?? [])],
+    tools: filterFixed(legacyToolProficiencies),
   }
 }
 

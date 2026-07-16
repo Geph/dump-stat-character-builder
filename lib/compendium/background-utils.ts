@@ -14,6 +14,8 @@ const ABILITY_ALIASES: Record<string, BackgroundAbilityKey> = {
   strength: "strength",
   dex: "dexterity",
   dexterity: "dexterity",
+  // LLMs occasionally hallucinate "desktop" for Dexterity — remap on import.
+  desktop: "dexterity",
   con: "constitution",
   constitution: "constitution",
   int: "intelligence",

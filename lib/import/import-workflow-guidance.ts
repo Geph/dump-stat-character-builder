@@ -28,7 +28,7 @@ export const JSON_ARRAY_IMPORT_TIP =
 export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {
     id: "spellcasting-class",
-    title: "Spellcasting classes (Witch, full casters)",
+    title: "Spellcasting classes",
     summary:
       "Import full homebrew spell write-ups first when needed, then one Classes pass for the class chapter (core + subclasses + spell list when present). Include Spell/School/Special tables in that same Classes pass.",
     examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters", "Artificer-style class lists"],
@@ -58,7 +58,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   },
   {
     id: "psion-disciplines",
-    title: "Psionic classes (KibblesTasty Psion)",
+    title: "Psionic classes (with separated powers)",
     summary:
       "Extract Psionic Disciplines and powers from the PDF first (even if they appear later in the book), import that library, then extract the Psion class + archetypes. Class features and psi costs wire to disciplines that already exist.",
     examples: ["KibblesTasty Psion"],
@@ -109,7 +109,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   },
   {
     id: "inventor-upgrades",
-    title: "Artificer-style upgrade classes (Inventor)",
+    title: "Artificer-style upgrade classes",
     summary:
       "Homebrew spell write-ups first when needed, then one Classes pass for the Inventor chapter with its spell list included. Upgrade pickers that ship as a separate library should come before the class when possible.",
     examples: ["Kibbles Inventor"],

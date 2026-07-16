@@ -338,9 +338,17 @@ export function collectBuilderModifierRefIds(params: {
         catalog,
       )
     : []
-  const backgroundResolved = backgroundInstances.length
+  const backgroundBase = backgroundInstances.length
     ? resolveLinkedModifiers(backgroundInstances, catalog).characteristics
     : []
+  const backgroundResolved =
+    background?.id && backgroundBase.length
+      ? applyModifierPlayerPicks(
+          backgroundBase,
+          `background:${background.id}:feature`,
+          modifierPlayerPicks,
+        )
+      : backgroundBase
 
   const featEntries =
     featSelectionEntries.length > 0

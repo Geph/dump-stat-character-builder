@@ -8,16 +8,28 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "feats", label: "Feats, Fighting Styles, Boons" },
   { value: "equipment", label: "Equipment" },
   { value: "abilities", label: "Custom Abilities / Resources" },
+  { value: "invocations_metamagic", label: "Custom Invocations / Metamagic" },
 ] as const
 
 export type ImportContentTypeHint = (typeof IMPORT_CONTENT_TYPE_HINTS)[number]["value"]
+
+/** Hints that extract via the custom abilities / import_proposals.custom_abilities pipeline. */
+export function isCustomAbilitiesContentTypeHint(
+  contentTypeHint: string | null | undefined,
+): boolean {
+  const hint = contentTypeHint?.trim().toLowerCase()
+  return hint === "abilities" || hint === "invocations_metamagic"
+}
 
 export function appendContentTypeHintToPrompt(
   systemPrompt: string,
   contentTypeHint: string | null | undefined,
 ): string {
   if (contentTypeHint && contentTypeHint !== "all") {
-    return `${systemPrompt}\n\nFocus primarily on extracting: ${contentTypeHint}. You may still extract other content types if clearly present.`
+    const label =
+      IMPORT_CONTENT_TYPE_HINTS.find((entry) => entry.value === contentTypeHint)?.label ??
+      contentTypeHint
+    return `${systemPrompt}\n\nFocus primarily on extracting: ${label}. You may still extract other content types if clearly present.`
   }
   return systemPrompt
 }

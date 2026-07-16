@@ -442,13 +442,24 @@ const SpellAiSchema = z.object({
   classes: z.array(z.string()).nullable(),
 })
 
+/** Fixed ability keys so structured output cannot invent typos like "desktop". */
+const BackgroundAbilityBonusesAiSchema = z.object({
+  strength: z.number().nullable(),
+  dexterity: z.number().nullable(),
+  constitution: z.number().nullable(),
+  intelligence: z.number().nullable(),
+  wisdom: z.number().nullable(),
+  charisma: z.number().nullable(),
+})
+
 const BackgroundAiSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
+  source: z.string().nullable(),
   skill_proficiencies: z.array(z.string()).nullable(),
   tool_proficiencies: z.array(z.string()).nullable(),
   feat_granted: z.string().nullable(),
-  ability_bonuses: z.record(z.string(), z.number()).nullable(),
+  ability_bonuses: BackgroundAbilityBonusesAiSchema.nullable(),
   feature: z.object({ name: z.string(), description: z.string() }).nullable(),
   grants_spells: z.boolean().nullable(),
   granted_spells: z.record(z.string(), z.array(z.string())).nullable(),
@@ -464,6 +475,7 @@ const BackgroundAiSchema = z.object({
   starting_equipment: z
     .array(z.object({ name: z.string(), quantity: z.number() }))
     .nullable(),
+  starting_equipment_groups: z.array(StartingEquipmentGroupAiSchema).nullable(),
   starting_gold: z.number().nullable(),
 })
 
@@ -586,6 +598,18 @@ function omitNull<T extends Record<string, unknown>>(row: T): Partial<T> {
     next[key as keyof T] = value as T[keyof T]
   }
   return next
+}
+
+/** Drop null ability slots from structured-output objects; null/empty → null (legacy). */
+function compactBackgroundAbilityBonuses(
+  bonuses: z.infer<typeof BackgroundAbilityBonusesAiSchema> | null | undefined,
+): Record<string, number> | null {
+  if (!bonuses) return null
+  const out: Record<string, number> = {}
+  for (const [key, value] of Object.entries(bonuses)) {
+    if (typeof value === "number") out[key] = value
+  }
+  return Object.keys(out).length > 0 ? out : null
 }
 
 function normalizeUsesConfig(
@@ -736,22 +760,27 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.backgrounds?.length) {
-    content.backgrounds = raw.backgrounds.map((background) => ({
-      name: background.name,
-      description: background.description,
-      skill_proficiencies: background.skill_proficiencies,
-      feat_granted: background.feat_granted,
-      ability_bonuses: background.ability_bonuses,
-      ...omitNull({
-        tool_proficiencies: background.tool_proficiencies,
-        feature: background.feature,
-        grants_spells: background.grants_spells === true ? true : undefined,
-        granted_spells: background.granted_spells,
-        proficiencies: background.proficiencies,
-        starting_equipment: background.starting_equipment,
-        starting_gold: background.starting_gold,
-      }),
-    })) as NonNullable<ImportContent["backgrounds"]>
+    content.backgrounds = raw.backgrounds.map((background) => {
+      const abilityBonuses = compactBackgroundAbilityBonuses(background.ability_bonuses)
+      return {
+        name: background.name,
+        description: background.description,
+        skill_proficiencies: background.skill_proficiencies,
+        feat_granted: background.feat_granted,
+        ability_bonuses: abilityBonuses,
+        ...omitNull({
+          source: background.source,
+          tool_proficiencies: background.tool_proficiencies,
+          feature: background.feature,
+          grants_spells: background.grants_spells === true ? true : undefined,
+          granted_spells: background.granted_spells,
+          proficiencies: background.proficiencies,
+          starting_equipment: background.starting_equipment,
+          starting_equipment_groups: background.starting_equipment_groups,
+          starting_gold: background.starting_gold,
+        }),
+      }
+    }) as NonNullable<ImportContent["backgrounds"]>
   }
 
   if (raw.spells?.length) {

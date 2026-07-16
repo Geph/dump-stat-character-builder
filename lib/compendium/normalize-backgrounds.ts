@@ -13,6 +13,7 @@ import { parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/backgro
 import { grantFeatCharacteristic, GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
+import { wireBackgroundProficiencyChoices } from "@/lib/compendium/wire-background-proficiency-choices"
 
 const bundledBackgroundByName = new Map(
   (bundledBackgrounds as unknown as {
@@ -94,14 +95,16 @@ export function normalizeBackgroundRow(row: Record<string, unknown>): Record<str
     )
   }
 
-  return wireBackgroundFeatGrantChoice({
-    ...row,
-    ability_bonuses: explicitNullBonuses
-      ? null
-      : Object.keys(ability_bonuses).length
-        ? ability_bonuses
-        : null,
-  })
+  return wireBackgroundProficiencyChoices(
+    wireBackgroundFeatGrantChoice({
+      ...row,
+      ability_bonuses: explicitNullBonuses
+        ? null
+        : Object.keys(ability_bonuses).length
+          ? ability_bonuses
+          : null,
+    }),
+  )
 }
 
 /** Fill missing SRD background fields from bundled seed data. */
