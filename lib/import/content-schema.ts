@@ -50,8 +50,12 @@ export const ImportMechanicSchema = z.object({
   /** "equal_to_walk" for "you gain a Swim/Fly/Climb Speed equal to your (walking) Speed" — speedFeet is ignored in that mode. */
   speedMode: z.enum(["fixed", "equal_to_walk"]).optional(),
   visionRangeFeet: z.number().optional(),
+  /** darkvision (default) | blindsight | truesight | tremorsense — required for Blind Fighting / Skulker. */
+  visionType: z.enum(["darkvision", "blindsight", "truesight", "tremorsense"]).optional(),
   usesFixed: z.number().optional(),
   usesAbility: z.enum(USES_ABILITY_CODES).optional(),
+  /** When true, uses scale with Proficiency Bonus (Lucky, etc.). Prefer over usesFixed: null. */
+  usesProficiency: z.boolean().optional(),
   usesRecharge: z
     .enum(["short_rest", "long_rest", "both", "until_item_consumed", "on_resource_reactivation"])
     .optional(),
@@ -75,7 +79,7 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   classResourceCostAbility: z.enum(USES_ABILITY_CODES).optional(),
   checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).optional(),
-  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).optional(),
+  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative", "death_save"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
   /** Freeform qualifier that cannot be auto-enforced (e.g. "that involves you dancing"). */
@@ -717,7 +721,9 @@ export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose 
 - Populate choices with { category, count, options: [{ name, description }] } or null when not applicable
 - Keep rules text in description; list each selectable option in choices.options
 - Put each option's mechanical rules in that option's description (not only in the parent feature list). Dump Stat wires Common Modifiers per option from option descriptions (resistance, speeds, darkvision, etc.) and strips duplicates from the parent.
-- Feat milestones that grant another feat (ASI, Epic Boon, Fighting Style feat picks): do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring). Never model those milestones as isChoice + choices.
+- Feat milestones that grant another feat (Epic Boon, Fighting Style feat picks, Origin Feat picks): do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring). Never model those milestones as isChoice + choices.
+- The Ability Score Improvement feat itself is NOT a grant_feat — its body is +2 to one score or +1 to two. Prefer empty mechanics[] (hand presets wire asi_pool) or omit grant_feat entirely; never tag ASI as grant_feat.
+- Named PHB Origin/General feats with complex spell/skill picks (Magic Initiate, Resilient, Keen Mind, Observant, Elemental Adept): prefer empty mechanics[] and avoid inventing isChoice shells — Dump Stat has name-matched presets. isChoice is fine for true option lists with no preset (homebrew).
 - If a feat grants a choice from a custom ability catalog that a class or subclass also draws from (a discipline, a class-level talent list, an exploit list, etc.) rather than granting a new feat pick, use isChoice: true with choices.options listing each eligible entry by its exact name (see Name and source matching). This is different from grant_feat milestones — the feat is granting a pick from an ability system, not another feat.`
 
 export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the source labels them:
@@ -727,7 +733,8 @@ export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the sourc
 - "Planar Pact" for Planar Pact feats (mutually exclusive pact feats like Fey Pact, Infernal Pact)
 - "General" for other feats (default when unclear)
 Do not embed the category name only in description — use the category field.
-When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).`
+When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).
+For well-known PHB feats (Alert, Tough, Magic Initiate, Archery, War Caster, etc.), prefer omitting mechanics[] when unsure — name-matched presets apply on load. Partial wrong mechanics (e.g. vision without visionType blindsight, grant_feat on ASI, empty damage_roll_modifiers) are worse than none.`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion")

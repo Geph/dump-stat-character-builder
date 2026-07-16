@@ -46,7 +46,7 @@ export type FeatureNameModifierRule = {
 }
 
 export const CLASSIC_ASI_PHRASE =
-  /increase one ability score of your choice by 2,?\s+or you can increase two ability scores of your choice by 1/i
+  /increase one ability score of your choice by 2,?\s+or(?: you can)? increase two ability scores of your choice by 1/i
 
 export const FEAT_ASI_2024_PHRASE =
   /gain the Ability Score Improvement feat or another feat of your choice for which you qualify/i

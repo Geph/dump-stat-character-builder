@@ -57,13 +57,13 @@ export function ImportSubclassMatchSelect({
   }, [enabled])
 
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap gap-2 items-center">
+    <div className="flex flex-col gap-1 shrink-0">
+      <div className="flex items-center gap-2">
         <label
           htmlFor="import-subclass-match"
-          className="text-sm font-medium text-muted-foreground"
+          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
         >
-          Match Class
+          Match class
         </label>
         <select
           id="import-subclass-match"
@@ -78,7 +78,7 @@ export function ImportSubclassMatchSelect({
             onChange(option ? { id: option.id, className: option.name } : null)
           }}
           disabled={loading}
-          className={`px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 ${focusRingClassName} max-w-[min(100%,22rem)]`}
+          className={`px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 ${focusRingClassName} max-w-[min(100%,14rem)]`}
         >
           <option value="">None — detect from source</option>
           {options.map((option) => (

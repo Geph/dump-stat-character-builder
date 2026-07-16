@@ -76,10 +76,37 @@ describe("enrichCustomFeatRow PHB presets", () => {
     expect(row.linked_modifiers).toEqual(existing)
   })
 
-  it("exposes presets for PHB general and fighting style feats", () => {
-    for (const name of ["Actor", "War Caster", "Blind Fighting", "Unarmed Fighting"]) {
+  it("exposes presets for PHB origin, general, and fighting style feats", () => {
+    for (const name of [
+      "Alert",
+      "Magic Initiate",
+      "Tough",
+      "Lucky",
+      "Actor",
+      "War Caster",
+      "Blind Fighting",
+      "Unarmed Fighting",
+    ]) {
       expect(presetForCustomFeatName(name)?.linkedModifiers?.length).toBeGreaterThan(0)
     }
-    expect(presetForCustomFeatName("Alert")).toBeUndefined()
+  })
+
+  it("applies Magic Initiate preset even when LLM set isChoice spell-list shells", () => {
+    const row = enrichCustomFeatRow({
+      name: "Magic Initiate",
+      source: PHB_SOURCE,
+      description: "Two Cantrips and a Level 1 Spell",
+      isChoice: true,
+      choices: {
+        category: "Spell List",
+        count: 1,
+        options: [{ name: "Wizard", description: "Wizard list" }],
+      },
+    })
+    expect(row.isChoice).toBe(false)
+    const linked = (row.linked_modifiers ?? []) as { characteristics?: { type: string }[] }[]
+    expect(linked.flatMap((inst) => inst.characteristics ?? []).some((c) => c.type === "spells_known")).toBe(
+      true,
+    )
   })
 })

@@ -17,13 +17,9 @@ function featHasLinkedModifiers(row: Record<string, unknown>): boolean {
   return Array.isArray(refs) && refs.length > 0
 }
 
+/** True when the row already has linked modifiers. `isChoice` alone does not block presets. */
 function featHasModifierConfig(row: Record<string, unknown>): boolean {
-  if (featHasLinkedModifiers(row)) return true
-  if (Boolean(row.is_choice ?? row.isChoice)) {
-    const choices = row.choices as { options?: unknown[] } | null | undefined
-    return Array.isArray(choices?.options) && choices.options.length > 0
-  }
-  return false
+  return featHasLinkedModifiers(row)
 }
 
 function isLegacySkilledRow(row: Record<string, unknown>): boolean {
@@ -125,6 +121,9 @@ function enrichSrdFeatRowCore(row: Record<string, unknown>): Record<string, unkn
     const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
     return applyFeatMechanicalDetection({
       ...row,
+      is_choice: false,
+      isChoice: false,
+      choices: null,
       linked_modifiers: synced.linkedModifiers,
       linkedModifiers: synced.linkedModifiers,
       modifier_refs: synced.modifierRefs,

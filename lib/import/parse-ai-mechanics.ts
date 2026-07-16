@@ -890,7 +890,7 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "vision")),
             type: "vision",
-            visionType: "darkvision",
+            visionType: mechanic.visionType ?? "darkvision",
             rangeFeet: mechanic.visionRangeFeet,
           },
         ]),
@@ -938,17 +938,22 @@ function buildFromMechanic(
             abilityModifier: mechanic.usesAbility,
             recharges: usesRechargesFromImport(mechanic.usesRecharge),
           }
-        : mechanic.usesFixed == null && mechanic.classResourceKey
+        : mechanic.usesProficiency
           ? {
-              type: "class_resource",
-              classResourceKey: mechanic.classResourceKey,
-              classResourceAmount: mechanic.classResourceCost ?? 1,
-            }
-          : {
-              type: "fixed",
-              fixedAmount: mechanic.usesFixed ?? 1,
+              type: "proficiency",
               recharges: usesRechargesFromImport(mechanic.usesRecharge),
             }
+          : mechanic.usesFixed == null && mechanic.classResourceKey
+            ? {
+                type: "class_resource",
+                classResourceKey: mechanic.classResourceKey,
+                classResourceAmount: mechanic.classResourceCost ?? 1,
+              }
+            : {
+                type: "fixed",
+                fixedAmount: mechanic.usesFixed ?? 1,
+                recharges: usesRechargesFromImport(mechanic.usesRecharge),
+              }
       // "Spend another resource to restore a use" — UsesConfig.restoreByResource/restoreBySpellSlot
       // already exist and are exercised by hand-written presets (e.g. Beguiling Magic rider); the
       // schema just never routed alternateRefresh into them. actionCost has no matching UsesConfig

@@ -54,8 +54,10 @@ const ImportMechanicAiSchema = z.object({
   speedType: z.enum(["walk", "fly", "swim", "climb"]).nullable(),
   speedFeet: z.number().nullable(),
   visionRangeFeet: z.number().nullable(),
+  visionType: z.enum(["darkvision", "blindsight", "truesight", "tremorsense"]).nullable(),
   usesFixed: z.number().nullable(),
   usesAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
+  usesProficiency: z.boolean().nullable(),
   usesRecharge: z
     .enum(["short_rest", "long_rest", "both", "until_item_consumed", "on_resource_reactivation"])
     .nullable(),
@@ -75,7 +77,7 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
   checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).nullable(),
-  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative"]).nullable(),
+  checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative", "death_save"]).nullable(),
   checkAbility: z
     .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
     .nullable(),

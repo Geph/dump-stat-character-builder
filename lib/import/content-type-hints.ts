@@ -1,11 +1,11 @@
 export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "all", label: "Auto-detect All" },
-  { value: "classes", label: "Classes (include spell lists if applicable)" },
+  { value: "classes", label: "Class (include spell list)" },
   { value: "subclasses", label: "Subclasses" },
   { value: "species", label: "Species" },
   { value: "backgrounds", label: "Backgrounds" },
   { value: "spells", label: "Spells" },
-  { value: "feats", label: "Feats" },
+  { value: "feats", label: "Feats, Fighting Styles, Boons" },
   { value: "equipment", label: "Equipment" },
   { value: "abilities", label: "Custom Abilities / Resources" },
 ] as const
