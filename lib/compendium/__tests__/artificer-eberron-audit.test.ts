@@ -93,16 +93,15 @@ describe("Eberron Artificer 2024 preset wiring", () => {
   })
 
   it("honors Artificer explicit_slot_progression at level 1", () => {
-    const spellcasting = {
-      type: "spellcasting" as const,
+    const spellcasting: NonNullable<DndClass["spellcasting"]> = {
       ability: "Intelligence",
-      caster_progression: "half" as const,
+      caster_progression: "half",
       explicit_slot_progression: [
         { level: 1, slots: [2, 0, 0, 0, 0] },
         { level: 5, slots: [4, 2, 0, 0, 0] },
       ],
     }
-    const table = getSpellSlotTable("Artificer", 1, spellcasting as DndClass["spellcasting"])
+    const table = getSpellSlotTable("Artificer", 1, spellcasting)
     expect(table?.slotsByLevel.slice(0, 2)).toEqual([2, 0])
   })
 
@@ -135,8 +134,7 @@ describe("Eberron Artificer 2024 preset wiring", () => {
         (row.expectType === "damage" &&
           types.some((t) => t === "damage_resistance" || t === "condition_immunity")) ||
         (row.expectType === "feature_option_picker" &&
-          (feature.isChoice === true ||
-            types.some((t) => t === "feature_option_picker" || t === "catalog_option"))) ||
+          (feature.isChoice === true || types.some((t) => t === "catalog_option"))) ||
         (row.expectType === "movement_option" && effects.includes("movement_option"))
       expect(
         hit,

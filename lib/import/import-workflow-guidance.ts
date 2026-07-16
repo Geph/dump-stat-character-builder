@@ -30,7 +30,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "spellcasting-class",
     title: "Spellcasting classes (Witch, full casters)",
     summary:
-      "Import full homebrew spell write-ups first when needed, then one Classes pass for the class chapter (core + subclasses + spell list when present). Prefer including Spell/School/Special tables with the class — use standalone Class Spell Lists only when the list is a separate document you must import before the class.",
+      "Import full homebrew spell write-ups first when needed, then one Classes pass for the class chapter (core + subclasses + spell list when present). Include Spell/School/Special tables in that same Classes pass.",
     examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters", "Artificer-style class lists"],
     steps: [
       {
@@ -51,7 +51,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     ],
     notes: [
       "SRD spells do not need a separate full import if your compendium is SRD-seeded; list stubs only need to tag the class name on each spell.",
-      "Upload spell lists with the class (Classes content type). Standalone Class Spell Lists is only for a list-only document — import that before the full class, never after (a stub class can overwrite features).",
+      "Upload spell lists with the class (Classes content type). Do not import a list-only stub after the full class — that can overwrite features.",
       "Cantrips bundled in a subclass file’s spells[] array are merged automatically.",
       "One class per pass — page-range out any other classes in the same book.",
     ],
