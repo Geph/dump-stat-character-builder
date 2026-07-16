@@ -45,6 +45,7 @@ import {
   Type,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { isCustomAbilitiesContentTypeHint } from "@/lib/import/content-type-hints"
 
 type ClipboardImportPanelProps = {
   contentType: string
@@ -132,7 +133,7 @@ export function ClipboardImportPanel({
 
   const customSystems = useMemo(
     () =>
-      contentType === "abilities"
+      isCustomAbilitiesContentTypeHint(contentType)
         ? {
             abilityCategory: customAbilityCategory,
             classResourceLabels,
@@ -320,7 +321,7 @@ export function ClipboardImportPanel({
             </div>
           </div>
 
-        {contentType === "abilities" ? (
+        {isCustomAbilitiesContentTypeHint(contentType) ? (
           <div className="space-y-3 rounded-xl border border-border bg-muted/25 p-3.5">
             <div>
               <p className="text-sm font-semibold text-foreground">Custom ability systems (optional)</p>

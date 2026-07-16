@@ -19,6 +19,21 @@ describe("legacy background import", () => {
     expect(parsed.feat_granted).toBeNull()
   })
 
+  it("remaps LLM-hallucinated desktop ability keys to dexterity on normalize", () => {
+    const row = normalizeBackgroundRow({
+      name: "Guide",
+      description: "Outdoors.",
+      skill_proficiencies: ["Stealth", "Survival"],
+      feat_granted: "Magic Initiate (Druid)",
+      ability_bonuses: { desktop: 0, constitution: 0, wisdom: 0 },
+    })
+    expect(row.ability_bonuses).toEqual({
+      dexterity: 0,
+      constitution: 0,
+      wisdom: 0,
+    })
+  })
+
   it("round-trips Tinker language choice, equipment, and gold through normalize", () => {
     const row = normalizeBackgroundRow({
       name: "Tinker",
@@ -38,13 +53,20 @@ describe("legacy background import", () => {
 
     expect(row.ability_bonuses).toBeNull()
     expect(row.feat_granted).toBeNull()
-    expect(row.proficiencies).toEqual({ languages: ["One language of your choice"] })
+    // Choice phrases move onto feature linkedModifiers; arrays keep only fixed grants.
+    expect(row.proficiencies).toEqual({ languages: [], tools: ["Tinker's tools"] })
     expect(row.starting_gold).toBe(10)
 
     const background = row as unknown as Background
     const prof = normalizeBackgroundProficiencies(background.proficiencies, background.tool_proficiencies)
-    expect(prof.languages).toEqual(["One language of your choice"])
+    expect(prof.languages).toEqual([])
     expect(prof.tools).toContain("Tinker's tools")
+    const langMods = (
+      (background.feature?.linkedModifiers ?? []) as {
+        characteristics?: { type: string; choiceCount?: number }[]
+      }[]
+    ).flatMap((m) => m.characteristics ?? [])
+    expect(langMods.some((c) => c.type === "languages" && c.choiceCount === 1)).toBe(true)
 
     const equipmentGroups = getBackgroundStartingEquipmentGroups(background)
     expect(equipmentGroups[0]?.options[0]?.items.map((item) => item.name)).toEqual(

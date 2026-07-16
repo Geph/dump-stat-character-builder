@@ -465,11 +465,13 @@ export const BackgroundImportSchema = z.object({
   name: z.string(),
   card_image_url: z.string().nullable().optional(),
   description: z.string().nullable(),
+  /** Optional book/product label; importer stamp fills when omitted. */
+  source: z.string().nullable().optional(),
   skill_proficiencies: z.array(z.string()).nullable(),
   tool_proficiencies: z.array(z.string()).nullable().optional(),
   /**
    * null = pre-2024 legacy background. The builder offers free +2/+1 or +1/+1/+1 ASI
-   * and any Origin feat — do NOT substitute zero-valued objects or invent a feat.
+   * and any Origin feat — do NOT substitute zero-valued ability objects or invent a feat.
    */
   feat_granted: z.string().nullable(),
   ability_bonuses: z.record(z.string(), z.number()).nullable(),
@@ -490,15 +492,39 @@ export const BackgroundImportSchema = z.object({
     .array(z.object({ name: z.string(), quantity: z.number() }))
     .nullable()
     .optional(),
+  /** Prefer this over a flat starting_equipment list when the source offers Choose A or B packages. */
+  starting_equipment_groups: z
+    .array(
+      z.object({
+        description: z.string(),
+        options: z.array(
+          z.object({
+            label: z.string(),
+            items: z.array(
+              z.object({
+                name: z.string(),
+                quantity: z.number(),
+              }),
+            ),
+          }),
+        ),
+      }),
+    )
+    .nullable()
+    .optional(),
   starting_gold: z.number().nullable().optional(),
 })
 
 /** Prompt hint for background PDF / BYO extraction. */
 export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feats:
 - D&D 2024 backgrounds: set ability_bonuses to eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed +1/+2 values; set feat_granted to the Origin feat name (e.g. "Magic Initiate (Cleric)").
+- ability_bonuses keys MUST be exactly these lowercase names and no others: strength, dexterity, constitution, intelligence, wisdom, charisma. Never invent keys (especially never "desktop" — that is not an ability; use "dexterity").
 - Pre-2024 / legacy backgrounds (no fixed ASI or Origin feat): set ability_bonuses: null and feat_granted: null. Do NOT invent zero-valued ability objects or placeholder feats — the character builder offers the player a free +2/+1 or +1/+1/+1 allocation and any Origin feat pick.
-- Extract Languages into proficiencies.languages (e.g. ["One language of your choice"]).
-- Extract Equipment into starting_equipment as { name, quantity } items and starting_gold for GP in a belt pouch (e.g. starting_gold: 10).
+- Optional source: set source to the book/product name when known (e.g. "Player's Handbook", "Planescape: Adventures in the Multiverse", "Van Richten's Guide to Ravenloft"). The Dump Stat importer also stamps a source label at paste time if omitted.
+- Extract Languages into proficiencies.languages (e.g. ["Two of your choice"] or ["One language of your choice"]). Keep choice phrasing — Dump Stat turns it into a language picker.
+- Tool choice phrasing belongs in tool_proficiencies (e.g. "Choose one kind of Artisan's Tools", "Choose one kind of Gaming Set", "Choose one kind of Musical Instrument") — Dump Stat turns these into tool pickers.
+- Equipment: when the source offers Choose A or B, prefer starting_equipment_groups with two options (A = gear list + pouch gold as items or starting_gold; B = [{ "name": "Gold Pieces", "quantity": 50 }]). Flat starting_equipment alone is package A only.
+- Extract Equipment into starting_equipment as { name, quantity } items and starting_gold for GP in a belt pouch when not using groups (e.g. starting_gold: 10).
 - Assign each Feature to the background whose toolset/theme it matches — do not attach a feature to the wrong background because of PDF column flow.
 - Do not copy d6 Ideals/Bonds/Flaws/Personality Trait tables into descriptions.`
 
