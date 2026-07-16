@@ -109,17 +109,9 @@ function unarmoredDefense(
   ])
 }
 
+/** 2024 Draconic Resilience: base AC 10 + DEX + CHA while unarmored (not 2014's 13 + DEX). */
 function draconicAc(instanceKey: string): LinkedModifierInstance {
-  return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.ac, [
-    {
-      id: modId(instanceKey),
-      type: "ac",
-      mode: "ability_modifiers",
-      base: 13,
-      abilities: ["DEX"],
-      label: "Draconic AC (13 + DEX while unarmored)",
-    },
-  ])
+  return unarmoredDefense(instanceKey, ["DEX", "CHA"], "Draconic AC (10 + DEX + CHA while unarmored)")
 }
 
 function speedAdd(
@@ -163,6 +155,7 @@ function speedTypeAdd(
   speedType: "climb" | "swim" | "fly",
   feet: number,
   label?: string,
+  limitations?: ModifierLimitation[],
 ): LinkedModifierInstance {
   return charInstance(`modinst_speed_${speedType}_${feet}`, "cat_char_speed", [
     {
@@ -172,6 +165,7 @@ function speedTypeAdd(
       mode: "add",
       value: feet,
       label,
+      limitations,
     },
   ])
 }
@@ -311,6 +305,19 @@ function damageResistance(types: string[] = [], label?: string): LinkedModifierI
       id: modId(`res_${key}`),
       type: "damage_resistance",
       damageTypes: types,
+      label,
+    },
+  ])
+}
+
+/** Resistance to damage dealt by spells (any type) — Abjurer Spell Resistance. */
+function spellDamageResistance(label = "Resistance to damage from spells"): LinkedModifierInstance {
+  return charInstance("modinst_res_spell_damage", FEAT_MODIFIER_CATALOG.damageResistance, [
+    {
+      id: modId("res_spell_damage"),
+      type: "damage_resistance",
+      damageTypes: [],
+      fromSpells: true,
       label,
     },
   ])
@@ -1216,6 +1223,76 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
     }
   }
 
+  if (name === "Elemental Affinity") {
+    const damageTypes = ["Acid", "Cold", "Fire", "Lightning", "Poison"] as const
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Elemental Affinity",
+        count: 1,
+        options: damageTypes.map((damageType) => {
+          const key = damageType.toLowerCase()
+          return {
+            name: damageType,
+            description: `You have Resistance to ${damageType} damage, and when you cast a spell that deals ${damageType} damage, you can add your Charisma modifier to one damage roll of that spell.`,
+            linkedModifiers: [
+              damageResistance([damageType], `${damageType} Resistance`),
+              onCastSpellChar(`elemental_affinity_${key}`, {
+                spellTags: ["damage"],
+                effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+                label: `+CHA to one ${damageType} damage roll of a spell`,
+              }),
+            ],
+          }
+        }),
+      },
+    }
+  }
+
+  if (name === "The Third Eye") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Third Eye Benefit",
+        count: 1,
+        swappableOnRest: true,
+        swapRestType: "short",
+        options: [
+          {
+            name: "Darkvision",
+            description: "You gain Darkvision with a range of 120 feet.",
+            linkedModifiers: [vision(120, "darkvision", "Darkvision 120 ft. (Third Eye)")],
+          },
+          {
+            name: "Greater Comprehension",
+            description: "You can read any language.",
+            linkedModifiers: [languages(["Read any language"], undefined, "Greater Comprehension")],
+          },
+          {
+            name: "See Invisibility",
+            description: "You can cast See Invisibility without expending a spell slot.",
+            linkedModifiers: [
+              castSpellFx(
+                "third_eye_see_invisibility",
+                {
+                  castSpellName: "See Invisibility",
+                  castSpellLevel: 2,
+                  castSpellListClasses: ["Wizard"],
+                  castSpellWithoutSlot: true,
+                  castSpellCastingTime: "action",
+                  label: "See Invisibility without a spell slot",
+                },
+                { action: true },
+              ),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
   return feature
 }
 
@@ -1375,8 +1452,11 @@ function d20TestReactionPreset(
     useReaction?: boolean
     rangeFeet?: number
     spendResourceKey?: string
-    dieSource?: "resource_die" | "fixed"
+    dieSource?: "resource_die" | "fixed" | "ability_modifier"
     fixedDie?: string
+    dieAbility?: import("@/lib/compendium/characteristic-modifiers").AbilityScoreKey
+    rollKinds?: import("@/lib/compendium/characteristic-modifiers").RollTriggerKind[]
+    label?: string
   },
 ): LinkedModifierInstance {
   return charInstance(`modinst_${instanceKey}`, D20_TEST_REACTION_CATALOG_ID, [
@@ -1384,7 +1464,7 @@ function d20TestReactionPreset(
       id: modId(instanceKey),
       type: "d20_test_reaction",
       modifierMode: config.modifierMode,
-      rollKinds: [],
+      rollKinds: config.rollKinds ?? [],
       targetScope: config.targetScope,
       rangeFeet: config.rangeFeet ?? null,
       useReaction: config.useReaction ?? false,
@@ -1392,7 +1472,9 @@ function d20TestReactionPreset(
       spendResourceAmount: config.spendResourceKey ? 1 : null,
       dieSource: config.dieSource ?? "resource_die",
       fixedDie: config.fixedDie ?? null,
+      dieAbility: config.dieAbility ?? null,
       effect: { catalogRefId: config.effectCatalogRefId },
+      label: config.label,
     },
   ])
 }
@@ -1845,7 +1927,7 @@ function magicalTinkeringPreset(): LinkedModifierInstance[] {
         ],
         usesPerLongRest: "ability_modifier",
         usesAbility: "intelligence",
-        label: "Magical Tinkering",
+        label: "Tinker's Magic",
       },
     ]),
   ]
@@ -1859,10 +1941,104 @@ function replicateMagicItemPreset(): LinkedModifierInstance[] {
         type: "equipment_and_magic_items",
         mode: "replicate_magic_item",
         planTables: [
-          { minArtificerLevel: 2, label: "Magic Item Plans (Artificer Level 2+)" },
-          { minArtificerLevel: 6, label: "Magic Item Plans (Artificer Level 6+)" },
-          { minArtificerLevel: 10, label: "Magic Item Plans (Artificer Level 10+)" },
-          { minArtificerLevel: 14, label: "Magic Item Plans (Artificer Level 14+)" },
+          {
+            minArtificerLevel: 2,
+            label: "Magic Item Plans (Artificer Level 2+)",
+            items: [
+              "Alchemy Jug",
+              "Bag of Holding",
+              "Cap of Water Breathing",
+              "Common magic item (not Potion/Scroll/cursed)",
+              "Goggles of Night",
+              "Manifold Tool",
+              "Repeating Shot",
+              "Returning Weapon",
+              "Rope of Climbing",
+              "Sending Stones",
+              "Shield, +1",
+              "Wand of Magic Detection",
+              "Wand of Secrets",
+              "Wand of the War Mage, +1",
+              "Weapon, +1",
+              "Wraps of Unarmed Power, +1",
+            ],
+          },
+          {
+            minArtificerLevel: 6,
+            label: "Magic Item Plans (Artificer Level 6+)",
+            items: [
+              "Armor, +1",
+              "Boots of Elvenkind",
+              "Boots of the Winding Path",
+              "Cloak of Elvenkind",
+              "Cloak of the Manta Ray",
+              "Dazzling Weapon",
+              "Eyes of Charming",
+              "Eyes of Minute Seeing",
+              "Gloves of Thievery",
+              "Helm of Awareness",
+              "Lantern of Revealing",
+              "Mind Sharpener",
+              "Necklace of Adaptation",
+              "Pipes of Haunting",
+              "Repulsion Shield",
+              "Ring of Swimming",
+              "Ring of Water Walking",
+              "Sentinel Shield",
+              "Spell-Refueling Ring",
+              "Wand of Magic Missiles",
+              "Wand of Web",
+              "Weapon of Warning",
+            ],
+          },
+          {
+            minArtificerLevel: 10,
+            label: "Magic Item Plans (Artificer Level 10+)",
+            items: [
+              "Armor of Resistance",
+              "Dagger of Venom",
+              "Elven Chain",
+              "Ring of Feather Falling",
+              "Ring of Jumping",
+              "Ring of Mind Shielding",
+              "Shield, +2",
+              "Uncommon Wondrous Item (not cursed)",
+              "Wand of the War Mage, +2",
+              "Weapon, +2",
+              "Wraps of Unarmed Power, +2",
+            ],
+          },
+          {
+            minArtificerLevel: 14,
+            label: "Magic Item Plans (Artificer Level 14+)",
+            items: [
+              "Armor, +2",
+              "Arrow-Catching Shield",
+              "Flame Tongue",
+              "Rare Wondrous Item (not cursed)",
+              "Ring of Free Action",
+              "Ring of Protection",
+              "Ring of the Ram",
+            ],
+          },
+        ],
+        itemOptions: [
+          "Alchemy Jug",
+          "Bag of Holding",
+          "Cap of Water Breathing",
+          "Sending Stones",
+          "Wand of the War Mage, +1",
+          "Weapon, +1",
+          "Shield, +1",
+          "Armor, +1",
+          "Boots of Elvenkind",
+          "Cloak of Elvenkind",
+          "Wand of Magic Missiles",
+          "Armor of Resistance",
+          "Elven Chain",
+          "Weapon, +2",
+          "Flame Tongue",
+          "Ring of Protection",
         ],
         choiceCount: 4,
         label: "Replicate Magic Item",
@@ -2191,10 +2367,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     }),
   ],
   "Sorcerer::Draconic Sorcery::Draconic Resilience": [
-    hitPointsPerLevel(3, "+3 HP per Sorcerer level"),
+    // 2024: +3 at feature grant, then +1 per further Sorcerer level ≡ +1 × Sorcerer level total.
+    hitPointsPerLevel(1, "+1 HP per Sorcerer level (Draconic Resilience)"),
     draconicAc("draconic_resilience_ac"),
   ],
-  "*::Elemental Affinity": [damageResistance([], "Chosen dragon damage type")],
+  "*::Elemental Affinity": [featureOptionPicker("Elemental Affinity damage type")],
   "*::Fiendish Resilience": [damageResistance([], "Chosen damage type (after rest)")],
   "*::Nature's Ward": [
     conditionImmunity(["Poisoned"], "Nature's Ward"),
@@ -2240,10 +2417,19 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Wholeness of Body": [
     healSelfBonusAction("wholeness_of_body", { healAbility: "WIS", label: "Martial Arts die + WIS" }),
   ],
-  "*::Dragon Wings": [
-    speedTypeAdd("fly", 60, "Fly Speed 60 ft."),
-    usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Dragon Wings"),
-  ],
+  "*::Dragon Wings": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Dragon Wings",
+        { resourceKey: "sorcery_points", resourceAmount: 3, restores: 1 },
+      ),
+      speedTypeAdd("fly", 60, "Fly Speed 60 ft. while Dragon Wings are active", [
+        requiresActiveToggleLimitation("dragon_wings_active"),
+      ]),
+    ],
+  },
   "*::Evasion": [evasion()],
   "*::Elusive": [elusive()],
   "*::Dark One's Blessing": [grantTempHpOnKill("Dark One's Blessing")],
@@ -2646,14 +2832,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Empowered Evocation": {
     linkedModifiers: [
-      charInstance("modinst_empowered_evocation", ON_CAST_SPELL_TRIGGER_CATALOG_ID, [
-        {
-          id: modId("empowered_evocation"),
-          type: "on_cast_spell_trigger",
-          spellSchool: "Evocation",
-          effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
-        },
-      ]),
+      onCastSpellChar("empowered_evocation", {
+        spellSchool: "Evocation",
+        effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+        label: "+INT to one damage roll of an Evocation Wizard spell",
+      }),
     ],
   },
   "*::Eldritch Master": {
@@ -2706,18 +2889,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ),
     ],
   },
-  "*::Evocation Savant": {
-    linkedModifiers: [
-      spellsKnownChar("evocation_savant", {
-        choiceGrants: [
-          { level: 1, count: 2 },
-          { level: 2, count: 2 },
-        ],
-        spellListClassOptions: ["Wizard"],
-        label: "Evocation spells (≤2nd level) added to spellbook at half time/gold",
-      }),
-    ],
-  },
+  // 2024: free Evocation spells in the spellbook (same as other school savants — not 2014 half cost).
+  "*::Evocation Savant": { linkedModifiers: [schoolSavantPreset("Evocation")] },
   "*::Potent Cantrip": {
     linkedModifiers: [
       onCastSpellChar("potent_cantrip", {
@@ -2790,7 +2963,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Spell Resistance": {
     linkedModifiers: [
       checkAdvantage("spell_resistance_saves", { category: "save", conditions: ["spell"] }),
-      damageResistance([], "Resistance to spell damage"),
+      spellDamageResistance(),
     ],
   },
   "*::Portent": {
@@ -3316,8 +3489,94 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Magical Tinkering": {
     linkedModifiers: magicalTinkeringPreset(),
   },
+  "*::Tinker's Magic": {
+    linkedModifiers: [
+      ...magicalTinkeringPreset(),
+      spellsKnownChar("tinkers_magic_mending", {
+        spells: ["Mending"],
+        label: "You know the Mending cantrip",
+      }),
+    ],
+  },
   "*::Replicate Magic Item": {
     linkedModifiers: replicateMagicItemPreset(),
+  },
+  "*::Magic Item Tinker": {
+    linkedModifiers: [
+      featureOptionPicker("Magic Item Tinker (Charge / Drain / Transmute)", true),
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Charge: Bonus Action + spell slot restores charges. Drain (1/LR): destroy item → 1st/2nd slot. Transmute (1/LR): transform into another known plan.",
+        },
+        "Magic Item Tinker",
+      ),
+    ],
+  },
+  "*::Flash of Genius": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
+        "Flash of Genius",
+      ),
+      d20TestReactionPreset("flash_of_genius", {
+        modifierMode: "add",
+        targetScope: "target_creature",
+        rangeFeet: 30,
+        useReaction: true,
+        dieSource: "ability_modifier",
+        dieAbility: "intelligence",
+        rollKinds: ["ability", "save"],
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        label: "Reaction: +INT (min +1) when you or an ally within 30 ft. fails a check or save",
+      }),
+    ],
+  },
+  "*::Spell-Storing Item": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Long Rest: store a level 1–3 Artificer action spell (no consumed M) in a weapon or focus; uses = 2×INT (min 2); cast as Magic action using your spellcasting modifier",
+        },
+        "Spell-Storing Item",
+      ),
+    ],
+  },
+  "*::Advanced Artifice": {
+    linkedModifiers: [
+      attunementSlots(5, "Attune to 5 magic items"),
+      usesPool(
+        {
+          type: "special",
+          specialDescription: "Short Rest: regain one expended Flash of Genius use (Refreshed Genius)",
+        },
+        "Refreshed Genius",
+      ),
+    ],
+  },
+  "*::Soul of Artifice": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Cheat Death: at 0 HP, disintegrate Uncommon/Rare Replicate items to set HP to 20× items destroyed",
+        },
+        "Cheat Death",
+      ),
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Magical Guidance: Short Rest regains all Flash of Genius uses if attuned to at least one magic item",
+        },
+        "Magical Guidance",
+      ),
+    ],
   },
 
   // —— Warlock ——
@@ -5260,6 +5519,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
         "Restorative Reagents (Lesser Restoration)",
       ),
+      spellsKnownChar("restorative_reagents", {
+        spells: ["Lesser Restoration"],
+        alwaysPrepared: true,
+        label: "Cast Lesser Restoration without a slot via Alchemist's Supplies (INT uses/LR)",
+      }),
     ],
   },
   "*::Chemical Mastery": {
@@ -5271,10 +5535,12 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       onHitTriggerPreset("alchemical_eruption", {
         effectCatalogRefId: "cat_fx_extra_damage_on_hit",
       }),
-      usesPool(
-        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
-        "Conjured Cauldron (Tasha's Bubbling Cauldron)",
-      ),
+      spellsKnownChar("conjured_cauldron", {
+        spells: ["Tasha's Bubbling Cauldron"],
+        alwaysPrepared: true,
+        freeCastPerLongRest: [{ spellName: "Tasha's Bubbling Cauldron", count: 1 }],
+        label: "Conjured Cauldron: cast Tasha's Bubbling Cauldron 1/Long Rest (no slot, no M)",
+      }),
     ],
   },
   "*::Armorer Spells": [alwaysPreparedSpells("Armorer spells")],
@@ -5447,6 +5713,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         { type: "ability_modifier", abilityModifier: "INT", recharges: [{ rest: "long_rest" }] },
         "Illuminated Cartography (Faerie Fire)",
       ),
+      spellsKnownChar("illuminated_cartography", {
+        spells: ["Faerie Fire"],
+        alwaysPrepared: true,
+        label: "Cast Faerie Fire without a slot (INT uses/LR via Illuminated Cartography)",
+      }),
       fxInstance("modinst_portal_jump", FEAT_MODIFIER_CATALOG.movementOption, {
         effects: [
           {
@@ -5723,7 +5994,7 @@ function resolvePresetKey(
   subclassName: string | null,
   featureName: string,
 ): string | null {
-  const normalized = featureName.trim()
+  const normalized = featureName.trim().replace(/[\u2018\u2019\u201B']/g, "'")
   const keys = [
     subclassName ? `${className}::${subclassName}::${normalized}` : null,
     `${className}::${normalized}`,
@@ -5740,7 +6011,7 @@ function resolvePresetKey(
 
 /** Apply only global `*::Feature` presets (safe for homebrew imports). */
 export function enrichWildcardFeaturePresets(feature: Feature): Feature {
-  const key = `*::${(feature.name ?? "").trim()}`
+  const key = `*::${(feature.name ?? "").trim().replace(/[\u2018\u2019\u201B']/g, "'")}`
   const preset = SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]
   if (!preset) return feature
   if (shouldSkipWildcardPreset(feature.name ?? "", feature.description ?? "", key)) {

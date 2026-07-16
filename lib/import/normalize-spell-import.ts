@@ -74,6 +74,9 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
     classes: classes?.length ? classes : [],
     psionic_augments: coercePsionicAugments(raw.psionic_augments, descriptionRaw),
     ...(material ? { material } : {}),
+    ...(raw.companion_stat_block && typeof raw.companion_stat_block === "object"
+      ? { companion_stat_block: raw.companion_stat_block as Record<string, unknown> }
+      : {}),
   } as NonNullable<ImportContent["spells"]>[number]
 }
 

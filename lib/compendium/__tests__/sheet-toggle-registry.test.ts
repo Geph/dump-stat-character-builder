@@ -13,6 +13,8 @@ describe("sheet-toggle-registry", () => {
     expect(ids).toContain("while_raging")
     expect(ids).toContain("while_wild_shape")
     expect(ids).toContain("while_innate_sorcery_active")
+    expect(ids).toContain("tides_of_chaos_active")
+    expect(ids).toContain("dragon_wings_active")
     expect(ids).toContain("below_half_hp")
     expect(ids).not.toContain("in_combat_or_high_stakes")
   })

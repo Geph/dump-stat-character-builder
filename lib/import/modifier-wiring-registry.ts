@@ -990,7 +990,7 @@ function formatMechanicsCheatsheet(): string {
     "- hit_points: hpMode per_level, hpValue 1",
     "- attack_roll_modifiers: attackBonus 2, attackTarget all|melee|ranged; criticalHitMinimum; criticalHitMinimumByLevel [{ level, fixed: minD20 }]",
     "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; grantAbilityModifierWhenMissing; bonusDiceWhenModifierIncluded \"1d8\"; scalingMode half_character_level_round_down|character_level|none (for \"plus half your Class level\" riders); damageTypeOptions [\"Necrotic\",\"Radiant\"] when the player picks the type at trigger time",
-    "- damage_resistance: damageTypes [\"Fire\", \"Psychic\"]",
+    "- damage_resistance: damageTypes [\"Fire\", \"Psychic\"]; use damageTypes [\"Spells\"] (or \"Spell damage\") for \"Resistance to the damage of spells\" — that routes to fromSpells resistance (sheet token \"Spell damage\"), not a literal elemental type",
     "- damage_reduction: reductionMode \"evasion\" (Dex-save half→none/half) OR \"flat\" with reductionAmount N; damageTypes optional for flat (default B/P/S). Kind must be damage_reduction — do not invent other names from cat_fx_damage_reduction / cat_char_damage_reduction.",
     "- condition_immunity: conditions [\"Charmed\"]",
     "- speed: speedType walk|fly|swim|climb, speedFeet 10; canHover true when fly speed allows hovering. For \"you gain a Swim/Fly/Climb Speed equal to your Speed\" (i.e. matches your walking speed, not a fixed number), use speedMode \"equal_to_walk\" instead of speedFeet.",

@@ -33,3 +33,7 @@ scripts/page-bg-sources/*
 scripts/subclass-card-sources/*
 !scripts/subclass-card-sources/README.md
 !scripts/subclass-card-sources/.gitkeep
+# Local third-party / copyrighted import extracts (dev-only; never commit)
+lib/import/__tests__/fixtures/*eberron*
+lib/import/__tests__/fixtures/*homebrew*
+**/import-json/

@@ -662,6 +662,11 @@ export interface DamageCharacteristic extends CharacteristicModifierBase {
   /** Player picks this many damage types from choiceOptions when damageTypes is empty. */
   choiceCount?: number | null
   choiceOptions?: string[] | null
+  /**
+   * When true, applies to damage from spells (any damage type) — e.g. Abjurer Spell Resistance.
+   * Aggregated onto the sheet as the display token "Spell damage".
+   */
+  fromSpells?: boolean
 }
 
 export interface ConditionImmunityCharacteristic extends CharacteristicModifierBase {
@@ -889,6 +894,8 @@ export interface D20TestReactionCharacteristic extends CharacteristicModifierBas
   spendResourceAmount?: number | null
   dieSource?: "resource_die" | "fixed" | "ability_modifier"
   fixedDie?: string | null
+  /** When dieSource is ability_modifier (e.g. Flash of Genius +INT). */
+  dieAbility?: AbilityScoreKey | null
   effect?: NestedModifierEffect | null
 }
 
@@ -1054,7 +1061,7 @@ export interface EquipmentAndMagicItemsCharacteristic extends CharacteristicModi
   choiceCount?: number
   usesPerLongRest?: number | "ability_modifier"
   usesAbility?: AbilityScoreKey
-  planTables?: { minArtificerLevel: number; label: string }[]
+  planTables?: { minArtificerLevel: number; label: string; items?: string[] }[]
 }
 
 export interface CatalogOptionCharacteristic extends CharacteristicModifierBase {
@@ -1208,7 +1215,7 @@ export function createCharacteristicModifier(
       return { id, type }
     case "damage_resistance":
     case "damage_immunity":
-      return { id, type, damageTypes: [], choiceCount: null, choiceOptions: null }
+      return { id, type, damageTypes: [], choiceCount: null, choiceOptions: null, fromSpells: false }
     case "damage_reduction":
       return { id, type, amount: 3, damageTypes: ["Bludgeoning", "Piercing", "Slashing"] }
     case "spells":
@@ -1466,6 +1473,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       useReaction: raw.useReaction ?? false,
       dieSource: raw.dieSource ?? "resource_die",
       fixedDie: raw.fixedDie ?? null,
+      dieAbility: raw.dieAbility ?? null,
       effect: raw.effect ?? null,
     }
   }
@@ -1589,6 +1597,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       damageTypes: coerceStringArray(raw.damageTypes ?? raw.values),
       choiceCount: raw.choiceCount ?? null,
       choiceOptions: raw.choiceOptions ? coerceStringArray(raw.choiceOptions) : null,
+      fromSpells: raw.fromSpells ?? false,
     }
   }
 
@@ -2268,9 +2277,11 @@ export function aggregateCharacteristics(
         break
       case "damage_resistance":
         pushUnique(result.resistances, mod.damageTypes)
+        if (mod.fromSpells) pushUnique(result.resistances, ["Spell damage"])
         break
       case "damage_immunity":
         pushUnique(result.immunities, mod.damageTypes)
+        if (mod.fromSpells) pushUnique(result.immunities, ["Spell damage"])
         break
       case "condition_immunity":
         pushUnique(result.conditionImmunities, mod.conditions)

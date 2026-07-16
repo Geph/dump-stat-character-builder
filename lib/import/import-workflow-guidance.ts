@@ -20,7 +20,7 @@ export const ONE_CLASS_AT_A_TIME_WARNING =
   "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are not likely to work — use a page range or split the extract."
 
 export const MULTI_FILE_IMPORT_TIP =
-  "Libraries before the class: non-SRD spells, psionic disciplines/powers, exploit/maneuver lists, and similar pickers should be extracted and imported first so the class can wire to them. Then do one class chapter (core + subclasses). Use page ranges to skip other classes — not to split a class from its own subclasses."
+  "Libraries before the class: full homebrew spell write-ups, psionic disciplines/powers, exploit/maneuver lists, and similar pickers should be extracted and imported first so the class can wire to them. Then do one class chapter (core + subclasses) with content type Classes — include that class's Spell/School/Special list in the same pass when present. Use page ranges to skip other classes — not to split a class from its own subclasses."
 
 export const JSON_ARRAY_IMPORT_TIP =
   "You can paste a JSON array of import objects in Step 2 — e.g. [{\"abilities\": [...]}, {\"spells\": [...]}, {\"classes\": [...]}, {\"subclasses\": [...]}] — and Dump Stat will merge them into one batch before wiring. Put library objects before the class object when combining passes."
@@ -30,17 +30,17 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "spellcasting-class",
     title: "Spellcasting classes (Witch, full casters)",
     summary:
-      "Import homebrew spells / class spell lists first, then one pass for the class chapter (core + subclasses). Subclass always-prepared tables wire cleanly when those spells already exist.",
-    examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters"],
+      "Import full homebrew spell write-ups first when needed, then one Classes pass for the class chapter (core + subclasses + spell list when present). Prefer including Spell/School/Special tables with the class — use standalone Class Spell Lists only when the list is a separate document you must import before the class.",
+    examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters", "Artificer-style class lists"],
     steps: [
       {
-        label: "Spells and class spell lists first",
-        hint: "Non-SRD spells and class spell lists (content types Spells or Class Spell Lists). Skip if everything is SRD-seeded.",
+        label: "Full spell write-ups first (if any)",
+        hint: "Non-SRD spells that have their own descriptions (content type Spells). Skip if everything is SRD-seeded. Do not use this step for class spell list tables — those go with the class chapter.",
         contentType: "spells",
       },
       {
-        label: "Class chapter (core + subclasses)",
-        hint: "One PDF/text pass for the class and its subclasses together — staged review covers both.",
+        label: "Class chapter (core + subclasses + spell list)",
+        hint: "One PDF/text pass with content type Classes — include Spell/School/Special list tables in the same paste when present (spell_list + spells[] stubs). Staged review covers both.",
         contentType: "classes",
       },
       {
@@ -50,7 +50,8 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
       },
     ],
     notes: [
-      "SRD spells do not need a separate import if your compendium is SRD-seeded.",
+      "SRD spells do not need a separate full import if your compendium is SRD-seeded; list stubs only need to tag the class name on each spell.",
+      "Upload spell lists with the class (Classes content type). Standalone Class Spell Lists is only for a list-only document — import that before the full class, never after (a stub class can overwrite features).",
       "Cantrips bundled in a subclass file’s spells[] array are merged automatically.",
       "One class per pass — page-range out any other classes in the same book.",
     ],
@@ -110,12 +111,12 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "inventor-upgrades",
     title: "Artificer-style upgrade classes (Inventor)",
     summary:
-      "Homebrew spells first when needed, then the Inventor class chapter. Upgrade pickers that ship as a separate library should come before the class when possible.",
+      "Homebrew spell write-ups first when needed, then one Classes pass for the Inventor chapter with its spell list included. Upgrade pickers that ship as a separate library should come before the class when possible.",
     examples: ["Kibbles Inventor"],
     steps: [
       {
-        label: "Spells and class spell lists (if any)",
-        hint: "Non-SRD spells your Inventor features rely on",
+        label: "Full spell write-ups (if any)",
+        hint: "Non-SRD spells your Inventor features rely on — class Spell/School/Special list tables go with the class pass, not here",
         contentType: "spells",
       },
       {
@@ -124,8 +125,8 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
         contentType: "abilities",
       },
       {
-        label: "Inventor class chapter (core + subclasses)",
-        hint: "Upgrades resource, specialization choices, and subclass features",
+        label: "Inventor class chapter (core + subclasses + spell list)",
+        hint: "Content type Classes — upgrades resource, specialization choices, subclass features, and the class spell list in the same pass",
         contentType: "classes",
       },
     ],
