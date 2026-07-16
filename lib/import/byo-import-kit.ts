@@ -12,7 +12,7 @@ export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from P
 
 For best extraction results, your source text should:
 - One class per pass only (that class + its subclasses is OK). Never extract multiple unrelated classes in one JSON
-- Libraries before class: non-SRD spells, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter
+- Libraries before class: full homebrew spell write-ups, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter. Include that class's Spell / School / Special list in the same class pass when present (spell_list + spells[] stubs); prefer Classes over a standalone Class Spell Lists upload
 - Prefer one class chapter per class pass: the core class and its subclasses together (staged review covers them in order)
 - Keep level progression tables in the source so the importer can read features and class_resources[] from them
 - Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Ki, Rage, Sorcery Points, etc.) in class_resources[]
@@ -47,7 +47,7 @@ When extracting from a PDF, add source_page (integer, 1-based PDF page) on featu
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
   classes:
-    "Focus on classes[] and class_resources[] when present. Include hit_die, proficiencies, and features[] with level, name, description. Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature.",
+    "Focus on classes[] and class_resources[] when present. Include hit_die, proficiencies, and features[] with level, name, description. Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature. If the source includes a dedicated class spell list (Spell / School / Special tables), also populate that class's spell_list and matching spells[] stubs in the same JSON.",
   subclasses:
     "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
@@ -56,7 +56,7 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
   spell_lists:
-    "Focus on class spell list tables (Spell / School / Special columns). Populate classes[] with spell_list (all spell names) and spells[] with level, school, concentration, components (M when Special includes M), and classes set to the list's class name. Preserve novel school names from the School column when present.",
+    "Focus on class spell list tables with Spell / School / Special columns (Special: C=Concentration, R=Ritual, M=Material; may be combined like 'C, R' or '—'). Populate classes[].spell_list with every spell name (strip * footnotes) and spells[] with level (from Cantrips/Level N headers), school, concentration (C), components including M when Special has M, and classes set to the list's class name. Skip legend prose and '*Appears in this chapter' lines. Preserve novel school names from the School column.",
   feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
   equipment:
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
@@ -247,7 +247,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         name: "Artificer",
         description: null,
         hit_die: 8,
-        spell_list: ["Acid Splash", "Cure Wounds", "Mending"],
+        spell_list: ["Acid Splash", "Dancing Lights", "Detect Magic", "Identify", "Homunculus Servant"],
       },
     ],
     spells: [
@@ -260,11 +260,35 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         classes: ["Artificer"],
       },
       {
-        name: "Cure Wounds",
-        level: 1,
-        school: "Abjuration",
-        concentration: false,
+        name: "Dancing Lights",
+        level: 0,
+        school: "Illusion",
+        concentration: true,
         components: null,
+        classes: ["Artificer"],
+      },
+      {
+        name: "Detect Magic",
+        level: 1,
+        school: "Divination",
+        concentration: true,
+        components: null,
+        classes: ["Artificer"],
+      },
+      {
+        name: "Identify",
+        level: 1,
+        school: "Divination",
+        concentration: false,
+        components: ["M"],
+        classes: ["Artificer"],
+      },
+      {
+        name: "Homunculus Servant",
+        level: 2,
+        school: "Conjuration",
+        concentration: false,
+        components: ["M"],
         classes: ["Artificer"],
       },
     ],

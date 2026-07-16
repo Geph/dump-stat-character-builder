@@ -16,12 +16,18 @@ export function isStandardSpellClass(name: string): boolean {
 }
 
 export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated spell list (e.g. "Artificer Spell List"):
-- On the class object, populate spell_list with every spell name from that list (exact names as written).
-- For PHB-style tables with Spell / School / Special columns: parse level from section headers (Cantrips = level 0, "Level N … Spells"), school from the School column, concentration when Special includes C, material component when Special includes M.
+- On the class object, populate spell_list with every spell name from that list (exact names as written — strip trailing * footnote markers from names).
+- PHB-style tables often have Spell / School / Special columns (not name-only). Treat extra columns as metadata; the spell name is still only the Spell column.
+  - Level: from section headers — "Cantrips (Level 0 … Spells)" → 0; "Level N … Spells" → N. Ignore repeated "Spell School Special" header rows.
+  - School: copy the School column exactly (preserve novel schools).
+  - Special column legend (often explained in the intro prose): C = Concentration, R = Ritual, M = specific Material component. Values may be "—"/en-dash (none), a single letter, or comma-separated (e.g. "C, R", "R, M").
+  - Map Special → JSON: concentration true when C is present; include "M" in components when M is present (V/S unknown → omit or null). There is no separate ritual field — do not invent one; R does not change concentration.
+  - Skip footnote-only lines (e.g. "*Appears in this chapter.") and intro paragraphs about the Special column.
+- Also emit spells[] rows for each list entry with at least: name, level, school, concentration, components (or null), classes: ["<ClassName>"]. Full casting_time/range/duration/description when the document has them; otherwise null is fine for list-only stubs.
 - For each spell on that list, include the class's exact name in the spell's classes array (e.g. "Artificer").
 - Custom/non-SRD classes are not among the standard eight (Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard); use the class name directly — never store the literal word "Other".
 - Spells may also appear on standard class lists; include all applicable class names in classes.
-- Extract full spell entries (level, school, casting time, etc.) when descriptions are present in the document.`
+- A class chapter may include its spell list in the same extract: keep the full class features[] and still populate spell_list + spells[] stubs from the list tables.`
 
 export const SPELL_SCHOOL_IMPORT_HINT = `Spell schools (school field on spells[]):
 - Use the school name exactly as written in the source.

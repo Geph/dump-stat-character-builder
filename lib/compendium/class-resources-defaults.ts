@@ -24,6 +24,15 @@ const SPELL_SLOTS_HALF: ClassResource = {
   uses: spellSlotResourceUsesForCasterType("half"),
 }
 
+/** Artificer 2024: half-caster pace but slots begin at level 1 (use class explicit_slot_progression). */
+const SPELL_SLOTS_ARTIFICER: ClassResource = {
+  id: "spell_slots",
+  name: "Spell Slots",
+  description:
+    "Spell slots per long rest follow the Artificer Features table (half-caster pace with slots from level 1).",
+  uses: spellSlotResourceUsesForCasterType("half"),
+}
+
 /** Default class resource pools for SRD classes (2024 rules). */
 export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
   Barbarian: [
@@ -186,5 +195,5 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
     },
   ],
   Wizard: [SPELL_SLOTS_FULL],
-  Artificer: [SPELL_SLOTS_HALF],
+  Artificer: [SPELL_SLOTS_ARTIFICER],
 }

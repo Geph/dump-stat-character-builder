@@ -230,6 +230,25 @@ const SpellcastingAiSchema = z.object({
   cantrips: z.number().nullable(),
   spells_known: z.number().nullable(),
   prepared: z.boolean().nullable(),
+  caster_progression: z.enum(["full", "half", "third", "pact"]).nullable(),
+  progression: z
+    .array(
+      z.object({
+        level: z.number(),
+        cantrips: z.number(),
+        prepared: z.number(),
+        max_spell_level: z.number(),
+      }),
+    )
+    .nullable(),
+  explicit_slot_progression: z
+    .array(
+      z.object({
+        level: z.number(),
+        slots: z.array(z.number()),
+      }),
+    )
+    .nullable(),
 })
 
 const SkillChoicesAiSchema = z.object({
@@ -616,6 +635,9 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
         cantrips: row.spellcasting.cantrips ?? undefined,
         spells_known: row.spellcasting.spells_known ?? undefined,
         prepared: row.spellcasting.prepared ?? undefined,
+        caster_progression: row.spellcasting.caster_progression ?? undefined,
+        progression: row.spellcasting.progression ?? undefined,
+        explicit_slot_progression: row.spellcasting.explicit_slot_progression ?? undefined,
       })
     : undefined
 

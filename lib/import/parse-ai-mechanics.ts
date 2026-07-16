@@ -821,16 +821,21 @@ function buildFromMechanic(
     }
     case "damage_resistance": {
       const types = (mechanic.damageTypes ?? []).map(titleCaseWords).filter(Boolean)
-      if (!types.length) return null
+      // "Spells" / "Spell damage" aren't elemental types — they mean "damage from spells"
+      // (Abjurer Spell Resistance). Route that to fromSpells instead of a dead type token.
+      const fromSpells = types.some((t) => /^(?:spells?|spell damage)$/i.test(t))
+      const concreteTypes = types.filter((t) => !/^(?:spells?|spell damage)$/i.test(t))
+      if (!concreteTypes.length && !fromSpells) return null
       return {
-        ruleId: "ai.resistance",
+        ruleId: fromSpells ? "ai.resistance.spell_damage" : "ai.resistance",
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, characteristicCatalogRefId("damage_resistance"), [
           {
             id: modId(instanceKey(ctx, "resistance")),
             type: "damage_resistance",
-            damageTypes: types,
+            damageTypes: concreteTypes,
+            ...(fromSpells ? { fromSpells: true } : {}),
             ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),

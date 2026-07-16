@@ -20,6 +20,7 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "peerless_athlete_active", label: "Peerless Athlete", sourceType: "builtin" },
   { id: "living_legend_active", label: "Living Legend", sourceType: "builtin" },
   { id: "tides_of_chaos_active", label: "Tides of Chaos", sourceType: "builtin" },
+  { id: "dragon_wings_active", label: "Dragon Wings", sourceType: "builtin" },
   { id: "below_half_hp", label: "Bloodied", sourceType: "builtin" },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
 ]

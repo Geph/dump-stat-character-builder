@@ -37,7 +37,7 @@ const SIGNATURE_FEATURE_FALLBACK: Record<string, string> = {
   Wizard: "Arcane Recovery",
   Ranger: "Favored Enemy",
   Rogue: "Sneak Attack",
-  Artificer: "Magical Tinkering",
+  Artificer: "Tinker's Magic",
   Warlock: "Eldritch Invocations",
 }
 
