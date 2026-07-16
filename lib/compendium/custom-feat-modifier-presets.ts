@@ -834,6 +834,120 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       ),
     ],
   },
+
+  // —— Planescape ——
+  "Agent of Order": {
+    linkedModifiers: [
+      asiOne("agent_of_order_asi", "+1 to one ability score"),
+      uses(
+        "agent_of_order_stasis",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Stasis Strike (PB uses / Long Rest)",
+      ),
+      onHitTrigger("agent_of_order_stasis_hit", {
+        label: "Stasis Strike: +1d8 Force; WIS save or Restrained until start of your next turn",
+      }),
+    ],
+  },
+  "Baleful Scion": {
+    linkedModifiers: [
+      asiOne("baleful_scion_asi", "+1 to one ability score"),
+      uses(
+        "baleful_scion_grasp",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Grasp of Avarice (PB uses / Long Rest)",
+      ),
+      onHitTrigger("baleful_scion_grasp_hit", {
+        label: "Grasp of Avarice: necrotic 1d6+PB and regain equal HP",
+      }),
+    ],
+  },
+  "Outlands Envoy": {
+    linkedModifiers: [
+      asiOne("outlands_envoy_asi", "+1 to one ability score"),
+      spellsKnown("outlands_envoy_spells", {
+        spells: [],
+        alwaysPrepared: true,
+        freeCastPerLongRest: [
+          { spellName: "Misty Step", count: 1 },
+          { spellName: "Tongues", count: 1 },
+        ],
+        label: "Misty Step and Tongues (1 free cast each / Long Rest)",
+      }),
+    ],
+  },
+  "Righteous Heritor": {
+    linkedModifiers: [
+      asiOne("righteous_heritor_asi", "+1 to one ability score"),
+      uses(
+        "righteous_heritor_soothe",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Soothe Pain (PB uses / Long Rest)",
+      ),
+      damageHalvingReaction("righteous_heritor_soothe_rx", "Soothe Pain: reduce damage by 1d10 + PB"),
+    ],
+  },
+
+  // —— Ravenloft Origin ——
+  "Sharp Eye": {
+    linkedModifiers: [
+      uses(
+        "sharp_eye",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Sharp Eye (PB uses / Long Rest; refunded on failed check)",
+      ),
+      checkFx(
+        "sharp_eye_advantage",
+        { kind: "check_advantage", checkCategory: "ability" },
+        {},
+      ),
+    ],
+  },
+  Survivor: {
+    linkedModifiers: [
+      uses(
+        "survivor_steel",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Steel Yourself (1 / Long Rest)",
+      ),
+      checkFx(
+        "survivor_steel_bonus",
+        {
+          kind: "check_bonus",
+          checkCategory: "save",
+          bonusConfig: { mode: "proficiency" },
+        },
+        { reaction: true },
+      ),
+    ],
+  },
+
+  // —— Ravenloft Dark Gifts ——
+  "Aberrant Anatomy": {
+    linkedModifiers: [
+      skillChoice("aberrant_perception", {
+        count: 1,
+        entries: [{ skill: "Perception", expertise: true }],
+        grantExpertise: true,
+        label: "Extrasensory Perception: proficiency + Expertise in Perception",
+      }),
+      visionMod("aberrant_blindsight", "blindsight", 15, "Blindsight 15 ft."),
+    ],
+  },
+  "Touch of Death": {
+    linkedModifiers: [
+      spellsKnown("touch_of_death_chill", {
+        spells: [],
+        alwaysPrepared: true,
+        label: "Chill Touch (no components; Necrotic ignores Resistance)",
+      }),
+      checkFx(
+        "touch_of_death_saves",
+        { kind: "check_disadvantage", checkCategory: "death_save" },
+        {},
+      ),
+    ],
+  },
 }
 
 export function customFeatHasPresetRegistry(featName: string): boolean {

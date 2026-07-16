@@ -3,6 +3,8 @@ export const FEAT_PICK_CATEGORIES = [
   "Epic Boon",
   "Fighting Style",
   "Origin",
+  /** Ravenloft Dark Gifts — selectable whenever an Origin feat slot is offered. */
+  "Dark Gift",
   "Metamagic",
   "Mystic Technique",
   "Eldritch Invocation",

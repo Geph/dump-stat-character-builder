@@ -783,7 +783,7 @@ export interface Feat {
   id: string
   name: string
   description: string | null
-  category: string | null  // "Origin" | "General" | "Fighting Style" | "Epic Boon"
+  category: string | null  // "Origin" | "Dark Gift" | "General" | "Fighting Style" | "Epic Boon" | "Planar Pact"
   level_requirement: number | null
   prerequisite: string | null  // legacy field
   prerequisite_feat_ids: string[] | null

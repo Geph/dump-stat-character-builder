@@ -34,10 +34,17 @@ export function normalizeFeatCategory(category: string | null | undefined): stri
   const lower = category.toLowerCase()
   if (lower.includes("epic boon")) return "Epic Boon"
   if (lower.includes("fighting style")) return "Fighting Style"
+  if (lower.includes("dark gift")) return "Dark Gift"
   if (lower.includes("origin")) return "Origin"
   if (lower.includes("general")) return "General"
   if (lower.includes("planar pact")) return "Planar Pact"
   return category.trim()
+}
+
+/** Origin-slot picks (background / Human Versatile / etc.) also accept Dark Gift feats. */
+export function isOriginSelectableCategory(category: string | null | undefined): boolean {
+  const normalized = normalizeFeatCategory(category)
+  return normalized === "Origin" || normalized === "Dark Gift"
 }
 
 export function isMutuallyExclusiveFeatCategory(category: string): boolean {
@@ -89,14 +96,19 @@ export function isFeatEligibleForCategories(
 ): boolean {
   const normalizedCategories = new Set(categories.map(normalizeFeatCategory))
   const category = normalizeFeatCategory(feat.category)
-  if (!normalizedCategories.has(category)) return false
+  const isOriginSlot = [...normalizedCategories].some((entry) => isOriginSelectableCategory(entry))
+
+  // Origin slots accept Origin + Dark Gift; Dark Gift is not a General/FS/etc. pick.
+  const categoryMatches =
+    normalizedCategories.has(category) ||
+    (isOriginSlot && isOriginSelectableCategory(category))
+  if (!categoryMatches) return false
 
   const taken = new Set(
     context.ownedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
-  const isOriginSlot = normalizedCategories.has("Origin")
-  if (category === "Origin" && !isOriginSlot) return false
+  if (isOriginSelectableCategory(category) && !isOriginSlot) return false
   if (!feat.repeatable && taken.has(feat.id)) return false
   if (hasExclusiveCategoryConflict(feat, context)) return false
 
@@ -104,7 +116,7 @@ export function isFeatEligibleForCategories(
     feat.level_requirement ??
     (category === "Epic Boon"
       ? 19
-      : category === "Origin" ||
+      : isOriginSelectableCategory(category) ||
           category === "Fighting Style" ||
           category === "Planar Pact" ||
           slotUsesCatalogFeatPicks(categories.map(normalizeFeatCategory))
