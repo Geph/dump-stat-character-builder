@@ -160,6 +160,52 @@ describe("aiMechanicsToDetections", () => {
     const abilityEffect = byAbility[0]?.instance.activation?.effects?.[0]
     expect(abilityEffect?.healMode).toBe("ability_modifier")
     expect(abilityEffect?.healAbility).toBe("CON")
+
+    const byProf = aiMechanicsToDetections(
+      [{ kind: "temporary_hit_points", amountScaling: "proficiency" }],
+      { contentKind: "feat", featureName: "Chef Treats" },
+    )
+    const profEffect = byProf[0]?.instance.activation?.effects?.[0]
+    expect(profEffect?.healMode).toBe("proficiency")
+    expect(profEffect?.healProficiencyMultiplier).toBe(1)
+  })
+
+  it("does not wire check_roll_modifier when conditionNote is set", () => {
+    expect(
+      aiMechanicsToDetections(
+        [
+          {
+            kind: "check_roll_modifier",
+            checkRollMode: "advantage",
+            checkCategory: "skill",
+            checkSkills: ["Performance"],
+            conditionNote: "that involves you dancing",
+            sourcePhrase: "advantage on Performance checks that involve you dancing",
+          },
+        ],
+        { contentKind: "feat", featureName: "Actor" },
+      ),
+    ).toEqual([])
+  })
+
+  it("wires flat damageBonus on damage_roll_modifiers", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_roll_modifiers",
+          damageBonus: 2,
+          damageTarget: "melee",
+          sourcePhrase: "when you are wielding a melee weapon in one hand",
+        },
+      ],
+      { contentKind: "feat", featureName: "Dueling" },
+    )
+    expect(detections).toHaveLength(1)
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("damage_roll_modifiers")
+    if (char?.type === "damage_roll_modifiers") {
+      expect(char.entries?.[0]).toMatchObject({ bonus: 2, target: "melee" })
+    }
   })
 
   it("does not wire temporary_hit_points triggers/targets the sheet can't apply yet", () => {

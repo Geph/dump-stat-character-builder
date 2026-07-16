@@ -45,6 +45,15 @@ describe("parseFeatPrerequisite", () => {
     })
   })
 
+  it("parses ordinal Level phrasing and strips plane parentheticals", () => {
+    expect(
+      parseFeatPrerequisite("4th Level, Scion of the Outer Planes (Lawful Outer Plane) Feat"),
+    ).toEqual({
+      levelRequirement: 4,
+      prerequisiteFeatNames: ["Scion of the Outer Planes"],
+    })
+  })
+
   it("ignores exclusive-category phrasing", () => {
     expect(parseFeatPrerequisite("Can't Have Another Planar Pact Feat").prerequisiteFeatNames).toEqual(
       [],

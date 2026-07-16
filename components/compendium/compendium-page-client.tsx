@@ -1557,9 +1557,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   >
                     <option value="all">All Types</option>
                     <option value="Origin">Origin</option>
+                    <option value="Dark Gift">Dark Gift</option>
                     <option value="General">General</option>
                     <option value="Epic Boon">Epic Boon</option>
                     <option value="Fighting Style">Fighting Style</option>
+                    <option value="Planar Pact">Planar Pact</option>
                   </select>
                 </div>
                 {featFilterCategory !== "all" && (

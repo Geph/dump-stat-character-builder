@@ -232,6 +232,11 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
         importModifierMeta: undefined,
       } as ImportFeatRow
     }
+    const ctx = {
+      contentKind: "feat" as const,
+      sourceName: inferred.name,
+      featureName: inferred.name,
+    }
     const enriched = enrichFeatureLike(
       {
         ...inferred,
@@ -239,16 +244,25 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
         linkedModifiers: (inferred as { linkedModifiers?: Feature["linkedModifiers"] }).linkedModifiers,
         modifierRefs: (inferred as { modifierRefs?: Feature["modifierRefs"] }).modifierRefs,
       },
+      ctx,
+    )
+    const withOptionMods = enrichChoiceOptionModifiers(
       {
-        contentKind: "feat",
-        sourceName: inferred.name,
-        featureName: inferred.name,
-      },
+        name: inferred.name,
+        description,
+        isChoice: Boolean((inferred as { isChoice?: boolean }).isChoice),
+        choices: (inferred as { choices?: Feature["choices"] }).choices,
+        linkedModifiers: enriched.linkedModifiers,
+        modifierRefs: enriched.modifierRefs,
+      } as Feature,
+      ctx,
     )
     return {
       ...inferred,
-      linkedModifiers: enriched.linkedModifiers,
-      modifierRefs: enriched.modifierRefs,
+      isChoice: withOptionMods.isChoice,
+      choices: withOptionMods.choices,
+      linkedModifiers: withOptionMods.linkedModifiers,
+      modifierRefs: withOptionMods.modifierRefs,
       importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
     } as ImportFeatRow
   })

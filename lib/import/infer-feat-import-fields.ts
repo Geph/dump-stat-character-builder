@@ -19,20 +19,22 @@ export function inferFeatImportFields<T extends FeatImportLike>(feat: T): T {
   // Prefer explicit Dark Gift / Planar Pact headers over a wrong LLM category (e.g. Dark Gift → Planar Pact).
   const header = description.slice(0, 240)
   const nameAndPrereq = `${feat.name}\n${prerequisite ?? ""}\n${header}`
-  if (/dark\s+gift\s+feat/i.test(nameAndPrereq) || /\bdark\s+gift\b/i.test(feat.name)) {
+  const explicitPlanarPact =
+    /planar\s+pact\s+feat/i.test(header) || /can'?t have another planar pact feat/i.test(nameAndPrereq)
+  const explicitDarkGift = /dark\s+gift\s+feat/i.test(nameAndPrereq) || /\bdark\s+gift\b/i.test(feat.name)
+
+  if (explicitDarkGift) {
     category = "Dark Gift"
-  } else if (
-    /planar\s+pact\s+feat/i.test(header) ||
-    /can'?t have another planar pact feat/i.test(nameAndPrereq)
-  ) {
+  } else if (explicitPlanarPact) {
     category = "Planar Pact"
-  } else if (
-    // LLM often mis-tags Ravenloft Dark Gifts as Planar Pact; campaign prereq + no pact language → Dark Gift.
-    (category === "Planar Pact" || !category || category === "General") &&
-    /ravenloft/i.test(prerequisite ?? "") &&
-    !/planar\s+pact/i.test(nameAndPrereq)
-  ) {
-    category = "Dark Gift"
+  } else if (category === "Planar Pact") {
+    // LLM often mis-tags Ravenloft Dark Gifts or Planescape Scion feats as Planar Pact.
+    // Planar Pact is opt-in only via explicit pact language above.
+    if (/ravenloft/i.test(prerequisite ?? "")) {
+      category = "Dark Gift"
+    } else {
+      category = "General"
+    }
   } else if (!category || category === "General") {
     if (/\bmystic\s+technique\b/i.test(header)) {
       category = "Mystic Technique"

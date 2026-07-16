@@ -17,6 +17,7 @@ import {
   damageMod,
   damageReductionFx,
   damageResistanceChoice,
+  damageResistanceFixed,
   failedRollTrigger,
   feyShadowTouchedSpells,
   forceSaveFx,
@@ -26,6 +27,7 @@ import {
   imposeDisadvantageFx,
   modifyCreatureFx,
   movementEffectsPassive,
+  movementFx,
   onHitTrigger,
   reactionAttackFx,
   riderFx,
@@ -836,6 +838,77 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   },
 
   // —— Planescape ——
+  "Scion of the Outer Planes": {
+    linkedModifiers: [
+      spellAbility("scion_spell_ability", "Spellcasting ability for Planar Infusion cantrip", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
+    ],
+    isChoice: true,
+    choices: {
+      category: "Planar Infusion",
+      count: 1,
+      options: [
+        {
+          name: "Chaotic Outer Plane",
+          description: "You gain resistance to Poison damage and learn the Minor Illusion cantrip.",
+          linkedModifiers: [
+            damageResistanceFixed("scion_chaotic_res", ["Poison"], "Poison resistance"),
+            spellsKnown("scion_chaotic_cantrip", {
+              spells: [{ spellId: "Minor Illusion", alwaysPrepared: true }],
+              label: "Minor Illusion cantrip",
+            }),
+          ],
+        },
+        {
+          name: "Evil Outer Plane",
+          description: "You gain resistance to Necrotic damage and learn the Chill Touch cantrip.",
+          linkedModifiers: [
+            damageResistanceFixed("scion_evil_res", ["Necrotic"], "Necrotic resistance"),
+            spellsKnown("scion_evil_cantrip", {
+              spells: [{ spellId: "Chill Touch", alwaysPrepared: true }],
+              label: "Chill Touch cantrip",
+            }),
+          ],
+        },
+        {
+          name: "Good Outer Plane",
+          description: "You gain resistance to Radiant damage and learn the Sacred Flame cantrip.",
+          linkedModifiers: [
+            damageResistanceFixed("scion_good_res", ["Radiant"], "Radiant resistance"),
+            spellsKnown("scion_good_cantrip", {
+              spells: [{ spellId: "Sacred Flame", alwaysPrepared: true }],
+              label: "Sacred Flame cantrip",
+            }),
+          ],
+        },
+        {
+          name: "Lawful Outer Plane",
+          description: "You gain resistance to Force damage and learn the Guidance cantrip.",
+          linkedModifiers: [
+            damageResistanceFixed("scion_lawful_res", ["Force"], "Force resistance"),
+            spellsKnown("scion_lawful_cantrip", {
+              spells: [{ spellId: "Guidance", alwaysPrepared: true }],
+              label: "Guidance cantrip",
+            }),
+          ],
+        },
+        {
+          name: "The Outlands",
+          description: "You gain resistance to Psychic damage and learn the Mage Hand cantrip.",
+          linkedModifiers: [
+            damageResistanceFixed("scion_outlands_res", ["Psychic"], "Psychic resistance"),
+            spellsKnown("scion_outlands_cantrip", {
+              spells: [{ spellId: "Mage Hand", alwaysPrepared: true }],
+              label: "Mage Hand cantrip",
+            }),
+          ],
+        },
+      ],
+    },
+  },
   "Agent of Order": {
     linkedModifiers: [
       asiOne("agent_of_order_asi", "+1 to one ability score"),
@@ -862,6 +935,9 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       }),
     ],
   },
+  "Cohort of Chaos": {
+    linkedModifiers: [asiOne("cohort_of_chaos_asi", "+1 to one ability score")],
+  },
   "Outlands Envoy": {
     linkedModifiers: [
       asiOne("outlands_envoy_asi", "+1 to one ability score"),
@@ -874,6 +950,20 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         ],
         label: "Misty Step and Tongues (1 free cast each / Long Rest)",
       }),
+    ],
+  },
+  "Planar Wanderer": {
+    linkedModifiers: [
+      damageResistanceChoice(
+        "planar_wanderer_adapt",
+        ["Acid", "Cold", "Fire"],
+        "Planar Adaptation: choose Acid, Cold, or Fire resistance after each Long Rest",
+      ),
+      uses(
+        "planar_wanderer_portal_sense",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Portal Sense detect action (1 / Long Rest)",
+      ),
     ],
   },
   "Righteous Heritor": {
@@ -934,10 +1024,141 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       visionMod("aberrant_blindsight", "blindsight", 15, "Blindsight 15 ft."),
     ],
   },
+  "Echoing Soul": {
+    linkedModifiers: [
+      skillChoice("echoing_soul_skills", {
+        count: 2,
+        allowAnySkill: true,
+        label: "Channeled Prowess: proficiency in two skills of your choice",
+      }),
+      skillChoice("echoing_soul_expertise", {
+        count: 1,
+        allowAnySkill: true,
+        grantExpertise: true,
+        label: "Expertise in one proficient skill (swappable on Long Rest)",
+      }),
+      charInstance("modinst_echoing_soul_lang", "cat_char_languages", [
+        {
+          id: modId("echoing_soul_lang"),
+          type: "languages",
+          values: [],
+          choiceCount: 1,
+          label: "Inherent Tongues: one additional language",
+        },
+      ]),
+    ],
+  },
+  "Gathered Whispers": {
+    linkedModifiers: [
+      spellsKnown("gathered_whispers_spells", {
+        spells: [
+          { spellId: "Message", alwaysPrepared: true },
+          { spellId: "Augury", alwaysPrepared: true },
+        ],
+        freeCastPerLongRest: [{ spellName: "Augury", count: 1 }],
+        label: "Message; Augury prepared (1 free cast / Long Rest)",
+      }),
+      spellAbility("gathered_whispers_ability", "Spellcasting ability for Spirit Whispers", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
+      uses(
+        "gathered_whispers_scream",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Unearthly Scream (PB uses / Long Rest)",
+      ),
+    ],
+  },
+  "Living Shadow": {
+    linkedModifiers: [
+      spellsKnown("living_shadow_mage_hand", {
+        spells: [{ spellId: "Mage Hand", alwaysPrepared: true }],
+        label: "Grasping Shadow: Mage Hand without components",
+      }),
+      spellAbility("living_shadow_ability", "Spellcasting ability for Grasping Shadow", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
+      uses(
+        "living_shadow_reach",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Lengthened Strike +10 ft. reach (PB uses / Long Rest)",
+      ),
+    ],
+  },
+  "Mist Walker": {
+    linkedModifiers: [
+      uses(
+        "mist_walker_walk",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Mist Walk teleport 15 ft. (PB uses / Long Rest)",
+      ),
+      movementFx(
+        "mist_walker_teleport",
+        {
+          kind: "movement_option",
+          moveDistanceMode: "fixed",
+          moveDistanceFixed: 15,
+          movementTeleport: true,
+        },
+        { reaction: true },
+      ),
+    ],
+  },
+  "Second Skin": {
+    linkedModifiers: [
+      spellsKnown("second_skin_alter", {
+        spells: [{ spellId: "Alter Self", alwaysPrepared: true }],
+        freeCastPerLongRest: [{ spellName: "Alter Self", count: 1 }],
+        label: "Alter Self prepared (1 free cast / Long Rest; no Concentration when free)",
+      }),
+      spellAbility("second_skin_ability", "Spellcasting ability for Alternate Form", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
+    ],
+  },
+  "Symbiotic Being": {
+    linkedModifiers: [
+      skillChoice("symbiotic_skill", {
+        count: 1,
+        entries: [
+          "Arcana",
+          "Deception",
+          "History",
+          "Intimidation",
+          "Insight",
+          "Investigation",
+          "Nature",
+          "Religion",
+          "Perception",
+          "Persuasion",
+        ].map((skill) => ({ skill, expertise: false })),
+        label: "Second Mind: proficiency in one listed skill",
+      }),
+      charInstance("modinst_symbiotic_lang", "cat_char_languages", [
+        {
+          id: modId("symbiotic_lang"),
+          type: "languages",
+          values: [],
+          choiceCount: 1,
+          label: "Second Mind: one additional language",
+        },
+      ]),
+      uses(
+        "symbiotic_sustained",
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Sustained Symbiosis: expend Hit Die to add to a failed save (PB uses / Long Rest)",
+      ),
+    ],
+  },
   "Touch of Death": {
     linkedModifiers: [
       spellsKnown("touch_of_death_chill", {
-        spells: [],
+        spells: [{ spellId: "Chill Touch", alwaysPrepared: true }],
         alwaysPrepared: true,
         label: "Chill Touch (no components; Necrotic ignores Resistance)",
       }),
@@ -946,6 +1167,21 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         { kind: "check_disadvantage", checkCategory: "death_save" },
         {},
       ),
+    ],
+  },
+  Watchers: {
+    linkedModifiers: [
+      spellsKnown("watchers_spells", {
+        spells: [
+          { spellId: "Beast Sense", alwaysPrepared: true },
+          { spellId: "Speak with Animals", alwaysPrepared: true },
+        ],
+        freeCastPerLongRest: [
+          { spellName: "Beast Sense", count: 1 },
+          { spellName: "Speak with Animals", count: 1 },
+        ],
+        label: "Beast Sense and Speak with Animals (1 free cast each / Long Rest)",
+      }),
     ],
   },
 }

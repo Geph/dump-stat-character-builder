@@ -1827,7 +1827,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "spell.know_cantrip",
     confidence: "high",
-    test: /\byou know the ([A-Za-z' ]+?) cantrip\b/i,
+    test: /\b(?:you\s+know|learn|you\s+learn)\s+the\s+([A-Za-z' ]+?)\s+cantrip\b/i,
     build: (match, ctx) => {
       const spellName = match[1].trim()
       if (!spellName) return null
