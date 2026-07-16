@@ -77,8 +77,8 @@ function aiConfidence(mechanic: ImportMechanic): DetectionConfidence {
 
 /**
  * Shared by the top-level `damage_roll_modifiers` mechanic and `on_hit_trigger`'s nested effect —
- * both describe "extra NdM [damage type] damage" via the same characteristic shape. Returns null
- * when there's no dice to report (bonusDice missing/blank).
+ * both describe flat +N or "extra NdM [damage type] damage" via the same characteristic shape.
+ * Returns null when neither damageBonus nor bonusDice is present.
  */
 function buildDamageRollModifiersCharacteristic(
   mechanic: ImportMechanic,
@@ -86,13 +86,34 @@ function buildDamageRollModifiersCharacteristic(
   idSuffix: string,
   labelSuffix?: string,
 ) {
+  const flatBonus = mechanic.damageBonus
   const dice = mechanic.bonusDice?.trim()
-  if (!dice) return null
+  if (flatBonus == null && !dice) return null
   const damageType = mechanic.damageType ? titleCaseWords(mechanic.damageType) : undefined
   const creatureTypes = mechanic.targetCreatureTypes?.map(titleCaseWords).filter(Boolean)
+  const target = mechanic.damageTarget ?? "all"
+
+  if (flatBonus != null) {
+    const baseLabel = `+${flatBonus}${damageType ? ` ${damageType}` : ""} damage`
+    return {
+      id: modId(instanceKey(ctx, idSuffix)),
+      type: "damage_roll_modifiers" as const,
+      entries: [
+        {
+          bonus: flatBonus,
+          target,
+          ...(damageType ? { customTarget: damageType } : {}),
+          ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
+        },
+      ],
+      label: labelSuffix ? `${baseLabel} ${labelSuffix}` : baseLabel,
+      ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+    }
+  }
+
   const entry = {
     bonus: 0,
-    target: "all",
+    target,
     customTarget: `${dice}${damageType ? ` ${damageType}` : ""}`,
     ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
   }
@@ -172,11 +193,16 @@ function buildTemporaryHitPointsEffect(
             healMode: "character_level" as const,
             healLevelMultiplier: mechanic.amount ?? mechanic.amountMultiplier ?? 1,
           }
-        : dice
-          ? { healMode: "dice" as const, healDiceCount: dice.count, healDieType: dice.dieType }
-          : mechanic.amount != null
-            ? { healMode: "fixed" as const, healFixed: mechanic.amount }
-            : null
+        : mechanic.amountScaling === "proficiency"
+          ? {
+              healMode: "proficiency" as const,
+              healProficiencyMultiplier: mechanic.amount ?? mechanic.amountMultiplier ?? 1,
+            }
+          : dice
+            ? { healMode: "dice" as const, healDiceCount: dice.count, healDieType: dice.dieType }
+            : mechanic.amount != null
+              ? { healMode: "fixed" as const, healFixed: mechanic.amount }
+              : null
   if (!healPatch) return null
 
   return {
@@ -223,6 +249,9 @@ function buildFromMechanic(
     }
 
     if (!mechanic.checkRollMode) return null
+    // Freeform qualifiers (e.g. "that involves you dancing") cannot be enforced on the sheet —
+    // skip wiring so we don't silently over-grant unrestricted advantage/bonus.
+    if (mechanic.conditionNote?.trim()) return null
     return {
       ruleId: "ai.check_roll_modifier",
       confidence: aiConfidence(mechanic),

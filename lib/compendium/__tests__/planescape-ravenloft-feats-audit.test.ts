@@ -59,6 +59,24 @@ describe("Dark Gift category + Origin-slot eligibility", () => {
     expect(inferred.category).toBe("Dark Gift")
   })
 
+  it("reclassifies Planescape Scion feats mis-tagged as Planar Pact to General", () => {
+    const inferred = inferFeatImportFields({
+      name: "Scion of the Outer Planes",
+      description: "Your connection to an Outer Plane infuses you with the energy there.",
+      prerequisite: "Planescape Campaign",
+      category: "Planar Pact",
+    })
+    expect(inferred.category).toBe("General")
+
+    const followUp = inferFeatImportFields({
+      name: "Agent of Order",
+      description: "You can channel cosmic forces of order.",
+      prerequisite: "4th Level, Scion of the Outer Planes (Lawful Outer Plane) Feat",
+      category: "Planar Pact",
+    })
+    expect(followUp.category).toBe("General")
+  })
+
   it("keeps true Planar Pact feats as Planar Pact", () => {
     const inferred = inferFeatImportFields({
       name: "Fey Pact",
@@ -71,7 +89,27 @@ describe("Dark Gift category + Origin-slot eligibility", () => {
 })
 
 describe("Planescape + Ravenloft feat presets", () => {
-  it("wires Scion follow-up and Ravenloft Origin presets", () => {
+  it("wires Scion choice options with resistance and cantrips", () => {
+    const scion = enrichCustomFeatRow({
+      name: "Scion of the Outer Planes",
+      source: PHB,
+      description: "Planar Infusion",
+    })
+    expect(scion.isChoice).toBe(true)
+    const options = (scion.choices as { options?: { name: string; linkedModifiers?: unknown[] }[] })
+      ?.options
+    expect(options?.length).toBe(5)
+    const lawful = options?.find((o) => o.name === "Lawful Outer Plane")
+    const lawfulChars = ((lawful?.linkedModifiers ?? []) as {
+      characteristics?: { type: string; damageTypes?: string[]; spells?: { spellId: string }[] }[]
+    }[]).flatMap((m) => m.characteristics ?? [])
+    expect(lawfulChars.some((c) => c.type === "damage_resistance" && c.damageTypes?.includes("Force"))).toBe(
+      true,
+    )
+    expect(lawfulChars.some((c) => c.type === "spells_known")).toBe(true)
+  })
+
+  it("wires Scion follow-up and Ravenloft Origin/Dark Gift presets", () => {
     const agent = enrichCustomFeatRow({
       name: "Agent of Order",
       source: PHB,
@@ -79,6 +117,20 @@ describe("Planescape + Ravenloft feat presets", () => {
     })
     expect(chars(agent).some((c) => c.type === "ability_scores")).toBe(true)
     expect(chars(agent).some((c) => c.type === "uses")).toBe(true)
+
+    const cohort = enrichCustomFeatRow({
+      name: "Cohort of Chaos",
+      source: PHB,
+      description: "Chaotic Flare",
+    })
+    expect(chars(cohort).some((c) => c.type === "ability_scores")).toBe(true)
+
+    const wanderer = enrichCustomFeatRow({
+      name: "Planar Wanderer",
+      source: PHB,
+      description: "Planar Adaptation",
+    })
+    expect(chars(wanderer).some((c) => c.type === "damage_resistance")).toBe(true)
 
     const sharp = enrichCustomFeatRow({
       name: "Sharp Eye",
@@ -99,14 +151,25 @@ describe("Planescape + Ravenloft feat presets", () => {
       rangeFeet: 15,
     })
 
+    const living = enrichCustomFeatRow({
+      name: "Living Shadow",
+      source: "Van Richten's Guide",
+      description: "Grasping Shadow",
+      category: "Dark Gift",
+    })
+    expect(chars(living).some((c) => c.type === "spells_known")).toBe(true)
+    expect(chars(living).some((c) => c.type === "uses")).toBe(true)
+
     const touch = enrichCustomFeatRow({
       name: "Touch of Death",
       source: "Van Richten's Guide",
       description: "Pull of the Grave",
       category: "Dark Gift",
     })
-    const fx = ((touch.linked_modifiers as { activation?: { effects?: { checkCategory?: string }[] } }[]) ?? [])
-      .flatMap((m) => m.activation?.effects ?? [])
+    const linked = (touch.linked_modifiers ?? []) as {
+      activation?: { effects?: { checkCategory?: string }[] }
+    }[]
+    const fx = linked.flatMap((m) => m.activation?.effects ?? [])
     expect(fx.some((e) => e.checkCategory === "death_save")).toBe(true)
   })
 })

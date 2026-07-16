@@ -41,6 +41,9 @@ export const ImportMechanicSchema = z.object({
   hpValue: z.number().optional(),
   attackBonus: z.number().optional(),
   attackTarget: z.enum(["all", "melee", "ranged"]).optional(),
+  /** Flat damage bonus (Dueling +2). Prefer over inventing bonusDice for non-dice bonuses. */
+  damageBonus: z.number().optional(),
+  damageTarget: z.enum(["all", "melee", "ranged"]).optional(),
   bonusDice: z.string().optional(),
   damageType: z.string().optional(),
   damageTypes: z.array(z.string()).optional(),
@@ -212,7 +215,7 @@ export const ImportMechanicSchema = z.object({
   amount: z.number().optional(),
   amountDice: z.string().optional(),
   amountScaling: z
-    .enum(["character_level", "class_resource_die", "ability_modifier"])
+    .enum(["character_level", "class_resource_die", "ability_modifier", "proficiency"])
     .optional(),
   ability: z.enum(ABILITY_SCORE_KEYS).optional(),
   thpTrigger: z.enum(["on_activation", "turn_start", "on_use", "on_hit"]).optional(),
@@ -732,8 +735,8 @@ export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the sourc
 - "Dark Gift" for Ravenloft Dark Gift feats — NOT Planar Pact. Dark Gifts may be chosen whenever an Origin feat slot is offered (with DM permission). Headers like "Dark Gift Feat (Prerequisite: Ravenloft Campaign)" → category "Dark Gift".
 - "Epic Boon" for Epic Boons (19th+ level boons)
 - "Fighting Style" for fighting style options
-- "Planar Pact" for Planar Pact feats only (mutually exclusive pact feats like Fey Pact, Infernal Pact — "Can't Have Another Planar Pact Feat")
-- "General" for other feats (default when unclear)
+- "Planar Pact" for Planar Pact feats only (mutually exclusive pact feats like Fey Pact, Infernal Pact — "Can't Have Another Planar Pact Feat"). Do NOT use Planar Pact for Planescape Scion / follow-up feats (those are General) or Ravenloft Dark Gifts.
+- "General" for other feats (default when unclear), including Planescape campaign feats (Scion of the Outer Planes and its follow-ups)
 Do not embed the category name only in description — use the category field.
 When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).
 When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Planar Pact").

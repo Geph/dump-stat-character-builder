@@ -68,15 +68,16 @@ export function enrichCustomFeatRow(row: Record<string, unknown>): Record<string
       return applyFeatMechanicalDetection(row)
     }
     if (preset.isChoice && preset.choices) {
+      const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
       return {
         ...row,
         is_choice: true,
         isChoice: true,
         choices: preset.choices,
-        linked_modifiers: [],
-        linkedModifiers: [],
-        modifier_refs: [],
-        modifierRefs: [],
+        linked_modifiers: synced.linkedModifiers,
+        linkedModifiers: synced.linkedModifiers,
+        modifier_refs: synced.modifierRefs,
+        modifierRefs: synced.modifierRefs,
         benefits: row.benefits ?? null,
         repeatable: row.repeatable ?? preset.repeatable ?? false,
       }

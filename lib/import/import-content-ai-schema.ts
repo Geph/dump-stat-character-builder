@@ -47,6 +47,8 @@ const ImportMechanicAiSchema = z.object({
   hpValue: z.number().nullable(),
   attackBonus: z.number().nullable(),
   attackTarget: z.enum(["all", "melee", "ranged"]).nullable(),
+  damageBonus: z.number().nullable(),
+  damageTarget: z.enum(["all", "melee", "ranged"]).nullable(),
   bonusDice: z.string().nullable(),
   damageType: z.string().nullable(),
   damageTypes: z.array(z.string()).nullable(),
@@ -193,7 +195,9 @@ const ImportMechanicAiSchema = z.object({
   menuAbilityNames: z.array(z.string()).nullable(),
   amount: z.number().nullable(),
   amountDice: z.string().nullable(),
-  amountScaling: z.enum(["character_level", "class_resource_die", "ability_modifier"]).nullable(),
+  amountScaling: z
+    .enum(["character_level", "class_resource_die", "ability_modifier", "proficiency"])
+    .nullable(),
   ability: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),

@@ -249,12 +249,32 @@ export function spellsKnown(
   ])
 }
 
-export function spellAbility(key: string, label: string): LinkedModifierInstance {
+export function spellAbility(
+  key: string,
+  label: string,
+  abilityOptions?: import("@/lib/compendium/characteristic-modifiers").AbilityScoreKey[],
+): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.spellcastingAbility, [
     {
       id: modId(key),
       type: "spellcasting_ability",
-      ability: "intelligence",
+      ability: abilityOptions?.[0] ?? "intelligence",
+      ...(abilityOptions?.length ? { abilityOptions } : {}),
+      label,
+    },
+  ])
+}
+
+export function damageResistanceFixed(
+  key: string,
+  damageTypes: string[],
+  label: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageResistance, [
+    {
+      id: modId(key),
+      type: "damage_resistance",
+      damageTypes,
       label,
     },
   ])

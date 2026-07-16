@@ -5,6 +5,8 @@ export type ParsedFeatPrerequisite = {
   prerequisiteFeatNames: string[]
 }
 
+const LEVEL_ONLY_SEGMENT = /^(?:\d+(?:st|nd|rd|th)?\s+level|level\s*\d+)\+?$/i
+
 /** Parse free-text feat prerequisites into structured fields. */
 export function parseFeatPrerequisite(
   prerequisite: string | null | undefined,
@@ -19,6 +21,10 @@ export function parseFeatPrerequisite(
   if (levelMatch) {
     levelRequirement = Number.parseInt(levelMatch[1], 10)
   }
+  const ordinalLevelMatch = text.match(/\b(\d+)(?:st|nd|rd|th)?\s+level\b/i)
+  if (!levelRequirement && ordinalLevelMatch) {
+    levelRequirement = Number.parseInt(ordinalLevelMatch[1], 10)
+  }
   const classLevelMatch = text.match(/(\d+)(?:st|nd|rd|th)?-level\s+[A-Za-z\s]+/i)
   if (!levelRequirement && classLevelMatch) {
     levelRequirement = Number.parseInt(classLevelMatch[1], 10)
@@ -27,6 +33,7 @@ export function parseFeatPrerequisite(
   const prerequisiteFeatNames: string[] = []
   const segments = text.split(/[,;]/).map((segment) => segment.trim()).filter(Boolean)
   for (const segment of segments) {
+    if (LEVEL_ONLY_SEGMENT.test(segment)) continue
     if (/^level\s*\d+/i.test(segment)) continue
     if (/can'?t have another/i.test(segment)) continue
     if (/^prerequisite:?$/i.test(segment.trim())) continue
@@ -34,8 +41,10 @@ export function parseFeatPrerequisite(
     const cleaned = segment
       .replace(/^prerequisite:\s*/i, "")
       .replace(/\s+feat$/i, "")
+      // "Scion of the Outer Planes (Lawful Outer Plane)" → base feat name for resolve
+      .replace(/\s*\([^)]*\)\s*$/g, "")
       .trim()
-    if (!cleaned || /^level\b/i.test(cleaned)) continue
+    if (!cleaned || LEVEL_ONLY_SEGMENT.test(cleaned) || /^level\b/i.test(cleaned)) continue
     prerequisiteFeatNames.push(cleaned)
   }
 
