@@ -25,6 +25,6 @@ describe("subclass match import hints", () => {
     const byo = buildByoExtractionPrompt("subclasses", { subclassMatch: match })
     expect(system).toContain('class_name must be exactly "Fighter"')
     expect(byo).toContain('class_name must be exactly "Fighter"')
-    expect(byo).toContain("Focus primarily on extracting: subclasses")
+    expect(byo).toContain("Focus primarily on extracting: Subclasses")
   })
 })
