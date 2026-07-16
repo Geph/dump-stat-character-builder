@@ -14,7 +14,7 @@ import {
 import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import {
-  hasHomebrewImportFixtures,
+  hasHomebrewFixture,
   homebrewFixturePath,
 } from "@/lib/import/__tests__/homebrew-fixture-path"
 
@@ -43,21 +43,30 @@ describe("combineImportContents", () => {
   })
 })
 
-describe.runIf(hasHomebrewImportFixtures)("merge import spell libraries", () => {
-  it("parses Red Magic Spells table from witch-subclasses.json", () => {
-    const witch = loadJson("witch-subclasses.json")
-    const redMagic = witch.subclasses
-      ?.find((sc) => sc.name === "Red Magic")
-      ?.features?.find((f) => f.name === "Red Magic Spells")
-    expect(redMagic).toBeTruthy()
-    const parsed = parseSubclassSpellTable(redMagic!.description ?? "")
-    expect(parsed?.rows.length).toBe(4)
-    expect(parsed?.rows[0]?.spellNames).toEqual(
-      expect.arrayContaining(["Burning Hands", "Hex: Imperil", "Scorching Ray"]),
-    )
-  })
+describe("merge import spell libraries", () => {
+  it.runIf(hasHomebrewFixture("witch-subclasses.json"))(
+    "parses Red Magic Spells table from witch-subclasses.json",
+    () => {
+      const witch = loadJson("witch-subclasses.json")
+      const redMagic = witch.subclasses
+        ?.find((sc) => sc.name === "Red Magic")
+        ?.features?.find((f) => f.name === "Red Magic Spells")
+      expect(redMagic).toBeTruthy()
+      const parsed = parseSubclassSpellTable(redMagic!.description ?? "")
+      expect(parsed?.rows.length).toBe(4)
+      expect(parsed?.rows[0]?.spellNames).toEqual(
+        expect.arrayContaining(["Burning Hands", "Hex: Imperil", "Scorching Ray"]),
+      )
+    },
+  )
 
-  it("combines witch subclasses with valdas and kibbles spell libraries", () => {
+  it.runIf(
+    hasHomebrewFixture(
+      "witch-subclasses.json",
+      "kibbles-spells-parsed.json",
+      "valdas-spells-201-231.json",
+    ),
+  )("combines witch subclasses with valdas and kibbles spell libraries", () => {
     const combined = combineImportContents([
       loadJson("witch-subclasses.json"),
       loadJson("kibbles-spells-parsed.json"),
@@ -77,7 +86,13 @@ describe.runIf(hasHomebrewImportFixtures)("merge import spell libraries", () => 
     expect(rubyEye?.classes).toEqual(expect.arrayContaining(["Witch"]))
   })
 
-  it("wires subclass spell tables after spell libraries are combined", () => {
+  it.runIf(
+    hasHomebrewFixture(
+      "witch-subclasses.json",
+      "kibbles-spells-parsed.json",
+      "valdas-spells-201-231.json",
+    ),
+  )("wires subclass spell tables after spell libraries are combined", () => {
     const combined = combineImportContents([
       loadJson("witch-subclasses.json"),
       loadJson("kibbles-spells-parsed.json"),
@@ -110,57 +125,66 @@ describe.runIf(hasHomebrewImportFixtures)("merge import spell libraries", () => 
     ).toBe(true)
   })
 
-  it("reports homebrew gaps when supplements lack referenced spells", () => {
-    const witch = loadJson("witch-subclasses.json")
-    const refs = collectReferencedSpellNames(witch)
-    const missing = listMissingReferencedSpellNames(
-      witch,
-      (witch.spells ?? []).map((s) => s.name),
-    )
-    expect(refs.length).toBeGreaterThan(50)
-    expect(missing).toContain("Exhume")
-    expect(missing).toContain("Hollowing Curse")
-
-    const combined = combineImportContents([witch, loadJson("valdas-spells-201-231.json")])
-    const stillMissing = listMissingReferencedSpellNames(
-      combined,
-      (combined.spells ?? []).map((s) => s.name),
-    )
-    expect(stillMissing).not.toContain("Exhume")
-    expect(stillMissing).not.toContain("Hollowing Curse")
-    // SRD spells stay missing from import bundles until compendium merge at persist.
-    expect(stillMissing).toContain("Burning Hands")
-    expect(stillMissing).toContain("Fireball")
-  })
-
-  it("normalizes kibbles spell component objects", () => {
-    const kibbles = loadJson("kibbles-spells-parsed.json")
-    const sample = kibbles.spells?.[0]
-    expect(sample?.components).toEqual(expect.arrayContaining(["V", "S"]))
-  })
-})
-
-describe.runIf(hasHomebrewImportFixtures)("enrichSubclassSpellTablesOnImport", () => {
-  it("links black magic spells when definitions are present", () => {
-    const combined = combineImportContents([
-      loadJson("witch-subclasses.json"),
-      loadJson("valdas-spells-201-231.json"),
-    ])
-    const enriched = enrichSubclassSpellTablesOnImport(combined)
-    const blackMagic = enriched.subclasses
-      ?.find((sc) => sc.name === "Black Magic")
-      ?.features?.find((f) => f.name === "Black Magic Spells") as unknown as import("@/lib/types").Feature | undefined
-    const spellsKnown = (blackMagic?.linkedModifiers ?? [])
-      .flatMap(
-        (mod: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance) =>
-          mod.characteristics ?? [],
+  it.runIf(hasHomebrewFixture("witch-subclasses.json", "valdas-spells-201-231.json"))(
+    "reports homebrew gaps when supplements lack referenced spells",
+    () => {
+      const witch = loadJson("witch-subclasses.json")
+      const refs = collectReferencedSpellNames(witch)
+      const missing = listMissingReferencedSpellNames(
+        witch,
+        (witch.spells ?? []).map((s) => s.name),
       )
-      .find(
-        (char: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier) =>
-          char.type === "spells_known",
-      ) as import("@/lib/compendium/characteristic-modifiers").SpellsKnownCharacteristic | undefined
-    expect((spellsKnown?.spells ?? []).some((s: { spellId?: string }) => /exhume/i.test(String(s.spellId)))).toBe(
-      true,
-    )
-  })
+      expect(refs.length).toBeGreaterThan(50)
+      expect(missing).toContain("Exhume")
+      expect(missing).toContain("Hollowing Curse")
+
+      const combined = combineImportContents([witch, loadJson("valdas-spells-201-231.json")])
+      const stillMissing = listMissingReferencedSpellNames(
+        combined,
+        (combined.spells ?? []).map((s) => s.name),
+      )
+      expect(stillMissing).not.toContain("Exhume")
+      expect(stillMissing).not.toContain("Hollowing Curse")
+      // SRD spells stay missing from import bundles until compendium merge at persist.
+      expect(stillMissing).toContain("Burning Hands")
+      expect(stillMissing).toContain("Fireball")
+    },
+  )
+
+  it.runIf(hasHomebrewFixture("kibbles-spells-parsed.json"))(
+    "normalizes kibbles spell component objects",
+    () => {
+      const kibbles = loadJson("kibbles-spells-parsed.json")
+      const sample = kibbles.spells?.[0]
+      expect(sample?.components).toEqual(expect.arrayContaining(["V", "S"]))
+    },
+  )
 })
+
+describe.runIf(hasHomebrewFixture("witch-subclasses.json", "valdas-spells-201-231.json"))(
+  "enrichSubclassSpellTablesOnImport",
+  () => {
+    it("links black magic spells when definitions are present", () => {
+      const combined = combineImportContents([
+        loadJson("witch-subclasses.json"),
+        loadJson("valdas-spells-201-231.json"),
+      ])
+      const enriched = enrichSubclassSpellTablesOnImport(combined)
+      const blackMagic = enriched.subclasses
+        ?.find((sc) => sc.name === "Black Magic")
+        ?.features?.find((f) => f.name === "Black Magic Spells") as unknown as import("@/lib/types").Feature | undefined
+      const spellsKnown = (blackMagic?.linkedModifiers ?? [])
+        .flatMap(
+          (mod: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance) =>
+            mod.characteristics ?? [],
+        )
+        .find(
+          (char: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier) =>
+            char.type === "spells_known",
+        ) as import("@/lib/compendium/characteristic-modifiers").SpellsKnownCharacteristic | undefined
+      expect((spellsKnown?.spells ?? []).some((s: { spellId?: string }) => /exhume/i.test(String(s.spellId)))).toBe(
+        true,
+      )
+    })
+  },
+)

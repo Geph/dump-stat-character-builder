@@ -5,7 +5,7 @@ import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifie
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import { getSpellSlotTable } from "@/lib/compendium/spell-slots"
 import {
-  hasHomebrewImportFixtures,
+  hasHomebrewFixture,
   homebrewFixturePath,
 } from "@/lib/import/__tests__/homebrew-fixture-path"
 import type { DndClass } from "@/lib/types"
@@ -27,7 +27,9 @@ function featureChars(feature: {
   return { types, effects, isChoice: feature.isChoice === true }
 }
 
-describe.runIf(hasHomebrewImportFixtures)("Eberron Artificer local import fixtures", () => {
+describe.runIf(
+  hasHomebrewFixture("eberron-artificer-class.json", "eberron-artificer-subclasses.json"),
+)("Eberron Artificer local import fixtures", () => {
   it("class JSON has Artificer L1 slots + Tinker's Magic + Flash of Genius wiring after enrich", () => {
     const raw = loadFixture("eberron-artificer-class.json")
     expect(raw).not.toBeNull()

@@ -35,3 +35,8 @@ export function homebrewFixturePath(name: string): string | null {
 }
 
 export const hasHomebrewImportFixtures = resolveHomebrewFixtureDir() !== null
+
+/** True when every named fixture file is present (dir alone is not enough). */
+export function hasHomebrewFixture(...names: string[]): boolean {
+  return names.length > 0 && names.every((name) => homebrewFixturePath(name) !== null)
+}

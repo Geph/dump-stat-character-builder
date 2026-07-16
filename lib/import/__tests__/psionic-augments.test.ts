@@ -11,7 +11,7 @@ import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifie
 import { combineImportContents } from "@/lib/import/merge-import-content"
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import {
-  hasHomebrewImportFixtures,
+  hasHomebrewFixture,
   homebrewFixturePath,
 } from "@/lib/import/__tests__/homebrew-fixture-path"
 
@@ -29,7 +29,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(parsePsionicAugmentCost("0 psi points")).toEqual({ fixed: 0 })
   })
 
-  it.runIf(hasHomebrewImportFixtures)("parses Seeing augments from psion-disciplines.json", () => {
+  it.runIf(hasHomebrewFixture("psion-disciplines.json"))("parses Seeing augments from psion-disciplines.json", () => {
     const content = loadFixture("psion-disciplines.json")
     const seeing = content.spells?.find((spell) => spell.name === "Seeing")
     expect(seeing).toBeTruthy()
@@ -46,7 +46,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(withheld?.cost.fixed).toBe(0)
   })
 
-  it.runIf(hasHomebrewImportFixtures)("parses Enhancing Surge augments", () => {
+  it.runIf(hasHomebrewFixture("psion-disciplines.json"))("parses Enhancing Surge augments", () => {
     const content = loadFixture("psion-disciplines.json")
     const surge = content.spells?.find((spell) => spell.name === "Enhancing Surge")
     const parsed = parsePsionicAugmentsFromDescription(surge?.description ?? "")
@@ -54,7 +54,7 @@ describe("parsePsionicAugmentsFromDescription", () => {
     expect(parsed?.augments.some((row) => row.name === "Resilient")).toBe(true)
   })
 
-  it.runIf(hasHomebrewImportFixtures)("computes selection cost summaries", () => {
+  it.runIf(hasHomebrewFixture("psion-disciplines.json"))("computes selection cost summaries", () => {
     const content = loadFixture("psion-disciplines.json")
     const seeing = content.spells?.find((spell) => spell.name === "Seeing")
     const parsed = parsePsionicAugmentsFromDescription(seeing?.description ?? "")
@@ -69,7 +69,9 @@ describe("parsePsionicAugmentsFromDescription", () => {
   })
 })
 
-describe.runIf(hasHomebrewImportFixtures)("import enrich psionic augments", () => {
+describe.runIf(
+  hasHomebrewFixture("psion-disciplines.json", "psion-class.json", "psion-knowing-mind.json"),
+)("import enrich psionic augments", () => {
   it("attaches psionic_augments to discipline powers on import", () => {
     const combined = combineImportContents([
       loadFixture("psion-disciplines.json"),
