@@ -284,6 +284,8 @@ export const ClassFeatureSchema = z.object({
   /** Exact SRD-standard feature name when this feature is a renamed/lightly-modified port. */
   basedOnSrdFeature: z.string().optional(),
   psionic_augments: z.unknown().optional(),
+  /** Companion/minion stat block (Steel Defender, Homunculus, etc.). */
+  companion_stat_block: z.record(z.unknown()).nullable().optional(),
   sheetDisplay: z
     .object({
       abilitiesActions: z.boolean().optional(),

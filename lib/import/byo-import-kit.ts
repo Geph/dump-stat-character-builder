@@ -12,7 +12,7 @@ export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from P
 
 For best extraction results, your source text should:
 - One class per pass only (that class + its subclasses is OK). Never extract multiple unrelated classes in one JSON
-- Libraries before class: full homebrew spell write-ups, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter. Include that class's Spell / School / Special list in the same class pass when present (spell_list + spells[] stubs); prefer Classes over a standalone Class Spell Lists upload
+- Libraries before class: full homebrew spell write-ups, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter. Include that class's Spell / School / Special list in the same class pass when present (spell_list + spells[] stubs)
 - Prefer one class chapter per class pass: the core class and its subclasses together (staged review covers them in order)
 - Keep level progression tables in the source so the importer can read features and class_resources[] from them
 - Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Ki, Rage, Sorcery Points, etc.) in class_resources[]
@@ -55,8 +55,6 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment, starting_gold, feat_granted, ability_bonuses, and feature. Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
-  spell_lists:
-    "Focus on class spell list tables with Spell / School / Special columns (Special: C=Concentration, R=Ritual, M=Material; may be combined like 'C, R' or '—'). Populate classes[].spell_list with every spell name (strip * footnotes) and spells[] with level (from Cantrips/Level N headers), school, concentration (C), components including M when Special has M, and classes set to the list's class name. Skip legend prose and '*Appears in this chapter' lines. Preserve novel school names from the School column.",
   feats: "Focus on feats[] with category (Origin, General, Fighting Style, Epic Boon) when known.",
   equipment:
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
@@ -238,58 +236,6 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         concentration: true,
         description: "You briefly rewind a wound on a creature you touch.",
         classes: ["Wizard"],
-      },
-    ],
-  },
-  spell_lists: {
-    classes: [
-      {
-        name: "Artificer",
-        description: null,
-        hit_die: 8,
-        spell_list: ["Acid Splash", "Dancing Lights", "Detect Magic", "Identify", "Homunculus Servant"],
-      },
-    ],
-    spells: [
-      {
-        name: "Acid Splash",
-        level: 0,
-        school: "Evocation",
-        concentration: false,
-        components: null,
-        classes: ["Artificer"],
-      },
-      {
-        name: "Dancing Lights",
-        level: 0,
-        school: "Illusion",
-        concentration: true,
-        components: null,
-        classes: ["Artificer"],
-      },
-      {
-        name: "Detect Magic",
-        level: 1,
-        school: "Divination",
-        concentration: true,
-        components: null,
-        classes: ["Artificer"],
-      },
-      {
-        name: "Identify",
-        level: 1,
-        school: "Divination",
-        concentration: false,
-        components: ["M"],
-        classes: ["Artificer"],
-      },
-      {
-        name: "Homunculus Servant",
-        level: 2,
-        school: "Conjuration",
-        concentration: false,
-        components: ["M"],
-        classes: ["Artificer"],
       },
     ],
   },
