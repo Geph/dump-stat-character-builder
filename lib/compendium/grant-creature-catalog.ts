@@ -108,3 +108,53 @@ export function creatureNamesFromAbility(
   ).flatMap((grant) => grant.creatureNames)
   return [...new Set([...fromField, ...fromMods].map((n) => n.trim()).filter(Boolean))]
 }
+
+/** Collect creature names granted by a spell's summon / grant_creature modifiers. */
+export function creatureNamesFromSpell(
+  spell: {
+    companion_creature_names?: string[] | null
+    linkedModifiers?: LinkedModifierInstance[] | null
+    linked_modifiers?: LinkedModifierInstance[] | null
+    modifierRefs?: string[] | null
+  },
+  catalog: ModifierCatalogEntry[] = [],
+): string[] {
+  const fromField = spell.companion_creature_names ?? []
+  const instances = spell.linkedModifiers ?? spell.linked_modifiers
+  const fromMods = grantCreaturesFromLinkedModifiers(
+    catalog,
+    instances,
+    spell.modifierRefs,
+  ).flatMap((grant) => grant.creatureNames)
+  return [...new Set([...fromField, ...fromMods].map((n) => n.trim()).filter(Boolean))]
+}
+
+/** Resolved grant_creature rows from a spell (preserves choice metadata). */
+export function grantCreaturesFromSpell(
+  spell: {
+    companion_creature_names?: string[] | null
+    linkedModifiers?: LinkedModifierInstance[] | null
+    linked_modifiers?: LinkedModifierInstance[] | null
+    modifierRefs?: string[] | null
+  },
+  catalog: ModifierCatalogEntry[] = [],
+): ResolvedGrantCreature[] {
+  const fromMods = grantCreaturesFromLinkedModifiers(
+    catalog,
+    spell.linkedModifiers ?? spell.linked_modifiers,
+    spell.modifierRefs,
+  )
+  const fromField = (spell.companion_creature_names ?? [])
+    .map((n) => n.trim())
+    .filter(Boolean)
+  if (!fromField.length) return fromMods
+  return [
+    ...fromMods,
+    {
+      catalogEntryId: GRANT_CREATURE_CATALOG_ID,
+      label: "Grant Creature / Companion",
+      creatureNames: fromField,
+      count: fromField.length,
+    },
+  ]
+}

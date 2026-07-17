@@ -213,7 +213,7 @@ describe("SRD creatures seed fixture", () => {
   run("round-trips every record in the SRD creatures fixture", () => {
     const doc = loadCreatureImportDocumentFromFile(fixturePath!)
     expect(doc.schema_version).toBe("2.0")
-    expect(doc.creatures.length).toBe(91)
+    expect(doc.creatures.length).toBe(104)
     for (const creature of doc.creatures) {
       expect(() => parseCreatureImportV2(creature)).not.toThrow()
       const template = mapCreatureImportV2ToTemplate(creature)
@@ -227,7 +227,7 @@ describe("SRD creatures seed fixture", () => {
       }
     }
     const rows = buildCreaturePersistRows(doc.creatures, "D&D 5.5e SRD")
-    expect(rows).toHaveLength(91)
+    expect(rows).toHaveLength(104)
     expect(rows.every((row) => row.import_payload != null)).toBe(true)
     expect(
       rows.every((row) => row.category === "creature" || row.category === "companion"),

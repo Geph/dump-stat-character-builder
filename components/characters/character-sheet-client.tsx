@@ -177,7 +177,6 @@ import {
 import { CompanionFormPicker } from "@/components/characters/companion-form-picker"
 import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
-import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
 import { SheetPersistentStatsBar, SheetInitiativeBlock } from "@/components/character-sheet/sheet-persistent-stats-bar"
@@ -1800,27 +1799,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       ownerAbilityScores: derived?.abilityScores,
       ownerSavingThrowProficiencies: derived?.savingThrowProficiencies,
     }
-    const hasFindFamiliar = spells.some((spell) => isFindFamiliarSpell(spell.name))
-    const spellcastingEntry =
-      classDetails.find((entry) => entry.class?.spellcasting) ?? classDetails[0]
-    const findFamiliarSpellSource = hasFindFamiliar
-      ? {
-          className: spellcastingClass?.name ?? "Spellcaster",
-          classId: spellcastingEntry?.row.class_id ?? "spellcaster",
-          subclassId: null,
-        }
-      : null
     const { companions, formGroups } = resolveCharacterCompanionsDetailed({
       classDetails,
       customAbilities: sheetCustomAbilities,
       ctx,
-      findFamiliarSpellSource,
+      knownSpells: spells,
+      equipment,
       creatures,
       modifierCatalog,
       formSelections: formSelectionsFromState(companionState),
     })
     return { rows: mergeCompanionState(companions, companionState), formGroups }
-  }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells, creatures, modifierCatalog])
+  }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells, equipment, creatures, modifierCatalog])
 
   const companionRows = companionResolution.rows
   const companionFormGroups = companionResolution.formGroups

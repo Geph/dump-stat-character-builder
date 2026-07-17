@@ -41,6 +41,33 @@ export function CompanionFormPicker({
     )
   }
 
+  if (group.kind === "choice") {
+    const selected = group.selected[0] ?? ""
+    const multi = (group.maxKnown ?? 1) > 1
+    if (!multi) {
+      return (
+        <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
+          <p className="text-[10px] uppercase font-bold text-muted-foreground">
+            {group.featureName} — Creature
+          </p>
+          <select
+            value={selected}
+            onChange={(event) => onChange(event.target.value ? [event.target.value] : [])}
+            className="w-full text-xs bg-muted border border-border rounded-lg px-2 py-1.5 text-foreground"
+          >
+            <option value="">Choose a creature…</option>
+            {group.options.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.name}
+                {option.cr ? ` (CR ${option.cr})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      )
+    }
+  }
+
   const selectedSet = new Set(group.selected.map((name) => name.toLowerCase()))
   const atBudget = group.maxKnown != null && group.selected.length >= group.maxKnown
 
