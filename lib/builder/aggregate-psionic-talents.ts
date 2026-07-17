@@ -2,6 +2,11 @@ import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formul
 import { aggregateDiscoveryOptions } from "@/lib/builder/aggregate-discoveries"
 import { aggregateKnackOptions } from "@/lib/builder/knack-choices"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
+import {
+  extractPrerequisiteFromDescription,
+  isChoicePrerequisiteMet,
+  type ChoicePrerequisiteContext,
+} from "@/lib/builder/choice-prerequisite"
 import type { CustomAbility, Equipment, Feature, FeatureChoice } from "@/lib/types"
 import { weaponMasteryOptionsForClass } from "@/lib/compendium/weapon-mastery-choice"
 import { weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
@@ -21,6 +26,22 @@ function disciplinePickNames(featureChoicePicks: Record<string, string[]>): stri
 
 function talentOptionsFromDiscipline(ability: CustomAbility): FeatureChoice["options"] {
   return ability.choices?.options ?? []
+}
+
+function filterOptionsByPrerequisite(
+  options: FeatureChoice["options"],
+  context: ChoicePrerequisiteContext,
+): FeatureChoice["options"] {
+  return options.filter((option) => {
+    const prerequisite =
+      option.prerequisite?.trim() ||
+      extractPrerequisiteFromDescription(option.description) ||
+      null
+    return isChoicePrerequisiteMet(prerequisite, {
+      ...context,
+      selectedAbilityNames: context.selectedAbilityNames ?? [],
+    })
+  })
 }
 
 /**
@@ -73,10 +94,21 @@ export function resolveFeatureChoiceOptions(
     classNames: string[]
     classLevel?: number
     equipmentCatalog?: Equipment[]
+    knownSpellNames?: string[]
+    subclassName?: string | null
   },
 ): FeatureChoice["options"] {
   const choices = feature.choices
   if (!choices) return []
+
+  const classLevel = params.classLevel ?? 20
+  const prerequisiteContext: ChoicePrerequisiteContext = {
+    classLevel,
+    knownSpellNames: params.knownSpellNames,
+    subclassName: params.subclassName,
+    selectedAbilityNames: [],
+  }
+
   if (choices.resourceKey === "weapon_mastery" && params.classNames[0]) {
     const masteryCatalogEntries = weaponMasteryCatalogEntriesFromAbilities(params.customAbilities)
     const merged = weaponMasteryOptionsForClass(
@@ -87,25 +119,41 @@ export function resolveFeatureChoiceOptions(
     if (merged.length) return merged
   }
   if (choices.optionsSource === "known_discipline_talents") {
-    return aggregatePsionicTalentOptions({
-      customAbilities: params.customAbilities,
-      featureChoicePicks: params.featureChoicePicks,
-      classNames: params.classNames,
-    })
+    return filterOptionsByPrerequisite(
+      aggregatePsionicTalentOptions({
+        customAbilities: params.customAbilities,
+        featureChoicePicks: params.featureChoicePicks,
+        classNames: params.classNames,
+      }),
+      {
+        ...prerequisiteContext,
+        selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
+      },
+    )
   }
   if (choices.optionsSource === "fusion_talents") {
-    return params.customAbilities
-      .filter((row) => row.ability_role === "talent_pool" && /fusion/i.test(row.name))
-      .flatMap((row) => row.choices?.options ?? [])
+    return filterOptionsByPrerequisite(
+      params.customAbilities
+        .filter((row) => row.ability_role === "talent_pool" && /fusion/i.test(row.name))
+        .flatMap((row) => row.choices?.options ?? []),
+      {
+        ...prerequisiteContext,
+        selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
+      },
+    )
   }
   if (choices.optionsSource === "class_knacks") {
-    const knackKey = Object.keys(params.featureChoicePicks).find((key) => /knack/i.test(key))
-    const selected = knackKey ? (params.featureChoicePicks[knackKey] ?? []) : []
+    const knackKey = Object.keys(params.featureChoicePicks).find((key) => /knack|trick/i.test(key))
+    const selected = knackKey
+      ? (params.featureChoicePicks[knackKey] ?? [])
+      : Object.values(params.featureChoicePicks).flat()
     return aggregateKnackOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
-      classLevel: params.classLevel ?? 20,
+      classLevel,
       selectedKnackNames: selected,
+      knownSpellNames: params.knownSpellNames,
+      subclassName: params.subclassName,
     })
   }
   if (choices.optionsSource === "class_upgrades") {
@@ -114,7 +162,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateUpgradeOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
-      classLevel: params.classLevel ?? 20,
+      classLevel,
       selectedUpgradeNames: selected,
     })
   }
@@ -130,11 +178,25 @@ export function resolveFeatureChoiceOptions(
     return aggregateDiscoveryOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
-      classLevel: params.classLevel ?? 20,
+      classLevel,
       selectedDiscoveryNames: selected,
     })
   }
-  return choices.options ?? []
+
+  // Static option lists (inline Warmage Tricks, discipline talents, etc.)
+  const staticSelectedKey = Object.keys(params.featureChoicePicks).find((key) => {
+    const category = choices.category?.toLowerCase() ?? ""
+    return (
+      (category && key.toLowerCase().includes(category)) ||
+      key.toLowerCase().includes(feature.name.toLowerCase())
+    )
+  })
+  return filterOptionsByPrerequisite(choices.options ?? [], {
+    ...prerequisiteContext,
+    selectedAbilityNames: staticSelectedKey
+      ? (params.featureChoicePicks[staticSelectedKey] ?? [])
+      : Object.values(params.featureChoicePicks).flat(),
+  })
 }
 
 /** Mark Psionic Talents class features for dynamic option aggregation at build time. */

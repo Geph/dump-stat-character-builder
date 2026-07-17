@@ -130,6 +130,12 @@ export const ImportMechanicSchema = z.object({
     )
     .optional(),
   featCount: z.number().optional(),
+  /** grant_creature: creature names from the Creatures & Companions compendium. */
+  creatureNames: z.array(z.string()).optional(),
+  /** grant_creature: optional player-pick list (subset of creatureNames). */
+  creatureChoiceOptions: z.array(z.string()).optional(),
+  /** grant_creature: Wild Shape / polymorph form. */
+  creaturePolymorph: z.boolean().optional(),
   languages: z.array(z.string()).optional(),
   languageChoiceCount: z.number().optional(),
   choicePool: z.enum(["standard", "standard_and_rare"]).optional(),
@@ -245,6 +251,14 @@ export const NewToggleImportSchema = z.object({
 
 export type NewToggleImport = z.infer<typeof NewToggleImportSchema>
 
+/** Informational prerequisites that cannot be mechanically evaluated by the builder. */
+export const PrerequisiteRuleSchema = z.object({
+  category: z.literal("other"),
+  value: z.string().min(1),
+})
+
+export type PrerequisiteRule = z.infer<typeof PrerequisiteRuleSchema>
+
 export const ChoiceOptionsSchema = z.object({
   category: z.string(),
   count: z.number(),
@@ -275,6 +289,7 @@ export const ChoiceOptionsSchema = z.object({
 export const SpeciesTraitSchema = z.object({
   name: z.string(),
   description: z.string(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
@@ -286,6 +301,7 @@ export const ClassFeatureSchema = z.object({
   level: z.number(),
   name: z.string(),
   description: z.string(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
@@ -294,6 +310,8 @@ export const ClassFeatureSchema = z.object({
   psionic_augments: z.unknown().optional(),
   /** Companion/minion stat block (Steel Defender, Homunculus, etc.). */
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
+  /** Names of Creatures & Companions this feature grants (resolve from creatures table). */
+  companion_creature_names: z.array(z.string()).nullable().optional(),
   sheetDisplay: z
     .object({
       abilitiesActions: z.boolean().optional(),
@@ -347,6 +365,7 @@ export const SubclassImportSchema = z.object({
   name: z.string(),
   class_name: z.string(),
   description: z.string().nullable(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   card_image_url: z.string().nullable().optional(),
   features: z.array(ClassFeatureSchema),
   new_toggles: z.array(NewToggleImportSchema).optional(),
@@ -362,12 +381,31 @@ export const FeatImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   prerequisite: z.string().nullable().optional(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   category: z.string().nullable().optional(),
   level_requirement: z.number().nullable().optional(),
   /** Ability-catalog picks (discipline / class talent / exploit). Not for ASI / Fighting Style / Epic Boon milestones. */
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
   mechanics: z.array(ImportMechanicSchema).optional(),
+})
+
+/**
+ * Creatures & Companions import row. Prefer a structured `stat_block` when available;
+ * otherwise put the full Monster Manual / companion prose in `description` — Dump Stat
+ * parses it into a CompanionStatBlockTemplate on persist.
+ */
+export const CreatureImportSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  creature_type: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  alignment: z.string().nullable().optional(),
+  cr: z.string().nullable().optional(),
+  /** Structured companion/creature stat block when the extractor already parsed it. */
+  stat_block: z.record(z.unknown()).nullable().optional(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
+  source: z.string().nullable().optional(),
 })
 
 export const SpellImportSchema = z.object({
@@ -381,6 +419,7 @@ export const SpellImportSchema = z.object({
   duration: z.string().nullable(),
   concentration: z.boolean(),
   description: z.string().nullable(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   classes: z.array(z.string()).nullable(),
   psionic_augments: z.unknown().optional(),
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
@@ -389,6 +428,7 @@ export const SpellImportSchema = z.object({
 export const ClassImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   card_image_url: z.string().nullable().optional(),
   card_blurb: z.string().max(120).nullable().optional(),
   complexity: z.enum(["easy", "medium", "hard"]).nullable().optional(),
@@ -467,6 +507,7 @@ export const BackgroundImportSchema = z.object({
   description: z.string().nullable(),
   /** Optional book/product label; importer stamp fills when omitted. */
   source: z.string().nullable().optional(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   skill_proficiencies: z.array(z.string()).nullable(),
   tool_proficiencies: z.array(z.string()).nullable().optional(),
   /**
@@ -518,13 +559,26 @@ export const BackgroundImportSchema = z.object({
 /** Prompt hint for background PDF / BYO extraction. */
 export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feats:
 - D&D 2024 backgrounds: set ability_bonuses to eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed +1/+2 values; set feat_granted to the Origin feat name (e.g. "Magic Initiate (Cleric)").
+- When the source says a Dark Gift pick (e.g. "A Dark Gift feat of your choice"), set feat_granted to that phrasing verbatim — e.g. "Choose one Dark Gift feat" or "A Dark Gift feat of your choice". Do NOT set feat_granted: null when ability_bonuses are present.
+- When the source offers a named Origin feat OR a Dark Gift (e.g. "Survivor or a Dark Gift feat of your choice"), keep the full or-phrasing in feat_granted — do NOT collapse to only the named feat.
+- Optional campaign gates on backgrounds: prerequisite_rules: [{ "category": "other", "value": "Ravenloft Campaign" }] (or Planescape Campaign) when the source implies a setting gate.
 - ability_bonuses keys MUST be exactly these lowercase names and no others: strength, dexterity, constitution, intelligence, wisdom, charisma. Never invent keys (especially never "desktop" — that is not an ability; use "dexterity").
 - Pre-2024 / legacy backgrounds (no fixed ASI or Origin feat): set ability_bonuses: null and feat_granted: null. Do NOT invent zero-valued ability objects or placeholder feats — the character builder offers the player a free +2/+1 or +1/+1/+1 allocation and any Origin feat pick.
 - Optional source: set source to the book/product name when known (e.g. "Player's Handbook", "Planescape: Adventures in the Multiverse", "Van Richten's Guide to Ravenloft"). The Dump Stat importer also stamps a source label at paste time if omitted.
+- For a fixed skill plus an unrestricted/faction fallback (e.g. "Arcana, the skill associated with your faction or one skill of your choice"), emit skill_proficiencies: ["Arcana", "One skill of your choice"]. Keep any faction-to-skill table in description; Dump Stat turns the choice phrase into a skill picker.
 - Extract Languages into proficiencies.languages (e.g. ["Two of your choice"] or ["One language of your choice"]). Keep choice phrasing — Dump Stat turns it into a language picker.
 - Tool choice phrasing belongs in tool_proficiencies (e.g. "Choose one kind of Artisan's Tools", "Choose one kind of Gaming Set", "Choose one kind of Musical Instrument") — Dump Stat turns these into tool pickers.
-- Equipment: when the source offers Choose A or B, prefer starting_equipment_groups with two options (A = gear list + pouch gold as items or starting_gold; B = [{ "name": "Gold Pieces", "quantity": 50 }]). Flat starting_equipment alone is package A only.
-- Extract Equipment into starting_equipment as { name, quantity } items and starting_gold for GP in a belt pouch when not using groups (e.g. starting_gold: 10).
+- Equipment Choose A or B: use starting_equipment_groups as ONE group object with nested options[] — never a flat array of { label, items } packages. Required shape:
+  starting_equipment_groups: [{
+    "description": "Choose A or B:",
+    "options": [
+      { "label": "A", "items": [{ "name": "…", "quantity": 1 }, { "name": "Gold Pieces", "quantity": 8 }] },
+      { "label": "B", "items": [{ "name": "Gold Pieces", "quantity": 50 }] }
+    ]
+  }]
+  Put pouch GP for package A as a Gold Pieces item inside option A (or set background-level starting_gold). Do NOT put starting_gold on each option. Wrong (will be dropped): [{ "label": "A", "items": [...], "starting_gold": 8 }, { "label": "B", "items": [...] }].
+- Prefer quantity on the item (e.g. Parchment quantity 10) over parenthetical counts in the name.
+- Flat starting_equipment alone is package A only — use groups whenever the source says Choose A or B.
 - Assign each Feature to the background whose toolset/theme it matches — do not attach a feature to the wrong background because of PDF column flow.
 - Do not copy d6 Ideals/Bonds/Flaws/Personality Trait tables into descriptions.`
 
@@ -542,11 +596,19 @@ Some abilities in a resource-pool library are gated by action economy rather tha
 /** Applies to every content type — not only backgrounds. */
 export const GENERAL_SOURCE_CLEANUP_HINT = `Source text cleanup (all content types)
 - Omit chapter running heads, page numbers, and nav ribbons from every description field.
-- Repeated running-head or footer text (e.g. a pipe-separated list of section names) must never be copied into description, regardless of what you are extracting.`
+- Repeated running-head or footer text (e.g. a pipe-separated list of section names) must never be copied into description, regardless of what you are extracting.
+- Doubled ALL-CAPS PDF glyphs (common in LaserLlama and similar homebrew PDFs): some copy-pastes repeat every capital letter, often with spaces between pairs. Collapse those runs into the intended word before extracting — never leave the doubled form in names, headers, ability abbreviations, or description text. Examples: "S ST T R R" → "STR"; "I IN N T T" → "INT"; "D DE E X X" → "DEX"; "T TR RA AI IT TS S" → "TRAITS". This only applies to ALL-CAPS runs (headers, stat abbreviations, section titles); leave mixed-case and normal prose alone.
+- Trailing superscript markers pasted as letters (common in KibblesTasty and similar homebrew PDFs): footnote/superscript markers on names often copy as a glued trailing capital letter — especially superscript K on custom/homebrew entries (e.g. "Returning WeaponK" → "Returning Weapon"). Before emitting JSON, strip marker letters from every name field (spells[], feats[], features[], traits[], equipment[], custom_abilities / abilities[], choice options, etc.). Do not leave the marker in the stored name. If a nearby legend defines what the marker means (homebrew vs SRD), use that to decide which rows need full extraction — but always output the clean name without the suffix.`
+
+export const PREREQUISITE_RULES_IMPORT_HINT = `Campaign and other non-mechanical prerequisites (all content types)
+- When any item, feature, or trait has a campaign/content gate such as "Prerequisite: Planescape Campaign" or "Prerequisite: Ravenloft Campaign", preserve it as prerequisite_rules: [{ "category": "other", "value": "Planescape Campaign" }].
+- Use category "other" for campaign, setting, DM-permission, story, faction, or similarly informational prerequisites the builder cannot evaluate mechanically.
+- Keep mechanically evaluable feat prerequisites in their existing fields too (level_requirement, prerequisite, etc.); prerequisite_rules is specifically for informational gates.
+- Do not discard a prerequisite merely because it appears between an item heading and its description.`
 
 /** Marker legends near spell/option tables (homebrew vs SRD). */
 export const MARKER_LEGEND_SCAN_HINT = `Footnote / marker legends near tables
-Before extracting spell tables or option lists, check for a legend, footnote, or "Special Cases" callout near them that defines a marker (superscript letter, dagger, asterisk, etc.) attached to some names but not others. These markers commonly distinguish homebrew/custom entries (which need full extraction from this document) from standard SRD entries (which should resolve against the existing compendium and not be re-extracted). If you find such a marker, note in your own extraction which names carried it, and extract full entries only for those.`
+Before extracting spell tables or option lists, check for a legend, footnote, or "Special Cases" callout near them that defines a marker (superscript letter, dagger, asterisk, etc.) attached to some names but not others. These markers commonly distinguish homebrew/custom entries (which need full extraction from this document) from standard SRD entries (which should resolve against the existing compendium and not be re-extracted). If you find such a marker, note in your own extraction which names carried it, and extract full entries only for those. PDF copy-paste often turns superscript markers into a trailing letter on the name (e.g. KibblesTasty superscript K → "Returning WeaponK"); strip that suffix from every emitted name while still honoring the legend for which rows are homebrew.`
 
 /** Brief grant + full write-up = one ability. */
 export const DUPLICATE_ABILITY_MERGE_HINT = `Duplicate references / same-ability merge
@@ -558,6 +620,7 @@ export const EquipmentImportSchema = z.object({
   category: z.string(),
   subcategory: z.string().nullable(),
   description: z.string().nullable(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   cost: z.object({ amount: z.number(), unit: z.string() }).nullable().optional(),
   weight: z.number().nullable().optional(),
   properties: z.record(z.unknown()).nullable().optional(),
@@ -575,6 +638,7 @@ export const AbilityImportSchema = z.object({
   card_image_url: z.string().nullable().optional(),
   description: z.string(),
   prerequisite: z.string().nullable().optional(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   repeatable: z.boolean().optional(),
   source_type: z
     .enum(["class", "subclass", "species", "background", "feat", "item", "compendium"])
@@ -680,6 +744,7 @@ export const ClassResourceImportSchema = z.object({
   resource_key: z.string(),
   name: z.string(),
   description: z.string().nullable().optional(),
+  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   uses: UsesConfigImportSchema,
 })
 
@@ -708,6 +773,7 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
           name: z.string(),
           card_image_url: z.string().nullable().optional(),
           description: z.string().nullable(),
+          prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
           speed: z.number().nullable(),
           size: z.string().nullable(),
           traits: z.array(SpeciesTraitSchema),
@@ -720,6 +786,7 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
     backgrounds: z.array(BackgroundImportSchema).optional(),
     spells: z.array(SpellImportSchema).optional(),
     feats: z.array(FeatImportSchema).optional(),
+    creatures: z.array(CreatureImportSchema).optional(),
     equipment: z.array(EquipmentImportSchema).optional(),
     import_proposals: ImportProposalsSchema.optional(),
   }
@@ -796,7 +863,7 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
 - Put each subclass/archetype/path in subclasses[] with class_name set to that same parent class name
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
-- Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror { description, options: [{ label, items: [{ name, quantity }] }] }
+- Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
 - Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name`
 
@@ -806,7 +873,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - When the source never names the pool formally, derive name from the granting feature (see Class resource import rules) so proposal_id / name stay stable across re-imports
 - definition: 1–3 sentences explaining what the pool is, how it is spent, and typical recharge — shown to the user before import
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
-- Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack options (one proposal row per Knack — do not bundle into a single choices catalog)
+- Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack / Trick options (one proposal row per option — do not bundle into a single choices catalog). Always copy "Prerequisite:" / "Prerequisites:" lines into prerequisite (e.g. "Light Cantrip", "Level 5+ Warmage, Force Buckler cantrip", "Level 10+ Warmage, House of Bishops") — Dump Stat enforces these at pick time against known spells, class level, subclass, and other selected options.
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
 - Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.

@@ -23,6 +23,7 @@ const EXPORT_TYPE_TO_TABLE: Record<ExportItemType, CompendiumTable> = {
   "dnd-background": "backgrounds",
   "dnd-spell": "spells",
   "dnd-feat": "feats",
+  "dnd-creature": "creatures",
   "dnd-equipment": "equipment",
   "dnd-class-resource": "class_resources",
   "dnd-ability": "custom_abilities",

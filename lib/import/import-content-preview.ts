@@ -41,6 +41,15 @@ function spellLevelLabel(level: number): string {
   return `${level}${suffix}`
 }
 
+function appendPrerequisiteRules(
+  details: ImportContentPreviewDetail[],
+  row: { prerequisite_rules?: { category: "other"; value: string }[] | null },
+): void {
+  for (const rule of row.prerequisite_rules ?? []) {
+    details.push({ label: "Other prerequisite", value: rule.value })
+  }
+}
+
 function previewSpells(content: ImportContent): ImportContentPreviewSection | null {
   const spells = content.spells
   if (!spells?.length) return null
@@ -61,6 +70,7 @@ function previewSpells(content: ImportContent): ImportContentPreviewSection | nu
       if (spell.classes?.length) {
         details.push({ label: "Classes", value: spell.classes.join(", ") })
       }
+      appendPrerequisiteRules(details, spell)
 
       const augments = spell.psionic_augments as { augments?: unknown[] } | null | undefined
       const badges: string[] = []
@@ -109,6 +119,7 @@ function previewEquipment(content: ImportContent): ImportContentPreviewSection |
       if (cost) details.push({ label: "Cost", value: cost })
       else if (isMagicItem(item)) details.push({ label: "Cost", value: "N/A" })
       if (item.weight != null) details.push({ label: "Weight", value: `${item.weight} lb.` })
+      appendPrerequisiteRules(details, item)
 
       const magicEffectCount =
         (Array.isArray(item.magic_effects) ? item.magic_effects.length : 0) +
@@ -156,6 +167,7 @@ function previewClasses(content: ImportContent): ImportContentPreviewSection | n
         value: `${featureCount} feature${featureCount === 1 ? "" : "s"}`,
       })
     }
+    appendPrerequisiteRules(details, row)
     const badges: string[] = []
     if (row.spellcasting?.ability) badges.push("Spellcasting")
     if (row.complexity) badges.push(row.complexity)
@@ -189,6 +201,7 @@ function previewSubclasses(content: ImportContent): ImportContentPreviewSection 
           value: `${featureCount} feature${featureCount === 1 ? "" : "s"}`,
         })
       }
+      appendPrerequisiteRules(details, row)
 
       return {
         id: `subclass:${row.class_name}:${row.name}`,
@@ -212,6 +225,7 @@ function previewFeats(content: ImportContent): ImportContentPreviewSection | nul
       const details: ImportContentPreviewDetail[] = []
       if (feat.category) details.push({ label: "Category", value: feat.category })
       if (feat.prerequisite) details.push({ label: "Prerequisite", value: feat.prerequisite })
+      appendPrerequisiteRules(details, feat)
       if ((feat.level_requirement ?? 0) > 1) {
         details.push({ label: "Level", value: `${feat.level_requirement}+` })
       }
@@ -236,6 +250,32 @@ function previewFeats(content: ImportContent): ImportContentPreviewSection | nul
   return { key: "feats", label: "Feats", items }
 }
 
+function previewCreatures(content: ImportContent): ImportContentPreviewSection | null {
+  const creatures = content.creatures
+  if (!creatures?.length) return null
+
+  const items = [...creatures]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((creature) => {
+      const details: ImportContentPreviewDetail[] = []
+      if (creature.creature_type) details.push({ label: "Type", value: creature.creature_type })
+      if (creature.size) details.push({ label: "Size", value: creature.size })
+      if (creature.cr) details.push({ label: "CR", value: creature.cr })
+      if (creature.alignment) details.push({ label: "Alignment", value: creature.alignment })
+      appendPrerequisiteRules(details, creature)
+
+      return {
+        id: `creature:${creature.name}`,
+        name: creature.name,
+        details,
+        badges: creature.cr ? [`CR ${creature.cr}`] : [],
+        descriptionSnippet: snippet(creature.description),
+      }
+    })
+
+  return { key: "creatures", label: "Creatures & Companions", items }
+}
+
 function previewSpecies(content: ImportContent): ImportContentPreviewSection | null {
   const species = content.species
   if (!species?.length) return null
@@ -247,6 +287,10 @@ function previewSpecies(content: ImportContent): ImportContentPreviewSection | n
       { label: "Size", value: row.size },
       { label: "Speed", value: `${row.speed} ft.` },
       { label: "Traits", value: String(row.traits?.length ?? 0) },
+      ...(row.prerequisite_rules ?? []).map((rule) => ({
+        label: "Other prerequisite",
+        value: rule.value,
+      })),
     ],
     badges: [],
     descriptionSnippet: snippet(row.description),
@@ -265,6 +309,7 @@ function previewBackgrounds(content: ImportContent): ImportContentPreviewSection
       details.push({ label: "Skills", value: row.skill_proficiencies.join(", ") })
     }
     if (row.feat_granted) details.push({ label: "Feat", value: row.feat_granted })
+    appendPrerequisiteRules(details, row)
     return {
       id: `background:${row.name}`,
       name: row.name,
@@ -288,6 +333,7 @@ export function collectImportContentPreview(
     previewBackgrounds(content),
     previewSubclasses(content),
     previewFeats(content),
+    previewCreatures(content),
     previewSpells(content),
     previewEquipment(content),
   ].filter((section): section is ImportContentPreviewSection => section != null)

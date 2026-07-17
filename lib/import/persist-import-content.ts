@@ -22,6 +22,7 @@ import {
 } from "@/lib/import/enrich-import-classes"
 import { buildGatedClassResourceRowsForSubclass } from "@/lib/compendium/subclass-gated-class-resources"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
@@ -275,6 +276,7 @@ export async function persistImportedContent(
         name: f.name,
         description: f.description ? formatFeatDescription(f.description) : null,
         prerequisite: f.prerequisite ?? null,
+        prerequisite_rules: f.prerequisite_rules ?? null,
         category: normalizeFeatCategory(f.category) ?? "General",
         level_requirement:
           typeof (f as { level_requirement?: unknown }).level_requirement === "number"
@@ -296,13 +298,15 @@ export async function persistImportedContent(
       const enriched = enrichFeatRowWithPrerequisites(row, existingFeats)
       if (
         enriched.level_requirement !== row.level_requirement ||
-        (enriched.prerequisite_feat_ids?.length ?? 0) > 0
+        (enriched.prerequisite_feat_ids?.length ?? 0) > 0 ||
+        (enriched.prerequisite_rules?.length ?? 0) > 0
       ) {
         await upsertByName("feats", [
           {
             name: enriched.name,
             level_requirement: enriched.level_requirement,
             prerequisite_feat_ids: enriched.prerequisite_feat_ids ?? [],
+            prerequisite_rules: enriched.prerequisite_rules ?? [],
           },
         ])
       }
@@ -310,6 +314,13 @@ export async function persistImportedContent(
 
     breakdown.feats = sanitized.feats.length
     totalImported += sanitized.feats.length
+  }
+
+  if (sanitized.creatures?.length) {
+    const creatureRows = buildCreaturePersistRows(sanitized.creatures, source)
+    await upsertByName("creatures", creatureRows)
+    breakdown.creatures = sanitized.creatures.length
+    totalImported += sanitized.creatures.length
   }
 
   if (sanitized.equipment?.length) {

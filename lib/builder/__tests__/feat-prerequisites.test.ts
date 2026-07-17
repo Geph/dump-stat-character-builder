@@ -7,10 +7,11 @@ import {
 import type { Feat } from "@/lib/types"
 import {
   enrichFeatRowWithPrerequisites,
+  inferOtherPrerequisiteRules,
   parseFeatPrerequisite,
   resolvePrerequisiteFeatIds,
 } from "@/lib/import/resolve-feat-prerequisites"
-import { parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/background-origin-feat"
+import { parseBackgroundFeatGrantChoice, parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/background-origin-feat"
 import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
 import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
@@ -59,6 +60,13 @@ describe("parseFeatPrerequisite", () => {
       [],
     )
   })
+
+  it("models campaign gates as other prerequisites, not feat names", () => {
+    expect(parseFeatPrerequisite("Planescape Campaign").prerequisiteFeatNames).toEqual([])
+    expect(inferOtherPrerequisiteRules("Prerequisite: Planescape Campaign")).toEqual([
+      { category: "other", value: "Planescape Campaign" },
+    ])
+  })
 })
 
 describe("resolvePrerequisiteFeatIds", () => {
@@ -82,6 +90,21 @@ describe("enrichFeatRowWithPrerequisites", () => {
     )
     expect((enriched as Record<string, unknown>).level_requirement).toBe(4)
     expect((enriched as Record<string, unknown>).prerequisite_feat_ids).toEqual(["infernal-pact"])
+  })
+
+  it("adds campaign gates to prerequisite_rules", () => {
+    const enriched = enrichFeatRowWithPrerequisites(
+      {
+        name: "Scion of the Outer Planes",
+        prerequisite: "Planescape Campaign",
+        category: "Origin",
+      },
+      [],
+    )
+    expect((enriched as Record<string, unknown>).prerequisite_rules).toEqual([
+      { category: "other", value: "Planescape Campaign" },
+    ])
+    expect((enriched as Record<string, unknown>).prerequisite_feat_ids).toEqual([])
   })
 })
 
@@ -152,6 +175,21 @@ describe("background Planar Pact grant wiring", () => {
     expect(parseBackgroundFeatGrantChoiceCategory("Choose one Planar Pact feat")).toBe("Planar Pact")
   })
 
+  it("parses Dark Gift of-your-choice and named-or-Dark-Gift phrasing", () => {
+    expect(parseBackgroundFeatGrantChoiceCategory("A Dark Gift feat of your choice")).toBe(
+      "Dark Gift",
+    )
+    expect(parseBackgroundFeatGrantChoiceCategory("Choose one Dark Gift feat")).toBe("Dark Gift")
+    expect(parseBackgroundFeatGrantChoice("Survivor or a Dark Gift feat of your choice")).toEqual({
+      category: "Dark Gift",
+      alsoFeatNames: ["Survivor"],
+    })
+    expect(parseBackgroundFeatGrantChoice("Sharp Eye or a Dark Gift feat of your choice")).toEqual({
+      category: "Dark Gift",
+      alsoFeatNames: ["Sharp Eye"],
+    })
+  })
+
   it("creates a background feat pick slot from imported background data", () => {
     const normalized = normalizeBackgroundRow({
       id: "pact-seeker",
@@ -168,5 +206,36 @@ describe("background Planar Pact grant wiring", () => {
     )
     expect(slots).toHaveLength(1)
     expect(slots[0]?.featCategories).toEqual(["Planar Pact"])
+  })
+
+  it("wires Mist Wanderer Dark Gift and Haunted One Survivor-or-Dark-Gift", () => {
+    const mist = normalizeBackgroundRow({
+      id: "mist-wanderer",
+      name: "Mist Wanderer",
+      feat_granted: "A Dark Gift feat of your choice",
+      ability_bonuses: { dexterity: 0, constitution: 0, wisdom: 0 },
+      feature: { name: "Wanderer", description: "You walk the Mists." },
+    })
+    const mistSlots = getBackgroundFeatPickSlots(
+      mist as unknown as import("@/lib/types").Background,
+      buildDefaultModifierCatalog(),
+    )
+    expect(mist.feat_granted).toBeNull()
+    expect(mistSlots[0]?.featCategories).toEqual(["Dark Gift"])
+
+    const haunted = normalizeBackgroundRow({
+      id: "haunted-one",
+      name: "Haunted One",
+      feat_granted: "Survivor or a Dark Gift feat of your choice",
+      ability_bonuses: { constitution: 0, wisdom: 0, charisma: 0 },
+      feature: { name: "Haunted", description: "You persist." },
+    })
+    const hauntedSlots = getBackgroundFeatPickSlots(
+      haunted as unknown as import("@/lib/types").Background,
+      buildDefaultModifierCatalog(),
+    )
+    expect(haunted.feat_granted).toBeNull()
+    expect(hauntedSlots[0]?.featCategories).toEqual(["Dark Gift"])
+    expect(hauntedSlots[0]?.alsoFeatNames).toEqual(["Survivor"])
   })
 })

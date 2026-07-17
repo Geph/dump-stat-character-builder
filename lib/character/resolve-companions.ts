@@ -12,7 +12,13 @@ import { isCompanionStatBlockFeature } from "@/lib/character/companion-recogniti
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
 import { SRD_FAMILIAR, isFamiliarFeature } from "@/lib/character/srd-familiar"
-import type { CustomAbility, Feature } from "@/lib/types"
+import {
+  creatureNamesFromAbility,
+  creatureNamesFromFeature,
+} from "@/lib/compendium/grant-creature-catalog"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import type { Creature, CustomAbility, Feature } from "@/lib/types"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 type FeatureCarrier = {
   level: number
@@ -20,6 +26,26 @@ type FeatureCarrier = {
   description: string
   companion_stat_block?: CompanionStatBlockTemplate | null
   companion_stat_blocks?: CompanionStatBlockTemplate[] | null
+  companion_creature_names?: string[] | null
+  linkedModifiers?: LinkedModifierInstance[] | null
+  modifierRefs?: string[] | null
+}
+
+function normalizeCreatureName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+/** Build a name → stat-block lookup from compendium creature rows. */
+export function buildCreatureTemplateLookup(
+  creatures: Creature[] | undefined,
+): Map<string, CompanionStatBlockTemplate> {
+  const lookup = new Map<string, CompanionStatBlockTemplate>()
+  for (const creature of creatures ?? []) {
+    const template = creature.stat_block
+    if (!template || !creature.name?.trim()) continue
+    lookup.set(normalizeCreatureName(creature.name), { ...template, name: creature.name })
+  }
+  return lookup
 }
 
 function scanFeatures(
@@ -32,6 +58,8 @@ function scanFeatures(
     maxLevel: number
   },
   into: { source: CompanionSource; template: CompanionStatBlockTemplate }[],
+  creatureLookup?: Map<string, CompanionStatBlockTemplate>,
+  modifierCatalog: ModifierCatalogEntry[] = [],
 ) {
   const baseSource = (featureName: string, featureLevel: number): CompanionSource => ({
     featureName,
@@ -45,8 +73,15 @@ function scanFeatures(
   for (const feature of features ?? []) {
     if (feature.level > ctx.maxLevel) continue
 
+    // Compendium creatures linked by name or grant_creature modifiers.
+    const linkedNames = creatureNamesFromFeature(feature as Feature, modifierCatalog)
+    const linkedCreatures = collectLinkedCreatureTemplates(linkedNames, creatureLookup)
+
     // SRD Druid Beast forms (Rat, Riding Horse, Spider, Wolf) populate from Wild Shape.
-    const forms: CompanionStatBlockTemplate[] = [...(feature.companion_stat_blocks ?? [])]
+    const forms: CompanionStatBlockTemplate[] = [
+      ...linkedCreatures,
+      ...(feature.companion_stat_blocks ?? []),
+    ]
     if (!forms.length && isDruidWildShapeFeature(ctx.className, feature.name)) {
       forms.push(...SRD_BEAST_FORMS)
     }
@@ -72,8 +107,24 @@ function scanFeatures(
   }
 }
 
+/** Resolve feature/ability creature-name references against the compendium lookup. */
+function collectLinkedCreatureTemplates(
+  names: string[] | null | undefined,
+  lookup: Map<string, CompanionStatBlockTemplate> | undefined,
+): CompanionStatBlockTemplate[] {
+  if (!names?.length || !lookup?.size) return []
+  const out: CompanionStatBlockTemplate[] = []
+  for (const name of names) {
+    const template = lookup.get(normalizeCreatureName(name))
+    if (template) out.push(template)
+  }
+  return out
+}
+
 export function collectCompanionCandidatesFromClasses(
   classDetails: CharacterClassDetail[],
+  creatureLookup?: Map<string, CompanionStatBlockTemplate>,
+  modifierCatalog: ModifierCatalogEntry[] = [],
 ): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
   const found: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
 
@@ -83,7 +134,7 @@ export function collectCompanionCandidatesFromClasses(
       classId: entry.row.class_id,
       className,
       maxLevel: entry.row.level,
-    }, found)
+    }, found, creatureLookup, modifierCatalog)
 
     if (entry.subclass) {
       scanFeatures(entry.subclass.features as FeatureCarrier[] | undefined, {
@@ -92,7 +143,7 @@ export function collectCompanionCandidatesFromClasses(
         subclassId: entry.subclass.id,
         subclassName: entry.subclass.name,
         maxLevel: entry.row.level,
-      }, found)
+      }, found, creatureLookup, modifierCatalog)
     }
   }
 
@@ -105,6 +156,8 @@ export function collectCompanionCandidatesFromClasses(
 
 export function collectCompanionCandidatesFromAbilities(
   abilities: CustomAbility[],
+  creatureLookup?: Map<string, CompanionStatBlockTemplate>,
+  modifierCatalog: ModifierCatalogEntry[] = [],
 ): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
   const out: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
 
@@ -112,6 +165,7 @@ export function collectCompanionCandidatesFromAbilities(
     const row = ability as CustomAbility & {
       companion_stat_block?: CompanionStatBlockTemplate | null
       companion_stat_blocks?: CompanionStatBlockTemplate[] | null
+      companion_creature_names?: string[] | null
     }
     const baseSource: CompanionSource = {
       featureName: ability.name,
@@ -123,7 +177,13 @@ export function collectCompanionCandidatesFromAbilities(
       subclassId: null,
     }
 
-    const forms = row.companion_stat_blocks ?? []
+    const forms = [
+      ...collectLinkedCreatureTemplates(
+        creatureNamesFromAbility(ability, modifierCatalog),
+        creatureLookup,
+      ),
+      ...(row.companion_stat_blocks ?? []),
+    ]
     if (forms.length) {
       for (const template of forms) {
         out.push({ source: { ...baseSource, formName: template.name }, template })
@@ -161,10 +221,16 @@ export function resolveCharacterCompanions(params: {
   ctx: CompanionResolveContext
   /** Source for a familiar granted by the Find Familiar spell (e.g. a Wizard who knows it). */
   findFamiliarSpellSource?: { className: string; classId: string; subclassId?: string | null } | null
+  /** Compendium creatures available to resolve name-linked companions. */
+  creatures?: Creature[]
+  /** Modifier catalog for resolving grant_creature linked modifiers. */
+  modifierCatalog?: ModifierCatalogEntry[]
 }): ResolvedCompanion[] {
+  const creatureLookup = buildCreatureTemplateLookup(params.creatures)
+  const catalog = params.modifierCatalog ?? []
   const candidates = [
-    ...collectCompanionCandidatesFromClasses(params.classDetails),
-    ...collectCompanionCandidatesFromAbilities(params.customAbilities ?? []),
+    ...collectCompanionCandidatesFromClasses(params.classDetails, creatureLookup, catalog),
+    ...collectCompanionCandidatesFromAbilities(params.customAbilities ?? [], creatureLookup, catalog),
   ]
 
   // A caster who knows Find Familiar gets the familiar too, unless a feature

@@ -121,6 +121,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   resource_ability_menu: "Resources & uses",
   extra_turn: "Active abilities",
   grant_feat: "Feats & choices",
+  grant_creature: "Feats & choices",
   equipment_and_magic_items: "Equipment & items",
   catalog_option: "Feats & choices",
   craftable_items: "Equipment & items",
@@ -161,6 +162,8 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       name:
         option.value === "grant_feat"
           ? "Gain a Feat"
+          : option.value === "grant_creature"
+            ? "Grant Creature / Companion"
           : option.value === "attack_roll_modifiers"
             ? "Attack Roll and Crit Modifiers"
             : option.value === "damage_roll_modifiers"
@@ -170,6 +173,8 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
       summary:
         option.value === "grant_feat"
           ? "Passive: choose a feat — set allowed categories below"
+          : option.value === "grant_creature"
+            ? "Passive: grant a creature/companion from the Creatures & Companions compendium (by name)"
           : option.value === "languages"
             ? "Passive: grant known languages and/or player picks from the Languages compendium (Standard or Rare pool)"
           : option.value === "ability_scores"

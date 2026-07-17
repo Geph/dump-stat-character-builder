@@ -7,6 +7,7 @@ import { ClipboardImportPanel } from "@/components/import/clipboard-import-panel
 import { ImportSubclassMatchSelect } from "@/components/import/import-subclass-match-select"
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import { ImportContentPreviewPanel } from "@/components/import/import-content-preview-panel"
+import { ImportBackgroundFeatGapPanel } from "@/components/import/import-background-feat-gap-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
@@ -80,6 +81,12 @@ import {
   collectImportModifierReview,
   removeImportModifierPreview,
 } from "@/lib/import/import-modifier-previews"
+import {
+  applyBackgroundFeatGrantNarrative,
+  collectBackgroundFeatGrantGaps,
+  type KnownFeat,
+} from "@/lib/import/collect-missing-background-feat-grants"
+import { createClient } from "@/lib/db/client"
 import {
   buildInitialImportCardArtUrlMap,
   type ImportCardArtUrlMap,
@@ -210,6 +217,58 @@ export default function ImportPage() {
     () => (pendingImport ? collectImportModifierReview(pendingImport.content) : []),
     [pendingImport],
   )
+
+  const pendingBackgroundsGrantFeats = Boolean(
+    pendingImport?.content.backgrounds?.some((background) => background.feat_granted?.trim()),
+  )
+
+  const [libraryFeats, setLibraryFeats] = useState<KnownFeat[] | null>(null)
+  useEffect(() => {
+    if (!pendingBackgroundsGrantFeats) {
+      setLibraryFeats(null)
+      return
+    }
+    let cancelled = false
+    const db = createClient()
+    void (async () => {
+      try {
+        const { data } = await db.from("feats").select("name, category")
+        if (cancelled) return
+        const rows = (data as { name?: unknown; category?: unknown }[] | null) ?? []
+        setLibraryFeats(
+          rows
+            .map((row) => ({
+              name: String(row.name ?? ""),
+              category: typeof row.category === "string" ? row.category : null,
+            }))
+            .filter((row) => row.name),
+        )
+      } catch {
+        if (!cancelled) setLibraryFeats([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pendingBackgroundsGrantFeats, pendingImport])
+
+  const backgroundFeatGaps = useMemo(() => {
+    if (!pendingImport || !pendingBackgroundsGrantFeats || libraryFeats === null) return []
+    return collectBackgroundFeatGrantGaps(pendingImport.content, libraryFeats)
+  }, [pendingImport, pendingBackgroundsGrantFeats, libraryFeats])
+
+  const backgroundFeatGateBlocking =
+    pendingBackgroundsGrantFeats && (libraryFeats === null || backgroundFeatGaps.length > 0)
+
+  const handleKeepFeatGrantsAsNarrative = () => {
+    if (!backgroundFeatGaps.length) return
+    const names = backgroundFeatGaps.map((gap) => gap.backgroundName)
+    setPendingImport((current) =>
+      current
+        ? { ...current, content: applyBackgroundFeatGrantNarrative(current.content, names) }
+        : null,
+    )
+  }
 
   const stagedReview = Boolean(
     pendingImport?.stagingSummary && pendingImport.stages.length > 0,
@@ -989,7 +1048,14 @@ export default function ImportPage() {
                 />
               </>
             )}
-            {reviewReadyToConfirm ? (
+            {backgroundFeatGaps.length > 0 ? (
+              <ImportBackgroundFeatGapPanel
+                gaps={backgroundFeatGaps}
+                onKeepAsNarrative={handleKeepFeatGrantsAsNarrative}
+                onCancelImport={clearPendingImport}
+              />
+            ) : null}
+            {reviewReadyToConfirm && !backgroundFeatGateBlocking ? (
               <ImportProposalPanel
                 proposals={pendingImport.proposals}
                 confirming={confirmingImport}

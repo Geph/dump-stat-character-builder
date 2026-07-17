@@ -319,6 +319,7 @@ export interface Feature {
   level: number
   name: string
   description: string
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   isChoice?: boolean
   choices?: FeatureChoice
   limitedUses?: UsesConfig | null
@@ -328,6 +329,8 @@ export interface Feature {
   companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
   /** Multiple stat blocks when one feature grants several forms (e.g. Druid Beast forms). */
   companion_stat_blocks?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate[] | null
+  /** Names of compendium Creatures this feature grants as companions (resolved from the creatures table). */
+  companion_creature_names?: string[] | null
   /** @deprecated Use limitedUses.type === "class_resource" */
   resourceId?: string | null
   /** Cleared when the user edits modifier wiring in the compendium after import. */
@@ -358,6 +361,7 @@ export interface ClassResourceRow {
   resource_key: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   uses: UsesConfig
   icon: string | null
   accent_color?: string | null
@@ -372,6 +376,7 @@ export interface ClassResourceRow {
 export interface Trait {
   name: string
   description: string
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   level?: number // level at which trait becomes available, defaults to 1
   isChoice?: boolean
   choices?: FeatureChoice
@@ -384,6 +389,7 @@ export interface Species {
   id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   speed: number | { [key: string]: number } // e.g. { walking: 30, climbing: 30 }
   size: string | null
   /** When the species offers a size choice (e.g. Small or Medium), the selectable sizes. */
@@ -497,6 +503,7 @@ export interface DndClass {
   id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   card_blurb: string | null
   /** Builder-facing difficulty tier: easy, medium, or hard. */
   complexity?: ClassComplexity | null
@@ -548,6 +555,7 @@ export interface Subclass {
   class_id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   features: Feature[]
   /** Subclass-granted spellcasting (e.g. Eldritch Knight, Arcane Trickster) — separate from the base class's own spellcasting. */
   spellcasting?: ClassSpellcastingConfig | null
@@ -668,6 +676,7 @@ export interface CustomAbility {
   id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   prerequisites: string | null
   characteristics: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   modifier_catalog?: import("@/lib/compendium/modifier-catalog").ModifierCatalogEntry[] | null
@@ -684,6 +693,8 @@ export interface CustomAbility {
   companion_stat_block?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate | null
   /** Multiple stat blocks when one ability grants several forms (e.g. Druid Beast forms). */
   companion_stat_blocks?: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate[] | null
+  /** Names of compendium Creatures this ability grants as companions (resolved from the creatures table). */
+  companion_creature_names?: string[] | null
   /** Psi-point empower options (KibblesTasty Psion psionic powers). */
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
@@ -728,6 +739,7 @@ export interface Background {
   id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   ability_bonuses: Record<string, number> | null
   skill_proficiencies: string[] | null
   tool_proficiencies: string[] | null
@@ -767,6 +779,7 @@ export interface Spell {
   concentration: boolean
   ritual: boolean
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   higher_levels: string | null
   classes: string[] | null
   /** Psi-point empower options parsed from homebrew psionic power text (KibblesTasty Psion, etc.). */
@@ -783,6 +796,7 @@ export interface Feat {
   id: string
   name: string
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   category: string | null  // "Origin" | "Dark Gift" | "General" | "Fighting Style" | "Epic Boon" | "Planar Pact"
   level_requirement: number | null
   prerequisite: string | null  // legacy field
@@ -808,6 +822,35 @@ export interface Feat {
   created_at: string
 }
 
+/**
+ * A creature or companion stat block browsable in the compendium. Feeds the character
+ * sheet Companions tab when linked from a feature, ability, or spell (e.g. Wild Shape
+ * Beast forms, Ranger companions, Find Familiar). The full stat block is stored as a
+ * CompanionStatBlockTemplate; `creature_type`, `size`, and `cr` are denormalized for
+ * browse/filtering.
+ */
+export interface Creature {
+  id: string
+  name: string
+  description: string | null
+  /** Beast, Fey, Undead, Construct, etc. */
+  creature_type: string | null
+  size: string | null
+  alignment: string | null
+  /** Challenge rating string, e.g. "1/4", "5". */
+  cr: string | null
+  /** Structured stat block resolved onto the character sheet Companions tab. */
+  stat_block: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
+  icon: string | null
+  accent_color?: string | null
+  card_image_url?: string | null
+  source: string
+  creator_url: string | null
+  enabled?: boolean
+  created_at: string
+}
+
 export interface Equipment {
   id: string
   name: string
@@ -817,6 +860,7 @@ export interface Equipment {
   weight: number | null
   properties: string[] | null
   description: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   // Armor-specific fields
   armor_class?: number | null
   stealth_disadvantage?: boolean

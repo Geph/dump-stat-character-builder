@@ -7,6 +7,7 @@ import { createModifierInstanceId, syncModifierRefs, type LinkedModifierInstance
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
+import { extractPrerequisiteFromDescription } from "@/lib/builder/choice-prerequisite"
 
 const FEATURE_OPTION_PICKER_CATALOG_ID = "cat_char_feature_option_picker"
 
@@ -79,45 +80,49 @@ function buildHexesResourcePicker(feature: Feature): LinkedModifierInstance {
   ])
 }
 
-function buildKnacksKnownPicker(feature: Feature): LinkedModifierInstance {
-  const instanceId = createModifierInstanceId()
-  return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
-    legacyFeatureOptionPickerCharacteristic({
-      id: modId("knacks_known"),
-      category: "Knack",
-      choiceCount: 1,
-      swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
-      swapRestType: /\bshort\s+rest\b/i.test(feature.description ?? "") ? "short" : "long",
-      resourceKey: "knacks_known",
-      optionsSource: "class_knacks",
-      label: "Knacks known (count scales on class table)",
-    }),
-  ])
-}
-
 function enrichKnacksFeature(feature: Feature): Feature {
-  if (!/^knacks?$/i.test(feature.name.trim())) return feature
+  const name = feature.name.trim()
+  const isKnackPool =
+    /^knacks?$/i.test(name) || /(?:warmage\s+)?tricks?$/i.test(name)
+  if (!isKnackPool) return feature
+  const category = /trick/i.test(name) ? (name || "Trick") : "Knack"
+  const resourceKey = /trick/i.test(name) ? "tricks_known" : "knacks_known"
   if ((feature.linkedModifiers ?? []).some((mod) =>
     mod.characteristics?.some((char) => {
       const legacy = char as { type?: string; resourceKey?: string | null }
-      return legacy.type === "feature_option_picker" && legacy.resourceKey === "knacks_known"
+      return (
+        legacy.type === "feature_option_picker" &&
+        (legacy.resourceKey === "knacks_known" || legacy.resourceKey === "tricks_known")
+      )
     }),
   )) {
     return feature
   }
+  const picker = charInstance(createModifierInstanceId(), FEATURE_OPTION_PICKER_CATALOG_ID, [
+    legacyFeatureOptionPickerCharacteristic({
+      id: modId(resourceKey),
+      category,
+      choiceCount: feature.choices?.count ?? 1,
+      swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
+      swapRestType: /\bshort\s+rest\b/i.test(feature.description ?? "") ? "short" : "long",
+      resourceKey,
+      optionsSource: "class_knacks",
+      label: `${category} options (count scales on class table)`,
+    }),
+  ])
   return syncModifierRefs({
     ...feature,
     isChoice: true,
     choices: {
-      category: "Knack",
-      count: 1,
-      options: [],
-      resourceKey: "knacks_known",
+      category,
+      count: feature.choices?.count ?? 1,
+      options: feature.choices?.options ?? [],
+      resourceKey,
       optionsSource: "class_knacks",
       swappableOnRest: /\breplace\b/i.test(feature.description ?? ""),
       swapRestType: /\bshort\s+rest\b/i.test(feature.description ?? "") ? "short" : "long",
     },
-    linkedModifiers: [...(feature.linkedModifiers ?? []), buildKnacksKnownPicker(feature)],
+    linkedModifiers: [...(feature.linkedModifiers ?? []), picker],
   })
 }
 
@@ -267,18 +272,36 @@ function isUpgradeSelectionFeature(feature: Feature): boolean {
   return /\b(?:select|choose)\s+an?\s+upgrade\b/i.test(feature.description ?? "")
 }
 
+function fillChoiceOptionPrerequisites(feature: Feature): Feature {
+  if (!feature.choices?.options?.length) return feature
+  let changed = false
+  const options = feature.choices.options.map((option) => {
+    if (option.prerequisite?.trim()) return option
+    const scraped = extractPrerequisiteFromDescription(option.description)
+    if (!scraped) return option
+    changed = true
+    return { ...option, prerequisite: scraped }
+  })
+  if (!changed) return feature
+  return {
+    ...feature,
+    choices: { ...feature.choices, options },
+  }
+}
+
 function enrichFeatureChoices(
   feature: Feature,
   content: ImportContent,
   className = "",
 ): Feature {
-  let next = enrichKnacksFeature(feature)
+  let next = fillChoiceOptionPrerequisites(feature)
+  next = enrichKnacksFeature(next)
   next = enrichUpgradesFeature(next)
   next = enrichBombFormulasFeature(next)
   next = enrichDiscoveriesFeature(next)
 
-  if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) {
-    const picker = buildChoiceOptionPicker(feature)
+  if (next.isChoice && (next.choices?.options?.length ?? 0) > 0) {
+    const picker = buildChoiceOptionPicker(next)
     if (picker) {
       next = syncModifierRefs({
         ...next,

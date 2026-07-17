@@ -39,11 +39,22 @@ export type CompanionStatBlockTemplate = {
   speed?: string | null
   abilityScores?: Partial<Record<AbilityScoreKey, CompanionAbilityRow>>
   resistances?: string[]
+  vulnerabilities?: string[]
   damageImmunities?: string[]
   conditionImmunities?: string[]
   senses?: string | null
   languages?: string | null
+  /** Skill proficiencies line, e.g. "Perception +5, Stealth +4". */
+  skills?: string | null
+  /** Saving throw bonuses line, e.g. "Con +2 plus PB". */
+  savingThrows?: string | null
+  /** Weapon/armor/tool proficiencies line. */
+  proficiencies?: string | null
+  /** Starting gear line. */
+  gear?: string | null
   cr?: string | null
+  /** Initiative modifier note, e.g. "+2 (12)". */
+  initiative?: string | null
   traits: CompanionNamedBlock[]
   actions: CompanionNamedBlock[]
   bonusActions?: CompanionNamedBlock[]

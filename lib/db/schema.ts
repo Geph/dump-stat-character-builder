@@ -16,6 +16,9 @@ const timestamps = {
   created_at: timestamp("created_at").defaultNow().notNull(),
 }
 const compendiumMeta = {
+  prerequisite_rules: json("prerequisite_rules").$type<
+    import("@/lib/import/content-schema").PrerequisiteRule[]
+  >(),
   icon: varchar("icon", { length: 255 }),
   accent_color: varchar("accent_color", { length: 32 }),
   card_image_url: mediumtext("card_image_url"),
@@ -98,6 +101,20 @@ export const tools = mysqlTable("tools", {
   subcategory: varchar("subcategory", { length: 64 }),
   check_ability: varchar("check_ability", { length: 32 }).notNull().default("intelligence"),
   expands_to: json("expands_to").$type<string[]>(),
+  ...compendiumMeta,
+})
+
+export const creatures = mysqlTable("creatures", {
+  id: id(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  creature_type: varchar("creature_type", { length: 64 }),
+  size: varchar("size", { length: 32 }),
+  alignment: varchar("alignment", { length: 64 }),
+  cr: varchar("cr", { length: 16 }),
+  stat_block: json("stat_block").$type<
+    import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
+  >(),
   ...compendiumMeta,
 })
 
@@ -319,6 +336,7 @@ export const tableMap = {
   backgrounds,
   spells,
   feats,
+  creatures,
   equipment,
   languages,
   tools,

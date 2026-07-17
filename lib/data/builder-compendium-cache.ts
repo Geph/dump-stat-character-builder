@@ -22,7 +22,7 @@ import type {
 } from "@/lib/types"
 
 const COMPENDIUM_META =
-  "icon, accent_color, card_image_url, source, enabled"
+  "prerequisite_rules, icon, accent_color, card_image_url, source, enabled"
 
 /** Columns omitted from every compendium fetch: created_at, creator_url. */
 export const BUILDER_CLASS_COLUMNS = [

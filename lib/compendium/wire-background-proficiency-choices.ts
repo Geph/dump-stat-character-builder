@@ -1,9 +1,11 @@
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
 import type { ToolChoicePool } from "@/lib/compendium/tool-options"
 
 const TOOL_CATALOG_ID = "cat_char_tool_proficiencies"
 const LANG_CATALOG_ID = "cat_char_languages"
+const SKILL_CATALOG_ID = "cat_char_skills"
 
 const WORD_COUNTS: Record<string, number> = {
   one: 1,
@@ -24,9 +26,18 @@ export type ParsedLanguageChoice = {
   label: string
 }
 
+export type ParsedSkillChoice = {
+  count: number
+  label: string
+}
+
 /** True when a proficiency string is a pick instruction, not a concrete grant. */
 export function isBackgroundProficiencyChoicePhrase(text: string): boolean {
-  return Boolean(parseBackgroundToolChoicePhrase(text) || parseBackgroundLanguageChoicePhrase(text))
+  return Boolean(
+    parseBackgroundToolChoicePhrase(text) ||
+      parseBackgroundLanguageChoicePhrase(text) ||
+      parseBackgroundSkillChoicePhrase(text),
+  )
 }
 
 export function parseBackgroundToolChoicePhrase(text: string): ParsedToolChoice | null {
@@ -93,6 +104,45 @@ export function parseBackgroundLanguageChoicePhrase(text: string): ParsedLanguag
   return null
 }
 
+const SKILL_CHOICE_PHRASE_RE =
+  /\b(?:choose|select|gain proficiency in)?\s*(one|two|three|four|a|\d+)\s+(?:additional\s+)?skills?\s+of\s+your\s+choice\b/i
+
+const SKILL_NAMES_BY_LENGTH = [...SKILL_NAMES].sort((a, b) => b.length - a.length)
+
+/** Parse unrestricted background skill choices, including faction-table fallback wording. */
+export function parseBackgroundSkillChoicePhrase(text: string): ParsedSkillChoice | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+
+  const match = trimmed.match(SKILL_CHOICE_PHRASE_RE)
+  if (!match) return null
+
+  const raw = match[1].toLowerCase()
+  const count = WORD_COUNTS[raw] ?? Number.parseInt(raw, 10)
+  if (!Number.isFinite(count) || count < 1) return null
+  return {
+    count,
+    label: `Choose ${count} skill${count === 1 ? "" : "s"}`,
+  }
+}
+
+/**
+ * When a single skill_proficiencies entry mixes fixed skills with a choice fallback
+ * (e.g. "Arcana, the skill associated with your faction …, or one skill of your choice"),
+ * recover the concrete skill names that appear before the choice phrase.
+ */
+export function extractFixedSkillsFromMixedChoiceEntry(text: string): string[] {
+  const match = text.match(SKILL_CHOICE_PHRASE_RE)
+  if (!match || match.index == null) return []
+  const before = text.slice(0, match.index)
+  const found: string[] = []
+  for (const skill of SKILL_NAMES_BY_LENGTH) {
+    const re = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i")
+    if (re.test(before) && !found.includes(skill)) found.push(skill)
+  }
+  return found
+}
+
 function toolChoiceInstance(
   key: string,
   choice: ParsedToolChoice,
@@ -125,11 +175,36 @@ function languageChoiceInstance(
   ])
 }
 
+function skillChoiceInstance(
+  key: string,
+  choice: ParsedSkillChoice,
+): LinkedModifierInstance {
+  return charInstance(`modinst_bg_skill_${key}`, SKILL_CATALOG_ID, [
+    {
+      id: modId(`bg_skill_${key}`),
+      type: "skills",
+      entries: [],
+      allowAnySkill: true,
+      choiceCount: choice.count,
+      label: choice.label,
+    },
+  ])
+}
+
 /**
- * Convert "choose one artisan's tools" / "two languages of your choice" strings into
+ * Convert skill/tool/language choice phrases into
  * feature linkedModifiers, and strip those phrases from the proficiency arrays.
  */
 export function wireBackgroundProficiencyChoices(row: Record<string, unknown>): Record<string, unknown> {
+  const skillList = [
+    ...((row.skill_proficiencies as string[] | null | undefined) ?? []),
+  ]
+  // Some extractors preserve a faction table but omit its explicit fallback skill pick.
+  // Treat "one skill of your choice" in background prose as the same unrestricted choice.
+  const descriptionSkillChoice =
+    typeof row.description === "string"
+      ? parseBackgroundSkillChoicePhrase(row.description)
+      : null
   const toolList = [
     ...((row.tool_proficiencies as string[] | null | undefined) ?? []),
     ...((((row.proficiencies as { tools?: string[] } | null)?.tools) ?? []) as string[]),
@@ -139,10 +214,38 @@ export function wireBackgroundProficiencyChoices(row: Record<string, unknown>): 
   ]
 
   const choiceMods: LinkedModifierInstance[] = []
+  const fixedSkills: string[] = []
   const fixedTools: string[] = []
   const fixedLanguages: string[] = []
+  const seenSkillFp = new Set<string>()
   const seenToolFp = new Set<string>()
   const seenLangFp = new Set<string>()
+
+  for (const entry of skillList) {
+    const choice = parseBackgroundSkillChoicePhrase(entry)
+    if (choice) {
+      for (const skill of extractFixedSkillsFromMixedChoiceEntry(entry)) {
+        if (!fixedSkills.includes(skill)) fixedSkills.push(skill)
+      }
+      const fp = `skill:${choice.count}`
+      if (!seenSkillFp.has(fp)) {
+        seenSkillFp.add(fp)
+        choiceMods.push(skillChoiceInstance(`choice_${choice.count}`, choice))
+      }
+      continue
+    }
+    const trimmed = entry.trim()
+    if (trimmed && !fixedSkills.includes(trimmed)) fixedSkills.push(trimmed)
+  }
+  if (descriptionSkillChoice) {
+    const fp = `skill:${descriptionSkillChoice.count}`
+    if (!seenSkillFp.has(fp)) {
+      seenSkillFp.add(fp)
+      choiceMods.push(
+        skillChoiceInstance(`choice_${descriptionSkillChoice.count}`, descriptionSkillChoice),
+      )
+    }
+  }
 
   for (const entry of toolList) {
     const choice = parseBackgroundToolChoicePhrase(entry)
@@ -191,6 +294,7 @@ export function wireBackgroundProficiencyChoices(row: Record<string, unknown>): 
   const prevProf = (row.proficiencies as Record<string, unknown> | null | undefined) ?? {}
   return {
     ...row,
+    skill_proficiencies: fixedSkills.length ? fixedSkills : null,
     tool_proficiencies: fixedTools.length ? fixedTools : null,
     proficiencies: {
       ...prevProf,

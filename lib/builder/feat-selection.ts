@@ -93,22 +93,26 @@ export function isFeatEligibleForCategories(
   categories: string[],
   milestoneLevel: number,
   context: FeatSlotContext,
+  alsoFeatNames: string[] = [],
 ): boolean {
   const normalizedCategories = new Set(categories.map(normalizeFeatCategory))
   const category = normalizeFeatCategory(feat.category)
   const isOriginSlot = [...normalizedCategories].some((entry) => isOriginSelectableCategory(entry))
+  const nameAllowed = alsoFeatNames.some(
+    (name) => name.trim().toLowerCase() === feat.name.trim().toLowerCase(),
+  )
 
   // Origin slots accept Origin + Dark Gift; Dark Gift is not a General/FS/etc. pick.
   const categoryMatches =
     normalizedCategories.has(category) ||
     (isOriginSlot && isOriginSelectableCategory(category))
-  if (!categoryMatches) return false
+  if (!categoryMatches && !nameAllowed) return false
 
   const taken = new Set(
     context.ownedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
-  if (isOriginSelectableCategory(category) && !isOriginSlot) return false
+  if (isOriginSelectableCategory(category) && !isOriginSlot && !nameAllowed) return false
   if (!feat.repeatable && taken.has(feat.id)) return false
   if (hasExclusiveCategoryConflict(feat, context)) return false
 
@@ -119,10 +123,11 @@ export function isFeatEligibleForCategories(
       : isOriginSelectableCategory(category) ||
           category === "Fighting Style" ||
           category === "Planar Pact" ||
+          nameAllowed ||
           slotUsesCatalogFeatPicks(categories.map(normalizeFeatCategory))
         ? 1
         : 4)
-  if (minLevel > context.totalLevel || minLevel > milestoneLevel) return false
+  if (minLevel > context.totalLevel || (minLevel > milestoneLevel && !nameAllowed)) return false
 
   if (feat.prerequisite_class_ids?.length) {
     if (!feat.prerequisite_class_ids.some((id) => context.classIds.includes(id))) return false

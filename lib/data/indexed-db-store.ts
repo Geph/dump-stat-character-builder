@@ -8,8 +8,8 @@ import {
 } from "@/lib/character/character-classes"
 
 const DB_NAME = "dump-stat"
-/** Bump when COMPENDIUM_TABLES gains a new store (v3: tools, v4: repair pass). */
-const DB_VERSION = 4
+/** Bump when COMPENDIUM_TABLES gains a new store (v3: tools, v4: repair pass, v5: creatures). */
+const DB_VERSION = 5
 
 const ALL_STORES = [...COMPENDIUM_TABLES, "characters"] as const
 type StoreName = CompendiumTable | "characters"

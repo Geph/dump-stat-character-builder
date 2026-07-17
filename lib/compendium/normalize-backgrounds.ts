@@ -9,7 +9,7 @@ import {
   normalizeBackgroundAbilityBonuses,
   parseBackgroundAbilityScoresLine,
 } from "@/lib/compendium/background-utils"
-import { parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/background-origin-feat"
+import { parseBackgroundFeatGrantChoice } from "@/lib/compendium/background-origin-feat"
 import { grantFeatCharacteristic, GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
@@ -37,20 +37,25 @@ function parseStoredAbilityBonuses(raw: unknown): Record<string, number> {
 }
 
 function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<string, unknown> {
-  const category = parseBackgroundFeatGrantChoiceCategory(
+  const parsed = parseBackgroundFeatGrantChoice(
     typeof row.feat_granted === "string" ? row.feat_granted : null,
   )
-  if (!category) return row
+  if (!parsed) return row
 
   const feature = (row.feature ?? null) as unknown as Record<string, unknown> | null
   const linked = (feature?.linkedModifiers ?? feature?.linked_modifiers) as unknown[] | undefined
   if (linked?.length) return row
 
+  const characteristic = grantFeatCharacteristic([parsed.category as FeatPickCategory], 1)
+  if (parsed.alsoFeatNames?.length) {
+    characteristic.alsoFeatNames = [...parsed.alsoFeatNames]
+  }
+
   const linkedModifiers = [
     {
       instanceId: createModifierInstanceId(),
       catalogRefId: GRANT_FEAT_CATALOG_ID,
-      characteristics: [grantFeatCharacteristic([category as FeatPickCategory], 1)],
+      characteristics: [characteristic],
     },
   ]
 

@@ -228,6 +228,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "extra_turn", label: "Extra Turn" },
   { value: "grant_feat", label: "Gain a Feat" },
   {
+    value: "grant_creature",
+    label: "Grant Creature / Companion",
+    hint: "Adds a Creatures & Companions entry to the character sheet Companions tab (by name)",
+  },
+  {
     value: "equipment_and_magic_items",
     label: "Equipment & Magic Items",
     hint: "Create mundane gear or replicate magic item plans (Artificer)",
@@ -1049,6 +1054,29 @@ export interface GrantFeatCharacteristic extends CharacteristicModifierBase {
   featCategories: string[]
   /** How many feat choices this modifier grants (default 1). */
   count: number
+  /**
+   * Named feats also eligible for this pick (e.g. "Survivor" when the grant is
+   * "Survivor or a Dark Gift feat of your choice").
+   */
+  alsoFeatNames?: string[]
+}
+
+/**
+ * Grants one or more Creatures & Companions entries on the character sheet.
+ * Names resolve against the creatures table (exact / case-insensitive match).
+ * When choiceOptions is set, the player picks `count` from that list; otherwise
+ * all creatureNames are granted.
+ */
+export interface GrantCreatureCharacteristic extends CharacteristicModifierBase {
+  type: "grant_creature"
+  /** Creature names from the Creatures & Companions compendium. */
+  creatureNames: string[]
+  /** When set, player picks from these (subset of or override for creatureNames). */
+  choiceOptions?: string[]
+  /** How many creatures to pick when choiceOptions is set (default 1). */
+  count?: number
+  /** When true, the form uses polymorph rules (Wild Shape). */
+  polymorph?: boolean
 }
 
 export type EquipmentMagicItemsMode = "create_mundane" | "replicate_magic_item"
@@ -1121,6 +1149,7 @@ export type CharacteristicModifier =
   | SpellcastingAbilityCharacteristic
   | UsesCharacteristic
   | GrantFeatCharacteristic
+  | GrantCreatureCharacteristic
   | EquipmentAndMagicItemsCharacteristic
   | CatalogOptionCharacteristic
 
@@ -1283,6 +1312,8 @@ export function createCharacteristicModifier(
       return { id, type, firstRoundOnly: true, turnCount: 1 }
     case "grant_feat":
       return { id, type, featCategories: ["General"], count: 1 }
+    case "grant_creature":
+      return { id, type, creatureNames: [], count: 1 }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
     case "craftable_items":
