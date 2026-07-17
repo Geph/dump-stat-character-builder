@@ -213,18 +213,25 @@ describe("SRD creatures seed fixture", () => {
   run("round-trips every record in the SRD creatures fixture", () => {
     const doc = loadCreatureImportDocumentFromFile(fixturePath!)
     expect(doc.schema_version).toBe("2.0")
-    expect(doc.creatures.length).toBe(83)
+    expect(doc.creatures.length).toBe(84)
     for (const creature of doc.creatures) {
       expect(() => parseCreatureImportV2(creature)).not.toThrow()
       const template = mapCreatureImportV2ToTemplate(creature)
       expect(template.name).toBe(creature.name)
-      expect(template.category).toBe("creature")
-      expect(template.cr).toBeTruthy()
+      if (creature.category === "companion") {
+        expect(template.category).toBe("companion")
+        expect(template.scaling).toBeTruthy()
+      } else {
+        expect(template.category).toBe("creature")
+        expect(template.cr).toBeTruthy()
+      }
     }
     const rows = buildCreaturePersistRows(doc.creatures, "D&D 5.5e SRD")
-    expect(rows).toHaveLength(83)
+    expect(rows).toHaveLength(84)
     expect(rows.every((row) => row.import_payload != null)).toBe(true)
-    expect(rows.every((row) => row.category === "creature")).toBe(true)
+    expect(
+      rows.every((row) => row.category === "creature" || row.category === "companion"),
+    ).toBe(true)
     expect(rows.find((row) => row.name === "Wolf")?.stat_block.ac.parts).toEqual([
       { type: "fixed", value: 12 },
     ])

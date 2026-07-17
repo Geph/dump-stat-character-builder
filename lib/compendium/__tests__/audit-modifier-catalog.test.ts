@@ -9,6 +9,7 @@ describe("audit-modifier-catalog", () => {
       [
         "d20_test_reaction",
         "damage_halving_reaction",
+        "grant_creature",
         "grant_feat",
         "healing_dice_pool",
         "on_creature_death_trigger",

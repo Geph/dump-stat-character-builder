@@ -5526,6 +5526,125 @@
       "description": "Octopus\nSmall Beast, Unaligned\nAC 12 Initiative +2 (12)\nHP 3 (1d6)\nSpeed 5 ft., Swim 30 ft.\nTraits\nCompression. The octopus can move through a space as narrow as 1 inch without expending extra movement to do so. Water Breathing. The octopus can breathe only underwater.\nActions\nTentacles. Melee Attack Roll: +4, reach 5 ft. Hit: 1 Bludgeoning damage.\nReactions\nInk Cloud (1/Day). Trigger: A creature ends its turn within 5 feet of the octopus while underwater. Response: The octopus releases ink that fills a 5-foot Cube centered on itself, and the octopus moves up to its Swim Speed. The Cube is Heavily Obscured for 1 minute or until a strong current or similar effect disperses the ink."
     },
     {
+      "name": "Otherworldly Steed",
+      "creature_type": "Celestial, Fey, or Fiend (Your Choice)",
+      "size": "Large",
+      "alignment": "Neutral",
+      "category": "companion",
+      "cr": null,
+      "xp": null,
+      "proficiency_bonus": null,
+      "scaling": {
+        "scales_with": "the spell's level",
+        "notes": "Summoned by the Find Steed spell. AC equals 10 + 1 per spell level. HP equals 5 + 10 per spell level (the steed has a number of Hit Dice [d10s] equal to the spell's level). It can fly if the spell's level is 4+. PB equals your Proficiency Bonus; attack bonus equals your spell attack modifier; save DCs equal your spell save DC."
+      },
+      "ac": "10 + 1 per spell level",
+      "ac_note": null,
+      "initiative_modifier": "+1",
+      "initiative_passive": 11,
+      "hp": "5 + 10 per spell level",
+      "hit_dice": "d10 per spell level",
+      "speed": {
+        "walk": 60,
+        "fly": 60,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": "(Fly requires level 4+ spell)"
+      },
+      "ability_scores": {
+        "str": {
+          "score": 18,
+          "mod": "+4",
+          "save": "+4"
+        },
+        "dex": {
+          "score": 12,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "con": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "int": {
+          "score": 6,
+          "mod": "-2",
+          "save": "-2"
+        },
+        "wis": {
+          "score": 12,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "cha": {
+          "score": 8,
+          "mod": "-1",
+          "save": "-1"
+        }
+      },
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": null,
+      "damage_immunities": null,
+      "condition_immunities": null,
+      "vulnerabilities": null,
+      "senses": {
+        "darkvision": null,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 11
+      },
+      "languages": "Telepathy 1 mile (works only with you)",
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Life Bond",
+          "tag": null,
+          "text": "When you regain Hit Points from a level 1+ spell, the steed regains the same number of Hit Points if you're within 5 feet of it."
+        }
+      ],
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Otherworldly Slam",
+          "tag": null,
+          "text": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 5 ft. Hit: 1d8 plus the spell's level of Radiant (Celestial), Psychic (Fey), or Necrotic (Fiend) damage."
+        }
+      ],
+      "bonus_actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Fell Glare",
+          "tag": "Fiend Only; Recharges after a Long Rest",
+          "text": "Wisdom Saving Throw: DC equals your spell save DC, one creature within 60 feet the steed can see. Failure: The target has the Frightened condition until the end of your next turn."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Fey Step",
+          "tag": "Fey Only; Recharges after a Long Rest",
+          "text": "The steed teleports, along with its rider, to an unoccupied space of your choice up to 60 feet away from itself."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Healing Touch",
+          "tag": "Celestial Only; Recharges after a Long Rest",
+          "text": "One creature within 5 feet of the steed regains a number of Hit Points equal to 2d8 plus the spell's level."
+        }
+      ],
+      "reactions": null,
+      "legendary_actions": null,
+      "description": "Otherworldly Steed\nLarge Celestial, Fey, or Fiend (Your Choice), Neutral\nAC 10 + 1 per spell level\nHP 5 + 10 per spell level (the steed has a number of Hit Dice [d10s] equal to the spell's level)\nSpeed 60 ft., Fly 60 ft. (requires level 4+ spell)\nTraits\nLife Bond. When you regain Hit Points from a level 1+ spell, the steed regains the same number of Hit Points if you're within 5 feet of it.\nActions\nOtherworldly Slam. Melee Attack Roll: Bonus equals your spell attack modifier, reach 5 ft. Hit: 1d8 plus the spell's level of Radiant (Celestial), Psychic (Fey), or Necrotic (Fiend) damage.\nBonus Actions\nFell Glare (Fiend Only; Recharges after a Long Rest). Wisdom Saving Throw: DC equals your spell save DC, one creature within 60 feet the steed can see. Failure: The target has the Frightened condition until the end of your next turn.\nFey Step (Fey Only; Recharges after a Long Rest). The steed teleports, along with its rider, to an unoccupied space of your choice up to 60 feet away from itself.\nHealing Touch (Celestial Only; Recharges after a Long Rest). One creature within 5 feet of the steed regains a number of Hit Points equal to 2d8 plus the spell's level."
+    },
+    {
       "name": "Owl",
       "creature_type": "Beast",
       "size": "Tiny",
