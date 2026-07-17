@@ -1,8 +1,8 @@
 {
-  "version": "5.2.3",
+  "version": "5.2.5",
   "source": "downfallx/dnd-5e-srd-markdown",
   "license": "CC-BY-4.0 (SRD 5.2.1 by Wizards of the Coast)",
-  "generatedAt": "2026-07-06T05:05:11.989Z",
+  "generatedAt": "2026-07-17T02:21:00.000Z",
   "counts": {
     "species": 9,
     "backgrounds": 4,
@@ -11,6 +11,7 @@
     "spells": 339,
     "feats": 17,
     "equipment": 133,
-    "magicItems": 266
+    "magicItems": 266,
+    "creatures": 83
   }
 }

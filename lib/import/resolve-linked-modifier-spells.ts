@@ -1,4 +1,5 @@
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import type { NamedSourceRow } from "@/lib/compendium/prefer-same-source"
 import { resolveSpellNamesToIds } from "@/lib/import/subclass-spell-table"
 
 export const IMPORT_SPELL_NAME_PREFIX = "import_spell_name:"
@@ -18,7 +19,8 @@ function spellNameFromPlaceholder(spellId: string): string {
 /** Resolve import spell-name placeholders on linked modifiers to catalog spell IDs. */
 export function resolveLinkedModifierSpells(
   linkedModifiers: LinkedModifierInstance[] | undefined,
-  catalog: { id: string; name: string }[],
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
 ): LinkedModifierInstance[] | undefined {
   if (!linkedModifiers?.length || !catalog.length) return linkedModifiers
 
@@ -30,7 +32,7 @@ export function resolveLinkedModifierSpells(
       const spells = (char.spells ?? []).map((entry) => {
         if (!entry.spellId || !isSpellNamePlaceholder(entry.spellId)) return entry
         const name = spellNameFromPlaceholder(entry.spellId)
-        const { resolved } = resolveSpellNamesToIds([name], catalog)
+        const { resolved } = resolveSpellNamesToIds([name], catalog, preferredSource)
         const match = resolved[0]
         if (!match) return entry
         return { ...entry, spellId: match.spellId }

@@ -22,11 +22,25 @@ export type CompanionAbilityRow = {
   score: number
   modifier: number
   save: number
+  /**
+   * When set (companion formula saves like "+2 plus PB"), resolve against the owner
+   * at sheet time; `save` holds the fixed component for fallback display.
+   */
+  saveFormula?: CompanionScaledValue | null
+  /** Original mod string from import (e.g. "+3"). */
+  modLabel?: string | null
+  /** Original save string from import (e.g. "+2 plus PB"). */
+  saveLabel?: string | null
 }
 
 export type CompanionNamedBlock = {
   name: string
   description: string
+  /** Owner class level gate (companions / retainers). */
+  unlockLevel?: number | null
+  unlockLevelLabel?: string | null
+  /** Parenthetical tag: "2 Ferocity", "Recharge 6", "1/Day", "Signature Attack". */
+  tag?: string | null
 }
 
 /** Parsed companion stat block (template — resolved at sheet time). */
@@ -59,6 +73,7 @@ export type CompanionStatBlockTemplate = {
   actions: CompanionNamedBlock[]
   bonusActions?: CompanionNamedBlock[]
   reactions?: CompanionNamedBlock[]
+  legendaryActions?: CompanionNamedBlock[]
   /**
    * A "polymorph" form (e.g. Druid Wild Shape) where the owner becomes the
    * creature instead of commanding a separate companion. When set, the owner
@@ -66,6 +81,16 @@ export type CompanionStatBlockTemplate = {
    * skill/saving throw proficiencies (using the higher modifier).
    */
   polymorph?: boolean
+  /** Import schema v2 category — creature (fixed) vs companion (owner-scaled). */
+  category?: "creature" | "companion" | null
+  /** Companion scaling metadata from import schema v2. */
+  scaling?: { scales_with: string; notes: string } | null
+  /** XP for fixed-CR creatures; null for companions. */
+  xp?: number | null
+  /** Printed PB for creatures (e.g. "+2"); companions use owner PB via scaling. */
+  proficiencyBonusLabel?: string | null
+  /** Parenthetical AC qualifier (natural armor, shield). */
+  acNote?: string | null
 }
 
 export type CompanionSource = {
@@ -226,8 +251,9 @@ function resolvePolymorphAbilityScores(
   for (const key of PHYSICAL_ABILITIES) {
     const beast = template.abilityScores?.[key]
     if (!beast) continue
+    const resolvedBeast = resolveAbilityRow(beast, ctx)
     const owner = ownerRow(key)
-    result[key] = { ...beast, save: Math.max(beast.save, owner.save) }
+    result[key] = { ...resolvedBeast, save: Math.max(resolvedBeast.save, owner.save) }
   }
 
   // Mental abilities: retained from the owner.
@@ -235,6 +261,30 @@ function resolvePolymorphAbilityScores(
     result[key] = ownerRow(key)
   }
 
+  return result
+}
+
+function resolveAbilityRow(
+  row: CompanionAbilityRow,
+  ctx: CompanionResolveContext,
+): CompanionAbilityRow {
+  if (!row.saveFormula) return row
+  return {
+    ...row,
+    save: resolveCompanionScaledValue(row.saveFormula, ctx),
+  }
+}
+
+function resolveAbilityScores(
+  scores: Partial<Record<AbilityScoreKey, CompanionAbilityRow>> | undefined,
+  ctx: CompanionResolveContext,
+): Partial<Record<AbilityScoreKey, CompanionAbilityRow>> | undefined {
+  if (!scores) return undefined
+  const result: Partial<Record<AbilityScoreKey, CompanionAbilityRow>> = {}
+  for (const key of Object.keys(scores) as AbilityScoreKey[]) {
+    const row = scores[key]
+    if (row) result[key] = resolveAbilityRow(row, ctx)
+  }
   return result
 }
 
@@ -261,7 +311,7 @@ export function resolveCompanion(
     polymorph,
     abilityScores: polymorph
       ? resolvePolymorphAbilityScores(template, ctx)
-      : template.abilityScores,
+      : resolveAbilityScores(template.abilityScores, ctx),
   }
 }
 

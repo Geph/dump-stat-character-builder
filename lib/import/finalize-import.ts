@@ -23,6 +23,7 @@ import {
 } from "@/lib/import/import-material-source"
 import { persistImportedContent } from "@/lib/import/persist-import-content"
 import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
+import type { PersistImportOptions } from "@/lib/import/persist-import-options"
 
 export async function finalizeImportedContent(
   pendingContent: ImportContent,
@@ -32,6 +33,7 @@ export async function finalizeImportedContent(
   collisions: ImportCollision[] = [],
   collisionResolutionMap: ImportCollisionResolutionMap = {},
   cardArtUrlMap: ImportCardArtUrlMap = {},
+  persistOptions?: PersistImportOptions,
 ) {
   return finalizeImportWithPersist(
     pendingContent,
@@ -42,6 +44,7 @@ export async function finalizeImportedContent(
     collisions,
     collisionResolutionMap,
     cardArtUrlMap,
+    persistOptions,
   )
 }
 

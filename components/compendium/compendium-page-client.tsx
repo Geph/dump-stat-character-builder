@@ -1973,6 +1973,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                       ]
                     : activeTab === "creatures"
                       ? [
+                          ...((selectedItem as Creature).category === "companion"
+                            ? [{ label: "Companion", emphasis: true }]
+                            : []),
                           ...((selectedItem as Creature).cr
                             ? [{ label: `CR ${(selectedItem as Creature).cr}`, emphasis: true }]
                             : []),

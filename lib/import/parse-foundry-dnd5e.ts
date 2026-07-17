@@ -21,15 +21,18 @@ import {
   type FoundryParseResult,
 } from "@/lib/import/foundry-types"
 import { cleanFoundryHtml } from "@/lib/import/foundry-html"
+import { mapFoundryNpcActorToCreature } from "@/lib/import/map-foundry-npc-creature"
+import type { CreatureImportV2 } from "@/lib/import/creature-import-v2-schema"
 
 export { cleanFoundryHtml } from "@/lib/import/foundry-html"
 
 /**
- * Parses Foundry VTT dnd5e system item exports into the internal ImportContent shape.
+ * Parses Foundry VTT dnd5e system item and NPC actor exports into ImportContent.
  *
  * Supports the "Export Data" JSON Foundry produces for an item, an array of such
- * items, a `{ items: [...] }` wrapper (actor / pack exports), an object map of
- * items (compendium dumps), and newline-delimited JSON (NeDB `.db` packs).
+ * items, NPC actors (creatures / companions), a `{ items: [...] }` wrapper
+ * (actor / pack exports), an object map of items (compendium dumps), and
+ * newline-delimited JSON (NeDB `.db` packs).
  *
  * Format reference: https://github.com/foundryvtt/dnd5e
  */
@@ -728,7 +731,11 @@ function collectFoundryDocuments(
   if (isFoundryActorShape(value)) {
     actors.push(value)
     const record = asRecord(value)
-    if (Array.isArray(record.items)) {
+    const actorType = asString(record.type).toLowerCase()
+    // NPC embedded items become creature traits/actions — do not also import them
+    // as standalone spells/feats/equipment. Character (and other) actors still
+    // contribute nested items to the item import path.
+    if (actorType !== "npc" && Array.isArray(record.items)) {
       for (const entry of record.items) collectFoundryDocuments(entry, items, actors)
     }
     return
@@ -772,8 +779,16 @@ function coerceFoundryDocuments(raw: string): CoercedFoundryDocuments {
       if (!lineTrimmed || lineTrimmed === "{}") continue
       try {
         const parsed = JSON.parse(lineTrimmed)
-        if (isFoundryActorShape(parsed)) actors.push(parsed)
-        else if (isFoundryItemShape(parsed)) items.push(parsed)
+        if (isFoundryActorShape(parsed)) {
+          actors.push(parsed)
+          const record = asRecord(parsed)
+          const actorType = asString(record.type).toLowerCase()
+          if (actorType !== "npc" && Array.isArray(record.items)) {
+            for (const entry of record.items) collectFoundryDocuments(entry, items, actors)
+          }
+        } else if (isFoundryItemShape(parsed)) {
+          items.push(parsed)
+        }
       } catch {
         // skip malformed line
       }
@@ -783,19 +798,51 @@ function coerceFoundryDocuments(raw: string): CoercedFoundryDocuments {
   return { items, actors }
 }
 
-function coerceFoundryItems(raw: string): FoundryItem[] {
-  return coerceFoundryDocuments(raw).items
-}
-
-/** True when the raw text looks like a Foundry VTT dnd5e item export. */
+/** True when the raw text looks like a Foundry VTT dnd5e item or NPC export. */
 export function isFoundryDnd5eJson(raw: string): boolean {
-  return coerceFoundryItems(raw).length > 0
+  const { items, actors } = coerceFoundryDocuments(raw)
+  if (items.length > 0) return true
+  return actors.some((actor) => asString(actor.type).toLowerCase() === "npc")
 }
 
-/** Map a list of Foundry items into ImportContent (no DB access). */
+function mapFoundryNpcActors(
+  actors: FoundryItem[],
+  meta: FoundryImportMeta,
+): CreatureImportV2[] {
+  const creatures: CreatureImportV2[] = []
+  const skippedActors: string[] = []
+
+  for (const actor of actors) {
+    const type = asString(actor.type).toLowerCase()
+    if (type === "npc") {
+      const mapped = mapFoundryNpcActorToCreature(actor)
+      if (mapped) {
+        creatures.push(mapped)
+        meta.sourceLabel = mergeSourceLabels(meta.sourceLabel, mapped.source ?? "")
+      } else {
+        skippedActors.push(asString(actor.name) || "Unnamed NPC")
+      }
+      continue
+    }
+    skippedActors.push(asString(actor.name) || `Unnamed ${type || "actor"}`)
+  }
+
+  if (skippedActors.length) {
+    recordSkippedDocuments(
+      meta,
+      "Non-NPC actors are not imported (character/vehicle/group sheets)",
+      skippedActors,
+    )
+  }
+
+  return creatures
+}
+
+/** Map a list of Foundry items (and optional NPC actors) into ImportContent. */
 export function foundryItemsToImportContent(
   items: FoundryItem[],
   meta: FoundryImportMeta = emptyFoundryImportMeta(),
+  actors: FoundryItem[] = [],
 ): ImportContent | null {
   const spells: SpellImport[] = []
   const feats: FeatImport[] = []
@@ -806,6 +853,7 @@ export function foundryItemsToImportContent(
   const backgrounds: BackgroundImport[] = []
   const orphanClassFeatures: ClassImport["features"] = []
   const orphanSubclassFeatures: SubclassImport["features"] = []
+  const creatures = mapFoundryNpcActors(actors, meta)
 
   const uuidIndex = buildFoundryUuidIndex(items)
 
@@ -924,7 +972,8 @@ export function foundryItemsToImportContent(
     classes.length +
     subclasses.length +
     species.length +
-    backgrounds.length
+    backgrounds.length +
+    creatures.length
 
   meta.mapped.items = total
   if (total === 0) return null
@@ -937,11 +986,12 @@ export function foundryItemsToImportContent(
   if (subclasses.length) content.subclasses = subclasses
   if (species.length) content.species = species
   if (backgrounds.length) content.backgrounds = backgrounds
+  if (creatures.length) content.creatures = creatures
 
   return combineImportContents([content])
 }
 
-/** Full Foundry parse with manifest/binary detection and actor skip reporting. */
+/** Full Foundry parse with manifest/binary detection and actor reporting. */
 export function parseFoundryInput(raw: string): FoundryParseResult {
   const trimmed = raw.trim()
   if (!trimmed) return { kind: "not_foundry" }
@@ -958,32 +1008,23 @@ export function parseFoundryInput(raw: string): FoundryParseResult {
   }
 
   const { items, actors } = coerceFoundryDocuments(trimmed)
+  if (!items.length && !actors.length) return { kind: "not_foundry" }
+
   const meta = emptyFoundryImportMeta()
-
-  if (actors.length) {
-    recordSkippedDocuments(
-      meta,
-      "Actors are not imported (compendium items only)",
-      actors.map((actor) => asString(actor.name) || "Unnamed actor"),
-    )
-  }
-
-  if (!items.length) {
-    if (actors.length) {
+  const content = foundryItemsToImportContent(items, meta, actors)
+  if (!content) {
+    const hasOnlySkippedActors =
+      actors.length > 0 && actors.every((actor) => asString(actor.type).toLowerCase() !== "npc")
+    if (hasOnlySkippedActors) {
       return buildFoundryNoImportableResult(
         meta,
-        "Foundry actor data detected. Export compendium items as JSON instead of actor sheets.",
+        "Foundry character/vehicle actor data detected. Export NPC actors or compendium items as JSON.",
       )
     }
-    return { kind: "not_foundry" }
-  }
-
-  const content = foundryItemsToImportContent(items, meta)
-  if (!content) {
-    if (actors.length) {
-      return buildFoundryNoImportableResult(meta, "Only actor documents were found — no compendium items to import.")
-    }
-    return { kind: "not_foundry" }
+    return buildFoundryNoImportableResult(
+      meta,
+      "No importable Foundry items or NPC creatures were found in this export.",
+    )
   }
 
   return {

@@ -59,6 +59,9 @@ type ClipboardImportPanelProps = {
   /** Optional existing subclass to match in the extraction prompt. */
   subclassMatch: ImportSubclassMatchValue | null
   onSubclassMatchChange: (value: ImportSubclassMatchValue | null) => void
+  /** When importing classes that replace SRD spells/feats from the same source. */
+  preferSameSourceReplacements: boolean
+  onPreferSameSourceReplacementsChange: (value: boolean) => void
   sourceText: string
   onSourceTextChange: (value: string) => void
   jsonText: string
@@ -91,6 +94,8 @@ export function ClipboardImportPanel({
   onClassResourceLabelsChange,
   subclassMatch,
   onSubclassMatchChange,
+  preferSameSourceReplacements,
+  onPreferSameSourceReplacementsChange,
   sourceText,
   onSourceTextChange,
   jsonText,
@@ -233,6 +238,23 @@ export function ClipboardImportPanel({
                 focusRingClassName="focus:ring-lime"
                 enabled
               />
+            ) : null}
+            {contentType === "classes" ? (
+              <label className="inline-flex items-start gap-2 max-w-md text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={preferSameSourceReplacements}
+                  onChange={(event) => onPreferSameSourceReplacementsChange(event.target.checked)}
+                  className="mt-0.5 rounded border-border text-lime focus:ring-lime"
+                />
+                <span>
+                  Has replacements for other SRD content, such as spells or feats
+                  <span className="block text-xs text-muted-foreground/80 mt-0.5">
+                    Prefer matching spells and feats from this Source over base SRD entries with the
+                    same name.
+                  </span>
+                </span>
+              </label>
             ) : null}
             <div className="flex items-center gap-2 flex-1 min-w-[min(100%,18rem)]">
               <label
@@ -593,9 +615,9 @@ export function ClipboardImportPanel({
             >
               Foundry VTT dnd5e
             </a>{" "}
-            item exports — paste a single item, an array, or a compendium dump (spells, feats,
-            equipment, classes, subclasses, species, backgrounds) and it&apos;s detected
-            automatically.
+            item exports — paste a single item, an array, a compendium dump (spells, feats,
+            equipment, classes, subclasses, species, backgrounds), or NPC actor JSON
+            (Creatures &amp; Companions) and it&apos;s detected automatically.
           </p>
         </div>
         <textarea

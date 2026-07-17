@@ -391,22 +391,24 @@ export const FeatImportSchema = z.object({
 })
 
 /**
- * Creatures & Companions import row. Prefer a structured `stat_block` when available;
- * otherwise put the full Monster Manual / companion prose in `description` — Dump Stat
- * parses it into a CompanionStatBlockTemplate on persist.
+ * Creatures & Companions import row.
+ * Prefer schema v2.0 structured records (category creature|companion + ability_scores, etc.).
+ * Legacy prose-only rows (name + description) are still accepted and parsed on persist.
  */
-export const CreatureImportSchema = z.object({
-  name: z.string(),
-  description: z.string().nullable().optional(),
-  creature_type: z.string().nullable().optional(),
-  size: z.string().nullable().optional(),
-  alignment: z.string().nullable().optional(),
-  cr: z.string().nullable().optional(),
-  /** Structured companion/creature stat block when the extractor already parsed it. */
-  stat_block: z.record(z.unknown()).nullable().optional(),
-  prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
-  source: z.string().nullable().optional(),
-})
+export {
+  CreatureImportSchema,
+  CreatureImportV2Schema,
+  CreatureImportLegacySchema,
+  CreatureImportDocumentSchema,
+  isCreatureImportV2,
+  CREATURE_IMPORT_SCHEMA_VERSION,
+  type CreatureImportRow,
+  type CreatureImportV2,
+  type CreatureImportLegacy,
+  type CreatureImportDocument,
+} from "@/lib/import/creature-import-v2-schema"
+
+import { CreatureImportSchema } from "@/lib/import/creature-import-v2-schema"
 
 export const SpellImportSchema = z.object({
   name: z.string(),

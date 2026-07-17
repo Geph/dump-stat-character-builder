@@ -75,6 +75,7 @@ export type PrepareImportOptions = {
 export type ImportPersistFn = (
   content: ImportContent,
   source: ImportSourceLabel,
+  options?: import("@/lib/import/persist-import-options").PersistImportOptions,
 ) => Promise<PersistImportResult>
 
 function withSanitizedClassRows(content: ImportContent): ImportContent {
@@ -140,6 +141,7 @@ export async function finalizeImportWithPersist(
   collisions: ImportCollision[] = [],
   collisionResolutionMap: ImportCollisionResolutionMap = {},
   cardArtUrlMap: ImportCardArtUrlMap = {},
+  persistOptions?: import("@/lib/import/persist-import-options").PersistImportOptions,
 ): Promise<PersistImportResult> {
   const materialSource = normalizeImportMaterialSource(source)
   const renamed = collisions.length
@@ -155,5 +157,5 @@ export async function finalizeImportWithPersist(
     applyProposalSelections(renamed, proposals, selections),
   )
   const withCardArt = applyImportCardArtUrls(withModifiers, cardArtUrlMap)
-  return persist(withCardArt, materialSource)
+  return persist(withCardArt, materialSource, persistOptions)
 }

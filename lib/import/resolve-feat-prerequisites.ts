@@ -1,5 +1,6 @@
 import type { Feat } from "@/lib/types"
 import type { PrerequisiteRule } from "@/lib/import/content-schema"
+import { resolvePreferredNameMatch } from "@/lib/compendium/prefer-same-source"
 
 export type ParsedFeatPrerequisite = {
   levelRequirement: number | null
@@ -80,18 +81,23 @@ function normalizeFeatNameKey(name: string): string {
 
 export function resolvePrerequisiteFeatIds(
   names: string[],
-  feats: Pick<Feat, "id" | "name">[],
+  feats: Pick<Feat, "id" | "name">[] | Pick<Feat, "id" | "name" | "source">[],
+  preferredSource?: string | null,
 ): string[] {
-  const byName = new Map(feats.map((feat) => [normalizeFeatNameKey(feat.name), feat.id]))
+  const catalog = feats.map((feat) => ({
+    id: feat.id,
+    name: feat.name,
+    source: "source" in feat ? feat.source : null,
+  }))
   const resolved: string[] = []
 
   for (const name of names) {
-    const key = normalizeFeatNameKey(name)
-    const id = byName.get(key)
-    if (id) {
-      resolved.push(id)
+    const match = resolvePreferredNameMatch(name, catalog, preferredSource)
+    if (match) {
+      resolved.push(match.id)
       continue
     }
+    const key = normalizeFeatNameKey(name)
     const fuzzy = feats.find(
       (feat) =>
         normalizeFeatNameKey(feat.name) === key ||
@@ -112,9 +118,17 @@ export function enrichFeatRowWithPrerequisites<
     prerequisite_rules?: PrerequisiteRule[] | null
     category?: string | null
   },
->(row: T, feats: Pick<Feat, "id" | "name">[]): T {
+>(
+  row: T,
+  feats: Pick<Feat, "id" | "name">[] | Pick<Feat, "id" | "name" | "source">[],
+  preferredSource?: string | null,
+): T {
   const parsed = parseFeatPrerequisite(row.prerequisite)
-  const prerequisiteFeatIds = resolvePrerequisiteFeatIds(parsed.prerequisiteFeatNames, feats)
+  const prerequisiteFeatIds = resolvePrerequisiteFeatIds(
+    parsed.prerequisiteFeatNames,
+    feats,
+    preferredSource,
+  )
   const levelRequirement = row.level_requirement ?? parsed.levelRequirement ?? null
   const prerequisiteRules = inferOtherPrerequisiteRules(
     row.prerequisite,

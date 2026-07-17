@@ -539,6 +539,11 @@ export interface DndClass {
   source: string
   creator_url: string | null
   created_at: string
+  /**
+   * When true, builder/import resolution prefers spells and feats from this class's
+   * source over SRD rows that share the same base name (e.g. LaserLlama replacements).
+   */
+  prefer_same_source_replacements?: boolean | null
   /** Sheet toggles this class's features introduce (gated via requiresSheetToggle). */
   new_toggles?: NewToggleDeclaration[] | null
 }
@@ -837,8 +842,16 @@ export interface Creature {
   creature_type: string | null
   size: string | null
   alignment: string | null
-  /** Challenge rating string, e.g. "1/4", "5". */
+  /** Challenge rating string, e.g. "1/4", "5". Null for companions. */
   cr: string | null
+  /** "creature" (fixed CR) or "companion" (owner-scaled). */
+  category?: "creature" | "companion" | null
+  /** XP for fixed-CR creatures; null for companions. */
+  xp?: number | null
+  /** Companion scaling metadata (import schema v2). */
+  scaling?: { scales_with: string; notes: string } | null
+  /** Full schema v2 import payload for round-trip fidelity (optional). */
+  import_payload?: import("@/lib/import/creature-import-v2-schema").CreatureImportV2 | null
   /** Structured stat block resolved onto the character sheet Companions tab. */
   stat_block: import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
   prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null

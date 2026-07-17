@@ -84,7 +84,8 @@ function upsertSpellsKnownModifier(
 /** Parse subclass spell tables and attach always-prepared spell links to features. */
 export function enrichSubclassSpellTableFeatures(
   row: Record<string, unknown>,
-  spellCatalog: { id: string; name: string }[],
+  spellCatalog: { id: string; name: string; source?: string | null }[],
+  preferredSource?: string | null,
 ): Record<string, unknown> {
   const features = row.features
   if (!Array.isArray(features)) return row
@@ -100,7 +101,11 @@ export function enrichSubclassSpellTableFeatures(
 
     const spellEntries: SpellsKnownEntry[] = []
     for (const tableRow of parsed.rows) {
-      const { resolved } = resolveSpellNamesToIds(tableRow.spellNames, spellCatalog)
+      const { resolved } = resolveSpellNamesToIds(
+        tableRow.spellNames,
+        spellCatalog,
+        preferredSource,
+      )
       for (const spell of resolved) {
         spellEntries.push({
           spellId: spell.spellId,

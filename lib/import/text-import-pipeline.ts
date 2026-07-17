@@ -17,6 +17,7 @@ export async function runTextImportPipeline(
     sourceLabel?: string
     materialSource?: string
     foundryMeta?: FoundryImportMeta
+    preferSameSourceReplacements?: boolean
   },
 ): Promise<NextResponse> {
   try {
@@ -67,6 +68,9 @@ export async function runTextImportPipeline(
       await persistImportedContent(
       foundryMeta ? { ...prepared.content, foundryImportMeta: foundryMeta } : prepared.content,
       materialSource,
+      {
+        preferSameSourceReplacements: Boolean(options?.preferSameSourceReplacements),
+      },
     )
 
     return NextResponse.json({

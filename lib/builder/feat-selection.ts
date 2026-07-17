@@ -1,4 +1,8 @@
 import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
+import {
+  baseCompendiumLookupKey,
+  sourcesEqual,
+} from "@/lib/compendium/prefer-same-source"
 import type { Feat } from "@/lib/types"
 
 export const FEAT_MILESTONES = [4, 8, 12, 16, 19] as const
@@ -16,6 +20,11 @@ export type FeatSlotContext = {
   backgroundId: string | null
   /** Feat id already chosen for this slot (excluded from taken / exclusivity checks). */
   currentSlotFeatId?: string | null
+  /**
+   * When set (from classes with prefer_same_source_replacements), alsoFeatNames and
+   * category lists prefer same-source replacements over SRD duplicates.
+   */
+  preferredSources?: string[]
 }
 
 export function buildOwnedFeatIds(params: {
@@ -98,9 +107,13 @@ export function isFeatEligibleForCategories(
   const normalizedCategories = new Set(categories.map(normalizeFeatCategory))
   const category = normalizeFeatCategory(feat.category)
   const isOriginSlot = [...normalizedCategories].some((entry) => isOriginSelectableCategory(entry))
-  const nameAllowed = alsoFeatNames.some(
-    (name) => name.trim().toLowerCase() === feat.name.trim().toLowerCase(),
-  )
+  const preferredSources = context.preferredSources ?? []
+  const nameAllowed = alsoFeatNames.some((name) => {
+    if (name.trim().toLowerCase() === feat.name.trim().toLowerCase()) return true
+    if (!preferredSources.length) return false
+    if (baseCompendiumLookupKey(name) !== baseCompendiumLookupKey(feat.name)) return false
+    return preferredSources.some((source) => sourcesEqual(source, feat.source))
+  })
 
   // Origin slots accept Origin + Dark Gift; Dark Gift is not a General/FS/etc. pick.
   const categoryMatches =

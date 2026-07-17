@@ -136,6 +136,7 @@ export default function ImportPage() {
     id: string
     className: string
   } | null>(null)
+  const [preferSameSourceReplacements, setPreferSameSourceReplacements] = useState(false)
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
   const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
@@ -153,6 +154,7 @@ export default function ImportPage() {
     stagingSummary: string
     tokenSavings?: ImportTokenSavingsReport
     materialSource: string
+    preferSameSourceReplacements?: boolean
   } | null>(null)
   const [renameMap, setRenameMap] = useState<ImportRenameMap>({})
   const [collisionResolutionMap, setCollisionResolutionMap] =
@@ -499,6 +501,7 @@ export default function ImportPage() {
           collisions: pendingImport.collisions,
           collisionResolutionMap,
           cardArtUrlMap,
+          preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
         })
         applyImportSuccess(data)
         setTextStatus("success")
@@ -517,6 +520,7 @@ export default function ImportPage() {
           collisions: pendingImport.collisions,
           materialSource: pendingImport.materialSource,
           cardArtUrlMap,
+          preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
         }),
       })
 
@@ -598,6 +602,10 @@ export default function ImportPage() {
     if (pdfContentTypeHint === "subclasses" && subclassMatch) {
       formData.append("subclassMatchClassName", subclassMatch.className)
     }
+    if (pdfContentTypeHint === "classes" && preferSameSourceReplacements) {
+      formData.append("preferSameSourceReplacements", "true")
+    }
+    formData.append("materialSource", importMaterialSource)
     if (pdfPageScope === "range") {
       formData.append("pageStart", pdfPageStart)
       formData.append("pageEnd", pdfPageEnd)
@@ -634,6 +642,8 @@ export default function ImportPage() {
             stagingSummary: (data.stagingSummary as string) ?? "",
             tokenSavings: data.tokenSavings as ImportTokenSavingsReport | undefined,
             materialSource: importMaterialSource,
+            preferSameSourceReplacements:
+              pdfContentTypeHint === "classes" ? preferSameSourceReplacements : false,
           })
           setMessage("")
           return
@@ -659,9 +669,14 @@ export default function ImportPage() {
     setFoundryGuidance(null)
     setPendingImport(null)
 
+    const sameSourceOpt =
+      textContentType === "classes" ? preferSameSourceReplacements : false
+
     try {
       if (staticMode && payload.importMode === "byo-json") {
-        const data = await runClientByoJsonImport(payload.text, importMaterialSource)
+        const data = await runClientByoJsonImport(payload.text, importMaterialSource, {
+          preferSameSourceReplacements: sameSourceOpt,
+        })
         if ("needsConfirmation" in data && data.needsConfirmation) {
           setTextStatus("review")
           setRenameMap(defaultRenameMap(data.collisions))
@@ -675,6 +690,7 @@ export default function ImportPage() {
             stages: data.stages,
             stagingSummary: data.stagingSummary,
             materialSource: importMaterialSource,
+            preferSameSourceReplacements: sameSourceOpt,
           })
           setMessage("")
           return
@@ -694,6 +710,7 @@ export default function ImportPage() {
           contentType: textContentType,
           importMode: payload.importMode,
           materialSource: importMaterialSource,
+          preferSameSourceReplacements: sameSourceOpt,
           customAbilityCategory:
             textContentType === "abilities" ? customAbilityCategory.trim() || undefined : undefined,
           classResourceLabels:
@@ -728,6 +745,7 @@ export default function ImportPage() {
             stagingSummary: (data.stagingSummary as string) ?? "",
             tokenSavings: data.tokenSavings as ImportTokenSavingsReport | undefined,
             materialSource: importMaterialSource,
+            preferSameSourceReplacements: sameSourceOpt,
           })
           const warning = typeof data.warning === "string" ? data.warning.trim() : ""
           setMessage(warning)
@@ -1210,6 +1228,8 @@ export default function ImportPage() {
                     onClassResourceLabelsChange={setClassResourceLabels}
                     subclassMatch={subclassMatch}
                     onSubclassMatchChange={setSubclassMatch}
+                    preferSameSourceReplacements={preferSameSourceReplacements}
+                    onPreferSameSourceReplacementsChange={setPreferSameSourceReplacements}
                     sourceText={textContent}
                     onSourceTextChange={setTextContent}
                     jsonText={jsonImportText}
@@ -1303,6 +1323,23 @@ export default function ImportPage() {
                         focusRingClassName="focus:ring-orange"
                         enabled
                       />
+                    ) : null}
+                    {pdfContentTypeHint === "classes" ? (
+                      <label className="inline-flex items-start gap-2 max-w-lg text-sm text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={preferSameSourceReplacements}
+                          onChange={(event) => setPreferSameSourceReplacements(event.target.checked)}
+                          className="mt-0.5 rounded border-border text-orange focus:ring-orange"
+                        />
+                        <span>
+                          Has replacements for other SRD content, such as spells or feats
+                          <span className="block text-xs text-muted-foreground/80 mt-0.5">
+                            Prefer matching spells and feats from the import Source over base SRD
+                            entries with the same name.
+                          </span>
+                        </span>
+                      </label>
                     ) : null}
 
                     <div className="flex flex-wrap gap-4 items-center">

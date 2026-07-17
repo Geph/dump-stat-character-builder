@@ -1,0 +1,99 @@
+{
+  "name": "Goblin",
+  "type": "npc",
+  "img": "icons/svg/mystery-man.svg",
+  "system": {
+    "abilities": {
+      "str": { "value": 8, "proficient": 0 },
+      "dex": { "value": 14, "proficient": 0 },
+      "con": { "value": 10, "proficient": 0 },
+      "int": { "value": 10, "proficient": 0 },
+      "wis": { "value": 8, "proficient": 0 },
+      "cha": { "value": 8, "proficient": 0 }
+    },
+    "attributes": {
+      "ac": { "flat": 15, "calc": "flat", "formula": "" },
+      "hp": { "value": 7, "max": 7, "formula": "2d6" },
+      "init": { "ability": "dex", "bonus": 0 },
+      "movement": {
+        "burrow": null,
+        "climb": null,
+        "fly": null,
+        "swim": null,
+        "walk": 30,
+        "units": "ft",
+        "hover": false
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": 0,
+        "tremorsense": 0,
+        "truesight": 0,
+        "units": "ft",
+        "special": ""
+      },
+      "prof": 2
+    },
+    "details": {
+      "type": { "value": "humanoid", "subtype": "goblinoid", "swarm": "", "custom": "" },
+      "alignment": "Neutral Evil",
+      "cr": 0.25,
+      "xp": { "value": 50 },
+      "biography": { "value": "", "public": "" },
+      "source": { "book": "SRD 5.1", "custom": "", "page": "" }
+    },
+    "traits": {
+      "size": "sm",
+      "di": { "value": [], "custom": "" },
+      "dr": { "value": [], "custom": "" },
+      "dv": { "value": [], "custom": "" },
+      "ci": { "value": [], "custom": "" },
+      "languages": { "value": ["common", "goblin"], "custom": "" }
+    },
+    "skills": {
+      "ste": { "value": 1, "ability": "dex" }
+    }
+  },
+  "items": [
+    {
+      "name": "Scimitar",
+      "type": "weapon",
+      "system": {
+        "description": {
+          "value": "<p>Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.</p>"
+        },
+        "activation": { "type": "action", "cost": 1 },
+        "damage": {
+          "parts": [["1d6 + @mod", "slashing"]]
+        }
+      }
+    },
+    {
+      "name": "Shortbow",
+      "type": "weapon",
+      "system": {
+        "description": {
+          "value": "<p>Ranged Attack Roll: +4, range 80/320 ft. Hit: 5 (1d6 + 2) Piercing damage.</p>"
+        },
+        "activation": { "type": "action", "cost": 1 }
+      }
+    },
+    {
+      "name": "Nimble Escape",
+      "type": "feat",
+      "system": {
+        "description": {
+          "value": "<p>The goblin can take the Disengage or Hide action as a bonus action on each of its turns.</p>"
+        },
+        "activation": { "type": "bonus", "cost": 1 }
+      }
+    },
+    {
+      "name": "Leather Armor",
+      "type": "equipment",
+      "system": {
+        "description": { "value": "<p>Light armor.</p>" }
+      }
+    }
+  ]
+}

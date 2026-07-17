@@ -185,6 +185,10 @@ import {
 } from "@/lib/builder/catalog-feat-pick-groups"
 import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import {
+  filterPreferredSourceReplacements,
+  preferredSourcesFromClasses,
+} from "@/lib/compendium/prefer-same-source"
+import {
   buildFeatSelectionEntries,
   featChoicePickKey,
   grantedFeatChoicePickKey,
@@ -1007,6 +1011,15 @@ export default function BuilderPageClient() {
     subclasses,
     subclassByClassId,
   )
+  const preferredFeatSources = useMemo(
+    () =>
+      preferredSourcesFromClasses(
+        activeClassLevels
+          .map((entry) => classes.find((cls) => cls.id === entry.classId))
+          .filter((cls): cls is (typeof classes)[number] => Boolean(cls)),
+      ),
+    [activeClassLevels, classes],
+  )
   const { catalogGroups: classCatalogFeatGroups, regularSlots: regularClassFeatSlots } = useMemo(
     () => groupCatalogFeatPickSlots(featPickSlots),
     [featPickSlots],
@@ -1269,6 +1282,7 @@ export default function BuilderPageClient() {
       ownedFeatIds,
       speciesId: character.species_id,
       backgroundId: character.background_id,
+      preferredSources: preferredFeatSources,
     }
 
     setFeatureChoicePicks((prev) => {
@@ -3186,17 +3200,19 @@ export default function BuilderPageClient() {
                         speciesId: character.species_id,
                         backgroundId: character.background_id,
                         currentSlotFeatId: pickedId,
+                        preferredSources: preferredFeatSources,
                       }
-                      const eligibleFeats = feats
-                        .filter((feat) =>
+                      const eligibleFeats = filterPreferredSourceReplacements(
+                        feats.filter((feat) =>
                           isFeatEligibleForCategories(
                             feat,
                             slot.featCategories,
                             slot.milestoneLevel,
                             featContext,
                           ),
-                        )
-                        .sort((a, b) => a.name.localeCompare(b.name))
+                        ),
+                        preferredFeatSources,
+                      ).sort((a, b) => a.name.localeCompare(b.name))
 
                       const selectPick = (nextId: string | null) => {
                         const choiceKey = featChoicePickKey(slot.key)
@@ -3604,17 +3620,19 @@ export default function BuilderPageClient() {
                           speciesId: character.species_id,
                           backgroundId: character.background_id,
                           currentSlotFeatId: pickedId,
+                          preferredSources: preferredFeatSources,
                         }
-                        const eligible = feats
-                          .filter((feat) =>
+                        const eligible = filterPreferredSourceReplacements(
+                          feats.filter((feat) =>
                             isFeatEligibleForCategories(
                               feat,
                               slot.featCategories,
                               1,
                               featContext,
                             ),
-                          )
-                          .sort((a, b) => a.name.localeCompare(b.name))
+                          ),
+                          preferredFeatSources,
+                        ).sort((a, b) => a.name.localeCompare(b.name))
 
                         return (
                           <div key={slot.key} className="mt-3">
@@ -3917,9 +3935,10 @@ export default function BuilderPageClient() {
                           speciesId: character.species_id,
                           backgroundId: character.background_id,
                           currentSlotFeatId: pickedId,
+                          preferredSources: preferredFeatSources,
                         }
-                        const eligible = feats
-                          .filter((feat) =>
+                        const eligible = filterPreferredSourceReplacements(
+                          feats.filter((feat) =>
                             isFeatEligibleForCategories(
                               feat,
                               slot.featCategories,
@@ -3927,8 +3946,9 @@ export default function BuilderPageClient() {
                               featContext,
                               slot.alsoFeatNames ?? [],
                             ),
-                          )
-                          .sort((a, b) => a.name.localeCompare(b.name))
+                          ),
+                          preferredFeatSources,
+                        ).sort((a, b) => a.name.localeCompare(b.name))
 
                         return (
                           <div key={slot.key} className="mt-3">

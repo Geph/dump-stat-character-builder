@@ -27,7 +27,7 @@ export function FoundryImportGuidancePanel({ manifest, skippedPayload }: Props) 
           <p>
             Detected a Foundry {manifest.kind} manifest (<strong>{manifest.title}</strong>) with{" "}
             {manifest.packs.length} compendium pack{manifest.packs.length === 1 ? "" : "s"}. Item
-            JSON exports are required — manifests cannot be imported directly.
+            or NPC Actor JSON exports are required — manifests cannot be imported directly.
           </p>
           <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
             {manifest.guidance.map((line) => (

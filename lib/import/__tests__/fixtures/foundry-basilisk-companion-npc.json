@@ -1,0 +1,82 @@
+{
+  "name": "Basilisk Companion",
+  "type": "npc",
+  "img": "icons/svg/mystery-man.svg",
+  "system": {
+    "abilities": {
+      "str": { "value": 16, "proficient": 0 },
+      "dex": { "value": 10, "proficient": 0 },
+      "con": { "value": 15, "proficient": 1, "bonuses": { "save": "+ @prof" } },
+      "int": { "value": 5, "proficient": 0 },
+      "wis": { "value": 12, "proficient": 0 },
+      "cha": { "value": 10, "proficient": 0 }
+    },
+    "attributes": {
+      "ac": { "flat": null, "calc": "custom", "formula": "15 + @prof" },
+      "hp": { "value": 7, "max": 7, "formula": "7 + 7 * @details.level" },
+      "init": { "ability": "dex", "bonus": 0 },
+      "movement": {
+        "burrow": null,
+        "climb": null,
+        "fly": null,
+        "swim": null,
+        "walk": 30,
+        "units": "ft",
+        "hover": false
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": 0,
+        "tremorsense": 0,
+        "truesight": 0,
+        "units": "ft",
+        "special": ""
+      },
+      "prof": 2
+    },
+    "details": {
+      "type": { "value": "monstrosity", "subtype": "", "swarm": "", "custom": "" },
+      "alignment": "Unaligned",
+      "cr": null,
+      "xp": { "value": 0 },
+      "biography": {
+        "value": "<p>Scales with caregiver's level. PB equals the caregiver's Proficiency Bonus.</p>"
+      },
+      "source": { "custom": "Homebrew Companions", "book": "", "page": "" }
+    },
+    "traits": {
+      "size": "med",
+      "di": { "value": [], "custom": "" },
+      "dr": { "value": [], "custom": "" },
+      "dv": { "value": [], "custom": "" },
+      "ci": { "value": [], "custom": "" },
+      "languages": { "value": [], "custom": "" }
+    },
+    "skills": {
+      "ath": { "value": 1, "ability": "str" },
+      "sur": { "value": 1, "ability": "wis" }
+    }
+  },
+  "items": [
+    {
+      "name": "Bite",
+      "type": "weapon",
+      "system": {
+        "description": {
+          "value": "<p>Melee Weapon Attack: +3 plus PB to hit, reach 5 ft., one target. Hit: 1d6 plus PB piercing damage.</p>"
+        },
+        "activation": { "type": "action", "cost": 1 }
+      }
+    },
+    {
+      "name": "Heavy Glare",
+      "type": "feat",
+      "system": {
+        "description": {
+          "value": "<p>When the basilisk's caregiver hits a creature that can see the basilisk, the basilisk can force that creature to make a Constitution saving throw.</p>"
+        },
+        "activation": { "type": "reaction", "cost": 1 }
+      }
+    }
+  ]
+}

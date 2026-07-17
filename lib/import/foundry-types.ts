@@ -56,7 +56,8 @@ export type FoundryParseResult =
   | { kind: "not_foundry" }
 
 export const FOUNDRY_MANIFEST_GUIDANCE = [
-  "Export individual compendium items: right-click an entry → Export Data → JSON.",
+  "Export individual compendium entries: right-click an entry → Export Data → JSON (Items and NPC Actors).",
+  "NPC actor JSON imports as Creatures & Companions; character/vehicle/group actors are skipped.",
   "Or paste a NeDB .db pack file (one JSON document per line) — already supported.",
   "Or unpack the module with the Foundry CLI: fvtt package unpack <module-id> and import JSON from src/packs/<pack>/**/*.json.",
   "LevelDB packs inside a .zip cannot be read directly — unpack to JSON first.",

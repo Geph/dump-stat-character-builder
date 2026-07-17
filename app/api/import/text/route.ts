@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       customAbilityCategory,
       classResourceLabels,
       subclassMatchClassName,
+      preferSameSourceReplacements,
     } = body
     const aiOverride = parseImportAiOverride(body)
     const importMode = body.importMode as string | undefined
@@ -74,6 +75,9 @@ export async function POST(request: NextRequest) {
         (collisions ?? []) as import("@/lib/import/import-collisions").ImportCollision[],
         collisionResolutionMap ?? {},
         (cardArtUrlMap ?? {}) as import("@/lib/import/import-card-art").ImportCardArtUrlMap,
+        {
+          preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
+        },
       )
 
       return NextResponse.json({
@@ -123,6 +127,7 @@ export async function POST(request: NextRequest) {
       return await runTextImportPipeline(content, {
         charLength: trimmedText.length,
         materialSource,
+        preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
         tokenSavings: {
           inputCharsBefore: trimmedText.length,
           inputCharsAfter: trimmedText.length,
@@ -173,6 +178,7 @@ export async function POST(request: NextRequest) {
     return runTextImportPipeline(extraction.content, {
       charLength: trimmedText.length,
       materialSource,
+      preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
       tokenSavings,
     })
   } catch (error) {

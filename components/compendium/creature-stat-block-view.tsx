@@ -37,12 +37,21 @@ function NamedBlocks({ title, blocks }: { title: string; blocks?: CompanionNamed
         {title}
       </h4>
       <ul className="space-y-1.5">
-        {blocks.map((block) => (
-          <li key={block.name} className="text-sm text-white/85">
-            <span className="font-semibold italic text-white">{block.name}.</span>{" "}
-            {block.description}
-          </li>
-        ))}
+        {blocks.map((block) => {
+          const label = [
+            block.unlockLevelLabel ? `${block.unlockLevelLabel}:` : null,
+            block.name,
+            block.tag ? `(${block.tag})` : null,
+          ]
+            .filter(Boolean)
+            .join(" ")
+          return (
+            <li key={`${block.unlockLevelLabel ?? ""}:${block.name}:${block.tag ?? ""}`} className="text-sm text-white/85">
+              <span className="font-semibold italic text-white">{label}.</span>{" "}
+              {block.description}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -63,7 +72,10 @@ export function CreatureStatBlockView({
   const strong = variant === "dark" ? "text-white/90" : "text-foreground"
 
   const headerRows: { label: string; value: string }[] = []
-  headerRows.push({ label: "AC", value: formatScaled(template.ac) })
+  const acValue = template.acNote
+    ? `${formatScaled(template.ac)} (${template.acNote})`
+    : formatScaled(template.ac)
+  headerRows.push({ label: "AC", value: acValue })
   if (template.initiative) headerRows.push({ label: "Initiative", value: template.initiative })
   headerRows.push({
     label: "HP",
@@ -91,7 +103,19 @@ export function CreatureStatBlockView({
     headerRows.push({ label: "Immunities", value: parts.join(", ") })
   }
   if (template.languages) headerRows.push({ label: "Languages", value: template.languages })
+  if (template.scaling) {
+    headerRows.push({
+      label: "Scaling",
+      value: `${template.scaling.scales_with}${
+        template.scaling.notes ? ` — ${template.scaling.notes}` : ""
+      }`,
+    })
+  }
   if (template.cr) headerRows.push({ label: "CR", value: template.cr })
+  if (template.proficiencyBonusLabel) {
+    headerRows.push({ label: "PB", value: template.proficiencyBonusLabel })
+  }
+  if (template.xp != null) headerRows.push({ label: "XP", value: String(template.xp) })
 
   const abilities = template.abilityScores
 
@@ -123,12 +147,14 @@ export function CreatureStatBlockView({
           <tbody>
             {ABILITY_ORDER.filter(({ key }) => abilities[key]).map(({ key, label }) => {
               const row = abilities[key]!
+              const saveDisplay = row.saveLabel ?? signed(row.save)
+              const modDisplay = row.modLabel ?? signed(row.modifier)
               return (
                 <tr key={key} className={strong}>
                   <td className={`text-left font-semibold ${muted}`}>{label}</td>
                   <td>{row.score}</td>
-                  <td>{signed(row.modifier)}</td>
-                  <td>{signed(row.save)}</td>
+                  <td>{modDisplay}</td>
+                  <td>{saveDisplay}</td>
                 </tr>
               )
             })}
@@ -140,6 +166,7 @@ export function CreatureStatBlockView({
       <NamedBlocks title="Actions" blocks={template.actions} />
       <NamedBlocks title="Bonus Actions" blocks={template.bonusActions} />
       <NamedBlocks title="Reactions" blocks={template.reactions} />
+      <NamedBlocks title="Legendary Actions" blocks={template.legendaryActions} />
     </div>
   )
 }
