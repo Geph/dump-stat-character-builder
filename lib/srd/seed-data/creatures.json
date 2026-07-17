@@ -1398,6 +1398,117 @@
       "description": "Dire Wolf\nLarge Beast, Unaligned\nAC 14 Initiative +2 (12)\nHP 22 (3d10 + 6)\nSpeed 50 ft.\nTraits\nPack Tactics. The wolf has Advantage on an attack roll against a creature if at least one of the wolf’s allies is within 5 feet of the creature and the ally doesn’t have the Incapacitated condition.\nActions\nBite. Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition."
     },
     {
+      "category": "companion",
+      "cr": null,
+      "xp": null,
+      "proficiency_bonus": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": "Acid, Cold, Fire, Lightning, Poison",
+      "damage_immunities": null,
+      "condition_immunities": "Charmed, Frightened, Poisoned",
+      "vulnerabilities": null,
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "initiative_modifier": "+2",
+      "initiative_passive": 12,
+      "hit_dice": null,
+      "name": "Draconic Spirit",
+      "creature_type": "Dragon",
+      "size": "Large",
+      "alignment": "Neutral",
+      "scaling": {
+        "scales_with": "the spell's level",
+        "notes": "Summoned by the Summon Dragon spell. AC equals 14 + the spell's level. HP equals 50 + 10 for each spell level above 5. PB equals your Proficiency Bonus; attack bonus equals your spell attack modifier; save DCs equal your spell save DC. Multiattack uses a number of Rend attacks equal to half the spell's level (round down)."
+      },
+      "ac": "14 + the spell's level",
+      "hp": "50 + 10 for each spell level above 5",
+      "speed": {
+        "walk": 30,
+        "fly": 60,
+        "swim": 30,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 19,
+          "mod": "+4",
+          "save": "+4"
+        },
+        "dex": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "con": {
+          "score": 17,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "int": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "wis": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "cha": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": 30,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 12
+      },
+      "languages": "Draconic, understands the languages you know",
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Shared Resistances",
+          "tag": null,
+          "text": "When you summon the spirit, choose one of its Resistances. You have Resistance to the chosen damage type until the spell ends."
+        }
+      ],
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Multiattack",
+          "tag": null,
+          "text": "The spirit makes a number of Rend attacks equal to half the spell's level (round down), and it uses Breath Weapon."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Rend",
+          "tag": null,
+          "text": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 feet. Hit: 1d6 + 4 + the spell's level Piercing damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Breath Weapon",
+          "tag": null,
+          "text": "Dexterity Saving Throw: DC equals your spell save DC, each creature in a 30-foot Cone. Failure: 2d6 damage of a type this spirit has Resistance to (your choice when you cast the spell). Success: Half damage."
+        }
+      ],
+      "description": "Draconic Spirit\nLarge Dragon, Neutral\nAC 14 + the spell's level\nHP 50 + 10 for each spell level above 5\nSpeed 30 ft., Fly 60 ft., Swim 30 ft.\nResistances Acid, Cold, Fire, Lightning, Poison\nImmunities Charmed, Frightened, Poisoned\nSenses Blindsight 30 ft., Darkvision 60 ft.; Passive Perception 12\nLanguages Draconic, understands the languages you know\nTraits\nShared Resistances. When you summon the spirit, choose one of its Resistances. You have Resistance to the chosen damage type until the spell ends.\nActions\nMultiattack. The spirit makes a number of Rend attacks equal to half the spell's level (round down), and it uses Breath Weapon.\nRend. Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 feet. Hit: 1d6 + 4 + the spell's level Piercing damage.\nBreath Weapon. Dexterity Saving Throw: DC equals your spell save DC, each creature in a 30-foot Cone. Failure: 2d6 damage of a type this spirit has Resistance to (your choice when you cast the spell). Success: Half damage."
+    },
+    {
       "name": "Draft Horse",
       "creature_type": "Beast",
       "size": "Large",
@@ -1856,6 +1967,207 @@
       "reactions": null,
       "legendary_actions": null,
       "description": "Frog\nTiny Beast, Unaligned\nAC 11 Initiative +1 (11)\nHP 1 (1d4 - 1)\nSpeed 20 ft., Swim 20 ft.\nTraits\nAmphibious. The frog can breathe air and water. Standing Leap. The frog’s Long Jump is up to 10 feet and its High Jump is up to 5 feet with or without a running start.\nActions\nBite. Melee Attack Roll: +3, reach 5 ft. Hit: 1 Piercing damage."
+    },
+    {
+      "category": "creature",
+      "scaling": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": "Necrotic",
+      "damage_immunities": "Poison",
+      "condition_immunities": "Charmed, Exhaustion, Poisoned",
+      "vulnerabilities": null,
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Stench",
+          "tag": null,
+          "text": "Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is immune to this ghast's Stench for 24 hours."
+        }
+      ],
+      "name": "Ghast",
+      "creature_type": "Undead",
+      "size": "Medium",
+      "alignment": "Chaotic Evil",
+      "cr": "2",
+      "xp": 450,
+      "proficiency_bonus": "+2",
+      "ac": "13",
+      "initiative_modifier": "+3",
+      "initiative_passive": 13,
+      "hp": "36",
+      "hit_dice": "8d8",
+      "speed": {
+        "walk": 30,
+        "fly": null,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 16,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "dex": {
+          "score": 17,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "con": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "int": {
+          "score": 11,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "wis": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+2"
+        },
+        "cha": {
+          "score": 8,
+          "mod": "-1",
+          "save": "-1"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 10
+      },
+      "languages": "Common",
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Bite",
+          "tag": null,
+          "text": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage plus 9 (2d8) Necrotic damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Claw",
+          "tag": null,
+          "text": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage. If the target is a non-Undead creature, it is subjected to the following effect. Constitution Saving Throw: DC 10. Failure: The target has the Paralyzed condition until the end of its next turn."
+        }
+      ],
+      "description": "Ghast\nMedium Undead, Chaotic Evil\nAC 13\nHP 36 (8d8)\nSpeed 30 ft.\nResistances Necrotic\nImmunities Poison; Charmed, Exhaustion, Poisoned\nSenses Darkvision 60 ft., Passive Perception 10\nLanguages Common\nCR 2 (XP 450; PB +2)\nTraits\nStench. Constitution Saving Throw: DC 10, any creature that starts its turn in a 5-foot Emanation originating from the ghast. Failure: The target has the Poisoned condition until the start of its next turn. Success: The target is immune to this ghast's Stench for 24 hours.\nActions\nBite. Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage plus 9 (2d8) Necrotic damage.\nClaw. Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage. If the target is a non-Undead creature, it is subjected to the following effect. Constitution Saving Throw: DC 10. Failure: The target has the Paralyzed condition until the end of its next turn."
+    },
+    {
+      "category": "creature",
+      "scaling": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": null,
+      "damage_immunities": "Poison",
+      "condition_immunities": "Charmed, Exhaustion, Poisoned",
+      "vulnerabilities": null,
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "traits": null,
+      "name": "Ghoul",
+      "creature_type": "Undead",
+      "size": "Medium",
+      "alignment": "Chaotic Evil",
+      "cr": "1",
+      "xp": 200,
+      "proficiency_bonus": "+2",
+      "ac": "12",
+      "initiative_modifier": "+2",
+      "initiative_passive": 12,
+      "hp": "22",
+      "hit_dice": "5d8",
+      "speed": {
+        "walk": 30,
+        "fly": null,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 13,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "dex": {
+          "score": 15,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "con": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "int": {
+          "score": 7,
+          "mod": "-2",
+          "save": "-2"
+        },
+        "wis": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "cha": {
+          "score": 6,
+          "mod": "-2",
+          "save": "-2"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 10
+      },
+      "languages": "Common",
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Multiattack",
+          "tag": null,
+          "text": "The ghoul makes two Bite attacks."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Bite",
+          "tag": null,
+          "text": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage plus 3 (1d6) Necrotic damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Claw",
+          "tag": null,
+          "text": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage. If the target is a creature that isn't an Undead or Elf, it is subjected to the following effect. Constitution Saving Throw: DC 10. Failure: The target has the Paralyzed condition until the end of its next turn."
+        }
+      ],
+      "description": "Ghoul\nMedium Undead, Chaotic Evil\nAC 12\nHP 22 (5d8)\nSpeed 30 ft.\nImmunities Poison; Charmed, Exhaustion, Poisoned\nSenses Darkvision 60 ft., Passive Perception 10\nLanguages Common\nCR 1 (XP 200; PB +2)\nActions\nMultiattack. The ghoul makes two Bite attacks.\nBite. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage plus 3 (1d6) Necrotic damage.\nClaw. Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage. If the target is a creature that isn't an Undead or Elf, it is subjected to the following effect. Constitution Saving Throw: DC 10. Failure: The target has the Paralyzed condition until the end of its next turn."
     },
     {
       "name": "Giant Ape",
@@ -3000,6 +3312,125 @@
       "reactions": null,
       "legendary_actions": null,
       "description": "Giant Hyena\nLarge Beast, Unaligned\nAC 12 Initiative +2 (12)\nHP 45 (6d10 + 12)\nSpeed 50 ft.\nActions\nBite. Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage.\nBonus Actions\nRampage (1/Day). Immediately after dealing damage to a creature that was already Bloodied, the hyena can move up to half its Speed, and it makes one Bite attack."
+    },
+    {
+      "category": "companion",
+      "cr": null,
+      "xp": null,
+      "proficiency_bonus": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": null,
+      "damage_immunities": null,
+      "condition_immunities": null,
+      "vulnerabilities": null,
+      "bonus_actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Venomous Spew",
+          "tag": "Centipede Only",
+          "text": "Constitution Saving Throw: DC equals your spell save DC, one creature the insect can see within 10 feet. Failure: The target has the Poisoned condition until the start of the insect's next turn."
+        }
+      ],
+      "reactions": null,
+      "legendary_actions": null,
+      "initiative_modifier": "+1",
+      "initiative_passive": 11,
+      "hit_dice": null,
+      "name": "Giant Insect",
+      "creature_type": "Beast",
+      "size": "Large",
+      "alignment": "Unaligned",
+      "scaling": {
+        "scales_with": "the spell's level",
+        "notes": "Summoned by the Giant Insect spell as a giant centipede, spider, or wasp. AC equals 11 + the spell's level. HP equals 30 + 10 for each spell level above 4. Fly Speed applies to the wasp form only. PB equals your Proficiency Bonus; attack bonus equals your spell attack modifier; save DCs equal your spell save DC."
+      },
+      "ac": "11 + the spell's level",
+      "hp": "30 + 10 for each spell level above 4",
+      "speed": {
+        "walk": 40,
+        "fly": 40,
+        "swim": null,
+        "climb": 40,
+        "burrow": null,
+        "notes": "(Fly is wasp form only)"
+      },
+      "ability_scores": {
+        "str": {
+          "score": 17,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "dex": {
+          "score": 13,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "con": {
+          "score": 15,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "int": {
+          "score": 4,
+          "mod": "-3",
+          "save": "-3"
+        },
+        "wis": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "cha": {
+          "score": 3,
+          "mod": "-4",
+          "save": "-4"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 12
+      },
+      "languages": "Understands the languages you know",
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Spider Climb",
+          "tag": null,
+          "text": "The insect can climb difficult surfaces, including along ceilings, without needing to make an ability check."
+        }
+      ],
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Multiattack",
+          "tag": null,
+          "text": "The insect makes a number of attacks equal to half this spell's level (round down)."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Poison Jab",
+          "tag": null,
+          "text": "Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 ft. Hit: 1d6 + 3 + the spell's level Piercing damage plus 1d4 Poison damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Web Bolt",
+          "tag": "Spider Only",
+          "text": "Ranged Attack Roll: Bonus equals your spell attack modifier, range 60 ft. Hit: 1d10 + 3 + the spell's level Bludgeoning damage, and the target's Speed is reduced to 0 until the start of the insect's next turn."
+        }
+      ],
+      "description": "Giant Insect\nLarge Beast, Unaligned\nAC 11 + the spell's level\nHP 30 + 10 for each spell level above 4\nSpeed 40 ft., Climb 40 ft., Fly 40 ft. (Wasp only)\nSenses Darkvision 60 ft., Passive Perception 12\nLanguages Understands the languages you know\nTraits\nSpider Climb. The insect can climb difficult surfaces, including along ceilings, without needing to make an ability check.\nActions\nMultiattack. The insect makes a number of attacks equal to half this spell's level (round down).\nPoison Jab. Melee Attack Roll: Bonus equals your spell attack modifier, reach 10 ft. Hit: 1d6 + 3 + the spell's level Piercing damage plus 1d4 Poison damage.\nWeb Bolt (Spider Only). Ranged Attack Roll: Bonus equals your spell attack modifier, range 60 ft. Hit: 1d10 + 3 + the spell's level Bludgeoning damage, and the target's Speed is reduced to 0 until the start of the insect's next turn.\nBonus Actions\nVenomous Spew (Centipede Only). Constitution Saving Throw: DC equals your spell save DC, one creature the insect can see within 10 feet. Failure: The target has the Poisoned condition until the start of the insect's next turn."
     },
     {
       "name": "Giant Lizard",
@@ -5408,6 +5839,106 @@
       "reactions": null,
       "legendary_actions": null,
       "description": "Mule\nMedium Beast, Unaligned\nAC 10 Initiative +0 (10)\nHP 11 (2d8 + 2)\nSpeed 40 ft.\nTraits\nBeast of Burden. The mule counts as one size larger for the purpose of determining its carrying capacity.\nActions\nHooves. Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Bludgeoning damage."
+    },
+    {
+      "category": "creature",
+      "scaling": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": null,
+      "damage_immunities": "Necrotic, Poison",
+      "condition_immunities": "Charmed, Exhaustion, Frightened, Paralyzed, Poisoned",
+      "vulnerabilities": "Fire",
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "traits": null,
+      "name": "Mummy",
+      "creature_type": "Undead",
+      "size": "Medium or Small",
+      "alignment": "Lawful Evil",
+      "cr": "3",
+      "xp": 700,
+      "proficiency_bonus": "+2",
+      "ac": "11",
+      "initiative_modifier": "-1",
+      "initiative_passive": 9,
+      "hp": "58",
+      "hit_dice": "9d8 + 18",
+      "speed": {
+        "walk": 20,
+        "fly": null,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 16,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "dex": {
+          "score": 8,
+          "mod": "-1",
+          "save": "-1"
+        },
+        "con": {
+          "score": 15,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "int": {
+          "score": 6,
+          "mod": "-2",
+          "save": "-2"
+        },
+        "wis": {
+          "score": 12,
+          "mod": "+1",
+          "save": "+3"
+        },
+        "cha": {
+          "score": 12,
+          "mod": "+1",
+          "save": "+1"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 11
+      },
+      "languages": "Common plus two other languages",
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Multiattack",
+          "tag": null,
+          "text": "The mummy makes two Rotting Fist attacks and uses Dreadful Glare."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Rotting Fist",
+          "tag": null,
+          "text": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Dreadful Glare",
+          "tag": null,
+          "text": "Wisdom Saving Throw: DC 11, one creature the mummy can see within 60 feet. Failure: The target has the Frightened condition until the end of the mummy's next turn. Success: The target is immune to this mummy's Dreadful Glare for 24 hours."
+        }
+      ],
+      "description": "Mummy\nMedium or Small Undead, Lawful Evil\nAC 11\nHP 58 (9d8 + 18)\nSpeed 20 ft.\nVulnerabilities Fire\nImmunities Necrotic, Poison; Charmed, Exhaustion, Frightened, Paralyzed, Poisoned\nSenses Darkvision 60 ft., Passive Perception 11\nLanguages Common plus two other languages\nCR 3 (XP 700; PB +2)\nActions\nMultiattack. The mummy makes two Rotting Fist attacks and uses Dreadful Glare.\nRotting Fist. Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack.\nDreadful Glare. Wisdom Saving Throw: DC 11, one creature the mummy can see within 60 feet. Failure: The target has the Frightened condition until the end of the mummy's next turn. Success: The target is immune to this mummy's Dreadful Glare for 24 hours."
     },
     {
       "name": "Octopus",
@@ -7928,6 +8459,121 @@
       "description": "Weasel\nTiny Beast, Unaligned\nAC 13 Initiative +3 (13)\nHP 1 (1d4 - 1)\nSpeed 30 ft., Climb 30 ft.\nActions\nBite. Melee Attack Roll: +5, reach 5 ft. Hit: 1 Piercing damage."
     },
     {
+      "category": "creature",
+      "scaling": null,
+      "ac_note": null,
+      "skills": "Perception +3, Stealth +4",
+      "proficiencies": null,
+      "gear": "Studded Leather Armor",
+      "resistances": "Necrotic",
+      "damage_immunities": "Poison",
+      "condition_immunities": "Exhaustion, Poisoned",
+      "vulnerabilities": null,
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Sunlight Sensitivity",
+          "tag": null,
+          "text": "While in sunlight, the wight has Disadvantage on ability checks and attack rolls."
+        }
+      ],
+      "name": "Wight",
+      "creature_type": "Undead",
+      "size": "Medium",
+      "alignment": "Neutral Evil",
+      "cr": "3",
+      "xp": 700,
+      "proficiency_bonus": "+2",
+      "ac": "14",
+      "initiative_modifier": "+4",
+      "initiative_passive": 14,
+      "hp": "82",
+      "hit_dice": "11d8 + 33",
+      "speed": {
+        "walk": 30,
+        "fly": null,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 15,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "dex": {
+          "score": 14,
+          "mod": "+2",
+          "save": "+2"
+        },
+        "con": {
+          "score": 16,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "int": {
+          "score": 10,
+          "mod": "+0",
+          "save": "+0"
+        },
+        "wis": {
+          "score": 13,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "cha": {
+          "score": 15,
+          "mod": "+2",
+          "save": "+2"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 13
+      },
+      "languages": "Common plus one other language",
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Multiattack",
+          "tag": null,
+          "text": "The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Necrotic Sword",
+          "tag": null,
+          "text": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Necrotic Bow",
+          "tag": null,
+          "text": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage."
+        },
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Life Drain",
+          "tag": null,
+          "text": "Constitution Saving Throw: DC 13, one creature within 5 feet. Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time."
+        }
+      ],
+      "description": "Wight\nMedium Undead, Neutral Evil\nAC 14\nHP 82 (11d8 + 33)\nSpeed 30 ft.\nSkills Perception +3, Stealth +4\nResistances Necrotic\nImmunities Poison; Exhaustion, Poisoned\nGear Studded Leather Armor\nSenses Darkvision 60 ft., Passive Perception 13\nLanguages Common plus one other language\nCR 3 (XP 700; PB +2)\nTraits\nSunlight Sensitivity. While in sunlight, the wight has Disadvantage on ability checks and attack rolls.\nActions\nMultiattack. The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain.\nNecrotic Sword. Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage.\nNecrotic Bow. Ranged Attack Roll: +4, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage.\nLife Drain. Constitution Saving Throw: DC 13, one creature within 5 feet. Failure: 6 (1d8 + 2) Necrotic damage, and the target's Hit Point maximum decreases by an amount equal to the damage taken. A Humanoid slain by this attack rises 24 hours later as a Zombie under the wight's control, unless the Humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at a time."
+    },
+    {
       "name": "Wolf",
       "creature_type": "Beast",
       "size": "Medium",
@@ -8020,6 +8666,100 @@
       "reactions": null,
       "legendary_actions": null,
       "description": "Wolf\nMedium Beast, Unaligned\nAC 12 Initiative +2 (12)\nHP 11 (2d8 + 2)\nSpeed 40 ft.\nTraits\nPack Tactics. The wolf has Advantage on attack rolls against a creature if at least one of the wolf’s allies is within 5 feet of the creature and the ally doesn’t have the Incapacitated condition.\nActions\nBite. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition."
+    },
+    {
+      "category": "creature",
+      "scaling": null,
+      "ac_note": null,
+      "skills": null,
+      "proficiencies": null,
+      "gear": null,
+      "resistances": null,
+      "damage_immunities": "Poison",
+      "condition_immunities": "Exhaustion, Poisoned",
+      "vulnerabilities": null,
+      "bonus_actions": null,
+      "reactions": null,
+      "legendary_actions": null,
+      "traits": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Undead Fortitude",
+          "tag": null,
+          "text": "If damage reduces the zombie to 0 Hit Points, it must make a Constitution saving throw (DC 5 plus the damage taken) unless the damage is Radiant or from a Critical Hit. On a successful save, the zombie drops to 1 Hit Point instead."
+        }
+      ],
+      "name": "Zombie",
+      "creature_type": "Undead",
+      "size": "Medium",
+      "alignment": "Neutral Evil",
+      "cr": "1/4",
+      "xp": 50,
+      "proficiency_bonus": "+2",
+      "ac": "8",
+      "initiative_modifier": "-2",
+      "initiative_passive": 8,
+      "hp": "15",
+      "hit_dice": "2d8 + 6",
+      "speed": {
+        "walk": 20,
+        "fly": null,
+        "swim": null,
+        "climb": null,
+        "burrow": null,
+        "notes": null
+      },
+      "ability_scores": {
+        "str": {
+          "score": 13,
+          "mod": "+1",
+          "save": "+1"
+        },
+        "dex": {
+          "score": 6,
+          "mod": "-2",
+          "save": "-2"
+        },
+        "con": {
+          "score": 16,
+          "mod": "+3",
+          "save": "+3"
+        },
+        "int": {
+          "score": 3,
+          "mod": "-4",
+          "save": "-4"
+        },
+        "wis": {
+          "score": 6,
+          "mod": "-2",
+          "save": "+0"
+        },
+        "cha": {
+          "score": 5,
+          "mod": "-3",
+          "save": "-3"
+        }
+      },
+      "senses": {
+        "darkvision": 60,
+        "blindsight": null,
+        "tremorsense": null,
+        "truesight": null,
+        "passive_perception": 8
+      },
+      "languages": "Understands Common plus one other language but can't speak",
+      "actions": [
+        {
+          "unlock_level_label": null,
+          "unlock_level_number": null,
+          "name": "Slam",
+          "tag": null,
+          "text": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Bludgeoning damage."
+        }
+      ],
+      "description": "Zombie\nMedium Undead, Neutral Evil\nAC 8\nHP 15 (2d8 + 6)\nSpeed 20 ft.\nImmunities Poison; Exhaustion, Poisoned\nSenses Darkvision 60 ft., Passive Perception 8\nLanguages Understands Common plus one other language but can't speak\nCR 1/4 (XP 50; PB +2)\nTraits\nUndead Fortitude. If damage reduces the zombie to 0 Hit Points, it must make a Constitution saving throw (DC 5 plus the damage taken) unless the damage is Radiant or from a Critical Hit. On a successful save, the zombie drops to 1 Hit Point instead.\nActions\nSlam. Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Bludgeoning damage."
     }
   ]
 }

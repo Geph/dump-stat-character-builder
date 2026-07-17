@@ -3527,6 +3527,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         },
         { action: true },
       ),
+      grantCreaturePreset("dragon_companion_spirit", ["Draconic Spirit"], {
+        label: "Draconic Spirit (Summon Dragon)",
+      }),
     ],
   },
 
