@@ -36,6 +36,24 @@ describe("Faithful Steed preset", () => {
   })
 })
 
+describe("Dragon Companion preset (Draconic Sorcery)", () => {
+  const feature = enrich(
+    "Sorcerer",
+    {
+      name: "Dragon Companion",
+      level: 18,
+      description: "You can cast Summon Dragon without a Material component.",
+    },
+    "Draconic Sorcery",
+  )
+
+  it("grants the Draconic Spirit companion", () => {
+    const grants = grantCreaturesFromLinkedModifiers([], feature.linkedModifiers)
+    expect(grants).toHaveLength(1)
+    expect(grants[0].creatureNames).toEqual(["Draconic Spirit"])
+  })
+})
+
 describe("Primal Companion preset (Beast Master)", () => {
   const feature = enrich(
     "Ranger",
