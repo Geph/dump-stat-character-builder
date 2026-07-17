@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS spells (
   higher_levels TEXT,
   classes JSON,
   psionic_augments JSON,
+  companion_creature_names JSON,
+  linked_modifiers JSON,
   prerequisite_rules JSON,
   icon VARCHAR(255),
   accent_color VARCHAR(32),

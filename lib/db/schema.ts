@@ -167,6 +167,8 @@ export const spells = mysqlTable("spells", {
   psionic_augments: json("psionic_augments").$type<
     import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig
   >(),
+  companion_creature_names: json("companion_creature_names").$type<string[]>().default([]),
+  linked_modifiers: json("linked_modifiers").$type<unknown[]>().default([]),
   ...compendiumMeta,
 })
 

@@ -17,6 +17,13 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import {
+  normalizeLinkedModifiers,
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
+import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
@@ -69,6 +76,8 @@ interface SpellFormData {
   description: string
   higher_levels: string
   classes: string[]
+  companion_creature_names: string[]
+  linked_modifiers: LinkedModifierInstance[]
   source: string
   creator_url: string
   icon: string | null
@@ -90,6 +99,8 @@ const defaultSpell: SpellFormData = {
   description: "",
   higher_levels: "",
   classes: [],
+  companion_creature_names: [],
+  linked_modifiers: [],
   source: "Custom",
   creator_url: "",
   icon: "bookmarklet",
@@ -106,6 +117,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
   const [otherClassListOpen, setOtherClassListOpen] = useState(false)
   const [spellSchools, setSpellSchools] = useState<string[]>(() => getSpellSchools())
   const router = useRouter()
+  const { catalog: modifierCatalog } = useModifierCatalog()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("spells", id)
 
   const isStandardSpellClass = (name: string) =>
@@ -171,6 +183,14 @@ export default function SpellEditorPage({ id }: { id: string }) {
               description: String(row.description ?? ""),
               higher_levels: String(row.higher_levels ?? ""),
               classes: (row.classes as string[]) || [],
+              companion_creature_names: Array.isArray(row.companion_creature_names)
+                ? (row.companion_creature_names as string[])
+                : [],
+              linked_modifiers: normalizeLinkedModifiers(
+                (row.linked_modifiers ?? row.linkedModifiers) as LinkedModifierInstance[] | null | undefined,
+                modifierCatalog,
+                [],
+              ),
               source: String(row.source ?? "Custom"),
               creator_url: String(row.creator_url ?? ""),
               icon: (row.icon as string | null) ?? null,
@@ -183,7 +203,7 @@ export default function SpellEditorPage({ id }: { id: string }) {
       }
       fetchSpell()
     }
-  }, [id])
+  }, [id, modifierCatalog])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -191,7 +211,12 @@ export default function SpellEditorPage({ id }: { id: string }) {
     setError(null)
 
     const db = createClient()
-    const payload = { ...form, creator_url: normalizeCreatorUrl(form.creator_url) }
+    const synced = syncModifierRefs({ linkedModifiers: form.linked_modifiers })
+    const payload = {
+      ...form,
+      linked_modifiers: synced.linkedModifiers ?? form.linked_modifiers,
+      creator_url: normalizeCreatorUrl(form.creator_url),
+    }
     
     if (id === "new") {
       const { error } = await db.from("spells").insert([payload])
@@ -499,6 +524,46 @@ export default function SpellEditorPage({ id }: { id: string }) {
                 placeholder="Material components (e.g., a bit of bat guano and sulfur)"
               />
             )}
+          </CompendiumEditorPanel>
+
+          <CompendiumEditorPanel title="Summon Creature" defaultOpen={false}>
+            <p className="text-xs text-muted-foreground mb-3">
+              Link Creatures &amp; Companions that appear on the character sheet Companions tab when
+              this spell is known (Find Familiar, Find Steed, Animate Dead, etc.). Prefer the{" "}
+              <span className="font-semibold">Grant Creature / Companion</span> modifier for player
+              choices.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-foreground mb-2">
+                Creature names (always granted)
+              </label>
+              <textarea
+                value={form.companion_creature_names.join("\n")}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    companion_creature_names: e.target.value
+                      .split(/[\n,]/)
+                      .map((entry) => entry.trim())
+                      .filter(Boolean),
+                  })
+                }
+                rows={3}
+                placeholder={"Otherworldly Steed\nDraconic Spirit"}
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+            <LinkedModifiersEditor
+              value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, [])}
+              onChange={(linked_modifiers) =>
+                setForm((prev) => ({
+                  ...prev,
+                  linked_modifiers,
+                }))
+              }
+              catalog={modifierCatalog}
+              label="Summon / grant creature modifiers"
+            />
           </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Description" defaultOpen>

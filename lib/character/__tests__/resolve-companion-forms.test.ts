@@ -95,14 +95,33 @@ describe("Wild Shape linked to eligible beasts", () => {
 })
 
 describe("Find Familiar form selection", () => {
-  const wizardSource = { className: "Wizard", classId: "wizard" }
+  const findFamiliarSpell = {
+    id: "spell-ff",
+    name: "Find Familiar",
+    level: 1,
+    school: "Conjuration",
+    casting_time: "1 hour",
+    range: "10 feet",
+    components: ["V", "S", "M"],
+    material: null,
+    duration: "Instantaneous",
+    concentration: false,
+    ritual: true,
+    description: "",
+    higher_levels: null,
+    classes: ["Wizard"],
+    icon: null,
+    source: "SRD",
+    creator_url: null,
+    created_at: "",
+  }
 
   it("grants the generic familiar with pickable forms when no form is chosen", () => {
     const { companions, formGroups } = resolveCharacterCompanionsDetailed({
       classDetails: [],
       ctx: CTX,
       creatures: SEED_CREATURES,
-      findFamiliarSpellSource: wizardSource,
+      knownSpells: [findFamiliarSpell as never],
     })
     expect(companions.map((c) => c.template.name)).toContain("Familiar")
     const familiar = formGroups.find((group) => group.kind === "familiar")!
@@ -116,8 +135,8 @@ describe("Find Familiar form selection", () => {
       classDetails: [],
       ctx: CTX,
       creatures: SEED_CREATURES,
-      findFamiliarSpellSource: wizardSource,
-      formSelections: { "wizard:none:find_familiar": ["Owl"] },
+      knownSpells: [findFamiliarSpell as never],
+      formSelections: { "spellcaster:none:find_familiar": ["Owl"] },
     })
     const familiar = companions.find((c) => /^Familiar/.test(c.template.name))!
     expect(familiar.template.name).toBe("Familiar (Owl)")
@@ -158,12 +177,54 @@ describe("Find Familiar form selection", () => {
       classDetails: [warlock],
       ctx: CTX,
       creatures: SEED_CREATURES,
-      findFamiliarSpellSource: { className: "Warlock", classId: "warlock" },
+      knownSpells: [findFamiliarSpell as never],
       formSelections: { "warlock:none:pact_of_the_chain": ["Sprite"] },
     })
     const familiars = companions.filter((c) => /^Familiar/.test(c.template.name))
     expect(familiars).toHaveLength(1)
     expect(familiars[0].template.name).toBe("Familiar (Sprite)")
+  })
+
+  it("resolves Animate Dead / Awaken / Find Steed from known spells", () => {
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [],
+      ctx: CTX,
+      creatures: SEED_CREATURES,
+      knownSpells: [
+        {
+          ...findFamiliarSpell,
+          id: "spell-steed",
+          name: "Find Steed",
+          companion_creature_names: ["Otherworldly Steed"],
+        } as never,
+        {
+          ...findFamiliarSpell,
+          id: "spell-animate",
+          name: "Animate Dead",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_animate",
+              catalogRefId: "cat_char_grant_creature",
+              characteristics: [
+                {
+                  id: "mod_animate",
+                  type: "grant_creature",
+                  creatureNames: ["Skeleton", "Zombie"],
+                  choiceOptions: ["Skeleton", "Zombie"],
+                  count: 1,
+                },
+              ],
+            },
+          ],
+        } as never,
+      ],
+      formSelections: { "spellcaster:none:animate_dead": ["Skeleton"] },
+    })
+    expect(companions.map((c) => c.template.name)).toContain("Otherworldly Steed")
+    expect(companions.map((c) => c.template.name)).toContain("Skeleton")
+    expect(formGroups.some((g) => g.kind === "choice" && g.featureName === "Animate Dead")).toBe(
+      true,
+    )
   })
 })
 

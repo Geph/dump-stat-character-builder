@@ -8,6 +8,7 @@ import {
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { BaseEquipmentFilter } from "@/lib/compendium/equipment-magic"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
+import { magicItemSummonCreaturePresets } from "@/lib/compendium/magic-item-summon-creatures"
 import { isSrdSource } from "@/lib/srd/source"
 import { applySrdItemIcon, SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 
@@ -190,14 +191,26 @@ function presetForRow(row: MagicItemSeedRow): MagicItemPreset | null {
 export function enrichSrdMagicItemRow(row: MagicItemSeedRow): MagicItemSeedRow {
   if (!isSrdSource(row.source ?? "")) return row
   const preset = presetForRow(row)
-  if (!preset) return row
+  const summonEffects = magicItemSummonCreaturePresets(row.name)
+  if (!preset && !summonEffects?.length) return row
+
+  const byId = new Map<string, LinkedModifierInstance>()
+  for (const effect of [
+    ...(preset?.magic_effects ?? []),
+    ...(summonEffects ?? []),
+    ...(row.magic_effects ?? []),
+  ]) {
+    if (!byId.has(effect.instanceId)) byId.set(effect.instanceId, effect)
+  }
+  const magic_effects = [...byId.values()]
+
   return {
     ...row,
-    requires_attunement: preset.requires_attunement ?? row.requires_attunement,
-    rarity: preset.rarity ?? row.rarity,
-    base_equipment_names: preset.base_equipment_names ?? row.base_equipment_names,
-    base_equipment_filter: preset.base_equipment_filter ?? row.base_equipment_filter,
-    magic_effects: preset.magic_effects ?? row.magic_effects,
+    requires_attunement: preset?.requires_attunement ?? row.requires_attunement,
+    rarity: preset?.rarity ?? row.rarity,
+    base_equipment_names: preset?.base_equipment_names ?? row.base_equipment_names,
+    base_equipment_filter: preset?.base_equipment_filter ?? row.base_equipment_filter,
+    magic_effects: magic_effects.length ? magic_effects : row.magic_effects,
   }
 }
 

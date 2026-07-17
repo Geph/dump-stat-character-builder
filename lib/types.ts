@@ -789,6 +789,12 @@ export interface Spell {
   classes: string[] | null
   /** Psi-point empower options parsed from homebrew psionic power text (KibblesTasty Psion, etc.). */
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
+  /**
+   * Summon / grant Creatures & Companions (Find Familiar, Find Steed, Animate Dead, etc.).
+   * Resolved onto the character sheet Companions tab when the spell is known.
+   */
+  companion_creature_names?: string[] | null
+  linkedModifiers?: LinkedModifierInstance[] | null
   icon: string | null
   accent_color?: string | null
   card_image_url?: string | null

@@ -18,13 +18,15 @@ import {
 } from "@/lib/character/companion-form-options"
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
-import { SRD_FAMILIAR, isFamiliarFeature } from "@/lib/character/srd-familiar"
+import { SRD_FAMILIAR, isFamiliarFeature, isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import {
   creatureNamesFromAbility,
   creatureNamesFromFeature,
+  grantCreaturesFromLinkedModifiers,
+  grantCreaturesFromSpell,
 } from "@/lib/compendium/grant-creature-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Creature, CustomAbility, Feature } from "@/lib/types"
+import type { Creature, CustomAbility, Equipment, Feature, Spell } from "@/lib/types"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 type FeatureCarrier = {
@@ -51,7 +53,7 @@ export type CompanionFormGroup = {
   key: string
   featureName: string
   className: string
-  kind: "wild_shape" | "familiar"
+  kind: "wild_shape" | "familiar" | "choice"
   /** Pickable forms from the compendium (name + CR for display). */
   options: { name: string; cr?: string | null }[]
   /** Currently active form names. */
@@ -324,14 +326,228 @@ type ResolveCompanionsParams = {
   classDetails: CharacterClassDetail[]
   customAbilities?: CustomAbility[]
   ctx: CompanionResolveContext
-  /** Source for a familiar granted by the Find Familiar spell (e.g. a Wizard who knows it). */
+  /**
+   * @deprecated Prefer `knownSpells` — Find Familiar is resolved from the spell's
+   * summon-creature (grant_creature) modifiers.
+   */
   findFamiliarSpellSource?: { className: string; classId: string; subclassId?: string | null } | null
+  /** Known/prepared spells — grant_creature / companion_creature_names feed the Companions tab. */
+  knownSpells?: Spell[]
+  /** Inventory equipment — magic_effects grant_creature feed the Companions tab. */
+  equipment?: Equipment[]
   /** Compendium creatures available to resolve name-linked companions. */
   creatures?: Creature[]
   /** Modifier catalog for resolving grant_creature linked modifiers. */
   modifierCatalog?: ModifierCatalogEntry[]
   /** Player-selected forms per group key (from CharacterCompanionState.knownForms). */
   formSelections?: CompanionFormSelections
+}
+
+function classHasPactOfTheChain(classDetails: CharacterClassDetail[]): boolean {
+  return classDetails.some((entry) =>
+    [...(entry.class?.features ?? []), ...(entry.subclass?.features ?? [])].some(
+      (feature) =>
+        (feature as { level?: number }).level != null &&
+        (feature as { level: number }).level <= entry.row.level &&
+        isPactOfTheChainFeature((feature as { name?: string }).name ?? ""),
+    ),
+  )
+}
+
+function pushFamiliarCandidate(params: {
+  source: CompanionSource
+  creatures?: Creature[]
+  formSelections?: CompanionFormSelections
+  formGroups: CompanionFormGroup[]
+  pactOfTheChain: boolean
+  into: { source: CompanionSource; template: CompanionStatBlockTemplate }[]
+}) {
+  const groupKey = companionKey(params.source)
+  const options = familiarFormOptions(params.creatures, {
+    pactOfTheChain: params.pactOfTheChain,
+  })
+  const selectedName = params.formSelections?.[groupKey]?.[0] ?? null
+  const chosen = selectedName
+    ? options.find(
+        (form) => normalizeCreatureName(form.name) === normalizeCreatureName(selectedName),
+      )
+    : null
+  if (options.length) {
+    params.formGroups.push({
+      key: groupKey,
+      featureName: params.source.featureName,
+      className: params.source.className,
+      kind: "familiar",
+      options: options.map((form) => ({ name: form.name, cr: form.cr ?? null })),
+      selected: chosen ? [chosen.name] : [],
+      maxKnown: 1,
+    })
+  }
+  params.into.push({
+    source: params.source,
+    template: chosen ? familiarTemplateForForm(chosen) : SRD_FAMILIAR,
+  })
+}
+
+function pushChoiceGrant(params: {
+  source: CompanionSource
+  optionNames: string[]
+  maxKnown: number
+  creatureLookup?: Map<string, CompanionStatBlockTemplate>
+  formSelections?: CompanionFormSelections
+  formGroups: CompanionFormGroup[]
+  into: { source: CompanionSource; template: CompanionStatBlockTemplate }[]
+}) {
+  const groupKey = companionKey(params.source)
+  const options = params.optionNames
+    .map((name) => params.creatureLookup?.get(normalizeCreatureName(name)))
+    .filter((template): template is CompanionStatBlockTemplate => Boolean(template))
+  if (!options.length) return
+
+  const selectedNames =
+    params.formSelections?.[groupKey] ??
+    (options.length === 1 ? [options[0].name] : [])
+  const selectedSet = new Set(selectedNames.map(normalizeCreatureName))
+  const chosen = options.filter((form) => selectedSet.has(normalizeCreatureName(form.name)))
+
+  params.formGroups.push({
+    key: groupKey,
+    featureName: params.source.featureName,
+    className: params.source.className,
+    kind: "choice",
+    options: options.map((form) => ({ name: form.name, cr: form.cr ?? null })),
+    selected: chosen.map((form) => form.name),
+    maxKnown: params.maxKnown,
+  })
+
+  for (const template of chosen) {
+    params.into.push({
+      source: { ...params.source, formName: template.name },
+      template,
+    })
+  }
+}
+
+export function collectCompanionCandidatesFromSpells(
+  spells: Spell[],
+  creatureLookup: Map<string, CompanionStatBlockTemplate> | undefined,
+  modifierCatalog: ModifierCatalogEntry[],
+  extras: ScanExtras & {
+    classDetails?: CharacterClassDetail[]
+    className?: string
+    classId?: string
+    /** Skip Find Familiar when a class feature already granted one. */
+    skipFindFamiliar?: boolean
+  } = {},
+): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
+  const out: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
+  const formGroups = extras.formGroups ?? []
+  const pactOfTheChain = classHasPactOfTheChain(extras.classDetails ?? [])
+  const className = extras.className ?? "Spellcaster"
+  const classId = extras.classId ?? "spellcaster"
+
+  for (const spell of spells) {
+    const source: CompanionSource = {
+      featureName: spell.name,
+      featureLevel: Math.max(1, spell.level || 1),
+      className,
+      subclassName: null,
+      classId,
+      subclassId: null,
+    }
+
+    if (isFindFamiliarSpell(spell.name)) {
+      if (extras.skipFindFamiliar) continue
+      pushFamiliarCandidate({
+        source,
+        creatures: extras.creatures,
+        formSelections: extras.formSelections,
+        formGroups,
+        pactOfTheChain,
+        into: out,
+      })
+      continue
+    }
+
+    const grants = grantCreaturesFromSpell(spell, modifierCatalog)
+    if (!grants.length) {
+      // Fall back to flat name list when no structured grant metadata.
+      const names = collectLinkedCreatureTemplates(
+        // creatureNamesFromSpell is imported via grantCreaturesFromSpell helpers
+        (spell.companion_creature_names ?? []).map((n) => n.trim()).filter(Boolean),
+        creatureLookup,
+      )
+      for (const template of names) {
+        out.push({ source: { ...source, formName: template.name }, template })
+      }
+      continue
+    }
+
+    for (const grant of grants) {
+      if (grant.choiceOptions?.length) {
+        pushChoiceGrant({
+          source,
+          optionNames: grant.choiceOptions,
+          maxKnown: grant.count ?? 1,
+          creatureLookup,
+          formSelections: extras.formSelections,
+          formGroups,
+          into: out,
+        })
+      } else {
+        for (const template of collectLinkedCreatureTemplates(grant.creatureNames, creatureLookup)) {
+          out.push({ source: { ...source, formName: template.name }, template })
+        }
+      }
+    }
+  }
+
+  return out
+}
+
+export function collectCompanionCandidatesFromEquipment(
+  equipment: Equipment[],
+  creatureLookup: Map<string, CompanionStatBlockTemplate> | undefined,
+  modifierCatalog: ModifierCatalogEntry[],
+  extras: ScanExtras = {},
+): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
+  const out: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
+  const formGroups = extras.formGroups ?? []
+
+  for (const item of equipment) {
+    const effects = (item.magic_effects ?? []) as LinkedModifierInstance[]
+    const grants = grantCreaturesFromLinkedModifiers(modifierCatalog, effects)
+    if (!grants.length) continue
+
+    const source: CompanionSource = {
+      featureName: item.name,
+      featureLevel: 1,
+      className: "Magic Item",
+      subclassName: null,
+      classId: item.id,
+      subclassId: null,
+    }
+
+    for (const grant of grants) {
+      if (grant.choiceOptions?.length) {
+        pushChoiceGrant({
+          source,
+          optionNames: grant.choiceOptions,
+          maxKnown: grant.count ?? 1,
+          creatureLookup,
+          formSelections: extras.formSelections,
+          formGroups,
+          into: out,
+        })
+      } else {
+        for (const template of collectLinkedCreatureTemplates(grant.creatureNames, creatureLookup)) {
+          out.push({ source: { ...source, formName: template.name }, template })
+        }
+      }
+    }
+  }
+
+  return out
 }
 
 export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsParams): {
@@ -346,57 +562,62 @@ export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsPara
     formSelections: params.formSelections,
     formGroups,
   }
-  const candidates = [
-    ...collectCompanionCandidatesFromClasses(params.classDetails, creatureLookup, catalog, extras),
-    ...collectCompanionCandidatesFromAbilities(params.customAbilities ?? [], creatureLookup, catalog),
-  ]
+  const spellcastingEntry =
+    params.classDetails.find((entry) => entry.class?.spellcasting) ?? params.classDetails[0]
+  const spellClassName = spellcastingEntry?.class?.name ?? "Spellcaster"
+  const spellClassId = spellcastingEntry?.row.class_id ?? "spellcaster"
 
-  // A caster who knows Find Familiar gets the familiar too, unless a feature
-  // (Wild Companion, Pact of the Chain) already provided one.
-  const hasFamiliar = candidates.some(
+  const fromClasses = collectCompanionCandidatesFromClasses(
+    params.classDetails,
+    creatureLookup,
+    catalog,
+    extras,
+  )
+  const fromAbilities = collectCompanionCandidatesFromAbilities(
+    params.customAbilities ?? [],
+    creatureLookup,
+    catalog,
+  )
+  const hasFamiliar = [...fromClasses, ...fromAbilities].some(
     (row) => row.template.name === SRD_FAMILIAR.name || /^familiar \(/i.test(row.template.name),
   )
-  if (params.findFamiliarSpellSource && !hasFamiliar) {
-    const source: CompanionSource = {
-      featureName: "Find Familiar",
-      featureLevel: 1,
-      className: params.findFamiliarSpellSource.className,
-      subclassName: null,
-      classId: params.findFamiliarSpellSource.classId,
-      subclassId: params.findFamiliarSpellSource.subclassId ?? null,
-    }
-    const groupKey = companionKey(source)
-    // Pact of the Chain broadens the form options even when the familiar
-    // comes from the spell (e.g. a Warlock who learned Find Familiar).
-    const hasPactOfTheChain = params.classDetails.some((entry) =>
-      [...(entry.class?.features ?? []), ...(entry.subclass?.features ?? [])].some(
-        (feature) =>
-          (feature as { level?: number }).level != null &&
-          (feature as { level: number }).level <= entry.row.level &&
-          isPactOfTheChainFeature((feature as { name?: string }).name ?? ""),
-      ),
-    )
-    const options = familiarFormOptions(params.creatures, { pactOfTheChain: hasPactOfTheChain })
-    const selectedName = params.formSelections?.[groupKey]?.[0] ?? null
-    const chosen = selectedName
-      ? options.find(
-          (form) => normalizeCreatureName(form.name) === normalizeCreatureName(selectedName),
-        )
-      : null
-    if (options.length) {
-      formGroups.push({
-        key: groupKey,
+  const candidates = [
+    ...fromClasses,
+    ...fromAbilities,
+    ...collectCompanionCandidatesFromSpells(params.knownSpells ?? [], creatureLookup, catalog, {
+      ...extras,
+      classDetails: params.classDetails,
+      className: spellClassName,
+      classId: spellClassId,
+      skipFindFamiliar: hasFamiliar,
+    }),
+    ...collectCompanionCandidatesFromEquipment(
+      params.equipment ?? [],
+      creatureLookup,
+      catalog,
+      extras,
+    ),
+  ]
+
+  // Legacy fallback: findFamiliarSpellSource without knownSpells still grants a familiar.
+  const hasFamiliarAfter = candidates.some(
+    (row) => row.template.name === SRD_FAMILIAR.name || /^familiar \(/i.test(row.template.name),
+  )
+  if (params.findFamiliarSpellSource && !hasFamiliarAfter && !(params.knownSpells ?? []).length) {
+    pushFamiliarCandidate({
+      source: {
         featureName: "Find Familiar",
+        featureLevel: 1,
         className: params.findFamiliarSpellSource.className,
-        kind: "familiar",
-        options: options.map((form) => ({ name: form.name, cr: form.cr ?? null })),
-        selected: chosen ? [chosen.name] : [],
-        maxKnown: 1,
-      })
-    }
-    candidates.push({
-      source,
-      template: chosen ? familiarTemplateForForm(chosen) : SRD_FAMILIAR,
+        subclassName: null,
+        classId: params.findFamiliarSpellSource.classId,
+        subclassId: params.findFamiliarSpellSource.subclassId ?? null,
+      },
+      creatures: params.creatures,
+      formSelections: params.formSelections,
+      formGroups,
+      pactOfTheChain: classHasPactOfTheChain(params.classDetails),
+      into: candidates,
     })
   }
 

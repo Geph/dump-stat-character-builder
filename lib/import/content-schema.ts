@@ -425,6 +425,8 @@ export const SpellImportSchema = z.object({
   classes: z.array(z.string()).nullable(),
   psionic_augments: z.unknown().optional(),
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
+  companion_creature_names: z.array(z.string()).nullable().optional(),
+  linkedModifiers: z.array(z.record(z.unknown())).nullable().optional(),
 })
 
 export const ClassImportSchema = z.object({

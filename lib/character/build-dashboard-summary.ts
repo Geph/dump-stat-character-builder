@@ -9,7 +9,6 @@ import {
   mergeCompanionState,
   resolveCharacterCompanions,
 } from "@/lib/character/resolve-companions"
-import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { normalizeSheetPlayState } from "@/lib/character/sheet-play-state"
 import type { DerivedCharacter } from "@/lib/character/types"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
@@ -268,21 +267,11 @@ function buildCompanionSummaries(
     ownerSavingThrowProficiencies: derived.savingThrowProficiencies,
   }
 
-  const hasFindFamiliar = spells.some((spell) => isFindFamiliarSpell(spell.name))
-  const spellcastingEntry = classDetails.find((entry) => entry.class?.spellcasting) ?? classDetails[0]
-  const findFamiliarSpellSource = hasFindFamiliar
-    ? {
-        className: spellcastingClass?.name ?? "Spellcaster",
-        classId: spellcastingEntry?.row.class_id ?? "spellcaster",
-        subclassId: null,
-      }
-    : null
-
   const resolved = resolveCharacterCompanions({
     classDetails,
     customAbilities: sheetCustomAbilities,
     ctx,
-    findFamiliarSpellSource,
+    knownSpells: spells,
     formSelections: formSelectionsFromState(character.companion_state ?? []),
   })
   const merged = mergeCompanionState(resolved, character.companion_state ?? [])
