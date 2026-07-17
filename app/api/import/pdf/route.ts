@@ -26,7 +26,7 @@ import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
 import { prepareImportedContent } from "@/lib/import/finalize-import"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { detectImportCollisions } from "@/lib/import/fetch-import-collisions"
-import { persistImportedContent } from "@/lib/import/persist-import-content"
+import { persistImportedContent, normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { extractTextFromPdfBuffer, parseImportPageRange } from "@/lib/import/parse-pdf-text"
 import {
@@ -91,6 +91,10 @@ export async function POST(request: NextRequest) {
     const pageStart = formData.get("pageStart") as string | null
     const pageEnd = formData.get("pageEnd") as string | null
     const subclassMatchClassName = formData.get("subclassMatchClassName") as string | null
+    const preferSameSourceReplacements =
+      formData.get("preferSameSourceReplacements") === "true" ||
+      formData.get("preferSameSourceReplacements") === "1"
+    const materialSourceRaw = formData.get("materialSource") as string | null
     const aiProvider = formData.get("aiProvider") as string | null
     const aiModel = formData.get("aiModel") as string | null
     const aiOverride = parseImportAiOverride({ aiProvider, aiModel })
@@ -285,7 +289,10 @@ export async function POST(request: NextRequest) {
     const { totalImported, breakdown, warnings, report, discoveredSpellSchools } =
       await persistImportedContent(
       prepared.content,
-      "PDF Import",
+      normalizeImportMaterialSource(materialSourceRaw, "PDF Import"),
+      {
+        preferSameSourceReplacements,
+      },
     )
 
     return NextResponse.json({

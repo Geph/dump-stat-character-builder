@@ -1,4 +1,5 @@
 import { stripHtml } from "@/lib/import/normalize-equipment"
+import { resolvePreferredNameMatch, type NamedSourceRow } from "@/lib/compendium/prefer-same-source"
 
 export type SubclassSpellTableRow = {
   unlocksAtClassLevel: number
@@ -231,14 +232,14 @@ export function parseSubclassSpellTable(description: string): ParsedSubclassSpel
 
 export function resolveSpellNamesToIds(
   spellNames: string[],
-  catalog: { id: string; name: string }[],
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
 ): { resolved: { name: string; spellId: string }[]; missing: string[] } {
-  const byName = new Map(catalog.map((spell) => [spell.name.toLowerCase(), spell]))
   const resolved: { name: string; spellId: string }[] = []
   const missing: string[] = []
 
   for (const name of spellNames) {
-    const match = byName.get(name.toLowerCase())
+    const match = resolvePreferredNameMatch(name, catalog, preferredSource)
     if (match) {
       if (!resolved.some((entry) => entry.spellId === match.id)) {
         resolved.push({ name: match.name, spellId: match.id })

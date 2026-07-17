@@ -17,7 +17,7 @@ export async function respondToFoundryParseResult(
       return NextResponse.json(
         {
           code: "foundry_manifest",
-          error: "Foundry module/world manifest detected — export compendium items as JSON.",
+          error: "Foundry module/world manifest detected — export Item or NPC Actor JSON.",
           manifest: result.manifest,
         },
         { status: 422 },

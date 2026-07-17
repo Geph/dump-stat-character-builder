@@ -20,6 +20,7 @@ import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
+import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
     await upsertByName("languages", withSrdCreatorUrlList(languages))
     await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools)))
+    await upsertByName("creatures", buildSrdCreatureSeedRows())
     const equipmentSeed = await seedSrdEquipment({
       upsertByName,
       listEquipmentByName: async () => {

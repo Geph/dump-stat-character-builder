@@ -451,14 +451,86 @@ const FeatAiSchema = z.object({
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
 })
 
+const CreatureAbilityEntryAiSchema = z.object({
+  unlock_level_label: z.string().nullable(),
+  unlock_level_number: z.number().nullable(),
+  name: z.string(),
+  tag: z.string().nullable(),
+  text: z.string(),
+})
+
+const CreatureAbilityScoreAiSchema = z.object({
+  score: z.number(),
+  mod: z.string(),
+  save: z.string(),
+})
+
 const CreatureAiSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   creature_type: z.string().nullable(),
   size: z.string().nullable(),
   alignment: z.string().nullable(),
+  /** "creature" (fixed CR) or "companion" (owner-scaled). Prefer schema v2.0 fields when known. */
+  category: z.enum(["creature", "companion", "monster"]).nullable(),
   cr: z.string().nullable(),
-  /** Full stat-block prose when not already structured — Dump Stat parses on persist. */
+  xp: z.number().nullable(),
+  proficiency_bonus: z.string().nullable(),
+  scaling: z
+    .object({
+      scales_with: z.string(),
+      notes: z.string(),
+    })
+    .nullable(),
+  ac: z.string().nullable(),
+  ac_note: z.string().nullable(),
+  initiative_modifier: z.string().nullable(),
+  initiative_passive: z.number().nullable(),
+  hp: z.string().nullable(),
+  hit_dice: z.string().nullable(),
+  speed: z
+    .object({
+      walk: z.number().nullable(),
+      fly: z.number().nullable(),
+      swim: z.number().nullable(),
+      climb: z.number().nullable(),
+      burrow: z.number().nullable(),
+      notes: z.string().nullable(),
+    })
+    .nullable(),
+  ability_scores: z
+    .object({
+      str: CreatureAbilityScoreAiSchema,
+      dex: CreatureAbilityScoreAiSchema,
+      con: CreatureAbilityScoreAiSchema,
+      int: CreatureAbilityScoreAiSchema,
+      wis: CreatureAbilityScoreAiSchema,
+      cha: CreatureAbilityScoreAiSchema,
+    })
+    .nullable(),
+  skills: z.string().nullable(),
+  proficiencies: z.string().nullable(),
+  gear: z.string().nullable(),
+  resistances: z.string().nullable(),
+  damage_immunities: z.string().nullable(),
+  condition_immunities: z.string().nullable(),
+  vulnerabilities: z.string().nullable(),
+  senses: z
+    .object({
+      darkvision: z.number().nullable(),
+      blindsight: z.number().nullable(),
+      tremorsense: z.number().nullable(),
+      truesight: z.number().nullable(),
+      passive_perception: z.number().nullable(),
+    })
+    .nullable(),
+  languages: z.string().nullable(),
+  traits: z.array(CreatureAbilityEntryAiSchema).nullable(),
+  actions: z.array(CreatureAbilityEntryAiSchema).nullable(),
+  bonus_actions: z.array(CreatureAbilityEntryAiSchema).nullable(),
+  reactions: z.array(CreatureAbilityEntryAiSchema).nullable(),
+  legendary_actions: z.array(CreatureAbilityEntryAiSchema).nullable(),
+  /** Full stat-block prose fallback when structured fields are incomplete. */
   stat_block_text: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
   source: z.string().nullable(),
@@ -856,18 +928,57 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.creatures?.length) {
-    content.creatures = raw.creatures.map((creature) =>
-      omitNull({
+    content.creatures = raw.creatures.map((creature) => {
+      const description = creature.stat_block_text ?? creature.description
+      const base = omitNull({
         name: creature.name,
-        description: creature.stat_block_text ?? creature.description,
+        description,
         creature_type: creature.creature_type,
         size: creature.size,
         alignment: creature.alignment,
         cr: creature.cr,
         prerequisite_rules: creature.prerequisite_rules,
         source: creature.source,
-      }),
-    ) as NonNullable<ImportContent["creatures"]>
+      })
+
+      // Prefer schema v2.0 when the model populated category + combat fields.
+      if (creature.category && creature.ac && creature.hp && creature.ability_scores && creature.speed && creature.senses) {
+        const category =
+          creature.category === "monster" ? "creature" : creature.category
+        return omitNull({
+          ...base,
+          category,
+          xp: creature.xp,
+          proficiency_bonus: creature.proficiency_bonus,
+          scaling: creature.scaling,
+          ac: creature.ac,
+          ac_note: creature.ac_note,
+          initiative_modifier: creature.initiative_modifier,
+          initiative_passive: creature.initiative_passive,
+          hp: creature.hp,
+          hit_dice: creature.hit_dice,
+          speed: creature.speed,
+          ability_scores: creature.ability_scores,
+          skills: creature.skills,
+          proficiencies: creature.proficiencies,
+          gear: creature.gear,
+          resistances: creature.resistances,
+          damage_immunities: creature.damage_immunities,
+          condition_immunities: creature.condition_immunities,
+          vulnerabilities: creature.vulnerabilities,
+          senses: creature.senses,
+          languages: creature.languages,
+          traits: creature.traits,
+          actions: creature.actions,
+          bonus_actions: creature.bonus_actions,
+          reactions: creature.reactions,
+          legendary_actions: creature.legendary_actions,
+          description: description ?? `${creature.name}`,
+        })
+      }
+
+      return base
+    }) as NonNullable<ImportContent["creatures"]>
   }
 
   if (raw.equipment?.length) {

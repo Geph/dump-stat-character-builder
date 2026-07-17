@@ -9,6 +9,7 @@ import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { createClient } from "@/lib/db/client"
 import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
+import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
@@ -88,6 +89,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as unknown as Record<string, unknown>[])))
   await upsertByName("languages", withSrdCreatorUrlList(languages as unknown as Record<string, unknown>[]))
   await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as unknown as Record<string, unknown>[])))
+  await upsertByName("creatures", buildSrdCreatureSeedRows())
   await upsertByName(
     "spells",
     enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
@@ -182,6 +184,7 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   )
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as unknown as Record<string, unknown>[])))
   await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as unknown as Record<string, unknown>[])))
+  await upsertByName("creatures", buildSrdCreatureSeedRows())
   await seedSrdEquipment({
     upsertByName: upsertByName as unknown as (table: "equipment", rows: Record<string, unknown>[]) => Promise<void>,
     listEquipmentByName: async () => {

@@ -5,7 +5,12 @@ import {
   parseFoundryInput,
 } from "@/lib/import/parse-foundry-dnd5e"
 import kcllFeature from "@/lib/import/__tests__/fixtures/kcll-feature-item.json"
+import goblinNpc from "@/lib/import/__tests__/fixtures/foundry-goblin-npc.json"
+import basiliskCompanionNpc from "@/lib/import/__tests__/fixtures/foundry-basilisk-companion-npc.json"
 import { cleanFoundryHtml } from "@/lib/import/foundry-html"
+import { isCreatureImportV2 } from "@/lib/import/creature-import-v2-schema"
+import { parseCreatureImportV2 } from "@/lib/import/load-creature-import-v2"
+import { buildCreaturePersistRows } from "@/lib/import/map-creature-import-v2"
 
 const fireball = {
   name: "Fireball",
@@ -134,6 +139,10 @@ describe("isFoundryDnd5eJson", () => {
     expect(isFoundryDnd5eJson('{"type":"dump-stat-export","items":[]}')).toBe(false)
     expect(isFoundryDnd5eJson("not json")).toBe(false)
   })
+
+  it("detects NPC actor exports", () => {
+    expect(isFoundryDnd5eJson(JSON.stringify(goblinNpc))).toBe(true)
+  })
 })
 
 describe("parseFoundryDnd5eJson — spells", () => {
@@ -244,23 +253,66 @@ describe("parseFoundryInput — manifest and actors", () => {
     }
   })
 
-  it("skips actors with a clear report", () => {
-    const result = parseFoundryInput(
-      JSON.stringify({
-        name: "Goblin",
-        type: "npc",
-        system: { details: { type: { value: "humanoid" } } },
-        items: [],
-      }),
-    )
-    expect(result.kind).toBe("no_importable")
-    if (result.kind === "no_importable") {
-      expect(result.meta.skipped[0]?.reason).toContain("Actors are not imported")
-      expect(result.meta.skipped[0]?.count).toBe(1)
+  it("imports NPC actors as creatures", () => {
+    const result = parseFoundryInput(JSON.stringify(goblinNpc))
+    expect(result.kind).toBe("content")
+    if (result.kind !== "content") return
+
+    expect(result.content.creatures).toHaveLength(1)
+    const goblin = result.content.creatures![0] as {
+      name: string
+      category: string
+      cr: string
+      xp: number
+      ac: string
+      hp: string
+      size: string
+      creature_type: string
+      actions?: { name: string }[]
+      bonus_actions?: { name: string }[]
+      gear?: string | null
     }
+    expect(goblin).toMatchObject({
+      name: "Goblin",
+      category: "creature",
+      cr: "1/4",
+      xp: 50,
+      ac: "15",
+      hp: "7",
+      size: "Small",
+      creature_type: "Humanoid (Goblinoid)",
+    })
+    expect(goblin.actions?.map((row) => row.name).sort()).toEqual(["Scimitar", "Shortbow"])
+    expect(goblin.bonus_actions?.map((row) => row.name)).toEqual(["Nimble Escape"])
+    expect(goblin.gear).toContain("Leather Armor")
+    // Embedded NPC items must not also become standalone equipment/feats.
+    expect(result.content.equipment ?? []).toHaveLength(0)
+    expect(result.content.feats ?? []).toHaveLength(0)
   })
 
-  it("imports nested actor items but skips the actor shell", () => {
+  it("imports companion-style NPCs with scaling", () => {
+    const result = parseFoundryInput(JSON.stringify(basiliskCompanionNpc))
+    expect(result.kind).toBe("content")
+    if (result.kind !== "content") return
+
+    const companion = result.content.creatures![0] as {
+      name: string
+      category: string
+      cr: string | null
+      scaling: { scales_with: string } | null
+      ac: string
+      hp: string
+      reactions?: { name: string }[]
+    }
+    expect(companion.category).toBe("companion")
+    expect(companion.cr).toBeNull()
+    expect(companion.scaling?.scales_with).toMatch(/owner/i)
+    expect(companion.ac).toMatch(/PB/i)
+    expect(companion.hp.toLowerCase()).toMatch(/level/)
+    expect(companion.reactions?.map((row) => row.name)).toEqual(["Heavy Glare"])
+  })
+
+  it("skips character actors but still imports nested items", () => {
     const result = parseFoundryInput(
       JSON.stringify({
         name: "Hero",
@@ -272,8 +324,41 @@ describe("parseFoundryInput — manifest and actors", () => {
     expect(result.kind).toBe("content")
     if (result.kind === "content") {
       expect(result.content.spells?.length).toBe(1)
+      expect(result.meta.skipped[0]?.reason).toContain("Non-NPC actors")
       expect(result.meta.skipped[0]?.count).toBe(1)
     }
+  })
+
+  it("reports no_importable when only character actors are present", () => {
+    const result = parseFoundryInput(
+      JSON.stringify({
+        name: "Hero",
+        type: "character",
+        system: { details: {} },
+        items: [],
+      }),
+    )
+    expect(result.kind).toBe("no_importable")
+    if (result.kind === "no_importable") {
+      expect(result.meta.skipped[0]?.reason).toContain("Non-NPC actors")
+    }
+  })
+
+  it("round-trips Foundry NPC creatures through persist row mapping", () => {
+    const result = parseFoundryInput(JSON.stringify([goblinNpc, basiliskCompanionNpc]))
+    expect(result.kind).toBe("content")
+    if (result.kind !== "content") return
+
+    const creatures = result.content.creatures ?? []
+    expect(creatures).toHaveLength(2)
+    for (const row of creatures) {
+      expect(isCreatureImportV2(row)).toBe(true)
+      expect(() => parseCreatureImportV2(row)).not.toThrow()
+    }
+    const persistRows = buildCreaturePersistRows(creatures, "Foundry VTT Import")
+    expect(persistRows).toHaveLength(2)
+    expect(persistRows.map((row) => row.category).sort()).toEqual(["companion", "creature"])
+    expect(persistRows.every((row) => row.stat_block != null)).toBe(true)
   })
 })
 

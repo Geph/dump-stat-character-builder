@@ -42,19 +42,25 @@ function stampSource<T extends Record<string, unknown>>(row: T, importerSource: 
 
 import { collectSpellSchoolsFromImportContent } from "@/lib/compendium/schools-of-magic"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
+import {
+  preferredSourceForPersist,
+  type PersistImportOptions,
+} from "@/lib/import/persist-import-options"
 
 export type { PersistImportResult } from "@/lib/import/persist-import-types"
+export type { PersistImportOptions } from "@/lib/import/persist-import-options"
 
 function normalizeFeatCategory(category: string | null | undefined): string | null {
   const trimmed = category?.trim()
   return trimmed ? trimmed : null
 }
 
-async function loadSpellCatalog(): Promise<{ id: string; name: string }[]> {
+async function loadSpellCatalog(): Promise<{ id: string; name: string; source: string | null }[]> {
   const rows = await listRows("spells")
   return rows.map((row) => ({
     id: row.id as string,
     name: row.name as string,
+    source: (row.source as string | null | undefined) ?? null,
   }))
 }
 
@@ -65,9 +71,11 @@ function asClassResourceImports(content: ImportContent): ClassResourceImportRow[
 export async function persistImportedContent(
   content: ImportContent | ImportContentWithFoundryMeta,
   source: ImportSourceLabel,
+  options: PersistImportOptions = {},
 ): Promise<PersistImportResult> {
   const foundryMeta = (content as ImportContentWithFoundryMeta).foundryImportMeta
   const sanitized = sanitizeImportContentForPersist(stripFoundryMeta(content as ImportContentWithFoundryMeta))
+  const preferredSource = preferredSourceForPersist(source, options)
   let totalImported = 0
   const breakdown: Record<string, number> = {}
   const warnings: string[] = []
@@ -86,7 +94,15 @@ export async function persistImportedContent(
 
   if (sanitized.classes?.length) {
     enrichedClasses = enrichImportedClassList(
-      sanitized.classes.map((c) => stampSource({ ...c }, source)),
+      sanitized.classes.map((c) =>
+        stampSource(
+          {
+            ...c,
+            prefer_same_source_replacements: Boolean(options.preferSameSourceReplacements),
+          },
+          source,
+        ),
+      ),
       explicitResources,
     )
     await upsertByName("classes", enrichedClasses)
@@ -188,6 +204,7 @@ export async function persistImportedContent(
         subclassesWithIds.map(({ class_name: _className, ...row }) => row),
         classNameById,
         spellCatalog,
+        preferredSource,
       )
 
       enrichedSubclasses = enrichedSubclasses.map((row, index) => {
@@ -270,6 +287,7 @@ export async function persistImportedContent(
       const linkedModifiers = resolveLinkedModifierSpells(
         (row.linkedModifiers ?? row.linked_modifiers) as import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | undefined,
         spellCatalog,
+        preferredSource,
       )
       const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
       return {
@@ -293,9 +311,10 @@ export async function persistImportedContent(
     const existingFeats = (await listRows("feats")).map((row) => ({
       id: row.id as string,
       name: row.name as string,
+      source: ((row.source as string | null | undefined) ?? "") as string,
     }))
     for (const row of featRows) {
-      const enriched = enrichFeatRowWithPrerequisites(row, existingFeats)
+      const enriched = enrichFeatRowWithPrerequisites(row, existingFeats, preferredSource)
       if (
         enriched.level_requirement !== row.level_requirement ||
         (enriched.prerequisite_feat_ids?.length ?? 0) > 0 ||

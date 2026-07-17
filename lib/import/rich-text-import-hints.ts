@@ -8,5 +8,5 @@ For description, benefits, feature description, trait description, and similar n
 - Item names, spell names, and other identifier fields must remain plain text without HTML.
 - Strip HTML only from non-description identifier fields (names, categories, etc.).
 - Companions / summoned creatures embedded in a custom ability or feature (Psi Crystal, Recruit Mercenary, Homunculus, and similar):
-  Prefer the structured companion_stat_block field (ability scores, AC, HP formula, speed, skills, traits, actions) when the source presents a full creature block — do not rely on HTML tables alone. Keep a readable HTML table or prose copy in description as well when useful. This is the intended model for the companion sub-sheet; do not invent a separate equipment[] or species[] row for a summoned/recruited companion that exists only as part of an ability.
+  Prefer importing a creatures[] row (schema v2.0: category "companion" with scaling + formula AC/HP, or "creature" with fixed CR) plus mechanics grant_creature. When the block only lives inside an ability, you may also use companion_stat_block on that ability. Keep a readable prose copy in description when useful. This feeds the Companions tab — do not invent a separate equipment[] or species[] row for a summoned/recruited companion that exists only as part of an ability.
 `

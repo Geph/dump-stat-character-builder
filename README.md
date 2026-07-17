@@ -47,7 +47,7 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including all 13 mundane armor types); **no AI**
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
-- **Foundry VTT import** — Paste or upload Foundry `dnd5e` item exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e))
+- **Foundry VTT import** — Paste or upload Foundry `dnd5e` item and NPC actor exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e)). NPC actors import as Creatures & Companions; character/vehicle sheets are skipped.
 - **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
 
 See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
@@ -247,7 +247,7 @@ Dump Stat supports five compendium import paths:
 |--------|--------|-----|----------|
 | **SRD seed** | Button / `POST /api/seed` | No | Official SRD baseline |
 | **Dump Stat JSON** | `.json` file or pasted JSON | No | Homebrew with full `linkedModifiers`, repeatable imports |
-| **Foundry VTT JSON** | `dnd5e` item/pack export (file or pasted) | No | Migrating items, feats, spells, classes from Foundry |
+| **Foundry VTT JSON** | `dnd5e` item/NPC/pack export (file or pasted) | No | Migrating items, feats, spells, classes, and creatures from Foundry |
 | **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, website copy-paste, copied stat blocks |
 | **PDF import** | Uploaded PDF (+ optional page range) | Optional server AI | Same as text; also accepts JSON export files (no AI) |
 

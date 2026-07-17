@@ -45,6 +45,7 @@ export type ClientByoImportResult = ClientByoImportReviewResult | ClientByoImpor
 export async function runClientByoJsonImport(
   text: string,
   materialSource: string,
+  persistOptions?: import("@/lib/import/persist-import-options").PersistImportOptions,
 ): Promise<ClientByoImportResult> {
   const trimmed = text.trim()
   const content = parseImportContentJson(trimmed)
@@ -73,7 +74,7 @@ export async function runClientByoJsonImport(
   }
 
   const source = normalizeImportMaterialSource(materialSource)
-  const result = await persistImportedContentLocal(prepared.content, source)
+  const result = await persistImportedContentLocal(prepared.content, source, persistOptions)
   return {
     success: true,
     count: result.totalImported,
@@ -92,6 +93,7 @@ export async function confirmClientByoJsonImport(params: {
   collisions: ImportCollision[]
   collisionResolutionMap: ImportCollisionResolutionMap
   cardArtUrlMap?: ImportCardArtUrlMap
+  preferSameSourceReplacements?: boolean
 }): Promise<ClientByoImportSuccessResult> {
   const multiClassBlock = getMultipleClassImportBlock(params.pendingContent, "text")
   if (multiClassBlock) {
@@ -107,6 +109,9 @@ export async function confirmClientByoJsonImport(params: {
     params.collisions,
     params.collisionResolutionMap,
     params.cardArtUrlMap ?? {},
+    {
+      preferSameSourceReplacements: Boolean(params.preferSameSourceReplacements),
+    },
   )
 
   return {

@@ -55,6 +55,10 @@ export const classes = mysqlTable("classes", {
   special_ability: json("special_ability").$type<
     import("@/lib/types").DndClass["special_ability"]
   >(),
+  /** Prefer same-source spells/feats over SRD when this class replaces SRD content. */
+  prefer_same_source_replacements: boolean("prefer_same_source_replacements")
+    .notNull()
+    .default(false),
   ...compendiumMeta,
 })
 
@@ -109,9 +113,15 @@ export const creatures = mysqlTable("creatures", {
   name: varchar("name", { length: 255 }).notNull().unique(),
   description: text("description"),
   creature_type: varchar("creature_type", { length: 64 }),
-  size: varchar("size", { length: 32 }),
+  size: varchar("size", { length: 64 }),
   alignment: varchar("alignment", { length: 64 }),
   cr: varchar("cr", { length: 16 }),
+  category: varchar("category", { length: 16 }).$type<"creature" | "companion">().default("creature"),
+  xp: int("xp"),
+  scaling: json("scaling").$type<{ scales_with: string; notes: string } | null>(),
+  import_payload: json("import_payload").$type<
+    import("@/lib/import/creature-import-v2-schema").CreatureImportV2 | null
+  >(),
   stat_block: json("stat_block").$type<
     import("@/lib/character/companion-stat-block").CompanionStatBlockTemplate
   >(),

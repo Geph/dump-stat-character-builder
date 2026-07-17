@@ -260,6 +260,12 @@ function previewCreatures(content: ImportContent): ImportContentPreviewSection |
       const details: ImportContentPreviewDetail[] = []
       if (creature.creature_type) details.push({ label: "Type", value: creature.creature_type })
       if (creature.size) details.push({ label: "Size", value: creature.size })
+      if ("category" in creature && creature.category) {
+        details.push({
+          label: "Category",
+          value: creature.category === "companion" ? "Companion" : "Creature",
+        })
+      }
       if (creature.cr) details.push({ label: "CR", value: creature.cr })
       if (creature.alignment) details.push({ label: "Alignment", value: creature.alignment })
       appendPrerequisiteRules(details, creature)
@@ -268,7 +274,10 @@ function previewCreatures(content: ImportContent): ImportContentPreviewSection |
         id: `creature:${creature.name}`,
         name: creature.name,
         details,
-        badges: creature.cr ? [`CR ${creature.cr}`] : [],
+        badges: [
+          ...("category" in creature && creature.category === "companion" ? ["Companion"] : []),
+          ...(creature.cr ? [`CR ${creature.cr}`] : []),
+        ],
         descriptionSnippet: snippet(creature.description),
       }
     })
