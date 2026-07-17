@@ -5,6 +5,7 @@ import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/ch
 import type { DashboardHydratedCharacter, DashboardCharacterRecord } from "@/lib/character/hydrate-dashboard"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import {
+  formSelectionsFromState,
   mergeCompanionState,
   resolveCharacterCompanions,
 } from "@/lib/character/resolve-companions"
@@ -282,6 +283,7 @@ function buildCompanionSummaries(
     customAbilities: sheetCustomAbilities,
     ctx,
     findFamiliarSpellSource,
+    formSelections: formSelectionsFromState(character.companion_state ?? []),
   })
   const merged = mergeCompanionState(resolved, character.companion_state ?? [])
 

@@ -130,6 +130,11 @@ export type CharacterCompanionState = {
   activeConditions?: string[] | null
   /** When true for a polymorph form, owner physical stats use this form on the main sheet. */
   polymorphActive?: boolean | null
+  /**
+   * Player-selected form names for a selectable form group (Wild Shape known
+   * Beasts, Find Familiar chosen form). Stored on the group's base key.
+   */
+  knownForms?: string[] | null
 }
 
 export type CompanionResolveContext = {

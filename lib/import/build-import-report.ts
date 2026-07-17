@@ -21,6 +21,7 @@ import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { mergeFoundryIntoImportReport } from "@/lib/import/foundry-import-report"
 import { collectUnmatchedStartingEquipmentNames } from "@/lib/import/collect-unmatched-starting-equipment"
 import { collectMissingBackgroundFeatGrants } from "@/lib/import/collect-missing-background-feat-grants"
+import { collectMissingCreatureGrants } from "@/lib/import/collect-missing-creature-grants"
 import type { Feature } from "@/lib/types"
 
 export type ImportReportNextStep = {
@@ -483,6 +484,14 @@ export function buildImportReport(params: {
       severity: "warning",
       title: `Background feat not in library: ${missing.name}`,
       detail: `Granted by ${missing.sources.join(", ")}. Import that feat first (e.g. dragonmark / campaign feats) or the background grant will not resolve.`,
+    })
+  }
+
+  for (const missing of collectMissingCreatureGrants(params.content)) {
+    nextSteps.push({
+      severity: "warning",
+      title: `Companion creature not in library: ${missing.name}`,
+      detail: `Needed by ${missing.sources.join(", ")}. Import the creature (Creatures & Companions) or the companion will not appear on the character sheet Companions tab.`,
     })
   }
 

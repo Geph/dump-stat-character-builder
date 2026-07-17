@@ -4,6 +4,7 @@ import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-re
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
+import { GRANT_CREATURE_CATALOG_ID } from "@/lib/compendium/grant-creature-catalog"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
 import { applyBlindsensePresetOverride } from "@/lib/import/apply-blindsense-preset-override"
@@ -1777,6 +1778,27 @@ function companionPreset(name: string): LinkedModifierInstance {
   return featureOptionPicker(`${name} (companion stat block)`, false)
 }
 
+/**
+ * Grants Creatures & Companions entries by name (resolved against the
+ * creatures table onto the sheet Companions tab).
+ */
+function grantCreaturePreset(
+  instanceKey: string,
+  creatureNames: string[],
+  options?: { choiceOptions?: string[]; count?: number; label?: string },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${instanceKey}`, GRANT_CREATURE_CATALOG_ID, [
+    {
+      id: modId(instanceKey),
+      type: "grant_creature",
+      creatureNames,
+      ...(options?.choiceOptions?.length ? { choiceOptions: options.choiceOptions } : {}),
+      ...(options?.count != null ? { count: options.count } : {}),
+      ...(options?.label ? { label: options.label } : {}),
+    },
+  ])
+}
+
 function damageResReaction(instanceKey: string, label: string): LinkedModifierInstance {
   return fxInstance(`modinst_${instanceKey}`, DAMAGE_REDUCTION_CATALOG_ID, {
     reaction: true,
@@ -2480,7 +2502,16 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Paladin's Smite": [alwaysPreparedSpells("Divine Smite")],
   "*::Favored Enemy": [alwaysPreparedSpells("Hunter's Mark")],
-  "*::Faithful Steed": [alwaysPreparedSpells("Find Steed")],
+  "*::Faithful Steed": [
+    spellsKnownChar("faithful_steed", {
+      alwaysPrepared: true,
+      freeCastPerLongRest: [{ spellName: "Find Steed", count: 1 }],
+      label: "Find Steed always prepared; cast once without a slot per Long Rest",
+    }),
+    grantCreaturePreset("faithful_steed_mount", ["Otherworldly Steed"], {
+      label: "Otherworldly Steed (Find Steed)",
+    }),
+  ],
   "*::Life Domain Spells": [alwaysPreparedSpells("Life Domain spells")],
   "*::Oath of Devotion Spells": [alwaysPreparedSpells("Oath of Devotion spells")],
   "*::Fiend Spells": [alwaysPreparedSpells("Fiend Patron spells")],
@@ -4816,7 +4847,18 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
 
   // —— Ranger subclasses (2024) ——
-  "*::Primal Companion": [featureOptionPicker("Primal Companion (Land/Sea/Sky)")],
+  "*::Primal Companion": [
+    featureOptionPicker("Primal Companion (Land/Sea/Sky)"),
+    grantCreaturePreset(
+      "primal_companion",
+      ["Beast of the Land", "Beast of the Sea", "Beast of the Sky"],
+      {
+        choiceOptions: ["Beast of the Land", "Beast of the Sea", "Beast of the Sky"],
+        count: 1,
+        label: "Primal Companion beast (import the Beast of the Land/Sea/Sky creatures)",
+      },
+    ),
+  ],
   "*::Exceptional Training": {
     activation: { bonusAction: true },
     linkedModifiers: [

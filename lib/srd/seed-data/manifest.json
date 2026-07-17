@@ -1,5 +1,5 @@
 {
-  "version": "5.2.5",
+  "version": "5.2.6",
   "source": "downfallx/dnd-5e-srd-markdown",
   "license": "CC-BY-4.0 (SRD 5.2.1 by Wizards of the Coast)",
   "generatedAt": "2026-07-17T02:21:00.000Z",
@@ -12,6 +12,6 @@
     "feats": 17,
     "equipment": 133,
     "magicItems": 266,
-    "creatures": 83
+    "creatures": 84
   }
 }

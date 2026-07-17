@@ -168,11 +168,13 @@ import { buildHitDicePool, recoverHitDiceOnLongRest } from "@/lib/character/hit-
 import type { Feature, RestType } from "@/lib/types"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
-  companionStateFromResolved,
+  formSelectionsFromState,
   mergeCompanionState,
-  resolveCharacterCompanions,
+  resolveCharacterCompanionsDetailed,
   activePolymorphCompanion,
+  type CompanionFormGroup,
 } from "@/lib/character/resolve-companions"
+import { CompanionFormPicker } from "@/components/characters/companion-form-picker"
 import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/get-derived-breakdowns"
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
 import { isFindFamiliarSpell } from "@/lib/character/srd-familiar"
@@ -1757,8 +1759,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
   }, [sheetToggleDefinitions])
 
-  const companionRows = useMemo(() => {
-    if (!character || !classDetails.length) return []
+  const companionResolution = useMemo((): {
+    rows: ReturnType<typeof mergeCompanionState>
+    formGroups: CompanionFormGroup[]
+  } => {
+    if (!character || !classDetails.length) return { rows: [], formGroups: [] }
     const abilityMods = derived?.abilityMods ?? {
       strength: 0,
       dexterity: 0,
@@ -1805,16 +1810,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           subclassId: null,
         }
       : null
-    const resolved = resolveCharacterCompanions({
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
       classDetails,
       customAbilities: sheetCustomAbilities,
       ctx,
       findFamiliarSpellSource,
       creatures,
       modifierCatalog,
+      formSelections: formSelectionsFromState(companionState),
     })
-    return mergeCompanionState(resolved, companionState)
+    return { rows: mergeCompanionState(companions, companionState), formGroups }
   }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells, creatures, modifierCatalog])
+
+  const companionRows = companionResolution.rows
+  const companionFormGroups = companionResolution.formGroups
 
   const persistCompanionState = useCallback(
     async (next: CharacterCompanionState[]) => {
@@ -1835,6 +1844,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const patchCompanionState = useCallback(
     (key: string, patch: Partial<CharacterCompanionState>) => {
+      const knownFormsByKey = new Map(
+        companionState
+          .filter((row) => row.knownForms?.length)
+          .map((row) => [row.key, row.knownForms!] as const),
+      )
       const next = companionRows.map((row) => {
         const base: CharacterCompanionState = {
           key: row.key,
@@ -1842,6 +1856,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           customName: row.displayName !== row.template.name ? row.displayName : null,
           activeConditions: row.activeConditions.length ? row.activeConditions : null,
           polymorphActive: row.polymorphActive ? true : null,
+          knownForms: knownFormsByKey.get(row.key) ?? null,
         }
         if (row.key !== key) {
           if (patch.polymorphActive && row.polymorphActive) {
@@ -1866,9 +1881,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               : base.polymorphActive,
         }
       })
+      // Selection rows for form groups (e.g. Wild Shape) have no companion row of
+      // their own — keep them so the picks survive HP/condition updates.
+      for (const [groupKey, forms] of knownFormsByKey) {
+        if (!next.some((row) => row.key === groupKey)) {
+          next.push({ key: groupKey, currentHp: null, knownForms: forms })
+        }
+      }
       void persistCompanionState(next)
     },
-    [companionRows, persistCompanionState],
+    [companionRows, companionState, persistCompanionState],
+  )
+
+  const setCompanionGroupForms = useCallback(
+    (groupKey: string, formNames: string[]) => {
+      const others = companionState.filter((row) => row.key !== groupKey)
+      const existing = companionState.find((row) => row.key === groupKey)
+      void persistCompanionState([
+        ...others,
+        {
+          key: groupKey,
+          currentHp: existing?.currentHp ?? null,
+          customName: existing?.customName ?? null,
+          activeConditions: existing?.activeConditions ?? null,
+          polymorphActive: existing?.polymorphActive ?? null,
+          knownForms: formNames.length ? formNames : null,
+        },
+      ])
+    },
+    [companionState, persistCompanionState],
   )
 
   const updateCompanionHp = useCallback(
@@ -3571,6 +3612,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "companions" && (
             <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+              {companionFormGroups.map((group) => (
+                <CompanionFormPicker
+                  key={group.key}
+                  group={group}
+                  onChange={(formNames) => setCompanionGroupForms(group.key, formNames)}
+                />
+              ))}
               {companionRows.length > 0 ? (
                 <>
                   {companionRows.some((companion) => companion.polymorph) && (
