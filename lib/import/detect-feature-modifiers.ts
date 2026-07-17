@@ -331,6 +331,10 @@ export function modifierSummaryFromInstance(instance: LinkedModifierInstance): s
     const categories = char.featCategories?.length ? char.featCategories.join(", ") : "General"
     return char.label ?? `Gain a Feat (${categories})`
   }
+  if (char?.type === "grant_creature") {
+    const names = char.creatureNames?.length ? char.creatureNames.join(", ") : "creature"
+    return char.label ?? `Grant Companion (${names})`
+  }
   if (char?.label) return char.label
   if (char?.type) return char.type.replace(/_/g, " ")
   const kind = instance.activation?.effects?.[0]?.kind

@@ -6,6 +6,7 @@ export type BackgroundFeatPickSlot = {
   key: string
   label: string
   featCategories: string[]
+  alsoFeatNames?: string[]
 }
 
 function pushGrantSlots(
@@ -28,6 +29,7 @@ function pushGrantSlots(
         key: slotKey,
         label: labelPrefix ? `${labelPrefix}: ${grantLabel}` : grantLabel,
         featCategories: grant.featCategories,
+        alsoFeatNames: grant.alsoFeatNames,
       })
     }
   })

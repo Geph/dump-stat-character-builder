@@ -51,6 +51,7 @@ export type ResolvedGrantFeat = {
   label: string
   featCategories: string[]
   count: number
+  alsoFeatNames?: string[]
 }
 
 function resolveGrantFeatCategories(
@@ -111,6 +112,7 @@ export function grantFeatsFromModifierRefs(
         label: grantFeatLabel(entry, refId, mod),
         featCategories: resolveGrantFeatCategories(refId, mod),
         count: mod.count ?? 1,
+        alsoFeatNames: mod.alsoFeatNames?.length ? [...mod.alsoFeatNames] : undefined,
       })
     }
   }
@@ -137,6 +139,7 @@ export function grantFeatsFromLinkedModifiers(
         label: grantFeatLabel(entry, instance.catalogRefId, mod),
         featCategories: resolveGrantFeatCategories(instance.catalogRefId, mod),
         count: mod.count ?? 1,
+        alsoFeatNames: mod.alsoFeatNames?.length ? [...mod.alsoFeatNames] : undefined,
       })
     }
   }

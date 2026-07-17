@@ -1,4 +1,5 @@
 import type { Feat } from "@/lib/types"
+import type { PrerequisiteRule } from "@/lib/import/content-schema"
 
 export type ParsedFeatPrerequisite = {
   levelRequirement: number | null
@@ -36,6 +37,7 @@ export function parseFeatPrerequisite(
     if (LEVEL_ONLY_SEGMENT.test(segment)) continue
     if (/^level\s*\d+/i.test(segment)) continue
     if (/can'?t have another/i.test(segment)) continue
+    if (/\bcampaign\b/i.test(segment)) continue
     if (/^prerequisite:?$/i.test(segment.trim())) continue
 
     const cleaned = segment
@@ -49,6 +51,27 @@ export function parseFeatPrerequisite(
   }
 
   return { levelRequirement, prerequisiteFeatNames }
+}
+
+export function inferOtherPrerequisiteRules(
+  prerequisite: string | null | undefined,
+  existing: PrerequisiteRule[] | null | undefined = [],
+): PrerequisiteRule[] {
+  const rules = [...(existing ?? [])]
+  const text = prerequisite?.trim() ?? ""
+  if (text && /\bcampaign\b/i.test(text)) {
+    const value = text.replace(/^prerequisite:\s*/i, "").trim()
+    if (
+      value &&
+      !rules.some(
+        (rule) =>
+          rule.category === "other" && rule.value.toLowerCase() === value.toLowerCase(),
+      )
+    ) {
+      rules.push({ category: "other", value })
+    }
+  }
+  return rules
 }
 
 function normalizeFeatNameKey(name: string): string {
@@ -86,16 +109,22 @@ export function enrichFeatRowWithPrerequisites<
     prerequisite?: string | null
     level_requirement?: number | null
     prerequisite_feat_ids?: string[] | null
+    prerequisite_rules?: PrerequisiteRule[] | null
     category?: string | null
   },
 >(row: T, feats: Pick<Feat, "id" | "name">[]): T {
   const parsed = parseFeatPrerequisite(row.prerequisite)
   const prerequisiteFeatIds = resolvePrerequisiteFeatIds(parsed.prerequisiteFeatNames, feats)
   const levelRequirement = row.level_requirement ?? parsed.levelRequirement ?? null
+  const prerequisiteRules = inferOtherPrerequisiteRules(
+    row.prerequisite,
+    row.prerequisite_rules,
+  )
 
   return {
     ...row,
     level_requirement: levelRequirement,
     prerequisite_feat_ids: prerequisiteFeatIds.length ? prerequisiteFeatIds : row.prerequisite_feat_ids ?? [],
+    prerequisite_rules: prerequisiteRules.length ? prerequisiteRules : row.prerequisite_rules ?? [],
   }
 }

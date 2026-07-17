@@ -12,6 +12,10 @@ import {
   buildGrantFeatModifier,
   buildWeaponMasteryModifier,
 } from "@/lib/compendium/shared-feature-modifier-builders"
+import {
+  GRANT_CREATURE_CATALOG_ID,
+  grantCreatureCharacteristic,
+} from "@/lib/compendium/grant-creature-catalog"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
@@ -137,6 +141,12 @@ function textMentionsWhileRaging(text: string): boolean {
 
 function grantFeatInstance(categories: FeatPickCategory[], label: string): LinkedModifierInstance {
   return buildGrantFeatModifier(categories, label, newInstanceId())
+}
+
+function grantCreatureInstance(creatureNames: string[]): LinkedModifierInstance {
+  return charInstance(newInstanceId(), GRANT_CREATURE_CATALOG_ID, [
+    grantCreatureCharacteristic(creatureNames),
+  ])
 }
 
 // When adding a name rule, add a matching entry in lib/import/modifier-wiring-registry.ts (tests enforce coverage).
@@ -1625,6 +1635,16 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         recharges: [{ rest: "long_rest" }],
       }
       return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
+    },
+  },
+  {
+    id: "grant.creature_companion",
+    confidence: "medium",
+    test: /\b(?:gain|summon|call)\s+(?:a\s+|an\s+)?([A-Z][A-Za-z0-9' -]{1,40}?(?:Companion|Familiar|Beast Form|Minstrel|Defender))\b/i,
+    build: (match) => {
+      const name = match[1]?.trim()
+      if (!name || /\bfeat\b/i.test(name)) return null
+      return grantCreatureInstance([name])
     },
   },
   {

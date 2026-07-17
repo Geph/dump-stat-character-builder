@@ -1,4 +1,10 @@
 import type { CustomAbility } from "@/lib/types"
+import {
+  isChoicePrerequisiteMet,
+  parseMinimumLevelFromPrerequisite,
+  prerequisiteMentionsAbility,
+  type ChoicePrerequisiteContext,
+} from "@/lib/builder/choice-prerequisite"
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase()
@@ -24,47 +30,28 @@ export function knackAbilitiesForClass(
   })
 }
 
-function parseMinimumClassLevel(prerequisite: string | null | undefined): number | null {
-  if (!prerequisite) return null
-  const match = prerequisite.match(/(\d+)(?:st|nd|rd|th)?\s*[- ]?level/i)
-  if (!match) return null
-  const level = parseInt(match[1], 10)
-  return Number.isFinite(level) ? level : null
-}
-
-function prerequisiteMentionsKnack(prerequisite: string | null | undefined, knackName: string): boolean {
-  if (!prerequisite?.trim()) return false
-  const needle = normalizeName(knackName)
-  return normalizeName(prerequisite).includes(needle)
-}
+export type KnackEligibilityContext = ChoicePrerequisiteContext
 
 export function isKnackEligible(
   knack: CustomAbility,
-  classLevel: number,
-  selectedKnackNames: string[],
+  classLevelOrContext: number | KnackEligibilityContext,
+  selectedKnackNames?: string[],
 ): boolean {
-  const minLevel = knack.level_requirement ?? parseMinimumClassLevel(knack.prerequisites)
-  if (minLevel != null && classLevel < minLevel) return false
+  const context: KnackEligibilityContext =
+    typeof classLevelOrContext === "number"
+      ? {
+          classLevel: classLevelOrContext,
+          selectedAbilityNames: selectedKnackNames ?? [],
+        }
+      : {
+          ...classLevelOrContext,
+          selectedAbilityNames:
+            classLevelOrContext.selectedAbilityNames ?? selectedKnackNames ?? [],
+        }
 
-  const prereq = knack.prerequisites
-  if (!prereq?.trim()) return true
-
-  const requiredNames = prereq
-    .split(/,| and /i)
-    .map((part) => part.replace(/\d+(?:st|nd|rd|th)?\s*[- ]?level\s+\w+/gi, "").trim())
-    .filter((part) => part.length > 1)
-
-  for (const required of requiredNames) {
-    if (/^\d/.test(required)) continue
-    const normalizedRequired = normalizeName(required)
-    const satisfied = selectedKnackNames.some((name) => {
-      const normalizedName = normalizeName(name)
-      return normalizedName.includes(normalizedRequired) || normalizedRequired.includes(normalizedName)
-    })
-    if (!satisfied) return false
-  }
-
-  return true
+  return isChoicePrerequisiteMet(knack.prerequisites, context, {
+    levelRequirement: knack.level_requirement ?? parseMinimumLevelFromPrerequisite(knack.prerequisites),
+  })
 }
 
 export function aggregateKnackOptions(params: {
@@ -72,14 +59,22 @@ export function aggregateKnackOptions(params: {
   classNames: string[]
   classLevel: number
   selectedKnackNames: string[]
+  knownSpellNames?: string[]
+  subclassName?: string | null
 }): { name: string; description: string; prerequisite?: string | null; repeatable?: boolean | null }[] {
   const knacks = knackAbilitiesForClass(params.customAbilities, params.classNames)
   const selected = params.selectedKnackNames
+  const context: KnackEligibilityContext = {
+    classLevel: params.classLevel,
+    selectedAbilityNames: selected,
+    knownSpellNames: params.knownSpellNames,
+    subclassName: params.subclassName,
+  }
   const options: { name: string; description: string; prerequisite?: string | null; repeatable?: boolean | null }[] =
     []
 
   for (const knack of knacks) {
-    if (!isKnackEligible(knack, params.classLevel, selected)) continue
+    if (!isKnackEligible(knack, context)) continue
     const countInSelection = selected.filter((name) => normalizeName(name) === normalizeName(knack.name)).length
     if (!knack.repeatable && countInSelection > 0) continue
     options.push({
@@ -98,6 +93,8 @@ export function validateKnackSelectionChange(params: {
   next: string[]
   customAbilities: CustomAbility[]
   classLevel: number
+  knownSpellNames?: string[]
+  subclassName?: string | null
 }): { ok: true } | { ok: false; message: string } {
   const knackByName = new Map(
     params.customAbilities
@@ -110,7 +107,7 @@ export function validateKnackSelectionChange(params: {
     for (const keptName of params.next) {
       const kept = knackByName.get(normalizeName(keptName))
       if (!kept?.prerequisites) continue
-      if (prerequisiteMentionsKnack(kept.prerequisites, removedName)) {
+      if (prerequisiteMentionsAbility(kept.prerequisites, removedName)) {
         return {
           ok: false,
           message: `Cannot replace ${removedName} — ${keptName} requires it as a prerequisite.`,
@@ -137,7 +134,14 @@ export function validateKnackSelectionChange(params: {
     const knack = knackByName.get(normalizeName(name))
     if (!knack) continue
     const others = params.next.filter((entry) => entry !== name)
-    if (!isKnackEligible(knack, params.classLevel, others)) {
+    if (
+      !isKnackEligible(knack, {
+        classLevel: params.classLevel,
+        selectedAbilityNames: others,
+        knownSpellNames: params.knownSpellNames,
+        subclassName: params.subclassName,
+      })
+    ) {
       return { ok: false, message: `${name} prerequisites are not met.` }
     }
   }

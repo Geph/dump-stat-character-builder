@@ -2514,6 +2514,80 @@ function ModifierFields({
           </div>
         </div>
       )
+    case "grant_creature":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Creature names (Creatures &amp; Companions)
+            </label>
+            <textarea
+              value={(mod.creatureNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  creatureNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Wolf\nBasilisk Companion"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              One name per line (or comma-separated). Names must match Creatures &amp; Companions
+              entries.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Choice options (optional)
+            </label>
+            <textarea
+              value={(mod.choiceOptions ?? []).join("\n")}
+              onChange={(e) => {
+                const next = e.target.value
+                  .split(/[\n,]/)
+                  .map((entry) => entry.trim())
+                  .filter(Boolean)
+                onChange({
+                  ...mod,
+                  choiceOptions: next.length ? next : undefined,
+                })
+              }}
+              rows={2}
+              placeholder="Leave blank to grant all named creatures"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">Pick count</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={mod.count ?? 1}
+                onChange={(e) =>
+                  onChange({ ...mod, count: Math.max(1, parseInt(e.target.value, 10) || 1) })
+                }
+                className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer pb-2">
+              <input
+                type="checkbox"
+                checked={Boolean(mod.polymorph)}
+                onChange={(e) => onChange({ ...mod, polymorph: e.target.checked || undefined })}
+                className="accent-primary"
+              />
+              Polymorph form (Wild Shape)
+            </label>
+          </div>
+        </div>
+      )
   }
 }
 

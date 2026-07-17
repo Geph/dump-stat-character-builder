@@ -56,6 +56,29 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("expiresEndOfTurn")
   })
 
+  it("tells the LLM to collapse doubled ALL-CAPS PDF glyphs (LaserLlama-style)", () => {
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("Doubled ALL-CAPS PDF glyphs")
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain('S ST T R R" → "STR')
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain('T TR RA AI IT TS S" → "TRAITS')
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("only applies to ALL-CAPS runs")
+    expect(CLEAN_SOURCE_TEXT_GUIDELINES).toContain("LaserLlama")
+    expect(CLEAN_SOURCE_TEXT_GUIDELINES).toContain("S ST T R R")
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("Doubled ALL-CAPS PDF glyphs")
+    expect(prompt).toContain("TRAITS")
+  })
+
+  it("tells the LLM to strip trailing superscript markers pasted as letters (KibblesTasty K)", () => {
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("Trailing superscript markers")
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain('Returning WeaponK" → "Returning Weapon')
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("custom_abilities")
+    expect(MARKER_LEGEND_SCAN_HINT).toContain("Returning WeaponK")
+    expect(CLEAN_SOURCE_TEXT_GUIDELINES).toContain("Returning WeaponK")
+    const prompt = buildByoExtractionPrompt("spells")
+    expect(prompt).toContain("Trailing superscript markers")
+    expect(prompt).toContain("Returning Weapon")
+  })
+
   it("covers exploit-library fields and cross-pass Leadership-style notes", () => {
     const prompt = buildByoExtractionPrompt("abilities", {
       customSystems: {
@@ -139,5 +162,26 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("never invent keys like desktop")
     expect(prompt).toContain("strength|dexterity|constitution|intelligence|wisdom|charisma")
     expect(buildImportSystemPrompt("backgrounds")).toContain('never invent keys like "desktop"')
+  })
+
+  it("requires nested starting_equipment_groups options shape for backgrounds", () => {
+    const prompt = buildByoExtractionPrompt("backgrounds")
+    expect(prompt).toContain("one group with description + options")
+    expect(prompt).toContain('never a flat [{label,items}] array')
+    const system = buildImportSystemPrompt("backgrounds")
+    expect(system).toContain('"description": "Choose A or B:"')
+    expect(system).toContain("Wrong (will be dropped)")
+    expect(system).toContain("options")
+  })
+
+  it("preserves faction skill fallbacks and campaign gates on backgrounds", () => {
+    const prompt = buildByoExtractionPrompt("backgrounds")
+    expect(prompt).toContain('"One skill of your choice"')
+    expect(prompt).toContain("preserve the faction table in description")
+    expect(prompt).toContain(
+      'prerequisite_rules: [{ "category": "other", "value": "Planescape Campaign" }]',
+    )
+    expect(prompt).toContain("Survivor or a Dark Gift feat of your choice")
+    expect(prompt).toContain("Choose one Dark Gift feat")
   })
 })

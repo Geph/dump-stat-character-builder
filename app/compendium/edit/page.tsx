@@ -14,6 +14,7 @@ const EDITORS: Record<CompendiumContentType, ComponentType<{ id: string }>> = {
   backgrounds: dynamic(() => import("./background-editor")),
   spells: dynamic(() => import("./spell-editor")),
   feats: dynamic(() => import("./feat-editor")),
+  creatures: dynamic(() => import("./creature-editor")),
   equipment: dynamic(() => import("./equipment-editor")),
   magic_items: dynamic(() => import("./equipment-editor")),
   languages: dynamic(() => import("./language-editor")),

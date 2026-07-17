@@ -16,6 +16,7 @@ describe("collectImportContentPreview", () => {
           duration: "Instantaneous",
           concentration: false,
           description: "You hurl a mote of fire at a creature or object within range.",
+          prerequisite_rules: [{ category: "other" as const, value: "Planescape Campaign" }],
           classes: ["Sorcerer", "Wizard"],
         },
       ],
@@ -40,6 +41,10 @@ describe("collectImportContentPreview", () => {
 
     expect(spells?.items[0]?.name).toBe("Fire Bolt")
     expect(spells?.items[0]?.details.some((row) => row.label === "School")).toBe(true)
+    expect(spells?.items[0]?.details).toContainEqual({
+      label: "Other prerequisite",
+      value: "Planescape Campaign",
+    })
     expect(equipment?.items[0]?.badges).toContain("Magic item")
     expect(equipment?.items[0]?.details.some((row) => row.value === "Rare")).toBe(true)
     expect(equipment?.items[0]?.descriptionSnippet).toMatch(/3 charges/)

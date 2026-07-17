@@ -72,6 +72,9 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
     concentration: raw.concentration === true,
     description: split.description,
     classes: classes?.length ? classes : [],
+    ...(Array.isArray(raw.prerequisite_rules)
+      ? { prerequisite_rules: raw.prerequisite_rules }
+      : {}),
     psionic_augments: coercePsionicAugments(raw.psionic_augments, descriptionRaw),
     ...(material ? { material } : {}),
     ...(raw.companion_stat_block && typeof raw.companion_stat_block === "object"

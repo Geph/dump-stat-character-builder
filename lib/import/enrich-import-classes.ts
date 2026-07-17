@@ -29,6 +29,7 @@ export type ClassResourceImportRow = {
   resource_key: string
   name: string
   description?: string | null
+  prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   uses: UsesConfig
 }
 
@@ -295,6 +296,7 @@ export function buildClassResourceRowsForClass(
       resource_key: remapImportedResourceKey(className, resource.resource_key),
       name: resource.name,
       description: resource.description ?? null,
+      prerequisite_rules: resource.prerequisite_rules ?? null,
       uses: resource.uses,
       source,
     })

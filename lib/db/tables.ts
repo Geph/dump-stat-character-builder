@@ -5,6 +5,7 @@ export const COMPENDIUM_TABLES = [
   "backgrounds",
   "spells",
   "feats",
+  "creatures",
   "equipment",
   "languages",
   "tools",

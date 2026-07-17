@@ -36,13 +36,50 @@ export function magicInitiateListFromFeatGranted(
   return parseBackgroundOriginFeat(featGranted)?.spellList ?? null
 }
 
-/** e.g. "Choose one Planar Pact feat" → "Planar Pact". */
+/** e.g. "Choose one Planar Pact feat" / "A Dark Gift feat of your choice" / "Survivor or a Dark Gift feat". */
+export type BackgroundFeatGrantChoice = {
+  category: string
+  /** Named Origin feats offered alongside the category pick (Haunted One / Investigator). */
+  alsoFeatNames?: string[]
+}
+
+export function parseBackgroundFeatGrantChoice(
+  featGranted: string | null | undefined,
+): BackgroundFeatGrantChoice | null {
+  const text = featGranted?.trim() ?? ""
+  if (!text) return null
+
+  // "Survivor or a Dark Gift feat of your choice"
+  const namedOr = text.match(
+    /^(.+?)\s+or\s+(?:a\s+|one\s+)?(.+?)\s+feat(?:\s+of\s+your\s+choice)?\b/i,
+  )
+  if (namedOr) {
+    const namedFeat = namedOr[1].replace(/^a\s+/i, "").trim()
+    const category = namedOr[2].trim()
+    if (namedFeat && category && !/^choose\b/i.test(namedFeat)) {
+      return { category, alsoFeatNames: [namedFeat] }
+    }
+  }
+
+  // "A Dark Gift feat of your choice" / "Choose one Dark Gift feat"
+  const ofChoice = text.match(
+    /^(?:a|one|choose\s+(?:one|a))\s+(.+?)\s+feat(?:\s+of\s+your\s+choice)?\b/i,
+  )
+  if (ofChoice) {
+    return { category: ofChoice[1].trim() }
+  }
+
+  const choose = text.match(/choose\s+(?:one|a)\s+(.+?)\s+feat\b/i)
+  if (choose) return { category: choose[1].trim() }
+
+  return null
+}
+
+/** @deprecated Prefer parseBackgroundFeatGrantChoice — returns category only. */
 export function parseBackgroundFeatGrantChoiceCategory(
   featGranted: string | null | undefined,
 ): string | null {
-  const text = featGranted?.trim() ?? ""
-  const match = text.match(/choose\s+(?:one|a)\s+(.+?)\s+feat\b/i)
-  return match ? match[1].trim() : null
+  return parseBackgroundFeatGrantChoice(featGranted)?.category ?? null
 }
 
 export function formatMagicInitiateOriginFeat(spellList: MagicInitiateSpellList): string {
@@ -80,7 +117,8 @@ export function legacyBackgroundOriginFeatPickKey(backgroundId: string): string 
   return `background:${backgroundId}:origin-feat`
 }
 
-function backgroundFeatureHasLinkedModifiers(
+/** True when the background feature itself grants a feat pick (e.g. Planar Pact), not tool/language/skill choices. */
+function backgroundFeatureGrantsFeatPick(
   background: Pick<Background, "feature"> | null | undefined,
 ): boolean {
   const feature = background?.feature
@@ -88,12 +126,26 @@ function backgroundFeatureHasLinkedModifiers(
   const linked =
     feature.linkedModifiers ??
     (feature as { linked_modifiers?: unknown[] }).linked_modifiers
-  return Array.isArray(linked) && linked.length > 0
+  if (!Array.isArray(linked)) return false
+  return linked.some((instance: unknown) => {
+    if (!instance || typeof instance !== "object") return false
+    const characteristics = (instance as { characteristics?: unknown }).characteristics
+    if (!Array.isArray(characteristics)) return false
+    return characteristics.some(
+      (characteristic: unknown) =>
+        Boolean(
+          characteristic &&
+            typeof characteristic === "object" &&
+            (characteristic as { type?: unknown }).type === "grant_feat",
+        ),
+    )
+  })
 }
 
 /**
  * Pre-2024 backgrounds: both ability_bonuses and feat_granted are null at import.
  * null is intentional — the builder offers free ASI and an Origin feat pick.
+ * Proficiency choice linkedModifiers (tools/languages/skills) do not disqualify legacy.
  */
 export function isLegacyBackground(
   background: Pick<Background, "ability_bonuses" | "feat_granted" | "feature"> | null | undefined,
@@ -101,7 +153,7 @@ export function isLegacyBackground(
   if (!background) return false
   if (background.ability_bonuses !== null) return false
   if (background.feat_granted?.trim()) return false
-  if (backgroundFeatureHasLinkedModifiers(background)) return false
+  if (backgroundFeatureGrantsFeatPick(background)) return false
   return true
 }
 

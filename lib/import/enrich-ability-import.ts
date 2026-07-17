@@ -1,3 +1,7 @@
+import {
+  extractPrerequisiteFromDescription,
+  parseMinimumLevelFromPrerequisite,
+} from "@/lib/builder/choice-prerequisite"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
@@ -83,6 +87,35 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
         }
       : row.uses
 
+  const explicitPrerequisite =
+    (typeof row.prerequisite === "string" && row.prerequisite.trim()
+      ? row.prerequisite.trim()
+      : null) ??
+    (typeof row.prerequisites === "string" && row.prerequisites.trim()
+      ? row.prerequisites.trim()
+      : null)
+  const scrapedPrerequisite = extractPrerequisiteFromDescription(descriptionHtml)
+  const prerequisites = explicitPrerequisite ?? scrapedPrerequisite
+
+  const existingLevel =
+    typeof row.level_requirement === "number" && Number.isFinite(row.level_requirement)
+      ? row.level_requirement
+      : null
+  const inferredLevel = parseMinimumLevelFromPrerequisite(prerequisites)
+  const level_requirement = existingLevel ?? inferredLevel
+
+  let choices = row.choices as Feature["choices"] | undefined
+  if (choices?.options?.length) {
+    choices = {
+      ...choices,
+      options: choices.options.map((option) => {
+        if (option.prerequisite?.trim()) return option
+        const scraped = extractPrerequisiteFromDescription(option.description)
+        return scraped ? { ...option, prerequisite: scraped } : option
+      }),
+    }
+  }
+
   return {
     ...row,
     ...next,
@@ -100,10 +133,10 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
         }
       : {}),
     ...(uses ? { uses } : {}),
-    prerequisites:
-      (typeof row.prerequisite === "string" ? row.prerequisite : null) ??
-      (typeof row.prerequisites === "string" ? row.prerequisites : null) ??
-      null,
+    ...(choices ? { choices } : {}),
+    prerequisites,
+    prerequisite: prerequisites,
+    ...(level_requirement != null ? { level_requirement } : {}),
     repeatable: Boolean(row.repeatable),
     linked_modifiers: synced.linkedModifiers,
     linkedModifiers: synced.linkedModifiers,

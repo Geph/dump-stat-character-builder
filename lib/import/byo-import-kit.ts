@@ -30,6 +30,8 @@ PDF tips:
 - Page ranges: skip other classes, or isolate a library section (e.g. Psionic Disciplines) before the class chapter — do not use them to split a class from its own subclasses
 - Spell PDF imports: at most ${SPELLS_PDF_MAX_PAGES} pages per pass
 - Class PDFs with a level table plus feature sections often parse with zero AI when structure is clean
+- Some homebrew PDFs (notably LaserLlama) paste ALL-CAPS labels with every letter doubled — e.g. "S ST T R R" / "T TR RA AI IT TS S". Prefer fixing those in the paste when you notice them; the extraction prompt also tells the LLM to collapse them to "STR" / "TRAITS" (ALL-CAPS runs only)
+- KibblesTasty and similar sources often mark custom entries with a superscript letter (commonly K) that pastes as a trailing capital on the name — e.g. "Returning WeaponK". Fix or let the LLM strip those before import; check spell/feat/feature names especially
 
 Multi-file homebrew (spellcasters, psionics, martial exploits, and similar):
 - Import supporting libraries before the class that references them, then the class chapter, then any leftover custom systems
@@ -52,16 +54,18 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
   backgrounds:
-    "Focus on backgrounds[] with skill_proficiencies, proficiencies (tools, languages), starting_equipment or starting_equipment_groups (Choose A/B), starting_gold, feat_granted, ability_bonuses, optional source, and feature. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
+    "Focus on backgrounds[] with skill_proficiencies, tool_proficiencies / proficiencies.languages, starting_equipment_groups for Choose A/B (one group with description + options[{label,items}], never a flat [{label,items}] array), prerequisite_rules for campaign gates, feat_granted, ability_bonuses, optional source, and feature. For Dark Gift backgrounds keep feat_granted phrasing like \"Choose one Dark Gift feat\" or \"Survivor or a Dark Gift feat of your choice\" (never collapse the or-choice; never null out Dark Gift-only grants when ASI is present). For a fixed skill plus a faction/unrestricted fallback, include \"One skill of your choice\" in skill_proficiencies and preserve the faction table in description. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep skill/tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
   feats: "Focus on feats[] with category (Origin, Dark Gift, General, Fighting Style, Epic Boon, Planar Pact) when known. Ravenloft Dark Gifts → Dark Gift, never Planar Pact.",
+  creatures:
+    "Focus on creatures[] (Creatures & Companions). For each entry set name, optional creature_type/size/alignment/cr, and put the FULL Monster Manual / companion stat-block prose in description (AC/HP/Speed, ability scores, Traits/Actions/Bonus Actions/Reactions). Dump Stat parses the prose into a structured companion block. Prefer importing companion sets together (e.g. all Wild Shape beasts, all Ranger companions). Features that grant a companion should also emit mechanics: [{ kind: \"grant_creature\", creatureNames: [\"Wolf\"] }].",
   equipment:
     "Focus on equipment[] with category (Weapon, Armor, Adventuring Gear, Tool, Mount, Vehicle, Trade Good, or Other for magic items without a mundane type), magic_item_category (Wondrous Item, Ring, Potion, etc.), rarity, requires_attunement, cost { amount, unit } or null when no price, weight, and properties (weapon/armor stats only — put rarity and attunement on top-level fields, not in properties).",
   abilities:
     "Focus on custom ability libraries and class_resources[]. Split hierarchy (do not mash): category label (not a row) → mid-level packages → leaf powers / class_talent rows + nested Discipline Talents in choices. Prefer import_proposals.custom_abilities[] for discipline packages (ability_role discipline), psionic powers (ability_role psionic_power — NOT spells[]), class-level/feat-gated talents (ability_role class_talent), exploits, and upgrades. Distinguish Discipline Talents vs Class Talents category/resourceKey. Set source_type and source_name consistently. Keep spend phrasing (expend N psi points, expend one Exploit Die). See Custom ability library structure examples.",
   invocations_metamagic:
-    "Focus on Eldritch Invocation, Metamagic, and similar pick-from-a-list option libraries. Route through the same custom abilities pipeline: one import_proposals.custom_abilities[] row per option (not section headers). Prefer ability_role knack when the class selects from a known pool (wire granting features with optionsSource class_knacks); otherwise omit ability_role. Capture prerequisites, level gates, and spend costs in description/prerequisite. Do not put these in feats[] or spells[].",
+    "Focus on Eldritch Invocation, Metamagic, Warmage Tricks, and similar pick-from-a-list option libraries. Route through the same custom abilities pipeline: one import_proposals.custom_abilities[] row per option (not section headers). Prefer ability_role knack when the class selects from a known pool (wire granting features with optionsSource class_knacks); otherwise omit ability_role. Always put Prerequisite/Prerequisites lines into prerequisite (cantrips, Level N+ class, subclass names, prior options) — Dump Stat gates picks against known spells, level, and subclass. Do not put these in feats[] or spells[].",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
 }
 
@@ -192,9 +196,29 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         name: "Soldier",
         description: "You served in an army.",
         skill_proficiencies: ["Athletics", "Intimidation"],
+        tool_proficiencies: ["Choose one kind of Gaming Set"],
         feat_granted: "Savage Attacker",
-        ability_bonuses: { strength: 0, constitution: 0 },
-        feature: { name: "Military Rank", description: "You have a rank from your service." },
+        ability_bonuses: { strength: 0, dexterity: 0, constitution: 0 },
+        starting_equipment_groups: [
+          {
+            description: "Choose A or B:",
+            options: [
+              {
+                label: "A",
+                items: [
+                  { name: "Spear", quantity: 1 },
+                  { name: "Gaming Set", quantity: 1 },
+                  { name: "Traveler's Clothes", quantity: 1 },
+                  { name: "Gold Pieces", quantity: 14 },
+                ],
+              },
+              {
+                label: "B",
+                items: [{ name: "Gold Pieces", quantity: 50 }],
+              },
+            ],
+          },
+        ],
       },
       {
         name: "Tinker",
@@ -248,6 +272,19 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         description: "You gain a +2 bonus to attack rolls with ranged weapons.",
         prerequisite: "Dexterity 13 or higher",
         category: "Fighting Style",
+      },
+    ],
+  },
+  creatures: {
+    creatures: [
+      {
+        name: "Wolf",
+        creature_type: "Beast",
+        size: "Medium",
+        alignment: "Unaligned",
+        cr: "1/4",
+        description:
+          "Wolf\nMedium Beast, Unaligned\nAC 12 Initiative +2 (12)\nHP 11 (2d8 + 2)\nSpeed 40 ft.\nTraits\nPack Tactics. The wolf has Advantage on attack rolls against a creature if at least one of the wolf's allies is within 5 feet of the creature.\nActions\nBite. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
       },
     ],
   },

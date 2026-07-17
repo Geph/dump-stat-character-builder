@@ -20,6 +20,7 @@ import {
 import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { mergeFoundryIntoImportReport } from "@/lib/import/foundry-import-report"
 import { collectUnmatchedStartingEquipmentNames } from "@/lib/import/collect-unmatched-starting-equipment"
+import { collectMissingBackgroundFeatGrants } from "@/lib/import/collect-missing-background-feat-grants"
 import type { Feature } from "@/lib/types"
 
 export type ImportReportNextStep = {
@@ -467,12 +468,21 @@ export function buildImportReport(params: {
   const unmatchedFeatures = collectUnmatchedModifierFeatures(params.content)
   const modifierReview = collectImportModifierReview(params.content)
   const unmatchedEquipment = collectUnmatchedStartingEquipmentNames(params.content)
+  const missingFeatGrants = collectMissingBackgroundFeatGrants(params.content)
 
   for (const missing of unmatchedEquipment) {
     nextSteps.push({
       severity: "action",
       title: `Import or create equipment: ${missing.name}`,
       detail: `Referenced by ${missing.sources.join(", ")} but not found in the equipment catalog.`,
+    })
+  }
+
+  for (const missing of missingFeatGrants) {
+    nextSteps.push({
+      severity: "warning",
+      title: `Background feat not in library: ${missing.name}`,
+      detail: `Granted by ${missing.sources.join(", ")}. Import that feat first (e.g. dragonmark / campaign feats) or the background grant will not resolve.`,
     })
   }
 

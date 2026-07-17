@@ -1604,6 +1604,9 @@ export default function BuilderPageClient() {
   )
   const grantedSpellIds = [...new Set([...featGrantedSpellIds, ...subclassGrantedSpellIds])]
   const allSpellIds = [...new Set([...mergedSpellIds, ...grantedSpellIds])]
+  const knownSpellNames = allSpellIds
+    .map((id) => spells.find((spell) => spell.id === id)?.name)
+    .filter((name): name is string => Boolean(name?.trim()))
 
   const characterDerived = useMemo(
     () => {
@@ -2901,12 +2904,17 @@ export default function BuilderPageClient() {
 
                           {eligibleFeatures.map((feature) => {
                             const key = featureChoiceKey(entry.classId, feature.name, feature.level)
+                            const subclassForClass =
+                              subclasses.find((sc) => sc.id === subclassByClassId[entry.classId]) ??
+                              null
                             const choiceOptions = resolveFeatureChoiceOptions(feature, {
                               customAbilities,
                               featureChoicePicks,
                               classNames: [cls.name],
                               classLevel: entry.level,
                               equipmentCatalog: equipment,
+                              knownSpellNames,
+                              subclassName: subclassForClass?.name ?? null,
                             })
                             const choiceCount = resolveFeatureChoiceCount(
                               feature.choices!,
@@ -2914,12 +2922,13 @@ export default function BuilderPageClient() {
                               cls.name,
                             )
                             const isWeaponMastery = isWeaponMasteryFeature(feature)
-                            const isKnackPool = feature.choices?.optionsSource === "class_knacks"
+                            const isKnackPool =
+                              feature.choices?.optionsSource === "class_knacks"
                             const isUpgradePool = feature.choices?.optionsSource === "class_upgrades"
                             const masteryHint = isWeaponMastery
                               ? `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""}.`
                               : isKnackPool
-                                ? `Choose ${choiceCount} Knack${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""}.`
+                                ? `Choose ${choiceCount} ${/trick/i.test(feature.choices?.category ?? feature.name) ? "Trick" : "Knack"}${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""}.`
                                 : isUpgradePool
                                   ? `Choose ${choiceCount} Upgrade${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (exchange on level-up per feature rules)" : ""}.`
                               : feature.choices!.optionsSource === "known_discipline_talents"
@@ -2933,6 +2942,8 @@ export default function BuilderPageClient() {
                                   next: selected,
                                   customAbilities,
                                   classLevel: entry.level,
+                                  knownSpellNames,
+                                  subclassName: subclassForClass?.name ?? null,
                                 })
                                 if (!validation.ok) {
                                   window.alert(validation.message)
@@ -3909,7 +3920,13 @@ export default function BuilderPageClient() {
                         }
                         const eligible = feats
                           .filter((feat) =>
-                            isFeatEligibleForCategories(feat, slot.featCategories, 1, featContext),
+                            isFeatEligibleForCategories(
+                              feat,
+                              slot.featCategories,
+                              1,
+                              featContext,
+                              slot.alsoFeatNames ?? [],
+                            ),
                           )
                           .sort((a, b) => a.name.localeCompare(b.name))
 

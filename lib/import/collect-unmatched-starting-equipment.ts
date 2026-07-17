@@ -1,8 +1,19 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Equipment } from "@/lib/types"
 import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
+import toolsSeed from "@/lib/srd/seed-data/tools.json"
 
 type EquipmentNameRow = Pick<Equipment, "id" | "name">
+
+/** Starting-gear placeholders that resolve via tool proficiency picks, not equipment rows. */
+const TOOL_POOL_PLACEHOLDERS = new Set(
+  [
+    "Artisan's Tools",
+    "Artisans Tools",
+    "Gaming Set",
+    "Musical Instrument",
+  ].map((name) => name.toLowerCase()),
+)
 
 function seedEquipmentCatalog(): EquipmentNameRow[] {
   return (equipmentSeed as { name: string }[]).map((row, index) => ({
@@ -11,8 +22,29 @@ function seedEquipmentCatalog(): EquipmentNameRow[] {
   }))
 }
 
+function seedToolCatalog(): EquipmentNameRow[] {
+  return (toolsSeed as { name: string }[]).map((row, index) => ({
+    name: row.name,
+    id: `tool_${index}`,
+  }))
+}
+
 function normalizeEquipmentNameKey(name: string): string {
   return name.toLowerCase().replace(/['']/g, "'").replace(/\s+/g, " ").trim()
+}
+
+/** Collapse common English plurals for catalog lookup (Torches → Torch). */
+function equipmentNameLookupKeys(name: string): string[] {
+  const key = normalizeEquipmentNameKey(name)
+  const keys = new Set<string>([key])
+  if (key.endsWith("ies") && key.length > 3) keys.add(`${key.slice(0, -3)}y`)
+  if (key.endsWith("ses") && key.length > 3) keys.add(key.slice(0, -2))
+  if (key.endsWith("ches") || key.endsWith("shes") || key.endsWith("xes") || key.endsWith("zes")) {
+    keys.add(key.slice(0, -2))
+  } else if (key.endsWith("s") && !key.endsWith("ss") && key.length > 1) {
+    keys.add(key.slice(0, -1))
+  }
+  return [...keys]
 }
 
 /** Word tokens for "Clothes, Traveler's" ↔ "Traveler's Clothes" style reorder. */
@@ -30,18 +62,22 @@ function sameEquipmentNameTokens(a: string, b: string): boolean {
   return ta.length > 0 && ta.length === tb.length && ta.every((token, i) => token === tb[i])
 }
 
+function isToolPoolPlaceholder(name: string): boolean {
+  const key = normalizeEquipmentNameKey(name)
+  if (TOOL_POOL_PLACEHOLDERS.has(key)) return true
+  // "Artisan's Tools (same as above)" style
+  const bare = key.replace(/\s*\([^)]*\)\s*$/g, "").trim()
+  return TOOL_POOL_PLACEHOLDERS.has(bare)
+}
+
 /** Strict name match for import suggestions (avoid fuzzy false positives). */
 function catalogHasEquipmentName(name: string, catalog: EquipmentNameRow[]): boolean {
-  const key = normalizeEquipmentNameKey(name)
-  const singular = key.replace(/ies$/, "y").replace(/s$/, "")
+  if (isToolPoolPlaceholder(name)) return true
+  const keys = equipmentNameLookupKeys(name)
   return catalog.some((row) => {
-    const en = normalizeEquipmentNameKey(row.name)
-    return (
-      en === key ||
-      en === singular ||
-      key === en.replace(/s$/, "") ||
-      sameEquipmentNameTokens(key, en)
-    )
+    const rowKeys = equipmentNameLookupKeys(row.name)
+    if (keys.some((key) => rowKeys.includes(key))) return true
+    return keys.some((key) => sameEquipmentNameTokens(key, normalizeEquipmentNameKey(row.name)))
   })
 }
 
@@ -84,10 +120,10 @@ function collectNamedItems(content: ImportContent): { name: string; from: string
   return items
 }
 
-/** Names referenced by imported starting gear that are not in the equipment catalog (or this batch). */
+/** Names referenced by imported starting gear that are not in the equipment/tools catalogs (or this batch). */
 export function collectUnmatchedStartingEquipmentNames(
   content: ImportContent,
-  catalogEquipment: EquipmentNameRow[] = seedEquipmentCatalog(),
+  catalogEquipment: EquipmentNameRow[] = [...seedEquipmentCatalog(), ...seedToolCatalog()],
 ): { name: string; sources: string[] }[] {
   const batchNames: EquipmentNameRow[] = (content.equipment ?? []).map((row, index) => ({
     name: row.name,

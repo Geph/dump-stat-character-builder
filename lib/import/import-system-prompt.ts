@@ -21,6 +21,7 @@ import {
   MARKER_LEGEND_SCAN_HINT,
   MECHANICS_IMPORT_HINT,
   NAME_SOURCE_MATCHING_HINT,
+  PREREQUISITE_RULES_IMPORT_HINT,
   SUBCLASS_IMPORT_HINT,
   BACKGROUND_LEGACY_IMPORT_HINT,
 } from "@/lib/import/content-schema"
@@ -45,6 +46,8 @@ For equipment: use cost { amount, unit } separate from name; strip HTML/markdown
 Keep mechanical rules text in feature descriptions. Optionally add mechanics[] per feature for explicit Common Modifier hints (see below).
 
 ${GENERAL_SOURCE_CLEANUP_HINT}
+
+${PREREQUISITE_RULES_IMPORT_HINT}
 
 ${NAME_SOURCE_MATCHING_HINT}
 

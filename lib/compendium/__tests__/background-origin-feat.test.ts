@@ -59,6 +59,34 @@ describe("isLegacyBackground", () => {
       ),
     ).toBe(false)
   })
+
+  it("stays legacy when feature only has proficiency choice linkedModifiers", () => {
+    expect(
+      isLegacyBackground(
+        legacyBackground({
+          feature: {
+            name: "Know-How",
+            description: "You fix things.",
+            linkedModifiers: [
+              {
+                instanceId: "inst-lang",
+                catalogRefId: "cat_char_languages",
+                characteristics: [
+                  {
+                    id: "c-lang",
+                    type: "languages",
+                    values: [],
+                    choiceCount: 1,
+                    choicePool: "standard",
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe("legacy background origin feat pick", () => {

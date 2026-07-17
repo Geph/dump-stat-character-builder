@@ -8,7 +8,7 @@ import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
 import { skillIconSlug } from "@/lib/compendium/skill-icons"
 import { ClampedRichText } from "@/components/character-sheet/expandable-description"
 
-type ChoiceOption = { name: string; description?: string }
+type ChoiceOption = { name: string; description?: string; prerequisite?: string | null }
 
 type MultiSelectChoicesProps = {
   title: string
@@ -142,6 +142,11 @@ export function MultiSelectChoices({
                       {option.name}
                     </p>
                   </div>
+                  {option.prerequisite?.trim() ? (
+                    <p className={`text-muted-foreground mt-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
+                      Prereq: {option.prerequisite}
+                    </p>
+                  ) : null}
                   {isTakenElsewhere && (
                     <p className={`text-muted-foreground mt-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
                       Already chosen

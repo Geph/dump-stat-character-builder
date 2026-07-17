@@ -125,6 +125,12 @@ export function combineImportContents(contents: ImportContent[]): ImportContent 
     if (content.feats?.length) {
       merged.feats = mergeArrayByName(merged.feats, content.feats) as unknown as ImportContent["feats"]
     }
+    if (content.creatures?.length) {
+      merged.creatures = mergeArrayByName(
+        merged.creatures,
+        content.creatures,
+      ) as unknown as ImportContent["creatures"]
+    }
     if (content.species?.length) {
       merged.species = mergeArrayByName(merged.species, content.species) as unknown as ImportContent["species"]
     }

@@ -12,8 +12,9 @@ import {
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid, Info } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool } from "@/lib/types"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, PawPrint, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid, Info } from "lucide-react"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool, Creature } from "@/lib/types"
+import { CreatureStatBlockView } from "@/components/compendium/creature-stat-block-view"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { filterCompendiumClassResourcesBySubclasses } from "@/lib/compendium/subclass-gated-class-resources"
@@ -131,6 +132,7 @@ const tabs: { id: ContentType; label: string; icon: React.ReactNode }[] = [
   { id: "backgrounds", label: "Backgrounds", icon: <BookOpen className="w-3.5 h-3.5" /> },
   { id: "spells", label: "Spells", icon: <Wand2 className="w-3.5 h-3.5" /> },
   { id: "feats", label: "Feats", icon: <Sparkles className="w-3.5 h-3.5" /> },
+  { id: "creatures", label: "Creatures & Companions", icon: <PawPrint className="w-3.5 h-3.5" /> },
   { id: "equipment", label: "Equipment", icon: <Package className="w-3.5 h-3.5" /> },
   { id: "magic_items", label: "Magic Items", icon: <Sparkles className="w-3.5 h-3.5" /> },
   { id: "languages", label: "Languages", icon: <Languages className="w-3.5 h-3.5" /> },
@@ -146,6 +148,7 @@ const newItemButtonLabels: Record<ContentType, string> = {
   backgrounds: "New Background",
   spells: "New Spell",
   feats: "New Feat",
+  creatures: "New Creature",
   equipment: "New Item",
   magic_items: "New Magic Item",
   languages: "New Language",
@@ -203,6 +206,7 @@ export default function CompendiumPageClient() {
     backgrounds: [],
     spells: [],
     feats: [],
+    creatures: [],
     equipment: [],
     magic_items: [],
     languages: [],
@@ -245,6 +249,7 @@ export default function CompendiumPageClient() {
     backgrounds: 0,
     spells: 0,
     feats: 0,
+    creatures: 0,
     equipment: 0,
     magic_items: 0,
     languages: 0,
@@ -282,6 +287,7 @@ export default function CompendiumPageClient() {
         { count: backgroundsCount },
         { count: spellsCount },
         { count: featsCount },
+        { count: creaturesCount },
         { data: equipmentRows },
         { count: languagesCount },
         { count: toolsCount },
@@ -294,6 +300,7 @@ export default function CompendiumPageClient() {
         db.from("backgrounds").select("*", { count: "exact", head: true }),
         db.from("spells").select("*", { count: "exact", head: true }),
         db.from("feats").select("*", { count: "exact", head: true }),
+        db.from("creatures").select("*", { count: "exact", head: true }),
         db
           .from("equipment")
           .select(
@@ -312,6 +319,7 @@ export default function CompendiumPageClient() {
         backgrounds: backgroundsCount ?? 0,
         spells: spellsCount ?? 0,
         feats: featsCount ?? 0,
+        creatures: creaturesCount ?? 0,
         equipment: equipmentSplit.mundane.length,
         magic_items: equipmentSplit.magic.length,
         languages: languagesCount ?? 0,
@@ -545,6 +553,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       { count: backgroundsCount },
       { count: spellsCount },
       { count: featsCount },
+      { count: creaturesCount },
       { data: equipmentRows },
       { count: languagesCount },
       { count: toolsCount },
@@ -557,6 +566,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       db.from("backgrounds").select("*", { count: "exact", head: true }),
       db.from("spells").select("*", { count: "exact", head: true }),
       db.from("feats").select("*", { count: "exact", head: true }),
+      db.from("creatures").select("*", { count: "exact", head: true }),
       db
         .from("equipment")
         .select(
@@ -575,6 +585,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       backgrounds: backgroundsCount ?? 0,
       spells: spellsCount ?? 0,
       feats: featsCount ?? 0,
+      creatures: creaturesCount ?? 0,
       equipment: equipmentSplit.mundane.length,
       magic_items: equipmentSplit.magic.length,
       languages: languagesCount ?? 0,
@@ -1960,6 +1971,18 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                           ? [{ label: (selectedItem as Tool).subcategory! }]
                           : []),
                       ]
+                    : activeTab === "creatures"
+                      ? [
+                          ...((selectedItem as Creature).cr
+                            ? [{ label: `CR ${(selectedItem as Creature).cr}`, emphasis: true }]
+                            : []),
+                          ...((selectedItem as Creature).creature_type
+                            ? [{ label: (selectedItem as Creature).creature_type! }]
+                            : []),
+                          ...((selectedItem as Creature).size
+                            ? [{ label: (selectedItem as Creature).size! }]
+                            : []),
+                        ]
                 : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as unknown as Record<string, unknown>)}
@@ -2042,6 +2065,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
           )}
+          {activeTab === "creatures" && (selectedItem as Creature).stat_block ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+              <CreatureStatBlockView template={(selectedItem as Creature).stat_block} variant="dark" />
+            </div>
+          ) : null}
           {activeTab === "abilities" &&
           isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) ? (
             <div className="space-y-4">

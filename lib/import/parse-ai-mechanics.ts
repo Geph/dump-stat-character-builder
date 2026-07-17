@@ -1,6 +1,10 @@
 import type { AbilityModifierKey, AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { GRANT_FEAT_CATALOG_ID, grantFeatCharacteristic } from "@/lib/compendium/grant-feat-catalog"
+import {
+  GRANT_CREATURE_CATALOG_ID,
+  grantCreatureCharacteristic,
+} from "@/lib/compendium/grant-creature-catalog"
 import { CHARACTERISTIC_MODIFIER_TYPE_OPTIONS } from "@/lib/compendium/characteristic-modifiers"
 import { isKnownEffectKind } from "@/lib/compendium/modifier-catalog-refs"
 import {
@@ -1018,6 +1022,21 @@ function buildFromMechanic(
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, GRANT_FEAT_CATALOG_ID, [characteristic]),
+      }
+    }
+    case "grant_creature": {
+      const names = mechanic.creatureNames?.filter((n) => n.trim()) ?? []
+      if (!names.length) return null
+      const characteristic = grantCreatureCharacteristic(names, {
+        count: mechanic.featCount ?? mechanic.choiceCount ?? 1,
+        choiceOptions: mechanic.creatureChoiceOptions?.filter((n) => n.trim()),
+        polymorph: mechanic.creaturePolymorph === true,
+      })
+      return {
+        ruleId: "ai.grant_creature",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, GRANT_CREATURE_CATALOG_ID, [characteristic]),
       }
     }
     case "spellcasting_ability": {

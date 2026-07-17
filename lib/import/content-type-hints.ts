@@ -6,6 +6,7 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "backgrounds", label: "Backgrounds" },
   { value: "spells", label: "Spells" },
   { value: "feats", label: "Feats, Fighting Styles, Boons" },
+  { value: "creatures", label: "Creatures & Companions" },
   { value: "equipment", label: "Equipment" },
   { value: "abilities", label: "Custom Abilities / Resources" },
   { value: "invocations_metamagic", label: "Custom Invocations / Metamagic" },

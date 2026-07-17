@@ -37,6 +37,7 @@ import type {
   Spell,
   Equipment,
   CustomAbility,
+  Creature,
   Feat,
   Subclass,
 } from "@/lib/types"
@@ -428,6 +429,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [spellCatalog, setSpellCatalog] = useState<Spell[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
+  const [creatures, setCreatures] = useState<Creature[]>([])
   const [companionState, setCompanionState] = useState<CharacterCompanionState[]>([])
   const [featureChoicePicks, setFeatureChoicePicks] = useState<Record<string, string[]>>({})
   const [characterFeats, setCharacterFeats] = useState<Feat[]>([])
@@ -553,6 +555,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         const catalog = await loadModifierCatalog(db)
         setModifierCatalog(catalog)
         setCustomAbilities(await loadCustomAbilitiesForGameplay(db))
+
+        const { data: creatureData } = await db.from("creatures").select("*").order("name")
+        if (creatureData) {
+          setCreatures(asCompendiumRows<Creature & Record<string, unknown>>(creatureData) as Creature[])
+        }
 
         const featIds = (row.feat_ids ?? []).filter(Boolean)
         if (featIds.length) {
@@ -1803,9 +1810,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       customAbilities: sheetCustomAbilities,
       ctx,
       findFamiliarSpellSource,
+      creatures,
+      modifierCatalog,
     })
     return mergeCompanionState(resolved, companionState)
-  }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells])
+  }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells, creatures, modifierCatalog])
 
   const persistCompanionState = useCallback(
     async (next: CharacterCompanionState[]) => {
