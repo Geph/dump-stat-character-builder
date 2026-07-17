@@ -4,7 +4,7 @@
 
 A modern 5E compatible character builder and compendium built with Next.js and MySQL.
 
-**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can be used to process your own imported content.
+**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, creatures & companions, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can be used to process your own imported content.
 
 ## Features
 
@@ -17,38 +17,45 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Automatic calculations** — HP, AC, weapon attacks, saving throws, skills, and modifiers calculated automatically
 
 ### Compendium
-- **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, and more)
-- **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities
+- **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, creatures, and more)
+- **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, creatures & companions, and custom abilities
+- **Creatures & Companions** — First-class compendium type with editable stat blocks (size, type, AC, HP, speeds, abilities, traits, actions). Bundled SRD seed includes familiar/steed/Wild Shape forms plus undead and other summon targets. Features, spells, and magic items grant companions via the **Grant Creature** common modifier (`grant_creature`) — including Druid Wild Shape, Find Familiar, Find Steed / Faithful Steed, Beast Master, *Animate Dead* / *Create Undead*, and other summoning content
 - **Common Modifier Effects** — A permanent, editable system catalog under Custom Abilities that merges class-feature activation templates with characteristic modifiers; class/subclass features, feats, species traits, custom abilities, and choice options all pick from this searchable list and configure it inline instead of defining effects from scratch
-- **Configurable everywhere** — Linked modifiers attach to class/subclass features, feats, species traits, *and* custom abilities with the same editor, so a homebrew ability can carry skill choices, languages, resource pools, level-scaling dice, alternate-ability checks, companions, or feat grants exactly like SRD content
-- **Player-choice modifiers** — Skill/expertise (with optional "any skill" or class-list scoping), tool/instrument selections, languages, sizes, weapon masteries, and feat grants are authored once on a modifier and rendered as builder choices automatically
+- **Configurable everywhere** — Linked modifiers attach to class/subclass features, feats, species traits, *and* custom abilities with the same editor, so a homebrew ability can carry skill choices, languages, resource pools, level-scaling dice, alternate-ability checks, creature grants, or feat grants exactly like SRD content
+- **Player-choice modifiers** — Skill/expertise (with optional "any skill" or class-list scoping), tool/instrument selections, languages, sizes, weapon masteries, feat grants, and creature picks are authored once on a modifier and rendered as builder choices automatically
+- **Choice prerequisites** — Option lists (knacks, talents, upgrades, and similar) can gate picks on class level, other selected options, known spells, and freeform requirements so the builder only offers legal choices
 - **Level-scaling effects** — Effects like unarmed/Martial Arts die, Sneak Attack, and player-chosen feature branches (Druid *Elemental Fury*, Cleric *Blessed Strikes*) scale by level from the player's original choice without needing duplicate higher-level entries
-- **Companions & beast forms** — Companion / Beast Form stat-block templates (with SRD Druid Wild Shape defaults: Rat, Riding Horse, Spider, Wolf) populate the character sheet via a common modifier
+- **Companions on the sheet** — Granted creatures resolve into the character sheet Companion / Beast Form tab (polymorph forms vs summoned companions), with stat blocks from the Creatures catalog rather than one-off embedded templates alone
 - **Spell-slot progression editor** — Accordion editor with full / half / third / pact caster presets for class spellcasting
-- **SRD modifier enrichment** — Bundled SRD classes, subclasses, feats, and species traits ship with linked common-modifier presets (class resources, cast spell, movement types, Metamagic/Eldritch Invocations catalogs, unarmed die scaling, standard-language grants, size options, Monk tool/weapon proficiencies, and more); run `pnpm dlx tsx scripts/audit-srd-class-features.ts` to list gaps
+- **SRD modifier enrichment** — Bundled SRD classes, subclasses, feats, and species traits ship with linked common-modifier presets (class resources, cast spell, movement types, Metamagic/Eldritch Invocations catalogs, unarmed die scaling, standard-language grants, size options, Monk tool/weapon proficiencies, creature grants, and more); run `pnpm dlx tsx scripts/audit-srd-class-features.ts` to list gaps
 - **Card background graphics** — Every compendium entry can have a hero image for selection cards and full-screen detail overlays (upload or URL in the editor header area); classes, species, and subclasses use **3:4 portrait** art on browse cards and a side-by-side **Description & card art** editor row
 - **Cinematic selection UI** — Builder class/species/background pickers and compendium detail views use full-bleed artwork with gold-framed cards inspired by D&D Beyond
 - **Default SRD icons** — Bundled defaults for subclasses, mundane weapons (same icons as the mastery visual grid), and all 13 mundane armor types; compendium browse shows them when no custom icon is set
-- **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses
+- **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses; subclass-only pools (Superiority Dice, Psionic Energy Dice) appear when those subclasses are loaded
 - **Enable / disable content** — Toggle compendium entries off for the builder (grayed-out cards including artwork); prompts when disabling or re-enabling related entries (subclasses, class resources, attached abilities, etc.)
-- **Unified editor header** — Icon picker (inline with name field), name, source, and source link on one row across all compendium editors
-- **Background proficiencies editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, and languages
+- **Unified editor header** — Icon picker and theme color (fly-out), name, source, and source link on one row across all compendium editors
+- **Background editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, languages, origin feat grants, tool/language choice phrases wired as builder picks, and Choose A/B starting equipment packages
 - **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level
-- **Spell editor** — Casting time, range, and duration presets with “Other” custom values; ritual and concentration on the same row as level and school
+- **Spell editor** — Casting time, range, and duration presets with “Other” custom values; ritual and concentration on the same row as level and school; edit sections open by default
 - **Section export & clear** — Export or wipe an entire compendium tab from the gear menu
 - **Filtering & search** — Find content quickly with search and category filters
 
 ### Character Management
 - **Save & load characters** — Persist characters to MySQL; resume editing from the builder
-- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab, roll-able special actions from features, off-hand weapon slots for dual wielding, and class-feature toggles (e.g. Rage, Innate Sorcery) with conditional combat bonuses
+- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab driven by Creatures & Companions grants, roll-able special actions from features, off-hand weapon slots for dual wielding, and class-feature toggles (e.g. Rage, Innate Sorcery) with conditional combat bonuses
 - **Export options** — Download character and compendium data as JSON
 
 ### Import
-- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including all 13 mundane armor types); **no AI**
+- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including armor types and Creatures & Companions); **no AI**
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
+- **Content-type hints** — Focus extraction on Class (include spell list), Subclasses, Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, or Custom Invocations / Metamagic (same custom-abilities pipeline)
+- **Same-source replacements** — When importing a class that replaces SRD spells or feats, optionally prefer matching names from the import’s Source label over base SRD entries
+- **Creature import v2** — Structured creatures/companions JSON (schema `2.0`) with loud validation; Foundry NPC actors map into the same Creatures catalog
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 - **Foundry VTT import** — Paste or upload Foundry `dnd5e` item and NPC actor exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e)). NPC actors import as Creatures & Companions; character/vehicle sheets are skipped.
-- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses)
+- **PDF paste cleanup** — BYO extraction prompts tell the LLM to collapse doubled ALL-CAPS glyphs (common in LaserLlama PDFs) and strip trailing superscript markers pasted as letters (e.g. KibblesTasty `Returning WeaponK` → `Returning Weapon`)
+- **Source limits** — Spell PDF imports cap at 15 pages per pass; pasted source text has a Plus-tier LLM character budget so extraction stays practical
+- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses; include class spell lists with the class pass)
 
 See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
 
@@ -305,7 +312,7 @@ The **Clipboard** tab is the primary import path for pasted text:
 3. Run the prompt in ChatGPT, Claude, Gemini, or any LLM — using your own API key or subscription.
 4. Paste the model's JSON output back into Dump Stat and click **Import JSON**.
 
-The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, etc.). No server API keys are required for this flow.
+The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, collapse doubled ALL-CAPS PDF glyphs, strip trailing superscript markers like KibblesTasty `K`, etc.). No server API keys are required for this flow.
 
 **Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs (hidden when no provider is configured). The BYO prompt/template workflow remains available either way.
 
@@ -329,21 +336,20 @@ On the app: **Import → Multi-file import order** (expandable panel at the top 
 2. **One batch or sequential** — Either paste a **JSON array** of import objects in dependency order, or run separate imports in the same order (earlier files persist to the compendium before later ones wire references).
 3. **Set a source label** — Use the compendium source label field (e.g. `Kibbles Witch`) so you can filter and re-import safely.
 
-**Spellcasting classes** (Witch, Inventor, full casters)
+**Spellcasting classes** (Witch, full casters, etc.)
 
 | Step | Content |
 |------|---------|
-| 1 | Homebrew spell libraries (`kibbles-spells-parsed.json`, Valda's supplements, etc.) |
-| 2 | Class spell list stub (optional) |
-| 3 | Class JSON |
-| 4 | Subclasses JSON (always-prepared spell tables) |
-| 5 | Choice options if separate (grand hexes, invocations, …) |
+| 1 | Homebrew spell libraries (`kibbles-spells-parsed.json`, Valda's supplements, etc.) when needed |
+| 2 | Class JSON **including** the class spell list (Spell / School / Special tables) when present |
+| 3 | Subclasses JSON (always-prepared spell tables) |
+| 4 | Choice options if separate (grand hexes, invocations, …) |
 
-**KibblesTasty Psion**
+**KibblesTasty Psion** (and similar psionic classes with separated powers)
 
 | Step | Content |
 |------|---------|
-| 1 | `psion-disciplines.json` (powers in `spells[]`, discipline packages in `import_proposals`) |
+| 1 | `psion-disciplines.json` (psionic powers as custom abilities / proposals — not ordinary `spells[]`) |
 | 2 | `psion-class.json` |
 | 3 | Archetypes / subclasses (e.g. `psion-knowing-mind.json`) |
 
@@ -592,9 +598,9 @@ public/
 
 Dump Stat is built so that **everything the SRD content does, your homebrew can do too** — there are no hard-coded class or species mechanics that you can't reproduce in the editors.
 
-- **Content** — Create or edit species, classes, subclasses, backgrounds, feats, spells, equipment, and custom abilities in the Compendium. Custom entries are marked with source **Custom**; SRD entries can be edited, disabled, exported, or replaced.
-- **Mechanics via Common Modifier Effects** — Instead of inline, one-off rules, every feature, trait, feat, choice option, and custom ability draws from one searchable catalog of modifier effects (ability/skill/save bonuses, proficiencies, resource pools, level-scaling dice, spell grants, alternate-ability checks, companions/beast forms, feat grants, and more). Edit a modifier once and every entry that links it updates.
-- **Player choices** — Author a choice (skills, tools/instruments, languages, sizes, weapon masteries, feat grants) on a modifier and it renders automatically as an interactive pick in the builder at the right step.
+- **Content** — Create or edit species, classes, subclasses, backgrounds, feats, spells, equipment, creatures & companions, and custom abilities in the Compendium. Custom entries are marked with source **Custom**; SRD entries can be edited, disabled, exported, or replaced.
+- **Mechanics via Common Modifier Effects** — Instead of inline, one-off rules, every feature, trait, feat, choice option, and custom ability draws from one searchable catalog of modifier effects (ability/skill/save bonuses, proficiencies, resource pools, level-scaling dice, spell grants, alternate-ability checks, creature grants / beast forms, feat grants, and more). Edit a modifier once and every entry that links it updates.
+- **Player choices** — Author a choice (skills, tools/instruments, languages, sizes, weapon masteries, feat grants, creature picks) on a modifier and it renders automatically as an interactive pick in the builder at the right step.
 - **Layout & theme** — Toggle the builder between **compact** and **visual** layouts in settings. Theming lives in `app/globals.css` (Arcane default plus Parchment, Stone, Moss, and Clay); use the gear icon in the header to switch styles. Both preferences are stored in `localStorage`.
 - **Portability** — Move content between instances (or between hosted and static deploys) with Dump Stat JSON export/import, and bring in third-party content via Foundry VTT, text, or PDF import.
 
