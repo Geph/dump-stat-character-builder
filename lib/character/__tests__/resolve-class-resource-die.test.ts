@@ -28,6 +28,20 @@ function battleMasterFighterDetail(level: number): CharacterClassDetail {
   }
 }
 
+function unleashedPsionDetail(level: number): CharacterClassDetail {
+  const rampage = SUBCLASS_GATED_CLASS_RESOURCES.find(
+    (entry) => entry.resource.id === "rampage_die",
+  )!.resource
+  return {
+    row: { class_id: "cls_psion", level, subclass_id: "sub_unleashed", order: 0 },
+    class: {
+      id: "cls_psion",
+      name: "Psion",
+      class_resources: [rampage],
+    } as unknown as DndClass,
+  }
+}
+
 describe("resolveClassResourceDieSides", () => {
   it("resolves Bardic Inspiration's die size from SRD defaults, scaling by level", () => {
     expect(resolveClassResourceDieSides([bardDetail(1)], "bardic_inspiration")).toBe(6)
@@ -58,5 +72,14 @@ describe("buildClassResourceDieSidesMap", () => {
     const map = buildClassResourceDieSidesMap([battleMasterFighterDetail(10), bardDetail(5)])
     expect(map.superiority_dice).toBe(10)
     expect(map.bardic_inspiration).toBe(8)
+  })
+
+  it("applies persisted play-state overrides only to resources the character owns", () => {
+    const map = buildClassResourceDieSidesMap([unleashedPsionDetail(3)], {
+      rampage_die: 10,
+      unknown_die: 12,
+    })
+    expect(map.rampage_die).toBe(10)
+    expect(map.unknown_die).toBeUndefined()
   })
 })

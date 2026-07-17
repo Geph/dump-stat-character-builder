@@ -62,6 +62,8 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "ability_scores",
   "movement_option",
   "feature_option_picker",
+  // Complex nested characteristic — auto-wired by phrase detection, not hand-authored by the LLM.
+  "on_cast_spell_trigger",
   "*",
 ])
 
@@ -158,14 +160,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "proficiency.armor.medium",
     trigger: "description",
     catalog: "cat_char_armor_proficiencies",
-    examples: ["proficiency with medium armor"],
+    examples: [
+      "proficiency with medium armor",
+      "proficiency with martial weapons and medium armor",
+    ],
     mechanicsKind: "armor_proficiencies",
   },
   {
     ruleId: "proficiency.armor.shields",
     trigger: "description",
     catalog: "cat_char_armor_proficiencies",
-    examples: ["proficiency with shields"],
+    examples: ["proficiency with shields", "proficiency with medium armor and shields"],
     mechanicsKind: "armor_proficiencies",
   },
   {
@@ -319,9 +324,14 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "resource.expend_psi_points",
     trigger: "description",
     catalog: "cat_char_uses",
-    examples: ["expend 2 psi points to activate this discipline"],
+    examples: [
+      "expend 2 psi points to activate this discipline",
+      "you can spend 1 psi point to swap places with your Astral Construct",
+      "by expending 1 psi point",
+    ],
     mechanicsKind: "uses",
-    notes: 'classResourceKey: "psi_points", classResourceCost from match',
+    notes:
+      'classResourceKey: "psi_points", classResourceCost from match. "unless you expend N psi points" refresh clauses are skipped (not an activation cost).',
   },
   {
     ruleId: "heal.turn_start_low_hp",
@@ -433,6 +443,49 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'checkCategory: "save"',
   },
   {
+    ruleId: "save.advantage.magic",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: [
+      "You have advantage on saving throws against spells and other magical effects",
+    ],
+    mechanicsKind: "check_roll_modifier",
+    notes: 'checkCategory: "save", checkConditionTypes: ["spell"] — no checkAbility (any save vs magic)',
+  },
+  {
+    ruleId: "check.bonus.ability_checks.die",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: [
+      "Whenever you make an ability check using Strength or Dexterity, you can add 1d4 to the result.",
+    ],
+    mechanicsKind: "check_roll_modifier",
+    notes:
+      'checkRollMode: "bonus", checkCategory: "ability", checkAbility per ability, bonusConfig { mode: "die", dieCount, dieType } — keep the sentence shape "Whenever you make an ability check using X or Y, you can add NdM to the result"',
+  },
+  {
+    ruleId: "skill.check.alternate_ability",
+    trigger: "description",
+    catalog: "cat_char_skill_check_alternate_ability",
+    examples: [
+      "You can use Intelligence instead of Strength for Athletics checks",
+      "use Intelligence instead of other ability modifiers when making an Athletics check",
+      "use Intelligence instead of Wisdom when making an Insight check against a creature with Intelligence 6 or higher",
+    ],
+    mechanicsKind: "skill_check_alternate_ability",
+    notes:
+      'alternateAbility + alternateSkills; a leading "While …," clause or trailing "against …" qualifier becomes conditionLabel.',
+  },
+  {
+    ruleId: "check.bonus.initiative.proficiency",
+    trigger: "description",
+    catalog: "cat_char_initiative",
+    examples: ["You can add your proficiency bonus to Perception and initiative rolls."],
+    mechanicsKind: "initiative",
+    notes:
+      'initiativeMode: "add_proficiency". Paired skill mentions (Perception) are NOT auto-wired — add a skills mechanic or separate proficiency sentence if intended.',
+  },
+  {
     ruleId: "check.advantage.skill",
     trigger: "description",
     catalog: "cat_fx_check_roll_modifier",
@@ -465,19 +518,34 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     mechanicsKind: "damage_resistance",
   },
   {
+    ruleId: "resistance.spell_damage",
+    trigger: "description",
+    catalog: "cat_char_damage_resistance",
+    examples: ["You gain resistance to damage dealt by spells or magical effects"],
+    mechanicsKind: "damage_resistance",
+    notes: 'fromSpells: true (sheet token "Spell damage") — same as damageTypes ["Spells"] in mechanics[].',
+  },
+  {
     ruleId: "immunity.condition",
     trigger: "description",
     catalog: "cat_char_condition_immunity",
-    examples: ["immune to the charmed condition"],
+    examples: [
+      "immune to the charmed condition",
+      "immunity to the Charmed and Frightened conditions",
+    ],
     mechanicsKind: "condition_immunity",
   },
   {
     ruleId: "speed.walk",
     trigger: "description",
     catalog: "cat_char_speed",
-    examples: ["walking speed increases by 10 feet"],
+    examples: [
+      "walking speed increases by 10 feet",
+      "Primordial Aspect — Lightning: your walking speed increases by 5 feet",
+    ],
     mechanicsKind: "speed",
-    notes: 'speedType: "walk"',
+    notes:
+      'speedType: "walk". Primordial Aspect Lightning is automatically gated by primordial_aspect_lightning.',
   },
   {
     ruleId: "speed.fly",
@@ -520,11 +588,30 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     mechanicsKind: "telepathy",
   },
   {
+    ruleId: "sense.telepathy.communicate",
+    trigger: "description",
+    catalog: "cat_char_telepathy",
+    examples: [
+      "You can communicate telepathically with any creature you can see within 30 feet",
+    ],
+    mechanicsKind: "telepathy",
+    notes: "telepathyRangeFeet from the sentence — same wiring as sense.telepathy.",
+  },
+  {
     ruleId: "vision.darkvision",
     trigger: "description",
     catalog: "cat_char_vision",
     examples: ["darkvision within 60 feet"],
     mechanicsKind: "vision",
+  },
+  {
+    ruleId: "vision.mindsight",
+    trigger: "description",
+    catalog: "cat_char_vision",
+    examples: ["You gain mindsight with a range of 60 feet"],
+    mechanicsKind: "vision",
+    notes:
+      'Wires as visionType "custom" with customType "Mindsight"; preserves an Intelligence threshold and hidden-creature caveat in display text.',
   },
   {
     ruleId: "attack.extra",
@@ -544,6 +631,32 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     mechanicsKind: "uses",
     notes: 'usesFixed: 1, usesRecharge: "both"',
+  },
+  {
+    ruleId: "uses.once_until_rest",
+    trigger: "description",
+    catalog: "cat_char_uses",
+    examples: [
+      "Once you do, you can't do so again until you finish a long rest.",
+      "Once used, you can't use this talent again until you finish a short or long rest.",
+      "Once you cast it this way, you can't do so again until you finish a long rest.",
+      "Once you create an additional duplicate, you cannot do so again until you finish a short or long rest.",
+      "Once you use this ability, you cannot use it again until you complete a short or long rest.",
+    ],
+    mechanicsKind: "uses",
+    notes:
+      'usesFixed: 1 + usesRecharge from the rest type. Accepts finish or complete. Wire even when an "unless you expend N psi points" alternate refresh follows — that clause is additive.',
+  },
+  {
+    ruleId: "uses.once_regain_after_rest",
+    trigger: "description",
+    catalog: "cat_char_uses",
+    examples: [
+      "You can create an illusory duplicate in this way once, regaining its use after a long rest.",
+      "You can cast it once without expending any psi points, regaining the ability to do so after a long rest.",
+    ],
+    mechanicsKind: "uses",
+    notes: 'usesFixed: 1 + usesRecharge from the rest type. Kibbles-style once + regain phrasing.',
   },
   {
     ruleId: "uses.item_charges",
@@ -569,9 +682,12 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "uses.ability_modifier",
     trigger: "description",
     catalog: "cat_char_uses",
-    examples: ["a number of times equal to your Wisdom modifier (minimum once)"],
+    examples: [
+      "a number of times equal to your Wisdom modifier (minimum once)",
+      "You can create a number equal to your Intelligence modifier, regaining all uses after a long rest",
+    ],
     mechanicsKind: "uses",
-    notes: 'usesAbility: "WIS"',
+    notes: 'usesAbility: "WIS" / "INT"; accepts "a number equal to" as well as "a number of times equal to".',
   },
   {
     ruleId: "uses.proficiency",
@@ -579,6 +695,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_uses",
     examples: [
       "a number of times equal to your proficiency bonus, regaining all uses on a long rest",
+      "a number of times equal to your proficiency bonus, regaining all uses when you finish a long rest",
     ],
     mechanicsKind: "uses",
   },
@@ -588,7 +705,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_languages",
     examples: ["You know Sylvan", "You know Common and Elvish"],
     mechanicsKind: "languages",
-    notes: 'languages: ["Sylvan"] for fixed grants.',
+    notes: 'languages: ["Sylvan"] for fixed grants. Language name must be Capitalized — lowercase "you know it/that…" prose is ignored.',
   },
   {
     ruleId: "language.choice",
@@ -626,6 +743,18 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'spellNames + castAsRitual: true when "only as Ritual(s)"; castingAbility from companion sentence',
   },
   {
+    ruleId: "spell.gain_cast_named",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You can cast minor illusion with your psionic powers",
+      "You gain the ability to cast plane shift and teleport",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      'Explicit named-spell grants that omit the word "spell"; preserves every concrete name in an "and" list.',
+  },
+  {
     ruleId: "spell.cantrip.choice",
     trigger: "description",
     catalog: "cat_char_spells_known",
@@ -650,6 +779,77 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: 'uses: { type: "unlimited" }',
   },
   {
+    ruleId: "spell.cast_via_psi_points",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You can cast psychic drain by expending 2 psi points",
+      "you can expend 5 psi points to cast animate objects",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      "Name the spell explicitly next to the psi cost. The psi spend itself wires separately (resource.expend_psi_points) — keep both in one sentence.",
+  },
+  {
+    ruleId: "spell.cast_named_no_slot",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You can cast awaken once without expending a spell slot or psi points",
+      "You can cast fire shield without expending psi points",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      'Wires the named spell as known; pair with the "Once you do, you can\'t … until you finish a long rest" sentence for the once-per-rest limit.',
+  },
+  {
+    ruleId: "spell.cast_named_at_will",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You can cast alter self at will without expending a spell slot or psi points",
+      "You gain the ability to cast alter self at will",
+    ],
+    mechanicsKind: "spells_known",
+    notes: 'Named at-will grants — keep the spell name directly after "cast". Prefer over gain_cast_named when "at will" is present.',
+  },
+  {
+    ruleId: "spell.learn_named",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "You gain the cure wounds spell and can cast it as a 1st-level spell by expending 1 psi point",
+      "You learn divide self and can cast it by expending 5 psi points",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      'The bare "You learn X." form requires a casting mention in the same feature; prefer "You gain the X spell" phrasing.',
+  },
+  {
+    ruleId: "spell.added_to_effects_list",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "The mutate and polymorph spells are added to your Enhancement Alternate Effects list",
+      "Silent image, major image, hallucinatory terrain, and seeming are added to your Telepathy Discipline Alternate Effects list",
+      "You add the spell weird to your alternate effects list, costing 9 psi points",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      "Psi-caster talents extending a discipline's castable list — wired as known spells (cast via psi points).",
+  },
+  {
+    ruleId: "weapon.reach.bonus",
+    trigger: "description",
+    catalog: "cat_char_weapon_reach_modifier",
+    examples: [
+      "your reach increases by 5 feet when making melee attacks, interacting with objects, or navigating environments",
+    ],
+    mechanicsKind: "weapon_reach_modifier",
+    notes:
+      "Self reach bonus for melee/unarmed; appliesToUnarmedStrike defaults true. Prefer mechanics[] weapon_reach_modifier when already extracted.",
+  },
+  {
     ruleId: "grant.fighting_style",
     trigger: "description",
     catalog: "cat_char_grant_feat",
@@ -668,6 +868,25 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     mechanicsKind: "grant_creature",
     notes: 'creatureNames: ["Basilisk Companion"] — also import the creature into creatures[]',
+  },
+  {
+    ruleId: "grant.creature.raise_undead",
+    trigger: "description",
+    catalog: "cat_char_grant_creature",
+    examples: ["raising it as a zombie or skeleton under your control"],
+    mechanicsKind: "grant_creature",
+    notes: 'creatureChoiceOptions: ["Zombie", "Skeleton"] — SRD stat blocks resolve by name.',
+  },
+  {
+    ruleId: "grant.creature.mephit_choice",
+    trigger: "description",
+    catalog: "cat_char_grant_creature",
+    examples: [
+      "manifest it as a mephit: an ice mephit for cold, magma mephit for fire, or dust mephit for lightning",
+    ],
+    mechanicsKind: "grant_creature",
+    notes:
+      'creatureChoiceOptions: ["Ice Mephit", "Magma Mephit", "Dust Mephit"] — keep all three mephit names in the option description.',
   },
   {
     ruleId: "grant.fighting_style_feat",
@@ -744,6 +963,39 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     notes:
       "Bonus Action activation with while_raging requirement; single sheet action (not separate Dash/Disengage cards).",
+  },
+  {
+    ruleId: "movement.leap.full_speed",
+    trigger: "description",
+    catalog: "cat_fx_movement_option",
+    examples: [
+      "you can expend movement up to your speed in a single bounding leap",
+      "leap in a single bounding leap propelled by telekinetic power",
+    ],
+    notes:
+      "Self movement option (jump) covering up to your full Speed; no action cost (part of normal movement).",
+  },
+  {
+    ruleId: "spell.damage.half_on_save",
+    trigger: "description",
+    catalog: "cat_char_on_cast_spell_trigger",
+    examples: [
+      "When a target succeeds on a saving throw against a damaging Psionic Power … it still takes half damage but suffers no other effects",
+      "a creature that succeeds on its save still takes half the damage and suffers no other effects",
+    ],
+    notes:
+      "Mirrors Evoker Potent Cantrip: on_cast_spell_trigger with damage_reduction (half-on-save, no other effects). Display/reminder characteristic.",
+  },
+  {
+    ruleId: "spell.damage.add_int_psionic_power",
+    trigger: "description",
+    catalog: "cat_char_on_cast_spell_trigger",
+    examples: [
+      "When you deal damage with a psionic discipline power, you can add your Intelligence modifier to the damage dealt",
+      "When a creature suffers damage from one of your psionic discipline powers, you can add your Intelligence modifier to the damage dealt",
+    ],
+    notes:
+      "Psion Empowered Psionics variants. Mirrors Empowered Evocation as a scoped on_cast_spell_trigger reminder.",
   },
   {
     ruleId: "damage.scaling.die_by_level",

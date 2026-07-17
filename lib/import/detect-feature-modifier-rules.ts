@@ -270,6 +270,8 @@ function buildCheckRollModifier(
     checkCategory: "save" | "skill" | "initiative" | "attack" | "ability"
     checkAbility?: string | null
     checkSkills?: string[]
+    /** Conditions the roll is made against (e.g. ["spell"] for saves vs spells). */
+    checkConditionTypes?: string[]
   },
   sourceText?: string,
 ): LinkedModifierInstance {
@@ -282,10 +284,33 @@ function buildCheckRollModifier(
         checkCategory: options.checkCategory,
         checkAbility: options.checkAbility ?? null,
         checkSkills: options.checkSkills,
+        ...(options.checkConditionTypes?.length
+          ? { checkConditionTypes: options.checkConditionTypes }
+          : {}),
         limitations: sourceText ? parseLimitationsFromText(sourceText) : [],
       },
     ],
   })
+}
+
+function spellsKnownInstance(
+  ctx: DetectFeatureContext,
+  ruleSuffix: string,
+  spellNames: string[],
+  label: string,
+): LinkedModifierInstance {
+  return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+    {
+      id: modId(instanceKey(ctx, ruleSuffix)),
+      type: "spells_known",
+      spells: spellNames.map((name) => ({
+        spellId: spellNamePlaceholder(name),
+        alwaysPrepared: true,
+      })),
+      alwaysPrepared: true,
+      label,
+    },
+  ])
 }
 
 function parseSpellNameList(fragment: string): string[] {
@@ -296,15 +321,20 @@ function parseSpellNameList(fragment: string): string[] {
   if (!cleaned) return []
   return cleaned
     .split(/\s*,\s*|\s+and\s+/i)
-    .map((part) => part.trim().replace(/^the\s+/i, ""))
+    // Oxford-comma lists ("…, and seeming") leave a leading "and" on the last part.
+    .map((part) => part.trim().replace(/^(?:and|or)\s+/i, "").replace(/^the\s+/i, ""))
     .filter((part) => part.length > 1 && looksLikeNamedSpell(part))
 }
 
 /** Reject chooser / pool phrasing that is not a concrete spell title. */
 function looksLikeNamedSpell(name: string): boolean {
   if (/\d/.test(name)) return false
-  if (/^(one|two|three|four|five|six|a|an|any)\b/i.test(name)) return false
-  if (/\b(of your|that you|level|prepared|from your|circle|domain|oath)\b/i.test(name)) return false
+  if (/^(one|two|three|four|five|six|a|an|any|it|this|that|them|the|each|whether|how|what)\b/i.test(name)) {
+    return false
+  }
+  if (/\b(of your|that you|level|prepared|from your|circle|domain|oath|psi|expend(?:ing)?|spend(?:ing)?)\b/i.test(name)) {
+    return false
+  }
   if (!/^[A-Za-z]/.test(name)) return false
   return true
 }
@@ -325,11 +355,16 @@ function parseDamageTypes(fragment: string): string[] {
 }
 
 function parseCondition(fragment: string): string | null {
-  const normalized = titleCaseWords(fragment.replace(/the\s+/i, "").replace(/\s+condition$/i, ""))
-  for (const condition of CONDITION_NAMES) {
-    if (condition.toLowerCase() === normalized.toLowerCase()) return condition
-  }
-  return null
+  const conditions = parseConditions(fragment)
+  return conditions[0] ?? null
+}
+
+function parseConditions(fragment: string): string[] {
+  const lower = fragment.toLowerCase()
+  return CONDITION_NAMES.filter((condition) => {
+    const re = new RegExp(`\\b${condition.toLowerCase()}\\b`, "i")
+    return re.test(lower)
+  })
 }
 
 function parseRechargeRest(fragment: string): UsesConfig["recharges"] {
@@ -1047,7 +1082,8 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "proficiency.armor.heavy",
     confidence: "high",
-    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+heavy\s+armor\b/i,
+    // Also match combined grants like "martial weapons and heavy armor".
+    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+(?:(?:martial|simple)\s+weapons?\s+and\s+)?heavy\s+armor\b/i,
     build: (_match, ctx) =>
       charInstance(newInstanceId(), characteristicCatalogRefId("armor_proficiencies"), [
         {
@@ -1060,7 +1096,8 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "proficiency.armor.medium",
     confidence: "high",
-    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+medium\s+armor\b/i,
+    // Also match combined grants like "martial weapons and medium armor" (Nomad's Gear).
+    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+(?:(?:martial|simple)\s+weapons?\s+and\s+)?medium\s+armor\b/i,
     build: (_match, ctx) =>
       charInstance(newInstanceId(), characteristicCatalogRefId("armor_proficiencies"), [
         {
@@ -1073,7 +1110,8 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "proficiency.armor.shields",
     confidence: "high",
-    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+shields?\b/i,
+    // Also match combined grants like "proficiency with medium armor and shields".
+    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+(?:(?:light|medium|heavy)\s+armor\s+and\s+)?shields?\b/i,
     build: (_match, ctx) =>
       charInstance(newInstanceId(), characteristicCatalogRefId("armor_proficiencies"), [
         {
@@ -1344,6 +1382,23 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "save.advantage.magic",
+    confidence: "high",
+    test:
+      /\badvantage\s+on\s+saving\s+throws?\s+against\s+spells(?:\s+(?:and|or)\s+(?:other\s+)?magic(?:al)?\s+effects?)?\b/i,
+    build: (_match, ctx, text) =>
+      buildCheckRollModifier(
+        ctx,
+        "save_adv_magic",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "save",
+          checkConditionTypes: ["spell"],
+        },
+        text,
+      ),
+  },
+  {
     id: "check.advantage.skill.ability",
     confidence: "high",
     test:
@@ -1397,6 +1452,21 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "resistance.spell_damage",
+    confidence: "high",
+    test: /\bresistance\s+to\s+(?:the\s+)?damage\s+(?:dealt\s+by|of|from)\s+spells\b/i,
+    build: (_match, ctx) =>
+      charInstance(newInstanceId(), characteristicCatalogRefId("damage_resistance"), [
+        {
+          id: modId(instanceKey(ctx, "res_spell_damage")),
+          type: "damage_resistance",
+          damageTypes: [],
+          fromSpells: true,
+          label: "Resistance to damage from spells",
+        },
+      ]),
+  },
+  {
     id: "resistance.damage",
     confidence: "high",
     test: /\bresistance\s+to\s+([^.;\n]+?)\s+damage\b/i,
@@ -1417,16 +1487,28 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "immunity.condition",
     confidence: "high",
-    test: /\b(?:immune\s+to\s+(?:the\s+)?|can'?t\s+be\s+)([^.;\n]+?)(?:\s+condition)?\b/i,
+    // "immune to" / "immunity to" / "can't be" — including multi-condition lists
+    // like "immunity to the Charmed and Frightened conditions" (Uncontrollable Mind).
+    test: /\b(?:immune\s+to\s+(?:the\s+)?|immunity\s+to\s+(?:the\s+)?|can'?t\s+be\s+)([^.;\n]+)/i,
     build: (match, ctx, text) => {
-      if (!/\bimmune\b/i.test(text) && !/\bcan'?t\s+be\b/i.test(text)) return null
-      const condition = parseCondition(match[1])
-      if (!condition) return null
+      if (
+        !/\bimmune\b/i.test(text) &&
+        !/\bimmunity\b/i.test(text) &&
+        !/\bcan'?t\s+be\b/i.test(text)
+      ) {
+        return null
+      }
+      const conditions = parseConditions(match[1])
+      if (!conditions.length) return null
+      const whileClause = text.match(/\b(While\s+[^,]{3,80}),/i)?.[1]?.trim()
       return charInstance(newInstanceId(), characteristicCatalogRefId("condition_immunity"), [
         {
           id: modId(instanceKey(ctx, "condition_immune")),
           type: "condition_immunity",
-          conditions: [condition],
+          conditions,
+          ...(whileClause
+            ? { label: `Immunity to ${conditions.join(" and ")} (${whileClause})` }
+            : {}),
         },
       ])
     },
@@ -1435,9 +1517,12 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "speed.walk",
     confidence: "high",
     test: /\b(?:walking\s+)?speed\s+increases?\s+by\s+(\d+)\s+feet\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
       const feet = parseInt(match[1], 10)
       if (!Number.isFinite(feet)) return null
+      const primordialLightning =
+        /^Primordial Aspect$/i.test(ctx.featureName ?? "") &&
+        /\bLightning\b[\s\S]{0,120}\bwalking speed increases?\b/i.test(text)
       return charInstance(newInstanceId(), characteristicCatalogRefId("speed"), [
         {
           id: modId(instanceKey(ctx, "speed_walk")),
@@ -1445,6 +1530,12 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           speedType: "walk",
           mode: "add",
           value: feet,
+          ...(primordialLightning
+            ? {
+                requiresSheetToggle: "primordial_aspect_lightning",
+                label: `+${feet} ft. walking speed (Lightning aspect)`,
+              }
+            : {}),
         },
       ])
     },
@@ -1529,6 +1620,31 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "vision.mindsight",
+    confidence: "high",
+    scope: "full",
+    test: /\bgain\s+mindsight\s+with\s+a\s+range\s+of\s+(\d+)\s+feet\b/i,
+    build: (match, ctx, text) => {
+      const rangeFeet = parseInt(match[1], 10)
+      if (!Number.isFinite(rangeFeet)) return null
+      const intelligenceFloor = text.match(/\bIntelligence\s+(\d+)\s+or\s+higher\b/i)?.[1]
+      return charInstance(newInstanceId(), characteristicCatalogRefId("vision"), [
+        {
+          id: modId(instanceKey(ctx, "mindsight")),
+          type: "vision",
+          visionType: "custom",
+          customType: intelligenceFloor
+            ? `Mindsight (creatures with Intelligence ${intelligenceFloor}+)`
+            : "Mindsight",
+          rangeFeet,
+          label: /creature\s+you\s+are\s+unaware\s+of\s+can\s+still\s+be\s+hidden/i.test(text)
+            ? "Mindsight; creatures you are unaware of can still be hidden"
+            : "Mindsight",
+        },
+      ])
+    },
+  },
+  {
     id: "attack.extra",
     confidence: "high",
     test: /\b(?:gain(?:s)?\s+an?\s+extra\s+attack|attack\s+twice|two\s+attacks)\b/i,
@@ -1553,6 +1669,39 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         type: "fixed",
         fixedAmount: 1,
         recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+      }
+      return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
+    },
+  },
+  {
+    // "Once you do / Once used / Once you cast it this way, you can't … again until you
+    // finish/complete a (short or) long rest" — common homebrew once-per-rest phrasing.
+    id: "uses.once_until_rest",
+    confidence: "high",
+    test:
+      /\bonce\s+(?:you\s+(?:do|use|cast|create)\b[^.]{0,80}?|used|cast(?:\s+(?:it\s+)?this\s+way)?)\s*,\s*you\s+can(?:['\u2019]t|not)\s+(?:do\s+so|use|cast|create)\b[^.]{0,60}?\bagain\s+until\s+you\s+(?:finish|complete)\s+a\s+(short\s+or\s+long|long|short)\s+rest\b/i,
+    build: (match, ctx) => {
+      const uses: UsesConfig = {
+        type: "fixed",
+        fixedAmount: 1,
+        recharges: parseRechargeRest(match[1]),
+      }
+      return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
+    },
+  },
+  {
+    // "… once, regaining its use after a long rest" / "regaining the ability to do so after
+    // a long rest" — Kibbles-style once-per-rest without "can't … again until".
+    id: "uses.once_regain_after_rest",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\bonce\b[^.]{0,80}?regain(?:ing)?\s+(?:(?:all\s+)?(?:its|the)\s+uses?|the\s+ability\s+to\s+do\s+so)\s+after\s+a\s+(short\s+or\s+long|long|short)\s+rest\b/i,
+    build: (match, ctx) => {
+      const uses: UsesConfig = {
+        type: "fixed",
+        fixedAmount: 1,
+        recharges: parseRechargeRest(match[1]),
       }
       return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
     },
@@ -1608,12 +1757,15 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "uses.ability_modifier",
     confidence: "medium",
     test:
-      /\b(?:a\s+)?number\s+of\s+times\s+equal\s+to\s+your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier\b/i,
+      /\b(?:a\s+)?number(?:\s+of\s+times)?\s+equal\s+to\s+your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier\b/i,
     build: (match, ctx, text) => {
-      if (!/\bregain(?:ing)?\s+all\s+expended\s+uses\b/i.test(text) && !/\bper\s+long\s+rest\b/i.test(text)) {
+      if (
+        !/\bregain(?:ing)?\s+all\s+(?:expended\s+)?uses\b/i.test(text) &&
+        !/\bper\s+long\s+rest\b/i.test(text)
+      ) {
         return null
       }
-      const ability = match[1].toUpperCase().slice(0, 3) as unknown as unknown as unknown as unknown as UsesConfig["abilityModifier"]
+      const ability = match[1].toUpperCase().slice(0, 3) as UsesConfig["abilityModifier"]
       const uses: UsesConfig = {
         type: "ability_modifier",
         abilityModifier: ability,
@@ -1627,7 +1779,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     confidence: "medium",
     test: /\b(?:a\s+)?number\s+of\s+times\s+equal\s+to\s+your\s+proficiency\s+bonus\b/i,
     build: (_match, ctx, text) => {
-      if (!/\bregain(?:ing)?\s+all\s+expended\s+uses\b/i.test(text) && !/\bper\s+long\s+rest\b/i.test(text)) {
+      if (!/\bregain(?:ing)?\s+all\s+(?:expended\s+)?uses\b/i.test(text) && !/\bper\s+long\s+rest\b/i.test(text)) {
         return null
       }
       const uses: UsesConfig = {
@@ -1791,11 +1943,155 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    // "You can communicate telepathically with any creature you can see within 30 feet"
+    // (Kibbles Telepathy Discipline).
+    id: "sense.telepathy.communicate",
+    confidence: "high",
+    test:
+      /\bcommunicate\s+telepathically\s+with\s+any\s+creature\s+(?:you\s+can\s+see\s+)?within\s+(\d+)\s+feet\b/i,
+    build: (match, ctx) => {
+      const rangeFeet = parseInt(match[1], 10)
+      if (!Number.isFinite(rangeFeet)) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("telepathy"), [
+        {
+          id: modId(instanceKey(ctx, "telepathy_comm")),
+          type: "telepathy",
+          rangeFeet,
+        },
+      ])
+    },
+  },
+  {
+    // "You can add your proficiency bonus to Perception and initiative rolls" (Prescience).
+    id: "check.bonus.initiative.proficiency",
+    confidence: "high",
+    test:
+      /\badd\s+(?:your\s+)?proficiency\s+bonus\s+to\s+(?:[A-Za-z]+\s+and\s+)?initiative\s+rolls?\b/i,
+    build: (_match, ctx) =>
+      charInstance(newInstanceId(), characteristicCatalogRefId("initiative"), [
+        {
+          id: modId(instanceKey(ctx, "init_prof")),
+          type: "initiative",
+          mode: "add_proficiency",
+        },
+      ]),
+  },
+  {
+    // "use Intelligence instead of Strength for Athletics checks" / "use Intelligence
+    // instead of other ability modifiers when making an Athletics check".
+    id: "skill.check.alternate_ability",
+    confidence: "high",
+    test:
+      /\buse\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+instead\s+of\s+(?:other\s+ability\s+modifiers?|(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s+or\s+(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma))?)\s+(?:for|when\s+making)\s+(?:an?\s+)?([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+checks?\b/i,
+    build: (match, ctx, text) => {
+      const ability = parseAbilityWord(match[1])
+      const skill = matchSkillName(match[2])
+      if (!ability || !skill) return null
+      const whileClause = text.match(/^\s*(While\s+[^,]{3,80}),/i)
+      const trailingCondition = text.match(/\bchecks?\s+((?:against|to)\s+[^.;\n]+)/i)
+      const conditionLabel = whileClause?.[1].trim() ?? trailingCondition?.[1].trim()
+      return charInstance(
+        newInstanceId(),
+        characteristicCatalogRefId("skill_check_alternate_ability"),
+        [
+          {
+            id: modId(instanceKey(ctx, "skill_alt_ability")),
+            type: "skill_check_alternate_ability",
+            ability,
+            skills: [skill],
+            ...(conditionLabel ? { conditionLabel } : {}),
+          },
+        ],
+      )
+    },
+  },
+  {
+    // "Whenever you make an ability check using Strength or Dexterity, you can add 1d4
+    // to the result" (Enhancing Skill).
+    id: "check.bonus.ability_checks.die",
+    confidence: "high",
+    test:
+      /\bwhenever\s+you\s+make\s+an\s+ability\s+check\s+using\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s+or\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma))?,?\s+you\s+can\s+add\s+(\d+)d(4|6|8|10|12|20)\s+to\s+the\s+result\b/i,
+    build: (match, ctx) => {
+      const abilities = [match[1], match[2]]
+        .map((word) => (word ? parseSaveAbility(word) : null))
+        .filter((value): value is string => Boolean(value))
+      const dieCount = parseInt(match[3], 10)
+      const dieType = `d${match[4]}` as "d4" | "d6" | "d8" | "d10" | "d12" | "d20"
+      if (!abilities.length || !Number.isFinite(dieCount)) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("check_roll_modifier"), {
+        effects: abilities.map((ability, index) => ({
+          id: modId(instanceKey(ctx, `ability_check_die_${index}`)),
+          kind: "check_roll_modifier",
+          checkRollMode: "bonus" as const,
+          checkCategory: "ability" as const,
+          checkAbility: ability,
+          bonusConfig: { mode: "die", dieCount, dieType } satisfies RollBonusConfig,
+        })),
+      })
+    },
+  },
+  {
+    // "raising it as a zombie or skeleton under your control" (Unlife Wielder).
+    id: "grant.creature.raise_undead",
+    confidence: "high",
+    test:
+      /\brais(?:e|ing)\s+(?:it|a\s+corpse|the\s+corpse|corpses?)\s+as\s+a\s+(zombie|skeleton)(?:\s+or\s+(?:a\s+)?(zombie|skeleton))?\b/i,
+    build: (match, ctx) => {
+      const options = [...new Set([match[1], match[2]].filter(Boolean).map(titleCaseWords))]
+      if (!options.length) return null
+      return charInstance(newInstanceId(), GRANT_CREATURE_CATALOG_ID, [
+        {
+          ...grantCreatureCharacteristic(options, {
+            count: 1,
+            ...(options.length > 1 ? { choiceOptions: options } : {}),
+          }),
+          id: modId(instanceKey(ctx, "raise_undead")),
+        },
+      ])
+    },
+  },
+  {
+    // Manifested Emotions (Kibbles Psychokinesis): ice / magma / dust mephit choice.
+    id: "grant.creature.mephit_choice",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\b(?:ice|magma|dust)\s+mephit\b[\s\S]{0,120}?\b(?:ice|magma|dust)\s+mephit\b[\s\S]{0,120}?\b(?:ice|magma|dust)\s+mephit\b/i,
+    build: (_match, ctx, text) => {
+      const found: string[] = []
+      for (const kind of ["Ice", "Magma", "Dust"] as const) {
+        if (new RegExp(`\\b${kind}\\s+mephit\\b`, "i").test(text)) {
+          found.push(`${kind} Mephit`)
+        }
+      }
+      if (found.length < 2) return null
+      return charInstance(newInstanceId(), GRANT_CREATURE_CATALOG_ID, [
+        {
+          ...grantCreatureCharacteristic(found, {
+            count: 1,
+            choiceOptions: found,
+          }),
+          id: modId(instanceKey(ctx, "mephit_choice")),
+          label: `Manifest mephit (${found.join(" / ")})`,
+        },
+      ])
+    },
+  },
+  {
     id: "language.known",
     confidence: "high",
-    test: /\byou know (?!the )([A-Za-z]+)\b/i,
+    // Capitalized word required (case-sensitive) so pronouns / clause openers
+    // ("you know it can cast…", "you know whether…") don't wire as languages.
+    test: /\b[Yy]ou know (?!the )([A-Z][a-z]+)\b/,
     build: (match, ctx) => {
-      const language = titleCaseWords(match[1].trim())
+      const raw = match[1].trim()
+      const notLanguages = new Set([
+        "It", "Its", "That", "This", "These", "Those", "They", "The", "A", "An",
+        "One", "Two", "What", "Whether", "How", "If", "When", "Where", "Which", "Who", "You",
+      ])
+      if (notLanguages.has(raw)) return null
+      const language = titleCaseWords(raw)
       if (!language) return null
       return charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
         {
@@ -1873,6 +2169,9 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       // Natural Recovery-style: "cast … without exhausting / without a slot" is an ability,
       // not always-prepared named spells. Check full text — the capture ends at "spell(s)".
       if (!ritualOnly && /\bwithout(?:\s+expending)?\s+a\s+spell\s+slot\b/i.test(text)) return null
+      // Psi-point casting is handled by spell.cast_via_psi_points — the lazy capture here
+      // would only pick up a partial name list.
+      if (/\bby\s+(?:expend|spend)ing\s+(?:\d+\s+)?psi\s+points?\b/i.test(text)) return null
       const names = parseSpellNameList(match[1])
       if (!names.length) return null
       const castingAbility = parseCastingAbilityFromText(text) ?? undefined
@@ -1890,6 +2189,24 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: ritualOnly ? `${names.join(", ")} (ritual only)` : names.join(", "),
         },
       ])
+    },
+  },
+  {
+    id: "spell.gain_cast_named",
+    confidence: "high",
+    scope: "full",
+    // Explicit grants that omit the literal word "spell": "You can cast minor
+    // illusion with your psionic powers" / "You gain the ability to cast plane
+    // shift and teleport." Stop before "at will" so spell.cast_named_at_will wins.
+    test:
+      /\byou\s+(?:gain\s+the\s+ability\s+to|can)\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,80}?)(?=\s+with\s+your\s+psionic\s+powers|\s+at\s+will\b|\s*[.;])/i,
+    build: (match, ctx, text) => {
+      if (/\bat\s+will\b/i.test(text) && /\bcast\s+[A-Za-z][A-Za-z'\/ -]{2,60}?\s+at\s+will\b/i.test(text)) {
+        return null
+      }
+      const names = parseSpellNameList(match[1])
+      if (!names.length) return null
+      return spellsKnownInstance(ctx, "gain_cast_named", names, names.join(", "))
     },
   },
   {
@@ -1943,6 +2260,118 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: "Cast without a spell slot",
         },
       ]),
+  },
+  {
+    // "cast antimagic field by expending 8 psi points" / "expend 5 psi points to cast
+    // animate objects" — psi-point casters (Kibbles Psion). Psi cost itself is wired
+    // separately by resource.expend_psi_points.
+    id: "spell.cast_via_psi_points",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\bcast\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+by\s+(?:expend|spend)ing\s+(?:\d+\s+)?psi\s+points?\b|\b(?:expend|spend)\s+\d+\s+psi\s+points?\s+to\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)(?=\s*[.,;:]|$)/i,
+    build: (match, ctx) => {
+      const names = parseSpellNameList(match[1] ?? match[2] ?? "")
+      if (!names.length) return null
+      return spellsKnownInstance(
+        ctx,
+        "cast_via_psi",
+        names,
+        `${names.join(", ")} (cast with psi points)`,
+      )
+    },
+  },
+  {
+    // "You can cast awaken once without expending a spell slot or psi points" /
+    // "cast fire shield without expending psi points". Once-per-rest limits wire
+    // separately via uses.once_until_rest.
+    id: "spell.cast_named_no_slot",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\bcast\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+(?:once\s+)?without\s+expending\s+(?:a\s+spell\s+slots?(?:\s+or\s+psi\s+points?)?|psi\s+points?)/i,
+    build: (match, ctx) => {
+      const fragment = match[1].replace(/\s+at\s+will$/i, "").replace(/\s+once$/i, "")
+      const names = parseSpellNameList(fragment)
+      if (!names.length) return null
+      return spellsKnownInstance(
+        ctx,
+        "cast_no_slot",
+        names,
+        `${names.join(", ")} (no slot or psi cost)`,
+      )
+    },
+  },
+  {
+    // "You can cast alter self at will …" / "You gain the ability to cast alter self at will"
+    id: "spell.cast_named_at_will",
+    confidence: "high",
+    test:
+      /\b(?:can|gain\s+the\s+ability\s+to)\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+at\s+will\b/i,
+    build: (match, ctx) => {
+      const names = parseSpellNameList(match[1])
+      if (!names.length) return null
+      return spellsKnownInstance(ctx, "cast_at_will", names, `${names.join(", ")} (at will)`)
+    },
+  },
+  {
+    // "You gain the cure wounds spell" / "You learn divide self and can cast it …" /
+    // "You learn invest life." — named-spell learning outside cantrip phrasing.
+    id: "spell.learn_named",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\byou\s+(?:gain|learn)\s+the\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+spells?\b|\byou\s+learn\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)(?=\s*[.,]|\s+and\s+can\s+cast\b)/i,
+    build: (match, ctx, text) => {
+      const fromGain = match[1]
+      const fromLearn = match[2]
+      // The bare "You learn X." form needs casting context nearby to avoid
+      // wiring narrative "you learn …" ribbons as spells.
+      if (!fromGain && !/\bcast\b/i.test(text)) return null
+      const names = parseSpellNameList(fromGain ?? fromLearn ?? "")
+      if (!names.length) return null
+      return spellsKnownInstance(ctx, "learn_named", names, names.join(", "))
+    },
+  },
+  {
+    // "The mutate and polymorph spells are added to your Enhancement Alternate Effects
+    // list" / "You add the spell weird to your alternate effects list" — Kibbles Psion
+    // talents that extend a discipline's psi-castable spell list.
+    id: "spell.added_to_effects_list",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\b(?:(?:the\s+)?([A-Za-z][A-Za-z'\/, -]{2,80}?)(?:\s+spells?)?\s+(?:is|are)\s+added\s+to\s+your\s+[A-Za-z' ]{0,40}?Alternate\s+Effects?\s+list|you\s+add\s+the\s+spell\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+to\s+your\s+[A-Za-z' ]{0,40}?[Aa]lternate\s+[Ee]ffects?\s+list)/i,
+    build: (match, ctx) => {
+      const names = parseSpellNameList(match[1] ?? match[2] ?? "")
+      if (!names.length) return null
+      return spellsKnownInstance(
+        ctx,
+        "added_alt_effects",
+        names,
+        `${names.join(", ")} (Alternate Effects)`,
+      )
+    },
+  },
+  {
+    // Uncanny Flexibility / similar: "your reach increases by 5 feet when making melee
+    // attacks" — self reach for melee/unarmed interactions.
+    id: "weapon.reach.bonus",
+    confidence: "high",
+    test: /\breach\s+increases?\s+by\s+(\d+)\s+feet\b/i,
+    build: (match, ctx) => {
+      const reachBonusFeet = parseInt(match[1], 10)
+      if (!Number.isFinite(reachBonusFeet) || reachBonusFeet <= 0) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("weapon_reach_modifier"), [
+        {
+          id: modId(instanceKey(ctx, "weapon_reach")),
+          type: "weapon_reach_modifier",
+          reachBonusFeet,
+          appliesToUnarmedStrike: true,
+          label: `+${reachBonusFeet} ft. reach`,
+        },
+      ])
+    },
   },
   {
     id: "ac.bonus.while_armored",
@@ -2006,6 +2435,69 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "movement.leap.full_speed",
+    confidence: "high",
+    scope: "full",
+    // Propelled Bound: "When you move on your turn, you can expend movement up to your
+    // speed in a single bounding leap …" — a self movement option covering up to your
+    // full speed as a jump. Keyed on the distinctive "bounding leap" phrasing.
+    test: /\bbounding leap\b/i,
+    build: (_match, ctx) =>
+      fxInstance(newInstanceId(), effectCatalogRefId("movement_option"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "propelled_bound")),
+            kind: "movement_option",
+            moveDistanceMode: "speed",
+            movementTypes: ["jump"],
+            label: "Leap up to your Speed as a single bounding jump",
+          } satisfies FeatureEffect,
+        ],
+      }),
+  },
+  {
+    id: "spell.damage.half_on_save",
+    confidence: "high",
+    scope: "full",
+    // Potent Psionics: "When a target succeeds on a saving throw against a damaging
+    // Psionic Power … it still takes half damage but suffers no other effects." Mirrors
+    // Evoker Potent Cantrip (on_cast_spell_trigger + damage_reduction half-on-save).
+    test: /(?:still\s+)?takes?\s+half\s+(?:the\s+)?damage\b[\s\S]{0,40}?\bno\s+other\s+effect/i,
+    build: (_match, ctx, text) => {
+      if (!/\bsav(?:e|ing)\b/i.test(text)) return null
+      return charInstance(newInstanceId(), "cat_char_on_cast_spell_trigger", [
+        {
+          id: modId(instanceKey(ctx, "half_damage_on_save")),
+          type: "on_cast_spell_trigger",
+          spellTags: ["discipline power", "damage"],
+          effect: { catalogRefId: "cat_fx_damage_reduction" },
+          label:
+            "Damaging power on a successful save: target still takes half damage and suffers no other effects",
+        },
+      ])
+    },
+  },
+  {
+    id: "spell.damage.add_int_psionic_power",
+    confidence: "high",
+    scope: "full",
+    // Shared by several Psion subclasses' Empowered Psionics feature. This is
+    // represented the same way as Empowered Evocation: a scoped cast trigger
+    // whose label carries the ability-modifier calculation for the sheet.
+    test:
+      /\bwhen\s+(?:you|a creature)\s+(?:deal|deals|suffer|suffers)\s+damage\s+(?:with|from)\s+(?:(?:one of\s+)?your\s+|a\s+)?psionic discipline powers?,?\s+you can add your Intelligence modifier to the damage dealt\b/i,
+    build: (_match, ctx) =>
+      charInstance(newInstanceId(), "cat_char_on_cast_spell_trigger", [
+        {
+          id: modId(instanceKey(ctx, "psionic_power_int_damage")),
+          type: "on_cast_spell_trigger",
+          spellTags: ["discipline power", "damage"],
+          effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+          label: "+INT to damage dealt by a psionic discipline power",
+        },
+      ]),
+  },
+  {
     id: "damage.scaling.die_by_level",
     confidence: "medium",
     scope: "full",
@@ -2016,20 +2508,32 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "resource.expend_psi_points",
     confidence: "high",
     scope: "full",
-    test: /\bexpend\s+(\d+)\s+psi\s+points?\b/i,
-    build: (match, ctx) =>
-      charInstance(newInstanceId(), characteristicCatalogRefId("uses"), [
+    test: /\b(?:expend|spend)(?:ing)?\s+(\d+)\s+psi\s+points?\b/i,
+    build: (_match, ctx, text) => {
+      // Find the first spend that is an activation cost — "unless you expend N psi
+      // points" is an alternate-refresh clause, not the ability's cost.
+      let amount: number | null = null
+      const all = text.matchAll(/\b(?:expend|spend)(?:ing)?\s+(\d+)\s+psi\s+points?\b/gi)
+      for (const hit of all) {
+        const before = text.slice(Math.max(0, (hit.index ?? 0) - 24), hit.index ?? 0)
+        if (/\bunless\s+you\s*$/i.test(before)) continue
+        amount = parseInt(hit[1], 10)
+        break
+      }
+      if (amount == null) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("uses"), [
         {
           id: modId(instanceKey(ctx, "psi_spend")),
           type: "uses",
           uses: {
             type: "class_resource",
             classResourceKey: "psi_points",
-            classResourceAmount: parseInt(match[1], 10) || 1,
+            classResourceAmount: amount || 1,
           },
           label: "Spend psi points",
         },
-      ]),
+      ])
+    },
   },
   {
     id: "spellcasting.ability",

@@ -2,6 +2,7 @@ import { applyKnownEquipmentNameWiring } from "@/lib/import/enrichment-presets/b
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   detectFeatureModifiers,
+  isModifierRedundantAgainst,
   mergeFeatureModifierDetections,
   modifierInstanceFingerprint,
   type DetectFeatureContext,
@@ -24,6 +25,10 @@ import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
+import {
+  alternateEffectsSpellsKnownModifier,
+  parseAlternateEffectsSpellNames,
+} from "@/lib/import/parse-alternate-effects-table"
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import { customFeatHasPresetRegistry } from "@/lib/compendium/custom-feat-modifier-presets"
 import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
@@ -375,16 +380,51 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
 
   if (content.abilities?.length) {
     next.abilities = content.abilities.map((ability) => {
-      const enriched = enrichFeatureLike(ability as ImportMechanicsCarrier, {
-        contentKind: "ability",
+      const isPsionicPower =
+        (ability as { ability_role?: string }).ability_role === "psionic_power"
+      const ctx = {
+        contentKind: "ability" as const,
         sourceName: ability.source_name ?? ability.name,
+        // Power bodies describe the power's own active effect; phrase rules would
+        // wire spurious passive modifiers (damage riders, "you know it" languages).
+        suppressPhraseDetection: isPsionicPower,
+      }
+      const enriched = enrichFeatureLike(ability as ImportMechanicsCarrier, {
+        ...ctx,
         featureName: ability.name,
         level: ability.level_requirement ?? undefined,
       })
+      const abilityChoices = (ability as { choices?: Feature["choices"] }).choices
+      const withOptionMods = enrichChoiceOptionModifiers(
+        {
+          name: ability.name,
+          description: ability.description,
+          isChoice: Boolean(
+            (ability as { isChoice?: boolean }).isChoice || abilityChoices?.options?.length,
+          ),
+          choices: abilityChoices,
+          linkedModifiers: enriched.linkedModifiers,
+          modifierRefs: enriched.modifierRefs,
+        } as Feature,
+        ctx,
+      )
+      let linkedModifiers = withOptionMods.linkedModifiers ?? []
+      const altEffects = alternateEffectsSpellsKnownModifier(
+        parseAlternateEffectsSpellNames(ability.description),
+        `import_ability_${ability.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
+      )
+      if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
+        linkedModifiers = [...linkedModifiers, altEffects]
+      }
+      const synced = syncModifierRefs({
+        linkedModifiers,
+        modifierRefs: withOptionMods.modifierRefs,
+      })
       return {
         ...ability,
-        linkedModifiers: enriched.linkedModifiers,
-        modifierRefs: enriched.modifierRefs,
+        ...(withOptionMods.choices ? { choices: withOptionMods.choices } : {}),
+        linkedModifiers: synced.linkedModifiers,
+        modifierRefs: synced.modifierRefs,
         importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
         companion_stat_block:
           (enriched as ImportMechanicsCarrier).companion_stat_block ??

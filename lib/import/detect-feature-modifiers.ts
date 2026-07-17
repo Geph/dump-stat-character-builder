@@ -24,6 +24,12 @@ export type DetectFeatureContext = {
   basedOnSrdFeature?: string
   level?: number
   classPrefix?: string
+  /**
+   * Skip description-phrase detection (name rules and explicit mechanics[] still apply).
+   * Used for psionic power bodies whose prose describes the power's own active effect —
+   * "deals an extra 1d6 damage" there is not a passive sheet modifier.
+   */
+  suppressPhraseDetection?: boolean
 }
 
 export type DetectedModifier = {
@@ -234,7 +240,7 @@ export function detectFeatureModifiers(text: string, ctx: DetectFeatureContext):
     all.push(detection)
   }
 
-  if (!normalized) return all
+  if (!normalized || ctx.suppressPhraseDetection) return all
 
   const segments = clauseSegments(normalized)
   for (const segment of segments) {

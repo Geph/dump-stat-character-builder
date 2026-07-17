@@ -90,6 +90,19 @@ describe("parseCompanionStatBlock", () => {
     expect(template!.hp.parts.some((p) => p.type === "scale")).toBe(true)
   })
 
+  it("parses a two-column HTML table stat block (Kibbles Psi Crystal)", () => {
+    const html = `<p>You can expend 2 psi points to cast find familiar, but your familiar uses the Psi Crystal statistics and requires a crystal worth 10 gp instead of the spell\u2019s normal material components.</p><table><tbody><tr><td>Creature</td><td>Psi Crystal; Tiny construct, unaligned</td></tr><tr><td>Armor Class</td><td>20 (natural armor)</td></tr><tr><td>Hit Points</td><td>2 (1d4)</td></tr><tr><td>Speed</td><td>0 ft., fly 20 ft. (hover)</td></tr><tr><td>STR</td><td>1 (\u22125)</td></tr><tr><td>DEX</td><td>10 (+0)</td></tr><tr><td>CON</td><td>10 (+0)</td></tr><tr><td>INT</td><td>10 (+0)</td></tr><tr><td>WIS</td><td>10 (+0)</td></tr><tr><td>CHA</td><td>10 (+0)</td></tr><tr><td>Skills</td><td>Perception +4</td></tr><tr><td>Damage Vulnerabilities</td><td>bludgeoning</td></tr><tr><td>Damage Resistances</td><td>piercing, slashing</td></tr><tr><td>Condition Immunities</td><td>blinded, charmed, deafened, frightened, paralyzed, petrified, poisoned, stunned</td></tr><tr><td>Senses</td><td>blindsight 60 ft. (blind beyond this radius), passive Perception 14</td></tr><tr><td>Languages</td><td>Understands the languages of its creator but can\u2019t speak</td></tr></tbody></table>`
+    expect(isCompanionStatBlockFeature({ name: "Psi Crystal", description: html })).toBe(true)
+    const template = parseCompanionStatBlock("Psi Crystal", html)
+    expect(template).not.toBeNull()
+    expect(resolveCompanionScaledValue(template!.ac, FAMILIAR_CTX)).toBe(20)
+    expect(resolveCompanionScaledValue(template!.hp, FAMILIAR_CTX)).toBe(2)
+    expect(template!.hitDiceNote).toBe("1d4")
+    expect(template!.speed).toContain("fly 20 ft.")
+    expect(template!.abilityScores?.strength).toEqual({ score: 1, modifier: -5, save: -5 })
+    expect(template!.abilityScores?.dexterity).toEqual({ score: 10, modifier: 0, save: 0 })
+  })
+
   it("resolves scaled AC and HP from owner stats", () => {
     const template = parseCompanionStatBlock("Reanimated Companion", REANIMATED_COMPANION)!
     const ctx = {

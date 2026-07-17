@@ -33,6 +33,7 @@ export function resolveClassResourceDieSides(
 /** Build a resourceKey -> current die sides map for every dice-scaled class resource on a character. */
 export function buildClassResourceDieSidesMap(
   classDetails: CharacterClassDetail[],
+  overrides: Readonly<Record<string, number>> = {},
 ): Record<string, number> {
   const map: Record<string, number> = {}
   for (const detail of classDetails) {
@@ -41,6 +42,12 @@ export function buildClassResourceDieSidesMap(
     for (const resource of resources) {
       const sides = resolveDieSidesAtLevel(resource.uses, detail.row.level)
       if (sides != null) map[resource.id] = sides
+    }
+  }
+  for (const [resourceKey, sides] of Object.entries(overrides)) {
+    // Runtime state may only replace a resource the character actually owns.
+    if (resourceKey in map && Number.isInteger(sides) && sides >= 2) {
+      map[resourceKey] = sides
     }
   }
   return map

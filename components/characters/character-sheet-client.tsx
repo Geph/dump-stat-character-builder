@@ -74,6 +74,10 @@ import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/cha
 import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
 import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-resource-die"
 import {
+  normalizeRampageDieSides,
+  stepRampageDieSides,
+} from "@/lib/character/rampage-die"
+import {
   applyTurnStartTriggers,
   collectTurnStartTriggers,
 } from "@/lib/character/collect-turn-start-triggers"
@@ -473,6 +477,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [accumulatedResources, setAccumulatedResources] = useState<
     Record<string, AccumulatedResourceState>
   >({})
+  const [resourceDieSidesByKey, setResourceDieSidesByKey] = useState<Record<string, number>>({})
   const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle")
@@ -529,6 +534,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setHasInspiration(playState.hasInspiration)
         setRealTimeCooldowns(playState.realTimeCooldowns)
         setAccumulatedResources(tickAccumulatedResources(playState.accumulatedResources))
+        setResourceDieSidesByKey(playState.resourceDieSidesByKey)
         setSessionHydrated(true)
 
         if (row.spell_ids?.length) {
@@ -617,6 +623,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         hasInspiration,
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
+        resourceDieSidesByKey,
         savedAt: null,
       }),
     )
@@ -637,6 +644,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     hasInspiration,
     realTimeCooldowns,
     accumulatedResources,
+    resourceDieSidesByKey,
   ])
 
   const equipmentMagicContext = useMemo(
@@ -1145,6 +1153,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         hasInspiration,
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
+        resourceDieSidesByKey,
         savedAt,
       }),
     [
@@ -1162,6 +1171,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       hasInspiration,
       realTimeCooldowns,
       accumulatedResources,
+      resourceDieSidesByKey,
     ],
   )
 
@@ -1242,10 +1252,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return [...entries, ...collectFeatureUsesResources(classDetails, modifierCatalog)]
   }, [classDetails, modifierCatalog])
 
-  const classResourceDieSides = useMemo(
-    () => buildClassResourceDieSidesMap(classDetails),
+  const hasUnleashedMind = useMemo(
+    () =>
+      classDetails.some((entry) =>
+        /unleashed mind/i.test(entry.subclass?.name ?? ""),
+      ),
     [classDetails],
   )
+  const classResourceDieSides = useMemo(() => {
+    const sides = buildClassResourceDieSidesMap(classDetails, resourceDieSidesByKey)
+    // Imported subclass resources live in their own table and may not yet be
+    // embedded on an older Psion class row. The subclass itself is sufficient
+    // proof that this character owns Rampage Die.
+    if (hasUnleashedMind) {
+      sides.rampage_die = normalizeRampageDieSides(resourceDieSidesByKey.rampage_die)
+    }
+    return sides
+  }, [classDetails, hasUnleashedMind, resourceDieSidesByKey])
+  const rampageDieSides = classResourceDieSides.rampage_die ?? null
 
   const classResourceSpendKeys = useMemo(() => {
     const keys = new Set<string>()
@@ -1279,7 +1303,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     )
     return {
       spendableResourceEntries: spendable,
-      staticResourceEntries: staticEntries,
+      // Rampage Die has a dedicated mutable play-state control below; the
+      // generic static renderer would always show its baseline d4.
+      staticResourceEntries: staticEntries.filter(
+        (entry) => entry.resource.id !== "rampage_die",
+      ),
     }
   }, [resourceEntries, classResourcesById, classResourceSpendKeys])
 
@@ -3294,6 +3322,73 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             resolveContext={usesResolveContext}
                           />
                         )}
+                        {rampageDieSides != null && (
+                          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-rose-800 dark:text-rose-200">
+                                  Rampage Die
+                                </p>
+                                <p className="text-2xl font-black tabular-nums text-foreground">
+                                  d{rampageDieSides}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setResourceDieSidesByKey((prev) => ({
+                                      ...prev,
+                                      rampage_die: stepRampageDieSides(
+                                        prev.rampage_die ?? rampageDieSides,
+                                        -1,
+                                      ),
+                                    }))
+                                  }
+                                  className="rounded-md border border-border px-2 py-1 text-xs font-semibold"
+                                >
+                                  Step down
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setResourceDieSidesByKey((prev) => ({
+                                      ...prev,
+                                      rampage_die: 4,
+                                    }))
+                                  }
+                                  className="rounded-md border border-border px-2 py-1 text-xs font-semibold"
+                                >
+                                  Reset d4
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setResourceDieSidesByKey((prev) => ({
+                                      ...prev,
+                                      rampage_die: stepRampageDieSides(
+                                        prev.rampage_die ?? rampageDieSides,
+                                        1,
+                                      ),
+                                    }))
+                                  }
+                                  className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-xs font-semibold text-rose-800 dark:text-rose-200"
+                                >
+                                  Step up
+                                </button>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-[10px] text-muted-foreground">
+                              Once per turn, add this die to one damage roll. Step up after
+                              consecutive turns dealing damage; reset after a turn without damage
+                              or when Incapacitated.
+                            </p>
+                            <p className="mt-1 text-[10px] font-medium text-rose-800 dark:text-rose-200">
+                              Tantrum (if known): step up when initiative is rolled, and when you
+                              take damage while this die is d6 or lower.
+                            </p>
+                          </div>
+                        )}
                         {hasInfluencePointsMechanic && (influencePointCount > 0 || influencePointCap > 0) && (
                           <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5">
                             <div className="flex items-center justify-between gap-2 mb-1">
@@ -3332,7 +3427,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         ) : null}
                         {!spellSlotTables.length &&
                           !spendableResourceEntries.length &&
-                          !staticResourceEntries.length && (
+                          !staticResourceEntries.length &&
+                          rampageDieSides == null && (
                           <p className="text-xs text-muted-foreground italic">
                             No class resources to track
                           </p>

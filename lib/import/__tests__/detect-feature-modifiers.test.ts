@@ -80,6 +80,35 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "martial weapons and medium armor together",
+      text: "You gain proficiency with martial weapons and medium armor.",
+      ruleId: "proficiency.armor.medium",
+      assert: (detections) => {
+        expect(detections.some((d) => d.ruleId === "proficiency.weapons.martial")).toBe(true)
+        expect(detections.some((d) => d.ruleId === "proficiency.armor.medium")).toBe(true)
+        const armor = detections.find((d) => d.ruleId === "proficiency.armor.medium")?.instance
+          .characteristics?.[0]
+        expect(armor?.type).toBe("armor_proficiencies")
+        if (armor?.type === "armor_proficiencies") {
+          expect(armor.values).toEqual(["Medium armor"])
+        }
+      },
+    },
+    {
+      label: "immunity to multiple conditions",
+      text: "While your Rampage Die is a d8 or higher, you have immunity to the Charmed and Frightened conditions.",
+      ruleId: "immunity.condition",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "immunity.condition")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("condition_immunity")
+        if (char?.type === "condition_immunity") {
+          expect(char.conditions?.slice().sort()).toEqual(["Charmed", "Frightened"])
+          expect(char.label).toMatch(/While your Rampage Die is a d8 or higher/i)
+        }
+      },
+    },
+    {
       label: "item charge pool",
       text: "This amulet has 3 charges and regains 1d3 expended charges daily at dawn.",
       ruleId: "uses.item_charges",
@@ -349,6 +378,178 @@ describe("detectFeatureModifiers", () => {
         expect(char?.spells?.every((entry) => entry.castAsRitual)).toBe(true)
       },
     },
+    {
+      label: "named at-will spell grants",
+      text: "You can cast the detect magic spell at will.",
+      ruleId: "spell.cast_named_at_will",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.cast_named_at_will")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.[0]?.spellId).toContain("detect magic")
+      },
+    },
+    {
+      label: "named psionic casting grant without the word spell",
+      text: "You can cast minor illusion with your psionic powers.",
+      ruleId: "spell.gain_cast_named",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.gain_cast_named")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.[0]?.spellId).toContain("minor illusion")
+      },
+    },
+    {
+      label: "multiple named casting grants",
+      text: "You gain the ability to cast plane shift and teleport.",
+      ruleId: "spell.gain_cast_named",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.gain_cast_named")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells).toHaveLength(2)
+      },
+    },
+    {
+      label: "bounding leap up to full speed (Propelled Bound)",
+      text: "When you move on your turn, you can expend movement up to your speed in a single bounding leap propelled by telekinetic power or psychokinetic force.",
+      ruleId: "movement.leap.full_speed",
+      assert: (detections) => {
+        const effect = detections.find((d) => d.ruleId === "movement.leap.full_speed")?.instance
+          .activation?.effects?.[0]
+        expect(effect?.kind).toBe("movement_option")
+        if (effect?.kind === "movement_option") {
+          expect(effect.moveDistanceMode).toBe("speed")
+          expect(effect.movementTypes).toContain("jump")
+        }
+      },
+    },
+    {
+      label: "half damage on successful save (Potent Psionics)",
+      text: "When a target succeeds on a saving throw against a damaging Psionic Power granted by a psionic discipline, it still takes half damage but suffers no other effects.",
+      ruleId: "spell.damage.half_on_save",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "spell.damage.half_on_save")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("on_cast_spell_trigger")
+        if (char?.type === "on_cast_spell_trigger") {
+          expect(char.effect?.catalogRefId).toBe("cat_fx_damage_reduction")
+        }
+      },
+    },
+    {
+      label: "Intelligence damage bonus for discipline powers (Empowered Psionics)",
+      text: "When you deal damage with a psionic discipline power, you can add your Intelligence modifier to the damage dealt.",
+      ruleId: "spell.damage.add_int_psionic_power",
+      assert: (detections) => {
+        const char = detections.find(
+          (d) => d.ruleId === "spell.damage.add_int_psionic_power",
+        )?.instance.characteristics?.[0]
+        expect(char?.type).toBe("on_cast_spell_trigger")
+        if (char?.type === "on_cast_spell_trigger") {
+          expect(char.spellTags).toEqual(["discipline power", "damage"])
+          expect(char.label).toMatch(/\+INT/)
+        }
+      },
+    },
+    {
+      label: "custom mindsight vision with creature threshold",
+      text: "You gain mindsight with a range of 60 feet, allowing you to see creatures with Intelligence 6 or higher within range as if by Blindsight. A creature you are unaware of can still be hidden from you.",
+      ruleId: "vision.mindsight",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "vision.mindsight")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("vision")
+        if (char?.type === "vision") {
+          expect(char.visionType).toBe("custom")
+          expect(char.customType).toMatch(/Intelligence 6\+/)
+          expect(char.rangeFeet).toBe(60)
+          expect(char.label).toMatch(/still be hidden/)
+        }
+      },
+    },
+    {
+      label: "once-per-rest creation (Imaginary Army)",
+      text: "Once you create an additional duplicate, you cannot do so again until you finish a short or long rest.",
+      ruleId: "uses.once_until_rest",
+    },
+    {
+      label: "once-per-rest with complete phrasing (Bile Blast)",
+      text: "Once you use this ability, you cannot use it again until you complete a short or long rest.",
+      ruleId: "uses.once_until_rest",
+    },
+    {
+      label: "once-per-rest after longer cast clause (Mutant Regeneration)",
+      text: "Once you cast it on yourself without expending a spell slot, you cannot do so again until you complete a long rest.",
+      ruleId: "uses.once_until_rest",
+    },
+    {
+      label: "once regain after rest (Projected Self)",
+      text: "You can create an illusory duplicate in this way once, regaining its use after a long rest.",
+      ruleId: "uses.once_regain_after_rest",
+    },
+    {
+      label: "Intelligence-modifier uses count (Imaginary Ally)",
+      text: "You can create a number equal to your Intelligence modifier, regaining all uses after a long rest.",
+      ruleId: "uses.ability_modifier",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "uses.ability_modifier")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("uses")
+        if (char?.type === "uses") {
+          expect(char.uses?.type).toBe("ability_modifier")
+          expect(char.uses?.abilityModifier).toBe("INT")
+        }
+      },
+    },
+    {
+      label: "gain ability to cast at will (Flexible Existence)",
+      text: "You gain the ability to cast alter self at will. The spell no longer requires concentration.",
+      ruleId: "spell.cast_named_at_will",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.cast_named_at_will")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.[0]?.spellId).toContain("alter self")
+        expect(detections.some((d) => d.ruleId === "spell.gain_cast_named")).toBe(false)
+      },
+    },
+    {
+      label: "you add the spell to Alternate Effects (Rampant Illusions)",
+      text: "You add the spell weird to your alternate effects list, costing 9 psi points.",
+      ruleId: "spell.added_to_effects_list",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.added_to_effects_list")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.[0]?.spellId).toContain("weird")
+      },
+    },
+    {
+      label: "reach increases by feet (Uncanny Flexibility)",
+      text: "your reach increases by 5 feet when making melee attacks, interacting with objects, or navigating environments",
+      ruleId: "weapon.reach.bonus",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "weapon.reach.bonus")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("weapon_reach_modifier")
+        if (char?.type === "weapon_reach_modifier") {
+          expect(char.reachBonusFeet).toBe(5)
+          expect(char.appliesToUnarmedStrike).toBe(true)
+        }
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {
@@ -361,12 +562,50 @@ describe("detectFeatureModifiers", () => {
   const negativeCases = [
     "As a bonus action, you can dash.",
     "Your spellcasting ability is Intelligence.",
-    "You can cast the detect magic spell at will.",
     "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without expending a spell slot, and you must finish a Long Rest before you do so again.",
   ]
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {
     expect(detectFeatureModifiers(text, baseCtx)).toEqual([])
+  })
+
+  it("preserves an alternate-skill ability's target condition", () => {
+    const detections = detectFeatureModifiers(
+      "You can use Intelligence instead of Wisdom when making an Insight check against a creature with an Intelligence score of 6 or higher.",
+      baseCtx,
+    )
+    const char = detections.find(
+      (entry) => entry.ruleId === "skill.check.alternate_ability",
+    )?.instance.characteristics?.[0]
+    expect(char?.type).toBe("skill_check_alternate_ability")
+    if (char?.type === "skill_check_alternate_ability") {
+      expect(char.conditionLabel).toBe(
+        "against a creature with an Intelligence score of 6 or higher",
+      )
+    }
+
+    const perception = detectFeatureModifiers(
+      "You can use Intelligence instead of Wisdom when making Perception checks to detect creatures.",
+      baseCtx,
+    ).find((entry) => entry.ruleId === "skill.check.alternate_ability")?.instance
+      .characteristics?.[0]
+    expect(perception?.type).toBe("skill_check_alternate_ability")
+    if (perception?.type === "skill_check_alternate_ability") {
+      expect(perception.conditionLabel).toBe("to detect creatures")
+    }
+  })
+
+  it("gates Primordial Aspect's speed bonus behind the Lightning aspect toggle", () => {
+    const detections = detectFeatureModifiers(
+      "<ul><li><strong>Cold.</strong> Icy shell.</li><li><strong>Fire.</strong> Fiery aura.</li><li><strong>Lightning.</strong> Your walking speed increases by 5 feet.</li></ul>",
+      { ...baseCtx, featureName: "Primordial Aspect" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "speed.walk")?.instance
+      .characteristics?.[0]
+    expect(char?.type).toBe("speed")
+    if (char?.type === "speed") {
+      expect(char.requiresSheetToggle).toBe("primordial_aspect_lightning")
+    }
   })
 
   it("dedupes identical detections across clauses", () => {

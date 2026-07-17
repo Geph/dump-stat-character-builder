@@ -29,6 +29,9 @@ describe("subclass-gated class resources", () => {
     expect(gatedClassResourcesUnlockedBySubclass("Rogue", "Soulknife").map((r) => r.id)).toEqual([
       "psionic_energy_dice",
     ])
+    expect(gatedClassResourcesUnlockedBySubclass("Psion", "Unleashed Mind").map((r) => r.id)).toEqual([
+      "rampage_die",
+    ])
     expect(gatedClassResourcesUnlockedBySubclass("Fighter", "Champion")).toEqual([])
   })
 
@@ -74,6 +77,19 @@ describe("subclass-gated class resources", () => {
       resource_key: "superiority_dice",
       name: "Superiority Dice",
       source: "Tasha's",
+    })
+
+    const rampageRows = buildGatedClassResourceRowsForSubclass(
+      "cls-psion",
+      "Psion",
+      "Unleashed Mind",
+      "KibblesTasty",
+    )
+    expect(rampageRows[0]).toMatchObject({
+      class_id: "cls-psion",
+      resource_key: "rampage_die",
+      name: "Rampage Die",
+      uses: { type: "special", dieType: "d4" },
     })
   })
 

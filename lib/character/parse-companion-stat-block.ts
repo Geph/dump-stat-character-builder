@@ -21,6 +21,8 @@ function stripHtml(text: string): string {
   return text
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
+    // Table rows become lines so "<td>Armor Class</td><td>20 …</td>" parses as a stat line.
+    .replace(/<\/tr>/gi, "\n")
     .replace(/<em>([^<]+)\.<\/em>/gi, "\n$1. ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\u2212/g, "-")
@@ -98,6 +100,15 @@ function parseScaledLine(label: string, line: string): CompanionScaledValue | nu
     const single = normalized.match(/^(\d+)\s*$/)
     if (single) {
       parts.push({ type: "fixed", value: parseInt(single[1], 10) })
+      consumed = true
+    }
+  }
+
+  // "20 (natural armor)" — fixed value with a parenthetical note.
+  if (!consumed) {
+    const withNote = normalized.match(/^(\d+)\s*\(/)
+    if (withNote) {
+      parts.push({ type: "fixed", value: parseInt(withNote[1], 10) })
       consumed = true
     }
   }

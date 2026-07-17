@@ -107,7 +107,19 @@ function parseAugmentListItems(html: string): { name: string; costText: string; 
 
 export function descriptionHasPsionicAugments(description: string | null | undefined): boolean {
   if (!description) return false
-  return /spend\s+psi\s+points?\s+up\s+to\s+your\s+per\s+use\s+limit/i.test(description)
+  if (/spend\s+psi\s+points?\s+up\s+to\s+your\s+per[\s-]use\s+limit/i.test(description)) return true
+  if (/spend\s+psi\s+points?\s+up\s+to\s+your\s+psi[\s-]*(?:point[\s-]*)?limit/i.test(description)) {
+    return true
+  }
+  // Fallback gate: power bodies that skip the standard sentence (e.g. Mind Leech) but
+  // still list two or more "Name (N psi points): …" augment items.
+  const items = parseAugmentListItems(description)
+  let costed = 0
+  for (const item of items) {
+    if (parsePsionicAugmentCost(item.costText)) costed += 1
+    if (costed >= 2) return true
+  }
+  return false
 }
 
 /** Extract psi-point augment options from a psionic power description. */
@@ -119,7 +131,7 @@ export function parsePsionicAugmentsFromDescription(
 
   const resourceKey = options?.resourceKey ?? "psi_points"
   const allowMultiple =
-    /you can add multiple modifiers/i.test(description) ||
+    /add multiple modifiers/i.test(description) ||
     /add the following modifiers/i.test(description)
 
   const augmentSection = description.split(/add the following modifiers/i)[1] ?? description

@@ -48,18 +48,33 @@ describe("enrichPsionArchetypeFeatures", () => {
     })
   })
 
-  it("marks Rampage Die as deferred in description", () => {
+  it("marks Rampaging Power's mutable die state as deferred in description", () => {
     const enriched = enrichPsionArchetypeFeatures({
       subclasses: [
         {
           name: "Unleashed Mind",
           class_name: "Psion",
           description: null,
-          features: [{ level: 3, name: "Rampage Die", description: "Escalating die." }],
+          features: [{ level: 3, name: "Rampaging Power", description: "Escalating die." }],
         },
       ],
     } as unknown as ImportContent)
     const feature = enriched.subclasses?.[0]?.features?.[0]
-    expect(feature?.description).toMatch(/not fully modeled/i)
+    expect(feature?.description).toMatch(/begin at d4/i)
+    expect(feature?.description).toMatch(/Tantrum's initiative\/on-damage increases/i)
+    const characteristic = (
+      feature as unknown as {
+        linkedModifiers?: {
+          characteristics?: {
+            type?: string
+            automaticBonus?: { classResourceKey?: string }
+          }[]
+        }[]
+      }
+    )?.linkedModifiers?.[0]?.characteristics?.[0]
+    expect(characteristic).toMatchObject({
+      type: "bonus_damage_riders",
+      automaticBonus: { classResourceKey: "rampage_die" },
+    })
   })
 })

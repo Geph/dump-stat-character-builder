@@ -6,6 +6,7 @@ const SHORT_OR_LONG_REST = [{ rest: "short_rest" as const }, { rest: "long_rest"
 export const SUBCLASS_GATED_CLASS_RESOURCE_KEYS = new Set([
   "superiority_dice",
   "psionic_energy_dice",
+  "rampage_die",
 ])
 
 type SubclassGatedResource = {
@@ -86,6 +87,19 @@ const ROGUE_PSIONIC_ENERGY_DICE: ClassResource = {
   },
 }
 
+const PSION_RAMPAGE_DIE: ClassResource = {
+  id: "rampage_die",
+  name: "Rampage Die",
+  description:
+    "Starts at d4 and changes during play. Use the character-sheet Rampage Die controls to step it up through d6, d8, d10, and d12 or reset it to d4.",
+  display: "static",
+  uses: {
+    type: "special",
+    dieType: "d4",
+    specialDescription: "Mutable play-state die (d4–d12)",
+  },
+}
+
 /** Subclass-only pools (Battle Master, Psi Warrior / Psi Knight, Soulknife). */
 export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
   {
@@ -102,6 +116,11 @@ export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
     className: "Rogue",
     subclassMatchers: ["soulknife", "soul knife"],
     resource: ROGUE_PSIONIC_ENERGY_DICE,
+  },
+  {
+    className: "Psion",
+    subclassMatchers: ["unleashed mind"],
+    resource: PSION_RAMPAGE_DIE,
   },
 ]
 

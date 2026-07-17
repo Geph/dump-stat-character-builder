@@ -22,7 +22,8 @@ export function isCompanionStatBlockFeature(feature: {
   if (/\b(?:Force-Empowered Rend|Dreadful Swipe|Activate Cannon)\b/i.test(desc)) return true
   if (/\bgolem companion\b/i.test(name)) return true
   if (/\bcompanion stat block\b/i.test(desc)) return true
-  if (/\bArmor Class:\s*\d+/i.test(desc) && /\bHit Points:\s*/i.test(desc)) return true
+  // Colon optional — HTML-table stat blocks strip to "Armor Class 20 … Hit Points 2 (1d4)".
+  if (/\bArmor Class:?\s*\d+/i.test(desc) && /\bHit Points:?\s*\d+/i.test(desc)) return true
   if (/creature form/i.test(name)) return true
   return false
 }

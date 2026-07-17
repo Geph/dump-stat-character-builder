@@ -6,6 +6,13 @@ import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-fe
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
 import { detectPsiPointCost } from "@/lib/import/enrich-import-classes"
+import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
+import {
+  alternateEffectsSpellsKnownModifier,
+  parseAlternateEffectsSpellNames,
+} from "@/lib/import/parse-alternate-effects-table"
+import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import type { Feature } from "@/lib/types"
 
 function stripHtml(text: string): string {
@@ -57,6 +64,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
       null,
   })
 
+  const isPsionicPower = row.ability_role === "psionic_power"
   const headers = parseCastingHeaders(descriptionHtml)
   const detected = enrichFeatureWithMechanicalDetection(
     {
@@ -69,15 +77,36 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
       contentKind: "feat",
       sourceName: String(row.source_name ?? name),
       featureName: name,
+      suppressPhraseDetection: isPsionicPower,
     },
   )
 
+  let linkedModifiers = detected.linkedModifiers ?? []
+  const altEffects = alternateEffectsSpellsKnownModifier(
+    parseAlternateEffectsSpellNames(descriptionHtml),
+    `import_ability_${name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
+  )
+  if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
+    linkedModifiers = [...linkedModifiers, altEffects]
+  }
+
   const synced = syncModifierRefs({
-    linkedModifiers: detected.linkedModifiers ?? [],
+    linkedModifiers,
     modifierRefs: detected.modifierRefs,
   })
 
-  const psiCost = detectPsiPointCost(plainText)
+  const companionStatBlock =
+    row.companion_stat_block ??
+    (isCompanionStatBlockFeature({ name, description: descriptionHtml })
+      ? parseCompanionStatBlock(name, descriptionHtml)
+      : null)
+
+  // Augmented powers (Kibbles Psion) have a free base use — "N psi points" mentions in the
+  // description belong to individual augments, not an activation cost.
+  const hasAugments = Boolean(
+    (next.psionic_augments as { augments?: unknown[] } | null | undefined)?.augments?.length,
+  )
+  const psiCost = hasAugments ? null : detectPsiPointCost(plainText)
   const uses =
     psiCost != null
       ? {
@@ -109,9 +138,31 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     choices = {
       ...choices,
       options: choices.options.map((option) => {
-        if (option.prerequisite?.trim()) return option
-        const scraped = extractPrerequisiteFromDescription(option.description)
-        return scraped ? { ...option, prerequisite: scraped } : option
+        const withPrereq = option.prerequisite?.trim()
+          ? option
+          : (() => {
+              const scraped = extractPrerequisiteFromDescription(option.description)
+              return scraped ? { ...option, prerequisite: scraped } : option
+            })()
+        if (withPrereq.linkedModifiers?.length) return withPrereq
+        const optionDetected = enrichFeatureWithMechanicalDetection(
+          {
+            name: `${name}:${withPrereq.name}`,
+            description: stripHtml(withPrereq.description ?? ""),
+            linkedModifiers: withPrereq.linkedModifiers,
+            modifierRefs: withPrereq.modifierRefs,
+          } as Feature,
+          {
+            contentKind: "feat",
+            sourceName: String(row.source_name ?? name),
+            featureName: `${name}:${withPrereq.name}`,
+          },
+        )
+        if (!optionDetected.linkedModifiers?.length) return withPrereq
+        return syncModifierRefs({
+          ...withPrereq,
+          linkedModifiers: optionDetected.linkedModifiers,
+        })
       }),
     }
   }
@@ -134,6 +185,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
       : {}),
     ...(uses ? { uses } : {}),
     ...(choices ? { choices } : {}),
+    ...(companionStatBlock ? { companion_stat_block: companionStatBlock } : {}),
     prerequisites,
     prerequisite: prerequisites,
     ...(level_requirement != null ? { level_requirement } : {}),

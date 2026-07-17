@@ -28,6 +28,8 @@ export type CharacterSheetPlayState = {
   hasInspiration: boolean
   realTimeCooldowns: RealTimeCooldownState
   accumulatedResources: Record<string, AccumulatedResourceState>
+  /** Runtime die-size overrides for mutable resources (e.g. Rampage Die d4→d12). */
+  resourceDieSidesByKey: Record<string, number>
   /** Set when the player last saved play state to the database. */
   savedAt: string | null
 }
@@ -48,8 +50,21 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     hasInspiration: false,
     realTimeCooldowns: {},
     accumulatedResources: {},
+    resourceDieSidesByKey: {},
     savedAt: null,
   }
+}
+
+function normalizeResourceDieSides(
+  raw: Record<string, number> | null | undefined,
+): Record<string, number> {
+  if (!raw || typeof raw !== "object") return {}
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      ([key, sides]) =>
+        key.trim().length > 0 && Number.isInteger(sides) && sides >= 2 && sides <= 100,
+    ),
+  )
 }
 
 export function normalizeSheetPlayState(
@@ -103,6 +118,7 @@ export function normalizeSheetPlayState(
       raw.accumulatedResources && typeof raw.accumulatedResources === "object"
         ? { ...raw.accumulatedResources }
         : base.accumulatedResources,
+    resourceDieSidesByKey: normalizeResourceDieSides(raw.resourceDieSidesByKey),
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : base.savedAt,
   }
 }
