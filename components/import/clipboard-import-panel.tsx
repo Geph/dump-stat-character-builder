@@ -240,21 +240,32 @@ export function ClipboardImportPanel({
               />
             ) : null}
             {contentType === "classes" ? (
-              <label className="inline-flex items-start gap-2 max-w-md text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={preferSameSourceReplacements}
-                  onChange={(event) => onPreferSameSourceReplacementsChange(event.target.checked)}
-                  className="mt-0.5 rounded border-border text-lime focus:ring-lime"
-                />
-                <span>
-                  Has replacements for other SRD content, such as spells or feats
-                  <span className="block text-xs text-muted-foreground/80 mt-0.5">
+              <div className="inline-flex items-center gap-1 max-w-md text-sm text-muted-foreground">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={preferSameSourceReplacements}
+                    onChange={(event) => onPreferSameSourceReplacementsChange(event.target.checked)}
+                    className="rounded border-border text-lime focus:ring-lime"
+                  />
+                  <span>Has replacements for other SRD content, such as spells or feats</span>
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-0.5 text-muted-foreground hover:text-foreground shrink-0"
+                      aria-label="About same-source replacements"
+                    >
+                      <Info className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
                     Prefer matching spells and feats from this Source over base SRD entries with the
                     same name.
-                  </span>
-                </span>
-              </label>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             ) : null}
             <div className="flex items-center gap-2 flex-1 min-w-[min(100%,18rem)]">
               <label

@@ -4,7 +4,10 @@ import {
 } from "@/lib/import/enrichment-presets/builders"
 
 const DEFERRED_MECHANICS_NOTE =
-  "Mechanic not fully modeled on sheet — see feature description (Rampage Die, Dark Lurker check reduction)."
+  "Mechanic not fully modeled on sheet — see feature description (Dark Lurker check reduction)."
+
+const RAMPAGE_DIE_DEFERRED_NOTE =
+  "Rampage Die state is tracked manually: begin at d4, increase one die step after consecutive turns dealing damage (maximum d12), and reset to d4 after a turn without damage or when Incapacitated. Automatic die stepping and Tantrum's initiative/on-damage increases are not yet modeled."
 
 export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
   {
@@ -207,8 +210,33 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
     id: "psion.subclass.rampage_die",
     pack: "psion",
     target: "subclass_feature",
-    match: { subclassClassName: /psion/i, name: /rampage die/i },
-    operations: [{ op: "appendDescription", text: DEFERRED_MECHANICS_NOTE }],
+    match: { subclassClassName: /psion/i, name: /^(?:rampage die|rampaging power)$/i },
+    operations: [
+      { op: "appendDescription", text: RAMPAGE_DIE_DEFERRED_NOTE },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "rampaging_power_damage",
+          catalogRefId: "cat_char_bonus_damage_riders",
+          characteristics: [
+            {
+              id: "mod_rampaging_power_damage",
+              type: "bonus_damage_riders",
+              riders: [],
+              triggerOn: "on_hit",
+              automaticBonus: {
+                mode: "die",
+                dieScaling: "class_resource",
+                classResourceKey: "rampage_die",
+                dieCount: 1,
+              },
+              label: "Once per turn: add your current Rampage Die to one damage roll",
+            },
+          ],
+        },
+      },
+    ],
   },
   {
     id: "psion.subclass.dark_lurker",

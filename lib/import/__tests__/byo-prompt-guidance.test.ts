@@ -157,6 +157,14 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("lost its whitespace")
   })
 
+  it("distinguishes rest-swappable choices, modal toggles, and mutable combat dice", () => {
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("swappableOnRest")
+    expect(prompt).toContain("primordial_aspect_lightning")
+    expect(prompt).toContain("Rampage Die")
+    expect(prompt).toContain("not by class level")
+  })
+
   it("forbids inventing ability_bonuses keys like desktop on backgrounds", () => {
     const prompt = buildByoExtractionPrompt("backgrounds")
     expect(prompt).toContain("never invent keys like desktop")

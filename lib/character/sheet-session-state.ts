@@ -60,6 +60,7 @@ export function buildSheetPlayStateFromSheet(params: {
   hasInspiration: boolean
   realTimeCooldowns: CharacterSheetPlayState["realTimeCooldowns"]
   accumulatedResources: CharacterSheetPlayState["accumulatedResources"]
+  resourceDieSidesByKey: CharacterSheetPlayState["resourceDieSidesByKey"]
   savedAt?: string | null
 }): CharacterSheetPlayState {
   return normalizeSheetPlayState({
