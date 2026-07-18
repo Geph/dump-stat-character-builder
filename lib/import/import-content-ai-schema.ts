@@ -297,10 +297,13 @@ const UsesConfigAiSchema = z.object({
   atLevelMode: z.enum(["tier", "multiply_level"]).nullable(),
   recharges: z
     .array(
-      z.object({
-        rest: z.enum(["short_rest", "long_rest"]),
-        amount: z.number().nullable(),
-      }),
+      z.union([
+        z.enum(["short_rest", "long_rest"]),
+        z.object({
+          rest: z.enum(["short_rest", "long_rest"]),
+          amount: z.number().nullable(),
+        }),
+      ]),
     )
     .nullable(),
 })
@@ -430,6 +433,7 @@ const SubclassAiSchema = z.object({
   name: z.string(),
   class_name: z.string(),
   description: z.string().nullable(),
+  card_blurb: z.string().max(120).nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
   features: z.array(ClassFeatureAiSchema),
   new_toggles: z.array(NewToggleAiSchema).nullable(),
@@ -749,9 +753,19 @@ function normalizeUsesConfig(
 ): NonNullable<ImportContent["class_resources"]>[number]["uses"] {
   const next = omitNull(uses) as unknown as Record<string, unknown>
   if (Array.isArray(next.recharges)) {
-    next.recharges = next.recharges.map((entry) =>
-      omitNull(entry as unknown as Record<string, unknown>),
-    )
+    next.recharges = next.recharges
+      .map((entry) => {
+        // Templates and some LLM output use ["short_rest","long_rest"] instead of [{rest}].
+        if (typeof entry === "string") {
+          if (entry === "short_rest" || entry === "long_rest") return { rest: entry }
+          return null
+        }
+        if (entry && typeof entry === "object") {
+          return omitNull(entry as Record<string, unknown>)
+        }
+        return null
+      })
+      .filter(Boolean)
   }
   return next as NonNullable<ImportContent["class_resources"]>[number]["uses"]
 }
@@ -894,6 +908,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
       prerequisite_rules: subclass.prerequisite_rules ?? undefined,
       features: subclass.features.map(normalizeFeatureLike),
       ...omitNull({
+        card_blurb: subclass.card_blurb,
         new_toggles: subclass.new_toggles?.length ? subclass.new_toggles : undefined,
       }),
     }))

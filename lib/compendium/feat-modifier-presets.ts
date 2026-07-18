@@ -43,6 +43,7 @@ export const FEAT_MODIFIER_CATALOG = {
   checkRollModifier: "cat_fx_check_roll_modifier",
   extraAction: "cat_fx_extra_action",
   movementOption: "cat_fx_movement_option",
+  standardAction: "cat_fx_standard_action",
   selfBuffCaster: "cat_fx_self_buff_caster",
   damageReduction: "cat_fx_damage_reduction",
   grantTempHp: "cat_fx_grant_temp_hp",
@@ -57,6 +58,8 @@ export const FEAT_MODIFIER_CATALOG = {
   healingDicePool: "cat_char_healing_dice_pool",
   specialAttack: "cat_char_special_attack",
   equipmentAndMagicItems: "cat_char_equipment_and_magic_items",
+  /** Passive flat / proficiency-based damage reduction (Heavy Armor Master). */
+  damageReductionChar: "cat_char_damage_reduction",
 } as const
 
 export type FeatModifierPreset = {
@@ -147,6 +150,8 @@ export function skillChoice(
     allowAnySkill?: boolean
     entries?: { skill: string; expertise: boolean }[]
     grantExpertise?: boolean
+    /** If already proficient in the chosen skill, grant Expertise instead. */
+    expertiseIfProficient?: boolean
     sharedChoiceGroup?: string
     sharedChoiceCount?: number
     label?: string
@@ -160,6 +165,7 @@ export function skillChoice(
       allowAnySkill: config.allowAnySkill ?? false,
       choiceCount: config.sharedChoiceGroup ? 0 : (config.count ?? null),
       grantExpertise: config.grantExpertise ?? false,
+      expertiseIfProficient: config.expertiseIfProficient ?? false,
       sharedChoiceGroup: config.sharedChoiceGroup,
       sharedChoiceCount: config.sharedChoiceCount,
       label: config.label,
@@ -354,6 +360,27 @@ export function movementFx(
   })
 }
 
+/** Grant Study / Search (or both) at an alternate action economy (e.g. Bonus Action). */
+export function standardActionFx(
+  key: string,
+  actions: { study?: boolean; search?: boolean },
+  activation: Partial<FeatureActivation> = { bonusAction: true },
+  label?: string,
+): LinkedModifierInstance {
+  return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.standardAction, {
+    ...activation,
+    effects: [
+      {
+        id: modId(key),
+        kind: "standard_action",
+        standardActionStudy: actions.study ?? false,
+        standardActionSearch: actions.search ?? false,
+        label,
+      },
+    ],
+  })
+}
+
 export function movementEffectsPassive(
   key: string,
   flags: Partial<Extract<CharacteristicModifier, { type: "movement_effects" }>>,
@@ -479,6 +506,30 @@ export function damageReductionFx(
       },
     ],
   })
+}
+
+/** Passive characteristic damage reduction (Heavy Armor Master, etc.). */
+export function damageReductionPassive(
+  key: string,
+  config: {
+    amount?: number
+    amountMode?: "fixed" | "proficiency"
+    damageTypes?: string[]
+    requiresArmorCategory?: "Light armor" | "Medium armor" | "Heavy armor" | null
+    label: string
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageReductionChar, [
+    {
+      id: modId(key),
+      type: "damage_reduction",
+      amount: config.amount ?? 0,
+      amountMode: config.amountMode ?? "fixed",
+      damageTypes: config.damageTypes ?? ["Bludgeoning", "Piercing", "Slashing"],
+      requiresArmorCategory: config.requiresArmorCategory ?? null,
+      label: config.label,
+    },
+  ])
 }
 
 export function grantTempHpFx(
@@ -781,19 +832,67 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   "Boon of Combat Prowess": {
     linkedModifiers: [
       asiOne("boon_combat_asi", "+1 to one ability score (max 30)"),
-      checkFx("boon_combat_hit", { kind: "extra_action" }),
+      uses(
+        "boon_combat_peerless",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Peerless Aim: turn a miss into a hit (1/turn; track manually)",
+      ),
+      checkFx(
+        "boon_combat_hit",
+        { kind: "check_bonus", checkCategory: "attack" },
+        {},
+      ),
     ],
   },
   "Boon of Dimensional Travel": {
     linkedModifiers: [
       asiOne("boon_dim_asi", "+1 to one ability score (max 30)"),
-      movementFx("boon_dim_travel", { kind: "movement_option" }),
+      movementFx(
+        "boon_dim_travel",
+        {
+          kind: "movement_option",
+          moveDistanceMode: "fixed",
+          moveDistanceFixed: 30,
+          movementTeleport: true,
+        },
+        {},
+      ),
+    ],
+  },
+  "Boon of Energy Resistance": {
+    linkedModifiers: [
+      asiOne("boon_energy_asi", "+1 to one ability score (max 30)"),
+      damageResistanceChoice(
+        "boon_energy_resist",
+        [
+          "Acid",
+          "Cold",
+          "Fire",
+          "Lightning",
+          "Necrotic",
+          "Poison",
+          "Psychic",
+          "Radiant",
+          "Thunder",
+        ],
+        "Energy Resistances: choose 2 (change on Long Rest)",
+        2,
+      ),
+      forceSaveFx("boon_energy_redirect", { reaction: true }),
     ],
   },
   "Boon of Fate": {
     linkedModifiers: [
       asiOne("boon_fate_asi", "+1 to one ability score (max 30)"),
-      checkFx("boon_fate", { kind: "check_bonus", checkCategory: "other" }, { reaction: true }),
+      d20TestReaction("boon_fate", {
+        modifierMode: "add",
+        dieSource: "fixed",
+        fixedDie: "2d4",
+        targetScope: "target_creature",
+        rangeFeet: 60,
+        useReaction: true,
+        label: "Improve Fate: ±2d4 to a d20 Test (you or another creature within 60 ft.)",
+      }),
       uses(
         "boon_fate_uses",
         { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
@@ -801,9 +900,28 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
       ),
     ],
   },
+  "Boon of Fortitude": {
+    linkedModifiers: [
+      asiOne("boon_fortitude_asi", "+1 to one ability score (max 30)"),
+      charInstance("modinst_boon_fortitude_hp", FEAT_MODIFIER_CATALOG.hitPoints, [
+        {
+          id: modId("boon_fortitude_hp"),
+          type: "hit_points",
+          mode: "flat",
+          value: 40,
+          label: "Fortified Health: +40 Hit Point maximum",
+        },
+      ]),
+      uses(
+        "boon_fortitude_extra_heal",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }] },
+        "When you regain HP, also regain CON mod HP (once/turn)",
+      ),
+    ],
+  },
   "Boon of Irresistible Offense": {
     linkedModifiers: [
-      asiOne("boon_offense_asi", "+1 Strength or Dexterity (max 30)"),
+      asiOne("boon_offense_asi", "+1 Strength or Dexterity (max 30)", ["strength", "dexterity"]),
       damageMod(
         "boon_offense_resist",
         [{ bonus: 0, target: "custom", customTarget: "B/P/S damage ignores resistance" }],
@@ -812,17 +930,96 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
       riderFx("boon_offense_crit", { bonusDice: "Overwhelming Strike: extra damage on nat 20" }),
     ],
   },
+  "Boon of Recovery": {
+    linkedModifiers: [
+      asiOne("boon_recovery_asi", "+1 to one ability score (max 30)"),
+      uses(
+        "boon_recovery_last_stand",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Last Stand: drop to 1 HP and regain half your HP max instead of 0 (1/Long Rest)",
+      ),
+      healingDicePool("boon_recovery_vitality", {
+        dieType: "d10",
+        poolSize: 10,
+        activation: "bonus_action",
+        recharges: [{ rest: "long_rest" }],
+        label: "Recover Vitality: expend dice from a 10d10 pool as a Bonus Action",
+      }),
+    ],
+  },
+  "Boon of Skill": {
+    linkedModifiers: [
+      asiOne("boon_skill_asi", "+1 to one ability score (max 30)"),
+      skillChoice("boon_skill_all", {
+        entries: [
+          "Acrobatics",
+          "Animal Handling",
+          "Arcana",
+          "Athletics",
+          "Deception",
+          "History",
+          "Insight",
+          "Intimidation",
+          "Investigation",
+          "Medicine",
+          "Nature",
+          "Perception",
+          "Performance",
+          "Persuasion",
+          "Religion",
+          "Sleight of Hand",
+          "Stealth",
+          "Survival",
+        ].map((skill) => ({ skill, expertise: false })),
+        label: "All-Around Adept: proficiency in all skills",
+      }),
+      skillChoice("boon_skill_expertise", {
+        count: 1,
+        allowAnySkill: true,
+        grantExpertise: true,
+        label: "Expertise in one skill that lacks Expertise",
+      }),
+    ],
+  },
+  "Boon of Speed": {
+    linkedModifiers: [
+      asiOne("boon_speed_asi", "+1 to one ability score (max 30)"),
+      speedMod("boon_speed_walk", "walk", "add", 30, "Quickness: +30 Speed"),
+      movementEffectsPassive(
+        "boon_speed_escape",
+        { movementDisengage: true },
+        "Escape Artist: Bonus Action Disengage also ends Grappled on you",
+      ),
+      movementFx("boon_speed_disengage", { kind: "movement_option" }, { bonusAction: true }),
+    ],
+  },
   "Boon of Spell Recall": {
     linkedModifiers: [
-      asiOne("boon_spell_asi", "+1 Intelligence, Wisdom, or Charisma (max 30)"),
-      checkFx("boon_spell_recall", { kind: "self_buff_caster" }),
+      asiOne("boon_spell_asi", "+1 Intelligence, Wisdom, or Charisma (max 30)", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
+      checkFx(
+        "boon_spell_recall",
+        { kind: "self_buff_caster" },
+        {},
+      ),
+      uses(
+        "boon_spell_recall_free",
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Free Casting: when you cast a 1st–4th level spell with a slot, roll d4; on matching level, don't expend the slot (track manually)",
+      ),
     ],
   },
   "Boon of the Night Spirit": {
     linkedModifiers: [
       asiOne("boon_night_asi", "+1 to one ability score (max 30)"),
       checkFx("boon_night_invis", { kind: "self_buff_caster" }, { bonusAction: true }),
-      damageResistancePick("boon_night_resist", "Shadowy Form: Resistance to most damage in dim light/darkness"),
+      damageResistancePick(
+        "boon_night_resist",
+        "Shadowy Form: Resistance to all damage except Psychic and Radiant while in Dim Light or Darkness",
+      ),
     ],
   },
   "Boon of Truesight": {

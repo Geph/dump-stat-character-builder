@@ -290,8 +290,9 @@ export function ClipboardImportPanel({
                     {contentType === "subclasses" ? (
                       <>
                         {" "}
-                        When importing subclasses, optionally match a class so the extraction prompt
-                        locks class_name
+                        Subclasses only is for add-ons when the parent class is already imported.
+                        Prefer Class + subclasses for a full chapter. Optionally match a class so
+                        the extraction prompt locks class_name
                         {subclassMatch ? <> to {subclassMatch.className}</> : null}.
                       </>
                     ) : null}
@@ -500,8 +501,9 @@ export function ClipboardImportPanel({
                 </p>
               ) : (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Use a page range to skip other classes or chapters. Prefer keeping a class and its
-                  subclasses in the same pass — staged review walks them in order. Scope notes and{" "}
+                  Use a page range to skip other classes or chapters. Keep a class and its
+                  subclasses in the same Class + subclasses pass — staged review walks them in
+                  order. Scope notes and{" "}
                   <span className="font-mono">source_page</span> tagging are included in the copied
                   prompt.
                 </p>
@@ -613,8 +615,10 @@ export function ClipboardImportPanel({
           <h2 className="text-base font-bold text-foreground">Step 2 — Import JSON</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Paste the JSON your LLM returned (or your hand-filled template) and import. For
-            multi-file homebrew, paste a JSON array in dependency order — see the import order
-            guide at the top of this page.
+            multi-file homebrew, paste a JSON array of extracts — typically{" "}
+            <span className="font-mono text-[11px]">[library, classChapter]</span> — for one
+            review. Dump Stat auto-orders libraries before the class chapter; see Import tips →
+            Import order.
           </p>
           <p className="text-xs text-muted-foreground mt-2">
             Also accepts{" "}

@@ -778,10 +778,33 @@ function SkillsEditor({
             <input
               type="checkbox"
               checked={!!mod.grantExpertise}
-              onChange={(e) => onChange({ ...mod, grantExpertise: e.target.checked })}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  grantExpertise: e.target.checked,
+                  expertiseIfProficient: e.target.checked ? false : mod.expertiseIfProficient,
+                })
+              }
               className="accent-primary"
             />
             <span className="text-muted-foreground">Grant Expertise (not just proficiency)</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!mod.expertiseIfProficient}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  expertiseIfProficient: e.target.checked,
+                  grantExpertise: e.target.checked ? false : mod.grantExpertise,
+                })
+              }
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">
+              Expertise if already proficient (otherwise proficiency) — Keen Mind / Observant
+            </span>
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input

@@ -80,6 +80,7 @@ function parseImportContentArray(parsed: unknown[]): ImportContent | null {
     if (content) parts.push(content)
   }
   if (!parts.length) return null
+  // combineImportContents auto-orders libraries before the class chapter.
   return parts.length === 1 ? parts[0] : combineImportContents(parts)
 }
 

@@ -3,6 +3,10 @@ import {
   pointCostForSpellLevel,
   type PointPoolSpellcasting,
 } from "@/lib/character/point-pool-spellcasting"
+import {
+  formatResourceKeyDisplayName,
+  type SpellResourceCastCost,
+} from "@/lib/character/spell-resource-cast-costs"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import {
@@ -26,8 +30,9 @@ export type SpellCastCostBlockReason =
   | "no_casting_mode"
 
 export type ResolvedSpellCastCost = {
-  mode: "slots" | "point_pool"
-  castKind?: "pool" | "arcanum"
+  /** slots = normal slots; point_pool = level→cost table; resource = fixed per-spell cost */
+  mode: "slots" | "point_pool" | "resource"
+  castKind?: "pool" | "arcanum" | "resource"
   baseCost: number
   metamagicCost: number
   totalCost: number
@@ -35,6 +40,7 @@ export type ResolvedSpellCastCost = {
   blockReason?: SpellCastCostBlockReason
   pointPool?: PointPoolSpellcasting
   resourceKey?: string
+  resourceDisplayName?: string
   spellLimit?: number | null
   metamagicCap?: number | null
 }
@@ -148,10 +154,54 @@ export function resolveSpellCastCost(params: {
   ctx: ResolveUsesContext
   /** When casting Innate Arcanum tiers (above the point-pool table). */
   arcanumAvailable?: boolean
+  /**
+   * Per-spell fixed resource cost (e.g. Psion Alternate Effects via psi points).
+   * Takes priority over class-level point_pool / slots for the base cast cost.
+   */
+  spellResourceCost?: SpellResourceCastCost | null
+  /** Optional per-activation spend cap (e.g. Psi Limit). */
+  resourceSpendCap?: number | null
 }): ResolvedSpellCastCost {
-  const pool = getPointPoolSpellcasting(params.spellcasting)
   const metamagicCost = params.selectedMetamagic.reduce((sum, row) => sum + row.cost, 0)
   const metamagicCap = params.ctx.proficiencyBonus ?? 2
+
+  if (params.spellResourceCost && params.spellResourceCost.amount > 0) {
+    const baseCost = params.spellResourceCost.amount
+    const totalCost = baseCost + metamagicCost
+    const resourceKey = params.spellResourceCost.resourceKey
+    let canCast = true
+    let blockReason: SpellCastCostBlockReason | undefined
+
+    if (params.spellLevel > 0 && totalCost > params.availablePoints) {
+      canCast = false
+      blockReason = "insufficient_points"
+    } else if (
+      params.resourceSpendCap != null &&
+      baseCost > params.resourceSpendCap
+    ) {
+      canCast = false
+      blockReason = "base_over_spell_limit"
+    } else if (metamagicCost > metamagicCap) {
+      canCast = false
+      blockReason = "metamagic_over_proficiency_cap"
+    }
+
+    return {
+      mode: "resource",
+      castKind: "resource",
+      baseCost,
+      metamagicCost,
+      totalCost,
+      canCast,
+      blockReason,
+      resourceKey,
+      resourceDisplayName: formatResourceKeyDisplayName(resourceKey),
+      spellLimit: params.resourceSpendCap ?? null,
+      metamagicCap,
+    }
+  }
+
+  const pool = getPointPoolSpellcasting(params.spellcasting)
 
   if (!pool) {
     let canCast = true
@@ -189,6 +239,7 @@ export function resolveSpellCastCost(params: {
       blockReason: canCast ? undefined : "insufficient_points",
       pointPool: pool,
       resourceKey: pool.resource_key,
+      resourceDisplayName: formatResourceKeyDisplayName(pool.resource_key),
     }
   }
 
@@ -235,6 +286,7 @@ export function resolveSpellCastCost(params: {
     blockReason,
     pointPool: pool,
     resourceKey: pool.resource_key,
+    resourceDisplayName: formatResourceKeyDisplayName(pool.resource_key),
     spellLimit,
     metamagicCap: metamagicCapFromPool,
   }

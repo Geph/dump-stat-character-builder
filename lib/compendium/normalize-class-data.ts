@@ -1,4 +1,5 @@
 import type { StartingEquipmentGroup } from "@/lib/types"
+import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
@@ -103,6 +104,12 @@ export function enrichClassesList<
     if (isSrdSource(row.source)) {
       return enrichSrdClassRow(enriched as unknown as Record<string, unknown>) as T
     }
-    return enriched
+
+    const existingIcon = (enriched as { icon?: unknown }).icon
+    if (typeof existingIcon === "string" && existingIcon.trim()) {
+      return { ...enriched, icon: existingIcon.trim() }
+    }
+    const defaultIcon = defaultClassIconForName(enriched.name)
+    return defaultIcon ? { ...enriched, icon: defaultIcon } : enriched
   })
 }

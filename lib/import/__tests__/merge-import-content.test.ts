@@ -10,6 +10,7 @@ import {
 import {
   combineImportContents,
   enrichSubclassSpellTablesOnImport,
+  orderImportContentsForMerge,
 } from "@/lib/import/merge-import-content"
 import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
@@ -40,6 +41,23 @@ describe("combineImportContents", () => {
     expect(combined.spells?.length).toBeGreaterThan(0)
     expect(combined.classes?.[0]?.name).toBe("Fighter")
     expect(combined.subclasses?.[0]?.name).toBe("Champion")
+  })
+
+  it("auto-orders a reversed library + class kit array", () => {
+    const classFirst = [
+      { classes: [{ name: "Psion", hit_die: 6, features: [] }] },
+      {
+        abilities: [{ name: "Telepathy Discipline", description: "Package." }],
+      },
+    ] as unknown as import("@/lib/import/content-schema").ImportContent[]
+
+    const ordered = orderImportContentsForMerge(classFirst)
+    expect(ordered[0]?.abilities?.[0]?.name).toBe("Telepathy Discipline")
+    expect(ordered[1]?.classes?.[0]?.name).toBe("Psion")
+
+    const combined = combineImportContents(classFirst)
+    expect(combined.classes?.[0]?.name).toBe("Psion")
+    expect(combined.abilities?.[0]?.name).toBe("Telepathy Discipline")
   })
 })
 

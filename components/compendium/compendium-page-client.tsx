@@ -410,16 +410,6 @@ export default function CompendiumPageClient() {
     fetchActiveTabContent()
   }, [activeTab])
 
-  const subclassesByClassId = useMemo(() => {
-    const map = new Map<string, Subclass[]>()
-    for (const sc of subclassesForClasses) {
-      const list = map.get(sc.class_id) ?? []
-      list.push(sc)
-      map.set(sc.class_id, list)
-    }
-    return map
-  }, [subclassesForClasses])
-
   // Derive unique spell filter options from loaded spell data
   const spellData = (content.spells as unknown as Spell[])
 const UNASSIGNED_SPELL_CLASS = "__unassigned__"
@@ -1025,17 +1015,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {formatCompendiumSource(castCompendiumRow<DndClass>(data).source) || "Custom"}
             </span>
-            {(() => {
-              const subs = subclassesByClassId.get(data.id as string) ?? []
-              return subs.map((sc) => (
-                <span
-                  key={sc.id}
-                  className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full"
-                >
-                  {sc.name}
-                </span>
-              ))
-            })()}
           </div>
         )}
         {activeTab === "subclasses" && (

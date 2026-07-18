@@ -155,4 +155,41 @@ describe("resolveSpellCastCost", () => {
     expect(result.totalCost).toBe(0)
     expect(result.canCast).toBe(false)
   })
+
+  it("uses per-spell resource costs (Psion Alternate Effects) over slots", () => {
+    const result = resolveSpellCastCost({
+      spellLevel: 3,
+      spellcasting: { ability: "Intelligence" },
+      classRow: { class_resources: null },
+      classLevel: 5,
+      availablePoints: 10,
+      selectedMetamagic: [],
+      ctx,
+      spellResourceCost: { resourceKey: "psi_points", amount: 3 },
+      resourceSpendCap: 4,
+    })
+    expect(result.mode).toBe("resource")
+    expect(result.baseCost).toBe(3)
+    expect(result.totalCost).toBe(3)
+    expect(result.resourceKey).toBe("psi_points")
+    expect(result.resourceDisplayName).toBe("Psi Points")
+    expect(result.canCast).toBe(true)
+  })
+
+  it("blocks resource casts when cost exceeds the spend cap (Psi Limit)", () => {
+    const result = resolveSpellCastCost({
+      spellLevel: 5,
+      spellcasting: null,
+      classRow: { class_resources: null },
+      classLevel: 5,
+      availablePoints: 20,
+      selectedMetamagic: [],
+      ctx,
+      spellResourceCost: { resourceKey: "psi_points", amount: 5 },
+      resourceSpendCap: 4,
+    })
+    expect(result.mode).toBe("resource")
+    expect(result.canCast).toBe(false)
+    expect(result.blockReason).toBe("base_over_spell_limit")
+  })
 })

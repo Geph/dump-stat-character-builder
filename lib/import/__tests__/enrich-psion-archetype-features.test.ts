@@ -77,4 +77,31 @@ describe("enrichPsionArchetypeFeatures", () => {
       automaticBonus: { classResourceKey: "rampage_die" },
     })
   })
+
+  it("wires Curious Mind with skill options and long-rest limited uses", () => {
+    const enriched = enrichPsionArchetypeFeatures({
+      subclasses: [
+        {
+          name: "Wandering Mind",
+          class_name: "Psion",
+          description: null,
+          features: [
+            {
+              level: 3,
+              name: "Curious Mind",
+              description:
+                "At the end of a long rest select two skills you do not have proficiency in, until the end of your next long rest, you can add half your proficiency modifier (rounded down) to ability checks for those skills.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const feature = enriched.subclasses?.[0]?.features?.[0] as unknown as import("@/lib/types").Feature
+    expect(feature.isChoice).toBe(true)
+    expect(feature.choices?.count).toBe(2)
+    expect(feature.choices?.swappableOnRest).toBe(true)
+    expect(feature.choices?.options?.length).toBeGreaterThan(10)
+    expect(feature.choices?.options?.[0]?.linkedModifiers?.length).toBeGreaterThan(0)
+    expect(feature.limitedUses?.recharges?.[0]).toMatchObject({ rest: "long_rest" })
+  })
 })

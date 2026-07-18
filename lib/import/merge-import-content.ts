@@ -102,12 +102,39 @@ export function spellCatalogFromContent(content: ImportContent): { id: string; n
   }))
 }
 
+/**
+ * Prefer library objects before class chapter objects so same-batch wiring can
+ * resolve abilities/spells even when the user pastes the array out of order.
+ */
+export function orderImportContentsForMerge(contents: ImportContent[]): ImportContent[] {
+  const rank = (content: ImportContent): number => {
+    const hasClassChapter =
+      (content.classes?.length ?? 0) > 0 ||
+      (content.subclasses?.length ?? 0) > 0 ||
+      (content.class_resources?.length ?? 0) > 0
+    const hasLibrary =
+      (content.abilities?.length ?? 0) > 0 ||
+      (content.import_proposals?.custom_abilities?.length ?? 0) > 0 ||
+      (content.import_proposals?.class_resources?.length ?? 0) > 0 ||
+      (content.spells?.length ?? 0) > 0 ||
+      (content.feats?.length ?? 0) > 0 ||
+      (content.creatures?.length ?? 0) > 0 ||
+      (content.equipment?.length ?? 0) > 0
+    if (hasLibrary && !hasClassChapter) return 0
+    if (hasLibrary && hasClassChapter) return 1
+    if (hasClassChapter) return 2
+    return 1
+  }
+  return [...contents].sort((a, b) => rank(a) - rank(b))
+}
+
 /** Combine multiple import payloads (e.g. subclasses + spell libraries) into one batch. */
 export function combineImportContents(contents: ImportContent[]): ImportContent {
+  const ordered = orderImportContentsForMerge(contents)
   const merged: ImportContent = {}
   const supplementSpells: SpellRow[] = []
 
-  for (const content of contents) {
+  for (const content of ordered) {
     if (content.spells?.length) {
       supplementSpells.push(
         ...normalizeSpellImportRows(content.spells as unknown as Record<string, unknown>[]),

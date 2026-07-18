@@ -20,17 +20,17 @@ export const ONE_CLASS_AT_A_TIME_WARNING =
   "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are not likely to work — use a page range or split the extract."
 
 export const MULTI_FILE_IMPORT_TIP =
-  "Libraries before the class: full homebrew spell write-ups, psionic disciplines/powers, exploit/maneuver lists, and similar pickers should be extracted and imported first so the class can wire to them. Then do one class chapter (core + subclasses) with content type Classes — include that class's Spell/School/Special list in the same pass when present. Use page ranges to skip other classes — not to split a class from its own subclasses."
+  "Happy path: usually two LLM extracts, then one import. (1) Supporting library — disciplines, exploits, full spell write-ups. (2) Class chapter — core class + every archetype in the same JSON (classes[] + subclasses[]), including Spell/School/Special list stubs when present. Paste both as a JSON array in Step 2 for one staged review (Dump Stat auto-orders libraries before the class even if you paste them reversed). Use page ranges to skip other classes — not to split a class from its own subclasses. Use content type Subclasses only when adding archetypes to a class already in your compendium."
 
 export const JSON_ARRAY_IMPORT_TIP =
-  "You can paste a JSON array of import objects in Step 2 — e.g. [{\"abilities\": [...]}, {\"spells\": [...]}, {\"classes\": [...]}, {\"subclasses\": [...]}] — and Dump Stat will merge them into one batch before wiring. Put library objects before the class object when combining passes."
+  "Paste a JSON array in Step 2 — e.g. [{\"abilities\": [...]}, {\"classes\": [...], \"subclasses\": [...]}] — and Dump Stat merges it into one batch before wiring. Libraries are auto-sorted ahead of the class chapter; keep archetypes in the same object as classes[] (not a later separate pass)."
 
 export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {
     id: "spellcasting-class",
     title: "Spellcasting classes",
     summary:
-      "Import full homebrew spell write-ups first when needed, then one Classes pass for the class chapter (core + subclasses + spell list when present). Include Spell/School/Special tables in that same Classes pass.",
+      "Import full homebrew spell write-ups first when needed, then one Class + subclasses pass for the class chapter (core + every archetype + spell list when present). Include Spell/School/Special tables in that same pass.",
     examples: ["Kibbles Witch", "Kibbles Inventor", "homebrew full/half/third casters", "Artificer-style class lists"],
     steps: [
       {
@@ -40,7 +40,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
       },
       {
         label: "Class chapter (core + subclasses + spell list)",
-        hint: "One PDF/text pass with content type Classes — include Spell/School/Special list tables in the same paste when present (spell_list + spells[] stubs). Staged review covers both.",
+        hint: "One PDF/text pass with content type Class + subclasses — put every archetype in subclasses[] beside classes[]. Include Spell/School/Special list tables in the same paste when present (spell_list + spells[] stubs). Staged review covers class then subclasses.",
         contentType: "classes",
       },
       {
@@ -51,8 +51,9 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     ],
     notes: [
       "SRD spells do not need a separate full import if your compendium is SRD-seeded; list stubs only need to tag the class name on each spell.",
-      "Upload spell lists with the class (Classes content type). Do not import a list-only stub after the full class — that can overwrite features.",
-      "Cantrips bundled in a subclass file’s spells[] array are merged automatically.",
+      "Upload spell lists with the class (Class + subclasses content type). Do not import a list-only stub after the full class — that can overwrite features.",
+      "An empty subclasses[] means no archetypes in the builder — always extract them with the class chapter unless you are intentionally adding later.",
+      "Cantrips bundled in a subclass-only file’s spells[] array are still merged when you use Subclasses only for add-ons.",
       "One class per pass — page-range out any other classes in the same book.",
     ],
   },
@@ -60,22 +61,22 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "psion-disciplines",
     title: "Psionic classes (with separated powers)",
     summary:
-      "Extract Psionic Disciplines and powers from the PDF first (even if they appear later in the book), import that library, then extract the Psion class + archetypes. Class features and psi costs wire to disciplines that already exist.",
+      "Two extracts, one import: disciplines/powers library, then Psion class + all archetypes. Paste both JSON objects as an array in Step 2 (auto-ordered) so features wire to disciplines in one review.",
     examples: ["KibblesTasty Psion"],
     steps: [
       {
-        label: "Disciplines & powers first",
-        hint: "Point the LLM at the Psionic Disciplines / powers section — abilities[], related spells[], and import_proposals.custom_abilities. Do this before the class chapter.",
+        label: "Disciplines & powers extract",
+        hint: "Point the LLM at the Psionic Disciplines / powers section — abilities[], related spells[], and import_proposals.custom_abilities.",
         contentType: "abilities",
       },
       {
-        label: "Psion class chapter (core + archetypes)",
-        hint: "Psi Points, Psi Limit, Psionic Disciplines feature, and archetypes/subclasses — after the discipline library is in (or in the same JSON array after the library object)",
+        label: "Psion class chapter extract (core + all archetypes)",
+        hint: "Psi Points, Psi Limit, Psionic Disciplines feature, and every archetype in subclasses[]. Do not leave archetypes for a later pass.",
         contentType: "classes",
       },
       {
-        label: "Discipline feats (if bundled separately)",
-        contentType: "feats",
+        label: "One Step 2 paste",
+        hint: "Paste [library, classChapter] (or either order — Dump Stat sorts libraries first). Optional: discipline feats as a third array object if separate.",
       },
     ],
     notes: [
@@ -88,7 +89,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "martial-exploits",
     title: "Martial exploit classes (Laserllama Alt Fighter, etc.)",
     summary:
-      "Same pattern as Psion: extract the exploit / maneuver library first, then the class chapter (level table + subclasses).",
+      "Same pattern as Psion: extract the exploit / maneuver library first, then one Classes pass for the class chapter (level table + every subclass).",
     examples: ["Laserllama Alternate Fighter", "MCDM classes with technique lists"],
     steps: [
       {
@@ -97,8 +98,8 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
         contentType: "abilities",
       },
       {
-        label: "Class chapter (level table + subclasses)",
-        hint: "Exploit Dice columns, Martial Exploits feature, and subclasses after the library exists",
+        label: "Class chapter (level table + all subclasses)",
+        hint: "Exploit Dice columns, Martial Exploits feature, and every subclass in the same Classes JSON after the library exists",
         contentType: "classes",
       },
     ],
@@ -111,7 +112,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     id: "inventor-upgrades",
     title: "Artificer-style upgrade classes",
     summary:
-      "Homebrew spell write-ups first when needed, then one Classes pass for the Inventor chapter with its spell list included. Upgrade pickers that ship as a separate library should come before the class when possible.",
+      "Homebrew spell write-ups first when needed, then one Classes pass for the Inventor chapter with its subclasses and spell list included. Upgrade pickers that ship as a separate library should come before the class when possible.",
     examples: ["Kibbles Inventor"],
     steps: [
       {
@@ -126,7 +127,7 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
       },
       {
         label: "Inventor class chapter (core + subclasses + spell list)",
-        hint: "Content type Classes — upgrades resource, specialization choices, subclass features, and the class spell list in the same pass",
+        hint: "Content type Class + subclasses — upgrades resource, specialization choices, every subclass feature, and the class spell list in the same pass",
         contentType: "classes",
       },
     ],

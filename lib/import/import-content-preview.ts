@@ -1,4 +1,4 @@
-import type { ImportContent } from "@/lib/import/content-schema"
+import type { ImportContent, PrerequisiteRule } from "@/lib/import/content-schema"
 import { formatEquipmentCost } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import type { Equipment } from "@/lib/types"
@@ -41,12 +41,25 @@ function spellLevelLabel(level: number): string {
   return `${level}${suffix}`
 }
 
+function formatPrerequisiteRule(rule: PrerequisiteRule): { label: string; value: string } {
+  if (rule.category === "armor_training") {
+    return { label: "Armor training", value: rule.value }
+  }
+  if (rule.category === "ability_score") {
+    const abilities = rule.abilities
+      .map((ability) => ability.charAt(0).toUpperCase() + ability.slice(1))
+      .join(" or ")
+    return { label: "Ability score", value: `${abilities} ${rule.minimum}+` }
+  }
+  return { label: "Other prerequisite", value: rule.value }
+}
+
 function appendPrerequisiteRules(
   details: ImportContentPreviewDetail[],
-  row: { prerequisite_rules?: { category: "other"; value: string }[] | null },
+  row: { prerequisite_rules?: PrerequisiteRule[] | null },
 ): void {
   for (const rule of row.prerequisite_rules ?? []) {
-    details.push({ label: "Other prerequisite", value: rule.value })
+    details.push(formatPrerequisiteRule(rule))
   }
 }
 
@@ -296,10 +309,7 @@ function previewSpecies(content: ImportContent): ImportContentPreviewSection | n
       { label: "Size", value: row.size },
       { label: "Speed", value: `${row.speed} ft.` },
       { label: "Traits", value: String(row.traits?.length ?? 0) },
-      ...(row.prerequisite_rules ?? []).map((rule) => ({
-        label: "Other prerequisite",
-        value: rule.value,
-      })),
+      ...(row.prerequisite_rules ?? []).map((rule) => formatPrerequisiteRule(rule)),
     ],
     badges: [],
     descriptionSnippet: snippet(row.description),

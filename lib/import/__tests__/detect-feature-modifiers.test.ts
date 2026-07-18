@@ -695,6 +695,68 @@ describe("detectFeatureModifiers", () => {
     })
   })
 
+  it("wires Kibbles discipline grants without 'of' and Psychokinetics spelling", () => {
+    const telekinesis = detectFeatureModifiers(
+      "granting you the psionic discipline Telekinesis.",
+      { ...baseCtx, featureName: "Unshackled Power", contentKind: "subclass_feature" },
+    )
+    expect(
+      telekinesis.find((entry) => entry.ruleId === "grant.custom_ability.named_discipline")
+        ?.instance.characteristics?.[0],
+    ).toMatchObject({ abilityNames: ["Telekinesis Discipline"] })
+
+    const psycho = detectFeatureModifiers(
+      "You gain the psionic discipline of Psychokinetics.",
+      { ...baseCtx, featureName: "Elemental Power", contentKind: "subclass_feature" },
+    )
+    expect(
+      psycho.find((entry) => entry.ruleId === "grant.custom_ability.named_discipline")
+        ?.instance.characteristics?.[0],
+    ).toMatchObject({ abilityNames: ["Psychokinesis Discipline"] })
+  })
+
+  it("wires named talent grants for Cunning Strikes and Ravenous Powers", () => {
+    const rift = detectFeatureModifiers(
+      "Starting at 3rd level, you gain the Rift Strike talent. If you already have the Rift Strike talent.",
+      { ...baseCtx, featureName: "Cunning Strikes", contentKind: "subclass_feature" },
+    )
+    expect(
+      rift.find((entry) => entry.ruleId === "grant.custom_ability.named_talent")
+        ?.instance.characteristics?.[0],
+    ).toMatchObject({ abilityNames: ["Rift Strike"] })
+
+    const devourer = detectFeatureModifiers(
+      "you gain the psionic talent Mind Devourer; this talent ignores the normal level restriction. Additionally, you can gain the benefit of this talent from a range of 30 feet when the creature is killed by one of your Psionic powers.",
+      { ...baseCtx, featureName: "Ravenous Powers", contentKind: "subclass_feature" },
+    )
+    expect(
+      devourer.find((entry) => entry.ruleId === "grant.custom_ability.named_talent")
+        ?.instance.characteristics?.[0],
+    ).toMatchObject({ abilityNames: ["Mind Devourer"] })
+    const rider = devourer.find((entry) => entry.ruleId === "power.rider.from_prose")
+      ?.instance.characteristics?.[0]
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      parentPowerNames: ["Mind Devourer"],
+    })
+    if (rider?.type === "power_rider") {
+      expect(rider.alertSummary).toMatch(/30 feet/i)
+    }
+  })
+
+  it("wires Living Power as a Psychokinesis power rider", () => {
+    const detections = detectFeatureModifiers(
+      "When you use a power or alternate effect of psychkinetics, you can apply one of the following modifiers.",
+      { ...baseCtx, featureName: "Living Power", contentKind: "subclass_feature" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "power.rider.from_prose")
+      ?.instance.characteristics?.[0]
+    expect(char).toMatchObject({
+      type: "power_rider",
+      parentPowerNames: ["Elemental Blast"],
+    })
+  })
+
   it("gates Primordial Aspect's speed bonus behind the Lightning aspect toggle", () => {
     const detections = detectFeatureModifiers(
       "<ul><li><strong>Cold.</strong> Icy shell.</li><li><strong>Fire.</strong> Fiery aura.</li><li><strong>Lightning.</strong> Your walking speed increases by 5 feet.</li></ul>",

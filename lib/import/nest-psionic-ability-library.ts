@@ -36,9 +36,20 @@ function abilityRole(row: Record<string, unknown>): string {
   return typeof row.ability_role === "string" ? row.ability_role.trim().toLowerCase() : ""
 }
 
+type CustomAbilityLike = {
+  name?: string | null
+  description?: string | null
+  parent_ability_name?: string | null
+  definition?: string | null
+}
+
 function resolveDisciplineNameForPower(row: Record<string, unknown>): string | null {
   const name = normalizeName(String(row.name ?? ""))
   if (POWER_TO_DISCIPLINE[name]) return POWER_TO_DISCIPLINE[name]
+
+  const parent =
+    typeof row.parent_ability_name === "string" ? row.parent_ability_name.trim() : ""
+  if (parent && /\bdiscipline\b/i.test(parent)) return parent
 
   const definition = String(row.definition ?? "")
   const fromDef = definition.match(/from\s+([A-Za-z][A-Za-z' ]+Discipline)/i)
@@ -49,6 +60,16 @@ function resolveDisciplineNameForPower(row: Record<string, unknown>): string | n
   if (fromDesc?.[1] && /discipline/i.test(fromDesc[1])) return fromDesc[1].trim()
 
   return null
+}
+
+/** Resolve which discipline package owns a psionic power row (import / sheet gating). */
+export function resolvePsionicPowerDisciplineName(ability: CustomAbilityLike): string | null {
+  return resolveDisciplineNameForPower({
+    name: ability.name,
+    description: ability.description ?? "",
+    parent_ability_name: ability.parent_ability_name ?? null,
+    definition: ability.definition ?? "",
+  })
 }
 
 /** Pull the first bold/named passive feature before Alternate Effects. */

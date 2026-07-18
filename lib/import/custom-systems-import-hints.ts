@@ -173,7 +173,7 @@ Psionic Disciplines → discipline packages + nested Discipline Talents + separa
     ]
   },
   "class_resources": [
-    { "class_name": "Psion", "resource_key": "psi_points", "name": "Psi Points", "uses": { "type": "at_level", "atLevelMode": "tier", "atLevelTable": [{ "level": 1, "count": 1 }], "recharges": ["short_rest", "long_rest"] } },
+    { "class_name": "Psion", "resource_key": "psi_points", "name": "Psi Points", "uses": { "type": "at_level", "atLevelMode": "tier", "atLevelTable": [{ "level": 1, "count": 1 }], "recharges": [{ "rest": "short_rest" }, { "rest": "long_rest" }] } },
     { "class_name": "Psion", "resource_key": "psi_limit", "name": "Psi Limit", "uses": { "type": "special", "atLevelMode": "tier", "atLevelTable": [{ "level": 1, "count": 1 }] } }
   ]
 }

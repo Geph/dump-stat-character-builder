@@ -1,6 +1,10 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
-import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
+import {
+  resolveTierCountAtLevel,
+  resolveUsesAtLevel,
+  type ResolveUsesContext,
+} from "@/lib/compendium/resolve-uses-config"
 
 /** Highest Psi Limit cap across class levels (KibblesTasty Psion per-activation augment cap). */
 export function resolvePsiLimit(
@@ -13,7 +17,12 @@ export function resolvePsiLimit(
     const resources = resolveClassResourcesForClass(entry.class)
     const psiLimit = resources.find((resource) => resource.id === "psi_limit")
     if (!psiLimit) continue
-    const max = resolveUsesAtLevel(psiLimit.uses, entry.row.level, ctx)
+    const fromUses = resolveUsesAtLevel(psiLimit.uses, entry.row.level, ctx)
+    const fromTable =
+      psiLimit.uses.type === "special"
+        ? resolveTierCountAtLevel(psiLimit.uses.atLevelTable, entry.row.level)
+        : null
+    const max = fromUses ?? fromTable
     if (max != null && (best == null || max > best)) best = max
   }
   return best

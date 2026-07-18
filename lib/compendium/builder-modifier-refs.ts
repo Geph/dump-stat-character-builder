@@ -12,7 +12,15 @@ import {
   speciesTraitSourceKey,
 } from "@/lib/builder/modifier-player-choices"
 import { featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
-import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import {
+  normalizeCharacteristics,
+  type CharacteristicModifier,
+} from "@/lib/compendium/characteristic-modifiers"
+import {
+  abilityNameIsSelected,
+  collectSelectedCustomAbilityNames,
+  filterUnlockedCustomAbilities,
+} from "@/lib/builder/picked-custom-abilities"
 import {
   effectiveLinkedModifiers,
   readLinkedModifiers,
@@ -36,6 +44,23 @@ import type {
   Species,
   Subclass,
 } from "@/lib/types"
+
+function collectGrantedCustomAbilityNames(mods: CharacteristicModifier[]): string[] {
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (const mod of mods) {
+    if (mod.type !== "grant_custom_ability") continue
+    for (const raw of mod.abilityNames ?? []) {
+      const name = raw.trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      names.push(name)
+    }
+  }
+  return names
+}
 
 export function characteristicsFromLinkedModifiers(
   catalog: ModifierCatalogEntry[],
@@ -405,7 +430,24 @@ export function collectBuilderModifierRefIds(params: {
     })
   })
 
-  const customAbilityMods = customAbilities.flatMap((ability) => {
+  // Fixed grants (archetype primary discipline, etc.) come from class/feat features —
+  // resolve those before deciding which pick-gated custom abilities are unlocked.
+  const grantedFromFeatures = collectGrantedCustomAbilityNames([
+    ...speciesResolved,
+    ...normalizeCharacteristics(classResolved, null),
+    ...normalizeCharacteristics(backgroundResolved, null),
+    ...featMods,
+  ])
+
+  const selectedAbilityNames = collectSelectedCustomAbilityNames({
+    featureChoicePicks,
+    featChoicePicks,
+    grantedCustomAbilityNames: grantedFromFeatures,
+  })
+
+  const unlockedAbilities = filterUnlockedCustomAbilities(customAbilities, selectedAbilityNames)
+
+  const customAbilityMods = unlockedAbilities.flatMap((ability) => {
     const row = ability as unknown as Record<string, unknown>
     let linked = readLinkedModifiers(row, catalog)
     const refs = ability.modifierRefs ?? readModifierRefs(row)
@@ -424,15 +466,36 @@ export function collectBuilderModifierRefIds(params: {
         ]
       }
     }
-    return tagModifierSource(
-      characteristicsFromLinkedModifiers(catalog, linked, refs),
-      {
-        sourceType: "feature",
-        source: ability.name,
-        label: ability.name,
-        sourceId: ability.id,
-      },
-    )
+    return tagModifierSource(characteristicsFromLinkedModifiers(catalog, linked, refs), {
+      sourceType: "feature",
+      source: ability.name,
+      label: ability.name,
+      sourceId: ability.id,
+    })
+  })
+
+  // Discipline-nested talent options store modifiers on the option, not a separate ability row.
+  const nestedTalentMods = unlockedAbilities.flatMap((ability) => {
+    const options = ability.choices?.options ?? []
+    if (!options.length) return []
+    return options.flatMap((option) => {
+      if (!abilityNameIsSelected(option.name, selectedAbilityNames)) return []
+      // Don't re-apply the package itself when the pick is the discipline name.
+      if (option.name.trim().toLowerCase() === ability.name.trim().toLowerCase()) return []
+      return tagModifierSource(
+        characteristicsFromLinkedModifiers(
+          catalog,
+          effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
+          option.modifierRefs,
+        ),
+        {
+          sourceType: "feature",
+          source: option.name,
+          label: option.name,
+          sourceId: ability.id,
+        },
+      )
+    })
   })
 
   return [
@@ -450,5 +513,6 @@ export function collectBuilderModifierRefIds(params: {
     }),
     ...featMods,
     ...customAbilityMods,
+    ...nestedTalentMods,
   ]
 }

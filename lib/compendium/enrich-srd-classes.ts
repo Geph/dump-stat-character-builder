@@ -4,7 +4,7 @@ import {
   enrichClassFeatureWithModifierPresets,
   monkToolProficiencyChoice,
 } from "@/lib/compendium/enrich-srd-class-features"
-import { SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
+import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
 import { applySrdCardImage } from "@/lib/compendium/card-image"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
@@ -176,7 +176,7 @@ export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, 
   const icon =
     typeof row.icon === "string" && row.icon.trim()
       ? row.icon.trim()
-      : SRD_CLASS_ICONS_BY_NAME[name] ?? null
+      : defaultClassIconForName(name)
   const weaponProficiencyOverride = SRD_CLASS_WEAPON_PROFICIENCY_OVERRIDES[name]
   const complexity = isClassComplexity(row.complexity)
     ? row.complexity

@@ -86,6 +86,10 @@ import {
   metamagicOptionsForCharacter,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
+import {
+  collectResourceCastSpellIds,
+  collectSpellResourceCastCosts,
+} from "@/lib/character/spell-resource-cast-costs"
 import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
 import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-panel"
@@ -113,6 +117,8 @@ import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
+import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -260,6 +266,10 @@ function buildClassDetailList(character: CharacterWithRelations): CharacterClass
       subclass: character.subclasses ?? null,
     },
   ]
+}
+
+function normalizeResourceName(value: string): string {
+  return value.trim().toLowerCase().replace(/[_\s]+/g, " ")
 }
 
 function CollapsibleDetailField({
@@ -1314,6 +1324,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const sheetCustomAbilities = useMemo(() => {
     if (!character) return []
+    const selectedAbilityNames = collectSelectedCustomAbilityNames({
+      featureChoicePicks,
+      grantedCustomAbilityNames: derived?.grantedCustomAbilityNames,
+    })
+    const knownDisciplineNames = collectKnownDisciplineNames({
+      customAbilities,
+      featureChoicePicks,
+      grantedAbilityNames: derived?.grantedCustomAbilityNames,
+    })
     return filterCustomAbilitiesForCharacterSheet(customAbilities, {
       classIds: classDetails.map((entry) => entry.row.class_id),
       classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
@@ -1335,8 +1354,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equipmentIds: character.equipment_ids ?? [],
       equipmentCategories: equipment.map((item) => item.category),
       spellIds: character.spell_ids ?? [],
+      selectedAbilityNames,
+      knownDisciplineNames,
     })
-  }, [customAbilities, character, classDetails, characterFeats, originFeat, equipment])
+  }, [
+    customAbilities,
+    character,
+    classDetails,
+    characterFeats,
+    originFeat,
+    equipment,
+    featureChoicePicks,
+    derived?.grantedCustomAbilityNames,
+  ])
+
+  const spellResourceCastCosts = useMemo(
+    () =>
+      collectSpellResourceCastCosts({
+        customAbilities: sheetCustomAbilities,
+        featureChoicePicks,
+        spellCatalog: spellCatalog.length ? spellCatalog : spells,
+      }),
+    [sheetCustomAbilities, featureChoicePicks, spellCatalog, spells],
+  )
+
+  const resourceCastSpellIds = useMemo(
+    () => collectResourceCastSpellIds(spellResourceCastCosts),
+    [spellResourceCastCosts],
+  )
 
   const usesResolveContext = useMemo(
     () => ({
@@ -1386,6 +1431,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const usedPoints = usedResourcesById[resourceId] ?? 0
       return {
         resourceId,
+        resourceKey: pool.resource_key,
         available: Math.max(0, maxPoints - usedPoints),
       }
     }
@@ -1398,6 +1444,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const usedPoints = usedResourcesById[entry.id] ?? 0
     return {
       resourceId: entry.id,
+      resourceKey: "sorcery_points",
       available: Math.max(0, maxPoints - usedPoints),
     }
   }, [
@@ -1406,6 +1453,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     usedResourcesById,
     usesResolveContext,
   ])
+
+  const availablePointsForResourceKey = useCallback(
+    (resourceKey: string | null | undefined): { resourceId: string | null; available: number } => {
+      if (!resourceKey) {
+        return {
+          resourceId: sorceryPointsState?.resourceId ?? null,
+          available: sorceryPointsState?.available ?? 0,
+        }
+      }
+      const entry = resourceEntries.find(
+        (row) =>
+          row.id.endsWith(`_${resourceKey}`) ||
+          row.id === resourceKey ||
+          normalizeResourceName(row.name) === normalizeResourceName(resourceKey),
+      )
+      if (!entry) {
+        if (sorceryPointsState?.resourceKey === resourceKey) {
+          return {
+            resourceId: sorceryPointsState.resourceId,
+            available: sorceryPointsState.available,
+          }
+        }
+        return { resourceId: null, available: 0 }
+      }
+      const maxPoints = resolveUsesAtLevel(entry.uses, entry.classLevel, usesResolveContext) ?? 0
+      const usedPoints = usedResourcesById[entry.id] ?? 0
+      return {
+        resourceId: entry.id,
+        available: Math.max(0, maxPoints - usedPoints),
+      }
+    },
+    [resourceEntries, usedResourcesById, usesResolveContext, sorceryPointsState],
+  )
 
   const metamagicOptions = useMemo(
     () =>
@@ -1434,13 +1514,23 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const spellCastCost = useMemo(() => {
-    if (!selectedSpell || !primarySpellcaster?.class) return null
+    if (!selectedSpell) return null
 
-    const availablePoints = sorceryPointsState?.available ?? 0
-    const pool = getPointPoolSpellcasting(primarySpellcaster.class.spellcasting)
+    const spellResourceCost = spellResourceCastCosts.get(selectedSpell.id) ?? null
+    const pointsState = availablePointsForResourceKey(
+      spellResourceCost?.resourceKey ??
+        (pointPoolClassDetail?.class
+          ? getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)?.resource_key
+          : null) ??
+        sorceryPointsState?.resourceKey,
+    )
+    const availablePoints = pointsState.available
+    const castingClass = primarySpellcaster?.class ?? classDetails[0]?.class ?? null
+    const castingLevel = primarySpellcaster?.row.level ?? classDetails[0]?.row.level ?? character?.level ?? 1
 
     let arcanumAvailable: boolean | undefined
-    if (pool) {
+    const pool = castingClass ? getPointPoolSpellcasting(castingClass.spellcasting) : null
+    if (pool && !spellResourceCost) {
       const poolMaxLevel = Math.max(
         0,
         ...Object.keys(pool.cost_by_level)
@@ -1461,22 +1551,31 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
     return resolveSpellCastCost({
       spellLevel: selectedSpell.level,
-      spellcasting: primarySpellcaster.class.spellcasting,
-      classRow: primarySpellcaster.class,
-      classLevel: primarySpellcaster.row.level,
+      spellcasting: castingClass?.spellcasting,
+      classRow: castingClass ?? { class_resources: null },
+      classLevel: castingLevel,
       availablePoints,
       selectedMetamagic,
       ctx: usesResolveContext,
       arcanumAvailable,
+      spellResourceCost,
+      resourceSpendCap:
+        spellResourceCost?.resourceKey === "psi_points" ? psiLimit : null,
     })
   }, [
     selectedSpell,
     primarySpellcaster,
+    classDetails,
+    character?.level,
     sorceryPointsState,
+    availablePointsForResourceKey,
+    spellResourceCastCosts,
+    pointPoolClassDetail,
     resourceEntries,
     usedResourcesById,
     selectedMetamagic,
     usesResolveContext,
+    psiLimit,
   ])
 
   useEffect(() => {
@@ -2143,29 +2242,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const alwaysPreparedSpellIds = (() => {
     const ids = new Set<string>()
-    if (!spellCatalog.length) return ids
+    const catalog = spellCatalog.length ? spellCatalog : spells
     for (const detail of classDetails) {
       const features = (detail.subclass?.features as import("@/lib/types").Feature[] | undefined) ?? []
-      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, spellCatalog, {
+      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, catalog, {
         classId: detail.row.class_id,
         featureChoicePicks,
       })) {
         ids.add(grant.spellId)
       }
     }
+    for (const id of resourceCastSpellIds) ids.add(id)
     return ids
   })()
 
   const displayedSpells = (() => {
-    if (!alwaysPreparedSpellIds.size) return spells
     const byId = new Map(spells.map((spell) => [spell.id, spell]))
+    const catalog = spellCatalog.length ? spellCatalog : spells
     for (const id of alwaysPreparedSpellIds) {
       if (byId.has(id)) continue
-      const row = spellCatalog.find((spell) => spell.id === id)
+      const row = catalog.find((spell) => spell.id === id)
       if (row) byId.set(id, row)
     }
-    return [...byId.values()]
+    return [...byId.values()].sort(
+      (a, b) => a.level - b.level || a.name.localeCompare(b.name),
+    )
   })()
+
+  const hasResourceCastSpells = resourceCastSpellIds.length > 0
+  const showSpellsPanel = hasSpellcasting || hasResourceCastSpells || displayedSpells.length > 0
 
   const spellsGroupedByLevel = (() => {
     const groups = new Map<number, Spell[]>()
@@ -2714,11 +2819,33 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </div>
                     <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium min-w-0">
                       <span className="truncate">Passive Insight</span>
-                      <span className="font-bold tabular-nums shrink-0">{passiveInsight}</span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        <span className="font-bold tabular-nums">{passiveInsight}</span>
+                        <StatExplainPopover
+                          title="Passive Insight"
+                          total={passiveInsight}
+                          contributions={
+                            statBreakdowns
+                              ? breakdownLines(statBreakdowns, "passiveInsight")
+                              : undefined
+                          }
+                        />
+                      </span>
                     </div>
                     <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium min-w-0">
                       <span className="truncate">Passive Investigation</span>
-                      <span className="font-bold tabular-nums shrink-0">{passiveInvestigation}</span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        <span className="font-bold tabular-nums">{passiveInvestigation}</span>
+                        <StatExplainPopover
+                          title="Passive Investigation"
+                          total={passiveInvestigation}
+                          contributions={
+                            statBreakdowns
+                              ? breakdownLines(statBreakdowns, "passiveInvestigation")
+                              : undefined
+                          }
+                        />
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -3178,7 +3305,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   ) : null}
                 </div>
 
-                {hasSpellcasting && (
+                {showSpellsPanel && (
                   <div className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
                     <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
                     {spellsGroupedByLevel.length ? (
@@ -3205,7 +3332,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     {alwaysPreparedSpellIds.has(spell.id) && (
                                       <span
                                         className="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"
-                                        title="Always prepared by your subclass"
+                                        title={
+                                          spellResourceCastCosts.has(spell.id)
+                                            ? "Granted by a discipline / feature (cast with class resource)"
+                                            : "Always prepared by your subclass"
+                                        }
                                       />
                                     )}
                                     {spell.concentration && (
@@ -3858,7 +3989,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 applyConcentration(result.concentrationApplied)
               }
               if (result.psiPointsSpent) {
+                const spendKey =
+                  spellCastCost?.resourceKey ??
+                  sorceryPointsState?.resourceKey ??
+                  null
                 const spResourceId =
+                  availablePointsForResourceKey(spendKey).resourceId ??
                   sorceryPointsState?.resourceId ??
                   (pointPoolClassDetail?.class
                     ? (() => {
@@ -3902,6 +4038,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             canUseSlot={
               selectedSpell.level === 0 ||
               spellCastCost?.mode === "point_pool" ||
+              spellCastCost?.mode === "resource" ||
               (primarySpellSlotTable != null &&
                 (() => {
                   const key = spellSlotTableKey(primarySpellSlotTable)

@@ -37,7 +37,7 @@ const TOPIC_BUTTONS: {
   {
     id: "import-order",
     title: "Import order",
-    blurb: "Libraries first, then class + subclasses",
+    blurb: "Usually 2 extracts → 1 paste",
     icon: Layers,
     accent: "text-sky-700 dark:text-sky-300",
   },
@@ -122,7 +122,7 @@ export function ImportWorkflowGuidancePanel() {
         open={topic === "import-order"}
         onOpenChange={(open) => setTopic(open ? "import-order" : null)}
         title="Import order"
-        description="Dependencies like spells or abilities first, then class and subclasses."
+        description="Usually two LLM extracts, then one Step 2 paste — libraries auto-merge with the class chapter."
         contentClassName="sm:max-w-xl"
       >
         <div className="space-y-4">

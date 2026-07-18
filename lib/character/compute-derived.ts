@@ -672,6 +672,20 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     ],
   )
   const skillExpertise = [...aggregatedCharacteristics.skillExpertise]
+  for (const skill of aggregatedCharacteristics.expertiseIfProficientSkills) {
+    const name = skill.trim()
+    if (!name) continue
+    const alreadyProficient = skillProficiencies.some(
+      (entry) => entry.toLowerCase() === name.toLowerCase(),
+    )
+    if (alreadyProficient) {
+      if (!skillExpertise.some((entry) => entry.toLowerCase() === name.toLowerCase())) {
+        skillExpertise.push(name)
+      }
+    } else {
+      skillProficiencies.push(name)
+    }
+  }
 
   const aggregatedClassWeaponProficiencies = aggregateClassWeaponProficiencies({
     classLevels: inputs.classLevels,

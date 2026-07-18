@@ -292,57 +292,12 @@ function fillChoiceOptionPrerequisites(feature: Feature): Feature {
   }
 }
 
-function hasOptionsSourcePicker(feature: Feature, optionsSource: string): boolean {
-  return (feature.linkedModifiers ?? []).some((mod) =>
-    mod.characteristics?.some((char) => {
-      const legacy = char as { type?: string; optionsSource?: string | null }
-      return legacy.type === "feature_option_picker" && legacy.optionsSource === optionsSource
-    }),
-  )
-}
-
 function enrichPsionicPoolFeature(feature: Feature): Feature {
   const [enriched] = enrichPsionicTalentGrantFeatures([feature])
   const next = enriched ?? feature
-  const optionsSource = next.choices?.optionsSource
-  if (
-    !optionsSource ||
-    (optionsSource !== "known_discipline_talents" &&
-      optionsSource !== "class_talents" &&
-      optionsSource !== "class_disciplines")
-  ) {
-    return next
-  }
-  if (hasOptionsSourcePicker(next, optionsSource)) return next
-
-  const resourceKey =
-    optionsSource === "class_talents"
-      ? (next.choices?.resourceKey ?? "class_talents_known")
-      : optionsSource === "known_discipline_talents"
-        ? (next.choices?.resourceKey ?? "psionic_talents_known")
-        : (next.choices?.resourceKey ?? null)
-
-  const picker = charInstance(createModifierInstanceId(), FEATURE_OPTION_PICKER_CATALOG_ID, [
-    legacyFeatureOptionPickerCharacteristic({
-      id: modId(optionsSource),
-      category: next.choices?.category ?? next.name,
-      choiceCount: next.choices?.count ?? 1,
-      choiceCountByLevel: next.choices?.choiceCountByLevel,
-      swappableOnRest: next.choices?.swappableOnRest,
-      resourceKey,
-      optionsSource,
-      label:
-        optionsSource === "class_disciplines"
-          ? "Psionic discipline options"
-          : optionsSource === "class_talents"
-            ? "Class / general psionic talent options"
-            : "Discipline talent options (from known disciplines)",
-    }),
-  ])
-  return syncModifierRefs({
-    ...next,
-    linkedModifiers: [...(next.linkedModifiers ?? []), picker],
-  })
+  // optionsSource on Feature.choices is the live wire — do not attach a legacy
+  // feature_option_picker characteristic (that only confuses the editor).
+  return migrateFeatureOptionPickers(next)
 }
 
 function enrichPsionicsAbilityFeature(feature: Feature): Feature {

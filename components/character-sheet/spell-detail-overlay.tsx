@@ -72,16 +72,19 @@ export function SpellDetailOverlay({
   const isCantrip = spell.level === 0
 
   const isPointPool = castCost?.mode === "point_pool"
+  const isResourceCast = castCost?.mode === "resource"
+  const spendsResourcePoints = isPointPool || isResourceCast
+  const resourceLabel = castCost?.resourceDisplayName ?? "Points"
   const hasMetamagic = metamagicOptions.length > 0
   const metamagicSelected = selectedMetamagicIds.length > 0
   const metamagicReady = !metamagicSelected || (castCost?.canCast ?? true)
   const canCastSpell = isCantrip
-    ? isPointPool
+    ? spendsResourcePoints
       ? (castCost?.canCast ?? true)
       : metamagicSelected
         ? metamagicReady
         : true
-    : isPointPool
+    : spendsResourcePoints
       ? (castCost?.canCast ?? false)
       : canUseSlot && metamagicReady
 
@@ -144,12 +147,12 @@ export function SpellDetailOverlay({
       if (isPointPool && castCost?.castKind === "arcanum") {
         result.arcanumUsed = true
         feedbackParts.push("Used Innate Arcanum charge")
-      } else if (isPointPool && castCost) {
+      } else if (spendsResourcePoints && castCost) {
         result.psiPointsSpent = castCost.totalCost
-        feedbackParts.push(`Spent ${castCost.totalCost} Sorcery Points`)
+        feedbackParts.push(`Spent ${castCost.totalCost} ${resourceLabel}`)
       } else if (castCost?.metamagicCost) {
         result.psiPointsSpent = castCost.metamagicCost
-        feedbackParts.push(`Spent ${castCost.metamagicCost} Sorcery Points on Metamagic`)
+        feedbackParts.push(`Spent ${castCost.metamagicCost} ${resourceLabel} on Metamagic`)
         if (!isCantrip) {
           result.slotUsed = true
           feedbackParts.push(`Used 1 level ${spell.level} slot`)
@@ -160,7 +163,7 @@ export function SpellDetailOverlay({
       }
     } else if (isCantrip && castCost?.metamagicCost) {
       result.psiPointsSpent = castCost.metamagicCost
-      feedbackParts.push(`Spent ${castCost.metamagicCost} Sorcery Points on Metamagic`)
+      feedbackParts.push(`Spent ${castCost.metamagicCost} ${resourceLabel} on Metamagic`)
     }
     if (psionicAugments && augmentSelections.length) {
       result.psionicAugments = augmentSelections
@@ -324,13 +327,13 @@ export function SpellDetailOverlay({
           {!isCantrip && !canCastSpell && (
             <p className="text-xs text-destructive text-center">
               {castCost?.blockReason === "base_over_spell_limit"
-                ? `Base cost exceeds Spell Limit (${castCost.baseCost} SP)`
+                ? `Base cost exceeds ${isResourceCast ? "spend limit" : "Spell Limit"} (${castCost.baseCost} ${resourceLabel})`
                 : castCost?.blockReason === "metamagic_over_proficiency_cap"
                   ? "Metamagic cost exceeds Proficiency Bonus cap"
                   : castCost?.blockReason === "insufficient_points"
                     ? hasMetamagic && selectedMetamagicIds.length > 0 && canUseSlot
-                      ? "Not enough Sorcery Points for Metamagic"
-                      : "Not enough Sorcery Points"
+                      ? `Not enough ${resourceLabel} for Metamagic`
+                      : `Not enough ${resourceLabel}`
                     : `No ${spell.level} slots remaining`}
             </p>
           )}
@@ -338,7 +341,7 @@ export function SpellDetailOverlay({
             <p className="text-xs text-destructive text-center">
               {castCost?.blockReason === "metamagic_over_proficiency_cap"
                 ? "Metamagic cost exceeds Proficiency Bonus cap"
-                : "Not enough Sorcery Points for Metamagic"}
+                : `Not enough ${resourceLabel} for Metamagic`}
             </p>
           )}
           {!concentrationWarningOpen && (
@@ -365,14 +368,14 @@ export function SpellDetailOverlay({
                 {spell.concentration && "Applies concentration condition · "}
                 {!isCantrip && isPointPool && castCost?.castKind === "arcanum"
                   ? "Uses one Innate Arcanum charge"
-                  : !isCantrip && isPointPool && castCost
-                    ? `Costs ${castCost.totalCost} Sorcery Points`
+                  : !isCantrip && spendsResourcePoints && castCost
+                    ? `Costs ${castCost.totalCost} ${resourceLabel}`
                     : !isCantrip && castCost?.metamagicCost
-                      ? `Uses 1 spell slot + ${castCost.metamagicCost} Sorcery Points Metamagic`
+                      ? `Uses 1 spell slot + ${castCost.metamagicCost} ${resourceLabel} Metamagic`
                       : !isCantrip
                         ? "Uses one spell slot"
                         : castCost?.metamagicCost
-                          ? `Cantrip · ${castCost.metamagicCost} Sorcery Points Metamagic`
+                          ? `Cantrip · ${castCost.metamagicCost} ${resourceLabel} Metamagic`
                           : "Cantrips do not use slots"}
               </p>
             </>

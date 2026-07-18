@@ -433,6 +433,32 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     }
   }
 
+  const insightLines = derived.skills.find((skill) => skill.name === "Insight")
+  if (insightLines) {
+    recorder.add("passiveInsight", {
+      sourceType: "base",
+      source: "Base",
+      label: "Base 10",
+      amount: 10,
+    })
+    for (const line of recorder.snapshot()[`skill:Insight`] ?? []) {
+      recorder.add("passiveInsight", line)
+    }
+  }
+
+  const investigationLines = derived.skills.find((skill) => skill.name === "Investigation")
+  if (investigationLines) {
+    recorder.add("passiveInvestigation", {
+      sourceType: "base",
+      source: "Base",
+      label: "Base 10",
+      amount: 10,
+    })
+    for (const line of recorder.snapshot()[`skill:Investigation`] ?? []) {
+      recorder.add("passiveInvestigation", line)
+    }
+  }
+
   const primaryCasting = derived.spellcasting[0]
   if (primaryCasting) {
     recorder.add("spellSaveDc", { sourceType: "base", source: "Base", label: "Base", amount: 8 })

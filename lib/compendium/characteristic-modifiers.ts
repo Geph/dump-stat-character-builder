@@ -156,7 +156,7 @@ export type CreatureSizeValue = (typeof SPECIES_SIZES)[number]
 
 export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "ability_scores", label: "Ability Scores" },
-  { value: "skills", label: "Skills (Proficiency / Expertise)" },
+  { value: "skills", label: "Skills (Proficiency / Expertise)", hint: "Fixed skills, player picks, or expertise-if-proficient (Keen Mind)" },
   { value: "languages", label: "Languages" },
   { value: "armor_proficiencies", label: "Armor Proficiencies" },
   { value: "weapon_proficiencies", label: "Weapon Proficiencies" },
@@ -384,6 +384,11 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
   choiceCount?: number | null
   /** When true, chosen or listed skills grant Expertise instead of proficiency. */
   grantExpertise?: boolean
+  /**
+   * Keen Mind / Observant style: if the character already has proficiency in the
+   * chosen skill, grant Expertise instead; otherwise grant proficiency.
+   */
+  expertiseIfProficient?: boolean
   /**
    * When false, skill entries / player picks do not grant proficiency — only drive
    * which skill a paired bonus applies to (e.g. Thaumaturge Arcana or Religion).
@@ -722,8 +727,12 @@ export interface AttunementSlotsCharacteristic extends CharacteristicModifierBas
 export interface DamageReductionCharacteristic extends CharacteristicModifierBase {
   type: "damage_reduction"
   amount: number
+  /** When `proficiency`, sheet/derived resolve amount from Proficiency Bonus (Heavy Armor Master). */
+  amountMode?: "fixed" | "proficiency"
   /** Empty = all damage types (e.g. Heavy Armor Master uses B/P/S) */
   damageTypes?: string[]
+  /** Optional armor gate (e.g. only while wearing Heavy armor). */
+  requiresArmorCategory?: "Light armor" | "Medium armor" | "Heavy armor" | null
 }
 
 export interface SpellSlotGrant {
@@ -761,6 +770,14 @@ export interface SpellsKnownEntry {
   unlocksAtClassLevel?: number
   /** May only be cast as a Ritual (e.g. Animal Speaker / Nature Speaker). */
   castAsRitual?: boolean
+  /**
+   * Cast this spell by spending a class resource instead of (or in addition to) a spell slot.
+   * Used by Psion Alternate Effects (psi points) and similar homebrew grant tables.
+   */
+  castCost?: {
+    resourceKey: string
+    amount: number
+  } | null
 }
 
 export interface SpellsKnownCharacteristic extends CharacteristicModifierBase {
@@ -1328,7 +1345,14 @@ export function createCharacteristicModifier(
     case "damage_immunity":
       return { id, type, damageTypes: [], choiceCount: null, choiceOptions: null, fromSpells: false }
     case "damage_reduction":
-      return { id, type, amount: 3, damageTypes: ["Bludgeoning", "Piercing", "Slashing"] }
+      return {
+        id,
+        type,
+        amount: 3,
+        amountMode: "fixed",
+        damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+        requiresArmorCategory: null,
+      }
     case "spells":
       return { id, type, grants: [{ level: 1, count: 1 }] }
     case "spells_known":
@@ -1933,12 +1957,19 @@ export type AggregatedSpellsKnown = {
   spellIds: string[]
   prepared: boolean
   castingAbility?: AbilityScoreKey
+  /** Per-spell resource cast costs keyed by spellId (Alternate Effects, etc.). */
+  castCostsBySpellId?: Record<string, { resourceKey: string; amount: number }>
 }
 
 export type AggregatedCharacteristics = {
   abilityBonuses: Partial<Record<AbilityScoreKey, number>>
   skills: string[]
   skillExpertise: string[]
+  /**
+   * Skills from feats like Keen Mind / Observant: resolve after other proficiencies —
+   * expertise if already proficient, otherwise proficiency.
+   */
+  expertiseIfProficientSkills: string[]
   customSkills: CustomSkillDefinition[]
   languages: string[]
   armorProficiencies: string[]
@@ -1992,7 +2023,12 @@ export type AggregatedCharacteristics = {
   spellHealingModifiers: SpellHealingModifierCharacteristic[]
   resourceAbilityMenus: ResourceAbilityMenuCharacteristic[]
   extraTurns: ExtraTurnCharacteristic[]
-  damageReduction: { amount: number; damageTypes: string[] }[]
+  damageReduction: {
+    amount: number
+    amountMode?: "fixed" | "proficiency"
+    damageTypes: string[]
+    requiresArmorCategory?: "Light armor" | "Medium armor" | "Heavy armor" | null
+  }[]
   spellsByLevel: { level: number; count: number }[]
   spellsKnown: AggregatedSpellsKnown[]
   spellListAccess: string[]
@@ -2037,6 +2073,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   abilityBonuses: {},
   skills: [],
   skillExpertise: [],
+  expertiseIfProficientSkills: [],
   customSkills: [],
   languages: [],
   armorProficiencies: [],
@@ -2228,6 +2265,12 @@ export function aggregateCharacteristics(
         break
       case "skills":
         if (mod.grantsProficiency === false) break
+        if (mod.expertiseIfProficient) {
+          for (const entry of getSkillEntries(mod)) {
+            pushUnique(result.expertiseIfProficientSkills, [entry.skill])
+          }
+          break
+        }
         for (const entry of getSkillEntries(mod)) {
           pushUnique(result.skills, [entry.skill])
           if (entry.expertise || mod.grantExpertise) {
@@ -2508,7 +2551,9 @@ export function aggregateCharacteristics(
       case "damage_reduction":
         result.damageReduction.push({
           amount: mod.amount,
+          amountMode: mod.amountMode ?? "fixed",
           damageTypes: mod.damageTypes ?? [],
+          requiresArmorCategory: mod.requiresArmorCategory ?? null,
         })
         break
       case "spells":
@@ -2529,10 +2574,21 @@ export function aggregateCharacteristics(
         break
       case "spells_known":
         if (mod.spells.length) {
+          const castCostsBySpellId: Record<string, { resourceKey: string; amount: number }> = {}
+          for (const entry of mod.spells) {
+            if (!entry.spellId || !entry.castCost) continue
+            castCostsBySpellId[entry.spellId] = {
+              resourceKey: entry.castCost.resourceKey,
+              amount: entry.castCost.amount,
+            }
+          }
           result.spellsKnown.push({
             spellIds: mod.spells.map((entry) => entry.spellId).filter(Boolean),
             prepared: mod.spells.some((entry) => entry.prepared !== false),
             castingAbility: mod.castingAbility,
+            castCostsBySpellId: Object.keys(castCostsBySpellId).length
+              ? castCostsBySpellId
+              : undefined,
           })
         }
         if (mod.castingAbility) {

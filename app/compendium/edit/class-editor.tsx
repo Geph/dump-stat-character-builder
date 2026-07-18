@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Plus, X, ChevronDown } from "lucide-react"
+import { Plus, X, ChevronDown, Trash2 } from "lucide-react"
 import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
@@ -125,6 +125,9 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [spellSlotsOpen, setSpellSlotsOpen] = useState(false)
   const [classResources, setClassResources] = useState<ClassResource[]>([])
   const [classResourceRows, setClassResourceRows] = useState<ClassResourceRow[]>([])
+  const [subclassCount, setSubclassCount] = useState(0)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("classes", id)
@@ -149,9 +152,10 @@ export default function ClassEditorPage({ id }: { id: string }) {
       const fetchClass = async () => {
         setLoading(true)
         const db = createClient()
-        const [{ data, error }, { data: resourceRows }] = await Promise.all([
+        const [{ data, error }, { data: resourceRows }, { data: subclassRows }] = await Promise.all([
           db.from("classes").select("*").eq("id", id).single(),
           db.from("class_resources").select("*").eq("class_id", id),
+          db.from("subclasses").select("id").eq("class_id", id),
         ])
         
         if (error) {
@@ -197,6 +201,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
               resourcesForClass(id, asCompendiumRows(resourceRows) as unknown as ClassResourceRow[]),
             )
             setClassResourceRows(asCompendiumRows(resourceRows) as unknown as ClassResourceRow[])
+            setSubclassCount(asCompendiumRows(subclassRows).length)
           }
         }
         setLoading(false)
@@ -259,11 +264,21 @@ export default function ClassEditorPage({ id }: { id: string }) {
     URL.revokeObjectURL(url)
   }
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this class?")) return
-    
+  const handleDelete = () => {
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    setDeleting(true)
+    setError(null)
     const db = createClient()
-    await db.from("classes").delete().eq("id", id)
+    const { error: deleteError } = await db.from("classes").delete().eq("id", id)
+    if (deleteError) {
+      setError(deleteError.message || "Failed to delete class")
+      setDeleting(false)
+      setDeleteConfirmOpen(false)
+      return
+    }
     router.push("/compendium?tab=classes")
   }
 
@@ -460,6 +475,69 @@ export default function ClassEditorPage({ id }: { id: string }) {
         copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
+
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-destructive/40 bg-card p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                <Trash2 className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-foreground">
+                  Delete {form.name.trim() || "this class"}?
+                </h2>
+                <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+              </div>
+            </div>
+            <p className="mb-6 text-muted-foreground">
+              This permanently removes{" "}
+              <strong className="text-foreground">{form.name.trim() || "this class"}</strong> from
+              your compendium.
+              {subclassCount > 0 ? (
+                <>
+                  {" "}
+                  It will also delete{" "}
+                  <strong className="text-foreground">
+                    {subclassCount} subclass{subclassCount === 1 ? "" : "es"}
+                  </strong>
+                  .
+                </>
+              ) : null}
+              {classResourceRows.length > 0 ? (
+                <>
+                  {" "}
+                  Linked{" "}
+                  <strong className="text-foreground">
+                    {classResourceRows.length} class resource
+                    {classResourceRows.length === 1 ? "" : "s"}
+                  </strong>{" "}
+                  will be removed.
+                </>
+              ) : null}{" "}
+              Saved characters that use this class will lose those class levels.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="flex-1 rounded-xl border-2 border-border bg-card px-4 py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete class"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {(error || copyError) && (

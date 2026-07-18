@@ -184,6 +184,36 @@ describe("Psion class feature enrichment", () => {
     expect(third?.choices?.optionsSource).toBe("class_disciplines")
   })
 
+  it("wires Opened Mind prose into grant_custom_ability for Telepathy", () => {
+    const content = {
+      subclasses: [
+        {
+          name: "Awakened Mind",
+          class_name: "Psion",
+          description: null,
+          features: [
+            {
+              level: 1,
+              name: "Opened Mind",
+              description:
+                "At 1st level when you select this archetype, your mind awakens the ability to directly connect to the minds of other creatures, granting the psionic discipline of Telepathy.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent
+
+    const enriched = enrichImportContentModifiers(content)
+    const feature = enriched.subclasses![0]!.features![0] as import("@/lib/types").Feature
+    const grant = (feature.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "grant_custom_ability")
+    expect(grant).toMatchObject({
+      type: "grant_custom_ability",
+      abilityNames: ["Telepathy Discipline"],
+    })
+  })
+
   it("wires archetype prose into grant_custom_ability for the primary discipline", () => {
     const content = {
       subclasses: [

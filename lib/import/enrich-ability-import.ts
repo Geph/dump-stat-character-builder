@@ -12,7 +12,7 @@ import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-bl
 import {
   alternateEffectsSpellsKnownModifier,
   applySpecializationAlternateEffectsChoice,
-  parseAlternateEffectsSpellNames,
+  parseAlternateEffectsCostRows,
 } from "@/lib/import/parse-alternate-effects-table"
 import {
   ensureSpecialAttackActivation,
@@ -89,7 +89,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
 
   let linkedModifiers = detected.linkedModifiers ?? []
   const altEffects = alternateEffectsSpellsKnownModifier(
-    parseAlternateEffectsSpellNames(descriptionHtml),
+    parseAlternateEffectsCostRows(descriptionHtml),
     `import_ability_${name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
   )
   if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {

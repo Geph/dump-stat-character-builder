@@ -79,6 +79,50 @@ describe("filterCustomAbilitiesForCharacterSheet", () => {
     expect(customAbilityAppliesOnCharacterSheet(psionDiscipline, warlockCtx)).toBe(false)
   })
 
+  it("matches class attachment when persist stored the class name instead of UUID", () => {
+    const power = ability({
+      id: "power-1",
+      name: "Enhancing Surge",
+      ability_role: "psionic_power",
+      attached_to_type: "class",
+      attached_to_id: "Psion",
+    })
+
+    expect(
+      customAbilityAppliesOnCharacterSheet(power, {
+        ...warlockCtx,
+        classIds: ["uuid-psion"],
+        classNames: ["Psion"],
+      }),
+    ).toBe(true)
+  })
+
+  it("keeps psionic powers only for known disciplines when gating is provided", () => {
+    const surge = ability({
+      id: "power-surge",
+      name: "Enhancing Surge",
+      ability_role: "psionic_power",
+      attached_to_type: "class",
+      attached_to_id: "uuid-psion",
+    })
+    const construct = ability({
+      id: "power-construct",
+      name: "Astral Construct",
+      ability_role: "psionic_power",
+      attached_to_type: "class",
+      attached_to_id: "uuid-psion",
+    })
+    const ctx = {
+      ...warlockCtx,
+      classIds: ["uuid-psion"],
+      classNames: ["Psion"],
+      knownDisciplineNames: ["Enhancement Discipline"],
+    }
+
+    expect(customAbilityAppliesOnCharacterSheet(surge, ctx)).toBe(true)
+    expect(customAbilityAppliesOnCharacterSheet(construct, ctx)).toBe(false)
+  })
+
   it("uses import source metadata when no attachment is set", () => {
     const row = ability({
       id: "imported-discipline",

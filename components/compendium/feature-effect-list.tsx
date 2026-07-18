@@ -121,6 +121,8 @@ export function FeatureEffectList({
       moveDistanceMode: null,
       moveDistanceFixed: null,
       moveDistanceMultiplier: null,
+      standardActionStudy: false,
+      standardActionSearch: false,
       attackStyle: null,
       attackDiceCount: null,
       attackDieType: null,
@@ -162,6 +164,9 @@ export function FeatureEffectList({
       defaults.movementDash = true
       defaults.movementDisengage = true
       defaults.movementHide = true
+    }
+    if (kind === "standard_action") {
+      defaults.standardActionStudy = true
     }
     if (kind === "extra_attack") {
       defaults.extraAttackCount = 2
@@ -625,6 +630,10 @@ function EffectRow({
 
       {fields.includes("movementOption") && (
         <MovementOptionEditor effect={effect} onChange={onChange} />
+      )}
+
+      {fields.includes("standardAction") && (
+        <StandardActionEditor effect={effect} onChange={onChange} />
       )}
 
       {fields.includes("castSpell") && (
@@ -1900,6 +1909,40 @@ function MovementOptionEditor({
         onChange={(movementTypes) => onChange({ movementTypes })}
         label="Applies to movement types"
       />
+    </div>
+  )
+}
+
+function StandardActionEditor({
+  effect,
+  onChange,
+}: {
+  effect: FeatureEffect
+  onChange: (patch: Partial<FeatureEffect>) => void
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-card/50 p-3">
+      <label className="block text-xs font-semibold text-foreground">
+        Standard actions (use activation timing above — typically Bonus Action)
+      </label>
+      <div className="flex flex-wrap gap-4 text-sm">
+        {(
+          [
+            ["standardActionStudy", "Study"],
+            ["standardActionSearch", "Search"],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!effect[key]}
+              onChange={(e) => onChange({ [key]: e.target.checked })}
+              className="accent-primary"
+            />
+            <span className="text-muted-foreground">{label}</span>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }

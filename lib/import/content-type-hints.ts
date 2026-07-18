@@ -1,7 +1,7 @@
 export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "all", label: "Auto-detect All" },
-  { value: "classes", label: "Class (include spell list)" },
-  { value: "subclasses", label: "Subclasses" },
+  { value: "classes", label: "Class + subclasses (include spell list)" },
+  { value: "subclasses", label: "Subclasses only (parent already imported)" },
   { value: "species", label: "Species" },
   { value: "backgrounds", label: "Backgrounds" },
   { value: "spells", label: "Spells" },

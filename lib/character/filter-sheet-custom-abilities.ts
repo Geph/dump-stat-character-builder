@@ -3,6 +3,12 @@ import {
   ELDRITCH_INVOCATIONS_CATALOG_ID,
   METAMAGIC_OPTIONS_CATALOG_ID,
 } from "@/lib/compendium/system-option-catalogs"
+import {
+  abilityNameIsSelected,
+  isCatalogPackageAbility,
+  isPickGatedCustomAbility,
+} from "@/lib/builder/picked-custom-abilities"
+import { resolvePsionicPowerDisciplineName } from "@/lib/import/nest-psionic-ability-library"
 import type { CustomAbility } from "@/lib/types"
 
 export type CharacterSheetAbilityContext = {
@@ -19,6 +25,13 @@ export type CharacterSheetAbilityContext = {
   equipmentIds: string[]
   equipmentCategories: string[]
   spellIds: string[]
+  /** Names unlocked via feature/feat picks or grant_custom_ability. */
+  selectedAbilityNames?: string[]
+  /**
+   * Known psionic disciplines (picks + grants). When set, `psionic_power` rows are
+   * kept only if their parent discipline is known (or parent cannot be resolved).
+   */
+  knownDisciplineNames?: string[]
 }
 
 /** System option catalogs keyed to a class name fragment (case-insensitive). */
@@ -85,13 +98,22 @@ function matchesAttachment(
 ): boolean {
   switch (attachType) {
     case "class":
-      return ctx.classIds.includes(attachId)
+      // Persist may store the class name when the UUID map was incomplete at import.
+      return ctx.classIds.includes(attachId) || nameMatches(ctx.classNames, attachId)
+    case "subclass":
+      return ctx.subclassIds.includes(attachId) || nameMatches(ctx.subclassNames, attachId)
     case "species":
-      return ctx.speciesId === attachId
+      return (
+        ctx.speciesId === attachId ||
+        nameMatches(ctx.speciesName ? [ctx.speciesName] : [], attachId)
+      )
     case "background":
-      return ctx.backgroundId === attachId
+      return (
+        ctx.backgroundId === attachId ||
+        nameMatches(ctx.backgroundName ? [ctx.backgroundName] : [], attachId)
+      )
     case "feat":
-      return ctx.featIds.includes(attachId)
+      return ctx.featIds.includes(attachId) || nameMatches(ctx.featNames, attachId)
     case "equipment":
       return (
         ctx.equipmentIds.includes(attachId) ||
@@ -106,11 +128,28 @@ function matchesAttachment(
   }
 }
 
+function psionicPowerUnlockedByKnownDiscipline(
+  ability: CustomAbility,
+  knownDisciplineNames: string[] | undefined,
+): boolean {
+  if (ability.ability_role !== "psionic_power") return true
+  if (knownDisciplineNames === undefined) return true
+  const parent = resolvePsionicPowerDisciplineName({
+    name: ability.name,
+    description: ability.description,
+    parent_ability_name:
+      (ability as CustomAbility & { parent_ability_name?: string | null }).parent_ability_name ?? null,
+  })
+  if (!parent) return true
+  return abilityNameIsSelected(parent, knownDisciplineNames)
+}
+
 export function customAbilityAppliesOnCharacterSheet(
   ability: CustomAbility,
   ctx: CharacterSheetAbilityContext,
 ): boolean {
   if (isCommonModifiersCatalogEntry(ability)) return false
+  if (isCatalogPackageAbility(ability)) return false
 
   const catalogClass = SYSTEM_CATALOG_CLASS_NAME[ability.id]
   if (catalogClass) {
@@ -118,6 +157,17 @@ export function customAbilityAppliesOnCharacterSheet(
   }
 
   if (ability.is_system) return false
+
+  if (isPickGatedCustomAbility(ability)) {
+    // When the sheet provides unlock context (including an empty list), require a pick/grant.
+    if (ctx.selectedAbilityNames !== undefined) {
+      if (!abilityNameIsSelected(ability.name, ctx.selectedAbilityNames)) return false
+    }
+  }
+
+  if (!psionicPowerUnlockedByKnownDiscipline(ability, ctx.knownDisciplineNames)) {
+    return false
+  }
 
   const attachType = ability.attached_to_type?.trim()
   const attachId = ability.attached_to_id?.trim()

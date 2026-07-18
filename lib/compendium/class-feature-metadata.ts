@@ -39,6 +39,7 @@ export type EffectInputField =
   | "modifyCreatureRoll"
   | "extraAttackCount"
   | "movementOption"
+  | "standardAction"
   | "weaponAttack"
   | "classResourceKey"
   | "classResourceChange"
@@ -169,6 +170,13 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     label: "Dash / Disengage / Hide / Related Effects",
     group: "movement",
     fields: ["movementOption", "movementTypes"],
+  },
+  {
+    value: "standard_action",
+    label: "Study / Search (alternate timing)",
+    group: "movement",
+    hint: "Take the Study or Search action as a Bonus Action (Keen Mind, Observant)",
+    fields: ["standardAction"],
   },
   { value: "transform", label: "Transform", group: "movement", hint: "Wild Shape" },
   { value: "quicken_casting", label: "Speed up spellcasting", group: "resource_casting" },

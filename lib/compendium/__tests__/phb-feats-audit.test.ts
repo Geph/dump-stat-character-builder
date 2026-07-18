@@ -46,9 +46,20 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
 
     const musician = enrich("Musician")
     expect(chars(musician).some((c) => c.type === "tool_proficiencies")).toBe(true)
+    expect(chars(musician).some((c) => c.type === "uses")).toBe(true)
+    expect(
+      ((musician.linked_modifiers as { catalogRefId?: string }[]) ?? []).some(
+        (m) => m.catalogRefId === "cat_other_gain_inspiration",
+      ),
+    ).toBe(true)
 
     const tavern = enrich("Tavern Brawler")
     expect(chars(tavern).some((c) => c.type === "unarmed_strike_damage")).toBe(true)
+    expect(
+      ((tavern.linked_modifiers as { catalogRefId?: string }[]) ?? []).some(
+        (m) => m.catalogRefId === "cat_fx_rider_damage",
+      ),
+    ).toBe(true)
 
     const healer = enrich("Healer")
     expect(chars(healer).length).toBeGreaterThan(0)
@@ -59,6 +70,69 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
     )
     const pool = chars(asi).find((c) => c.type === "ability_scores")
     expect(pool).toMatchObject({ mode: "asi_pool", points: 2 })
+  })
+
+  it("wires Heavy Armor Master passive PB reduction and Weapon Master mastery pick", () => {
+    const ham = enrich("Heavy Armor Master")
+    const reduction = chars(ham).find((c) => c.type === "damage_reduction")
+    expect(reduction).toMatchObject({
+      amountMode: "proficiency",
+      requiresArmorCategory: "Heavy armor",
+      damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+    })
+    expect(chars(ham).some((c) => c.type === "ability_scores")).toBe(true)
+
+    const wm = enrich("Weapon Master")
+    expect(chars(wm).some((c) => c.type === "ability_scores")).toBe(true)
+    expect(
+      ((wm.linked_modifiers as { catalogRefId?: string }[]) ?? []).some(
+        (m) => m.catalogRefId === "cat_char_weapon_mastery",
+      ),
+    ).toBe(true)
+  })
+
+  it("wires Epic Boon ASI restrictions and multi-component benefits", () => {
+    const offense = enrich("Boon of Irresistible Offense")
+    const offenseAsi = chars(offense).find((c) => c.type === "ability_scores")
+    expect(offenseAsi).toMatchObject({
+      mode: "asi_pool",
+      points: 1,
+      allowedAbilities: ["strength", "dexterity"],
+    })
+
+    const recall = enrich("Boon of Spell Recall")
+    const recallAsi = chars(recall).find((c) => c.type === "ability_scores")
+    expect(recallAsi).toMatchObject({
+      mode: "asi_pool",
+      points: 1,
+      allowedAbilities: ["intelligence", "wisdom", "charisma"],
+    })
+
+    const energy = enrich("Boon of Energy Resistance")
+    expect(chars(energy).some((c) => c.type === "damage_resistance")).toBe(true)
+    expect(chars(energy).some((c) => c.type === "ability_scores")).toBe(true)
+
+    const fortitude = enrich("Boon of Fortitude")
+    const hp = chars(fortitude).find((c) => c.type === "hit_points")
+    expect(hp).toMatchObject({ mode: "flat", value: 40 })
+
+    const skill = enrich("Boon of Skill")
+    expect(chars(skill).filter((c) => c.type === "skills").length).toBeGreaterThanOrEqual(2)
+
+    const speed = enrich("Boon of Speed")
+    expect(chars(speed).some((c) => c.type === "speed")).toBe(true)
+
+    const recovery = enrich("Boon of Recovery")
+    expect(chars(recovery).some((c) => c.type === "healing_dice_pool")).toBe(true)
+
+    const fate = enrich("Boon of Fate")
+    const fateRx = chars(fate).find((c) => c.type === "d20_test_reaction")
+    expect(fateRx).toMatchObject({
+      dieSource: "fixed",
+      fixedDie: "2d4",
+      targetScope: "target_creature",
+      rangeFeet: 60,
+    })
   })
 
   it("wires Durable death saves and Blind Fighting blindsight via presets", () => {

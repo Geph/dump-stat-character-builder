@@ -26,10 +26,23 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     displayName: "Psi Points",
     definition:
       "Psionic energy pool spent to activate disciplines, talents, and psi-cost features. Typically recharges on short and long rests.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
     spendPatterns: [
       /\b(?:expend|spend|costs?|pay|use)\s+(?:up\s+to\s+)?(\d+)\s+psi\s+points?\b/i,
       /\b(\d+)\s+psi\s+points?\b[^.]{0,40}\b(?:to|when|per)\b/i,
     ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
   },
   {
     resourceKey: "psi_limit",
@@ -38,6 +51,43 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     definition:
       "Maximum psi points that can be spent on a single psionic activation at your level (per-activation cap).",
     spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription:
+        "Maximum psi points spendable on a single psionic power or spell (half Psion level, rounded up).",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 1, count: 1 },
+        { level: 3, count: 2 },
+        { level: 5, count: 3 },
+        { level: 7, count: 4 },
+        { level: 9, count: 5 },
+        { level: 11, count: 6 },
+        { level: 13, count: 7 },
+        { level: 15, count: 8 },
+        { level: 17, count: 9 },
+        { level: 19, count: 10 },
+      ],
+    },
+    proposeFromText: true,
+    textProposalUses: {
+      type: "special",
+      specialDescription:
+        "Maximum psi points spendable on a single psionic power or spell (half Psion level, rounded up).",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 1, count: 1 },
+        { level: 3, count: 2 },
+        { level: 5, count: 3 },
+        { level: 7, count: 4 },
+        { level: 9, count: 5 },
+        { level: 11, count: 6 },
+        { level: 13, count: 7 },
+        { level: 15, count: 8 },
+        { level: 17, count: 9 },
+        { level: 19, count: 10 },
+      ],
+    },
   },
   {
     resourceKey: "spell_limit",
