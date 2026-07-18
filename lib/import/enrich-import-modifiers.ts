@@ -478,7 +478,7 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
         modifierRefs: synced.modifierRefs,
         importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
         ...(companionStatBlock ? { companion_stat_block: companionStatBlock } : {}),
-      } as Record<string, unknown>) as (typeof next.abilities)[number]
+      } as Record<string, unknown>) as NonNullable<ImportContent["abilities"]>[number]
     }) as ImportContent["abilities"]
     next.abilities = nestPsionicAbilityLibrary(
       (next.abilities ?? []).map((ability) => ({ ...(ability as unknown as Record<string, unknown>) })),
