@@ -117,6 +117,11 @@ type AiProposalAbility = {
     count?: number
     options?: { name: string; description: string; prerequisite?: string | null; repeatable?: boolean }[]
   }
+  specialization_choices?: {
+    category?: string
+    count?: number
+    options?: { name: string; description: string; prerequisite?: string | null; repeatable?: boolean }[]
+  }
 }
 
 function slugId(value: string): string {
