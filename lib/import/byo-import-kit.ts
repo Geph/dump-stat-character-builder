@@ -13,7 +13,8 @@ export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from P
 For best extraction results, your source text should:
 - One class per pass only (that class + its subclasses is OK). Never extract multiple unrelated classes in one JSON
 - Libraries before class: full homebrew spell write-ups, psionic disciplines/powers, exploit lists, and similar pickers first — then the class chapter. Include that class's Spell / School / Special list in the same class pass when present (spell_list + spells[] stubs)
-- Prefer one class chapter per class pass: the core class and its subclasses together (staged review covers them in order)
+- Prefer one class chapter per class pass: the core class and its subclasses together in the same JSON (staged review covers them in order). Do not leave archetypes for a later Subclasses-only pass unless the parent class is already imported
+- Happy path for multi-file kits: extract the library, extract the class chapter, then paste both as one JSON array in Step 2 (libraries are auto-sorted before the class)
 - Keep level progression tables in the source so the importer can read features and class_resources[] from them
 - Do NOT paste HTML level tables into classes[].description — put rules prose only; features go in features[] and pools (Ki, Rage, Sorcery Points, etc.) in class_resources[]
 - Keep feature headings with their full description paragraphs (e.g. "Fighting Style" followed by rules text)
@@ -34,8 +35,8 @@ PDF tips:
 - KibblesTasty and similar sources often mark custom entries with a superscript letter (commonly K) that pastes as a trailing capital on the name — e.g. "Returning WeaponK". Fix or let the LLM strip those before import; check spell/feat/feature names especially
 
 Multi-file homebrew (spellcasters, psionics, martial exploits, and similar):
-- Import supporting libraries before the class that references them, then the class chapter, then any leftover custom systems
-- You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers (put library objects first)
+- Happy path: two extracts → one Step 2 paste (JSON array). Import supporting libraries before the class that references them, then one class chapter (core + all subclasses), then any leftover custom systems — or paste library + class objects together and let Dump Stat auto-order
+- You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers (libraries sorted first; keep subclasses[] with the class object)
 - SRD spell names resolve from your seeded compendium; only import homebrew spells for non-SRD names`
 
 const JSON_OUTPUT_RULES = `Output format (required)
@@ -49,9 +50,9 @@ When extracting from a PDF, add source_page (integer, 1-based PDF page) on featu
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
   classes:
-    "Focus on classes[] and class_resources[] when present. Always include that class's subclasses/archetypes/paths in subclasses[] in the same JSON (class_name must match classes[].name). Include hit_die, proficiencies, and skill_choices from the Skills: line (count + options; use fixed for always-granted skills like Psionics). Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature. If the source includes a dedicated class spell list (Spell / School / Special tables), also populate that class's spell_list and matching spells[] stubs in the same JSON.",
+    "Focus on classes[] and class_resources[] when present. Always include that class's subclasses/archetypes/paths in subclasses[] in the same JSON (class_name must match classes[].name). Use top-level armor_proficiencies and weapon_proficiencies arrays — never nest them under a proficiencies object (that field is ignored on classes). Include hit_die, saving_throws, and skill_choices from the Skills line (count + options; use fixed for always-granted skills like Psionics). Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Archetype unlock features (Psionic Archetype, Martial Archetype, etc.) are short unlock prose only — do NOT put isChoice stub options listing archetype names; real archetypes go in subclasses[]. Secondary/Third Discipline (Psion) must be isChoice with choices.category \"Psionic Discipline\" and empty options[] (optionsSource is filled on import). Psionic Talents uses choices.category \"Psionic Talent\" and empty options[] — do not set optionsSource to class_talents. Wire Common Modifiers via description phrasing and optional mechanics[] on each feature. If the source includes a dedicated class spell list (Spell / School / Special tables), also populate that class's spell_list and matching spells[] stubs in the same JSON (school string required — use \"Unknown\" when the list has no school column; concentration boolean required — default false).",
   subclasses:
-    "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present. When a feature offers mutually exclusive subtype spell lists (Circle of the Land land types, similar circles/domains), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description.",
+    "Use this focus only when adding archetypes to a parent class that is already in the compendium (or when the user explicitly asked for subclasses alone). Prefer extracting a full class chapter with content type Class + subclasses instead — core class and archetypes in one JSON. Focus on subclasses[] with class_name matching the parent classes[].name exactly, features[] by level for EVERY archetype named in the chapter (do not omit optional/appendix minds), and spell tables in feature descriptions when present. When a feature offers mutually exclusive subtype spell lists (Circle of the Land land types, similar circles/domains), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description. For Elemental Mind Primordial Aspect, emit new_toggles with primordial_aspect_cold, primordial_aspect_fire, and primordial_aspect_lightning — never a single primordial_aspect key.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
   backgrounds:
     "Focus on backgrounds[] with skill_proficiencies, tool_proficiencies / proficiencies.languages, starting_equipment_groups for Choose A/B (one group with description + options[{label,items}], never a flat [{label,items}] array), prerequisite_rules for campaign gates, feat_granted, ability_bonuses, optional source, and feature. For Dark Gift backgrounds keep feat_granted phrasing like \"Choose one Dark Gift feat\" or \"Survivor or a Dark Gift feat of your choice\" (never collapse the or-choice; never null out Dark Gift-only grants when ASI is present). For a fixed skill plus a faction/unrestricted fallback, include \"One skill of your choice\" in skill_proficiencies and preserve the faction table in description. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep skill/tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds use ability_bonuses: null and feat_granted: null.",
@@ -143,6 +144,11 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
     ],
   },
   classes: {
+    // Homebrew class kit: library slots + class chapter in one object (or paste
+    // [libraryObject, thisObject] — Dump Stat merges and auto-orders).
+    abilities: [],
+    import_proposals: { custom_abilities: [], class_resources: [] },
+    spells: [],
     classes: [
       {
         name: "Fighter",
@@ -481,7 +487,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
           type: "at_level",
           atLevelMode: "tier",
           atLevelTable: [{ level: 1, count: 1 }],
-          recharges: ["short_rest", "long_rest"],
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
         },
       },
       {

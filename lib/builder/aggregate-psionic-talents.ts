@@ -403,7 +403,7 @@ export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[]
         choices: undefined,
       }
     } else if (
-      /^(?:secondary|third)\s+discipline$/i.test(name) ||
+      /^(?:second|secondary|third)\s+discipline$/i.test(name) ||
       (/discipline/i.test(name) &&
         feature.isChoice &&
         /psionic\s+discipline/i.test(feature.choices?.category ?? ""))

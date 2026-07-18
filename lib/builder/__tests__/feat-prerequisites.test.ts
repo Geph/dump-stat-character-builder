@@ -43,6 +43,8 @@ describe("parseFeatPrerequisite", () => {
     expect(parseFeatPrerequisite("Level 4+, Infernal Pact Feat")).toEqual({
       levelRequirement: 4,
       prerequisiteFeatNames: ["Infernal Pact"],
+      armorTraining: [],
+      abilityScoreRequirements: [],
     })
   })
 
@@ -52,6 +54,8 @@ describe("parseFeatPrerequisite", () => {
     ).toEqual({
       levelRequirement: 4,
       prerequisiteFeatNames: ["Scion of the Outer Planes"],
+      armorTraining: [],
+      abilityScoreRequirements: [],
     })
   })
 
@@ -66,6 +70,29 @@ describe("parseFeatPrerequisite", () => {
     expect(inferOtherPrerequisiteRules("Prerequisite: Planescape Campaign")).toEqual([
       { category: "other", value: "Planescape Campaign" },
     ])
+  })
+
+  it("parses armor training and ability-score gates", () => {
+    expect(parseFeatPrerequisite("Level 4+, Medium Armor Training")).toEqual({
+      levelRequirement: 4,
+      prerequisiteFeatNames: [],
+      armorTraining: ["Medium armor"],
+      abilityScoreRequirements: [],
+    })
+    expect(parseFeatPrerequisite("Level 4+, Strength or Dexterity 13+")).toEqual({
+      levelRequirement: 4,
+      prerequisiteFeatNames: [],
+      armorTraining: [],
+      abilityScoreRequirements: [
+        { abilities: ["strength", "dexterity"], minimum: 13 },
+      ],
+    })
+    expect(parseFeatPrerequisite("Level 4+, proficiency with light armor")).toEqual({
+      levelRequirement: 4,
+      prerequisiteFeatNames: [],
+      armorTraining: ["Light armor"],
+      abilityScoreRequirements: [],
+    })
   })
 })
 
@@ -105,6 +132,21 @@ describe("enrichFeatRowWithPrerequisites", () => {
       { category: "other", value: "Planescape Campaign" },
     ])
     expect((enriched as Record<string, unknown>).prerequisite_feat_ids).toEqual([])
+  })
+
+  it("adds armor training rules from freeform prerequisite text", () => {
+    const enriched = enrichFeatRowWithPrerequisites(
+      {
+        name: "Heavily Armored",
+        prerequisite: "Level 4+, Medium Armor Training",
+        category: "General",
+      },
+      [],
+    )
+    expect((enriched as Record<string, unknown>).level_requirement).toBe(4)
+    expect((enriched as Record<string, unknown>).prerequisite_rules).toEqual([
+      { category: "armor_training", value: "Medium armor" },
+    ])
   })
 })
 
@@ -165,6 +207,116 @@ describe("Planar Pact feat prerequisites", () => {
       isFeatEligibleForCategories(infernalBulwark, ["General"], 4, {
         ...baseContext,
         ownedFeatIds: ["infernal-pact"],
+      }),
+    ).toBe(true)
+  })
+})
+
+describe("armor training and ability score feat prerequisites", () => {
+  const heavilyArmored = feat({
+    id: "heavily-armored",
+    name: "Heavily Armored",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Level 4+, Medium Armor Training",
+  })
+  const moderatelyArmored = feat({
+    id: "moderately-armored",
+    name: "Moderately Armored",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Level 4+, Light Armor Training",
+  })
+  const greatWeaponMaster = feat({
+    id: "gwm",
+    name: "Great Weapon Master",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Level 4+, Strength 13+",
+  })
+  const athlete = feat({
+    id: "athlete",
+    name: "Athlete",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Level 4+, Strength or Dexterity 13+",
+  })
+
+  const baseContext: FeatSlotContext = {
+    totalLevel: 4,
+    classIds: ["wizard"],
+    feats: [heavilyArmored, moderatelyArmored, greatWeaponMaster, athlete],
+    ownedFeatIds: [],
+    speciesId: null,
+    backgroundId: null,
+    abilityScores: {
+      strength: 10,
+      dexterity: 10,
+      constitution: 10,
+      intelligence: 16,
+      wisdom: 12,
+      charisma: 8,
+    },
+    armorProficiencies: [],
+  }
+
+  it("blocks Heavily Armored without Medium armor training", () => {
+    expect(
+      isFeatEligibleForCategories(heavilyArmored, ["General"], 4, {
+        ...baseContext,
+        armorProficiencies: ["Light armor"],
+      }),
+    ).toBe(false)
+  })
+
+  it("allows Heavily Armored when the character has Medium armor", () => {
+    expect(
+      isFeatEligibleForCategories(heavilyArmored, ["General"], 4, {
+        ...baseContext,
+        armorProficiencies: ["Light armor", "Medium armor"],
+      }),
+    ).toBe(true)
+  })
+
+  it("treats All armor as satisfying Medium armor training", () => {
+    expect(
+      isFeatEligibleForCategories(heavilyArmored, ["General"], 4, {
+        ...baseContext,
+        armorProficiencies: ["All armor", "Shields"],
+      }),
+    ).toBe(true)
+  })
+
+  it("requires Light armor for Moderately Armored", () => {
+    expect(
+      isFeatEligibleForCategories(moderatelyArmored, ["General"], 4, baseContext),
+    ).toBe(false)
+    expect(
+      isFeatEligibleForCategories(moderatelyArmored, ["General"], 4, {
+        ...baseContext,
+        armorProficiencies: ["Light"],
+      }),
+    ).toBe(true)
+  })
+
+  it("enforces Strength 13+ for Great Weapon Master", () => {
+    expect(
+      isFeatEligibleForCategories(greatWeaponMaster, ["General"], 4, baseContext),
+    ).toBe(false)
+    expect(
+      isFeatEligibleForCategories(greatWeaponMaster, ["General"], 4, {
+        ...baseContext,
+        abilityScores: { ...baseContext.abilityScores, strength: 13 },
+      }),
+    ).toBe(true)
+  })
+
+  it("allows Athlete when either Strength or Dexterity is 13+", () => {
+    expect(isFeatEligibleForCategories(athlete, ["General"], 4, baseContext)).toBe(false)
+    expect(
+      isFeatEligibleForCategories(athlete, ["General"], 4, {
+        ...baseContext,
+        abilityScores: { ...baseContext.abilityScores, dexterity: 14 },
       }),
     ).toBe(true)
   })

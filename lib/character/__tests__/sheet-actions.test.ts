@@ -312,9 +312,73 @@ describe("collectSheetActions", () => {
     })
     const surge = actions.find((a) => a.name === "Enhancing Surge")
     expect(surge?.kinds).toEqual(["bonus"])
+    expect(surge?.category).toBe("combat")
     expect(surge?.castingTime).toBe("1 bonus action")
     expect(surge?.psionicAugments?.augments).toHaveLength(1)
     expect(surge?.classResourceKey).toBe("psi_points")
+  })
+
+  it("surfaces Astral Construct special attack and catalog-only discipline powers on combat", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 5)],
+      species: null,
+      customAbilities: [
+        {
+          id: "power-astral",
+          name: "Astral Construct",
+          description: "<p>Create a construct and make a melee spell attack.</p>",
+          ability_role: "psionic_power",
+          casting_time: "1 action",
+          linked_modifiers: [
+            {
+              instanceId: "modinst_astral",
+              catalogRefId: "cat_char_special_attack",
+              characteristics: [
+                {
+                  id: "mod_astral",
+                  type: "special_attack",
+                  attackName: "Astral Construct",
+                  attackProfile: "melee",
+                },
+              ],
+            },
+          ],
+        } as unknown as import("@/lib/types").CustomAbility,
+        {
+          id: "discipline-telekinesis",
+          name: "Telekinesis Discipline",
+          description: "Move objects with your mind.",
+          ability_role: "discipline",
+          modifier_catalog: [
+            {
+              id: "cat_force",
+              name: "Telekinetic Force",
+              group: "Psionic Powers",
+              summary: "1 action · 60 feet",
+              description: "<p>Hurl a creature or object.</p>",
+              characteristics: [
+                {
+                  id: "mod_force",
+                  type: "special_attack",
+                  attackName: "Telekinetic Force",
+                  attackProfile: "ranged",
+                },
+              ],
+              activation: { action: true, effects: [] },
+            },
+          ],
+        } as unknown as import("@/lib/types").CustomAbility,
+      ],
+    })
+
+    const astral = actions.find((a) => a.name === "Astral Construct")
+    expect(astral?.category).toBe("combat")
+    expect(astral?.kinds).toEqual(["action"])
+
+    const force = actions.find((a) => a.name === "Telekinetic Force")
+    expect(force?.category).toBe("combat")
+    expect(force?.kinds).toEqual(["action"])
+    expect(force?.sourceLabel).toBe("Telekinesis Discipline")
   })
 
   it("lists Action Surge on the combat tab only", () => {

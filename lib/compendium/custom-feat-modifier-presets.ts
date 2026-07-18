@@ -16,6 +16,7 @@ import {
   damageHalvingReaction,
   damageMod,
   damageReductionFx,
+  damageReductionPassive,
   damageResistanceChoice,
   damageResistanceFixed,
   failedRollTrigger,
@@ -38,6 +39,7 @@ import {
   spellAbility,
   spellHealing,
   spellsKnown,
+  standardActionFx,
   telepathyMod,
   toolProf,
   toolsChoice,
@@ -51,6 +53,7 @@ import {
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
 import { KIBBLES_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/kibbles-feat-modifier-presets"
+import { buildWeaponMasteryModifierInstance } from "@/lib/compendium/weapon-mastery-catalog"
 
 const LORE_SKILLS = ["Arcana", "History", "Investigation", "Nature", "Religion"] as const
 const OBSERVER_SKILLS = ["Insight", "Investigation", "Perception"] as const
@@ -152,6 +155,16 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         SRD_MUSICAL_INSTRUMENTS,
         "Instrument Training: proficiency with 3 Musical Instruments of your choice",
       ),
+      uses(
+        "musician_encouraging",
+        { type: "proficiency", recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Encouraging Song: after a Short or Long Rest, give Heroic Inspiration to PB allies who hear you",
+      ),
+      {
+        instanceId: "modinst_musician_inspiration",
+        catalogRefId: "cat_other_gain_inspiration",
+        characteristics: [],
+      },
     ],
   },
 
@@ -186,6 +199,9 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   "Tavern Brawler": {
     linkedModifiers: [
       unarmedDie("tavern_brawler_unarmed", "1d4", "Enhanced Unarmed Strike: 1d4 + STR"),
+      riderFx("tavern_brawler_reroll", {
+        bonusDice: "Damage Rerolls: reroll Unarmed Strike damage die on a 1 (must use new roll)",
+      }),
       weaponProf("tavern_brawler_improvised", "specific", ["Improvised Weapons"], "Improvised Weaponry"),
       onHitTrigger("tavern_brawler_push", {
         appliesTo: "unarmed",
@@ -401,7 +417,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   "Heavy Armor Master": {
     linkedModifiers: [
       asiOne("heavy_armor_master_asi", "+1 Constitution or Strength", ["constitution", "strength"]),
-      damageReductionFx("heavy_armor_master"),
+      damageReductionPassive("heavy_armor_master", {
+        amountMode: "proficiency",
+        damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+        requiresArmorCategory: "Heavy armor",
+        label: "Damage Reduction: reduce B/P/S by Proficiency Bonus while wearing Heavy armor",
+      }),
     ],
   },
 
@@ -418,9 +439,15 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       skillChoice("keen_mind_lore", {
         count: 1,
         entries: LORE_SKILLS.map((skill) => ({ skill, expertise: false })),
+        expertiseIfProficient: true,
         label: "Lore Knowledge: proficiency or Expertise in chosen skill",
       }),
-      checkFx("keen_mind_study", { kind: "extra_action" }, { bonusAction: true }),
+      standardActionFx(
+        "keen_mind_study",
+        { study: true },
+        { bonusAction: true },
+        "Quick Study: Study as a Bonus Action",
+      ),
     ],
   },
 
@@ -498,9 +525,15 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
       skillChoice("observant_keen", {
         count: 1,
         entries: OBSERVER_SKILLS.map((skill) => ({ skill, expertise: false })),
+        expertiseIfProficient: true,
         label: "Keen Observer: proficiency or Expertise in chosen skill",
       }),
-      checkFx("observant_search", { kind: "extra_action" }, { bonusAction: true }),
+      standardActionFx(
+        "observant_search",
+        { search: true },
+        { bonusAction: true },
+        "Quick Search: Search as a Bonus Action",
+      ),
     ],
   },
 
@@ -753,7 +786,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   "Weapon Master": {
     linkedModifiers: [
       asiOne("weapon_master_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
-      weaponProf("weapon_master", "specific", [], "Mastery Property: one Simple or Martial weapon kind (change on Long Rest)"),
+      buildWeaponMasteryModifierInstance("modinst_weapon_master_mastery"),
     ],
   },
 

@@ -133,10 +133,10 @@ export function baseAlternateEffectsSection(description: string): string {
   return split[0] ?? description
 }
 
-/** Collect Alternate Effects spell names from HTML tables and/or prose cost lists in a fragment. */
-export function parseAlternateEffectsSpellNamesFromFragment(
+/** Collect Alternate Effects cost rows from HTML tables and/or prose in a fragment. */
+export function parseAlternateEffectsCostRowsFromFragment(
   fragment: string | null | undefined,
-): string[] {
+): AlternateEffectsCostRow[] {
   if (!fragment?.trim()) return []
   const rows: AlternateEffectsCostRow[] = []
   const tableRe = /<table[^>]*>([\s\S]*?)<\/table>/gi
@@ -147,7 +147,14 @@ export function parseAlternateEffectsSpellNamesFromFragment(
   if (!rows.length) {
     rows.push(...parseAlternateEffectsCostRowsFromProse(fragment))
   }
-  return uniqueSpellNames(rows)
+  return rows
+}
+
+/** Collect Alternate Effects spell names from HTML tables and/or prose cost lists in a fragment. */
+export function parseAlternateEffectsSpellNamesFromFragment(
+  fragment: string | null | undefined,
+): string[] {
+  return uniqueSpellNames(parseAlternateEffectsCostRowsFromFragment(fragment))
 }
 
 /**
@@ -159,6 +166,14 @@ export function parseAlternateEffectsSpellNames(
 ): string[] {
   if (!description) return []
   return parseAlternateEffectsSpellNamesFromFragment(baseAlternateEffectsSection(description))
+}
+
+/** Cost rows from the default/base Alternate Effects section only. */
+export function parseAlternateEffectsCostRows(
+  description: string | null | undefined,
+): AlternateEffectsCostRow[] {
+  if (!description) return []
+  return parseAlternateEffectsCostRowsFromFragment(baseAlternateEffectsSection(description))
 }
 
 export type ParsedSpecializationAlternateEffects = {
@@ -246,25 +261,53 @@ export function parseSpecializationAlternateEffects(
   return out
 }
 
-/** Build a spells_known modifier for Alternate Effects table spells (cast via psi points). */
+/** Build a spells_known modifier for Alternate Effects table spells (cast via class resource). */
 export function alternateEffectsSpellsKnownModifier(
-  spellNames: string[],
+  costRowsOrNames: AlternateEffectsCostRow[] | string[],
   instanceKeyBase: string,
   labelSuffix = "Alternate Effects",
+  options?: { resourceKey?: string },
 ): LinkedModifierInstance | null {
-  if (!spellNames.length) return null
+  const resourceKey = options?.resourceKey ?? "psi_points"
+  const costRows: AlternateEffectsCostRow[] = Array.isArray(costRowsOrNames)
+    && costRowsOrNames.length > 0
+    && typeof costRowsOrNames[0] === "string"
+    ? [{ pointCost: 0, spellNames: costRowsOrNames as string[] }]
+    : (costRowsOrNames as AlternateEffectsCostRow[])
+
+  const spells = costRows.flatMap((row) =>
+    row.spellNames.map((name) => ({
+      spellId: spellNamePlaceholder(name),
+      alwaysPrepared: true as const,
+      castCost:
+        row.pointCost > 0
+          ? { resourceKey, amount: row.pointCost }
+          : null,
+    })),
+  )
+  // Deduplicate by spell name (first cost wins).
+  const seen = new Set<string>()
+  const uniqueSpells = spells.filter((entry) => {
+    const key = entry.spellId.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  if (!uniqueSpells.length) return null
+
+  const spellNames = uniqueSpells.map((entry) =>
+    entry.spellId.replace(/^import_spell_name:/i, ""),
+  )
   const label =
     spellNames.length <= 4
       ? `${spellNames.join(", ")} (${labelSuffix})`
-      : `${labelSuffix} (${spellNames.length} spells, cast with psi points)`
+      : `${labelSuffix} (${spellNames.length} spells, cast with ${resourceKey.replace(/_/g, " ")})`
+
   return charInstance(createModifierInstanceId(), characteristicCatalogRefId("spells_known"), [
     {
       id: modId(`${instanceKeyBase}_alt_effects`),
       type: "spells_known",
-      spells: spellNames.map((name) => ({
-        spellId: spellNamePlaceholder(name),
-        alwaysPrepared: true,
-      })),
+      spells: uniqueSpells,
       alwaysPrepared: true,
       label,
     },
@@ -272,11 +315,14 @@ export function alternateEffectsSpellsKnownModifier(
 }
 
 function spellsKnownOnOption(
-  spellNames: string[],
+  costRows: AlternateEffectsCostRow[],
   instanceKeyBase: string,
   label: string,
+  resourceKey = "psi_points",
 ): LinkedModifierInstance[] {
-  const mod = alternateEffectsSpellsKnownModifier(spellNames, instanceKeyBase, label)
+  const mod = alternateEffectsSpellsKnownModifier(costRows, instanceKeyBase, label, {
+    resourceKey,
+  })
   return mod ? [mod] : []
 }
 
@@ -297,7 +343,7 @@ export function specializationChoiceFromDescription(
       name: spec.name,
       description: spec.descriptionHtml,
       linkedModifiers: spellsKnownOnOption(
-        uniqueSpellNames(spec.costRows),
+        spec.costRows,
         `${instanceKeyBase}_${spec.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
         `${spec.name} Alternate Effects`,
       ),
@@ -324,13 +370,13 @@ export function enrichSpecializationChoiceOptions(
   let changed = false
   const options = choice.options.map((option) => {
     if (optionHasSpellsKnown(option)) return option
-    const spellNames = parseAlternateEffectsSpellNamesFromFragment(option.description)
-    if (!spellNames.length) return option
+    const costRows = parseAlternateEffectsCostRowsFromFragment(option.description)
+    if (!costRows.length) return option
     changed = true
     return {
       ...option,
       linkedModifiers: spellsKnownOnOption(
-        spellNames,
+        costRows,
         `${instanceKeyBase}_${option.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
         `${option.name} Alternate Effects`,
       ),

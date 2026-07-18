@@ -2,12 +2,44 @@ import type { ContentSeed, EnrichmentPreset } from "@/lib/import/enrichment-pres
 import {
   buildQuarryClassResource,
 } from "@/lib/import/enrichment-presets/builders"
+import { DND_SKILLS } from "@/lib/compendium/constants"
+import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
+import { effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
+import type { FeatureChoice } from "@/lib/types"
 
 const DEFERRED_MECHANICS_NOTE =
   "Mechanic not fully modeled on sheet — see feature description (Dark Lurker check reduction)."
 
 const RAMPAGE_DIE_DEFERRED_NOTE =
   "Rampage Die state is tracked manually: begin at d4, increase one die step after consecutive turns dealing damage (maximum d12), and reset to d4 after a turn without damage or when Incapacitated. Automatic die stepping and Tantrum's initiative/on-damage increases are not yet modeled."
+
+function curiousMindSkillOptions(): FeatureChoice["options"] {
+  return DND_SKILLS.map((skill) => ({
+    name: skill,
+    // Shared mechanic lives on the feature / picker hint — keep option cards name-only.
+    description: "",
+    linkedModifiers: [
+      fxInstance(createModifierInstanceId(), effectCatalogRefId("check_roll_modifier"), {
+        effects: [
+          {
+            id: modId(`curious_mind_${skill.toLowerCase()}`),
+            kind: "check_roll_modifier",
+            checkRollMode: "bonus",
+            checkCategory: "skill",
+            checkSkills: [skill],
+            bonusConfig: {
+              mode: "proficiency",
+              multiplier: 0.5,
+              bonusAppliesWhen: "non_proficient_skill_only",
+            },
+            label: `Curious Mind: +½ PB on ${skill}`,
+          },
+        ],
+      }),
+    ],
+  }))
+}
 
 export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
   {
@@ -255,16 +287,20 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
         op: "setChoices",
         isChoice: true,
         choices: {
-          category: "Skills",
+          category: "Curious Mind",
           count: 2,
-          options: [],
+          options: curiousMindSkillOptions(),
           swappableOnRest: true,
           swapRestType: "long",
         },
       },
       {
-        op: "appendDescription",
-        text: "Half proficiency bonus (rounded down) on chosen skills until next long rest.",
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
+        },
       },
     ],
   },

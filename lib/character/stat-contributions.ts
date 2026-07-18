@@ -27,6 +27,8 @@ export type DerivedStatKey =
   | "initiative"
   | "speed"
   | "passivePerception"
+  | "passiveInsight"
+  | "passiveInvestigation"
   | "spellSaveDc"
   | `save:${string}`
   | `skill:${string}`

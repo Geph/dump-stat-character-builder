@@ -11,11 +11,17 @@ export function ClassDetailFeatureList({
   levelLabel,
   accentClassName = "text-primary",
   comfortableFromMd = false,
+  /** When false, omit summary blurbs (titles + level only). */
+  showSummary = true,
+  /** Prefix each row with its unlock level. */
+  showLevel = false,
 }: {
   features: ClassDetailFeatureRow[]
   levelLabel?: string
   accentClassName?: string
   comfortableFromMd?: boolean
+  showSummary?: boolean
+  showLevel?: boolean
 }) {
   if (!features.length) return null
 
@@ -42,6 +48,9 @@ export function ClassDetailFeatureList({
                 feature.resourceRelated ? accentClassName : "text-white/90",
               )}
             >
+              {showLevel ? (
+                <span className={cn("mr-1.5", badgeClass, "text-white/45")}>L{feature.level}</span>
+              ) : null}
               {feature.name}
               {feature.resourceRelated ? (
                 <span className={cn("ml-1", badgeClass)}>
@@ -49,7 +58,7 @@ export function ClassDetailFeatureList({
                 </span>
               ) : null}
             </p>
-            {feature.summary ? (
+            {showSummary && feature.summary ? (
               <p className={cn(summaryClass, !comfortableFromMd && "line-clamp-1")}>{feature.summary}</p>
             ) : null}
           </li>

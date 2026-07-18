@@ -1160,10 +1160,23 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_grant_custom_ability",
     examples: [
       "granting the psionic discipline of Telepathy",
-      "You gain the psionic discipline of Psychokinesis",
+      "granting you the psionic discipline Telekinesis",
+      "You gain the psionic discipline of Psychokinetics",
+      "granting you the Enhancement Psionic Discipline",
     ],
     mechanicsKind: "grant_custom_ability",
-    notes: "Psion archetype L1 — primary discipline from subclass choice.",
+    notes: "Psion archetype L1 — primary discipline from subclass choice. Optional 'of'; Psychokinetics → Psychokinesis Discipline.",
+  },
+  {
+    ruleId: "grant.custom_ability.named_talent",
+    trigger: "description",
+    catalog: "cat_char_grant_custom_ability",
+    examples: [
+      "you gain the Rift Strike talent",
+      "you gain the psionic talent Mind Devourer",
+    ],
+    mechanicsKind: "grant_custom_ability",
+    notes: "Cunning Strikes / Ravenous Powers — grant nested discipline talent or class talent by name.",
   },
   {
     ruleId: "choice.count.bonus.unlimited_imagination",
@@ -1190,9 +1203,11 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "When you use Phase Rift to flicker",
       "When you cast Enhancing Surge",
+      "When you use a power or alternate effect of psychkinetics",
+      "gain the benefit of this talent from a range of 30 feet when the creature is killed by one of your Psionic powers",
     ],
     notes:
-      "Narrative rider talents (Flickering Escape, etc.) — alert overlay on related sheet actions; no roll card of their own.",
+      "Narrative rider talents (Flickering Escape, Living Power, Ravenous Powers range, etc.) — alert overlay on related sheet actions; no roll card of their own.",
   },
 ]
 

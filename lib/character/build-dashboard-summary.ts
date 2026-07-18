@@ -4,6 +4,7 @@ import { collectFeatureUsesResources } from "@/lib/character/collect-feature-use
 import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/character/compute-derived"
 import type { DashboardHydratedCharacter, DashboardCharacterRecord } from "@/lib/character/hydrate-dashboard"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
+import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
 import {
   formSelectionsFromState,
   mergeCompanionState,
@@ -252,6 +253,10 @@ function buildCompanionSummaries(
     equipmentIds: character.equipment_ids ?? [],
     equipmentCategories: hydrated.equipment.map((item) => item.category),
     spellIds: character.spell_ids ?? [],
+    selectedAbilityNames: collectSelectedCustomAbilityNames({
+      featureChoicePicks: character.feature_choice_picks ?? {},
+      grantedCustomAbilityNames: derived.grantedCustomAbilityNames,
+    }),
   })
 
   const ctx = {

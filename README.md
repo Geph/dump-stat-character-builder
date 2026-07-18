@@ -48,14 +48,14 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 ### Import
 - **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including armor types and Creatures & Companions); **no AI**
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
-- **Content-type hints** — Focus extraction on Class (include spell list), Subclasses, Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, or Custom Invocations / Metamagic (same custom-abilities pipeline)
+- **Content-type hints** — Focus extraction on Class + subclasses (include spell list), Subclasses only (parent already imported), Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, or Custom Invocations / Metamagic (same custom-abilities pipeline)
 - **Same-source replacements** — When importing a class that replaces SRD spells or feats, optionally prefer matching names from the import’s Source label over base SRD entries
 - **Creature import v2** — Structured creatures/companions JSON (schema `2.0`) with loud validation; Foundry NPC actors map into the same Creatures catalog
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
 - **Foundry VTT import** — Paste or upload Foundry `dnd5e` item and NPC actor exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e)). NPC actors import as Creatures & Companions; character/vehicle sheets are skipped.
 - **PDF paste cleanup** — BYO extraction prompts tell the LLM to collapse doubled ALL-CAPS glyphs (common in LaserLlama PDFs) and strip trailing superscript markers pasted as letters (e.g. KibblesTasty `Returning WeaponK` → `Returning Weapon`)
 - **Source limits** — Spell PDF imports cap at 15 pages per pass; pasted source text has a Plus-tier LLM character budget so extraction stays practical
-- **Multi-file import order** — On **Import**, expand **Multi-file import order** for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries before classes/subclasses; include class spell lists with the class pass)
+- **Multi-file import order** — On **Import**, expand **Import order** tips for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries first, then one class chapter with core + subclasses together; include class spell lists in that same pass)
 
 See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
 
@@ -326,32 +326,31 @@ PDF text extraction tries **deterministic** parsing first, then **hybrid** or fu
 
 ### Multi-file homebrew import order
 
-Many third-party classes ship as **several JSON files** (spell libraries, discipline powers, class, subclasses). Import **supporting libraries before** the class and subclass files that reference them so modifier wiring and spell links resolve correctly.
+Many third-party classes ship as **several JSON files** (spell libraries, discipline powers, class chapter). **Happy path: two LLM extracts → one Step 2 paste.** Import **supporting libraries** and the **class chapter** (core + every archetype in `classes[]` + `subclasses[]`) as a JSON array — Dump Stat **auto-orders** libraries before the class chapter even if you paste them reversed. Do not leave archetypes for a later file unless you are intentionally adding to a class already in the compendium.
 
-On the app: **Import → Multi-file import order** (expandable panel at the top of the page) lists workflows for spellcasters, KibblesTasty Psion, Laserllama-style Martial Exploits, and Inventor.
+On the app: **Import → Import tips → Import order** lists workflows for spellcasters, KibblesTasty Psion, Laserllama-style Martial Exploits, and Inventor.
 
 **General rules**
 
 1. **SRD spells** — If your compendium is SRD-seeded, standard spells (e.g. *Fireball*, *Burning Hands*) do not need a separate import; only import homebrew spell JSON for third-party names.
-2. **One batch or sequential** — Either paste a **JSON array** of import objects in dependency order, or run separate imports in the same order (earlier files persist to the compendium before later ones wire references).
-3. **Set a source label** — Use the compendium source label field (e.g. `Kibbles Witch`) so you can filter and re-import safely.
+2. **One batch or sequential** — Either paste a **JSON array** of import objects (order flexible — libraries are auto-sorted ahead of the class chapter), or run separate imports in the same order (earlier files persist to the compendium before later ones wire references).
+3. **Class + subclasses together** — Use content type **Class + subclasses**. An empty `subclasses[]` means no archetypes in the builder. Use **Subclasses only** only for add-ons when the parent class is already imported.
+4. **Set a source label** — Use the compendium source label field (e.g. `Kibbles Witch`) so you can filter and re-import safely.
 
 **Spellcasting classes** (Witch, full casters, etc.)
 
 | Step | Content |
 |------|---------|
 | 1 | Homebrew spell libraries (`kibbles-spells-parsed.json`, Valda's supplements, etc.) when needed |
-| 2 | Class JSON **including** the class spell list (Spell / School / Special tables) when present |
-| 3 | Subclasses JSON (always-prepared spell tables) |
-| 4 | Choice options if separate (grand hexes, invocations, …) |
+| 2 | Class chapter JSON: core class **and** subclasses, **including** the class spell list (Spell / School / Special tables) when present |
+| 3 | Choice options if separate (grand hexes, invocations, …) |
 
 **KibblesTasty Psion** (and similar psionic classes with separated powers)
 
 | Step | Content |
 |------|---------|
 | 1 | `psion-disciplines.json` (psionic powers as custom abilities / proposals — not ordinary `spells[]`) |
-| 2 | `psion-class.json` |
-| 3 | Archetypes / subclasses (e.g. `psion-knowing-mind.json`) |
+| 2 | Class chapter: core Psion **and** all archetypes in one JSON (`classes[]` + `subclasses[]`) |
 
 Discipline powers with psi-point augments get `psionic_augments` at import; pick augments on the character sheet when casting those powers.
 
@@ -360,16 +359,14 @@ Discipline powers with psi-point augments get `psionic_augments` at import; pick
 | Step | Content |
 |------|---------|
 | 1 | Exploit / maneuver library (if separate) |
-| 2 | Class with level table (Exploit Dice, Exploits Known) |
-| 3 | Subclasses (if separate) |
+| 2 | Class chapter: level table (Exploit Dice, Exploits Known) **and** all subclasses in the same pass |
 
 **JSON array example** (Clipboard → Step 2):
 
 ```json
 [
   { "spells": [ … ] },
-  { "classes": [ … ] },
-  { "subclasses": [ … ] }
+  { "classes": [ … ], "subclasses": [ … ] }
 ]
 ```
 

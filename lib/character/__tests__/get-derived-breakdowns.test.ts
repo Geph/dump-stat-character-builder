@@ -67,4 +67,18 @@ describe("getDerivedCharacterBreakdowns", () => {
     )
     expect(speedLines.some((line) => line.label.includes("Flight") && line.amount === 45)).toBe(true)
   })
+
+  it("passive Insight and Investigation breakdowns sum to derived totals", () => {
+    const derived = computeDerivedCharacter(inputs)
+    const breakdowns = getDerivedCharacterBreakdowns(inputs)
+    expect(sumContributions(breakdownLines(breakdowns, "passiveInsight"))).toBe(
+      derived.passiveInsight,
+    )
+    expect(sumContributions(breakdownLines(breakdowns, "passiveInvestigation"))).toBe(
+      derived.passiveInvestigation,
+    )
+    expect(sumContributions(breakdownLines(breakdowns, "passivePerception"))).toBe(
+      derived.passivePerception,
+    )
+  })
 })

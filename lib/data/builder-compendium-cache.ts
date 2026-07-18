@@ -3,6 +3,7 @@ import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { enrichSubclassDisplayList } from "@/lib/compendium/enrich-subclass-display"
 import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
@@ -55,6 +56,7 @@ export const BUILDER_SUBCLASS_COLUMNS = [
   "class_id",
   "name",
   "description",
+  "card_blurb",
   "features",
   "spellcasting",
   COMPENDIUM_META,
@@ -237,7 +239,9 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     }) as (DndClass & { enabled?: boolean | number | null })[],
   ) as unknown as DndClass[]
 
-  const subclasses = filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[]
+  const subclasses = enrichSubclassDisplayList(
+    filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[],
+  )
   const species = filterEnabled(
     enrichSpeciesList(
       asCompendiumRows<Parameters<typeof enrichSpeciesList>[0][number]>(speciesRes.data),

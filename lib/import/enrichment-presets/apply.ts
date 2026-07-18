@@ -104,13 +104,15 @@ function applyOperations(
           swappableOnRest: true,
           swapRestType: "long" as const,
         }
+        const presetOptions = operation.choices.options
         next = {
           ...next,
           isChoice: operation.isChoice ?? true,
           choices: {
             ...base,
             ...operation.choices,
-            options: base.options?.length ? base.options : operation.choices.options,
+            // Prefer preset options when provided (e.g. Curious Mind skill list with modifiers).
+            options: presetOptions?.length ? presetOptions : (base.options ?? []),
             swappableOnRest: operation.choices.swappableOnRest ?? true,
             swapRestType: operation.choices.swapRestType ?? "long",
           },

@@ -1,11 +1,12 @@
 import { COMPENDIUM_TABLES, resolveTable, type CompendiumTable } from "@/lib/db/tables"
 import { normalizeBannerUrl, normalizePortraitUrl } from "@/lib/portrait"
 import type { DbResult, Filter, OrderBy, QueryBuilder } from "./types"
-import type { Character } from "@/lib/types"
+import type { Character, ClassResourceRow, DndClass } from "@/lib/types"
 import {
   attachClassDetails,
   normalizeCharacterClassRows,
 } from "@/lib/character/character-classes"
+import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 
 const DB_NAME = "dump-stat"
 /** Bump when COMPENDIUM_TABLES gains a new store (v3: tools, v4: repair pass, v5: creatures). */
@@ -177,15 +178,24 @@ async function attachCharacterRelations(
       .map((row) => row.subclass_id)
       .filter(Boolean) as string[]
     const allSubclasses = subclasses.filter((row) => subclassIds.includes(row.id as string))
+
+    const resourceStore = await getStore("class_resources")
+    const resourceRows = resourceStore.filter((row) =>
+      classIds.includes(row.class_id as string),
+    ) as unknown as ClassResourceRow[]
+    const classesWithResources = allClasses.map((cls) =>
+      attachClassResourcesToClass(cls as unknown as DndClass, resourceRows),
+    )
+
     out.class_list = attachClassDetails(
       classRows,
-      allClasses as never,
+      classesWithResources as never,
       allSubclasses as never,
     )
 
     const primaryId = (character.class_id as string | null) ?? classRows[0]?.class_id
     if (primaryId) {
-      out.classes = allClasses.find((row) => row.id === primaryId) ?? out.classes
+      out.classes = classesWithResources.find((row) => row.id === primaryId) ?? out.classes
       const primaryRow = classRows.find((row) => row.class_id === primaryId)
       if (primaryRow?.subclass_id) {
         out.subclasses =
@@ -195,7 +205,13 @@ async function attachCharacterRelations(
   } else if (character.class_id) {
     const classes = await getStore("classes")
     const cls = classes.find((r) => r.id === character.class_id)
-    if (cls) out.classes = cls
+    if (cls) {
+      const resourceStore = await getStore("class_resources")
+      const resourceRows = resourceStore.filter(
+        (row) => row.class_id === character.class_id,
+      ) as unknown as ClassResourceRow[]
+      out.classes = attachClassResourcesToClass(cls as unknown as DndClass, resourceRows)
+    }
   }
 
   if (character.species_id) {

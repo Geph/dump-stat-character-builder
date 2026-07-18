@@ -57,8 +57,26 @@ export function ImportCollisionPanel({
     onResolutionChange(next)
   }
 
+  /** Preserve existing compendium rows: link matching spells, skip other conflicts. */
+  const keepAllExisting = () => {
+    const next: ImportCollisionResolutionMap = { ...resolutionMap }
+    for (const collision of collisions) {
+      next[collision.id] = collision.kind === "spell" ? "link" : "skip"
+    }
+    onResolutionChange(next)
+  }
+
+  const keepExistingResolution = (collision: ImportCollision): ImportCollisionResolution =>
+    collision.kind === "spell" ? "link" : "skip"
+
   const allSkipped = collisions.every(
     (collision) => (resolutionMap[collision.id] ?? defaultResolution(collision)) === "skip",
+  )
+
+  const allKeepingExisting = collisions.every(
+    (collision) =>
+      (resolutionMap[collision.id] ?? defaultResolution(collision)) ===
+      keepExistingResolution(collision),
   )
 
   return (
@@ -68,17 +86,30 @@ export function ImportCollisionPanel({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <p className="font-semibold text-foreground">Name conflicts</p>
-            <button
-              type="button"
-              onClick={skipAll}
-              className={`rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-colors shrink-0 ${
-                allSkipped
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border bg-background text-muted-foreground hover:border-primary/40"
-              }`}
-            >
-              Skip all
-            </button>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={keepAllExisting}
+                className={`rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  allKeepingExisting
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                Keep all existing
+              </button>
+              <button
+                type="button"
+                onClick={skipAll}
+                className={`rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  allSkipped
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                Skip all
+              </button>
+            </div>
           </div>
           <p className="mt-1 text-muted-foreground">
             {hasSpellCollisions && hasOtherCollisions

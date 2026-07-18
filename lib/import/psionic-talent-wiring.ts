@@ -53,9 +53,36 @@ const POWER_RIDER_PARENTS: { re: RegExp; parents: string[] }[] = [
   { re: /\bSeeing\b/i, parents: ["Seeing"] },
   { re: /\bDenial\b/i, parents: ["Denial"] },
   { re: /\bElemental Blast\b/i, parents: ["Elemental Blast"] },
+  // Kibbles prose sometimes typos "psychkinetics" (missing o).
+  { re: /psycho?kin/i, parents: ["Elemental Blast"] },
+  { re: /\bMind Devourer\b/i, parents: ["Mind Devourer"] },
   { re: /\bProject Item\b/i, parents: ["Projection Discipline"] },
   { re: /\bAdaptive Hunter\b/i, parents: ["Consumption Discipline"] },
 ]
+
+function normalizeGrantedDisciplineName(raw: string): string {
+  let name = raw.trim().replace(/[.,;:]+$/, "")
+  if (!name) return ""
+  // Kibbles Elemental Mind uses "Psychokinetics"; catalog packages use Psychokinesis.
+  if (/^psychokinetics$/i.test(name)) name = "Psychokinesis"
+  if (/\bdiscipline\b/i.test(name)) return name.replace(/\s+/g, " ").trim()
+  return `${name} Discipline`
+}
+
+function grantCustomAbilityInstance(
+  ctx: DetectFeatureContext,
+  abilityNames: string[],
+  label: string,
+): LinkedModifierInstance {
+  return charInstance(newInstanceId(), characteristicCatalogRefId("grant_custom_ability"), [
+    {
+      id: modId(instanceKey(ctx, "grant_ability")),
+      type: "grant_custom_ability",
+      abilityNames,
+      label,
+    },
+  ])
+}
 
 function collectParentPowerNames(text: string): string[] {
   const names: string[] = []
@@ -268,34 +295,35 @@ export const PSIONIC_TALENT_WIRING_RULES: FeatureModifierRule[] = [
     build: (match, ctx) => {
       const name = match[1].trim()
       if (!name) return null
-      return charInstance(newInstanceId(), characteristicCatalogRefId("grant_custom_ability"), [
-        {
-          id: modId(instanceKey(ctx, "grant_ability")),
-          type: "grant_custom_ability",
-          abilityNames: [name],
-          label: `Gain ${name}`,
-        },
-      ])
+      return grantCustomAbilityInstance(ctx, [name], `Gain ${name}`)
     },
   },
   {
     id: "grant.custom_ability.named_discipline",
     confidence: "high",
     scope: "full",
-    // "granting the psionic discipline of Telepathy" / "You gain the psionic discipline of Psychokinesis"
-    test: /\b(?:granting(?:\s+you)?|you\s+gain)\s+(?:the\s+)?psionic\s+discipline\s+of\s+([A-Za-z][A-Za-z' -]{1,40})/i,
+    // "granting the psionic discipline of Telepathy"
+    // "granting you the psionic discipline Telekinesis" (no "of")
+    // "You gain the psionic discipline of Psychokinetics"
+    // "granting you the Telepathy Psionic Discipline"
+    test: /\b(?:granting(?:\s+you)?|you\s+gain)\s+(?:the\s+)?(?:psionic\s+discipline(?:\s+of)?\s+([A-Za-z][A-Za-z' -]{1,40})|([A-Za-z][A-Za-z' -]{1,40})\s+psionic\s+discipline)\b/i,
     build: (match, ctx) => {
-      const raw = match[1].trim().replace(/[.,;:]+$/, "")
-      if (!raw) return null
-      const name = /\bdiscipline\b/i.test(raw) ? raw : `${raw} Discipline`
-      return charInstance(newInstanceId(), characteristicCatalogRefId("grant_custom_ability"), [
-        {
-          id: modId(instanceKey(ctx, "grant_discipline")),
-          type: "grant_custom_ability",
-          abilityNames: [name],
-          label: `Gain ${name}`,
-        },
-      ])
+      const raw = (match[1] ?? match[2] ?? "").trim()
+      const name = normalizeGrantedDisciplineName(raw)
+      if (!name) return null
+      return grantCustomAbilityInstance(ctx, [name], `Gain ${name}`)
+    },
+  },
+  {
+    id: "grant.custom_ability.named_talent",
+    confidence: "high",
+    scope: "full",
+    // "you gain the Rift Strike talent" / "you gain the psionic talent Mind Devourer"
+    test: /\byou\s+gain\s+(?:the\s+)?(?:psionic\s+talent\s+([A-Z][A-Za-z' -]{2,40})|([A-Z][A-Za-z' -]{2,40})\s+talent)\b/i,
+    build: (match, ctx) => {
+      const name = (match[1] ?? match[2] ?? "").trim().replace(/[.,;:]+$/, "")
+      if (!name) return null
+      return grantCustomAbilityInstance(ctx, [name], `Gain ${name}`)
     },
   },
   {
@@ -338,11 +366,20 @@ export const PSIONIC_TALENT_WIRING_RULES: FeatureModifierRule[] = [
     confidence: "medium",
     scope: "full",
     test:
-      /\b(?:Phase Rift|Enhancing Surge|Telekinetic Force|Astral Construct|Mind Leech|Telepathic Intrusion|Elemental Blast|Denial|Seeing|Project Item|flicker)\b/i,
+      /\b(?:Phase Rift|Enhancing Surge|Telekinetic Force|Astral Construct|Mind Leech|Telepathic Intrusion|Elemental Blast|Denial|Seeing|Project Item|Mind Devourer|flicker)\b|psycho?kin/i,
     build: (_match, ctx, text) => {
       const parents = collectParentPowerNames(text)
       if (!parents.length) return null
-      return powerRiderInstance(ctx, parents, ctx.featureName ?? undefined)
+      let summary = ctx.featureName ?? undefined
+      if (/range of 30 feet/i.test(text) && /Mind Devourer/i.test(text)) {
+        summary =
+          "You can gain the benefit of this Talent from a range of 30 feet when the creature is killed by one of your psionic powers."
+      } else if (/Living Power/i.test(ctx.featureName ?? "") || /psycho?kin/i.test(text)) {
+        summary =
+          summary ??
+          "When you use a Psychokinesis power or alternate effect, you can apply a Living Power modifier (Shaped, Controlled, or Raging)."
+      }
+      return powerRiderInstance(ctx, parents, summary)
     },
   },
 ]

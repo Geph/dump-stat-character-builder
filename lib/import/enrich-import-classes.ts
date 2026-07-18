@@ -14,6 +14,7 @@ import {
   remapKiResourceKey,
 } from "@/lib/import/enrichment-presets"
 import { enrichPointPoolClassResources, remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
+import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { extractMulticlassSection } from "@/lib/import/parse-multiclass-section"
 import { stripClassProgressionTablesFromText } from "@/lib/import/strip-class-progression-tables"
@@ -451,6 +452,9 @@ export function enrichImportedClassRow(
     ],
   )
 
+  const existingIcon = typeof row.icon === "string" ? row.icon.trim() : ""
+  const icon = existingIcon || defaultClassIconForName(className)
+
   return {
     ...row,
     description,
@@ -459,6 +463,7 @@ export function enrichImportedClassRow(
     special_ability: specialAbility ?? row.special_ability,
     starting_equipment_groups,
     starting_gold,
+    ...(icon ? { icon } : {}),
     ...(skill_choices ? { skill_choices } : {}),
     ...multiclassFields,
   }

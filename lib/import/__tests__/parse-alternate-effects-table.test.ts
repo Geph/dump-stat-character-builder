@@ -38,13 +38,30 @@ describe("parseAlternateEffectsSpellNames", () => {
     ])
   })
 
-  it("builds a spells_known modifier labeled as Alternate Effects", () => {
-    const mod = alternateEffectsSpellsKnownModifier(["heroism", "haste"], "test_enhancement")
+  it("builds a spells_known modifier with per-spell psi cast costs", () => {
+    const mod = alternateEffectsSpellsKnownModifier(
+      [
+        { pointCost: 1, spellNames: ["heroism"] },
+        { pointCost: 3, spellNames: ["haste"] },
+      ],
+      "test_enhancement",
+    )
     expect(mod?.catalogRefId).toBe("cat_char_spells_known")
     const char = mod?.characteristics?.[0]
     expect(char?.type).toBe("spells_known")
     if (char?.type === "spells_known") {
-      expect(char.spells).toHaveLength(2)
+      expect(char.spells).toEqual([
+        {
+          spellId: "import_spell_name:heroism",
+          alwaysPrepared: true,
+          castCost: { resourceKey: "psi_points", amount: 1 },
+        },
+        {
+          spellId: "import_spell_name:haste",
+          alwaysPrepared: true,
+          castCost: { resourceKey: "psi_points", amount: 3 },
+        },
+      ])
       expect(char.label).toContain("Alternate Effects")
     }
   })

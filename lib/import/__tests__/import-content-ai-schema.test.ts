@@ -142,4 +142,40 @@ describe("import content AI schema", () => {
     expect(normalized.classes?.[0]?.features?.[0]?.isChoice).toBeUndefined()
     expect(normalized.classes?.[0]?.name).toBe("Gunslinger")
   })
+
+  it("coerces string rest recharges into { rest } objects", () => {
+    const normalized = normalizeAiImportContent({
+      species: null,
+      classes: null,
+      class_resources: [
+        {
+          class_name: "Psion",
+          subclass_name: null,
+          resource_key: "psi_points",
+          name: "Psi Points",
+          description: "Spendable pool",
+          uses: {
+            type: "at_level",
+            fixedAmount: null,
+            abilityModifier: null,
+            specialDescription: null,
+            atLevelTable: [{ level: 1, count: 1 }],
+            atLevelMode: "tier",
+            recharges: ["short_rest", "long_rest"],
+          },
+        },
+      ],
+      subclasses: null,
+      backgrounds: null,
+      spells: null,
+      feats: null,
+      equipment: null,
+      import_proposals: null,
+    } as unknown as Parameters<typeof normalizeAiImportContent>[0])
+
+    expect(normalized.class_resources?.[0]?.uses?.recharges).toEqual([
+      { rest: "short_rest" },
+      { rest: "long_rest" },
+    ])
+  })
 })

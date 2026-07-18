@@ -251,11 +251,36 @@ export const NewToggleImportSchema = z.object({
 
 export type NewToggleImport = z.infer<typeof NewToggleImportSchema>
 
-/** Informational prerequisites that cannot be mechanically evaluated by the builder. */
-export const PrerequisiteRuleSchema = z.object({
-  category: z.literal("other"),
-  value: z.string().min(1),
-})
+const AbilityScoreKeySchema = z.enum([
+  "strength",
+  "dexterity",
+  "constitution",
+  "intelligence",
+  "wisdom",
+  "charisma",
+])
+
+/**
+ * Prerequisites attached to importable content.
+ * - `other`: informational (campaign/setting) — not evaluated by the builder
+ * - `armor_training` / `ability_score`: mechanically evaluated for feats
+ */
+export const PrerequisiteRuleSchema = z.discriminatedUnion("category", [
+  z.object({
+    category: z.literal("other"),
+    value: z.string().min(1),
+  }),
+  z.object({
+    category: z.literal("armor_training"),
+    value: z.enum(["Light armor", "Medium armor", "Heavy armor", "Shields"]),
+  }),
+  z.object({
+    category: z.literal("ability_score"),
+    /** Character must meet the minimum in any one of these abilities. */
+    abilities: z.array(AbilityScoreKeySchema).min(1),
+    minimum: z.number().int().positive(),
+  }),
+])
 
 export type PrerequisiteRule = z.infer<typeof PrerequisiteRuleSchema>
 
@@ -369,6 +394,7 @@ export const SubclassImportSchema = z.object({
   description: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   card_image_url: z.string().nullable().optional(),
+  card_blurb: z.string().max(120).nullable().optional(),
   features: z.array(ClassFeatureSchema),
   new_toggles: z.array(NewToggleImportSchema).optional(),
   /**
@@ -611,7 +637,7 @@ export const GENERAL_SOURCE_CLEANUP_HINT = `Source text cleanup (all content typ
 export const PREREQUISITE_RULES_IMPORT_HINT = `Campaign and other non-mechanical prerequisites (all content types)
 - When any item, feature, or trait has a campaign/content gate such as "Prerequisite: Planescape Campaign" or "Prerequisite: Ravenloft Campaign", preserve it as prerequisite_rules: [{ "category": "other", "value": "Planescape Campaign" }].
 - Use category "other" for campaign, setting, DM-permission, story, faction, or similarly informational prerequisites the builder cannot evaluate mechanically.
-- Keep mechanically evaluable feat prerequisites in their existing fields too (level_requirement, prerequisite, etc.); prerequisite_rules is specifically for informational gates.
+- Keep mechanically evaluable feat prerequisites in the freeform prerequisite string (and level_requirement when known). The importer parses armor training (e.g. "Medium Armor Training") and ability-score gates (e.g. "Strength 13+") from that text.
 - Do not discard a prerequisite merely because it appears between an item heading and its description.`
 
 /** Marker legends near spell/option tables (homebrew vs SRD). */
@@ -851,9 +877,10 @@ When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Plana
 For well-known PHB feats (Alert, Tough, Magic Initiate, Archery, War Caster, etc.), prefer omitting mechanics[] when unsure — name-matched presets apply on load. Partial wrong mechanics (e.g. vision without visionType blindsight, grant_feat on ASI, empty damage_roll_modifiers) are worse than none.`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
+- Prefer importing archetypes with the parent class (content type Class + subclasses): put every archetype in subclasses[] in the same JSON as classes[]. Use a Subclasses-only pass only when adding to a class already in the compendium, or when the user explicitly asks for subclasses alone.
 - Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion") — must match classes[].name when importing with the class
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
-- When extracting a full class chapter (content type Classes), include every archetype/subclass in subclasses[] alongside classes[] — do not leave archetypes for a later pass unless the user asks
+- When extracting a full class chapter, include every archetype/subclass in subclasses[] alongside classes[] — do not leave archetypes for a later pass unless the user asks
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present
 - When a feature lets the player choose among several mutually exclusive spell lists (Circle of the Land land types, similar circle/domain/oath subtype tables): set isChoice: true with choices.options — one option per subtype — and put THAT subtype's HTML spell table in the option description (not only a mashed parent table). Prefer swappableOnRest + swapRestType when the source lets the choice change on a rest.
@@ -870,7 +897,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - name: display name from the table header (e.g. "Psi Points")
 - When a level-scaling pool has no formal name in the source (referred to only as "the pool" / "your pool"), derive the display name from the granting feature (e.g. "Warrior of the Gods" → "Warrior of the Gods Dice") so repeated extractions converge — do not invent a flavor name
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
-- **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges (short_rest and/or long_rest)
+- **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
 - **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
 - **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
 - When the table has a separate "Die Size" / "Die Type" column alongside the pool count (e.g. Psionic Energy Dice: d6→d8→d10→d12 as the Number column also grows), set uses.dieSidesByLevel: [{ level, count: <die sides as a number, e.g. 6/8/10/12> }, ...] in addition to atLevelTable — do not drop the die-size progression just because it scales separately from the count
@@ -879,13 +906,16 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Designer> <Class Name>, Gunslinger):
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
-- Put the full class in classes[] with hit_die, proficiencies, and all class features by level
+- Put the full class in classes[] with hit_die, armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
 - Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options
 - Put each subclass/archetype/path in subclasses[] in the SAME JSON as the class (never omit archetypes from a Classes pass) with class_name set to that same parent class name
+- Archetype unlock features (name like "Psionic Archetype"): short description only — do NOT emit isChoice with stub options naming each archetype; Dump Stat uses subclasses[] for the real pick
+- Psion Secondary Discipline / Third Discipline: isChoice true with choices { category: "Psionic Discipline", count: 1, options: [] }. Prefer the name "Secondary Discipline" (not "Second Discipline")
+- Psion Psionic Talents: isChoice true with choices { category: "Psionic Talent", count: 2, options: [] } — do NOT set optionsSource "class_talents" (that is for General/Class Talents lists). Enrichment sets known_discipline_talents from the feature name
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
-- Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array
+- Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array; use labels A/B/C
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
-- Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name`
+- Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name; each spells[] stub needs level, school (use "Unknown" when absent), and concentration (boolean, default false)`
 
 export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation before creating compendium entries):
 - Identify every class resource pool you find (Psi Points, Psi Limit, Rage, Ki, Sorcery Points, etc.)

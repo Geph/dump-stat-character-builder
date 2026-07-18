@@ -1000,7 +1000,6 @@ export default function ImportPage() {
                 canNext={canGoNextReview}
                 onBack={goPreviousReview}
                 canBack={Boolean(canGoPreviousReview)}
-                onCancel={clearPendingImport}
                 contentChildren={
                   <>
                     <ImportCollisionPanel

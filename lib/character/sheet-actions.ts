@@ -1,4 +1,5 @@
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-talents"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
@@ -88,7 +89,13 @@ const COMBAT_CHARACTERISTIC_TYPES = new Set<CharacteristicModifier["type"]>([
 ])
 
 const COMBAT_TEXT_RE =
-  /\b(?:attacks?|attacking|damage|weapons?|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?)\b/i
+  /\b(?:attacks?|attacking|damage|weapons?|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?|psi points?|psionic)\b/i
+
+/** Resource keys that always place a spend action on the Combat tab. */
+const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
+  ...ACTION_PANEL_CLASS_RESOURCE_IDS,
+  "psi_points",
+])
 
 /** Description phrasings that imply an action-economy cost when no structured activation exists. */
 const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
@@ -162,9 +169,14 @@ function kindsFromText(description: string | null | undefined): ActionEconomyKin
 }
 
 /** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
-function classifyActionCategory(item: ActivatableItem): SheetActionCategory {
+function classifyActionCategory(
+  item: ActivatableItem,
+  opts?: { preferCombat?: boolean },
+): SheetActionCategory {
+  if (opts?.preferCombat) return "combat"
+
   const resourceKey = resolveActionResourceKey(item)
-  if (resourceKey && ACTION_PANEL_CLASS_RESOURCE_IDS.has(resourceKey)) return "combat"
+  if (resourceKey && COMBAT_CLASS_RESOURCE_KEYS.has(resourceKey)) return "combat"
 
   for (const instance of item.linkedModifiers ?? []) {
     for (const effect of instance.activation?.effects ?? []) {
@@ -236,12 +248,47 @@ const MOVEMENT_OPTION_DEFAULT_ACTIONS: Array<{
   { flag: "movementHide", actionId: "hide" },
 ]
 
+const STANDARD_ACTION_DEFAULT_ACTIONS: Array<{
+  flag: "standardActionStudy" | "standardActionSearch"
+  actionId: string
+}> = [
+  { flag: "standardActionStudy", actionId: "study" },
+  { flag: "standardActionSearch", actionId: "search" },
+]
+
 type MovementOptionExpansion = {
   actionKey: string
   name: string
   description: string
   kinds: ActionEconomyKind[]
   category: SheetActionCategory
+}
+
+function expansionsFromStandardActions(
+  instance: LinkedModifierInstance,
+): MovementOptionExpansion[] {
+  const kinds = activationKinds(instance.activation)
+  if (!kinds.length) return []
+  if (kinds.every((kind) => kind === "action")) return []
+
+  const expansions: MovementOptionExpansion[] = []
+  for (const effect of instance.activation?.effects ?? []) {
+    if ((effect as { kind?: string }).kind !== "standard_action") continue
+    for (const { flag, actionId } of STANDARD_ACTION_DEFAULT_ACTIONS) {
+      if (!(effect as unknown as Record<string, unknown>)[flag]) continue
+      const defaultAction = DEFAULT_ACTION_BY_ID.get(actionId)
+      if (!defaultAction) continue
+      expansions.push({
+        actionKey: actionId,
+        name: defaultAction.name,
+        description:
+          (effect as { label?: string | null }).label?.trim() || defaultAction.description,
+        kinds,
+        category: defaultAction.category === "combat" ? "combat" : "utility",
+      })
+    }
+  }
+  return expansions
 }
 
 function expansionsFromMovementOptions(
@@ -287,7 +334,10 @@ function collectMovementOptionExpansions(feature: ActivatableItem): MovementOpti
   const seen = new Set<string>()
   const expansions: MovementOptionExpansion[] = []
   for (const instance of feature.linkedModifiers ?? []) {
-    for (const expansion of expansionsFromMovementOptions(feature, instance)) {
+    for (const expansion of [
+      ...expansionsFromMovementOptions(feature, instance),
+      ...expansionsFromStandardActions(instance),
+    ]) {
       const key = `${expansion.actionKey}:${expansion.kinds.join("+")}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -303,12 +353,18 @@ function suppressParentForMovementExpansions(
   expansions: MovementOptionExpansion[],
 ): boolean {
   if (!expansions.length) return false
-  const hasNonMovementEffect = (feature.linkedModifiers ?? []).some((instance) =>
-    (instance.activation?.effects ?? []).some(
-      (effect) => (effect as { kind?: string }).kind && (effect as { kind?: string }).kind !== "movement_option",
-    ),
+  const hasNonExpansionEffect = (feature.linkedModifiers ?? []).some((instance) =>
+    (instance.activation?.effects ?? []).some((effect) => {
+      const kind = (effect as { kind?: string }).kind
+      return kind && kind !== "movement_option" && kind !== "standard_action"
+    }),
   )
-  return !hasNonMovementEffect
+  const hasPassiveCharacteristics = (feature.linkedModifiers ?? []).some(
+    (instance) => (instance.characteristics?.length ?? 0) > 0,
+  )
+  // Feats like Keen Mind also grant ASI/skills — keep the parent card.
+  if (hasPassiveCharacteristics || hasNonExpansionEffect) return false
+  return true
 }
 
 function pushActivatableItemActions(
@@ -435,6 +491,7 @@ function isCustomAbilityAction(ability: CustomAbility): boolean {
   if (ability.ability_role === "alchemist_bomb") return true
   if (ability.psionic_augments?.augments?.length) return true
   if (ability.casting_time) return true
+  if (ability.execution) return true
   const item: ActivatableItem = {
     name: ability.name,
     description: ability.description,
@@ -451,12 +508,25 @@ function customAbilitySourceLabel(ability: CustomAbility): string {
   return ability.source?.trim() || "Custom Ability"
 }
 
+function preferCombatForAbility(ability: CustomAbility, item: ActivatableItem): boolean {
+  if (ability.ability_role === "psionic_power") return true
+  if (ability.psionic_augments?.augments?.length) return true
+  for (const instance of item.linkedModifiers ?? []) {
+    if ((instance.characteristics ?? []).some((char) => char.type === "special_attack")) {
+      return true
+    }
+  }
+  return false
+}
+
 function pushCustomAbilityActions(
   actions: SheetActionEntry[],
   abilities: CustomAbility[] | undefined,
   levelCap: number,
   classId: string | null,
 ) {
+  const seenPowerNames = new Set<string>()
+
   for (const ability of abilities ?? []) {
     if (!isCustomAbilityAction(ability)) continue
     if (ability.level_requirement != null && ability.level_requirement > levelCap) continue
@@ -468,7 +538,7 @@ function pushCustomAbilityActions(
       linkedModifiers: ability.linked_modifiers ?? undefined,
     }
 
-    const castingKinds = kindsFromCastingTime(ability.casting_time)
+    const castingKinds = kindsFromCastingTime(ability.casting_time ?? ability.execution)
     const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
     const kinds = castingKinds.length
       ? castingKinds
@@ -484,12 +554,15 @@ function pushCustomAbilityActions(
     }
     if (!kinds.length) continue
 
+    seenPowerNames.add(normalizePickName(ability.name))
     actions.push({
       id: `ability:${ability.id}`,
       name: ability.name,
       sourceLabel: customAbilitySourceLabel(ability),
       kinds,
-      category: classifyActionCategory(item),
+      category: classifyActionCategory(item, {
+        preferCombat: preferCombatForAbility(ability, item),
+      }),
       limitedUses: ability.uses,
       classLevel: levelCap,
       description: ability.description ?? null,
@@ -497,17 +570,122 @@ function pushCustomAbilityActions(
       classResourceKey: resolveActionResourceKey(item),
       customAbilityId: ability.id,
       psionicAugments: resolvePsionicAugments(ability),
-      castingTime: ability.casting_time ?? null,
+      castingTime: ability.casting_time ?? ability.execution ?? null,
       range: ability.range ?? null,
       components: ability.components ?? null,
       duration: ability.duration ?? null,
       concentration: ability.concentration,
     })
   }
+
+  // Fallback: known discipline packages may only nest powers in modifier_catalog
+  // (no sibling psionic_power rows). Promote Psionic Powers / special attacks onto Combat.
+  for (const ability of abilities ?? []) {
+    if (!isDisciplinePackageAbility(ability)) continue
+    const catalog = ability.modifier_catalog
+    if (!Array.isArray(catalog) || !catalog.length) continue
+
+    for (const entry of catalog) {
+      const group = String(entry.group ?? "")
+      const isPowerGroup = /psionic\s+powers?/i.test(group)
+      const hasSpecialAttack = (entry.characteristics ?? []).some(
+        (char) => char.type === "special_attack",
+      )
+      if (!isPowerGroup && !hasSpecialAttack) continue
+
+      const entryName = String(entry.name ?? "").trim()
+      if (!entryName || seenPowerNames.has(normalizePickName(entryName))) continue
+
+      const linkedModifiers: LinkedModifierInstance[] = [
+        {
+          instanceId: `modinst_catalog_${ability.id}_${entry.id}`,
+          catalogRefId: entry.id,
+          characteristics: entry.characteristics ?? [],
+          activation: entry.activation ?? null,
+        },
+      ]
+      const item: ActivatableItem = {
+        name: entryName,
+        description: entry.description ?? entry.summary ?? null,
+        linkedModifiers,
+      }
+      const castingKinds = kindsFromCastingTime(entry.summary)
+      const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(linkedModifiers)
+      const kinds = castingKinds.length
+        ? castingKinds
+        : linkedKinds.length
+          ? linkedKinds
+          : kindsFromText(item.description)
+      if (!kinds.length && (isPowerGroup || hasSpecialAttack)) {
+        kinds.push("action")
+      }
+      if (!kinds.length) continue
+
+      seenPowerNames.add(normalizePickName(entryName))
+      actions.push({
+        id: `ability:${ability.id}:catalog:${entry.id}`,
+        name: entryName,
+        sourceLabel: ability.name,
+        kinds,
+        category: classifyActionCategory(item, { preferCombat: true }),
+        limitedUses: null,
+        classLevel: levelCap,
+        description: entry.description ?? entry.summary ?? null,
+        classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
+        classResourceKey: resolveActionResourceKey(item),
+        customAbilityId: ability.id,
+        castingTime: entry.summary?.match(/\b\d+\s+(?:bonus\s+)?action\b/i)?.[0] ?? null,
+      })
+    }
+  }
 }
 
 function normalizePickName(value: string): string {
   return value.trim().toLowerCase()
+}
+
+function collectTalentAlertsFromFeatures(
+  classDetails: CharacterClassDetail[],
+): SheetActionTalentAlert[] {
+  const alerts: SheetActionTalentAlert[] = []
+  const seen = new Set<string>()
+
+  const considerFeature = (
+    feature: ActivatableItem,
+    sourceLabel: string,
+    levelCap: number,
+  ) => {
+    if ((feature.level ?? 1) > levelCap) return
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const char of instance.characteristics ?? []) {
+        if (char.type !== "power_rider") continue
+        const key = `${feature.name}::${char.parentPowerNames.join("|")}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        alerts.push({
+          name: feature.name,
+          summary: char.alertSummary?.trim() || char.label?.trim() || feature.name,
+          description: feature.description ?? null,
+          sourceLabel,
+          parentPowerNames: char.parentPowerNames,
+        })
+      }
+    }
+  }
+
+  for (const entry of classDetails) {
+    const level = entry.row.level ?? 1
+    for (const feature of (entry.class?.features ?? []) as ActivatableItem[]) {
+      considerFeature(feature, entry.class?.name ?? "Class", level)
+    }
+    if (entry.subclass) {
+      for (const feature of (entry.subclass.features ?? []) as ActivatableItem[]) {
+        considerFeature(feature, entry.subclass.name, level)
+      }
+    }
+  }
+
+  return alerts
 }
 
 function collectTalentAlertsFromCustomAbilities(
@@ -684,10 +862,10 @@ export function collectSheetActions(params: {
     pushCustomAbilityActions(actions, params.customAbilities, Math.max(totalLevel, 1), null)
   }
 
-  const withRiders = attachTalentAlertsToActions(
-    actions,
-    collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
-  )
+  const withRiders = attachTalentAlertsToActions(actions, [
+    ...collectTalentAlertsFromFeatures(params.classDetails),
+    ...collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
+  ])
 
   const seen = new Set<string>()
   return withRiders.filter((action) => {
