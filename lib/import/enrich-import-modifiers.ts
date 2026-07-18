@@ -10,6 +10,8 @@ import {
 } from "@/lib/import/detect-feature-modifiers"
 import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
+import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
+import { nestPsionicAbilityLibrary } from "@/lib/import/nest-psionic-ability-library"
 import {
   applyImportEnrichmentPresets,
   remapKiKeysOnFeatRows,
@@ -27,8 +29,13 @@ import { isCompanionStatBlockFeature } from "@/lib/character/companion-recogniti
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import {
   alternateEffectsSpellsKnownModifier,
+  applySpecializationAlternateEffectsChoice,
   parseAlternateEffectsSpellNames,
 } from "@/lib/import/parse-alternate-effects-table"
+import {
+  ensureSpecialAttackActivation,
+  specialAttackModifierFromPowerDescription,
+} from "@/lib/import/parse-special-attack-from-power"
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import { customFeatHasPresetRegistry } from "@/lib/compendium/custom-feat-modifier-presets"
 import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
@@ -416,21 +423,66 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
       if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
         linkedModifiers = [...linkedModifiers, altEffects]
       }
+      if (isPsionicPower) {
+        const castingTimeForAttack =
+          (typeof (ability as { casting_time?: string }).casting_time === "string"
+            ? (ability as { casting_time: string }).casting_time
+            : null) ??
+          (typeof (ability as { execution?: string }).execution === "string"
+            ? (ability as { execution: string }).execution
+            : null)
+        const alreadyHasSpecialAttack = linkedModifiers.some((instance) =>
+          instance.characteristics?.some((char) => char.type === "special_attack"),
+        )
+        if (!alreadyHasSpecialAttack) {
+          const specialAttack = specialAttackModifierFromPowerDescription(ability.description, {
+            name: ability.name,
+            range:
+              typeof (ability as { range?: string }).range === "string"
+                ? (ability as { range: string }).range
+                : null,
+            castingTime: castingTimeForAttack,
+            instanceKey: ability.name,
+          })
+          if (specialAttack && !isModifierRedundantAgainst(specialAttack, linkedModifiers)) {
+            linkedModifiers = [...linkedModifiers, specialAttack]
+          }
+        }
+        linkedModifiers = ensureSpecialAttackActivation(linkedModifiers, castingTimeForAttack)
+      }
       const synced = syncModifierRefs({
         linkedModifiers,
         modifierRefs: withOptionMods.modifierRefs,
       })
-      return {
+      const withAugments = enrichAbilityPsionicAugments({
+        name: ability.name,
+        description: ability.description,
+        psionic_augments:
+          (ability as { psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null })
+            .psionic_augments ?? null,
+      })
+      const companionStatBlock =
+        (enriched as ImportMechanicsCarrier).companion_stat_block ??
+        ability.companion_stat_block ??
+        (isCompanionStatBlockFeature({
+          name: ability.name,
+          description: ability.description,
+        })
+          ? parseCompanionStatBlock(ability.name, ability.description)
+          : null)
+      return applySpecializationAlternateEffectsChoice({
         ...ability,
+        ...withAugments,
         ...(withOptionMods.choices ? { choices: withOptionMods.choices } : {}),
         linkedModifiers: synced.linkedModifiers,
         modifierRefs: synced.modifierRefs,
         importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
-        companion_stat_block:
-          (enriched as ImportMechanicsCarrier).companion_stat_block ??
-          ability.companion_stat_block,
-      }
+        ...(companionStatBlock ? { companion_stat_block: companionStatBlock } : {}),
+      } as Record<string, unknown>) as (typeof next.abilities)[number]
     }) as ImportContent["abilities"]
+    next.abilities = nestPsionicAbilityLibrary(
+      (next.abilities ?? []).map((ability) => ({ ...(ability as unknown as Record<string, unknown>) })),
+    ) as unknown as ImportContent["abilities"]
   }
 
   const withSpells = attachReferencedSpellsFromSupplements(

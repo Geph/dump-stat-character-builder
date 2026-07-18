@@ -422,6 +422,14 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               : {})}
           />
 
+          <CompendiumEditorPanel title="Description" defaultOpen>
+            <RichTextEditor
+              value={form.description}
+              onChange={(description) => setForm({ ...form, description })}
+              placeholder="Describe the item, including any special properties..."
+            />
+          </CompendiumEditorPanel>
+
           <CompendiumEditorPanel title="Category & cost" defaultOpen>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -526,14 +534,6 @@ export default function EquipmentEditorPage({ id }: { id: string }) {
               />
             </div>
           </div>
-          </CompendiumEditorPanel>
-
-          <CompendiumEditorPanel title="Description" defaultOpen>
-            <RichTextEditor
-              value={form.description}
-              onChange={(description) => setForm({ ...form, description })}
-              placeholder="Describe the item, including any special properties..."
-            />
           </CompendiumEditorPanel>
 
           {/* Armor-specific fields */}

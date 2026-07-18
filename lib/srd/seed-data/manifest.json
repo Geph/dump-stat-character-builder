@@ -1,8 +1,8 @@
 {
-  "version": "5.2.8",
+  "version": "5.2.9",
   "source": "downfallx/dnd-5e-srd-markdown",
   "license": "CC-BY-4.0 (SRD 5.2.1 by Wizards of the Coast)",
-  "generatedAt": "2026-07-17T02:21:00.000Z",
+  "generatedAt": "2026-07-18T00:10:00.000Z",
   "counts": {
     "species": 9,
     "backgrounds": 4,

@@ -11,7 +11,14 @@ import {
   type CharacteristicModifier,
   type CharacteristicModifierType,
 } from "@/lib/compendium/characteristic-modifiers"
-import type { FeatureActivation } from "@/lib/types"
+import type {
+  FeatureActivation,
+  FeatureDurationKey,
+  FeatureSheetDisplay,
+  UsesConfig,
+} from "@/lib/types"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { normalizeFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import {
   GRANT_FEAT_CATALOG_ID,
   LEGACY_GRANT_FEAT_CATALOG_IDS,
@@ -58,6 +65,12 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Resources & uses",
   "Feats & choices",
   "Equipment & items",
+  /** Nested custom-ability entries (Psion disciplines, talent pools, etc.) */
+  "Passive Features",
+  "Psionic Powers",
+  "Alternate Effects",
+  "Discipline Talents",
+  "General Talents",
 ] as const
 
 export type ModifierCatalogGroup = (typeof MODIFIER_CATALOG_GROUPS)[number]
@@ -70,6 +83,12 @@ export interface ModifierCatalogEntry {
   description?: string
   characteristics?: CharacteristicModifier[]
   activation?: FeatureActivation | null
+  /** Links into Common Modifier Effects (ability nested options / feature-like entries). */
+  linkedModifiers?: LinkedModifierInstance[]
+  modifierRefs?: string[]
+  limitedUses?: UsesConfig | null
+  duration?: FeatureDurationKey | null
+  sheetDisplay?: FeatureSheetDisplay | null
 }
 
 const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGroup> = {
@@ -232,19 +251,57 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
   return entries
 }
 
+function readCatalogLinkedModifiers(entry: Record<string, unknown>): LinkedModifierInstance[] | undefined {
+  const raw = entry.linkedModifiers ?? entry.linked_modifiers
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  return raw.filter(
+    (item): item is LinkedModifierInstance =>
+      Boolean(
+        item &&
+          typeof item === "object" &&
+          typeof (item as LinkedModifierInstance).catalogRefId === "string",
+      ),
+  )
+}
+
+function readCatalogModifierRefs(entry: Record<string, unknown>): string[] | undefined {
+  const raw = entry.modifierRefs ?? entry.modifier_refs
+  if (!Array.isArray(raw)) return undefined
+  const refs = raw.filter((id): id is string => typeof id === "string" && id.length > 0)
+  return refs.length ? refs : undefined
+}
+
 export function normalizeModifierCatalog(raw: unknown): ModifierCatalogEntry[] {
   if (!Array.isArray(raw)) return []
   return raw
     .filter((entry): entry is ModifierCatalogEntry => {
       return Boolean(entry && typeof entry === "object" && typeof (entry as ModifierCatalogEntry).id === "string")
     })
-    .map((entry) => ({
-      ...entry,
-      name: typeof entry.name === "string" ? entry.name : "Untitled",
-      group: typeof entry.group === "string" && entry.group.trim() ? entry.group : "Other",
-      characteristics: normalizeCharacteristics(entry.characteristics, null),
-      activation: entry.activation ?? null,
-    }))
+    .map((entry) => {
+      const record = entry as unknown as Record<string, unknown>
+      const linkedModifiers = readCatalogLinkedModifiers(record)
+      const modifierRefs = readCatalogModifierRefs(record)
+      const limitedUses =
+        (record.limitedUses as UsesConfig | null | undefined) ??
+        (record.limited_uses as UsesConfig | null | undefined) ??
+        null
+      const duration =
+        (record.duration as FeatureDurationKey | null | undefined) ?? null
+      return {
+        ...entry,
+        name: typeof entry.name === "string" ? entry.name : "Untitled",
+        group: typeof entry.group === "string" && entry.group.trim() ? entry.group : "Other",
+        characteristics: normalizeCharacteristics(entry.characteristics, null),
+        activation: entry.activation ?? null,
+        linkedModifiers,
+        modifierRefs,
+        limitedUses,
+        duration: duration && typeof duration === "string" ? duration : null,
+        sheetDisplay: normalizeFeatureSheetDisplay(
+          (record.sheetDisplay ?? record.sheet_display) as FeatureSheetDisplay | null | undefined,
+        ),
+      }
+    })
 }
 
 export function mergeDefaultCatalogEntries(existing: ModifierCatalogEntry[]): ModifierCatalogEntry[] {

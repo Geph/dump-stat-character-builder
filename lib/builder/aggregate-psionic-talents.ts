@@ -142,6 +142,26 @@ export function resolveFeatureChoiceOptions(
       },
     )
   }
+  if (choices.optionsSource === "class_talents") {
+    const fromPool = params.customAbilities.find(
+      (row) =>
+        row.ability_role === "talent_pool" && /general\s+psionic\s+talents/i.test(row.name),
+    )
+    const options =
+      fromPool?.choices?.options?.length
+        ? fromPool.choices.options
+        : params.customAbilities
+            .filter((row) => row.ability_role === "class_talent")
+            .map((row) => ({
+              name: row.name,
+              description: row.description ?? "",
+              prerequisite: row.prerequisites ?? null,
+            }))
+    return filterOptionsByPrerequisite(options, {
+      ...prerequisiteContext,
+      selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
+    })
+  }
   if (choices.optionsSource === "class_knacks") {
     const knackKey = Object.keys(params.featureChoicePicks).find((key) => /knack|trick/i.test(key))
     const selected = knackKey
@@ -202,15 +222,32 @@ export function resolveFeatureChoiceOptions(
 /** Mark Psionic Talents class features for dynamic option aggregation at build time. */
 export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[] {
   return features.map((feature) => {
-    if (!/^psionic talents$/i.test(feature.name.trim())) return feature
-    if (!feature.isChoice || !feature.choices) return feature
-    return {
-      ...feature,
-      choices: {
-        ...feature.choices,
-        optionsSource: "known_discipline_talents",
-        options: feature.choices.options?.length ? feature.choices.options : [],
-      },
+    const name = feature.name.trim()
+    if (/^psionic talents$/i.test(name)) {
+      if (!feature.isChoice || !feature.choices) return feature
+      return {
+        ...feature,
+        choices: {
+          ...feature.choices,
+          optionsSource: "known_discipline_talents",
+          options: feature.choices.options?.length ? feature.choices.options : [],
+        },
+      }
     }
+    if (/^(?:class talents|general psionic talents)$/i.test(name)) {
+      return {
+        ...feature,
+        isChoice: true,
+        choices: {
+          category: feature.choices?.category ?? "General Psionic Talents",
+          count: feature.choices?.count ?? 1,
+          options: feature.choices?.options ?? [],
+          resourceKey: feature.choices?.resourceKey ?? "class_talents_known",
+          optionsSource: "class_talents",
+          choiceCountByLevel: feature.choices?.choiceCountByLevel,
+        },
+      }
+    }
+    return feature
   })
 }

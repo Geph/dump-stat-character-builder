@@ -5,7 +5,11 @@ import {
   normalizeModifierCatalog,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
-import { resolveLinkedModifiers } from "@/lib/compendium/linked-modifiers"
+import {
+  appendInlineCharacteristicsAsLinked,
+  normalizeLinkedModifiers,
+  resolveLinkedModifiers,
+} from "@/lib/compendium/linked-modifiers"
 import {
   ELDRITCH_INVOCATIONS_CATALOG_ID,
   METAMAGIC_OPTIONS_CATALOG_ID,
@@ -127,20 +131,13 @@ export function resolveCatalogFeatPickCharacteristics(
   )
   if (!entry) return []
 
-  const fromEntry = entry.characteristics?.length
-    ? normalizeCharacteristics(
-        resolveLinkedModifiers(
-          [
-            {
-              instanceId: entry.id,
-              catalogRefId: entry.id,
-              characteristics: entry.characteristics,
-            },
-          ],
-          catalog,
-        ).characteristics,
-        null,
-      )
+  const linked = appendInlineCharacteristicsAsLinked(
+    normalizeLinkedModifiers(entry.linkedModifiers, catalog, entry.modifierRefs),
+    entry.characteristics,
+    entry.limitedUses,
+  )
+  const fromEntry = linked.length
+    ? normalizeCharacteristics(resolveLinkedModifiers(linked, catalog).characteristics, null)
     : []
   if (fromEntry.length) return fromEntry
 

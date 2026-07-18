@@ -105,6 +105,11 @@ async function ensureBundledSrdFresh(): Promise<void> {
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
   await seedClassResources(classIdMap)
 
+  const spellCatalog = (await getAllFromStore("spells")).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    source: (row.source as string | null | undefined) ?? null,
+  }))
   const subclassesWithIds = enrichSrdSubclassList(
     subclasses
       .map((sc) => ({
@@ -116,6 +121,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
       }))
       .filter((sc) => sc.class_id !== null) as unknown as Record<string, unknown>[],
     new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+    spellCatalog,
   )
   for (const source of LEGACY_SRD_SOURCES) {
     const existing = await getAllFromStore("subclasses")
@@ -147,6 +153,16 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
   const classRows = await getAllFromStore("classes")
   const classIdMap = new Map(classRows.map((c) => [c.name as string, c.id as string]))
 
+  await upsertByName(
+    "spells",
+    enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
+  )
+  const spellCatalog = (await getAllFromStore("spells")).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    source: (row.source as string | null | undefined) ?? null,
+  }))
+
   const subclassesWithIds = enrichSrdSubclassList(
     subclasses
       .map((sc) => ({
@@ -158,6 +174,7 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
       }))
       .filter((sc) => sc.class_id !== null) as unknown as Record<string, unknown>[],
     new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+    spellCatalog,
   )
   for (const source of LEGACY_SRD_SOURCES) {
     const existing = await getAllFromStore("subclasses")
@@ -178,10 +195,6 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
 
   await upsertByName("species", enrichSrdSpeciesList(withSrdCreatorUrlList(species)))
   await upsertByName("backgrounds", normalizeBackgroundRows(withSrdCreatorUrlList(backgrounds) as { name: string; ability_bonuses?: unknown; feat_granted?: string | null; source?: string | null }[]))
-  await upsertByName(
-    "spells",
-    enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
-  )
   await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats as unknown as Record<string, unknown>[])))
   await upsertByName("tools", enrichSrdToolList(withSrdCreatorUrlList(tools as unknown as Record<string, unknown>[])))
   await upsertByName("creatures", buildSrdCreatureSeedRows())

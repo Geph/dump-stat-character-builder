@@ -1,6 +1,7 @@
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { NamedSourceRow } from "@/lib/compendium/prefer-same-source"
 import { resolveSpellNamesToIds } from "@/lib/import/subclass-spell-table"
+import type { Feature, FeatureChoice } from "@/lib/types"
 
 export const IMPORT_SPELL_NAME_PREFIX = "import_spell_name:"
 
@@ -16,6 +17,34 @@ function spellNameFromPlaceholder(spellId: string): string {
   return spellId.slice(IMPORT_SPELL_NAME_PREFIX.length).trim()
 }
 
+/** True when spellId is already a real catalog row id. */
+function isCatalogSpellId(spellId: string, catalogIds: Set<string>): boolean {
+  return catalogIds.has(spellId)
+}
+
+/**
+ * Resolve a stored spellId to a catalog id.
+ * Handles import placeholders (`import_spell_name:Fireball`) and bare names left
+ * on spells_known entries when auto-wiring never ran a catalog pass.
+ */
+function resolveSpellIdEntry(
+  spellId: string,
+  catalog: NamedSourceRow[],
+  catalogIds: Set<string>,
+  preferredSource?: string | null,
+): string {
+  if (!spellId.trim()) return spellId
+  if (isCatalogSpellId(spellId, catalogIds)) return spellId
+
+  const name = isSpellNamePlaceholder(spellId)
+    ? spellNameFromPlaceholder(spellId)
+    : spellId.trim()
+  if (!name) return spellId
+
+  const { resolved } = resolveSpellNamesToIds([name], catalog, preferredSource)
+  return resolved[0]?.spellId ?? spellId
+}
+
 /** Resolve import spell-name placeholders on linked modifiers to catalog spell IDs. */
 export function resolveLinkedModifierSpells(
   linkedModifiers: LinkedModifierInstance[] | undefined,
@@ -24,21 +53,83 @@ export function resolveLinkedModifierSpells(
 ): LinkedModifierInstance[] | undefined {
   if (!linkedModifiers?.length || !catalog.length) return linkedModifiers
 
+  const catalogIds = new Set(
+    catalog.map((row) => row.id).filter((id): id is string => Boolean(id)),
+  )
+
   return linkedModifiers.map((instance) => ({
     ...instance,
     characteristics: instance.characteristics?.map((char) => {
       if (char.type !== "spells_known") return char
 
       const spells = (char.spells ?? []).map((entry) => {
-        if (!entry.spellId || !isSpellNamePlaceholder(entry.spellId)) return entry
-        const name = spellNameFromPlaceholder(entry.spellId)
-        const { resolved } = resolveSpellNamesToIds([name], catalog, preferredSource)
-        const match = resolved[0]
-        if (!match) return entry
-        return { ...entry, spellId: match.spellId }
+        if (!entry.spellId) return entry
+        const nextId = resolveSpellIdEntry(
+          entry.spellId,
+          catalog,
+          catalogIds,
+          preferredSource,
+        )
+        if (nextId === entry.spellId) return entry
+        return { ...entry, spellId: nextId }
       })
 
       return { ...char, spells }
     }),
   }))
+}
+
+function resolveChoiceOptionSpells(
+  choices: FeatureChoice | null | undefined,
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
+): FeatureChoice | null | undefined {
+  if (!choices?.options?.length) return choices
+  return {
+    ...choices,
+    options: choices.options.map((option) => {
+      const linkedModifiers = resolveLinkedModifierSpells(
+        option.linkedModifiers,
+        catalog,
+        preferredSource,
+      )
+      if (linkedModifiers === option.linkedModifiers) return option
+      return { ...option, linkedModifiers }
+    }),
+  }
+}
+
+/** Resolve spells_known placeholders on a feature and its choice options. */
+export function resolveFeatureLinkedSpells(
+  feature: Feature,
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
+): Feature {
+  if (!catalog.length) return feature
+  const linkedModifiers = resolveLinkedModifierSpells(
+    feature.linkedModifiers,
+    catalog,
+    preferredSource,
+  )
+  const choices = resolveChoiceOptionSpells(feature.choices, catalog, preferredSource)
+  if (linkedModifiers === feature.linkedModifiers && choices === feature.choices) {
+    return feature
+  }
+  return {
+    ...feature,
+    ...(linkedModifiers !== undefined ? { linkedModifiers } : {}),
+    ...(choices !== undefined ? { choices: choices ?? undefined } : {}),
+  }
+}
+
+/** Resolve spells_known on every feature in a list (class/subclass/species traits). */
+export function resolveFeatureListLinkedSpells(
+  features: Feature[] | null | undefined,
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
+): Feature[] | null | undefined {
+  if (!features?.length || !catalog.length) return features
+  return features.map((feature) =>
+    resolveFeatureLinkedSpells(feature, catalog, preferredSource),
+  )
 }

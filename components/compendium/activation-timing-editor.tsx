@@ -7,6 +7,12 @@ import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 import { ABILITY_CHECK_OPTIONS } from "@/lib/compendium/class-feature-metadata"
 import type { Feature, FeatureActivation, FeatureActivationRequirement, FeatureSheetDisplay } from "@/lib/types"
 import { FeatureSheetDisplayEditor } from "@/components/compendium/feature-sheet-display-editor"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 export type SiblingClassFeatureOption = {
   name: string
@@ -22,6 +28,13 @@ type ActivationEditorProps = {
   /** When set, renders sheet visibility controls in this section. */
   feature?: Feature
   onSheetDisplayChange?: (sheetDisplay: FeatureSheetDisplay) => void
+  /**
+   * When true, automatic triggers / usage rules / requirements / resource spend
+   * are nested under a collapsed accordion. Action economy + sheet display stay visible.
+   */
+  advancedCollapsed?: boolean
+  /** Extra fields rendered inside the advanced accordion (e.g. duration, limited uses). */
+  advancedExtra?: ReactNode
 }
 
 function newRequirement(): FeatureActivationRequirement {
@@ -92,6 +105,8 @@ export function ActivationEditor({
   siblingFeatures = [],
   feature,
   onSheetDisplayChange,
+  advancedCollapsed = false,
+  advancedExtra,
 }: ActivationEditorProps) {
   const requirements = activation.requirements ?? []
   const inheritActivation = Boolean(activation.usesExistingClassFeature)
@@ -106,27 +121,8 @@ export function ActivationEditor({
     setRequirements(next)
   }
 
-  return (
-    <div className="pt-2 border-t border-border space-y-4">
-      <div>
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Activation</p>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
-      </div>
-
-      <ActivationCheckboxGroup title="Action economy" disabled={inheritActivation}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
-          {ACTION_ECONOMY_OPTIONS.map(([key, label]) => (
-            <ActivationCheckbox
-              key={key}
-              checked={!!activation[key]}
-              disabled={inheritActivation}
-              label={label}
-              onChange={(checked) => onChange({ ...activation, [key]: checked })}
-            />
-          ))}
-        </div>
-      </ActivationCheckboxGroup>
-
+  const advancedFields = (
+    <>
       <ActivationCheckboxGroup title="Automatic triggers" disabled={inheritActivation}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
           {TRIGGER_OPTIONS.map(([key, label]) => (
@@ -196,10 +192,6 @@ export function ActivationEditor({
           />
         </div>
       </ActivationCheckboxGroup>
-
-      {feature && onSheetDisplayChange ? (
-        <FeatureSheetDisplayEditor feature={feature} onChange={onSheetDisplayChange} />
-      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
@@ -337,6 +329,48 @@ export function ActivationEditor({
           )
         })}
       </div>
+
+      {advancedExtra}
+    </>
+  )
+
+  return (
+    <div className="pt-2 border-t border-border space-y-4">
+      <div>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Activation</p>
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      </div>
+
+      <ActivationCheckboxGroup title="Action economy" disabled={inheritActivation}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2">
+          {ACTION_ECONOMY_OPTIONS.map(([key, label]) => (
+            <ActivationCheckbox
+              key={key}
+              checked={!!activation[key]}
+              disabled={inheritActivation}
+              label={label}
+              onChange={(checked) => onChange({ ...activation, [key]: checked })}
+            />
+          ))}
+        </div>
+      </ActivationCheckboxGroup>
+
+      {feature && onSheetDisplayChange ? (
+        <FeatureSheetDisplayEditor feature={feature} onChange={onSheetDisplayChange} />
+      ) : null}
+
+      {advancedCollapsed ? (
+        <Accordion type="single" collapsible className="rounded-lg border border-border px-3">
+          <AccordionItem value="advanced" className="border-0">
+            <AccordionTrigger className="py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:no-underline">
+              Triggers, usage, duration &amp; requirements
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-3">{advancedFields}</AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      ) : (
+        advancedFields
+      )}
     </div>
   )
 }

@@ -1,12 +1,15 @@
 import {
+  CHARACTERISTIC_MODIFIER_TYPE_OPTIONS,
   createModifierId,
   normalizeCharacteristics,
   type CharacteristicModifier,
+  type CharacteristicModifierType,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
   catalogEntryById,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
+import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import type { FeatureActivation } from "@/lib/types"
 
 import type { UsesConfig } from "@/lib/types"
@@ -23,6 +26,49 @@ export type LinkedModifierInstance = {
 /** Stored on migrated inline-only modifier instances (characteristics live on the instance). */
 export const MIGRATED_INLINE_CATALOG_ID = "cat_migrated_inline"
 
+function labelForCharacteristicTypes(
+  characteristics: CharacteristicModifier[] | null | undefined,
+): string {
+  const types = [...new Set((characteristics ?? []).map((mod) => mod.type))]
+  if (types.length === 1) {
+    return (
+      CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.find((option) => option.value === types[0])?.label ??
+      "Custom modifiers"
+    )
+  }
+  if (types.length > 1) return "Custom modifiers"
+  return "Custom modifiers"
+}
+
+/** Human title for a linked modifier card (never show raw catalog ids). */
+export function linkedModifierDisplayName(
+  instance: LinkedModifierInstance,
+  catalog: ModifierCatalogEntry[] | null | undefined,
+): string {
+  const entry = catalogEntryById(catalog, instance.catalogRefId)
+  if (entry?.name?.trim()) return entry.name.trim()
+
+  if (instance.catalogRefId === MIGRATED_INLINE_CATALOG_ID) {
+    return labelForCharacteristicTypes(instance.characteristics)
+  }
+
+  if (instance.catalogRefId.startsWith("cat_char_")) {
+    const type = instance.catalogRefId.slice("cat_char_".length) as CharacteristicModifierType
+    const option = CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.find((row) => row.value === type)
+    if (option) return option.label
+  }
+
+  if (instance.characteristics?.length) {
+    return labelForCharacteristicTypes(instance.characteristics)
+  }
+
+  return "Custom modifier"
+}
+
+/**
+ * Fold legacy inline `characteristics` into linked modifier instances.
+ * Prefer real Common Modifier catalog ids (`cat_char_*`) so the editor can show names.
+ */
 export function appendInlineCharacteristicsAsLinked(
   linked: LinkedModifierInstance[],
   inline: CharacteristicModifier[] | null | undefined,
@@ -30,17 +76,32 @@ export function appendInlineCharacteristicsAsLinked(
 ): LinkedModifierInstance[] {
   const normalized = normalizeCharacteristics(inline ?? null, uses ?? null)
   if (!normalized.length) return linked
+
+  // Legacy single blob — leave as-is (display name is resolved separately).
   if (linked.some((item) => item.catalogRefId === MIGRATED_INLINE_CATALOG_ID)) {
     return linked
   }
-  return [
-    ...linked,
-    {
+
+  const existingRefIds = new Set(linked.map((item) => item.catalogRefId))
+  const byType = new Map<CharacteristicModifierType, CharacteristicModifier[]>()
+  for (const mod of normalized) {
+    const list = byType.get(mod.type) ?? []
+    list.push(mod)
+    byType.set(mod.type, list)
+  }
+
+  const additions: LinkedModifierInstance[] = []
+  for (const [type, characteristics] of byType) {
+    const catalogRefId = characteristicCatalogRefId(type)
+    if (existingRefIds.has(catalogRefId)) continue
+    additions.push({
       instanceId: createModifierInstanceId(),
-      catalogRefId: MIGRATED_INLINE_CATALOG_ID,
-      characteristics: normalized,
-    },
-  ]
+      catalogRefId,
+      characteristics,
+    })
+  }
+
+  return additions.length ? [...linked, ...additions] : linked
 }
 
 export function createModifierInstanceId(): string {

@@ -183,6 +183,26 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
     test: (featureName) => /^weapon mastery$/i.test(featureName.trim()),
     build: () => buildWeaponMasteryModifier(`modinst_weapon_mastery_${newInstanceId()}`),
   },
+  {
+    // Unleashed Mind talent — play-state Rampage Die stepper already exists; this
+    // marks the talent as wired with a sheet reminder rather than inventing auto-triggers.
+    id: "psion.tantrum_by_name",
+    confidence: "medium",
+    test: (featureName) => /^tantrum$/i.test(featureName.trim()),
+    build: (ctx) =>
+      charInstance(newInstanceId(), characteristicCatalogRefId("uses"), [
+        {
+          id: modId(instanceKey(ctx, "tantrum_rampage")),
+          type: "uses",
+          uses: {
+            type: "special",
+            specialDescription:
+              "Rampage Die (sheet control): step up when you roll initiative; step up when you take damage while the die is d6 or lower. Auto-stepping is not modeled yet.",
+          },
+          label: "Tantrum — Rampage Die steps",
+        },
+      ]),
+  },
 ]
 
 function parseAbilityWord(word: string): AbilityScoreKey | null {

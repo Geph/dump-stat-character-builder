@@ -7,6 +7,7 @@ import {
 } from "@/lib/import/detect-feature-modifiers"
 import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { enrichWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -711,6 +712,33 @@ describe("enrichImportContentModifiers", () => {
     expect(feat.modifierRefs).toContain("cat_char_damage_resistance")
   })
 
+  it("marks psionic powers with parsed augments as wired in review", () => {
+    const enriched = enrichImportContentModifiers({
+      abilities: [
+        {
+          name: "Enhancing Surge",
+          ability_role: "psionic_power",
+          source_name: "Psion",
+          description: `<p>The target gains 1d6 temporary hit points.</p>
+<p>You can spend psi points up to your per-use limit to add multiple modifiers to Enhancing Surge.</p>
+<ul>
+<li><strong>Fortifying (1+ psi points):</strong> Extra THP.</li>
+<li><strong>Swift (2 psi points):</strong> Extra action.</li>
+</ul>`,
+        },
+      ],
+    } as ImportContent)
+
+    const review = collectImportModifierReview(enriched)
+    const row = review.find((entry) => entry.featureName === "Enhancing Surge")
+    expect(row?.status).toBe("wired")
+    expect(row?.modifiers.some((mod) => /psi augment/i.test(mod.summary))).toBe(true)
+    expect(
+      (enriched.abilities?.[0] as { psionic_augments?: { augments?: unknown[] } }).psionic_augments
+        ?.augments?.length,
+    ).toBe(2)
+  })
+
   it("wires Common Modifiers on imported abilities from description phrasing", () => {
     const enriched = enrichImportContentModifiers({
       abilities: [
@@ -830,6 +858,21 @@ describe("detectFeatureModifiers by feature name", () => {
     expect(feature.isChoice).toBe(true)
     const enriched = enrichWeaponMasteryFeature(feature, "Fighter")
     expect(enriched.choices?.choiceCountByLevel?.length).toBeGreaterThan(0)
+  })
+
+  it("wires Tantrum by name as a Rampage Die reminder", () => {
+    const detections = detectFeatureModifiers(
+      "When you roll initiative, you can immediately increase your Rampage Die by one step.",
+      { ...classCtx, featureName: "Tantrum", sourceName: "Psion" },
+    )
+    expect(detections.some((entry) => entry.ruleId === "psion.tantrum_by_name")).toBe(true)
+    const uses = detections.find((entry) => entry.ruleId === "psion.tantrum_by_name")?.instance
+      .characteristics?.[0]
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses?.type).toBe("special")
+      expect(uses.uses?.specialDescription).toMatch(/Rampage Die/i)
+    }
   })
 
   it("wires attunement slot increases from description", () => {

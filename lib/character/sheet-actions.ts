@@ -120,7 +120,8 @@ function kindsFromLinkedModifiers(
 ): ActionEconomyKind[] {
   const kinds = new Set<ActionEconomyKind>()
   for (const instance of instances ?? []) {
-    for (const kind of activationKinds(instance.activation)) kinds.add(kind)
+    const fromActivation = activationKinds(instance.activation)
+    for (const kind of fromActivation) kinds.add(kind)
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "healing_dice_pool") {
         kinds.add(characteristic.activation === "bonus_action" ? "bonus" : "action")
@@ -129,6 +130,9 @@ function kindsFromLinkedModifiers(
         (characteristic as { useReaction?: boolean }).useReaction
       ) {
         kinds.add("reaction")
+      } else if (characteristic.type === "special_attack" && !fromActivation.length) {
+        // Special attacks are combat Actions unless activation was set otherwise.
+        kinds.add("action")
       }
     }
   }
