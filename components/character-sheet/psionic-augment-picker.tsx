@@ -27,6 +27,8 @@ type PsionicAugmentPickerProps = {
   selections: PsionicAugmentSelection[]
   onChange: (next: PsionicAugmentSelection[]) => void
   psiLimit?: number | null
+  /** Remaining psi points on the sheet; blocks selections that would exceed this. */
+  availablePsiPoints?: number | null
   readOnly?: boolean
 }
 
@@ -42,29 +44,55 @@ export function PsionicAugmentPicker({
   selections,
   onChange,
   psiLimit,
+  availablePsiPoints = null,
   readOnly = false,
 }: PsionicAugmentPickerProps) {
   const selectedIds = useMemo(() => new Set(selections.map((row) => row.augmentId)), [selections])
   const totalCost = totalPsionicAugmentCost(config, selections)
+  const budget =
+    availablePsiPoints == null && psiLimit == null
+      ? null
+      : Math.min(
+          availablePsiPoints ?? Number.POSITIVE_INFINITY,
+          psiLimit ?? Number.POSITIVE_INFINITY,
+        )
+
+  const wouldFit = (augmentId: string, pointsSpent: number, replacing = false) => {
+    if (budget == null) return true
+    const without = replacing
+      ? selections.filter((row) => row.augmentId !== augmentId)
+      : selections
+    const nextTotal = totalPsionicAugmentCost(config, [
+      ...without,
+      { augmentId, pointsSpent },
+    ])
+    return nextTotal <= budget
+  }
 
   const toggleAugment = (augmentId: string) => {
     if (selectedIds.has(augmentId)) {
       onChange(selections.filter((row) => row.augmentId !== augmentId))
       return
     }
+    const points = defaultPointsForAugment(config, augmentId)
+    if (!wouldFit(augmentId, points, !config.allowMultiple && selections.length >= 1)) return
     if (!config.allowMultiple && selections.length >= 1) {
-      onChange([{ augmentId, pointsSpent: defaultPointsForAugment(config, augmentId) }])
+      onChange([{ augmentId, pointsSpent: points }])
       return
     }
-    onChange([
-      ...selections,
-      { augmentId, pointsSpent: defaultPointsForAugment(config, augmentId) },
-    ])
+    onChange([...selections, { augmentId, pointsSpent: points }])
   }
 
   const setPoints = (augmentId: string, pointsSpent: number) => {
+    const augment = config.augments.find((row) => row.id === augmentId)
+    if (!augment) return
+    const min = augment.cost.min ?? augment.cost.fixed ?? 0
+    const hardMax =
+      augment.cost.max ?? (augment.cost.scalesPerPoint ? psiLimit ?? 9 : min)
+    const capped = Math.min(Math.max(pointsSpent, min), hardMax)
+    if (!wouldFit(augmentId, capped, true)) return
     onChange(
-      selections.map((row) => (row.augmentId === augmentId ? { ...row, pointsSpent } : row)),
+      selections.map((row) => (row.augmentId === augmentId ? { ...row, pointsSpent: capped } : row)),
     )
   }
 
@@ -81,6 +109,9 @@ export function PsionicAugmentPicker({
               : config.allowMultiple
                 ? "Select one or more empower options before casting."
                 : "Select one empower option before casting."}
+            {budget != null && !readOnly ? (
+              <> Available: {budget === Number.POSITIVE_INFINITY ? "—" : budget} psi.</>
+            ) : null}
           </p>
         </div>
         {selections.length ? (
@@ -98,7 +129,21 @@ export function PsionicAugmentPicker({
             augment.cost.scalesPerPoint ||
             (augment.cost.min != null && augment.cost.max != null && augment.cost.fixed == null)
           const min = augment.cost.min ?? augment.cost.fixed ?? 0
-          const max = augment.cost.max ?? (augment.cost.scalesPerPoint ? psiLimit ?? 9 : min)
+          const max = Math.min(
+            augment.cost.max ?? (augment.cost.scalesPerPoint ? psiLimit ?? 9 : min),
+            budget == null || isSelected
+              ? Number.POSITIVE_INFINITY
+              : budget - totalCost + (selected ? augmentPointsCost(augment, selected.pointsSpent) : 0),
+          )
+          const defaultPoints = defaultPointsForAugment(config, augment.id)
+          const canSelect =
+            readOnly ||
+            isSelected ||
+            wouldFit(
+              augment.id,
+              defaultPoints,
+              !config.allowMultiple && selections.length >= 1,
+            )
 
           return (
             <div
@@ -106,15 +151,19 @@ export function PsionicAugmentPicker({
               className={`rounded-lg border px-3 py-2 transition-colors ${
                 isSelected
                   ? "border-violet-500/50 bg-violet-500/10"
-                  : "border-border/70 bg-background/60"
+                  : canSelect
+                    ? "border-border/70 bg-background/60"
+                    : "border-border/50 bg-muted/30 opacity-60"
               }`}
             >
-              <label className={`flex items-start gap-2 ${readOnly ? "" : "cursor-pointer"}`}>
+              <label
+                className={`flex items-start gap-2 ${readOnly || !canSelect ? "" : "cursor-pointer"}`}
+              >
                 <input
                   type={config.allowMultiple ? "checkbox" : "radio"}
                   name={`psionic-augment-${config.resourceKey}`}
                   checked={isSelected}
-                  disabled={readOnly}
+                  disabled={readOnly || (!isSelected && !canSelect)}
                   onChange={() => toggleAugment(augment.id)}
                   className="mt-1 accent-violet-500"
                 />
@@ -137,7 +186,7 @@ export function PsionicAugmentPicker({
                   <input
                     type="number"
                     min={min}
-                    max={max}
+                    max={Number.isFinite(max) ? max : hardMaxFallback(augment, psiLimit)}
                     value={selected?.pointsSpent ?? min}
                     disabled={readOnly}
                     onChange={(event) =>
@@ -162,4 +211,11 @@ export function PsionicAugmentPicker({
       ) : null}
     </div>
   )
+}
+
+function hardMaxFallback(
+  augment: { cost: { max?: number | null; scalesPerPoint?: boolean; min?: number; fixed?: number | null } },
+  psiLimit: number | null | undefined,
+): number {
+  return augment.cost.max ?? (augment.cost.scalesPerPoint ? psiLimit ?? 9 : augment.cost.min ?? 0)
 }
