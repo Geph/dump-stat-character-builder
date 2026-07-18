@@ -45,6 +45,40 @@ describe("aggregatePsionicTalentOptions", () => {
     })
     expect(options.map((row) => row.name)).toEqual(["Force Push"])
   })
+
+  it("ignores Specialization options when aggregating discipline talents", () => {
+    const psycho: CustomAbility = {
+      ...discipline("Psychokinesis Discipline", [
+        { name: "Elemental Aegis", description: "Shield." },
+      ]),
+      choices: {
+        category: "Discipline Talents",
+        count: 1,
+        options: [{ name: "Elemental Aegis", description: "Shield." }],
+      },
+      specialization_choices: {
+        category: "Specialization",
+        count: 1,
+        options: [{ name: "Cryokinetic", description: "Cold AE." }],
+      },
+    }
+    const mishmashed: CustomAbility = {
+      ...discipline("Broken Discipline", [{ name: "Cryokinetic", description: "oops" }]),
+      choices: {
+        category: "Specialization",
+        count: 1,
+        options: [{ name: "Cryokinetic", description: "Should not be a talent." }],
+      },
+    }
+    const options = aggregatePsionicTalentOptions({
+      customAbilities: [psycho, mishmashed],
+      featureChoicePicks: {
+        "class:Primary Discipline": ["Psychokinesis Discipline", "Broken Discipline"],
+      },
+      classNames: ["Psion"],
+    })
+    expect(options.map((row) => row.name)).toEqual(["Elemental Aegis"])
+  })
 })
 
 describe("enrichPsionicTalentGrantFeatures", () => {

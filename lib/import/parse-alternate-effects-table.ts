@@ -52,7 +52,13 @@ function splitSpellNames(chunk: string): string[] {
   return chunk
     .split(SPELL_NAME_SPLIT)
     .map((name) =>
-      stripHomebrewSpellMarker(name.trim().replace(/\*+/g, "").replace(/^(?:and|or)\s+/i, "")),
+      stripHomebrewSpellMarker(
+        name
+          .trim()
+          .replace(/\*+/g, "")
+          .replace(/^(?:and|or)\s+/i, "")
+          .replace(/[.;:]+$/g, ""),
+      ),
     )
     .filter(looksLikeSpellName)
 }
@@ -127,31 +133,32 @@ export function baseAlternateEffectsSection(description: string): string {
   return split[0] ?? description
 }
 
+/** Collect Alternate Effects spell names from HTML tables and/or prose cost lists in a fragment. */
+export function parseAlternateEffectsSpellNamesFromFragment(
+  fragment: string | null | undefined,
+): string[] {
+  if (!fragment?.trim()) return []
+  const rows: AlternateEffectsCostRow[] = []
+  const tableRe = /<table[^>]*>([\s\S]*?)<\/table>/gi
+  let tableMatch
+  while ((tableMatch = tableRe.exec(fragment))) {
+    rows.push(...parseAlternateEffectsCostRowsFromTable(tableMatch[1]))
+  }
+  if (!rows.length) {
+    rows.push(...parseAlternateEffectsCostRowsFromProse(fragment))
+  }
+  return uniqueSpellNames(rows)
+}
+
 /**
- * Parse Kibbles-style Alternate Effects HTML tables from the default/base section only
+ * Parse Kibbles-style Alternate Effects from the default/base section only
  * (specialization replacement tables are handled separately).
  */
 export function parseAlternateEffectsSpellNames(
   description: string | null | undefined,
 ): string[] {
-  if (!description || !/<table/i.test(description)) return []
-
-  const section = baseAlternateEffectsSection(description)
-  const names: string[] = []
-  const seen = new Set<string>()
-  const tableRe = /<table[^>]*>([\s\S]*?)<\/table>/gi
-  let tableMatch
-  while ((tableMatch = tableRe.exec(section))) {
-    for (const row of parseAlternateEffectsCostRowsFromTable(tableMatch[1])) {
-      for (const name of row.spellNames) {
-        const key = name.toLowerCase()
-        if (seen.has(key)) continue
-        seen.add(key)
-        names.push(name)
-      }
-    }
-  }
-  return names
+  if (!description) return []
+  return parseAlternateEffectsSpellNamesFromFragment(baseAlternateEffectsSection(description))
 }
 
 export type ParsedSpecializationAlternateEffects = {
@@ -200,7 +207,7 @@ function costRowsFromSpecializationBody(body: string): AlternateEffectsCostRow[]
   }
   const replaceClause =
     body.match(
-      /(?:replace(?:s|d)?\s+(?:your\s+)?(?:default\s+)?Alternate\s+Effects(?:\s+list)?|replace(?:s|d)?\s+the\s+default\s+table)\s*:?\s*([\s\S]+)/i,
+      /(?:(?:Its|Their|The)\s+)?(?:Alternate\s+Effects(?:\s+list)?\s+replace(?:s|d)?\s+(?:your\s+)?(?:default\s+)?(?:table|list)|replace(?:s|d)?\s+(?:your\s+)?(?:default\s+)?Alternate\s+Effects(?:\s+list)?|replace(?:s|d)?\s+the\s+default\s+table)\s*:?\s*([\s\S]+)/i,
     )?.[1] ?? body
   return parseAlternateEffectsCostRowsFromProse(replaceClause)
 }
@@ -298,10 +305,45 @@ export function specializationChoiceFromDescription(
   }
 }
 
+function optionHasSpellsKnown(option: FeatureChoice["options"][number]): boolean {
+  return (option.linkedModifiers ?? []).some((instance) =>
+    (instance.characteristics ?? []).some(
+      (char) => char.type === "spells_known" && (char.spells?.length ?? 0) > 0,
+    ),
+  )
+}
+
+/** Wire Alternate Effects spells_known onto existing Specialization options from their descriptions. */
+export function enrichSpecializationChoiceOptions(
+  choice: FeatureChoice | null | undefined,
+  instanceKeyBase: string,
+): FeatureChoice | null | undefined {
+  if (!choice?.options?.length) return choice
+  if (!/specialization/i.test(choice.category ?? "")) return choice
+
+  let changed = false
+  const options = choice.options.map((option) => {
+    if (optionHasSpellsKnown(option)) return option
+    const spellNames = parseAlternateEffectsSpellNamesFromFragment(option.description)
+    if (!spellNames.length) return option
+    changed = true
+    return {
+      ...option,
+      linkedModifiers: spellsKnownOnOption(
+        spellNames,
+        `${instanceKeyBase}_${option.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
+        `${option.name} Alternate Effects`,
+      ),
+    }
+  })
+  return changed ? { ...choice, options } : choice
+}
+
 /**
  * Attach specialization choices without clobbering Discipline Talents.
  * - Empty / already-Specialization choices → write to `choices`
  * - Discipline Talents (or other) present → write to `specialization_choices`
+ * Also wires spells_known onto any existing Specialization options that embed AE tables/prose.
  */
 export function applySpecializationAlternateEffectsChoice(
   row: Record<string, unknown>,
@@ -310,26 +352,66 @@ export function applySpecializationAlternateEffectsChoice(
   const keyBase = String(row.name ?? "discipline")
     .replace(/[^a-z0-9]+/gi, "_")
     .toLowerCase()
-  const specialization = specializationChoiceFromDescription(description, keyBase)
-  if (!specialization) return row
 
-  const existing = row.choices as FeatureChoice | null | undefined
+  let next: Record<string, unknown> = { ...row }
+  const existingChoices = enrichSpecializationChoiceOptions(
+    row.choices as FeatureChoice | null | undefined,
+    keyBase,
+  )
+  if (existingChoices !== row.choices) {
+    next = { ...next, choices: existingChoices }
+  }
+  const existingSpec = enrichSpecializationChoiceOptions(
+    row.specialization_choices as FeatureChoice | null | undefined,
+    `${keyBase}_spec`,
+  )
+  if (existingSpec !== row.specialization_choices) {
+    next = { ...next, specialization_choices: existingSpec }
+  }
+
+  const specialization = specializationChoiceFromDescription(description, keyBase)
+  if (!specialization) return next
+
+  const existing = (next.choices ?? row.choices) as FeatureChoice | null | undefined
   const category = existing?.category ?? ""
-  const isTalentPool = /talent/i.test(category)
   const isAlreadySpecialization = /specialization/i.test(category)
+  const alreadyHasSpec =
+    ((next.specialization_choices as FeatureChoice | null | undefined)?.options?.length ?? 0) > 0
+
+  if (alreadyHasSpec && !isAlreadySpecialization) {
+    return next
+  }
 
   if (!existing?.options?.length || isAlreadySpecialization) {
     return {
-      ...row,
+      ...next,
       isChoice: true,
       is_choice: true,
-      choices: specialization,
+      choices: isAlreadySpecialization
+        ? (enrichSpecializationChoiceOptions(existing, keyBase) ?? specialization)
+        : specialization,
       specialization_choices: null,
     }
   }
 
   return {
-    ...row,
+    ...next,
     specialization_choices: specialization,
   }
+}
+
+/** featureChoicePicks key for an optional discipline Specialization (Cryokinetic, etc.). */
+export function abilitySpecializationChoiceKey(abilityId: string): string {
+  return `ability:${abilityId}:specialization`
+}
+
+/** Prefer specialization_choices; fall back to choices when category is Specialization. */
+export function abilitySpecializationChoice(
+  ability: { choices?: FeatureChoice | null; specialization_choices?: FeatureChoice | null },
+): FeatureChoice | null {
+  if (ability.specialization_choices?.options?.length) return ability.specialization_choices
+  if (ability.choices?.options?.length && /specialization/i.test(ability.choices.category ?? "")) {
+    return ability.choices
+  }
+  return null
 }

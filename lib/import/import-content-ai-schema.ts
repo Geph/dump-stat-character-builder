@@ -368,12 +368,16 @@ const AbilityAiSchema = z.object({
   prerequisite: z.string().nullable(),
   repeatable: z.boolean().nullable(),
   source_page: z.number().nullable(),
+  isChoice: z.boolean().nullable(),
+  choices: ChoiceOptionsAiSchema.nullable(),
+  specialization_choices: ChoiceOptionsAiSchema.nullable().describe(
+    "One-time Specialization sub-choice when choices already holds Discipline Talents; each option may embed a replacement Alternate Effects HTML table",
+  ),
 })
 
 const ProposedCustomAbilityAiSchema = AbilityAiSchema.extend({
   proposal_id: z.string(),
   definition: z.string(),
-  choices: ChoiceOptionsAiSchema.nullable(),
 })
 
 const ImportProposalsAiSchema = z.object({
@@ -1060,6 +1064,20 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
                 category: ability.choices.category,
                 count: ability.choices.count,
                 options: ability.choices.options.map((option) =>
+                  omitNull({
+                    name: option.name,
+                    description: option.description,
+                    prerequisite: option.prerequisite ?? undefined,
+                    repeatable: option.repeatable ?? undefined,
+                  }),
+                ),
+              }
+            : undefined,
+          specialization_choices: ability.specialization_choices
+            ? {
+                category: ability.specialization_choices.category,
+                count: ability.specialization_choices.count,
+                options: ability.specialization_choices.options.map((option) =>
                   omitNull({
                     name: option.name,
                     description: option.description,

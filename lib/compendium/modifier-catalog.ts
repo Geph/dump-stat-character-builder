@@ -69,6 +69,7 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Passive Features",
   "Psionic Powers",
   "Alternate Effects",
+  "Specializations",
   "Discipline Talents",
   "General Talents",
 ] as const

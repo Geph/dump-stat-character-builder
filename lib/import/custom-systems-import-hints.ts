@@ -50,10 +50,12 @@ Split layers. Do NOT mash an entire package/section into one ability description
    c) Feat-gated / combo / fusion talents — unlocked by a feat; prerequisites often name multiple disciplines/talents.
       Also ability_role: "class_talent" with prerequisite naming the feat and required abilities using exact names (see Name and source matching), e.g. "Prerequisite: Psionic Synthesis feat, Transposition Discipline, Astral Swap Talent".
 
-4) Specialization (one-time package sub-choice)
-   If a discipline (or similar package) offers a mutually exclusive, one-time sub-choice made when the package is first gained — often labeled "Specialization" — model it as choices: { category: "Specialization", count: 1, options: [...] } when that is the package's only choices pool.
-   If the package ALSO has Discipline Talents, keep talents in choices (category "Discipline Talents") so talent aggregation works, and put each Specialization option (including any statement that it replaces the default Alternate Effects table, plus that replacement table) into the package description under a clear Specialization heading — do NOT mix Specialization options into the talent choices.options list.
-   The parent package description should keep only the default/base Alternate Effects table outside of those specialization sections.
+4) Specialization (one-time package sub-choice) + replacement spell lists
+   If a discipline (or similar package) offers a mutually exclusive, optional/one-time sub-choice when the package is first gained — often labeled "Specialization" — and each option replaces a default Alternate Effects / spell table:
+   - Prefer structured options with an HTML <table> (Point Cost | Alternate Effects) on each option's description so Dump Stat can wire spells_known per option.
+   - When the package ALSO has Discipline Talents: keep talents in choices (category "Discipline Talents"); put Specialization in specialization_choices: { category: "Specialization", count: 1, options: [...] } — do NOT mix Specialization options into the talent choices.options list.
+   - When Specialization is the package's only choices pool: choices: { category: "Specialization", count: 1, options: [...] } is fine.
+   - Fallback: if you cannot emit structured specialization_choices, put each specialization under a clear "Specializations" heading in the package description with bold option names and either an HTML replacement table or a prose cost list ("1—spell a, spell b; 2—…"). Keep only the default/base Alternate Effects table outside those specialization sections. The importer recovers structured choices from that prose.
 
 5) Leaf components (must be separate — completeness checklist)
    Psion — for EVERY discipline in the source, extract ALL of:
@@ -122,6 +124,16 @@ Psionic Disciplines → discipline packages + nested Discipline Talents + separa
             {
               "name": "Enhanced Regrowth",
               "description": "You gain the cure wounds spell…"
+            }
+          ]
+        },
+        "specialization_choices": {
+          "category": "Specialization",
+          "count": 1,
+          "options": [
+            {
+              "name": "Cryokinetic",
+              "description": "<p>Cold-only Elemental Blast…</p><table><tr><td>Point Cost</td><td>Alternate Effects</td></tr><tr><td>1</td><td>arctic breath, entomb</td></tr></table>"
             }
           ]
         },

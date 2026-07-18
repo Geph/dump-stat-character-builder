@@ -25,7 +25,12 @@ function disciplinePickNames(featureChoicePicks: Record<string, string[]>): stri
 }
 
 function talentOptionsFromDiscipline(ability: CustomAbility): FeatureChoice["options"] {
-  return ability.choices?.options ?? []
+  const choices = ability.choices
+  if (!choices?.options?.length) return []
+  // Specialization (Cryokinetic / Electrokinetic / …) is a one-time package sub-choice,
+  // not a talent pool — keep it out of known_discipline_talents aggregation.
+  if (/specialization/i.test(choices.category ?? "")) return []
+  return choices.options
 }
 
 function filterOptionsByPrerequisite(

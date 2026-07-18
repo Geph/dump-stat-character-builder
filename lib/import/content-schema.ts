@@ -669,6 +669,11 @@ export const AbilityImportSchema = z.object({
   concentration: z.boolean().optional(),
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),
+  /**
+   * One-time Specialization sub-choice when `choices` already holds Discipline Talents
+   * (e.g. Psychokinesis Cryokinetic / Electrokinetic / Pyrokinetic with replacement AE tables).
+   */
+  specialization_choices: ChoiceOptionsSchema.nullable().optional(),
   ability_role: z
     .enum([
       "discipline",
@@ -824,6 +829,7 @@ export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose 
 - Keep rules text in description; list each selectable option in choices.options
 - When the selected option can change on a rest, set choices.swappableOnRest: true and swapRestType to "short" or "long" from the source. Do not leave a rest-swappable adaptation looking like a permanent build choice.
 - Put each option's mechanical rules in that option's description (not only in the parent feature list). Dump Stat wires Common Modifiers per option from option descriptions (resistance, speeds, darkvision, etc.) and strips duplicates from the parent.
+- Choose-from-spell-lists (Circle of the Land land types, domain/oath lists with multiple mutually exclusive tables, Psychokinesis-style specializations that each replace an Alternate Effects table): model as isChoice + choices.options where EACH option's description includes its own HTML <table> of spells (class-level columns for subclass lists; Point Cost | Alternate Effects for psi Alternate Effects). Do not mash every subtype's spell table into the parent feature description alone — the importer wires spells_known per option from that option's table.
 - Feat milestones that grant another feat (Epic Boon, Fighting Style feat picks, Origin Feat picks): do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring). Never model those milestones as isChoice + choices.
 - The Ability Score Improvement feat itself is NOT a grant_feat — its body is +2 to one score or +1 to two. Prefer empty mechanics[] (hand presets wire asi_pool) or omit grant_feat entirely; never tag ASI as grant_feat.
 - Named PHB Origin/General feats with complex spell/skill picks (Magic Initiate, Resilient, Keen Mind, Observant, Elemental Adept): prefer empty mechanics[] and avoid inventing isChoice shells — Dump Stat has name-matched presets. isChoice is fine for true option lists with no preset (homebrew).
@@ -846,6 +852,7 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present
+- When a feature lets the player choose among several mutually exclusive spell lists (Circle of the Land land types, similar circle/domain/oath subtype tables): set isChoice: true with choices.options — one option per subtype — and put THAT subtype's HTML spell table in the option description (not only a mashed parent table). Prefer swappableOnRest + swapRestType when the source lets the choice change on a rest.
 - When a feature invents a new transformation / conditional state (e.g. "while in this form"), declare it once under new_toggles: [{ key: "rage_of_the_gods_form", name: "Rage of the Gods", grantingFeature: "Rage of the Gods" }] — then reference that key via requiresSheetToggle in mechanics[]. Do not invent unmatched toggle keys inside individual features.
 - A state with several mutually exclusive modes needs one gated key per mode, not one cosmetic parent toggle. For Elemental Mind's Primordial Aspect, use the recognized keys primordial_aspect_cold, primordial_aspect_fire, and primordial_aspect_lightning in the corresponding mechanics; do not emit a lone primordial_aspect toggle.
 - Do not model a mutable combat die (such as Unleashed Mind's Rampage Die) as a level-scaled dieSidesByLevel resource: its current size changes during play, not by class level. Preserve the exact feature and trigger wording so the dedicated play-state wiring can recognize it.
@@ -889,7 +896,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).
   2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; the importer also builds a "General Psionic Talents" talent_pool package. Wire the class feature with choices.category "Class Talents" or "General Psionic Talents", resourceKey class_talents_known, and optionsSource: "class_talents". Capture level/subclass gates in options[].prerequisite or the row's prerequisite.
   3) Feat-gated / combo talents: also ability_role: "class_talent" with prerequisite naming the feat and any required disciplines/talents (exact names — see Name and source matching).
-- Specialization on a discipline package: if the package offers a mutually exclusive one-time sub-choice when first gained (often labeled "Specialization"), use choices: { category: "Specialization", count: 1, options: [...] } on the package, separate from any Talents choice. Put replacement Alternate Effects tables on the specialization option's description; keep only the default/base table on the parent package description.
+- Specialization on a discipline package: mutually exclusive one-time sub-choice when first gained (often labeled "Specialization"), frequently with each option replacing the default Alternate Effects spell table. Prefer specialization_choices: { category: "Specialization", count: 1, options: [...] } when Discipline Talents already occupy choices; otherwise choices with category "Specialization" is fine. Put a Point Cost | Alternate Effects HTML <table> on each specialization option's description; keep only the default/base table on the parent package description. If you cannot emit structured options, put Specializations as bold-named sections in the package description with replacement tables or prose cost lists ("1—spell; 2—…") — the importer recovers them.
 - For disciplines with nested talents, include EVERY talent from that discipline's list in choices.options. Put each leaf labeled Psionic power as its own custom_abilities proposal with ability_role: "psionic_power" (casting headers + augment lists in description) — do NOT put those powers in spells[] and do not mash power text into the discipline package description.
 - For exploit/maneuver libraries, one custom_abilities proposal per exploit; degree headers (1st-Degree Exploits, …) are NOT ability rows.
 - Populate execution (verbatim Execution/Activation/Trigger line) and eligible_classes (every named learnable class) on exploit-style leaves; keep prerequisite for real prerequisites only (ability scores, skills/tools, level) — see Custom ability library structure.

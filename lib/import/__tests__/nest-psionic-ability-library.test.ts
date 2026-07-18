@@ -61,6 +61,34 @@ describe("nestPsionicAbilityLibrary", () => {
     expect(isTopLevelCompendiumAbility({ ability_role: "class_talent" })).toBe(false)
   })
 
+  it("nests Specializations separately from Discipline Talents", () => {
+    const nested = nestPsionicAbilityLibrary([
+      {
+        name: "Psychokinesis Discipline",
+        ability_role: "discipline",
+        description: "<p><strong>Alternate Effects.</strong> Table.</p>",
+        choices: {
+          category: "Discipline Talents",
+          count: 1,
+          options: [{ name: "Elemental Aegis", description: "Shield." }],
+        },
+        specialization_choices: {
+          category: "Specialization",
+          count: 1,
+          options: [{ name: "Cryokinetic", description: "Cold AE." }],
+        },
+        source_name: "Psion",
+      },
+    ])
+    const catalog = nested[0]?.modifier_catalog as { name: string; group: string }[]
+    expect(catalog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Cryokinetic", group: "Specializations" }),
+        expect.objectContaining({ name: "Elemental Aegis", group: "Discipline Talents" }),
+      ]),
+    )
+  })
+
   it("extracts Adaptive Hunter-style passives", () => {
     expect(
       extractDisciplinePassive(

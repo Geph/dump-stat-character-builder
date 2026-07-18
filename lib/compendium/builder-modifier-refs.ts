@@ -23,6 +23,10 @@ import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendi
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { tagModifierSource } from "@/lib/character/tag-modifier-source"
+import {
+  abilitySpecializationChoice,
+  abilitySpecializationChoiceKey,
+} from "@/lib/import/parse-alternate-effects-table"
 import type {
   Background,
   CustomAbility,
@@ -64,6 +68,23 @@ function collectLinkedFromFeature(
       instances.push(...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog))
     }
   }
+}
+
+/** Drop default Alternate Effects spells_known so a specialization replacement can take over. */
+function stripAlternateEffectsSpellsKnown(
+  linked: LinkedModifierInstance[],
+): LinkedModifierInstance[] {
+  return linked
+    .map((instance) => {
+      const characteristics = (instance.characteristics ?? []).filter(
+        (char) =>
+          !(char.type === "spells_known" && /alternate\s*effects/i.test(char.label ?? "")),
+      )
+      if (characteristics.length === (instance.characteristics ?? []).length) return instance
+      if (!characteristics.length) return null
+      return { ...instance, characteristics }
+    })
+    .filter((instance): instance is LinkedModifierInstance => instance != null)
 }
 
 function collectLinkedFromFeatures(
@@ -385,9 +406,24 @@ export function collectBuilderModifierRefIds(params: {
   })
 
   const customAbilityMods = customAbilities.flatMap((ability) => {
-    const row = ability as unknown as unknown as Record<string, unknown>
-    const linked = readLinkedModifiers(row, catalog)
+    const row = ability as unknown as Record<string, unknown>
+    let linked = readLinkedModifiers(row, catalog)
     const refs = ability.modifierRefs ?? readModifierRefs(row)
+    const specialization = abilitySpecializationChoice(ability)
+    if (specialization?.options?.length) {
+      const pickKey = abilitySpecializationChoiceKey(ability.id)
+      const pickedName = featureChoicePicks[pickKey]?.[0]
+      const picked = pickedName
+        ? specialization.options.find((option) => option.name === pickedName)
+        : undefined
+      if (picked) {
+        // Specialization replaces the default Alternate Effects spell list.
+        linked = [
+          ...stripAlternateEffectsSpellsKnown(linked),
+          ...effectiveLinkedModifiers(picked.linkedModifiers, picked.modifierRefs, catalog),
+        ]
+      }
+    }
     return tagModifierSource(
       characteristicsFromLinkedModifiers(catalog, linked, refs),
       {
