@@ -1,5 +1,9 @@
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import type { NamedSourceRow } from "@/lib/compendium/prefer-same-source"
+import {
+  resolvePreferredNameMatch,
+  type NamedSourceRow,
+} from "@/lib/compendium/prefer-same-source"
+import { isAliasRoutableSpellName } from "@/lib/compendium/spell-name-aliases"
 import { resolveSpellNamesToIds } from "@/lib/import/subclass-spell-table"
 import type { Feature, FeatureChoice } from "@/lib/types"
 
@@ -26,6 +30,8 @@ function isCatalogSpellId(spellId: string, catalogIds: Set<string>): boolean {
  * Resolve a stored spellId to a catalog id.
  * Handles import placeholders (`import_spell_name:Fireball`) and bare names left
  * on spells_known entries when auto-wiring never ran a catalog pass.
+ * Alias stubs already stored as catalog ids (e.g. Feeblemind) redirect to the
+ * canonical filled row (Befuddlement) when present.
  */
 function resolveSpellIdEntry(
   spellId: string,
@@ -34,7 +40,15 @@ function resolveSpellIdEntry(
   preferredSource?: string | null,
 ): string {
   if (!spellId.trim()) return spellId
-  if (isCatalogSpellId(spellId, catalogIds)) return spellId
+
+  if (isCatalogSpellId(spellId, catalogIds)) {
+    const row = catalog.find((entry) => entry.id === spellId)
+    if (row && isAliasRoutableSpellName(row.name)) {
+      const routed = resolvePreferredNameMatch(row.name, catalog, preferredSource)
+      if (routed?.id) return routed.id
+    }
+    return spellId
+  }
 
   const name = isSpellNamePlaceholder(spellId)
     ? spellNameFromPlaceholder(spellId)

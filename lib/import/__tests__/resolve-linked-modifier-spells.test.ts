@@ -46,6 +46,40 @@ describe("resolveLinkedModifierSpells", () => {
     ])
   })
 
+  it("routes stored alias-stub catalog ids to the canonical spell", () => {
+    const catalog = [
+      ...CATALOG,
+      { id: "stub-feeblemind", name: "Feeblemind", source: "Custom" },
+      { id: "srd-befuddlement", name: "Befuddlement", source: "SRD 5.2.1" },
+    ]
+    const linked = resolveLinkedModifierSpells(
+      [
+        {
+          instanceId: "modinst_test",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_test",
+              type: "spells_known",
+              spells: [
+                { spellId: "stub-feeblemind" },
+                { spellId: `${IMPORT_SPELL_NAME_PREFIX}Feeblemind` },
+              ],
+            },
+          ],
+        },
+      ],
+      catalog,
+    )
+    const spells = (
+      linked?.[0]?.characteristics?.[0] as { spells?: { spellId: string }[] } | undefined
+    )?.spells
+    expect(spells?.map((entry) => entry.spellId)).toEqual([
+      "srd-befuddlement",
+      "srd-befuddlement",
+    ])
+  })
+
   it("resolves bare spell names left as spellId", () => {
     const linked = resolveLinkedModifierSpells(
       [
