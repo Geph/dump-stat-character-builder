@@ -14,18 +14,19 @@ import {
   type OrderBy,
 } from "@/lib/db/repository"
 import { resolveTable } from "@/lib/db/tables"
+import { coerceQueryFilterValue } from "@/lib/data/coerce-query-filter-value"
 
 function parseFilters(request: NextRequest): Filter[] {
   const filters: Filter[] = []
   for (const [key, value] of request.nextUrl.searchParams.entries()) {
     if (key.startsWith("eq_")) {
-      filters.push({ op: "eq", column: key.slice(3), value })
+      filters.push({ op: "eq", column: key.slice(3), value: coerceQueryFilterValue(value) })
     }
     if (key.startsWith("in_")) {
       filters.push({
         op: "in",
         column: key.slice(3),
-        values: value.split(",").filter(Boolean),
+        values: value.split(",").filter(Boolean).map(coerceQueryFilterValue),
       })
     }
   }

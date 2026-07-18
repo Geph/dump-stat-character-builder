@@ -233,6 +233,31 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Adds a Creatures & Companions entry to the character sheet Companions tab (by name)",
   },
   {
+    value: "power_rider",
+    label: "Power / Ability Rider Alert",
+    hint: "Shows an alert on related sheet actions (e.g. Flickering Escape on Phase Rift)",
+  },
+  {
+    value: "ability_score_override",
+    label: "Ability Score Override",
+    hint: "Set one or more ability scores equal to another (Physical Surge)",
+  },
+  {
+    value: "healing_received_modifier",
+    label: "Healing Received Modifier",
+    hint: "Multiply magical healing you receive (Magical Anathema half healing)",
+  },
+  {
+    value: "grant_custom_ability",
+    label: "Grant Custom Ability",
+    hint: "Know / unlock a named custom ability (e.g. Telekinetic Weapons power)",
+  },
+  {
+    value: "feature_choice_count_bonus",
+    label: "Feature Choice Count Bonus",
+    hint: "Extra picks for a named feature or choice category (Unlimited Imagination, Skill Thief)",
+  },
+  {
     value: "equipment_and_magic_items",
     label: "Equipment & Magic Items",
     hint: "Create mundane gear or replicate magic item plans (Artificer)",
@@ -333,6 +358,11 @@ export interface AbilityScoresCharacteristic extends CharacteristicModifierBase 
   bonuses: Partial<Record<AbilityScoreKey, number>>
   /** Points to spend when mode is asi_pool (default 2 per SRD ASI). */
   points?: number
+  /**
+   * When mode is asi_pool, restrict which abilities may receive points
+   * (e.g. Athlete: Strength or Dexterity only). Omit for any ability.
+   */
+  allowedAbilities?: AbilityScoreKey[]
 }
 
 export interface SkillEntry {
@@ -947,6 +977,12 @@ export interface TurnStartTriggerCharacteristic extends CharacteristicModifierBa
   accrueResourceAmount?: number | null
   accrueResourceMaxAbility?: AbilityScoreKey | null
   accrueDecayMinutes?: number | null
+  /** Ephemeral turn-start grant that scales by class level (Psionic Mastery). */
+  accrueResourceAmountByLevel?: { level: number; amount: number }[] | null
+  /** Bonus units expire at end of turn if unspent (Psionic Mastery free psi). */
+  expiresEndOfTurn?: boolean
+  /** Human-readable spend restriction for ephemeral grants. */
+  usageRestriction?: string | null
   /** Skip when toggle is off (e.g. in-combat gate). */
   requiresSheetToggle?: SheetToggleKey
   /** Skip when any of these conditions are active (e.g. Incapacitated). */
@@ -1098,6 +1134,47 @@ export interface CatalogOptionCharacteristic extends CharacteristicModifierBase 
   catalogEntryId: string
 }
 
+/** Alert attached to named sheet actions / powers (talent riders without their own roll). */
+export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
+  type: "power_rider"
+  /** Action / custom ability names that should show the alert (e.g. "Phase Rift"). */
+  parentPowerNames: string[]
+  /** Short summary for the alert badge (defaults to feature label). */
+  alertSummary?: string
+}
+
+/** Set listed ability scores equal to another ability's score (Physical Surge). */
+export interface AbilityScoreOverrideCharacteristic extends CharacteristicModifierBase {
+  type: "ability_score_override"
+  targets: AbilityScoreKey[]
+  sourceAbility: AbilityScoreKey
+  /** Player may choose which target when more than one is listed. */
+  chooseOneTarget?: boolean
+}
+
+/** Multiply healing you receive (Magical Anathema). */
+export interface HealingReceivedModifierCharacteristic extends CharacteristicModifierBase {
+  type: "healing_received_modifier"
+  multiplier: number
+  magicalOnly?: boolean
+  includePotions?: boolean
+}
+
+/** Unlock / know a named custom ability (Telekinetic Weapons power). */
+export interface GrantCustomAbilityCharacteristic extends CharacteristicModifierBase {
+  type: "grant_custom_ability"
+  abilityNames: string[]
+}
+
+/** Extra picks for a feature choice pool (Unlimited Imagination, Skill Thief slots). */
+export interface FeatureChoiceCountBonusCharacteristic extends CharacteristicModifierBase {
+  type: "feature_choice_count_bonus"
+  targetFeatureName?: string | null
+  choiceCategory?: string | null
+  bonus?: number | null
+  bonusFrom?: "half_proficiency" | "proficiency" | null
+}
+
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
@@ -1152,6 +1229,11 @@ export type CharacteristicModifier =
   | GrantCreatureCharacteristic
   | EquipmentAndMagicItemsCharacteristic
   | CatalogOptionCharacteristic
+  | PowerRiderCharacteristic
+  | AbilityScoreOverrideCharacteristic
+  | HealingReceivedModifierCharacteristic
+  | GrantCustomAbilityCharacteristic
+  | FeatureChoiceCountBonusCharacteristic
 
 export function createModifierId(): string {
   return `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -1314,6 +1396,22 @@ export function createCharacteristicModifier(
       return { id, type, featCategories: ["General"], count: 1 }
     case "grant_creature":
       return { id, type, creatureNames: [], count: 1 }
+    case "power_rider":
+      return { id, type, parentPowerNames: [], alertSummary: "" }
+    case "ability_score_override":
+      return {
+        id,
+        type,
+        targets: ["strength", "dexterity"],
+        sourceAbility: "intelligence",
+        chooseOneTarget: true,
+      }
+    case "healing_received_modifier":
+      return { id, type, multiplier: 0.5, magicalOnly: true, includePotions: true }
+    case "grant_custom_ability":
+      return { id, type, abilityNames: [] }
+    case "feature_choice_count_bonus":
+      return { id, type, targetFeatureName: null, choiceCategory: null, bonus: 1, bonusFrom: null }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
     case "craftable_items":
@@ -1740,6 +1838,11 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
   if (value.type === "ability_scores") {
     const raw = value as AbilityScoresCharacteristic
     const mode = raw.mode === "asi_pool" ? "asi_pool" : "fixed"
+    const allowed = Array.isArray(raw.allowedAbilities)
+      ? raw.allowedAbilities.filter((key): key is AbilityScoreKey =>
+          (ABILITY_SCORE_KEYS as readonly string[]).includes(key),
+        )
+      : undefined
     return {
       id: raw.id,
       label: raw.label,
@@ -1747,6 +1850,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       mode,
       bonuses: raw.bonuses ?? {},
       points: mode === "asi_pool" ? (raw.points ?? 2) : undefined,
+      ...(mode === "asi_pool" && allowed?.length ? { allowedAbilities: allowed } : {}),
     }
   }
 
@@ -1913,6 +2017,11 @@ export type AggregatedCharacteristics = {
   }
   catalogOptions: CatalogOptionCharacteristic[]
   equipmentMagicItems: EquipmentAndMagicItemsCharacteristic[]
+  powerRiders: PowerRiderCharacteristic[]
+  abilityScoreOverrides: AbilityScoreOverrideCharacteristic[]
+  healingReceivedModifiers: HealingReceivedModifierCharacteristic[]
+  grantedCustomAbilityNames: string[]
+  featureChoiceCountBonuses: FeatureChoiceCountBonusCharacteristic[]
 }
 
 const UNARMED_DIE_RANK: Record<UnarmedStrikeDie, number> = {
@@ -2003,6 +2112,11 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   },
   catalogOptions: [],
   equipmentMagicItems: [],
+  powerRiders: [],
+  abilityScoreOverrides: [],
+  healingReceivedModifiers: [],
+  grantedCustomAbilityNames: [],
+  featureChoiceCountBonuses: [],
 })
 
 function pushUnique(list: string[], values: string[] | null | undefined) {
@@ -2445,6 +2559,21 @@ export function aggregateCharacteristics(
         break
       case "equipment_and_magic_items":
         result.equipmentMagicItems.push(mod)
+        break
+      case "power_rider":
+        result.powerRiders.push(mod)
+        break
+      case "ability_score_override":
+        result.abilityScoreOverrides.push(mod)
+        break
+      case "healing_received_modifier":
+        result.healingReceivedModifiers.push(mod)
+        break
+      case "grant_custom_ability":
+        pushUnique(result.grantedCustomAbilityNames, mod.abilityNames)
+        break
+      case "feature_choice_count_bonus":
+        result.featureChoiceCountBonuses.push(mod)
         break
     }
   }

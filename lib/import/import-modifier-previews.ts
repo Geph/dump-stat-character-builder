@@ -4,6 +4,7 @@ import {
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { isStructuralOrNarrativeFeature } from "@/lib/compendium/modifier-review"
 import {
   isSubclassSpellTableFeature,
   parseSubclassSpellTable,
@@ -58,6 +59,7 @@ function psionicAugmentCount(feature: FeatureCarrier): number {
 function featureHasLinkedModifiers(feature: FeatureCarrier): boolean {
   if ((feature.linkedModifiers?.length ?? 0) > 0) return true
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) return true
+  if (feature.isChoice && feature.choices?.optionsSource) return true
   if (feature.companion_stat_block) return true
   if (psionicAugmentCount(feature) > 0) return true
   const name = feature.name ?? ""
@@ -75,6 +77,7 @@ function collectUnmatchedFromFeature(
 ): void {
   const name = feature.name?.trim()
   if (!name || featureHasLinkedModifiers(feature)) return
+  if (isStructuralOrNarrativeFeature(feature)) return
   entries.push({
     id: `${sourceLabel}::${name}::${feature.level ?? 0}`,
     sourceLabel,
@@ -196,12 +199,27 @@ export type ImportModifierReviewRow = {
   sourceLabel: string
   featureName: string
   featureLevel?: number
-  status: "wired" | "unwired"
+  status: "wired" | "unwired" | "structural"
   modifiers: ImportModifierPreviewEntry[]
+  note?: string
 }
 
 function reviewRowId(sourceLabel: string, featureName: string, featureLevel?: number): string {
   return `${sourceLabel}::${featureName}::${featureLevel ?? 0}`
+}
+
+function featureHasChoicePool(feature: FeatureCarrier): boolean {
+  const isChoice = Boolean(
+    feature.isChoice ?? (feature as { is_choice?: boolean }).is_choice,
+  )
+  if (!isChoice) return false
+  const choices = feature.choices as
+    | { options?: unknown[]; optionsSource?: string | null; category?: string }
+    | null
+    | undefined
+  if (!choices) return false
+  if (choices.optionsSource) return true
+  return Array.isArray(choices.options) && choices.options.length > 0
 }
 
 function pushReviewRow(
@@ -210,14 +228,53 @@ function pushReviewRow(
   feature: FeatureCarrier,
   previews: ImportModifierPreviewEntry[],
 ): void {
-  const wiredByStructure = featureHasLinkedModifiers(feature)
+  const wiredByStructure = featureHasLinkedModifiers(feature) || featureHasChoicePool(feature)
+  if (previews.length > 0 || wiredByStructure) {
+    rows.push({
+      id: reviewRowId(sourceLabel, feature.name, feature.level),
+      sourceLabel,
+      featureName: feature.name,
+      featureLevel: feature.level,
+      status: "wired",
+      modifiers: previews.length
+        ? previews
+        : featureHasChoicePool(feature)
+          ? [
+              {
+                id: `${sourceLabel}::${feature.name}::choice_pool`,
+                sourceLabel,
+                featureName: feature.name,
+                featureLevel: feature.level,
+                summary: `Choice pool (${(feature.choices as { optionsSource?: string; category?: string })?.optionsSource ?? (feature.choices as { category?: string })?.category ?? "options"})`,
+                confidence: "high",
+                matchedPhrase: "Name preset / choice shell",
+                source: "detector",
+                ruleId: "feat.choice_pool",
+              },
+            ]
+          : [],
+    })
+    return
+  }
+  if (isStructuralOrNarrativeFeature(feature)) {
+    rows.push({
+      id: reviewRowId(sourceLabel, feature.name, feature.level),
+      sourceLabel,
+      featureName: feature.name,
+      featureLevel: feature.level,
+      status: "structural",
+      modifiers: [],
+      note: "Structural / narrative — no common modifiers expected (subclass pick, placeholder, or sheet-side transformation).",
+    })
+    return
+  }
   rows.push({
     id: reviewRowId(sourceLabel, feature.name, feature.level),
     sourceLabel,
     featureName: feature.name,
     featureLevel: feature.level,
-    status: previews.length > 0 || wiredByStructure ? "wired" : "unwired",
-    modifiers: previews,
+    status: "unwired",
+    modifiers: [],
   })
 }
 

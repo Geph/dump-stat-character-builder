@@ -2,81 +2,148 @@ import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formul
 import { aggregateDiscoveryOptions } from "@/lib/builder/aggregate-discoveries"
 import { aggregateKnackOptions } from "@/lib/builder/knack-choices"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
-import {
-  extractPrerequisiteFromDescription,
-  isChoicePrerequisiteMet,
-  type ChoicePrerequisiteContext,
-} from "@/lib/builder/choice-prerequisite"
+import { filterChoiceOptionsByEligibility, isCustomAbilityEligible } from "@/lib/builder/choice-option-eligibility"
+import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisite"
 import type { CustomAbility, Equipment, Feature, FeatureChoice } from "@/lib/types"
 import { weaponMasteryOptionsForClass } from "@/lib/compendium/weapon-mastery-choice"
 import { weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 
 function normalizeName(value: string): string {
-  return value.trim().toLowerCase()
+  return value.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-function disciplinePickNames(featureChoicePicks: Record<string, string[]>): string[] {
+function namesMatch(a: string, b: string): boolean {
+  const left = normalizeName(a)
+  const right = normalizeName(b)
+  if (!left || !right) return false
+  return left === right || left.includes(right) || right.includes(left)
+}
+
+function disciplinePickNames(
+  featureChoicePicks: Record<string, string[]>,
+  customAbilities: CustomAbility[],
+): string[] {
+  const disciplineAbilities = customAbilities.filter(isDisciplinePackageAbility)
   const names: string[] = []
   for (const [key, picks] of Object.entries(featureChoicePicks)) {
-    if (!/discipline/i.test(key)) continue
-    names.push(...picks)
+    if (/discipline/i.test(key)) {
+      names.push(...picks)
+      continue
+    }
+    // Feat picks (e.g. Psionic Adept) store package names without "discipline" in the key.
+    for (const pick of picks) {
+      if (disciplineAbilities.some((ability) => namesMatch(ability.name, pick))) {
+        names.push(pick)
+      }
+    }
   }
-  return names.map(normalizeName)
+  return names
+}
+
+export function isDisciplinePackageAbility(ability: CustomAbility): boolean {
+  if (ability.ability_role === "discipline") {
+    // Import accidents sometimes store class feature shells as discipline rows.
+    if (/^(?:primary|secondary|third)\s+discipline$/i.test(ability.name.trim())) return false
+    if (/^psionic talents$/i.test(ability.name.trim())) return false
+    return true
+  }
+  return /\bdiscipline\b/i.test(ability.name)
+}
+
+/**
+ * Disciplines the character currently knows: feature picks + granted custom abilities
+ * (e.g. archetype-granted primary discipline).
+ */
+export function collectKnownDisciplineNames(params: {
+  customAbilities: CustomAbility[]
+  featureChoicePicks: Record<string, string[]>
+  grantedAbilityNames?: string[]
+  knownDisciplineNames?: string[]
+}): string[] {
+  if (params.knownDisciplineNames?.length) {
+    return [...new Set(params.knownDisciplineNames.map((name) => name.trim()).filter(Boolean))]
+  }
+
+  const fromPicks = disciplinePickNames(params.featureChoicePicks, params.customAbilities)
+  const disciplineAbilities = params.customAbilities.filter(isDisciplinePackageAbility)
+  const fromGrants = (params.grantedAbilityNames ?? []).filter((grant) =>
+    disciplineAbilities.some((ability) => namesMatch(ability.name, grant)),
+  )
+
+  const merged: string[] = []
+  const seen = new Set<string>()
+  for (const name of [...fromPicks, ...fromGrants]) {
+    const key = normalizeName(name)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    merged.push(name.trim())
+  }
+  return merged
 }
 
 function talentOptionsFromDiscipline(ability: CustomAbility): FeatureChoice["options"] {
   const choices = ability.choices
-  if (!choices?.options?.length) return []
-  // Specialization (Cryokinetic / Electrokinetic / …) is a one-time package sub-choice,
-  // not a talent pool — keep it out of known_discipline_talents aggregation.
-  if (/specialization/i.test(choices.category ?? "")) return []
-  return choices.options
+  if (choices?.options?.length && !/specialization/i.test(choices.category ?? "")) {
+    return choices.options
+  }
+
+  // Nested import packages often store talents on modifier_catalog after specialization
+  // takes over `choices`.
+  const catalog = ability.modifier_catalog
+  if (!Array.isArray(catalog) || !catalog.length) return []
+  return catalog
+    .filter((entry) => /discipline\s+talents?/i.test(String(entry.group ?? "")))
+    .map((entry) => ({
+      name: entry.name,
+      description: entry.description ?? entry.summary ?? "",
+      prerequisite:
+        typeof entry.summary === "string" && /^prerequisite:/i.test(entry.summary)
+          ? entry.summary.replace(/^prerequisite:\s*/i, "").trim()
+          : null,
+    }))
 }
 
-function filterOptionsByPrerequisite(
-  options: FeatureChoice["options"],
-  context: ChoicePrerequisiteContext,
-): FeatureChoice["options"] {
-  return options.filter((option) => {
-    const prerequisite =
-      option.prerequisite?.trim() ||
-      extractPrerequisiteFromDescription(option.description) ||
-      null
-    return isChoicePrerequisiteMet(prerequisite, {
-      ...context,
-      selectedAbilityNames: context.selectedAbilityNames ?? [],
-    })
-  })
+function buildPrerequisiteContext(params: {
+  classLevel: number
+  featureChoicePicks: Record<string, string[]>
+  knownSpellNames?: string[]
+  subclassName?: string | null
+  grantedAbilityNames?: string[]
+  knownDisciplineNames?: string[]
+}): ChoicePrerequisiteContext {
+  return {
+    classLevel: params.classLevel,
+    knownSpellNames: params.knownSpellNames,
+    subclassName: params.subclassName,
+    selectedAbilityNames: [
+      ...Object.values(params.featureChoicePicks).flat(),
+      ...(params.grantedAbilityNames ?? []),
+      ...(params.knownDisciplineNames ?? []),
+    ],
+  }
 }
 
 /**
  * Union talent options from discipline custom abilities the character knows.
  * Used when a class feature sets choices.optionsSource = "known_discipline_talents".
+ * Returns [] until at least one discipline is known (picked or granted).
  */
 export function aggregatePsionicTalentOptions(params: {
   customAbilities: CustomAbility[]
   featureChoicePicks: Record<string, string[]>
   classNames: string[]
   knownDisciplineNames?: string[]
+  grantedAbilityNames?: string[]
 }): FeatureChoice["options"] {
-  const known =
-    params.knownDisciplineNames?.map(normalizeName) ??
-    disciplinePickNames(params.featureChoicePicks)
+  const known = collectKnownDisciplineNames(params).map(normalizeName)
+  if (!known.length) return []
 
   const options: FeatureChoice["options"] = []
   const seen = new Set<string>()
 
   for (const ability of params.customAbilities) {
-    if (ability.ability_role !== "discipline" && !/\bdiscipline\b/i.test(ability.name)) continue
-    if (params.classNames.length && ability.attached_to_type === "class") {
-      // attached abilities filtered elsewhere
-    }
-    const matchesKnown =
-      !known.length ||
-      known.some(
-        (pick) =>
-          normalizeName(ability.name).includes(pick) || pick.includes(normalizeName(ability.name)),
-      )
+    if (!isDisciplinePackageAbility(ability)) continue
+    const matchesKnown = known.some((pick) => namesMatch(ability.name, pick))
     if (!matchesKnown) continue
 
     for (const option of talentOptionsFromDiscipline(ability)) {
@@ -91,28 +158,43 @@ export function aggregatePsionicTalentOptions(params: {
 }
 
 /** Resolve effective choice options for builder/sheet (static or aggregated). */
+export type ResolveFeatureChoiceOptionsParams = {
+  customAbilities: CustomAbility[]
+  featureChoicePicks: Record<string, string[]>
+  classNames: string[]
+  classLevel?: number
+  equipmentCatalog?: Equipment[]
+  knownSpellNames?: string[]
+  subclassName?: string | null
+  /** Abilities granted by class/subclass modifiers (e.g. archetype disciplines). */
+  grantedCustomAbilityNames?: string[]
+}
+
 export function resolveFeatureChoiceOptions(
   feature: Feature,
-  params: {
-    customAbilities: CustomAbility[]
-    featureChoicePicks: Record<string, string[]>
-    classNames: string[]
-    classLevel?: number
-    equipmentCatalog?: Equipment[]
-    knownSpellNames?: string[]
-    subclassName?: string | null
-  },
+  params: ResolveFeatureChoiceOptionsParams,
 ): FeatureChoice["options"] {
   const choices = feature.choices
   if (!choices) return []
 
   const classLevel = params.classLevel ?? 20
-  const prerequisiteContext: ChoicePrerequisiteContext = {
+  const knownDisciplines = collectKnownDisciplineNames({
+    customAbilities: params.customAbilities,
+    featureChoicePicks: params.featureChoicePicks,
+    grantedAbilityNames: params.grantedCustomAbilityNames,
+  })
+  const prerequisiteContext = buildPrerequisiteContext({
     classLevel,
+    featureChoicePicks: params.featureChoicePicks,
     knownSpellNames: params.knownSpellNames,
     subclassName: params.subclassName,
-    selectedAbilityNames: [],
-  }
+    grantedAbilityNames: params.grantedCustomAbilityNames,
+    knownDisciplineNames: knownDisciplines,
+  })
+  const filterOptions = (options: FeatureChoice["options"]) =>
+    filterChoiceOptionsByEligibility(options, prerequisiteContext, {
+      customAbilities: params.customAbilities,
+    })
 
   if (choices.resourceKey === "weapon_mastery" && params.classNames[0]) {
     const masteryCatalogEntries = weaponMasteryCatalogEntriesFromAbilities(params.customAbilities)
@@ -124,28 +206,27 @@ export function resolveFeatureChoiceOptions(
     if (merged.length) return merged
   }
   if (choices.optionsSource === "known_discipline_talents") {
-    return filterOptionsByPrerequisite(
+    const aggregated = filterOptions(
       aggregatePsionicTalentOptions({
         customAbilities: params.customAbilities,
         featureChoicePicks: params.featureChoicePicks,
         classNames: params.classNames,
+        grantedAbilityNames: params.grantedCustomAbilityNames,
+        knownDisciplineNames: knownDisciplines,
       }),
-      {
-        ...prerequisiteContext,
-        selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
-      },
     )
+    // Do not fall back to the feature's static option dump — that bypasses discipline gates.
+    if (aggregated.length || knownDisciplines.length === 0) return aggregated
+    return filterOptions(choices.options ?? [])
   }
   if (choices.optionsSource === "fusion_talents") {
-    return filterOptionsByPrerequisite(
+    const aggregated = filterOptions(
       params.customAbilities
         .filter((row) => row.ability_role === "talent_pool" && /fusion/i.test(row.name))
         .flatMap((row) => row.choices?.options ?? []),
-      {
-        ...prerequisiteContext,
-        selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
-      },
     )
+    if (aggregated.length) return aggregated
+    return filterOptions(choices.options ?? [])
   }
   if (choices.optionsSource === "class_talents") {
     const fromPool = params.customAbilities.find(
@@ -161,11 +242,27 @@ export function resolveFeatureChoiceOptions(
               name: row.name,
               description: row.description ?? "",
               prerequisite: row.prerequisites ?? null,
+              level_requirement: row.level_requirement ?? null,
             }))
-    return filterOptionsByPrerequisite(options, {
-      ...prerequisiteContext,
-      selectedAbilityNames: Object.values(params.featureChoicePicks).flat(),
-    })
+    const aggregated = filterOptions(options)
+    if (aggregated.length) return aggregated
+    return filterOptions(choices.options ?? [])
+  }
+  if (choices.optionsSource === "class_disciplines") {
+    const aggregated = filterOptions(
+      params.customAbilities
+        .filter((row) => isDisciplinePackageAbility(row))
+        .filter((row) => isCustomAbilityEligible(row, prerequisiteContext))
+        .map((row) => ({
+          name: row.name,
+          description: row.description ?? "",
+          prerequisite: row.prerequisites ?? null,
+          level_requirement: row.level_requirement ?? null,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    )
+    if (aggregated.length) return aggregated
+    return filterOptions(choices.options ?? [])
   }
   if (choices.optionsSource === "class_knacks") {
     const knackKey = Object.keys(params.featureChoicePicks).find((key) => /knack|trick/i.test(key))
@@ -195,6 +292,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateBombFormulaOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
+      classLevel,
     })
   }
   if (choices.optionsSource === "class_discoveries") {
@@ -216,26 +314,39 @@ export function resolveFeatureChoiceOptions(
       key.toLowerCase().includes(feature.name.toLowerCase())
     )
   })
-  return filterOptionsByPrerequisite(choices.options ?? [], {
+  return filterChoiceOptionsByEligibility(choices.options ?? [], {
     ...prerequisiteContext,
     selectedAbilityNames: staticSelectedKey
-      ? (params.featureChoicePicks[staticSelectedKey] ?? [])
-      : Object.values(params.featureChoicePicks).flat(),
-  })
+      ? [
+          ...(params.featureChoicePicks[staticSelectedKey] ?? []),
+          ...(params.grantedCustomAbilityNames ?? []),
+          ...knownDisciplines,
+        ]
+      : prerequisiteContext.selectedAbilityNames,
+  }, { customAbilities: params.customAbilities })
 }
 
-/** Mark Psionic Talents class features for dynamic option aggregation at build time. */
+
+/** Mark Psionic Talents / discipline-pick class features for dynamic option aggregation. */
 export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[] {
   return features.map((feature) => {
     const name = feature.name.trim()
-    if (/^psionic talents$/i.test(name)) {
-      if (!feature.isChoice || !feature.choices) return feature
+    if (/^(?:primary\s+)?psionic talents$/i.test(name)) {
+      const choiceCountByLevel =
+        feature.choices?.choiceCountByLevel?.length
+          ? feature.choices.choiceCountByLevel
+          : parsePsionicTalentChoiceCountByLevel(feature.description ?? "")
       return {
         ...feature,
+        isChoice: true,
         choices: {
-          ...feature.choices,
+          category: feature.choices?.category ?? "Psionic Talent",
+          count: feature.choices?.count ?? choiceCountByLevel?.[0]?.count ?? 2,
+          options: feature.choices?.options?.length ? feature.choices.options : [],
           optionsSource: "known_discipline_talents",
-          options: feature.choices.options?.length ? feature.choices.options : [],
+          resourceKey: feature.choices?.resourceKey ?? null,
+          choiceCountByLevel,
+          swappableOnRest: feature.choices?.swappableOnRest ?? false,
         },
       }
     }
@@ -253,6 +364,70 @@ export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[]
         },
       }
     }
+    // Archetype grants the first discipline — Primary Discipline is not a free pick.
+    if (/^primary\s+discipline$/i.test(name)) {
+      return {
+        ...feature,
+        isChoice: false,
+        choices: undefined,
+      }
+    }
+    // Secondary / Third (and similarly named) are player picks of additional disciplines.
+    if (
+      /^(?:secondary|third)\s+discipline$/i.test(name) ||
+      (/discipline/i.test(name) &&
+        feature.isChoice &&
+        /psionic\s+discipline/i.test(feature.choices?.category ?? ""))
+    ) {
+      return {
+        ...feature,
+        isChoice: true,
+        choices: {
+          category: feature.choices?.category ?? "Psionic Discipline",
+          count: feature.choices?.count ?? 1,
+          options: feature.choices?.options ?? [],
+          optionsSource: "class_disciplines",
+          resourceKey: feature.choices?.resourceKey ?? null,
+          choiceCountByLevel: feature.choices?.choiceCountByLevel,
+        },
+      }
+    }
     return feature
   })
+}
+
+/**
+ * Parse "Pick two … additional at 5th, 7th, …" into cumulative choiceCountByLevel.
+ * Assumes the feature level is the first tier (default count 2).
+ */
+export function parsePsionicTalentChoiceCountByLevel(
+  description: string,
+): { level: number; count: number }[] | undefined {
+  const startMatch = description.match(/\bpick\s+(two|three|\d+)\s+psionic\s+talents?\b/i)
+  const startCount = startMatch
+    ? startMatch[1].toLowerCase() === "two"
+      ? 2
+      : startMatch[1].toLowerCase() === "three"
+        ? 3
+        : parseInt(startMatch[1], 10)
+    : 2
+  if (!Number.isFinite(startCount) || startCount <= 0) return undefined
+
+  const levelsMatch = description.match(
+    /additional\s+talents?\s+at\s+((?:\d+(?:st|nd|rd|th)?(?:\s*,\s*(?:and\s+)?|\s+and\s+)?)+)\s*levels?/i,
+  )
+  const extraLevels: number[] = []
+  if (levelsMatch) {
+    for (const raw of levelsMatch[1].matchAll(/(\d+)/g)) {
+      const level = parseInt(raw[1], 10)
+      if (Number.isFinite(level) && level > 0) extraLevels.push(level)
+    }
+  }
+  const tiers = [{ level: 2, count: startCount }]
+  let count = startCount
+  for (const level of [...new Set(extraLevels)].sort((a, b) => a - b)) {
+    count += 1
+    tiers.push({ level, count })
+  }
+  return tiers
 }

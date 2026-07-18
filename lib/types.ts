@@ -58,6 +58,8 @@ export interface FeatureChoice {
     resourceCost?: number | null
     /** Freeform prerequisite text (feat-style), e.g. "Slayer I". */
     prerequisite?: string | null
+    /** Numeric class-level gate (used with freeform prerequisite text when both exist). */
+    level_requirement?: number | null
     /** When true, the same option may be selected more than once. */
     repeatable?: boolean | null
   }[]
@@ -78,6 +80,7 @@ export interface FeatureChoice {
     | "known_discipline_talents"
     | "fusion_talents"
     | "class_talents"
+    | "class_disciplines"
     | "class_knacks"
     | "class_upgrades"
     | "class_bomb_formulas"
@@ -513,7 +516,7 @@ export interface DndClass {
   saving_throws: string[] | null
   armor_proficiencies: string[] | null
   weapon_proficiencies: string[] | null
-  skill_choices: { count: number; options: string[] } | null
+  skill_choices: { count: number; options: string[]; fixed?: string[] } | null
   starting_equipment: unknown
   starting_equipment_groups: StartingEquipmentGroup[] | null
   starting_gold: number | null

@@ -28,6 +28,107 @@ export function isGoldOnlyOption(
   return startingGold > 0 && item.quantity === startingGold
 }
 
+/** "Martial Weapon" / "any simple weapon" style category lines. */
+export function equipmentCategoryKind(name: string): "martial" | "simple" | null {
+  const normalized = name.trim().toLowerCase().replace(/\s+/g, " ")
+  if (/^(any\s+)?martial\s+weapons?$/.test(normalized)) return "martial"
+  if (/^(any\s+)?simple\s+weapons?$/.test(normalized)) return "simple"
+  return null
+}
+
+function isMartialWeapon(item: Equipment): boolean {
+  return /weapon/i.test(item.category ?? "") && /martial/i.test(String(item.subcategory ?? ""))
+}
+
+function isSimpleWeapon(item: Equipment): boolean {
+  return /weapon/i.test(item.category ?? "") && /simple/i.test(String(item.subcategory ?? ""))
+}
+
+export function equipmentForCategory(
+  kind: "martial" | "simple",
+  equipment: Equipment[],
+): Equipment[] {
+  return equipment
+    .filter((row) => (kind === "martial" ? isMartialWeapon(row) : isSimpleWeapon(row)))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function packageOptionLetter(label: string, index: number): string {
+  const trimmed = label.trim()
+  const match = trimmed.match(/^([A-Za-z])\b/)
+  if (match) return match[1]!.toUpperCase()
+  return String.fromCharCode(65 + index)
+}
+
+/**
+ * Collapse a run of single martial/simple weapon package options into one
+ * category choice (e.g. many "Option C" swords → one "Martial Weapon" pick).
+ */
+export function collapseWeaponCategoryPackageOptions(
+  options: { label: string; items: { name: string; quantity: number }[] }[],
+  equipment: Equipment[],
+): { label: string; items: { name: string; quantity: number }[] }[] {
+  if (!options.length) return options
+  const martialNames = new Set(equipmentForCategory("martial", equipment).map((row) => row.name.toLowerCase()))
+  const simpleNames = new Set(equipmentForCategory("simple", equipment).map((row) => row.name.toLowerCase()))
+
+  const result: { label: string; items: { name: string; quantity: number }[] }[] = []
+  let index = 0
+  while (index < options.length) {
+    const option = options[index]!
+    const items = option.items ?? []
+    const single = items.length === 1 ? items[0]!.name.trim() : ""
+    const kind =
+      equipmentCategoryKind(single) ??
+      (martialNames.has(single.toLowerCase())
+        ? "martial"
+        : simpleNames.has(single.toLowerCase())
+          ? "simple"
+          : null)
+
+    if (!kind || items.length !== 1) {
+      result.push(option)
+      index += 1
+      continue
+    }
+
+    const letter = packageOptionLetter(option.label, index)
+    let end = index + 1
+    while (end < options.length) {
+      const next = options[end]!
+      const nextItems = next.items ?? []
+      if (nextItems.length !== 1) break
+      if (packageOptionLetter(next.label, end) !== letter) break
+      const nextName = nextItems[0]!.name.trim()
+      const nextKind =
+        equipmentCategoryKind(nextName) ??
+        (martialNames.has(nextName.toLowerCase())
+          ? "martial"
+          : simpleNames.has(nextName.toLowerCase())
+            ? "simple"
+            : null)
+      if (nextKind !== kind) break
+      end += 1
+    }
+
+    if (end - index === 1 && equipmentCategoryKind(single)) {
+      result.push(option)
+    } else if (end - index >= 1) {
+      result.push({
+        label: letter,
+        items: [
+          {
+            name: kind === "martial" ? "Martial Weapon" : "Simple Weapon",
+            quantity: items[0]?.quantity ?? 1,
+          },
+        ],
+      })
+    }
+    index = end
+  }
+  return result
+}
+
 export function findEquipmentByName(name: string, equipment: Equipment[]): Equipment | undefined {
   const normalized = name.toLowerCase().replace(/['']/g, "'").trim()
   const exact = equipment.find((e) => e.name.toLowerCase() === normalized)
@@ -61,13 +162,21 @@ export function findEquipmentByName(name: string, equipment: Equipment[]): Equip
 export function resolvePackageEquipmentIds(
   items: { name: string; quantity: number }[],
   equipment: Equipment[],
+  categoryPicks: Record<string, string> = {},
+  pickKeyPrefix = "",
 ): string[] {
   const ids: string[] = []
-  for (const item of items) {
-    if (item.name.toLowerCase() === "gold pieces") continue
+  items.forEach((item, index) => {
+    if (item.name.toLowerCase() === "gold pieces") return
+    const category = equipmentCategoryKind(item.name)
+    if (category) {
+      const pickedId = categoryPicks[`${pickKeyPrefix}${index}`]
+      if (pickedId && !ids.includes(pickedId)) ids.push(pickedId)
+      return
+    }
     const match = findEquipmentByName(item.name, equipment)
     if (match && !ids.includes(match.id)) ids.push(match.id)
-  }
+  })
   return ids
 }
 

@@ -43,11 +43,35 @@ describe("getClassDetailBaseFeatures", () => {
     expect(rows.map((row) => row.name)).toEqual(["Bardic Inspiration", "Expertise"])
   })
 
-  it("excludes level-3 subclass gate features", () => {
+  it("excludes subclass gate features at any unlock level", () => {
     const all = getClassDetailFeatures(bardFixture())
     expect(all.some((row) => row.name === "Bard College")).toBe(true)
     expect(getClassDetailBaseFeatures(bardFixture()).some((row) => row.name === "Bard College")).toBe(
       false,
     )
+  })
+
+  it("excludes level-1 Psionic Archetype from base features", () => {
+    const psion = {
+      ...bardFixture(),
+      name: "Psion",
+      features: [
+        { level: 1, name: "Psionics", description: "You use psionics." },
+        {
+          level: 1,
+          name: "Psionic Archetype",
+          description: "Choose a Psionic Archetype.",
+        },
+        {
+          level: 3,
+          name: "Psionic Archetype Feature",
+          description: "Gain a feature from your chosen Psionic Archetype.",
+        },
+      ],
+    } as unknown as DndClass
+    expect(getClassDetailBaseFeatures(psion).map((row) => row.name)).toEqual([
+      "Psionics",
+      "Psionic Archetype Feature",
+    ])
   })
 })

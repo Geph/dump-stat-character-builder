@@ -2740,6 +2740,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <D20RollButton
                               modifier={mod}
                               title={`${ABILITY_LABELS[key]} ability check`}
+                              layout="stack"
                               rollContext={{ kind: "ability", ability: key }}
                             />
                           </div>

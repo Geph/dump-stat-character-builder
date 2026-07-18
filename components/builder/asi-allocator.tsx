@@ -23,6 +23,12 @@ type Props = {
   variant?: "default" | "visual"
   /** Optional banner image (e.g. selected background card art). */
   headerImageUrl?: string | null
+  /** Base ability scores before this allocator's bonuses. */
+  baseScores?: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>
+  /** Bonuses from other allocators already applied. */
+  otherBonuses?: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>
+  /** Cap for base + other + this allocator (default uncapped). */
+  scoreCap?: number
 }
 
 const ABILITY_LABELS: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
@@ -45,6 +51,9 @@ export function AsiAllocator({
   helpText: helpTextOverride,
   variant = "default",
   headerImageUrl,
+  baseScores,
+  otherBonuses,
+  scoreCap,
 }: Props) {
   const pointsUsed = getAsiPointsUsed(allocation)
   const pointsRemaining = totalPoints - pointsUsed
@@ -53,6 +62,14 @@ export function AsiAllocator({
   const visibleAbilities = allowedAbilities ?? ABILITY_SCORE_KEYS
   const visual = variant === "visual"
   const bannerUrl = headerImageUrl?.trim() || null
+
+  const canIncrease = (ability: (typeof ABILITY_SCORE_KEYS)[number], value: number) => {
+    if (pointsRemaining <= 0 || value >= perAbilityMax) return false
+    if (scoreCap == null) return true
+    const base = baseScores?.[ability] ?? 0
+    const other = otherBonuses?.[ability] ?? 0
+    return base + other + value + 1 <= scoreCap
+  }
 
   const abilityRows = (
     <div
@@ -109,7 +126,7 @@ export function AsiAllocator({
               <button
                 type="button"
                 onClick={() => onChange(adjustAsiPoint(allocation, ability, 1, perAbilityMax))}
-                disabled={pointsRemaining <= 0 || value >= perAbilityMax}
+                disabled={!canIncrease(ability, value)}
                 className={cn(
                   "rounded text-sm font-bold disabled:opacity-30 max-sm:h-10 max-sm:w-10 max-sm:text-base",
                   visual

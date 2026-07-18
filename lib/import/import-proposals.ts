@@ -191,11 +191,16 @@ function isDisciplineLikeFeature(feature: {
   choices?: { category?: string; options?: unknown[] }
 }): boolean {
   const name = feature.name ?? ""
+  // Primary/Secondary/Third Discipline, Psionic Talents, Innate Psionics are class features.
+  if (isPsionClassFeatureShell(name)) return false
   if (/\bdiscipline\b/i.test(name)) return true
-  if (feature.isChoice && /\b(talent|discipline|power)\b/i.test(feature.choices?.category ?? name)) {
+  if (
+    feature.isChoice &&
+    /\bdiscipline\b/i.test(feature.choices?.category ?? "") &&
+    (feature.choices?.options?.length ?? 0) > 0
+  ) {
     return true
   }
-  if (/\bprimary discipline\b/i.test(feature.description ?? "")) return true
   return false
 }
 
@@ -260,17 +265,16 @@ function disciplineDefinition(
   return `Psionic discipline option for ${className}. Disciplines are player-chosen ability packages with point-cost talents.${talentNote}`
 }
 
-function innatePsionicsDefinition(name: string, className: string): string {
-  return `${name} for ${className}. Innate psionic options detected from class features — import as a custom ability placeholder; full builder wiring is deferred until confirmed.`
-}
-
-function isInnatePsionicsFeature(feature: {
-  name?: string
-  description?: string
-}): boolean {
-  const name = feature.name ?? ""
-  if (/\binnate\s+psionic/i.test(name)) return true
-  if (/\binnate\s+psionic/i.test(feature.description ?? "")) return true
+/**
+ * Class-feature shells that must stay as features (pickers / choice-count bumps / spell grants),
+ * never as stand-alone custom abilities.
+ */
+export function isPsionClassFeatureShell(name: string): boolean {
+  const trimmed = name.trim()
+  if (/^(?:primary|secondary|third)\s+discipline$/i.test(trimmed)) return true
+  if (/^(?:primary\s+)?psionic talents$/i.test(trimmed)) return true
+  if (/^(?:class talents|general psionic talents)$/i.test(trimmed)) return true
+  if (/^innate\s+psionic(?:s|\s+ability)\b/i.test(trimmed)) return true
   return false
 }
 
@@ -332,6 +336,9 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
   }
 
   for (const ability of raw?.custom_abilities ?? []) {
+    // Class-feature shells (discipline picks, talent grants, innate spells) stay on the class.
+    if (isPsionClassFeatureShell(ability.name)) continue
+
     if (
       (ability.ability_role === "knack" || /\bknack/i.test(ability.choices?.category ?? "")) &&
       ability.choices?.options?.length
@@ -559,6 +566,27 @@ function collectDisciplineFeatures(
     sourceName: string,
   ) => {
     for (const feature of features ?? []) {
+      if (isPsionClassFeatureShell(feature.name)) {
+        // Primary Discipline may list package names as choices — propose those packages, not the shell.
+        if (
+          /^primary\s+discipline$/i.test(feature.name.trim()) &&
+          feature.choices?.options?.length
+        ) {
+          for (const option of feature.choices.options) {
+            pushAbility(into.customAbilities, seenAbilities, {
+              name: option.name,
+              definition: disciplineDefinition(option.name, sourceName),
+              description: option.description,
+              sourceType,
+              sourceName,
+              levelRequirement: feature.level,
+              abilityRole: "discipline",
+              source: "feature",
+            })
+          }
+        }
+        continue
+      }
       if (!isDisciplineLikeFeature(feature)) continue
       const talentCount = feature.choices?.options?.length
       pushAbility(into.customAbilities, seenAbilities, {
@@ -702,40 +730,6 @@ function collectCompanionStatBlockFeatures(
   }
 }
 
-function collectInnatePsionicsFeatures(
-  content: ImportContent,
-  into: ImportProposalSet,
-  seenAbilities: Set<string>,
-) {
-  const scanFeatures = (
-    features: { level: number; name: string; description: string; isChoice?: boolean; choices?: { category?: string; options?: { name: string; description: string }[] } }[] | undefined,
-    sourceType: ImportProposalCustomAbility["sourceType"],
-    sourceName: string,
-  ) => {
-    for (const feature of features ?? []) {
-      if (!isInnatePsionicsFeature(feature)) continue
-      pushAbility(into.customAbilities, seenAbilities, {
-        name: feature.name,
-        definition: innatePsionicsDefinition(feature.name, sourceName),
-        description: feature.description,
-        sourceType,
-        sourceName,
-        levelRequirement: feature.level,
-        choices: feature.choices as import("@/lib/types").FeatureChoice | undefined,
-        abilityRole: "talent_pool",
-        source: "feature",
-      })
-    }
-  }
-
-  for (const classRow of content.classes ?? []) {
-    scanFeatures(classRow.features, "class", classRow.name)
-  }
-  for (const subclass of content.subclasses ?? []) {
-    scanFeatures(subclass.features, "subclass", subclass.name)
-  }
-}
-
 function collectExplicitAbilities(
   content: ImportContent,
   into: ImportProposalSet,
@@ -775,7 +769,6 @@ export function collectImportProposals(content: ImportContent): ImportProposalSe
   }
 
   collectDisciplineFeatures(content, result, seenAbilities)
-  collectInnatePsionicsFeatures(content, result, seenAbilities)
   collectMartialExploitFeatures(content, result, seenAbilities)
   collectBattleMasterManeuverFeatures(content, result, seenAbilities)
   collectCompanionStatBlockFeatures(content, result, seenAbilities)

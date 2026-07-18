@@ -2596,6 +2596,228 @@ function ModifierFields({
           </div>
         </div>
       )
+
+    case "power_rider":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Parent power / action names
+            </label>
+            <textarea
+              value={(mod.parentPowerNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  parentPowerNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Phase Rift"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Alert summary</label>
+            <input
+              type="text"
+              value={mod.alertSummary ?? ""}
+              onChange={(e) => onChange({ ...mod, alertSummary: e.target.value || undefined })}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              placeholder="Short rider reminder shown on the related action"
+            />
+          </div>
+        </div>
+      )
+
+    case "ability_score_override":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Source ability</label>
+            <select
+              value={mod.sourceAbility}
+              onChange={(e) =>
+                onChange({ ...mod, sourceAbility: e.target.value as typeof mod.sourceAbility })
+              }
+              className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_SCORE_KEYS.map((ability) => (
+                <option key={ability} value={ability}>
+                  {ability}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Target abilities</label>
+            <div className="flex flex-wrap gap-2">
+              {ABILITY_SCORE_KEYS.map((ability) => {
+                const selected = mod.targets?.includes(ability) ?? false
+                return (
+                  <label
+                    key={ability}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-border bg-card text-xs cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={(e) => {
+                        const current = mod.targets ?? []
+                        const next = e.target.checked
+                          ? [...current, ability]
+                          : current.filter((entry) => entry !== ability)
+                        onChange({ ...mod, targets: next.length ? next : [ability] })
+                      }}
+                      className="accent-primary"
+                    />
+                    {ability}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.chooseOneTarget)}
+              onChange={(e) => onChange({ ...mod, chooseOneTarget: e.target.checked || undefined })}
+              className="accent-primary"
+            />
+            Player chooses one target
+          </label>
+        </div>
+      )
+
+    case "healing_received_modifier":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Multiplier</label>
+            <input
+              type="number"
+              min={0}
+              max={2}
+              step={0.1}
+              value={mod.multiplier ?? 0.5}
+              onChange={(e) =>
+                onChange({ ...mod, multiplier: Math.max(0, parseFloat(e.target.value) || 0) })
+              }
+              className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={mod.magicalOnly !== false}
+              onChange={(e) => onChange({ ...mod, magicalOnly: e.target.checked })}
+              className="accent-primary"
+            />
+            Magical healing only
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.includePotions)}
+              onChange={(e) => onChange({ ...mod, includePotions: e.target.checked || undefined })}
+              className="accent-primary"
+            />
+            Include potions
+          </label>
+        </div>
+      )
+
+    case "grant_custom_ability":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Custom ability names
+            </label>
+            <textarea
+              value={(mod.abilityNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  abilityNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Telekinetic Weapons"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )
+
+    case "feature_choice_count_bonus":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Target feature name
+            </label>
+            <input
+              type="text"
+              value={mod.targetFeatureName ?? ""}
+              onChange={(e) =>
+                onChange({ ...mod, targetFeatureName: e.target.value || null })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              placeholder="Boundless Imagination"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Choice category (optional)
+            </label>
+            <input
+              type="text"
+              value={mod.choiceCategory ?? ""}
+              onChange={(e) => onChange({ ...mod, choiceCategory: e.target.value || null })}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Flat bonus</label>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={mod.bonus ?? 1}
+              onChange={(e) =>
+                onChange({ ...mod, bonus: Math.max(0, parseInt(e.target.value, 10) || 0) })
+              }
+              className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Or scale from proficiency
+            </label>
+            <select
+              value={mod.bonusFrom ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  bonusFrom: (e.target.value || null) as typeof mod.bonusFrom,
+                })
+              }
+              className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="">Flat bonus only</option>
+              <option value="half_proficiency">Half proficiency</option>
+              <option value="proficiency">Full proficiency</option>
+            </select>
+          </div>
+        </div>
+      )
   }
 }
 

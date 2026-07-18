@@ -59,11 +59,11 @@ export function ManualRollTrigger() {
         title="Manual dice roller"
         aria-label="Open manual dice roller"
         className={cn(
-          "relative mt-1 flex h-10 w-10 items-center justify-center rounded-lg border-2 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
-          SHEET_BANNER_BUTTON.icon,
+          "relative flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors",
+          SHEET_BANNER_BUTTON.manualRoll,
         )}
       >
-        <Dices className="h-4 w-4" aria-hidden />
+        <Dices className="h-5 w-5" aria-hidden />
       </button>
 
       <AnimatePresence>

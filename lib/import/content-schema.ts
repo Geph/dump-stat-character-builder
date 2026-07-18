@@ -275,6 +275,7 @@ export const ChoiceOptionsSchema = z.object({
       "known_discipline_talents",
       "fusion_talents",
       "class_talents",
+      "class_disciplines",
       "class_knacks",
       "class_upgrades",
       "class_bomb_formulas",
@@ -446,6 +447,8 @@ export const ClassImportSchema = z.object({
     .object({
       count: z.number(),
       options: z.array(z.string()),
+      /** Always-granted skills (e.g. Psionics) that are not chosen from options. */
+      fixed: z.array(z.string()).optional(),
     })
     .nullable()
     .optional(),
@@ -848,8 +851,9 @@ When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Plana
 For well-known PHB feats (Alert, Tough, Magic Initiate, Archery, War Caster, etc.), prefer omitting mechanics[] when unsure — name-matched presets apply on load. Partial wrong mechanics (e.g. vision without visionType blindsight, grant_feat on ASI, empty damage_roll_modifiers) are worse than none.`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
-- Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion")
+- Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion") — must match classes[].name when importing with the class
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array
+- When extracting a full class chapter (content type Classes), include every archetype/subclass in subclasses[] alongside classes[] — do not leave archetypes for a later pass unless the user asks
 - Include all subclass features with their gain level
 - Spell list features should keep HTML tables in description when present
 - When a feature lets the player choose among several mutually exclusive spell lists (Circle of the Land land types, similar circle/domain/oath subtype tables): set isChoice: true with choices.options — one option per subtype — and put THAT subtype's HTML spell table in the option description (not only a mashed parent table). Prefer swappableOnRest + swapRestType when the source lets the choice change on a rest.
@@ -876,7 +880,8 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
 - Put the full class in classes[] with hit_die, proficiencies, and all class features by level
-- Put each subclass/archetype/path in subclasses[] with class_name set to that same parent class name
+- Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options
+- Put each subclass/archetype/path in subclasses[] in the SAME JSON as the class (never omit archetypes from a Classes pass) with class_name set to that same parent class name
 - Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
 - Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
@@ -889,6 +894,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - definition: 1–3 sentences explaining what the pool is, how it is spent, and typical recharge — shown to the user before import
 - Identify custom builder abilities: psionic disciplines, invocation lists, fighting-style pickers, and similar player-chosen option systems
 - Put each in import_proposals.custom_abilities[] with proposal_id, name, definition, description, source_type, source_name, level_requirement, prerequisite (freeform), repeatable (when the knack can be learned multiple times), ability_role: "knack" for class Knack / Trick options (one proposal row per option — do not bundle into a single choices catalog). Always copy "Prerequisite:" / "Prerequisites:" lines into prerequisite (e.g. "Light Cantrip", "Level 5+ Warmage, Force Buckler cantrip", "Level 10+ Warmage, House of Bishops") — Dump Stat enforces these at pick time against known spells, class level, subclass, and other selected options.
+- Do NOT put Primary/Secondary/Third Discipline, Psionic Talents, Class Talents, or Innate Psionics / Innate Psionic Ability shells in custom_abilities[] — those stay as class features. Primary Discipline comes from the Psionic Archetype (subclass) via grant_custom_ability; Secondary/Third Discipline are separate class_disciplines picks. Psionic Talents is a class feature with optionsSource known_discipline_talents (options = talents from all known disciplines). Innate Psionics wires spells_known on the class feature.
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
 - Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.

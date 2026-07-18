@@ -51,6 +51,10 @@ export const AI_MECHANIC_KINDS = [
   "extra_weapon_mastery",
   "damage_reduction",
   "movement_grant",
+  "ability_score_override",
+  "healing_received_modifier",
+  "grant_custom_ability",
+  "feature_choice_count_bonus",
 ] as const
 
 /**
@@ -64,6 +68,8 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "feature_option_picker",
   // Complex nested characteristic — auto-wired by phrase detection, not hand-authored by the LLM.
   "on_cast_spell_trigger",
+  // Sheet alert only — no numeric mechanic for the model to emit.
+  "power_rider",
   "*",
 ])
 
@@ -475,6 +481,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     mechanicsKind: "skill_check_alternate_ability",
     notes:
       'alternateAbility + alternateSkills; a leading "While …," clause or trailing "against …" qualifier becomes conditionLabel.',
+  },
+  {
+    ruleId: "weapon.ability.override",
+    trigger: "description",
+    catalog: "cat_char_weapon_ability_override",
+    examples: [
+      "You can use Intelligence instead of Strength or Dexterity for its attack and damage rolls",
+    ],
+    mechanicsKind: "weapon_ability_override",
+    notes:
+      'alternateAbility + weaponAbilityAppliesTo "both" + weaponAbilityScope "all" (Projected Weaponry). Keep "instead of Strength or Dexterity for … attack and damage rolls".',
   },
   {
     ruleId: "check.bonus.initiative.proficiency",
@@ -1059,6 +1076,123 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     notes:
       'requiresSheetToggle on mechanics[] — use a standard key (while_raging, while_wild_shape, etc.) OR a key declared once under new_toggles on the class/subclass. Never invent a one-off toggle key inside a single feature without declaring it.',
+  },
+  {
+    ruleId: "save.bonus.ability_modifier",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: ["add your Intelligence modifier to the saving throw"],
+    mechanicsKind: "check_roll_modifier",
+    notes: "One Step Ahead — ability_modifier bonus on saves.",
+  },
+  {
+    ruleId: "check.advantage.charisma.attuned",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: [
+      "When you make a Charisma check, roll an additional d20 and take the higher result",
+    ],
+    mechanicsKind: "check_roll_modifier",
+    notes: "Attuned Argument — Charisma check advantage approximation.",
+  },
+  {
+    ruleId: "spell.telekinetic_movement_buffs",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: ["effect of spider climb, feather fall, or levitate"],
+    mechanicsKind: "spells_known",
+    notes: "Telekinetic Movement — always-prepared option spells cast with psi.",
+  },
+  {
+    ruleId: "precognitive.dreams.thp",
+    trigger: "description",
+    catalog: "cat_fx_grant_temp_hp",
+    examples: ["temporary hit points equal to your Intelligence modifier"],
+    mechanicsKind: "temporary_hit_points",
+    notes: "Precognitive Dreams — INT-mod temp HP (companions after long rest).",
+  },
+  {
+    ruleId: "precognitive.dreams.surprise_immunity",
+    trigger: "description",
+    catalog: "cat_char_condition_immunity",
+    examples: ["you can't be surprised", "you cannot be surprised"],
+    mechanicsKind: "condition_immunity",
+    notes: "Precognitive Dreams — Surprised condition immunity.",
+  },
+  {
+    ruleId: "ability.score.override.physical_surge",
+    trigger: "description",
+    catalog: "cat_char_ability_score_override",
+    examples: [
+      "make your Strength or Dexterity ability score equal to your Intelligence ability score",
+    ],
+    mechanicsKind: "ability_score_override",
+    notes: "Physical Surge — gated by physical_surge_active sheet toggle.",
+  },
+  {
+    ruleId: "healing.received.half_magical",
+    trigger: "description",
+    catalog: "cat_char_healing_received_modifier",
+    examples: ["magical healing effects on you restore only half"],
+    mechanicsKind: "healing_received_modifier",
+    notes: "Magical Anathema — half magical healing received (includes potions).",
+  },
+  {
+    ruleId: "elemental.emotions.save_dice",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: [
+      "cold lets you add 1d4 to Wisdom saving throws … fire … Constitution … lightning … Dexterity",
+    ],
+    mechanicsKind: "check_roll_modifier",
+    notes: "Elemental Emotions — per-element save dice (player picks active aspect).",
+  },
+  {
+    ruleId: "grant.custom_ability.named_power",
+    trigger: "description",
+    catalog: "cat_char_grant_custom_ability",
+    examples: ["you gain the Telekinetic Weapons psionic power"],
+    mechanicsKind: "grant_custom_ability",
+  },
+  {
+    ruleId: "grant.custom_ability.named_discipline",
+    trigger: "description",
+    catalog: "cat_char_grant_custom_ability",
+    examples: [
+      "granting the psionic discipline of Telepathy",
+      "You gain the psionic discipline of Psychokinesis",
+    ],
+    mechanicsKind: "grant_custom_ability",
+    notes: "Psion archetype L1 — primary discipline from subclass choice.",
+  },
+  {
+    ruleId: "choice.count.bonus.unlimited_imagination",
+    trigger: "description",
+    catalog: "cat_char_feature_choice_count_bonus",
+    examples: ["select two options from Boundless Imagination"],
+    mechanicsKind: "feature_choice_count_bonus",
+    notes: "Unlimited Imagination — +1 Boundless Imagination pick.",
+  },
+  {
+    ruleId: "choice.count.bonus.skill_thief",
+    trigger: "description",
+    catalog: "cat_char_feature_choice_count_bonus",
+    examples: [
+      "gain an additional number of skill, tool, or language proficiencies from Adaptive Hunter equal to half your proficiency bonus",
+    ],
+    mechanicsKind: "feature_choice_count_bonus",
+    notes: "Skill Thief — Adaptive Hunter slots from half proficiency.",
+  },
+  {
+    ruleId: "power.rider.from_prose",
+    trigger: "description",
+    catalog: "cat_char_power_rider",
+    examples: [
+      "When you use Phase Rift to flicker",
+      "When you cast Enhancing Surge",
+    ],
+    notes:
+      "Narrative rider talents (Flickering Escape, etc.) — alert overlay on related sheet actions; no roll card of their own.",
   },
 ]
 

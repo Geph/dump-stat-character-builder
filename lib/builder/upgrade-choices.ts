@@ -1,3 +1,4 @@
+import { isChoiceOptionEligible } from "@/lib/builder/choice-option-eligibility"
 import type { CustomAbility } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -25,9 +26,15 @@ export function upgradeAbilitiesForClass(
 }
 
 export function isUpgradeEligible(upgrade: CustomAbility, classLevel: number): boolean {
-  const minLevel = upgrade.level_requirement ?? null
-  if (minLevel != null && classLevel < minLevel) return false
-  return true
+  return isChoiceOptionEligible(
+    {
+      name: upgrade.name,
+      description: upgrade.description,
+      prerequisite: upgrade.prerequisites,
+      level_requirement: upgrade.level_requirement,
+    },
+    { classLevel, selectedAbilityNames: [] },
+  )
 }
 
 export function aggregateUpgradeOptions(params: {

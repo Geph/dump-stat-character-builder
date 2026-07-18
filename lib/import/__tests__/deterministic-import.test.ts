@@ -30,6 +30,72 @@ describe("parseClassShellFromText", () => {
       options: expect.arrayContaining(["Acrobatics", "Athletics"]),
     })
   })
+
+  it("parses Choose N from … (Inventor / LaserLlama)", () => {
+    const shell = parseClassShellFromText(
+      `Skills: Choose three from Arcana, Deception, History, Investigation, Medicine, Nature, Religion, Sleight of Hand
+Equipment
+You start with the following equipment`,
+    )
+    expect(shell.skill_choices).toEqual({
+      count: 3,
+      options: [
+        "Arcana",
+        "Deception",
+        "History",
+        "Investigation",
+        "Medicine",
+        "Nature",
+        "Religion",
+        "Sleight of Hand",
+      ],
+    })
+  })
+
+  it("parses Choose N of the following", () => {
+    const shell = parseClassShellFromText(
+      `Skills: Choose two of the following: Animal Handling, Athletics, Intimidation, Nature, Perception, and Survival
+Equipment`,
+    )
+    expect(shell.skill_choices).toEqual({
+      count: 2,
+      options: expect.arrayContaining(["Animal Handling", "Athletics", "Survival"]),
+    })
+  })
+
+  it("parses fixed skill + choose from (Psion)", () => {
+    const shell = parseClassShellFromText(
+      `Skills: Psionics, and choose two from Deception, History, Insight, Intimidation, Investigation, Medicine, Perception, or
+Religion.
+Equipment`,
+    )
+    expect(shell.skill_choices).toEqual({
+      count: 2,
+      fixed: ["Psionics"],
+      options: [
+        "Deception",
+        "History",
+        "Insight",
+        "Intimidation",
+        "Investigation",
+        "Medicine",
+        "Perception",
+        "Religion",
+      ],
+    })
+  })
+
+  it("parses wrapped Choose N from lists (Beastheart)", () => {
+    const shell = parseClassShellFromText(
+      `Skills: Choose three from Animal Handling, Athletics, Intimidation, Nature, Perception, Stealth,
+and Survival
+Equipment`,
+    )
+    expect(shell.skill_choices?.count).toBe(3)
+    expect(shell.skill_choices?.options).toEqual(
+      expect.arrayContaining(["Animal Handling", "Stealth", "Survival"]),
+    )
+  })
 })
 
 describe("parseProgressionTableFeatures", () => {

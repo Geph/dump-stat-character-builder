@@ -25,6 +25,10 @@ const KIND_LABELS: Record<ImportCollision["kind"], string> = {
   ability: "Ability",
 }
 
+function defaultResolution(collision: ImportCollision): ImportCollisionResolution {
+  return collision.kind === "spell" ? "link" : "rename"
+}
+
 export function ImportCollisionPanel({
   collisions,
   value,
@@ -34,6 +38,9 @@ export function ImportCollisionPanel({
 }: ImportCollisionPanelProps) {
   if (!collisions.length) return null
 
+  const hasSpellCollisions = collisions.some((collision) => collision.kind === "spell")
+  const hasOtherCollisions = collisions.some((collision) => collision.kind !== "spell")
+
   const updateName = (collision: ImportCollision, nextName: string) => {
     onChange({ ...value, [collision.id]: nextName })
   }
@@ -42,23 +49,53 @@ export function ImportCollisionPanel({
     onResolutionChange({ ...resolutionMap, [collision.id]: resolution })
   }
 
+  const skipAll = () => {
+    const next: ImportCollisionResolutionMap = { ...resolutionMap }
+    for (const collision of collisions) {
+      next[collision.id] = "skip"
+    }
+    onResolutionChange(next)
+  }
+
+  const allSkipped = collisions.every(
+    (collision) => (resolutionMap[collision.id] ?? defaultResolution(collision)) === "skip",
+  )
+
   return (
     <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-        <div>
-          <p className="font-semibold text-foreground">Name conflicts</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="font-semibold text-foreground">Name conflicts</p>
+            <button
+              type="button"
+              onClick={skipAll}
+              className={`rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-colors shrink-0 ${
+                allSkipped
+                  ? "border-primary bg-primary/10 text-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              Skip all
+            </button>
+          </div>
           <p className="mt-1 text-muted-foreground">
-            These entries match existing compendium content by name. Choose whether to replace the
-            existing version or import under a new name.
+            {hasSpellCollisions && hasOtherCollisions
+              ? "Matching spells link to the existing compendium entry by default. Other content can replace the existing version, import under a new name, or be skipped."
+              : hasSpellCollisions
+                ? "These spells already exist in the compendium. They will be matched and linked by default (not replaced). You can still import a copy under a new name, or skip them."
+                : "These entries match existing compendium content by name. Choose whether to replace the existing version, import under a new name, or skip importing them."}
           </p>
         </div>
       </div>
 
       <div className="space-y-3">
         {collisions.map((collision) => {
-          const resolution = resolutionMap[collision.id] ?? "rename"
-          const renameDisabled = resolution === "overwrite"
+          const resolution = resolutionMap[collision.id] ?? defaultResolution(collision)
+          const isSpell = collision.kind === "spell"
+          const renameDisabled =
+            resolution === "overwrite" || resolution === "link" || resolution === "skip"
 
           return (
             <div
@@ -76,17 +113,31 @@ export function ImportCollisionPanel({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => updateResolution(collision, "overwrite")}
-                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                    resolution === "overwrite"
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                  }`}
-                >
-                  Replace existing
-                </button>
+                {isSpell ? (
+                  <button
+                    type="button"
+                    onClick={() => updateResolution(collision, "link")}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                      resolution === "link"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    Use existing
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => updateResolution(collision, "overwrite")}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                      resolution === "overwrite"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    Replace existing
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => updateResolution(collision, "rename")}
@@ -98,12 +149,37 @@ export function ImportCollisionPanel({
                 >
                   Import as new name
                 </button>
+                <button
+                  type="button"
+                  onClick={() => updateResolution(collision, "skip")}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                    resolution === "skip"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  Skip import
+                </button>
               </div>
 
               {resolution === "overwrite" ? (
                 <p className="text-xs text-muted-foreground">
-                  The compendium entry <span className="font-medium text-foreground">{collision.existingName}</span>{" "}
-                  will be updated with the imported version.
+                  The compendium entry{" "}
+                  <span className="font-medium text-foreground">{collision.existingName}</span> will
+                  be updated with the imported version.
+                </p>
+              ) : resolution === "link" ? (
+                <p className="text-xs text-muted-foreground">
+                  Keep{" "}
+                  <span className="font-medium text-foreground">{collision.existingName}</span> as-is.
+                  Imported features and lists that reference this spell will link to the existing
+                  compendium entry.
+                </p>
+              ) : resolution === "skip" ? (
+                <p className="text-xs text-muted-foreground">
+                  Do not import{" "}
+                  <span className="font-medium text-foreground">{collision.incomingName}</span>. The
+                  existing compendium entry stays unchanged.
                 </p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">

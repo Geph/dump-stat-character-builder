@@ -1,4 +1,4 @@
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import type { CharacteristicModifier, AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import {
   charInstance,
   fxInstance,
@@ -66,7 +66,12 @@ export type FeatModifierPreset = {
   choices?: import("@/lib/types").FeatureChoice
 }
 
-export function asiPool(instanceId: string, points = 2, label?: string): LinkedModifierInstance {
+export function asiPool(
+  instanceId: string,
+  points = 2,
+  label?: string,
+  allowedAbilities?: AbilityScoreKey[],
+): LinkedModifierInstance {
   return charInstance(instanceId, FEAT_MODIFIER_CATALOG.abilityScores, [
     {
       id: modId(`${instanceId}_asi`),
@@ -75,11 +80,45 @@ export function asiPool(instanceId: string, points = 2, label?: string): LinkedM
       points,
       bonuses: {},
       label,
+      ...(allowedAbilities?.length ? { allowedAbilities } : {}),
     },
   ])
 }
 
-export function asiOne(key: string, label: string): LinkedModifierInstance {
+/** Fixed +N to specific ability scores (e.g. Actor +1 Charisma). */
+export function asiFixed(
+  key: string,
+  bonuses: Partial<Record<AbilityScoreKey, number>>,
+  label: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.abilityScores, [
+    {
+      id: modId(`${key}_asi`),
+      type: "ability_scores",
+      mode: "fixed",
+      bonuses,
+      label,
+    },
+  ])
+}
+
+/**
+ * Half-feat ASI helper.
+ * - One ability → fixed +1 (no player choice).
+ * - Multiple abilities → 1-point pool restricted to those abilities.
+ * - No abilities → unrestricted 1-point pool (any score).
+ */
+export function asiOne(
+  key: string,
+  label: string,
+  abilities?: AbilityScoreKey[],
+): LinkedModifierInstance {
+  if (abilities?.length === 1) {
+    return asiFixed(key, { [abilities[0]]: 1 }, label)
+  }
+  if (abilities && abilities.length > 1) {
+    return asiPool(`modinst_${key}`, 1, label, abilities)
+  }
   return asiPool(`modinst_${key}`, 1, label)
 }
 

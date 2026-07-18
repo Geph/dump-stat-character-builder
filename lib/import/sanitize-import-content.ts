@@ -1,5 +1,6 @@
 import type { ImportContent, NewToggleImport } from "@/lib/import/content-schema"
 import { markFeatureModifierReviewForPersist } from "@/lib/compendium/modifier-review"
+import { alignImportParentClassNames } from "@/lib/import/resolve-parent-class"
 import type { Feature } from "@/lib/types"
 
 type StagingFeature = Feature & {
@@ -46,33 +47,34 @@ function stripFeatures(features: unknown[] | undefined): unknown[] | undefined {
 
 /** Remove import-only staging fields before writing to the compendium. */
 export function sanitizeImportContentForPersist(content: ImportContent): ImportContent {
-  const next: ImportContent = { ...content }
+  const aligned = alignImportParentClassNames(content)
+  const next: ImportContent = { ...aligned }
 
-  if (content.classes?.length) {
-    next.classes = content.classes.map((cls) => ({
+  if (aligned.classes?.length) {
+    next.classes = aligned.classes.map((cls) => ({
       ...cls,
       features: stripFeatures(cls.features) as typeof cls.features,
       new_toggles: hoistNewTogglesFromFeatures(cls.features, cls.new_toggles),
     }))
   }
 
-  if (content.subclasses?.length) {
-    next.subclasses = content.subclasses.map((subclass) => ({
+  if (aligned.subclasses?.length) {
+    next.subclasses = aligned.subclasses.map((subclass) => ({
       ...subclass,
       features: stripFeatures(subclass.features) as typeof subclass.features,
       new_toggles: hoistNewTogglesFromFeatures(subclass.features, subclass.new_toggles),
     }))
   }
 
-  if (content.species?.length) {
-    next.species = content.species.map((species) => ({
+  if (aligned.species?.length) {
+    next.species = aligned.species.map((species) => ({
       ...species,
       traits: stripFeatures(species.traits) as typeof species.traits,
     }))
   }
 
-  if (content.backgrounds?.length) {
-    next.backgrounds = content.backgrounds.map((background) => {
+  if (aligned.backgrounds?.length) {
+    next.backgrounds = aligned.backgrounds.map((background) => {
       if (!background.feature) return background
       return {
         ...background,
@@ -83,8 +85,8 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
     })
   }
 
-  if (content.feats?.length) {
-    next.feats = content.feats.map((feat) =>
+  if (aligned.feats?.length) {
+    next.feats = aligned.feats.map((feat) =>
       markFeatureModifierReviewForPersist(stripFeatureStagingFields(feat as StagingFeature) as unknown as Feature),
     ) as typeof content.feats
   }

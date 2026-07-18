@@ -78,6 +78,9 @@ export function collectFeatModifierChoiceBlockers(
   for (const entry of entries) {
     const feat = feats.find((f) => f.id === entry.featId)
     if (!feat?.isChoice || !feat.choices) continue
+    // Dynamic optionsSource pools are validated in the picker UI; skip hard blockers when the
+    // static options list is empty (talents may be unavailable until a discipline is known).
+    if (!feat.choices.options?.length) continue
     const picks = featChoicePicks[entry.choicePickKey] ?? []
     if (!choiceCountMet(picks, feat.choices.count)) {
       blockers.push(
@@ -104,7 +107,8 @@ export function featsRequiringModifierChoices(
 ): { entry: FeatSelectionEntry; feat: Feat }[] {
   return entries.flatMap((entry) => {
     const feat = feats.find((f) => f.id === entry.featId)
-    if (!feat?.isChoice || !feat.choices?.options?.length) return []
+    if (!feat?.isChoice || !feat.choices) return []
+    if (!feat.choices.options?.length && !feat.choices.optionsSource) return []
     return [{ entry, feat }]
   })
 }

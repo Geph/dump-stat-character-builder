@@ -45,8 +45,13 @@ describe("collectImportProposals", () => {
     expect(importProposalsNeedConfirmation(proposals)).toBe(true)
     expect(proposals.classResources.map((row) => row.name)).toEqual(["Psi Points", "Psi Limit"])
     expect(proposals.classResources[0].definition.toLowerCase()).toContain("psionic")
-    expect(proposals.customAbilities.some((row) => row.name === "Primary Discipline")).toBe(true)
-    expect(proposals.customAbilities[0].talentCount).toBe(2)
+    // Primary Discipline is a class-feature shell; its options become discipline packages.
+    expect(proposals.customAbilities.some((row) => row.name === "Primary Discipline")).toBe(false)
+    expect(proposals.customAbilities.map((row) => row.name).sort()).toEqual([
+      "Telekinetic",
+      "Telepathic",
+    ].sort())
+    expect(proposals.customAbilities.every((row) => row.abilityRole === "discipline")).toBe(true)
   })
 
   it("merges AI proposals with definitions", () => {
@@ -173,7 +178,7 @@ describe("Battle Master maneuvers", () => {
 })
 
 describe("innate psionics", () => {
-  it("proposes innate psionic features for user confirmation", () => {
+  it("keeps Innate Psionics as a class feature (not a custom ability proposal)", () => {
     const content = {
       classes: [
         {
@@ -192,16 +197,21 @@ describe("innate psionics", () => {
                 options: [{ name: "Mind Thrust", description: "Deal psychic damage." }],
               },
             },
+            {
+              level: 3,
+              name: "Secondary Discipline",
+              description: "Choose a second psionic discipline.",
+              isChoice: true,
+              choices: { category: "Psionic Discipline", count: 1, options: [] },
+            },
           ],
         },
       ],
     }
 
     const proposals = collectImportProposals(content as unknown as ImportContent)
-    const innate = proposals.customAbilities.find((row) => row.name === "Innate Psionics")
-    expect(innate).toBeDefined()
-    expect(innate?.abilityRole).toBe("talent_pool")
-    expect(innate?.definition).toMatch(/deferred/i)
+    expect(proposals.customAbilities.some((row) => row.name === "Innate Psionics")).toBe(false)
+    expect(proposals.customAbilities.some((row) => row.name === "Secondary Discipline")).toBe(false)
   })
 })
 

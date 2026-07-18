@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { aggregateAsiBonuses, type AsiAllocationsByFeatId } from "@/lib/builder/asi-allocation"
+import {
+  aggregateAsiBonuses,
+  isValidAsiAllocation,
+  type AsiAllocationsByFeatId,
+} from "@/lib/builder/asi-allocation"
 import { BACKGROUND_ASI_KEY } from "@/lib/builder/background-asi"
 
 const CLASS_A = "7072130c-5a53-4322-af76-d0bb1b6035b2"
@@ -52,5 +56,12 @@ describe("aggregateAsiBonuses", () => {
       legacyFeatId: { strength: 2 },
     }
     expect(aggregateAsiBonuses(allocations, new Set())).toEqual({ strength: 2 })
+  })
+})
+
+describe("isValidAsiAllocation with allowedAbilities", () => {
+  it("rejects points spent outside the allowed set", () => {
+    expect(isValidAsiAllocation({ charisma: 1 }, 1, ["strength", "dexterity"])).toBe(false)
+    expect(isValidAsiAllocation({ strength: 1 }, 1, ["strength", "dexterity"])).toBe(true)
   })
 })

@@ -6,8 +6,11 @@ import { legacyFeatureOptionPickerCharacteristic, migrateFeatureOptionPickers } 
 import { createModifierInstanceId, syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
+import { resolveClassSkillChoices } from "@/lib/import/parse-class-shell"
+import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import type { Feature } from "@/lib/types"
 import { extractPrerequisiteFromDescription } from "@/lib/builder/choice-prerequisite"
+import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 
 const FEATURE_OPTION_PICKER_CATALOG_ID = "cat_char_feature_option_picker"
 
@@ -289,6 +292,214 @@ function fillChoiceOptionPrerequisites(feature: Feature): Feature {
   }
 }
 
+function hasOptionsSourcePicker(feature: Feature, optionsSource: string): boolean {
+  return (feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; optionsSource?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.optionsSource === optionsSource
+    }),
+  )
+}
+
+function enrichPsionicPoolFeature(feature: Feature): Feature {
+  const [enriched] = enrichPsionicTalentGrantFeatures([feature])
+  const next = enriched ?? feature
+  const optionsSource = next.choices?.optionsSource
+  if (
+    !optionsSource ||
+    (optionsSource !== "known_discipline_talents" &&
+      optionsSource !== "class_talents" &&
+      optionsSource !== "class_disciplines")
+  ) {
+    return next
+  }
+  if (hasOptionsSourcePicker(next, optionsSource)) return next
+
+  const resourceKey =
+    optionsSource === "class_talents"
+      ? (next.choices?.resourceKey ?? "class_talents_known")
+      : optionsSource === "known_discipline_talents"
+        ? (next.choices?.resourceKey ?? "psionic_talents_known")
+        : (next.choices?.resourceKey ?? null)
+
+  const picker = charInstance(createModifierInstanceId(), FEATURE_OPTION_PICKER_CATALOG_ID, [
+    legacyFeatureOptionPickerCharacteristic({
+      id: modId(optionsSource),
+      category: next.choices?.category ?? next.name,
+      choiceCount: next.choices?.count ?? 1,
+      choiceCountByLevel: next.choices?.choiceCountByLevel,
+      swappableOnRest: next.choices?.swappableOnRest,
+      resourceKey,
+      optionsSource,
+      label:
+        optionsSource === "class_disciplines"
+          ? "Psionic discipline options"
+          : optionsSource === "class_talents"
+            ? "Class / general psionic talent options"
+            : "Discipline talent options (from known disciplines)",
+    }),
+  ])
+  return syncModifierRefs({
+    ...next,
+    linkedModifiers: [...(next.linkedModifiers ?? []), picker],
+  })
+}
+
+function enrichPsionicsAbilityFeature(feature: Feature): Feature {
+  if (!/^psionics$/i.test(feature.name.trim())) return feature
+
+  const abilityMatch = (feature.description ?? "").match(
+    /\b(?:your\s+)?psionic\s+ability\s+is\s+(Intelligence|Wisdom|Charisma)\b/i,
+  )
+  const ability = abilityMatch ? parseAbilityWord(abilityMatch[1]) : "intelligence"
+  const abilityLabel = abilityMatch?.[1] ?? "Intelligence"
+
+  const hasSpellcastingAbility = (feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => char.type === "spellcasting_ability"),
+  )
+  const hasCustomSkill = (feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some(
+      (char) => char.type === "custom_skill" && /^psionics$/i.test(String(char.name ?? "")),
+    ),
+  )
+
+  if (hasSpellcastingAbility && hasCustomSkill) return feature
+
+  const nextMods = [...(feature.linkedModifiers ?? [])]
+  if (!hasSpellcastingAbility && ability) {
+    nextMods.push(
+      charInstance(createModifierInstanceId(), characteristicCatalogRefId("spellcasting_ability"), [
+        {
+          id: modId("psionic_ability"),
+          type: "spellcasting_ability",
+          ability,
+          label: `${abilityLabel} psionic ability`,
+        },
+      ]),
+    )
+  }
+  if (!hasCustomSkill) {
+    nextMods.push(
+      charInstance(createModifierInstanceId(), characteristicCatalogRefId("custom_skill"), [
+        {
+          id: modId("psionics_skill"),
+          type: "custom_skill",
+          name: "Psionics",
+          ability: ability ?? "intelligence",
+          expertise: false,
+          label: "Psionics skill",
+        },
+      ]),
+    )
+  }
+
+  return syncModifierRefs({
+    ...feature,
+    linkedModifiers: nextMods,
+  })
+}
+
+function enrichInnatePsionicAbilityFeature(feature: Feature, className: string): Feature {
+  const name = feature.name.trim()
+  const isInnateAbility = /^innate\s+psionic\s+ability/i.test(name)
+  const isInnatePsionics = /^innate\s+psionics$/i.test(name)
+  if (!isInnateAbility && !isInnatePsionics) return feature
+
+  const spellLevelMatch =
+    feature.name.match(/\((\d+)(?:st|nd|rd|th)\s+level\)/i) ??
+    feature.description.match(/\b(\d+)(?:st|nd|rd|th)-level\s+spell\b/i)
+  const spellLevel = spellLevelMatch ? parseInt(spellLevelMatch[1], 10) : null
+  if (isInnateAbility && (!spellLevel || !Number.isFinite(spellLevel))) return feature
+
+  const hasSpellsKnown = (feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => char.type === "spells_known"),
+  )
+  const hasUses = (feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => char.type === "uses"),
+  )
+  if (hasSpellsKnown && (hasUses || isInnatePsionics)) return feature
+
+  const classLevel = feature.level ?? 1
+  const nextMods = [...(feature.linkedModifiers ?? [])]
+  const label = isInnateAbility
+    ? `Innate Psionic Ability (${spellLevel}${ordinalSuffix(spellLevel!)})`
+    : "Innate Psionics"
+
+  if (!hasUses && isInnateAbility) {
+    nextMods.push(
+      charInstance(createModifierInstanceId(), characteristicCatalogRefId("uses"), [
+        {
+          id: modId(`innate_psionic_${spellLevel}_uses`),
+          type: "uses",
+          uses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+          label,
+        },
+      ]),
+    )
+  }
+
+  if (!hasSpellsKnown) {
+    const namedSpells = (feature.choices?.options ?? [])
+      .map((option) => option.name.trim())
+      .filter(Boolean)
+      .map((spellName) => ({
+        spellId: spellNamePlaceholder(spellName),
+        alwaysPrepared: true,
+      }))
+
+    const choiceCount = feature.choices?.count ?? (namedSpells.length > 0 ? namedSpells.length : 1)
+    const grantLevel =
+      spellLevel && Number.isFinite(spellLevel)
+        ? spellLevel
+        : /\bcantrip/i.test(feature.description)
+          ? 0
+          : 1
+
+    nextMods.push(
+      charInstance(createModifierInstanceId(), characteristicCatalogRefId("spells_known"), [
+        {
+          id: modId(`innate_psionic_${spellLevel ?? classLevel}_spell`),
+          type: "spells_known",
+          spells: namedSpells,
+          choiceGrants: namedSpells.length
+            ? []
+            : [
+                {
+                  level: grantLevel,
+                  count: choiceCount,
+                  unlocksAtClassLevel: classLevel,
+                },
+              ],
+          spellListClassOptions: [className || "Psion"],
+          label,
+        },
+      ]),
+    )
+  }
+
+  return syncModifierRefs({
+    ...feature,
+    isChoice: false,
+    choices: undefined,
+    linkedModifiers: nextMods,
+  })
+}
+
+function ordinalSuffix(n: number): string {
+  const v = n % 100
+  if (v >= 11 && v <= 13) return "th"
+  switch (n % 10) {
+    case 1:
+      return "st"
+    case 2:
+      return "nd"
+    case 3:
+      return "rd"
+    default:
+      return "th"
+  }
+}
+
 function enrichFeatureChoices(
   feature: Feature,
   content: ImportContent,
@@ -299,6 +510,9 @@ function enrichFeatureChoices(
   next = enrichUpgradesFeature(next)
   next = enrichBombFormulasFeature(next)
   next = enrichDiscoveriesFeature(next)
+  next = enrichPsionicPoolFeature(next)
+  next = enrichPsionicsAbilityFeature(next)
+  next = enrichInnatePsionicAbilityFeature(next, className)
 
   if (next.isChoice && (next.choices?.options?.length ?? 0) > 0) {
     const picker = buildChoiceOptionPicker(next)
@@ -402,17 +616,26 @@ export function enrichImportChoiceFeatures(content: ImportContent): ImportConten
   const next: ImportContent = { ...content }
 
   if (content.classes?.length) {
-    next.classes = content.classes.map((cls) => ({
-      ...cls,
-      features: (cls.features ?? []).map((feature) =>
+    next.classes = content.classes.map((cls) => {
+      const features = (cls.features ?? []).map((feature) =>
         enrichSpellcastingFeature(
           enrichFeatureChoices(feature as Feature, content, cls.name),
           {
-          primary_ability: cls.primary_ability,
-          spellcasting: cls.spellcasting as ClassSpellcastingContext["spellcasting"],
-        }),
-      ),
-    })) as unknown as ImportContent["classes"]
+            primary_ability: cls.primary_ability,
+            spellcasting: cls.spellcasting as ClassSpellcastingContext["spellcasting"],
+          },
+        ),
+      )
+      const skill_choices = resolveClassSkillChoices(cls.skill_choices, [
+        cls.description,
+        features.map((feature) => feature.description ?? "").join("\n"),
+      ])
+      return {
+        ...cls,
+        ...(skill_choices ? { skill_choices } : {}),
+        features,
+      }
+    }) as unknown as ImportContent["classes"]
   }
 
   if (content.subclasses?.length) {

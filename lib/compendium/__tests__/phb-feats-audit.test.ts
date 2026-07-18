@@ -72,7 +72,7 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
     expect(vision).toMatchObject({ visionType: "blindsight", rangeFeet: 10 })
   })
 
-  it("import skips AI mechanics for named preset feats so presets are not blocked", () => {
+  it("import applies name presets so review sees wired modifiers (not empty shells)", () => {
     const content = enrichImportContentModifiers({
       feats: [
         {
@@ -105,28 +105,41 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
             },
           ],
         },
+        {
+          name: "Alert",
+          description: "You can add your Proficiency Bonus to Initiative rolls.",
+          category: "Origin",
+        },
+        {
+          name: "Tough",
+          description: "Your Hit Point maximum increases by twice your character level.",
+          category: "Origin",
+        },
       ],
     })
-    for (const feat of content.feats ?? []) {
-      const linked = (feat as { linkedModifiers?: unknown[] }).linkedModifiers ?? []
-      expect(linked).toHaveLength(0)
-    }
-    const loadedAsi = enrichCustomFeatRow({
-      name: "Ability Score Improvement",
-      source: PHB,
-      description: content.feats?.[0]?.description,
-    })
-    expect(chars(loadedAsi).some((c) => c.type === "ability_scores")).toBe(true)
-    expect(chars(loadedAsi).every((c) => c.type !== "grant_feat")).toBe(true)
 
-    const loadedBlind = enrichCustomFeatRow({
-      name: "Blind Fighting",
-      source: PHB,
-      description: content.feats?.[1]?.description,
-    })
-    expect(chars(loadedBlind).find((c) => c.type === "vision")).toMatchObject({
-      visionType: "blindsight",
-    })
+    const byName = Object.fromEntries((content.feats ?? []).map((feat) => [feat.name, feat]))
+
+    const asiLinked = (byName["Ability Score Improvement"] as { linkedModifiers?: unknown[] })
+      ?.linkedModifiers ?? []
+    expect(asiLinked.length).toBeGreaterThan(0)
+    expect(chars(byName["Ability Score Improvement"] as Record<string, unknown>).some((c) => c.type === "ability_scores")).toBe(
+      true,
+    )
+    expect(chars(byName["Ability Score Improvement"] as Record<string, unknown>).every((c) => c.type !== "grant_feat")).toBe(
+      true,
+    )
+
+    expect(
+      chars(byName["Blind Fighting"] as Record<string, unknown>).find((c) => c.type === "vision"),
+    ).toMatchObject({ visionType: "blindsight", rangeFeet: 10 })
+
+    expect(
+      ((byName.Alert as { linkedModifiers?: unknown[] })?.linkedModifiers ?? []).length,
+    ).toBeGreaterThan(0)
+    expect(chars(byName.Tough as Record<string, unknown>).some((c) => c.type === "hit_points")).toBe(
+      true,
+    )
   })
 
   it("parses visionType blindsight and usesProficiency from AI mechanics", () => {

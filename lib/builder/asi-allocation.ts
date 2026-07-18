@@ -58,12 +58,16 @@ export function getAsiAllocatorHelpText(totalPoints: number, pickCount: number):
 export function isValidAsiAllocation(
   allocation: AsiAllocation,
   totalPoints: number = ASI_POINTS_PER_PICK,
+  allowedAbilities?: AbilityScoreKey[],
 ): boolean {
   if (totalPoints <= 0) return true
   if (getAsiPointsUsed(allocation) !== totalPoints) return false
+  const allowed = allowedAbilities?.length ? new Set(allowedAbilities) : null
   return ABILITY_KEYS.every((key) => {
     const value = allocation[key] ?? 0
-    return Number.isInteger(value) && value >= 0 && value <= totalPoints
+    if (!Number.isInteger(value) || value < 0 || value > totalPoints) return false
+    if (allowed && value > 0 && !allowed.has(key)) return false
+    return true
   })
 }
 

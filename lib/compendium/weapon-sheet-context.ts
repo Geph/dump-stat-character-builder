@@ -19,7 +19,7 @@ import {
 import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
-import { SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import { resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import { readModifierSource } from "@/lib/character/tag-modifier-source"
 import type { StatContributionSourceType } from "@/lib/character/stat-contributions"
@@ -240,7 +240,7 @@ function characterHasWeaponMasteryFeature(inputs: CharacterBuildInputs): boolean
       return true
     }
     const subclassId = inputs.subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = inputs.subclasses.find((s) => s.id === subclassId)
       if (
         subclass?.features?.some(

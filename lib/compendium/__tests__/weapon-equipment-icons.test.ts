@@ -79,3 +79,36 @@ describe("weapon equipment icon defaults", () => {
     }
   })
 })
+
+describe("ability icon defaults", () => {
+  it("defaults Psion disciplines to psychic-waves", () => {
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Psychokinesis Discipline",
+        ability_role: "discipline",
+      }),
+    ).toBe("psychic-waves")
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Enhancement Discipline",
+      }),
+    ).toBe("psychic-waves")
+    expect(fs.existsSync(path.join(process.cwd(), "public/icons/psychic-waves.svg"))).toBe(true)
+  })
+
+  it("keeps the generic ability default for non-discipline rows and prefers saved icons", () => {
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Mind Leech",
+        ability_role: "psionic_power",
+      }),
+    ).toBe("magic-trident")
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Psychokinesis Discipline",
+        ability_role: "discipline",
+        icon: "fire-silhouette",
+      }),
+    ).toBe("fire-silhouette")
+  })
+})

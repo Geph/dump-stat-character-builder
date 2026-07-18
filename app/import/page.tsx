@@ -998,6 +998,9 @@ export default function ImportPage() {
                 hasModifiers={stageHasModifiers}
                 onNext={goNextReview}
                 canNext={canGoNextReview}
+                onBack={goPreviousReview}
+                canBack={Boolean(canGoPreviousReview)}
+                onCancel={clearPendingImport}
                 contentChildren={
                   <>
                     <ImportCollisionPanel

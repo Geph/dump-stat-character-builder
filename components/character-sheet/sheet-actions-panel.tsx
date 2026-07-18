@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Info, X } from "lucide-react"
+import { AlertTriangle, Info, X } from "lucide-react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   PsionicAugmentPicker,
@@ -192,6 +192,31 @@ function ActionInfoOverlay({
               readOnly
             />
           ) : null}
+          {action.relatedTalentAlerts?.length ? (
+            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                Related talents
+              </p>
+              {action.relatedTalentAlerts.map((alert) => (
+                <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-xs font-semibold text-foreground">{alert.name}</p>
+                    <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
+                    {alert.sourceLabel ? (
+                      <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
+                    ) : null}
+                    {alert.description ? (
+                      <RichTextContent
+                        html={alert.description}
+                        className="text-xs text-foreground/80 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <RichTextContent
             html={action.description}
             className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
@@ -337,18 +362,36 @@ export function SheetActionsPanel({
                           {entry.sourceLabel}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setInfoActionId(entry.id)
-                        }}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
-                        aria-label={`About ${entry.name}`}
-                        title="What does this do?"
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        {entry.relatedTalentAlerts?.length ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setInfoActionId(entry.id)
+                            }}
+                            className="rounded p-0.5 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15"
+                            aria-label={`Related talents for ${entry.name}`}
+                            title={entry.relatedTalentAlerts
+                              .map((alert) => `${alert.name}: ${alert.summary}`)
+                              .join(" · ")}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setInfoActionId(entry.id)
+                          }}
+                          className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          aria-label={`About ${entry.name}`}
+                          title="What does this do?"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     {usage ? (
                       <div className="flex items-center justify-between gap-2">
