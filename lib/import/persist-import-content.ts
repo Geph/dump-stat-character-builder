@@ -7,6 +7,7 @@ import { stripFoundryMeta, type ImportContentWithFoundryMeta } from "@/lib/impor
 import { buildImportReport, type ImportReport } from "@/lib/import/build-import-report"
 import { enrichFeatRowWithPrerequisites } from "@/lib/import/resolve-feat-prerequisites"
 import {
+  resolveFeatureChoiceLinkedSpells,
   resolveFeatureListLinkedSpells,
   resolveFeatureLinkedSpells,
   resolveLinkedModifierSpells,
@@ -464,26 +465,24 @@ export async function persistImportedContent(
         spellCatalog,
         preferredSource,
       )
-      const choicesRaw = row.choices as Feature["choices"] | undefined
-      const choices = choicesRaw?.options?.length
-        ? {
-            ...choicesRaw,
-            options: choicesRaw.options.map((option) => {
-              const optionMods = resolveLinkedModifierSpells(
-                option.linkedModifiers,
-                spellCatalog,
-                preferredSource,
-              )
-              if (optionMods === option.linkedModifiers) return option
-              return { ...option, linkedModifiers: optionMods }
-            }),
-          }
-        : choicesRaw
+      const choices = resolveFeatureChoiceLinkedSpells(
+        row.choices as Feature["choices"] | undefined,
+        spellCatalog,
+        preferredSource,
+      )
+      const specializationChoices = resolveFeatureChoiceLinkedSpells(
+        row.specialization_choices as Feature["choices"] | null | undefined,
+        spellCatalog,
+        preferredSource,
+      )
       const withSpells = {
         ...row,
         linked_modifiers: linkedModifiers ?? row.linked_modifiers ?? [],
         linkedModifiers: linkedModifiers ?? row.linkedModifiers ?? [],
-        ...(choices ? { choices } : {}),
+        ...(choices !== undefined ? { choices } : {}),
+        ...(specializationChoices !== undefined
+          ? { specialization_choices: specializationChoices }
+          : {}),
       }
       return resolveAbilityAttachmentRow(withSpells, attachmentMaps)
     })

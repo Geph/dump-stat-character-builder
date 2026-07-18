@@ -35,13 +35,23 @@ function coerceChoices(raw: unknown): FeatureChoice | null {
   const options = Array.isArray(row.options)
     ? row.options
         .filter(
-          (entry): entry is { name: string; description: string } =>
+          (entry): entry is {
+            name: string
+            description: string
+            prerequisite?: string | null
+            linkedModifiers?: FeatureChoice["options"][number]["linkedModifiers"]
+          } =>
             !!entry &&
             typeof entry === "object" &&
             typeof (entry as { name?: unknown }).name === "string" &&
             typeof (entry as { description?: unknown }).description === "string",
         )
-        .map((entry) => ({ name: entry.name, description: entry.description }))
+        .map((entry) => ({
+          name: entry.name,
+          description: entry.description,
+          ...(typeof entry.prerequisite === "string" ? { prerequisite: entry.prerequisite } : {}),
+          ...(entry.linkedModifiers?.length ? { linkedModifiers: entry.linkedModifiers } : {}),
+        }))
     : []
   if (!category || count == null || !options.length) return null
   return {
@@ -61,6 +71,7 @@ export function normalizeAbilityImportRow(raw: RawAbilityRow): Record<string, un
   const description = typeof raw.description === "string" ? raw.description : null
   const psionic_augments = coercePsionicAugments(raw.psionic_augments, description, name)
   const choices = coerceChoices(raw.choices)
+  const specializationChoices = coerceChoices(raw.specialization_choices)
   const components =
     coerceStringArray(raw.components) ??
     (typeof raw.components === "string" ? [raw.components] : null)
@@ -81,6 +92,7 @@ export function normalizeAbilityImportRow(raw: RawAbilityRow): Record<string, un
     ...(raw.concentration === true ? { concentration: true } : {}),
     ...(raw.isChoice === true ? { isChoice: true } : {}),
     ...(choices ? { choices } : {}),
+    ...(specializationChoices ? { specialization_choices: specializationChoices } : {}),
     ...(typeof raw.ability_role === "string" ? { ability_role: raw.ability_role } : {}),
   }
 }

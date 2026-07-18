@@ -49,6 +49,7 @@ describe("custom systems import hints", () => {
     expect(hint).toContain("EVERY discipline-gated talent")
     expect(hint).toContain("Discipline Talents")
     expect(hint).toContain("Class Talents")
+    expect(hint).toContain("specialization_choices")
   })
 
   it("includes structure examples in BYO extraction prompt with custom systems", () => {

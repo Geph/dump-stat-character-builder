@@ -32,8 +32,16 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("Discipline Talents")
     expect(prompt).toContain("Class Talents")
     expect(prompt).toContain("Specialization")
+    expect(prompt).toContain("specialization_choices")
     expect(prompt).toContain("class_talents_known")
     expect(prompt).not.toContain("KibblesTasty Psion")
+  })
+
+  it("prompts choose-from-spell-list subclass options with per-option tables", () => {
+    expect(CHOICE_EXTRACTION_HINT).toContain("Choose-from-spell-lists")
+    expect(CHOICE_EXTRACTION_HINT).toContain("Circle of the Land")
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("mutually exclusive spell lists")
   })
 
   it("scopes feat isChoice to ability-catalog picks, not grant_feat milestones", () => {

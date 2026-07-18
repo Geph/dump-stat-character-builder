@@ -56,6 +56,7 @@ export type ImportProposalCustomAbility = {
   levelRequirement: number | null
   talentCount?: number
   choices?: import("@/lib/types").FeatureChoice | null
+  specializationChoices?: import("@/lib/types").FeatureChoice | null
   abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "class_talent" | "knack" | "upgrade" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
@@ -446,6 +447,9 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
       levelRequirement: ability.level_requirement ?? null,
       talentCount,
       choices: ability.choices as import("@/lib/types").FeatureChoice | undefined,
+      specializationChoices: ability.specialization_choices as
+        | import("@/lib/types").FeatureChoice
+        | undefined,
       abilityRole:
         ability.ability_role ??
         (/\bknack\b/i.test(ability.choices?.category ?? ability.name)
@@ -823,6 +827,9 @@ export function applyProposalSelections(
     level_requirement: row.levelRequirement,
     companion_stat_block: row.companionStatBlock ?? null,
     ...(row.choices ? { isChoice: true, choices: row.choices } : {}),
+    ...(row.specializationChoices
+      ? { specialization_choices: row.specializationChoices }
+      : {}),
     ...(row.abilityRole ? { ability_role: row.abilityRole } : {}),
     ...(row.psionic_augments ? { psionic_augments: row.psionic_augments } : {}),
     ...(row.casting_time ? { casting_time: row.casting_time } : {}),

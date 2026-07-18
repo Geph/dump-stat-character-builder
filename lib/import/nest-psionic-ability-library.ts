@@ -162,25 +162,47 @@ function buildDisciplineCatalog(
       entry(
         "Alternate Effects",
         "Alternate Effects",
-        "Spells granted by this discipline (cast via Psionics / psi points). Linked as Common Modifiers on this ability.",
+        "Spells granted by this discipline (cast via Psionics / psi points). Linked as Common Modifiers on this ability. A Specialization may replace this list.",
         "Spell links on this ability",
       ),
     )
   }
 
-  const choices = discipline.choices as
-    | { options?: { name: string; description?: string; prerequisite?: string | null }[] }
+  const specializationChoices = (discipline.specialization_choices ??
+    (/specialization/i.test(
+      String((discipline.choices as { category?: string } | undefined)?.category ?? ""),
+    )
+      ? discipline.choices
+      : null)) as
+    | { options?: { name: string; description?: string }[] }
+    | null
     | undefined
-  for (const option of choices?.options ?? []) {
-    const prereq = option.prerequisite?.trim()
+  for (const option of specializationChoices?.options ?? []) {
     catalog.push(
       entry(
         option.name,
-        "Discipline Talents",
+        "Specializations",
         option.description ?? "",
-        prereq ? `Prerequisite: ${prereq}` : "Discipline talent",
+        "Optional specialization (may replace Alternate Effects)",
       ),
     )
+  }
+
+  const choices = discipline.choices as
+    | { category?: string; options?: { name: string; description?: string; prerequisite?: string | null }[] }
+    | undefined
+  if (!/specialization/i.test(choices?.category ?? "")) {
+    for (const option of choices?.options ?? []) {
+      const prereq = option.prerequisite?.trim()
+      catalog.push(
+        entry(
+          option.name,
+          "Discipline Talents",
+          option.description ?? "",
+          prereq ? `Prerequisite: ${prereq}` : "Discipline talent",
+        ),
+      )
+    }
   }
 
   return catalog

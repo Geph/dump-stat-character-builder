@@ -227,6 +227,10 @@ import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-
 import { collectSubclassAlwaysPreparedSpellIds } from "@/lib/character/subclass-granted-spells"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
+  abilitySpecializationChoice,
+  abilitySpecializationChoiceKey,
+} from "@/lib/import/parse-alternate-effects-table"
+import {
   buildOwnedFeatIds,
   isFeatEligibleForCategories,
   isOriginSelectableCategory,
@@ -3110,6 +3114,56 @@ export default function BuilderPageClient() {
                     })}
                   </div>
                 )}
+
+                {(() => {
+                  const pickedDisciplineNames = new Set(
+                    Object.entries(featureChoicePicks)
+                      .filter(([key]) => /discipline/i.test(key))
+                      .flatMap(([, picks]) => picks.map((name) => name.trim().toLowerCase())),
+                  )
+                  if (!pickedDisciplineNames.size) return null
+                  const specializationAbilities = customAbilities.filter((ability) => {
+                    const specialization = abilitySpecializationChoice(ability)
+                    if (!specialization?.options?.length) return false
+                    const name = ability.name.trim().toLowerCase()
+                    return [...pickedDisciplineNames].some(
+                      (pick) => name.includes(pick) || pick.includes(name),
+                    )
+                  })
+                  if (!specializationAbilities.length) return null
+                  return (
+                    <div className="mt-6 space-y-2 border-t border-border pt-6">
+                      <h3 className="text-lg font-bold text-foreground">Discipline Specializations</h3>
+                      <p className={`${pageFloatingHintClass} text-xs mb-2`}>
+                        Optional one-time specializations (e.g. Psychokinesis Cryokinetic). Selecting one
+                        replaces that discipline&apos;s default Alternate Effects spell list.
+                      </p>
+                      {specializationAbilities.map((ability) => {
+                        const specialization = abilitySpecializationChoice(ability)!
+                        const key = abilitySpecializationChoiceKey(ability.id)
+                        return (
+                          <MultiSelectChoices
+                            key={key}
+                            title={`${ability.name}: ${specialization.category}`}
+                            hint={`Choose up to ${specialization.count} (optional — leave empty for the default Alternate Effects list).`}
+                            options={specialization.options.map((option) => ({
+                              name: option.name,
+                              description: option.description,
+                            }))}
+                            maxCount={specialization.count}
+                            selected={featureChoicePicks[key] ?? []}
+                            onChange={(selected) =>
+                              setFeatureChoicePicks((prev) => ({
+                                ...prev,
+                                [key]: selected,
+                              }))
+                            }
+                          />
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
                 {/* Feats granted by class features */}
                 {activeClassLevels.length > 0 && requiredFeatSlots > 0 && (

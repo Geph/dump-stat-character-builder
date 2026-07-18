@@ -122,6 +122,15 @@ export function resolveFeatureLinkedSpells(
   }
 }
 
+/** Resolve spells_known on a FeatureChoice's options (ability talents / specializations). */
+export function resolveFeatureChoiceLinkedSpells(
+  choices: FeatureChoice | null | undefined,
+  catalog: NamedSourceRow[],
+  preferredSource?: string | null,
+): FeatureChoice | null | undefined {
+  return resolveChoiceOptionSpells(choices, catalog, preferredSource)
+}
+
 /** Resolve spells_known on every feature in a list (class/subclass/species traits). */
 export function resolveFeatureListLinkedSpells(
   features: Feature[] | null | undefined,
