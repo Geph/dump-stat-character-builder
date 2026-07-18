@@ -1,3 +1,8 @@
+import {
+  canonicalSpellLookupKey,
+  normalizeSpellLookupKey,
+  spellNamesAliasEqual,
+} from "@/lib/compendium/spell-name-aliases"
 import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import type { ImportContent } from "@/lib/import/content-schema"
 
@@ -8,16 +13,10 @@ export type ReferencedSpellRef = {
   unlocksAtClassLevel: number
 }
 
-export function normalizeSpellLookupKey(name: string): string {
-  return name
-    .replace(/\*+/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/\u2019/g, "'")
-}
+export { normalizeSpellLookupKey } from "@/lib/compendium/spell-name-aliases"
 
 export function spellNamesMatch(a: string, b: string): boolean {
-  return normalizeSpellLookupKey(a) === normalizeSpellLookupKey(b)
+  return spellNamesAliasEqual(a, b)
 }
 
 /** Collect spell names referenced by subclass always-prepared tables. */
@@ -53,10 +52,10 @@ export function listMissingReferencedSpellNames(
   content: ImportContent,
   catalogNames: string[],
 ): string[] {
-  const catalogKeys = new Set(catalogNames.map(normalizeSpellLookupKey))
+  const catalogKeys = new Set(catalogNames.map(canonicalSpellLookupKey))
   const missing: string[] = []
   for (const ref of collectReferencedSpellNames(content)) {
-    if (!catalogKeys.has(normalizeSpellLookupKey(ref.name))) {
+    if (!catalogKeys.has(canonicalSpellLookupKey(ref.name))) {
       missing.push(ref.name)
     }
   }

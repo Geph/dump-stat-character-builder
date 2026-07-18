@@ -7,6 +7,7 @@ import {
 import {
   IMPORT_SPELL_NAME_PREFIX,
 } from "@/lib/import/resolve-linked-modifier-spells"
+import { canonicalSpellLookupKey, normalizeSpellLookupKey } from "@/lib/compendium/spell-name-aliases"
 import { readLinkedModifiers, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { CustomAbility, Spell } from "@/lib/types"
 
@@ -16,7 +17,7 @@ export type SpellResourceCastCost = {
 }
 
 function normalizeName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ")
+  return canonicalSpellLookupKey(value)
 }
 
 function spellNameFromId(spellId: string): string | null {
@@ -26,12 +27,34 @@ function spellNameFromId(spellId: string): string | null {
   return null
 }
 
+function buildSpellCatalogByName(
+  spellCatalog: Pick<Spell, "id" | "name">[],
+): Map<string, string> {
+  const catalogByName = new Map<string, string>()
+  for (const spell of spellCatalog) {
+    const key = canonicalSpellLookupKey(spell.name)
+    if (!key) continue
+    const existing = catalogByName.get(key)
+    if (!existing || normalizeSpellLookupKey(spell.name) === key) {
+      catalogByName.set(key, spell.id)
+    }
+  }
+  return catalogByName
+}
+
 function resolveSpellCatalogId(
   spellIdOrName: string,
   catalogById: Map<string, Pick<Spell, "id" | "name">>,
   catalogByName: Map<string, string>,
 ): string | null {
-  if (catalogById.has(spellIdOrName)) return spellIdOrName
+  if (catalogById.has(spellIdOrName)) {
+    const row = catalogById.get(spellIdOrName)
+    if (row) {
+      const routed = catalogByName.get(canonicalSpellLookupKey(row.name))
+      if (routed) return routed
+    }
+    return spellIdOrName
+  }
   const fromPlaceholder = spellNameFromId(spellIdOrName)
   if (fromPlaceholder) {
     return catalogByName.get(normalizeName(fromPlaceholder)) ?? null
@@ -113,9 +136,7 @@ export function collectSpellResourceCastCosts(params: {
   const featureChoicePicks = params.featureChoicePicks ?? {}
   const out = new Map<string, SpellResourceCastCost>()
   const catalogById = new Map(params.spellCatalog.map((spell) => [spell.id, spell]))
-  const catalogByName = new Map(
-    params.spellCatalog.map((spell) => [normalizeName(spell.name), spell.id]),
-  )
+  const catalogByName = buildSpellCatalogByName(params.spellCatalog)
 
   for (const ability of params.customAbilities) {
     let linked = readLinkedModifiers(ability as unknown as Record<string, unknown>)
