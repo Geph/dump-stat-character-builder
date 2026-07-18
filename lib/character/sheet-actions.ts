@@ -3,7 +3,6 @@ import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-tale
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
-import { ACTION_PANEL_CLASS_RESOURCE_IDS } from "@/lib/compendium/class-resource-display"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
@@ -93,7 +92,9 @@ const COMBAT_TEXT_RE =
 
 /** Resource keys that always place a spend action on the Combat tab. */
 const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
-  ...ACTION_PANEL_CLASS_RESOURCE_IDS,
+  // Keep in sync with ACTION_PANEL_CLASS_RESOURCE_IDS (avoid importing that module —
+  // class-resource-display → modifier-catalog → feature-sheet-display → this file).
+  "second_wind",
   "psi_points",
 ])
 
