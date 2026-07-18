@@ -62,6 +62,11 @@ export interface FeatureChoice {
     level_requirement?: number | null
     /** When true, the same option may be selected more than once. */
     repeatable?: boolean | null
+    /**
+     * Builder subtitle for pooled options (e.g. psionic talents): discipline name
+     * or "General Talent" when not tied to a known discipline.
+     */
+    sourceLabel?: string | null
   }[]
   count: number // how many to choose
   /** Picks may be swapped out when finishing a rest (e.g. Fighting Style, Weapon Mastery). */
@@ -277,6 +282,10 @@ export interface FeatureEffect {
   label?: string | null
   /** movement_option: teleport instead of normal movement. */
   movementTeleport?: boolean
+  /** standard_action: take the Study action with this activation timing (e.g. Bonus Action). */
+  standardActionStudy?: boolean
+  /** standard_action: take the Search action with this activation timing. */
+  standardActionSearch?: boolean
   /** force_save / emanation: area shape label (cone, cube, etc.). */
   areaShape?: string | null
   /** heal_self: fixed heal amount (legacy import presets). */
@@ -564,6 +573,8 @@ export interface Subclass {
   class_id: string
   name: string
   description: string | null
+  /** Short hero/card hook (builder selection cards + detail overlay tagline). */
+  card_blurb?: string | null
   prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   features: Feature[]
   /** Subclass-granted spellcasting (e.g. Eldritch Knight, Arcane Trickster) — separate from the base class's own spellcasting. */

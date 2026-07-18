@@ -63,17 +63,21 @@ export function ImportProposalPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-background/80 p-4 text-sm">
-      {proposals.classResources.length === 0 && proposals.customAbilities.length === 0 ? (
-        <p className="text-muted-foreground">
-          No class resources or custom abilities need separate approval. Confirm when the preview
-          above looks correct.
-        </p>
-      ) : (
-        <p className="text-muted-foreground">
-          Uncheck any class resources or custom abilities you do not want created in the compendium.
-        </p>
-      )}
+    <div className="space-y-4 rounded-xl border-2 border-primary/45 bg-primary/[0.07] p-4 text-sm shadow-md shadow-primary/10 ring-1 ring-primary/20">
+      <div>
+        <p className="text-base font-semibold text-foreground">Ready to import</p>
+        {proposals.classResources.length === 0 && proposals.customAbilities.length === 0 ? (
+          <p className="mt-1 text-muted-foreground">
+            No class resources or custom abilities need separate approval. Confirm when the preview
+            above looks correct.
+          </p>
+        ) : (
+          <p className="mt-1 text-muted-foreground">
+            Uncheck any class resources or custom abilities you do not want created in the
+            compendium.
+          </p>
+        )}
+      </div>
 
       {proposals.classResources.length > 0 && (
         <section>
@@ -164,12 +168,12 @@ export function ImportProposalPanel({
         </section>
       )}
 
-      <div className="flex flex-wrap gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-3 border-t border-primary/25 pt-3">
         <button
           type="button"
           disabled={confirming}
           onClick={() => void onConfirm(selections)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/30 hover:bg-primary/90 disabled:opacity-60"
         >
           {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Confirm and import
@@ -178,7 +182,7 @@ export function ImportProposalPanel({
           type="button"
           disabled={confirming}
           onClick={onCancel}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
+          className="rounded-xl border border-border/80 bg-background/70 px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-60"
         >
           Cancel
         </button>

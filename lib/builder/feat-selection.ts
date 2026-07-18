@@ -1,8 +1,14 @@
 import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import {
   baseCompendiumLookupKey,
   sourcesEqual,
 } from "@/lib/compendium/prefer-same-source"
+import {
+  collectMechanicalFeatPrerequisiteRules,
+  hasArmorTraining,
+  meetsAbilityScorePrerequisite,
+} from "@/lib/import/resolve-feat-prerequisites"
 import type { Feat } from "@/lib/types"
 
 export const FEAT_MILESTONES = [4, 8, 12, 16, 19] as const
@@ -25,6 +31,10 @@ export type FeatSlotContext = {
    * category lists prefer same-source replacements over SRD duplicates.
    */
   preferredSources?: string[]
+  /** Effective armor training/proficiencies (class + feats + extras). */
+  armorProficiencies?: string[]
+  /** Effective ability scores after ASIs and racial bonuses. */
+  abilityScores?: Partial<Record<AbilityScoreKey, number>>
 }
 
 export function buildOwnedFeatIds(params: {
@@ -115,17 +125,26 @@ export function isFeatEligibleForCategories(
     return preferredSources.some((source) => sourcesEqual(source, feat.source))
   })
 
-  // Origin slots accept Origin + Dark Gift; Dark Gift is not a General/FS/etc. pick.
+  // Origin slots accept Origin + Dark Gift. General ASI slots also accept Origin feats
+  // (2024: any feat you're eligible for). Dark Gift stays Origin/Dark Gift–slot only.
   const categoryMatches =
     normalizedCategories.has(category) ||
-    (isOriginSlot && isOriginSelectableCategory(category))
+    (isOriginSlot && isOriginSelectableCategory(category)) ||
+    (normalizedCategories.has("General") && category === "Origin")
   if (!categoryMatches && !nameAllowed) return false
 
   const taken = new Set(
     context.ownedFeatIds.filter((id) => id && id !== context.currentSlotFeatId),
   )
 
-  if (isOriginSelectableCategory(category) && !isOriginSlot && !nameAllowed) return false
+  if (
+    category === "Dark Gift" &&
+    !isOriginSlot &&
+    !normalizedCategories.has("Dark Gift") &&
+    !nameAllowed
+  ) {
+    return false
+  }
   if (!feat.repeatable && taken.has(feat.id)) return false
   if (hasExclusiveCategoryConflict(feat, context)) return false
 
@@ -155,6 +174,17 @@ export function isFeatEligibleForCategories(
   }
   if (feat.prerequisite_feat_ids?.length) {
     if (!feat.prerequisite_feat_ids.every((id) => context.ownedFeatIds.includes(id))) return false
+  }
+
+  const mechanicalRules = collectMechanicalFeatPrerequisiteRules(feat)
+  for (const rule of mechanicalRules) {
+    if (rule.category === "armor_training") {
+      if (!hasArmorTraining(context.armorProficiencies, rule.value)) return false
+      continue
+    }
+    if (rule.category === "ability_score") {
+      if (!meetsAbilityScorePrerequisite(context.abilityScores, rule)) return false
+    }
   }
 
   return true

@@ -247,7 +247,16 @@ export function CompendiumSelectionCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt="" className={heroImageClass} />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-muted/80 via-card to-background" />
+          <div className="absolute inset-0 bg-gradient-to-br from-muted/90 via-card to-background">
+            <div
+              aria-hidden
+              className="absolute inset-0 opacity-[0.14] bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.9),transparent_42%),radial-gradient(circle_at_78%_78%,rgba(255,255,255,0.55),transparent_48%)]"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(135deg,transparent_40%,rgba(255,255,255,0.35)_50%,transparent_60%)]"
+            />
+          </div>
         )}
       </div>
       <div

@@ -81,9 +81,10 @@ describe("aggregatePsionicTalentOptions", () => {
       classNames: ["KibblesTasty Psion"],
     })
     expect(options.map((row) => row.name)).toEqual(["Force Push"])
+    expect(options[0]?.sourceLabel).toBe("Telekinetic Discipline")
   })
 
-  it("returns no talents until a discipline is known", () => {
+  it("returns no discipline talents until a discipline is known", () => {
     const options = aggregatePsionicTalentOptions({
       customAbilities: [
         discipline("Telekinetic Discipline", [{ name: "Force Push" }]),
@@ -91,7 +92,40 @@ describe("aggregatePsionicTalentOptions", () => {
       featureChoicePicks: {},
       classNames: ["Psion"],
     })
-    expect(options).toEqual([])
+    expect(options.map((row) => row.name)).toEqual([])
+  })
+
+  it("includes general psionic talents even without a known discipline", () => {
+    const options = aggregatePsionicTalentOptions({
+      customAbilities: [
+        discipline("Telekinetic Discipline", [{ name: "Force Push" }]),
+        classTalent("Astral Arms", { description: "Spectral arms." }),
+        classTalent("Awaken Mind", {
+          prerequisites: "9th-level Psion",
+          level_requirement: 9,
+        }),
+      ],
+      featureChoicePicks: {},
+      classNames: ["Psion"],
+    })
+    expect(options.map((row) => row.name).sort()).toEqual(["Astral Arms", "Awaken Mind"])
+    expect(options.every((row) => row.sourceLabel === "General Talent")).toBe(true)
+  })
+
+  it("unions known-discipline talents with general psionic talents", () => {
+    const options = aggregatePsionicTalentOptions({
+      customAbilities: [
+        discipline("Telekinetic Discipline", [{ name: "Force Push" }]),
+        classTalent("Schism"),
+      ],
+      featureChoicePicks: { "class:Primary Discipline": ["Telekinetic Discipline"] },
+      classNames: ["Psion"],
+    })
+    expect(options.map((row) => row.name).sort()).toEqual(["Force Push", "Schism"])
+    expect(options.find((row) => row.name === "Force Push")?.sourceLabel).toBe(
+      "Telekinetic Discipline",
+    )
+    expect(options.find((row) => row.name === "Schism")?.sourceLabel).toBe("General Talent")
   })
 
   it("includes archetype-granted disciplines", () => {
@@ -264,15 +298,20 @@ describe("resolveFeatureChoiceOptions talent filtering", () => {
     expect(optionsAt9.map((row) => row.name).sort()).toEqual(["Awaken Mind", "Open Mind"])
   })
 
-  it("hides discipline-talent picks when no discipline is known", () => {
+  it("hides discipline-talent picks when no discipline is known but keeps eligible general talents", () => {
     const options = resolveFeatureChoiceOptions(talentFeature, {
       customAbilities: [
         discipline("Telekinetic Discipline", [{ name: "Force Push" }]),
+        classTalent("Open Mind"),
+        classTalent("Awaken Mind", {
+          prerequisites: "9th-level Psion",
+          level_requirement: 9,
+        }),
       ],
       featureChoicePicks: {},
       classNames: ["Psion"],
       classLevel: 5,
     })
-    expect(options).toEqual([])
+    expect(options.map((row) => row.name)).toEqual(["Open Mind"])
   })
 })

@@ -69,6 +69,7 @@ export function FeatModifierChoicePicker({
       onChange={onChange}
       accentClass={accentClass}
       layout={layout}
+      showOptionInfo
     />
   )
 }

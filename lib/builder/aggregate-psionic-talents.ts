@@ -7,6 +7,7 @@ import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisit
 import type { CustomAbility, Equipment, Feature, FeatureChoice } from "@/lib/types"
 import { weaponMasteryOptionsForClass } from "@/lib/compendium/weapon-mastery-choice"
 import { weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
+import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
@@ -103,6 +104,35 @@ function talentOptionsFromDiscipline(ability: CustomAbility): FeatureChoice["opt
     }))
 }
 
+/** General Psionic Talents pool (class talents), independent of known disciplines. */
+export function aggregateGeneralPsionicTalentOptions(
+  customAbilities: CustomAbility[],
+): FeatureChoice["options"] {
+  const fromPool = customAbilities.find(
+    (row) =>
+      row.ability_role === "talent_pool" && /general\s+psionic\s+talents/i.test(row.name),
+  )
+  if (fromPool?.choices?.options?.length) {
+    return fromPool.choices.options.map((option) => ({
+      ...option,
+      sourceLabel: option.sourceLabel ?? "General Talent",
+      level_requirement:
+        option.level_requirement ??
+        customAbilities.find((row) => namesMatch(row.name, option.name))?.level_requirement ??
+        null,
+    }))
+  }
+  return customAbilities
+    .filter((row) => row.ability_role === "class_talent")
+    .map((row) => ({
+      name: row.name,
+      description: row.description ?? "",
+      prerequisite: row.prerequisites ?? null,
+      level_requirement: row.level_requirement ?? null,
+      sourceLabel: "General Talent",
+    }))
+}
+
 function buildPrerequisiteContext(params: {
   classLevel: number
   featureChoicePicks: Record<string, string[]>
@@ -124,9 +154,10 @@ function buildPrerequisiteContext(params: {
 }
 
 /**
- * Union talent options from discipline custom abilities the character knows.
+ * Union talent options from known disciplines plus General Psionic Talents.
  * Used when a class feature sets choices.optionsSource = "known_discipline_talents".
- * Returns [] until at least one discipline is known (picked or granted).
+ * Discipline talents require a known discipline; general talents always contribute
+ * (callers still filter by level / prerequisites).
  */
 export function aggregatePsionicTalentOptions(params: {
   customAbilities: CustomAbility[]
@@ -136,22 +167,37 @@ export function aggregatePsionicTalentOptions(params: {
   grantedAbilityNames?: string[]
 }): FeatureChoice["options"] {
   const known = collectKnownDisciplineNames(params).map(normalizeName)
-  if (!known.length) return []
 
   const options: FeatureChoice["options"] = []
   const seen = new Set<string>()
 
-  for (const ability of params.customAbilities) {
-    if (!isDisciplinePackageAbility(ability)) continue
-    const matchesKnown = known.some((pick) => namesMatch(ability.name, pick))
-    if (!matchesKnown) continue
+  const pushUnique = (option: FeatureChoice["options"][number]) => {
+    const key = normalizeName(option.name)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    options.push(option)
+  }
 
-    for (const option of talentOptionsFromDiscipline(ability)) {
-      const key = normalizeName(option.name)
-      if (seen.has(key)) continue
-      seen.add(key)
-      options.push(option)
+  if (known.length) {
+    for (const ability of params.customAbilities) {
+      if (!isDisciplinePackageAbility(ability)) continue
+      const matchesKnown = known.some((pick) => namesMatch(ability.name, pick))
+      if (!matchesKnown) continue
+
+      for (const option of talentOptionsFromDiscipline(ability)) {
+        pushUnique({
+          ...option,
+          sourceLabel: option.sourceLabel ?? ability.name.trim(),
+        })
+      }
     }
+  }
+
+  for (const option of aggregateGeneralPsionicTalentOptions(params.customAbilities)) {
+    pushUnique({
+      ...option,
+      sourceLabel: option.sourceLabel ?? "General Talent",
+    })
   }
 
   return options.sort((a, b) => a.name.localeCompare(b.name))
@@ -216,8 +262,7 @@ export function resolveFeatureChoiceOptions(
       }),
     )
     // Do not fall back to the feature's static option dump — that bypasses discipline gates.
-    if (aggregated.length || knownDisciplines.length === 0) return aggregated
-    return filterOptions(choices.options ?? [])
+    return aggregated
   }
   if (choices.optionsSource === "fusion_talents") {
     const aggregated = filterOptions(
@@ -229,22 +274,9 @@ export function resolveFeatureChoiceOptions(
     return filterOptions(choices.options ?? [])
   }
   if (choices.optionsSource === "class_talents") {
-    const fromPool = params.customAbilities.find(
-      (row) =>
-        row.ability_role === "talent_pool" && /general\s+psionic\s+talents/i.test(row.name),
+    const aggregated = filterOptions(
+      aggregateGeneralPsionicTalentOptions(params.customAbilities),
     )
-    const options =
-      fromPool?.choices?.options?.length
-        ? fromPool.choices.options
-        : params.customAbilities
-            .filter((row) => row.ability_role === "class_talent")
-            .map((row) => ({
-              name: row.name,
-              description: row.description ?? "",
-              prerequisite: row.prerequisites ?? null,
-              level_requirement: row.level_requirement ?? null,
-            }))
-    const aggregated = filterOptions(options)
     if (aggregated.length) return aggregated
     return filterOptions(choices.options ?? [])
   }
@@ -331,12 +363,13 @@ export function resolveFeatureChoiceOptions(
 export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[] {
   return features.map((feature) => {
     const name = feature.name.trim()
+    let next: Feature = feature
     if (/^(?:primary\s+)?psionic talents$/i.test(name)) {
       const choiceCountByLevel =
         feature.choices?.choiceCountByLevel?.length
           ? feature.choices.choiceCountByLevel
           : parsePsionicTalentChoiceCountByLevel(feature.description ?? "")
-      return {
+      next = {
         ...feature,
         isChoice: true,
         choices: {
@@ -349,9 +382,8 @@ export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[]
           swappableOnRest: feature.choices?.swappableOnRest ?? false,
         },
       }
-    }
-    if (/^(?:class talents|general psionic talents)$/i.test(name)) {
-      return {
+    } else if (/^(?:class talents|general psionic talents)$/i.test(name)) {
+      next = {
         ...feature,
         isChoice: true,
         choices: {
@@ -363,23 +395,20 @@ export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[]
           choiceCountByLevel: feature.choices?.choiceCountByLevel,
         },
       }
-    }
-    // Archetype grants the first discipline — Primary Discipline is not a free pick.
-    if (/^primary\s+discipline$/i.test(name)) {
-      return {
+    } else if (/^primary\s+discipline$/i.test(name)) {
+      // Archetype grants the first discipline — Primary Discipline is not a free pick.
+      next = {
         ...feature,
         isChoice: false,
         choices: undefined,
       }
-    }
-    // Secondary / Third (and similarly named) are player picks of additional disciplines.
-    if (
+    } else if (
       /^(?:secondary|third)\s+discipline$/i.test(name) ||
       (/discipline/i.test(name) &&
         feature.isChoice &&
         /psionic\s+discipline/i.test(feature.choices?.category ?? ""))
     ) {
-      return {
+      next = {
         ...feature,
         isChoice: true,
         choices: {
@@ -392,7 +421,7 @@ export function enrichPsionicTalentGrantFeatures(features: Feature[]): Feature[]
         },
       }
     }
-    return feature
+    return migrateFeatureOptionPickers(next)
   })
 }
 

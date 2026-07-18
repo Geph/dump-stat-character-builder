@@ -21,6 +21,7 @@ import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { ClassFeatureFields } from "@/components/compendium/class-feature-fields"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { CompendiumDescriptionCardImageRow } from "@/components/compendium/description-card-image-row"
+import { CardBlurbField } from "@/components/compendium/card-blurb-field"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import {
   CompendiumEditorToolbar,
@@ -39,6 +40,7 @@ const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wis
 interface SubclassFormData {
   name: string
   description: string
+  card_blurb: string
   class_id: string
   features: Feature[]
   spellcasting: {
@@ -56,6 +58,7 @@ interface SubclassFormData {
 const defaultSubclass: SubclassFormData = {
   name: "",
   description: "",
+  card_blurb: "",
   class_id: "",
   features: [{ level: 3, name: "", description: "" }],
   spellcasting: null,
@@ -110,6 +113,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             setForm({
               name: String(row.name ?? ""),
               description: String(row.description ?? ""),
+              card_blurb: String(row.card_blurb ?? ""),
               class_id: String(row.class_id ?? ""),
               features: Array.isArray(row.features) && row.features.length
                 ? (row.features as Feature[])
@@ -164,6 +168,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
     const db = createClient()
     const payload = {
       ...form,
+      card_blurb: form.card_blurb.trim() || null,
       features: form.features.filter(f => f.name.trim()),
       spellcasting: hasSpellcasting ? form.spellcasting : null,
       creator_url: normalizeCreatorUrl(form.creator_url),
@@ -388,6 +393,16 @@ export default function SubclassEditorPage({ id }: { id: string }) {
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
             cardImageCrop="top"
+            cardImageExtras={
+              <CardBlurbField
+                value={form.card_blurb}
+                onChange={(card_blurb) => setForm({ ...form, card_blurb })}
+                label="Short description"
+                hint="Shown on the builder card hero and detail overlay tagline (2 lines max)."
+                placeholder="A Consuming Mind practices a dangerous form of psionics that devours other creatures’ thoughts…"
+                rows={2}
+              />
+            }
           />
 
           <CompendiumEditorPanel title="Spellcasting">

@@ -1,3 +1,4 @@
+import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 
@@ -75,6 +76,10 @@ export function getCompendiumItemIcon(
 ): string {
   const icon = item.icon
   if (typeof icon === "string" && icon.trim()) return icon.trim()
+  if (tab === "classes") {
+    const classIcon = defaultClassIconForName(String(item.name ?? ""))
+    if (classIcon) return classIcon
+  }
   if (tab === "abilities") {
     const role =
       typeof item.ability_role === "string" ? item.ability_role.trim().toLowerCase() : ""
