@@ -71,6 +71,7 @@ export const subclasses = mysqlTable("subclasses", {
   class_id: char("class_id", { length: 36 }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  card_blurb: varchar("card_blurb", { length: 120 }),
   features: json("features").$type<unknown[]>().default([]),
   spellcasting: json("spellcasting"),
   ...compendiumMeta,

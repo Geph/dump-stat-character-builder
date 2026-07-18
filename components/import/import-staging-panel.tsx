@@ -22,7 +22,6 @@ type ImportStagingPanelProps = {
   canNext: boolean
   onBack?: () => void
   canBack?: boolean
-  onCancel?: () => void
   /** Content review / collisions / card art for the active stage. */
   contentChildren: ReactNode
   /** Modifier wiring for the active stage (shown on the modifiers phase). */
@@ -39,7 +38,6 @@ export function ImportStagingPanel({
   canNext,
   onBack,
   canBack = false,
-  onCancel,
   contentChildren,
   modifiersChildren,
 }: ImportStagingPanelProps) {
@@ -49,7 +47,7 @@ export function ImportStagingPanel({
   const stage = stages[safeIndex]
   const phaseLabel = phase === "content" ? "Parsed content" : "Modifier wiring"
   const showPhaseToggle = hasModifiers
-  const showFooter = Boolean(onCancel) || canBack || canNext
+  const showFooter = canBack || canNext
 
   return (
     <div className={cn(pageOverlayPanelClass, "space-y-4 p-4 text-sm")}>
@@ -139,15 +137,6 @@ export function ImportStagingPanel({
       {showFooter ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
           <div className="flex flex-wrap items-center gap-2">
-            {onCancel ? (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-              >
-                Cancel
-              </button>
-            ) : null}
             {canBack && onBack ? (
               <button
                 type="button"

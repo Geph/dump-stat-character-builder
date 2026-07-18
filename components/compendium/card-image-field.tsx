@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { ChevronDown, ImageIcon, X } from "lucide-react"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
@@ -33,6 +33,8 @@ type CardImageFieldProps = {
   /** Collapse control; default layout starts collapsed. */
   collapsible?: boolean
   defaultOpen?: boolean
+  /** Extra controls inside this panel (e.g. card blurb). */
+  extras?: ReactNode
 }
 
 export function CardImageField({
@@ -45,6 +47,7 @@ export function CardImageField({
   className,
   collapsible = layout === "default",
   defaultOpen = layout !== "default",
+  extras,
 }: CardImageFieldProps) {
   const { isCompactOnly } = useAppPresentationMode()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -178,6 +181,10 @@ export function CardImageField({
             className="hidden"
             onChange={(e) => onFile(e.target.files?.[0])}
           />
+
+          {extras ? (
+            <div className="space-y-3 border-t border-border/60 pt-3 shrink-0">{extras}</div>
+          ) : null}
         </>
       ) : null}
     </div>

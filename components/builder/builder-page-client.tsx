@@ -25,7 +25,6 @@ import {
   X,
   Wand2,
   Search,
-  Info,
   Heart,
   Sparkles,
   Plus,
@@ -92,6 +91,7 @@ import {
 import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
 import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
+import { subclassFeatureTitleRows } from "@/lib/builder/subclass-detail-display"
 import { getClassComplexityHeroBadge, getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
 import {
   formatSpeciesSizeDisplay,
@@ -116,8 +116,10 @@ import {
 import { getCompendiumItemAccentColor, compendiumAccentColorStyles } from "@/lib/compendium/theme-colors"
 import { cn } from "@/lib/utils"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
+import { enrichSubclassDisplayDefaults } from "@/lib/compendium/enrich-subclass-display"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ClassAbilitiesStepPanel } from "@/components/builder/class-abilities-step-panel"
+import { FeatPickGallery } from "@/components/builder/feat-pick-gallery"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import {
   buildWeaponMasteryDescriptionsLookup,
@@ -437,8 +439,8 @@ export default function BuilderPageClient() {
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
-    type: "class" | "species" | "background" | "spell" | "equipment" | "feat" | null
-    item: DndClass | Species | Background | Spell | Equipment | Feat | null
+    type: "class" | "subclass" | "species" | "background" | "spell" | "equipment" | "feat" | null
+    item: DndClass | Subclass | Species | Background | Spell | Equipment | Feat | null
   }>({ type: null, item: null })
   
   // Preview tabs
@@ -1321,58 +1323,6 @@ export default function BuilderPageClient() {
 
   const featPickSlotKeys = featPickSlots.map((slot) => slot.key).join("|")
 
-  // Once Origin is chosen, enforce feat prerequisites for class feature feat picks.
-  useEffect(() => {
-    if (selectedFeatCount === 0) return
-    const classIds = activeClassLevels.map((cl) => cl.classId)
-    const context = {
-      totalLevel,
-      classIds,
-      feats,
-      ownedFeatIds,
-      speciesId: character.species_id,
-      backgroundId: character.background_id,
-      preferredSources: preferredFeatSources,
-    }
-
-    setFeatureChoicePicks((prev) => {
-      const nextPicks = { ...prev }
-      let changed = false
-      for (const slot of featPickSlots) {
-        const pickedId = nextPicks[slot.key]?.[0]
-        if (!pickedId) continue
-        if (isCatalogFeatPickId(pickedId)) continue
-        const feat = feats.find((f) => f.id === pickedId)
-        if (
-          !feat ||
-          !isFeatEligibleForCategories(feat, slot.featCategories, slot.milestoneLevel, {
-            ...context,
-            currentSlotFeatId: pickedId,
-          })
-        ) {
-          nextPicks[slot.key] = []
-          changed = true
-        }
-      }
-      if (changed) {
-        window.setTimeout(() => {
-          alert("One or more selected feats no longer meet prerequisites. Please reselect.")
-        }, 0)
-        return nextPicks
-      }
-      return prev
-    })
-  }, [
-    character.species_id,
-    character.background_id,
-    totalLevel,
-    classLevels,
-    feats,
-    ownedFeatIds,
-    selectedFeatCount,
-    featPickSlotKeys,
-  ])
-
   useEffect(() => {
     if (!showLegacyMilestoneAsi || milestoneAsiTotalPoints <= 0) {
       setAsiAllocationsByFeatId((prev) => {
@@ -1905,6 +1855,71 @@ export default function BuilderPageClient() {
   const speed = characterDerived.speed
   const passivePerception = characterDerived.passivePerception
   const initiative = characterDerived.initiative
+
+  const featPrerequisiteStats = useMemo(
+    () => ({
+      armorProficiencies: effectiveArmorProficiencies,
+      abilityScores: effectiveAbilityScores,
+    }),
+    [effectiveArmorProficiencies, effectiveAbilityScores],
+  )
+
+  // Clear feat picks that no longer meet prerequisites (including armor training / ability scores).
+  useEffect(() => {
+    if (selectedFeatCount === 0) return
+    const classIds = activeClassLevels.map((cl) => cl.classId)
+    const context = {
+      totalLevel,
+      classIds,
+      feats,
+      ownedFeatIds,
+      speciesId: character.species_id,
+      backgroundId: character.background_id,
+      preferredSources: preferredFeatSources,
+      ...featPrerequisiteStats,
+    }
+
+    setFeatureChoicePicks((prev) => {
+      const nextPicks = { ...prev }
+      let changed = false
+      for (const slot of featPickSlots) {
+        const pickedId = nextPicks[slot.key]?.[0]
+        if (!pickedId) continue
+        if (isCatalogFeatPickId(pickedId)) continue
+        const feat = feats.find((f) => f.id === pickedId)
+        if (
+          !feat ||
+          !isFeatEligibleForCategories(feat, slot.featCategories, slot.milestoneLevel, {
+            ...context,
+            currentSlotFeatId: pickedId,
+          })
+        ) {
+          nextPicks[slot.key] = []
+          changed = true
+        }
+      }
+      if (changed) {
+        window.setTimeout(() => {
+          alert("One or more selected feats no longer meet prerequisites. Please reselect.")
+        }, 0)
+        return nextPicks
+      }
+      return prev
+    })
+  }, [
+    character.species_id,
+    character.background_id,
+    totalLevel,
+    classLevels,
+    feats,
+    ownedFeatIds,
+    selectedFeatCount,
+    featPickSlotKeys,
+    featPrerequisiteStats,
+    preferredFeatSources,
+    featPickSlots,
+    activeClassLevels,
+  ])
   
   // Darkvision from species traits + characteristic modifiers
   const speciesDarkvision = parseInt(
@@ -3195,42 +3210,68 @@ export default function BuilderPageClient() {
                                 className={
                                   useSwipeVisualPicker
                                     ? getCinematicPickerContainerClass()
-                                    : "grid grid-cols-1 sm:grid-cols-2 gap-2"
+                                    : pickerGridClass
                                 }
                               >
                                 {classSubclasses.map((subclass) => {
                                   const isSelected = subclassByClassId[entry.classId] === subclass.id
-                                  return (
-                                    <button
-                                      key={subclass.id || subclass.name}
-                                      type="button"
-                                      onClick={() =>
-                                        setSubclassByClassId((prev) => {
-                                          const next = { ...prev, [entry.classId]: subclass.id }
-                                          if (entry.classId === resolvedPrimaryClassId) {
-                                            setCharacter((characterPrev) => ({
-                                              ...characterPrev,
-                                              subclass_id: subclass.id,
-                                            }))
-                                          }
-                                          return next
-                                        })
+                                  const displaySubclass = enrichSubclassDisplayDefaults(subclass)
+                                  const accent = getCompendiumItemAccentColor(
+                                    displaySubclass as unknown as Record<string, unknown>,
+                                  )
+                                  const selectSubclass = () => {
+                                    setSubclassByClassId((prev) => {
+                                      const next = { ...prev, [entry.classId]: subclass.id }
+                                      if (entry.classId === resolvedPrimaryClassId) {
+                                        setCharacter((characterPrev) => ({
+                                          ...characterPrev,
+                                          subclass_id: subclass.id,
+                                        }))
                                       }
-                                      className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
-                                        isSelected
-                                          ? "border-primary bg-primary/10"
-                                          : "border-border bg-card hover:border-primary/40"
-                                      }`}
-                                    >
-                                      <p className="font-semibold text-sm text-foreground">{subclass.name}</p>
-                                      {cardViewMode === "cinematic" && subclass.description && (
-                                        <ClampedRichText
-                                          html={subclass.description}
-                                          lines={2}
-                                          className="text-xs mt-1"
-                                        />
-                                      )}
-                                    </button>
+                                      return next
+                                    })
+                                  }
+                                  const cardItem = {
+                                    ...displaySubclass,
+                                    icon:
+                                      displaySubclass.icon?.trim() ||
+                                      getCompendiumItemIcon(
+                                        "subclasses",
+                                        displaySubclass as unknown as Record<string, unknown>,
+                                      ),
+                                  }
+
+                                  // Visual (cinematic) and compact (dense) both use selection cards —
+                                  // never the plain text buttons.
+                                  if (cardViewMode === "dense") {
+                                    return (
+                                      <CompendiumDenseSelectionCard
+                                        key={subclass.id || subclass.name}
+                                        name={displaySubclass.name}
+                                        subtitle={displaySubclass.source || "Custom"}
+                                        icon={cardItem.icon}
+                                        accentColor={accent}
+                                        selected={isSelected}
+                                        onSelect={selectSubclass}
+                                      />
+                                    )
+                                  }
+
+                                  return (
+                                    <CompendiumSelectionCard
+                                      key={subclass.id || subclass.name}
+                                      item={cardItem}
+                                      subtitle={displaySubclass.source || "Custom"}
+                                      accentColor={accent}
+                                      selected={isSelected}
+                                      size="md"
+                                      cardShape={useCinematicPortraitCards ? "portrait" : "wide"}
+                                      imageCrop="top"
+                                      onSelect={selectSubclass}
+                                      onLearnMore={() =>
+                                        setDetailsModal({ type: "subclass", item: displaySubclass })
+                                      }
+                                    />
                                   )
                                 })}
                               </SwipeVisualPicker>
@@ -3335,6 +3376,9 @@ export default function BuilderPageClient() {
                                     unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
                                     showSkillInfo={
                                       feature.choices!.category.toLowerCase().includes("skill")
+                                    }
+                                    showOptionInfo={
+                                      !feature.choices!.category.toLowerCase().includes("skill")
                                     }
                                     layout={
                                       feature.choices!.category.toLowerCase().includes("skill")
@@ -3483,6 +3527,7 @@ export default function BuilderPageClient() {
                         backgroundId: character.background_id,
                         currentSlotFeatId: pickedId,
                         preferredSources: preferredFeatSources,
+                        ...featPrerequisiteStats,
                       }
                       const eligibleFeats = filterPreferredSourceReplacements(
                         feats.filter((feat) =>
@@ -3524,87 +3569,13 @@ export default function BuilderPageClient() {
                             {slot.className ? `${slot.className}: ` : ""}
                             {slot.label}
                           </p>
-                          <div
-                            className={`grid grid-cols-1 ${
-                              cardViewMode === "cinematic"
-                                ? "sm:grid-cols-2 gap-2"
-                                : "sm:grid-cols-2 lg:grid-cols-3 gap-1.5"
-                            }`}
-                          >
-                            {eligibleFeats.map((feat) => {
-                              const isSelected = feat.id === pickedId
-                              const featCard = (
-                                <button
-                                  type="button"
-                                  onClick={() => selectPick(isSelected ? null : feat.id)}
-                                  className={`rounded-lg border-2 text-left transition-all ${
-                                    cardViewMode === "cinematic"
-                                      ? "flex-1 p-3"
-                                      : "w-full px-2.5 py-1.5"
-                                  } ${
-                                    isSelected
-                                      ? "border-secondary bg-secondary/10"
-                                      : "border-border bg-card hover:border-secondary/50"
-                                  }`}
-                                >
-                                  <div
-                                    className={`flex items-start ${
-                                      cardViewMode === "cinematic" ? "gap-2.5" : "gap-2"
-                                    }`}
-                                  >
-                                    {cardViewMode === "cinematic" && (
-                                      <GameIcon
-                                        name={getCompendiumItemIcon(
-                                          "feats",
-                                          feat as unknown as unknown as Record<string, unknown>,
-                                        )}
-                                        className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
-                                      />
-                                    )}
-                                    <div className="min-w-0">
-                                      <p
-                                        className={`font-semibold text-foreground ${
-                                          cardViewMode === "cinematic" ? "text-sm" : "text-xs"
-                                        }`}
-                                      >
-                                        {feat.name}
-                                      </p>
-                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                        {feat.level_requirement && feat.level_requirement > 1 && (
-                                          <span>Lvl {feat.level_requirement}+</span>
-                                        )}
-                                        {feat.repeatable && (
-                                          <span className="text-primary">Repeatable</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </button>
-                              )
-
-                              if (cardViewMode !== "cinematic") {
-                                return <div key={feat.id}>{featCard}</div>
-                              }
-
-                              return (
-                                <div key={feat.id} className="flex items-stretch gap-1">
-                                  {featCard}
-                                  {feat.description?.trim() ? (
-                                    <button
-                                      type="button"
-                                      aria-label={`About ${feat.name}`}
-                                      onClick={() =>
-                                        setDetailsModal({ type: "feat", item: feat })
-                                      }
-                                      className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                                    >
-                                      <Info className="h-4 w-4" />
-                                    </button>
-                                  ) : null}
-                                </div>
-                              )
-                            })}
-                          </div>
+                          <FeatPickGallery
+                            feats={eligibleFeats}
+                            selectedId={pickedId}
+                            onSelect={selectPick}
+                            onShowDetails={(feat) => setDetailsModal({ type: "feat", item: feat })}
+                            layout={cardViewMode}
+                          />
                           {eligibleFeats.length === 0 && !featsLoadError && feats.length > 0 && (
                             <p className="text-xs text-muted-foreground">
                               No eligible feats for this slot.
@@ -3722,6 +3693,8 @@ export default function BuilderPageClient() {
                 speciesId={character.species_id}
                 backgroundId={character.background_id}
                 preferredFeatSources={preferredFeatSources}
+                armorProficiencies={featPrerequisiteStats.armorProficiencies}
+                abilityScores={featPrerequisiteStats.abilityScores}
                 onShowFeatDetails={(feat) => setDetailsModal({ type: "feat", item: feat })}
                 selectedClassAbilityFeatCount={selectedClassAbilityFeatCount}
                 requiredClassAbilityFeatSlots={requiredClassAbilityFeatSlots}
@@ -3947,6 +3920,7 @@ export default function BuilderPageClient() {
                           backgroundId: character.background_id,
                           currentSlotFeatId: pickedId,
                           preferredSources: preferredFeatSources,
+                          ...featPrerequisiteStats,
                         }
                         const eligible = filterPreferredSourceReplacements(
                           feats.filter((feat) =>
@@ -4263,6 +4237,7 @@ export default function BuilderPageClient() {
                           backgroundId: character.background_id,
                           currentSlotFeatId: pickedId,
                           preferredSources: preferredFeatSources,
+                          ...featPrerequisiteStats,
                         }
                         const eligible = filterPreferredSourceReplacements(
                           feats.filter((feat) =>
@@ -5977,6 +5952,69 @@ export default function BuilderPageClient() {
           )
         }
 
+        if (detailsModal.type === "subclass") {
+          const subclass = item as Subclass
+          const accentStyles = compendiumAccentColorStyles(accent)
+          const parentClass = classes.find((row) => row.id === subclass.class_id) ?? null
+          const features = subclassFeatureTitleRows(subclass.features ?? [])
+          const cardItem = {
+            ...subclass,
+            icon:
+              subclass.icon?.trim() ||
+              getCompendiumItemIcon("subclasses", subclass as unknown as Record<string, unknown>),
+          }
+          return (
+            <CompendiumDetailOverlay
+              open
+              onClose={close}
+              item={cardItem}
+              imageCrop="top"
+              panelWidth="portrait"
+              enableCardImage
+              subtitle={parentClass?.name ? `${parentClass.name} Subclass` : "Subclass"}
+              tagline={getCompendiumCardBlurb(subclass).toUpperCase()}
+              accentColor={accent}
+              detailScroll
+            >
+              <div className="space-y-6">
+                <div>
+                  <p className={cn(portraitDetailEyebrow, accentStyles.cardFooterText)}>
+                    Subclass highlights
+                  </p>
+                  <h3 className={portraitDetailHeading}>What this path offers</h3>
+                  {subclass.description?.trim() ? (
+                    <div className={cn("mt-1 text-white/75", portraitDetailBody)}>
+                      <RichTextContent html={subclass.description} />
+                    </div>
+                  ) : (
+                    <p className={cn("mt-1 text-white/75", portraitDetailBody)}>
+                      No description listed yet.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <h3 className={portraitDetailHeading}>Subclass features</h3>
+                  {features.length > 0 ? (
+                    <div className="mt-1">
+                      <ClassDetailFeatureList
+                        features={features}
+                        accentClassName={accentStyles.cardFooterText}
+                        comfortableFromMd
+                        showSummary={false}
+                        showLevel
+                      />
+                    </div>
+                  ) : (
+                    <p className={cn("mt-1 text-white/70", portraitDetailBody)}>
+                      No subclass features listed.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CompendiumDetailOverlay>
+          )
+        }
+
         if (detailsModal.type === "species") {
           const sp = item as Species
           const accentStyles = compendiumAccentColorStyles(accent)
@@ -6097,22 +6135,21 @@ export default function BuilderPageClient() {
 
         if (detailsModal.type === "feat") {
           const feat = item as Feat
+          const featSubtitleBits = [
+            feat.category?.trim() || null,
+            feat.level_requirement && feat.level_requirement > 1
+              ? `Level ${feat.level_requirement}+`
+              : null,
+            feat.repeatable ? "Repeatable" : null,
+          ].filter(Boolean)
           return (
             <CompendiumDetailOverlay
               open
               onClose={close}
               item={feat}
+              panelWidth="compact"
               enableCardImage={false}
-              subtitle={feat.category ?? feat.source ?? "Feat"}
-              tags={[
-                ...(feat.category
-                  ? [{ label: feat.category.toUpperCase(), emphasis: true }]
-                  : []),
-                ...(feat.level_requirement && feat.level_requirement > 1
-                  ? [{ label: `LEVEL ${feat.level_requirement}+` }]
-                  : []),
-                ...(feat.repeatable ? [{ label: "REPEATABLE" }] : []),
-              ]}
+              subtitle={featSubtitleBits.join(" · ") || feat.source || "Feat"}
               accentColor={accent}
             >
               {feat.description?.trim() ? (

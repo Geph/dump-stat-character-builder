@@ -14,8 +14,10 @@ type CompendiumDescriptionCardImageRowProps = {
   cardImageUrl: string | null
   onCardImageUrlChange: (url: string | null) => void
   cardImageCrop?: CompendiumCardImageCrop
-  /** Extra controls under the description (e.g. card blurb, complexity). */
+  /** Extra controls under the description (e.g. complexity). */
   descriptionExtras?: ReactNode
+  /** Extra controls inside the card-image panel (e.g. card blurb). */
+  cardImageExtras?: ReactNode
 }
 
 /** Card art (collapsed by default) stacked above an open Description panel. */
@@ -27,6 +29,7 @@ export function CompendiumDescriptionCardImageRow({
   onCardImageUrlChange,
   cardImageCrop = "center",
   descriptionExtras,
+  cardImageExtras,
 }: CompendiumDescriptionCardImageRowProps) {
   const { isCompactOnly } = useAppPresentationMode()
 
@@ -39,8 +42,13 @@ export function CompendiumDescriptionCardImageRow({
           imageAspect="3/4"
           imageCrop={cardImageCrop}
           collapsible
-          defaultOpen={false}
+          defaultOpen={Boolean(cardImageExtras) || false}
+          extras={cardImageExtras}
         />
+      ) : cardImageExtras ? (
+        <CompendiumEditorPanel title="Card blurb" defaultOpen>
+          {cardImageExtras}
+        </CompendiumEditorPanel>
       ) : null}
       <CompendiumEditorPanel title="Description" defaultOpen>
         <div className="min-h-[12rem]">

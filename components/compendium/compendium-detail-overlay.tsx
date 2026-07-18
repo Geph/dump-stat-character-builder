@@ -59,8 +59,8 @@ type CompendiumDetailOverlayProps = {
   children: ReactNode
   /** Portrait class art uses top crop inside the landscape banner. */
   imageCrop?: CompendiumCardImageCrop
-  /** Default 80vw; narrow 64vw; slim 48vw; portrait variants tune detail strip height. */
-  panelWidth?: "default" | "narrow" | "slim" | PortraitPanelWidth
+  /** Default 80vw; narrow 64vw; slim 48vw; compact = text-only dialog; portrait variants tune detail strip height. */
+  panelWidth?: "default" | "narrow" | "slim" | "compact" | PortraitPanelWidth
   /** `balanced` splits hero and detail strip evenly (background wide cards). */
   heroLayout?: "default" | "balanced"
 }
@@ -81,19 +81,22 @@ export function CompendiumDetailOverlay({
   panelWidth = "default",
   heroLayout = "default",
 }: CompendiumDetailOverlayProps) {
-  const imageUrl = enableCardImage ? getCompendiumCardImageUrl(item) : null
+  const isCompactPanel = panelWidth === "compact"
+  const imageUrl = !isCompactPanel && enableCardImage ? getCompendiumCardImageUrl(item) : null
   const accent = compendiumAccentColorStyles(accentColor)
   const isPortraitPanel = panelWidth in PORTRAIT_PANEL_WIDTH_BY_VARIANT
   const portraitPanelVariant = isPortraitPanel ? (panelWidth as PortraitPanelWidth) : null
   const isPortraitCompendiumPanel =
     portraitPanelVariant === "portrait" || portraitPanelVariant === "portrait-species"
-  const panelWidthClass = portraitPanelVariant
-    ? PORTRAIT_PANEL_WIDTH_BY_VARIANT[portraitPanelVariant]
-    : panelWidth === "slim"
-      ? "w-[min(48vw,420px)] max-w-[min(48vw,420px)]"
-      : panelWidth === "narrow"
-        ? "w-[64vw] max-w-[64vw]"
-        : "w-[80vw] max-w-[80vw]"
+  const panelWidthClass = isCompactPanel
+    ? "w-[min(92vw,28rem)] max-w-[min(92vw,28rem)]"
+    : portraitPanelVariant
+      ? PORTRAIT_PANEL_WIDTH_BY_VARIANT[portraitPanelVariant]
+      : panelWidth === "slim"
+        ? "w-[min(48vw,420px)] max-w-[min(48vw,420px)]"
+        : panelWidth === "narrow"
+          ? "w-[64vw] max-w-[64vw]"
+          : "w-[80vw] max-w-[80vw]"
   const isBalancedHero = heroLayout === "balanced"
   const [portraitDetailSheetOpen, setPortraitDetailSheetOpen] = useState(false)
 
@@ -101,7 +104,9 @@ export function CompendiumDetailOverlay({
     if (!open) setPortraitDetailSheetOpen(false)
   }, [open])
 
-  const viewportPanelHeightClass = "h-[min(92vh,900px)] max-h-[min(92vh,900px)]"
+  const viewportPanelHeightClass = isCompactPanel
+    ? "max-h-[min(80vh,36rem)]"
+    : "h-[min(92vh,900px)] max-h-[min(92vh,900px)]"
 
   return (
     <AnimatePresence>
@@ -110,7 +115,7 @@ export function CompendiumDetailOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/80 p-2 sm:p-4 md:p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 md:p-6"
           onClick={onClose}
         >
           <motion.div
@@ -120,13 +125,68 @@ export function CompendiumDetailOverlay({
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
             className={cn(
               "relative flex overflow-hidden rounded-xl border-2 border-primary/50 bg-card shadow-2xl",
-              isPortraitCompendiumPanel ? "flex-col lg:flex-row" : "flex-col",
+              isCompactPanel
+                ? cn("my-auto flex-col", accent.detailStripBg, accent.detailStripBorder)
+                : isPortraitCompendiumPanel
+                  ? "flex-col lg:flex-row"
+                  : "flex-col",
               viewportPanelHeightClass,
               panelWidthClass,
             )}
             onClick={(e) => e.stopPropagation()}
             style={{ boxShadow: "inset 0 0 0 1px rgba(212, 175, 55, 0.2), 0 24px 80px rgba(0,0,0,0.65)" }}
           >
+            {isCompactPanel ? (
+              <>
+                <div className="flex items-start justify-between gap-3 border-b border-white/15 px-4 py-3 sm:px-5">
+                  <div className="min-w-0 flex items-start gap-3">
+                    {item.icon ? (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/35 bg-black/40">
+                        <GameIcon name={item.icon} className={cn("h-5 w-5", accent.imageCardIconText)} />
+                      </div>
+                    ) : null}
+                    <div className="min-w-0">
+                      {subtitle ? (
+                        <p
+                          className={cn(
+                            "text-[10px] font-bold uppercase tracking-[0.2em]",
+                            accent.cardFooterText,
+                          )}
+                        >
+                          {subtitle}
+                        </p>
+                      ) : null}
+                      <h2 className="mt-0.5 font-serif text-xl font-black leading-tight text-white">
+                        {item.name}
+                      </h2>
+                      {tagline ? (
+                        <p className="mt-1 text-xs font-medium text-white/75">{tagline}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-start gap-2">
+                    {headerActions}
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="rounded-full border border-white/20 bg-black/40 p-1.5 text-white/80 transition-colors hover:bg-black/60 hover:text-white"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    "min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-white/90 sm:px-5 sm:py-4",
+                    "[&_.text-muted-foreground]:text-white/70 [&_.text-foreground]:text-white",
+                  )}
+                >
+                  {children}
+                </div>
+              </>
+            ) : (
+              <>
             {isPortraitCompendiumPanel ? (
               <button
                 type="button"
@@ -300,6 +360,8 @@ export function CompendiumDetailOverlay({
                 {children}
               </div>
             </div>
+              </>
+            )}
           </motion.div>
         </motion.div>
       )}

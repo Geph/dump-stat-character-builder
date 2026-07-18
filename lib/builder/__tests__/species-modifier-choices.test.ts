@@ -227,11 +227,11 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
     expect(isFeatEligibleForCategories(originFeat, ["Origin"], 1, ctx)).toBe(true)
   })
 
-  it("excludes Origin feats from a General milestone slot", () => {
+  it("allows Origin feats in a General milestone slot", () => {
     expect(isFeatEligibleForCategories(originFeat, ["General"], 4, {
       ...ctx,
       totalLevel: 4,
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it("excludes General feats from an Origin slot", () => {

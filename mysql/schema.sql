@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS subclasses (
   class_id CHAR(36),
   name VARCHAR(255) NOT NULL,
   description TEXT,
+  card_blurb VARCHAR(120),
   features JSON,
   new_toggles JSON,
   spellcasting JSON,

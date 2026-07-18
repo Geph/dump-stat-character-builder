@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import { CatalogFeatMultiPicker } from "@/components/builder/catalog-feat-multi-picker"
 import { ClassAbilityFeatureChoices } from "@/components/builder/class-ability-feature-choices"
+import { FeatPickGallery } from "@/components/builder/feat-pick-gallery"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import type { CatalogFeatPickGroup } from "@/lib/builder/catalog-feat-pick-groups"
@@ -19,13 +20,13 @@ import {
   setModifierPlayerPickValue,
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
-import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { isFeatEligibleForCategories } from "@/lib/builder/feat-selection"
 import { filterPreferredSourceReplacements } from "@/lib/compendium/prefer-same-source"
 import { featChoicePickKey } from "@/lib/builder/feat-choices"
-import { GameIcon } from "@/components/game-icon-picker"
-import { Info } from "lucide-react"
-import type { FeatureChoiceCountBonusCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  AbilityScoreKey,
+  FeatureChoiceCountBonusCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import type { CustomAbility, Equipment, Feat, Spell } from "@/lib/types"
 import {
   abilitySpecializationChoice,
@@ -73,6 +74,8 @@ type ClassAbilitiesStepProps = {
   speciesId: string | null
   backgroundId: string | null
   preferredFeatSources: string[]
+  armorProficiencies?: string[]
+  abilityScores?: Partial<Record<AbilityScoreKey, number>>
   onShowFeatDetails: (feat: Feat) => void
   selectedClassAbilityFeatCount: number
   requiredClassAbilityFeatSlots: number
@@ -114,6 +117,8 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
     speciesId,
     backgroundId,
     preferredFeatSources,
+    armorProficiencies,
+    abilityScores,
     onShowFeatDetails,
     selectedClassAbilityFeatCount,
     requiredClassAbilityFeatSlots,
@@ -319,6 +324,8 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
               backgroundId,
               currentSlotFeatId: pickedId,
               preferredSources: preferredFeatSources,
+              armorProficiencies,
+              abilityScores,
             }
             const eligibleFeats = filterPreferredSourceReplacements(
               feats.filter((feat) =>
@@ -358,63 +365,13 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
                   {slot.className ? `${slot.className}: ` : ""}
                   {slot.label}
                 </p>
-                <div
-                  className={`grid grid-cols-1 ${
-                    cardViewMode === "cinematic"
-                      ? "sm:grid-cols-2 gap-2"
-                      : "sm:grid-cols-2 lg:grid-cols-3 gap-1.5"
-                  }`}
-                >
-                  {eligibleFeats.map((feat) => {
-                    const isSelected = feat.id === pickedId
-                    return (
-                      <div key={feat.id} className="flex items-stretch gap-1">
-                        <button
-                          type="button"
-                          onClick={() => selectPick(isSelected ? null : feat.id)}
-                          className={`rounded-lg border-2 text-left transition-all flex-1 ${
-                            cardViewMode === "cinematic" ? "p-3" : "px-2.5 py-1.5"
-                          } ${
-                            isSelected
-                              ? "border-secondary bg-secondary/10"
-                              : "border-border bg-card hover:border-secondary/50"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            {cardViewMode === "cinematic" && (
-                              <GameIcon
-                                name={getCompendiumItemIcon(
-                                  "feats",
-                                  feat as unknown as Record<string, unknown>,
-                                )}
-                                className="mt-0.5 h-7 w-7 shrink-0 text-secondary"
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <p
-                                className={`font-semibold text-foreground ${
-                                  cardViewMode === "cinematic" ? "text-sm" : "text-xs"
-                                }`}
-                              >
-                                {feat.name}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                        {cardViewMode === "cinematic" && feat.description?.trim() ? (
-                          <button
-                            type="button"
-                            aria-label={`About ${feat.name}`}
-                            onClick={() => onShowFeatDetails(feat)}
-                            className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
+                <FeatPickGallery
+                  feats={eligibleFeats}
+                  selectedId={pickedId}
+                  onSelect={selectPick}
+                  onShowDetails={onShowFeatDetails}
+                  layout={cardViewMode}
+                />
                 {picked ? (
                   <p className="text-xs text-muted-foreground mt-2">
                     Selected: <span className="font-semibold text-foreground">{picked.name}</span>

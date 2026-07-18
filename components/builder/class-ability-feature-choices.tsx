@@ -32,6 +32,15 @@ type Props = {
   onClearModifierPicks: (sourceKey: string) => void
 }
 
+function plainFeatureBlurb(feature: Feature): string | undefined {
+  const raw = feature.description?.trim()
+  if (!raw) return undefined
+  const plain = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+  if (!plain) return undefined
+  // Keep the picker header short; full text stays on the feature / info overlays.
+  return plain.length > 220 ? `${plain.slice(0, 217).trimEnd()}…` : plain
+}
+
 function choiceHint(feature: Feature, choiceCount: number): string | undefined {
   if (isWeaponMasteryFeature(feature)) {
     return `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${
@@ -53,15 +62,25 @@ function choiceHint(feature: Feature, choiceCount: number): string | undefined {
     }.`
   }
   if (feature.choices?.optionsSource === "known_discipline_talents") {
-    return `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines.`
+    return `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines and General Psionic Talents (level gates apply).`
   }
   if (feature.choices?.optionsSource === "class_disciplines") {
-    return `Choose ${choiceCount} psionic discipline${choiceCount === 1 ? "" : "s"}.`
+    return `Choose ${choiceCount} psionic discipline${choiceCount === 1 ? "" : "s"}. Disciplines granted by your subclass appear selected.`
   }
   if (feature.choices?.optionsSource === "class_talents") {
     return `Choose ${choiceCount} general talent${choiceCount === 1 ? "" : "s"} available at your level.`
   }
+  // Shared mechanic text once at the top (e.g. Curious Mind) instead of on every card.
+  const blurb = plainFeatureBlurb(feature)
+  if (blurb) return blurb
   return feature.choices?.category
+}
+
+function namesMatchLoose(a: string, b: string): boolean {
+  const left = a.trim().toLowerCase().replace(/\s+/g, " ")
+  const right = b.trim().toLowerCase().replace(/\s+/g, " ")
+  if (!left || !right) return false
+  return left === right || left.includes(right) || right.includes(left)
 }
 
 export function ClassAbilityFeatureChoices({
@@ -112,7 +131,28 @@ export function ClassAbilityFeatureChoices({
         const isWeaponMastery = isWeaponMasteryFeature(feature)
         const isKnackPool = feature.choices?.optionsSource === "class_knacks"
         const isUpgradePool = feature.choices?.optionsSource === "class_upgrades"
+        const isDisciplinePool = feature.choices?.optionsSource === "class_disciplines"
         const hint = choiceHint(feature, choiceCount)
+        const lockedOptions = isDisciplinePool
+          ? (grantedCustomAbilityNames ?? []).filter((grant) =>
+              customAbilities.some((ability) => {
+                const isDiscipline =
+                  ability.ability_role === "discipline" ||
+                  /\bdiscipline\b/i.test(ability.name)
+                return isDiscipline && namesMatchLoose(ability.name, grant)
+              }),
+            )
+          : []
+        const optionsWithLocked = [...choiceOptions]
+        for (const grant of lockedOptions) {
+          if (optionsWithLocked.some((option) => namesMatchLoose(option.name, grant))) continue
+          const ability = customAbilities.find((row) => namesMatchLoose(row.name, grant))
+          optionsWithLocked.push({
+            name: ability?.name ?? grant,
+            description: ability?.description ?? "",
+            prerequisite: ability?.prerequisites ?? null,
+          })
+        }
         const sourceLabel =
           entry.source === "subclass" && subclassName
             ? `${className} (${subclassName})`
@@ -170,11 +210,14 @@ export function ClassAbilityFeatureChoices({
               <MultiSelectChoices
                 title={feature.name}
                 hint={hint}
-                options={choiceOptions}
+                options={optionsWithLocked}
                 maxCount={choiceCount}
                 selected={featureChoicePicks[key] ?? []}
+                lockedOptions={lockedOptions}
+                lockedLabel="Granted by subclass"
                 unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
                 showSkillInfo={feature.choices!.category.toLowerCase().includes("skill")}
+                showOptionInfo={!feature.choices!.category.toLowerCase().includes("skill")}
                 layout={
                   feature.choices!.category.toLowerCase().includes("skill")
                     ? skillPickerLayout

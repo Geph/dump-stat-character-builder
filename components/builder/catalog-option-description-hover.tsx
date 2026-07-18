@@ -22,7 +22,7 @@ export function CatalogOptionDescriptionHover({
         <button
           type="button"
           aria-label={`About ${name}`}
-          className="shrink-0 self-center rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+          className="shrink-0 rounded-md border border-border/80 bg-background/80 p-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
           onClick={(event) => event.stopPropagation()}
         >
           <Info className="h-4 w-4" />
