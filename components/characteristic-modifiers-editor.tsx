@@ -1312,6 +1312,14 @@ function SpellsKnownEditor({
               className="flex-1 min-w-[160px] px-2 py-1.5 bg-card border border-border rounded-lg text-sm"
             >
               <option value="">Select spell...</option>
+              {entry.spellId &&
+              !spellOptions.some((spell) => spell.id === entry.spellId) ? (
+                <option value={entry.spellId}>
+                  {entry.spellId.startsWith("import_spell_name:")
+                    ? `Unresolved: ${entry.spellId.slice("import_spell_name:".length)}`
+                    : `Missing: ${entry.spellId}`}
+                </option>
+              ) : null}
               {spellOptions.map((spell) => (
                 <option key={spell.id} value={spell.id}>
                   {formatSpellOptionLabel(spell)}

@@ -274,6 +274,7 @@ export const ChoiceOptionsSchema = z.object({
     .enum([
       "known_discipline_talents",
       "fusion_talents",
+      "class_talents",
       "class_knacks",
       "class_upgrades",
       "class_bomb_formulas",
@@ -886,7 +887,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.
 - Talent pools (three patterns — do not conflate):
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).
-  2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; wire the class feature with a distinct choices.category (e.g. "Class Talents") and resourceKey (e.g. class_talents_known). Capture level/subclass gates in options[].prerequisite or the row's prerequisite.
+  2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; the importer also builds a "General Psionic Talents" talent_pool package. Wire the class feature with choices.category "Class Talents" or "General Psionic Talents", resourceKey class_talents_known, and optionsSource: "class_talents". Capture level/subclass gates in options[].prerequisite or the row's prerequisite.
   3) Feat-gated / combo talents: also ability_role: "class_talent" with prerequisite naming the feat and any required disciplines/talents (exact names — see Name and source matching).
 - Specialization on a discipline package: if the package offers a mutually exclusive one-time sub-choice when first gained (often labeled "Specialization"), use choices: { category: "Specialization", count: 1, options: [...] } on the package, separate from any Talents choice. Put replacement Alternate Effects tables on the specialization option's description; keep only the default/base table on the parent package description.
 - For disciplines with nested talents, include EVERY talent from that discipline's list in choices.options. Put each leaf labeled Psionic power as its own custom_abilities proposal with ability_role: "psionic_power" (casting headers + augment lists in description) — do NOT put those powers in spells[] and do not mash power text into the discipline package description.

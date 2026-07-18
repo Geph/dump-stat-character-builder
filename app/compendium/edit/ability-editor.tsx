@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { Info } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
@@ -17,13 +18,14 @@ import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header
 import { CompendiumEditorPanel } from "@/components/compendium/compendium-editor-section"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
-import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
+import { ModifierCatalogAdminEditor } from "@/components/compendium/modifier-catalog-admin-editor"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  normalizeLinkedModifiers,
   readLinkedModifiers,
   syncModifierRefs,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
+import { normalizeModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
@@ -53,6 +55,8 @@ interface AbilityFormData {
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
   linked_modifiers: LinkedModifierInstance[]
+  modifier_catalog: ModifierCatalogEntry[]
+  ability_role: string
   attached_to_type: string
   attached_to_id: string
   show_in_builder: boolean
@@ -70,14 +74,32 @@ const defaultAbility: AbilityFormData = {
   characteristics: [],
   modifier_refs: [],
   linked_modifiers: [],
+  modifier_catalog: [],
+  ability_role: "",
   attached_to_type: "",
   attached_to_id: "",
-  show_in_builder: false,
+  show_in_builder: true,
   source: "Custom",
   creator_url: "",
   icon: null,
   accent_color: null,
   card_image_url: null,
+}
+
+const ABILITY_ROLE_LABELS: Record<string, string> = {
+  discipline: "Discipline package",
+  psionic_power: "Psionic power",
+  class_talent: "Class talent",
+  talent_pool: "Talent pool (e.g. General Psionic Talents)",
+  knack: "Knack / trick",
+  upgrade: "Upgrade",
+  bomb_formula: "Bomb formula",
+  discovery: "Discovery",
+  alchemist_bomb: "Alchemist bomb",
+}
+
+function abilityRoleLabel(role: string): string {
+  return ABILITY_ROLE_LABELS[role] ?? role.replace(/_/g, " ")
 }
 
 const ATTACH_OPTIONS = [
@@ -102,10 +124,22 @@ export default function AbilityEditorPage({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [attachTargets, setAttachTargets] = useState<{ id: string; name: string }[]>([])
   const [otherAbilities, setOtherAbilities] = useState<{ id: string; name: string }[]>([])
+  const [detectedAbilityRoles, setDetectedAbilityRoles] = useState<string[]>([])
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("abilities", id)
   const { catalog: modifierCatalog } = useModifierCatalog()
+
+  const abilityRoleOptions = useMemo(() => {
+    const roles = new Set(detectedAbilityRoles)
+    if (form.ability_role) roles.add(form.ability_role)
+    return [
+      { value: "", label: "None" },
+      ...[...roles]
+        .sort((a, b) => abilityRoleLabel(a).localeCompare(abilityRoleLabel(b)))
+        .map((value) => ({ value, label: abilityRoleLabel(value) })),
+    ]
+  }, [detectedAbilityRoles, form.ability_role])
 
   useEffect(() => {
     if (id && id !== "new") {
@@ -144,6 +178,10 @@ export default function AbilityEditorPage({ id }: { id: string }) {
                 ),
                 modifier_refs: readModifierRefs(row as unknown as Record<string, unknown>),
                 linked_modifiers: readLinkedModifiers(row as unknown as Record<string, unknown>, modifierCatalog),
+                modifier_catalog: normalizeModifierCatalog(
+                  (row as unknown as Record<string, unknown>).modifier_catalog,
+                ),
+                ability_role: String(row.ability_role ?? ""),
                 attached_to_type: String(row.attached_to_type ?? ""),
                 attached_to_id: String(row.attached_to_id ?? ""),
                 show_in_builder: Boolean(row.show_in_builder ?? false),
@@ -203,13 +241,21 @@ export default function AbilityEditorPage({ id }: { id: string }) {
     const fetchOtherAbilities = async () => {
       const db = createClient()
       const [{ data: abilities }, { data: spells }] = await Promise.all([
-        db.from("custom_abilities").select("id, name").order("name").limit(100),
-        db.from("spells").select("id, name, level").order("level").order("name").limit(500),
+        db.from("custom_abilities").select("id, name, ability_role").order("name").limit(500),
+        db.from("spells").select("id, name, level").order("level").order("name").limit(2000),
       ])
 
-      setOtherAbilities(
-        asCompendiumRows<{ id: string; name: string }>(abilities).filter((a) => a.id !== id),
+      const abilityRows = asCompendiumRows<{ id: string; name: string; ability_role?: string | null }>(
+        abilities,
       )
+      setOtherAbilities(abilityRows.filter((a) => a.id !== id).map(({ id, name }) => ({ id, name })))
+      setDetectedAbilityRoles([
+        ...new Set(
+          abilityRows
+            .map((row) => (typeof row.ability_role === "string" ? row.ability_role.trim() : ""))
+            .filter(Boolean),
+        ),
+      ])
       setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(spells))
     }
     fetchOtherAbilities()
@@ -240,9 +286,15 @@ export default function AbilityEditorPage({ id }: { id: string }) {
 
     const payload = {
       ...form,
+      ability_role: form.ability_role || null,
       attached_to_id: form.attached_to_id || null,
+      // Preserve ability-level linked modifiers + characteristics from older schema.
+      characteristics: form.characteristics,
+      linked_modifiers: form.linked_modifiers,
       modifier_refs: syncModifierRefs({ linkedModifiers: form.linked_modifiers }).modifierRefs,
+      modifier_catalog: form.modifier_catalog,
       uses: extractUsesConfig(form.characteristics),
+      show_in_builder: form.show_in_builder,
       creator_url: normalizeCreatorUrl(form.creator_url),
     }
     
@@ -363,107 +415,128 @@ export default function AbilityEditorPage({ id }: { id: string }) {
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
           />
 
-          <CompendiumEditorPanel title="Prerequisites">
-            <input
-              type="text"
-              value={form.prerequisites}
-              onChange={(e) => setForm({ ...form, prerequisites: e.target.value })}
-              className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-              placeholder="e.g., Level 5, Strength 13 or higher"
-            />
-          </CompendiumEditorPanel>
-
-          <CompendiumEditorPanel title="Attachment">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Attach to Type
-              </label>
-              <select
-                value={form.attached_to_type}
-                onChange={(e) => setForm({ ...form, attached_to_type: e.target.value, attached_to_id: "" })}
-                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-              >
-                {ATTACH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {form.attached_to_type && (
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">
-                  {isEquipmentCategoryAttach(form.attached_to_type)
-                    ? "Equipment category"
-                    : `Attach to ${form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}`}
-                </label>
-                <select
-                  value={form.attached_to_id}
-                  onChange={(e) => setForm({ ...form, attached_to_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                >
-                  <option value="">
-                    {isEquipmentCategoryAttach(form.attached_to_type)
-                      ? "Select category..."
-                      : `Select a ${form.attached_to_type}...`}
-                  </option>
-                  {attachTargets.map((target) => (
-                    <option key={target.id} value={target.id}>
-                      {target.name}
-                    </option>
-                  ))}
-                </select>
-                {isEquipmentCategoryAttach(form.attached_to_type) && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Applies to all items in that category (e.g. every Weapon), not a single item.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          </CompendiumEditorPanel>
-
-          <CompendiumEditorPanel title="Description">
+          <CompendiumEditorPanel title="Description" defaultOpen>
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}
               placeholder="Describe what this ability does..."
             />
+            <div className="border-t border-border/60 pt-3">
+              <label className="inline-flex items-center gap-1 text-sm font-semibold text-foreground mb-2">
+                Ability role
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-0.5 text-muted-foreground hover:text-foreground"
+                      aria-label="About ability roles"
+                    >
+                      <Info className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Only roles already present on imported or saved custom abilities are listed
+                    (plus the current value). Discipline packages and talent pools appear as
+                    top-level cards; psionic powers and class talents nest under those packages.
+                    Sheet placement for each option is set under Modifier Effect Entries.
+                  </TooltipContent>
+                </Tooltip>
+              </label>
+              <select
+                value={form.ability_role}
+                onChange={(e) => setForm({ ...form, ability_role: e.target.value })}
+                className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+              >
+                {abilityRoleOptions.map((opt) => (
+                  <option key={opt.value || "none"} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </CompendiumEditorPanel>
 
-          <CompendiumEditorPanel title="Modifier effects">
-          <LinkedModifiersEditor
-            value={normalizeLinkedModifiers(form.linked_modifiers, modifierCatalog, form.modifier_refs)}
-            onChange={(linked_modifiers) =>
-              setForm((prev) => ({
-                ...prev,
-                linked_modifiers,
-                modifier_refs: syncModifierRefs({ linkedModifiers: linked_modifiers }).modifierRefs,
-              }))
-            }
-            catalog={modifierCatalog}
-            label="Modifier effects (from shared catalog)"
-            spellOptions={allSpells}
-            otherAbilities={otherAbilities}
-          />
-          </CompendiumEditorPanel>
-
-          <CompendiumEditorPanel title="Character sheet visibility">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.show_in_builder}
-                onChange={(e) => setForm({ ...form, show_in_builder: e.target.checked })}
-                className="w-5 h-5 rounded border-border accent-primary"
-              />
+          <CompendiumEditorPanel title="Prerequisites">
+            <div className="space-y-4">
               <div>
-                <span className="font-semibold text-foreground">Show on Character Sheet / Preview</span>
-                <p className="text-sm text-muted-foreground">
-                  When enabled, this custom ability will appear in the &quot;Custom&quot; tab of the character builder preview as well as character sheet.
-                </p>
+                <label className="block text-sm font-semibold text-foreground mb-2">
+                  Prerequisite text
+                </label>
+                <input
+                  type="text"
+                  value={form.prerequisites}
+                  onChange={(e) => setForm({ ...form, prerequisites: e.target.value })}
+                  className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  placeholder="e.g., Level 5, Strength 13 or higher"
+                />
               </div>
-            </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Attach to Type
+                  </label>
+                  <select
+                    value={form.attached_to_type}
+                    onChange={(e) =>
+                      setForm({ ...form, attached_to_type: e.target.value, attached_to_id: "" })
+                    }
+                    className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  >
+                    {ATTACH_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {form.attached_to_type ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      {isEquipmentCategoryAttach(form.attached_to_type)
+                        ? "Equipment category"
+                        : `Attach to ${form.attached_to_type.charAt(0).toUpperCase() + form.attached_to_type.slice(1)}`}
+                    </label>
+                    <select
+                      value={form.attached_to_id}
+                      onChange={(e) => setForm({ ...form, attached_to_id: e.target.value })}
+                      className="w-full px-4 py-3 bg-card border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                    >
+                      <option value="">
+                        {isEquipmentCategoryAttach(form.attached_to_type)
+                          ? "Select category..."
+                          : `Select a ${form.attached_to_type}...`}
+                      </option>
+                      {attachTargets.map((target) => (
+                        <option key={target.id} value={target.id}>
+                          {target.name}
+                        </option>
+                      ))}
+                    </select>
+                    {isEquipmentCategoryAttach(form.attached_to_type) ? (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Applies to all items in that category (e.g. every Weapon), not a single item.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </CompendiumEditorPanel>
+
+          <CompendiumEditorPanel title="Modifier Effect Entries" defaultOpen>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Nested sub-abilities (passives, powers, alternate effects, talents). Each entry uses
+              the same modifier / activation / sheet-display controls as a class feature (without a
+              level).
+            </p>
+            <ModifierCatalogAdminEditor
+              value={form.modifier_catalog}
+              onChange={(modifier_catalog) => setForm({ ...form, modifier_catalog })}
+              spellOptions={allSpells}
+              otherAbilities={otherAbilities}
+              variant="abilityOption"
+              sharedModifierCatalog={modifierCatalog}
+            />
           </CompendiumEditorPanel>
 
         </form>

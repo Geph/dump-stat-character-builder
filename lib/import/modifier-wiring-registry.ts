@@ -1104,6 +1104,15 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     notes:
       "Wire tier table via choices.choiceCountByLevel on the Weapon Mastery feature (not class_resources). Property names and rules come from the Weapon Mastery Properties system catalog (custom_abilities …0004), with SRD defaults as fallback.",
   },
+  {
+    ruleId: "psion.tantrum_by_name",
+    trigger: "feature_name",
+    catalog: "cat_char_uses",
+    examples: ["Tantrum"],
+    mechanicsKind: "uses",
+    notes:
+      "Reminder for Unleashed Mind Rampage Die sheet controls. Auto initiative/damage stepping is tracked in #16.",
+  },
 ]
 
 /**

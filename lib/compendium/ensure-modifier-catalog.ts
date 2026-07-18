@@ -21,23 +21,23 @@ export async function ensureModifierCatalog(db: CatalogDb): Promise<void> {
 
   if (!existingRow) {
     await db.from("custom_abilities").insert([buildCommonModifiersCatalogRow()])
-    return
+  } else {
+    const catalog = normalizeModifierCatalog(existingRow.modifier_catalog)
+    const merged = mergeDefaultCatalogEntries(catalog)
+
+    if (merged.length !== catalog.length || !existingRow.is_system) {
+      await db
+        .from("custom_abilities")
+        .update({
+          is_system: true,
+          show_in_builder: false,
+          modifier_catalog: merged,
+        })
+        .eq("id", COMMON_MODIFIERS_CATALOG_ID)
+    }
   }
 
-  const catalog = normalizeModifierCatalog(existingRow.modifier_catalog)
-  const merged = mergeDefaultCatalogEntries(catalog)
-
-  if (merged.length !== catalog.length || !existingRow.is_system) {
-    await db
-      .from("custom_abilities")
-      .update({
-        is_system: true,
-        show_in_builder: false,
-        modifier_catalog: merged,
-      })
-      .eq("id", COMMON_MODIFIERS_CATALOG_ID)
-  }
-
+  // Always ensure Metamagic / Invocations / Weapon Mastery — even on first Common Modifiers insert.
   await ensureSystemOptionCatalogs(db)
 }
 

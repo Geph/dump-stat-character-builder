@@ -5,13 +5,19 @@ import {
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
+import { nestPsionicAbilityLibrary } from "@/lib/import/nest-psionic-ability-library"
 import { detectPsiPointCost } from "@/lib/import/enrich-import-classes"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import {
   alternateEffectsSpellsKnownModifier,
+  applySpecializationAlternateEffectsChoice,
   parseAlternateEffectsSpellNames,
 } from "@/lib/import/parse-alternate-effects-table"
+import {
+  ensureSpecialAttackActivation,
+  specialAttackModifierFromPowerDescription,
+} from "@/lib/import/parse-special-attack-from-power"
 import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import type { Feature } from "@/lib/types"
 
@@ -88,6 +94,40 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
   )
   if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
     linkedModifiers = [...linkedModifiers, altEffects]
+  }
+
+  const rangeForAttack =
+    (typeof row.range === "string" && row.range.trim() ? row.range.trim() : null) ??
+    headers.range ??
+    null
+  const castingTimeForAttack =
+    (typeof row.casting_time === "string" && row.casting_time.trim()
+      ? row.casting_time.trim()
+      : null) ??
+    headers.casting_time ??
+    (typeof row.execution === "string" && row.execution.trim() ? row.execution.trim() : null) ??
+    headers.execution ??
+    null
+  if (
+    isPsionicPower ||
+    Boolean(headers.casting_time) ||
+    Boolean(typeof row.casting_time === "string" && row.casting_time.trim())
+  ) {
+    const alreadyHasSpecialAttack = linkedModifiers.some((instance) =>
+      instance.characteristics?.some((char) => char.type === "special_attack"),
+    )
+    if (!alreadyHasSpecialAttack) {
+      const specialAttack = specialAttackModifierFromPowerDescription(descriptionHtml, {
+        name,
+        range: rangeForAttack,
+        castingTime: castingTimeForAttack,
+        instanceKey: name,
+      })
+      if (specialAttack && !isModifierRedundantAgainst(specialAttack, linkedModifiers)) {
+        linkedModifiers = [...linkedModifiers, specialAttack]
+      }
+    }
+    linkedModifiers = ensureSpecialAttackActivation(linkedModifiers, castingTimeForAttack)
   }
 
   const synced = syncModifierRefs({
@@ -167,7 +207,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     }
   }
 
-  return {
+  const enrichedRow: Record<string, unknown> = {
     ...row,
     ...next,
     ...headers,
@@ -195,8 +235,10 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     modifier_refs: synced.modifierRefs,
     modifierRefs: synced.modifierRefs,
   }
+
+  return applySpecializationAlternateEffectsChoice(enrichedRow)
 }
 
 export function enrichAbilityImportRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  return rows.map(enrichAbilityImportRow)
+  return nestPsionicAbilityLibrary(rows.map(enrichAbilityImportRow))
 }

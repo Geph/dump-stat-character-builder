@@ -576,7 +576,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
             </AccordionItem>
           </Accordion>
 
-          <CompendiumEditorPanel title="Description">
+          <CompendiumEditorPanel title="Description" defaultOpen>
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}

@@ -42,7 +42,17 @@ export async function POST(request: NextRequest) {
     await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
     const classData = await listRows("classes")
     const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
-    
+
+    await upsertByName(
+      "spells",
+      enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
+    )
+    const spellCatalog = (await listRows("spells")).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      source: (row.source as string | null | undefined) ?? null,
+    }))
+
     const subclassesWithIds = enrichSrdSubclassList(
       withSrdCreatorUrlList(
         subclasses
@@ -56,6 +66,7 @@ export async function POST(request: NextRequest) {
           .filter((sc) => sc.class_id !== null) as unknown as Record<string, unknown>[],
       ),
       new Map([...classIdMap.entries()].map(([name, id]) => [id, name])),
+      spellCatalog,
     )
 
     for (const source of LEGACY_SRD_SOURCES) {
@@ -74,10 +85,6 @@ export async function POST(request: NextRequest) {
       normalizeBackgroundRows(
         withSrdCreatorUrlList(backgrounds) as Parameters<typeof normalizeBackgroundRows>[0],
       ),
-    )
-    await upsertByName(
-      "spells",
-      enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
     )
     await upsertByName("feats", enrichSrdFeatList(withSrdCreatorUrlList(feats)))
     await upsertByName("languages", withSrdCreatorUrlList(languages))

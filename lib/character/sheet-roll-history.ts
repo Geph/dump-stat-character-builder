@@ -1,4 +1,4 @@
-export type SheetRollKind = "d20" | "damage" | "spell"
+export type SheetRollKind = "d20" | "damage" | "spell" | "manual"
 
 export type SheetRollEntry = {
   id: string

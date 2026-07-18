@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { buildBulkExportJson, rowToExportItem } from "@/lib/import/dump-stat-export-format"
 import { stripHtml } from "@/lib/import/normalize-equipment"
+import { isTopLevelCompendiumAbility } from "@/lib/import/nest-psionic-ability-library"
 import {
   getCompendiumItemIcon,
   isCompendiumContentType,
@@ -280,6 +281,8 @@ export default function CompendiumPageClient() {
   useEffect(() => {
     const fetchCounts = async () => {
       const db = createClient()
+      // Ensure Common Modifiers + Metamagic / Invocations / Weapon Mastery exist before counting.
+      await ensureModifierCatalog(db)
       const [
         { count: speciesCount },
         { count: classesCount },
@@ -351,7 +354,7 @@ export default function CompendiumPageClient() {
         .limit(
           isEquipmentBrowserTab(activeTab)
             ? 500
-            : activeTab === "spells" || activeTab === "feats"
+            : activeTab === "spells" || activeTab === "feats" || activeTab === "abilities"
               ? 5000
               : 100,
         )
@@ -454,6 +457,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         return true
       }
       if (!item.name?.toLowerCase().includes(query)) return false
+      if (activeTab === "abilities") {
+        const ability = item as {
+          ability_role?: string | null
+          parent_ability_name?: string | null
+          is_system?: boolean | null
+          name?: string | null
+        }
+        // Nested powers/talents stay hidden unless the user searches for them.
+        if (!query && !isTopLevelCompendiumAbility(ability)) return false
+      }
       if (activeTab === "spells") {
         const spell = item as Spell
         const spellClasses = spell.classes ?? []
@@ -546,6 +559,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
   const refreshTabCounts = async () => {
     const db = createClient()
+    await ensureModifierCatalog(db)
     const [
       { count: speciesCount },
       { count: classesCount },
@@ -1223,6 +1237,21 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   : `For: ${castCompendiumRow<{ attached_to_type: string }>(data).attached_to_type}`}
               </span>
             )}
+            {(() => {
+              const catalog = castCompendiumRow<{ modifier_catalog?: unknown[] }>(data).modifier_catalog
+              const count = Array.isArray(catalog) ? catalog.length : 0
+              if (!count) return null
+              return (
+                <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                  {count} entr{count === 1 ? "y" : "ies"}
+                </span>
+              )
+            })()}
+            {castCompendiumRow<{ ability_role?: string }>(data).ability_role ? (
+              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                {castCompendiumRow<{ ability_role: string }>(data).ability_role.replace(/_/g, " ")}
+              </span>
+            ) : null}
           </div>
         )}
         </div>

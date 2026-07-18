@@ -112,6 +112,10 @@ function SourceGroupCard({
                   </li>
                 ))}
               </ul>
+            ) : row.status === "wired" ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Wired via choices / structured ability data (no separate common-modifier chips).
+              </p>
             ) : (
               <p className="mt-1.5 text-xs text-destructive/90">
                 No common modifier linked — add effects in the compendium editor after import.

@@ -6,7 +6,12 @@ import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { stripFoundryMeta, type ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
 import { buildImportReport, type ImportReport } from "@/lib/import/build-import-report"
 import { enrichFeatRowWithPrerequisites } from "@/lib/import/resolve-feat-prerequisites"
-import { resolveLinkedModifierSpells } from "@/lib/import/resolve-linked-modifier-spells"
+import {
+  resolveFeatureListLinkedSpells,
+  resolveFeatureLinkedSpells,
+  resolveLinkedModifierSpells,
+} from "@/lib/import/resolve-linked-modifier-spells"
+import type { Feature } from "@/lib/types"
 import type { ImportSourceLabel } from "@/lib/import/import-material-source"
 import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
@@ -20,7 +25,6 @@ import {
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
-import type { Feature } from "@/lib/types"
 import {
   deleteWhereLocal,
   insertRowsLocal,
@@ -32,6 +36,26 @@ import {
   preferredSourceForPersist,
   type PersistImportOptions,
 } from "@/lib/import/persist-import-options"
+
+function withResolvedFeatureSpells(
+  rows: Record<string, unknown>[],
+  featureKey: "features" | "traits",
+  catalog: { id: string; name: string; source: string | null }[],
+  preferredSource?: string | null,
+): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const features = row[featureKey]
+    if (!Array.isArray(features)) return row
+    return {
+      ...row,
+      [featureKey]: resolveFeatureListLinkedSpells(
+        features as Feature[],
+        catalog,
+        preferredSource,
+      ),
+    }
+  })
+}
 
 function stampSource<T extends Record<string, unknown>>(row: T, importerSource: string): T {
   const existing = "source" in row ? row.source : undefined
@@ -80,23 +104,36 @@ export async function persistImportedContentLocal(
   const explicitResources = asClassResourceImports(sanitized)
 
   if (sanitized.species?.length) {
-    await upsertByNameLocal("species", sanitized.species.map((s) => stampSource({ ...s }, source)))
+    await upsertByNameLocal(
+      "species",
+      withResolvedFeatureSpells(
+        sanitized.species.map((s) => stampSource({ ...s }, source)),
+        "traits",
+        spellCatalog,
+        preferredSource,
+      ),
+    )
     breakdown.species = sanitized.species.length
     totalImported += sanitized.species.length
   }
 
   if (sanitized.classes?.length) {
-    enrichedClasses = enrichImportedClassList(
-      sanitized.classes.map((c) =>
-        stampSource(
-          {
-            ...c,
-            prefer_same_source_replacements: Boolean(options.preferSameSourceReplacements),
-          },
-          source,
+    enrichedClasses = withResolvedFeatureSpells(
+      enrichImportedClassList(
+        sanitized.classes.map((c) =>
+          stampSource(
+            {
+              ...c,
+              prefer_same_source_replacements: Boolean(options.preferSameSourceReplacements),
+            },
+            source,
+          ),
         ),
+        explicitResources,
       ),
-      explicitResources,
+      "features",
+      spellCatalog,
+      preferredSource,
     )
     await upsertByNameLocal("classes", enrichedClasses)
     breakdown.classes = enrichedClasses.length
@@ -157,6 +194,27 @@ export async function persistImportedContentLocal(
     breakdown.spells = sanitized.spells.length
     totalImported += sanitized.spells.length
     spellCatalog = await loadSpellCatalogLocal()
+    // Re-link class/species spell grants now that same-batch spells exist.
+    if (enrichedClasses.length) {
+      enrichedClasses = withResolvedFeatureSpells(
+        enrichedClasses,
+        "features",
+        spellCatalog,
+        preferredSource,
+      )
+      await upsertByNameLocal("classes", enrichedClasses)
+    }
+    if (sanitized.species?.length) {
+      await upsertByNameLocal(
+        "species",
+        withResolvedFeatureSpells(
+          sanitized.species.map((s) => stampSource({ ...s }, source)),
+          "traits",
+          spellCatalog,
+          preferredSource,
+        ),
+      )
+    }
   }
 
   if (sanitized.subclasses?.length) {
@@ -207,13 +265,21 @@ export async function persistImportedContentLocal(
           psiKey &&
           (importText.includes("psi point") ||
             explicitResources?.some((resource) => resource.class_name === parentClassName))
-        if (!shouldLinkPsi) return row
-
+        const withPsi = shouldLinkPsi
+          ? {
+              ...row,
+              features: enrichSubclassFeaturesWithPsiCosts(
+                (row.features as Feature[]) ?? [],
+                psiKey,
+              ),
+            }
+          : row
         return {
-          ...row,
-          features: enrichSubclassFeaturesWithPsiCosts(
-            (row.features as Feature[]) ?? [],
-            psiKey,
+          ...withPsi,
+          features: resolveFeatureListLinkedSpells(
+            (withPsi.features as Feature[]) ?? [],
+            spellCatalog,
+            preferredSource,
           ),
         }
       })
@@ -231,10 +297,20 @@ export async function persistImportedContentLocal(
   }
 
   if (sanitized.backgrounds?.length) {
-    await upsertByNameLocal(
-      "backgrounds",
-      normalizeBackgroundRows(sanitized.backgrounds.map((b) => stampSource({ ...b }, source))),
-    )
+    const backgroundRows = normalizeBackgroundRows(
+      sanitized.backgrounds.map((b) => stampSource({ ...b }, source)),
+    ).map((row) => {
+      if (!row.feature || typeof row.feature !== "object") return row
+      return {
+        ...row,
+        feature: resolveFeatureLinkedSpells(
+          row.feature as Feature,
+          spellCatalog,
+          preferredSource,
+        ),
+      }
+    })
+    await upsertByNameLocal("backgrounds", backgroundRows)
     breakdown.backgrounds = sanitized.backgrounds.length
     totalImported += sanitized.backgrounds.length
   }
@@ -312,12 +388,45 @@ export async function persistImportedContentLocal(
 
   if ((sanitized as ImportContentWithAbilities).abilities?.length) {
     const rawAbilities = (sanitized as ImportContentWithAbilities).abilities!
-    await upsertByNameLocal(
-      "custom_abilities",
-      rawAbilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
-    )
-    breakdown.abilities = rawAbilities.length
-    totalImported += rawAbilities.length
+    const { enrichAbilityImportRows } = await import("@/lib/import/enrich-ability-import")
+    const { normalizeAbilityImportRows } = await import("@/lib/import/normalize-ability-import")
+    const abilityRows = enrichAbilityImportRows(
+      normalizeAbilityImportRows(
+        rawAbilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
+      ),
+    ).map((row) => {
+      const linkedModifiers = resolveLinkedModifierSpells(
+        (row.linkedModifiers ?? row.linked_modifiers) as
+          | import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[]
+          | undefined,
+        spellCatalog,
+        preferredSource,
+      )
+      const choicesRaw = row.choices as Feature["choices"] | undefined
+      const choices = choicesRaw?.options?.length
+        ? {
+            ...choicesRaw,
+            options: choicesRaw.options.map((option) => {
+              const optionMods = resolveLinkedModifierSpells(
+                option.linkedModifiers,
+                spellCatalog,
+                preferredSource,
+              )
+              if (optionMods === option.linkedModifiers) return option
+              return { ...option, linkedModifiers: optionMods }
+            }),
+          }
+        : choicesRaw
+      return {
+        ...row,
+        linked_modifiers: linkedModifiers ?? row.linked_modifiers ?? [],
+        linkedModifiers: linkedModifiers ?? row.linkedModifiers ?? [],
+        ...(choices ? { choices } : {}),
+      }
+    })
+    await upsertByNameLocal("custom_abilities", abilityRows)
+    breakdown.abilities = abilityRows.length
+    totalImported += abilityRows.length
   }
 
   const report = buildImportReport({

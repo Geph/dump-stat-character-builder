@@ -77,6 +77,7 @@ export interface FeatureChoice {
   optionsSource?:
     | "known_discipline_talents"
     | "fusion_talents"
+    | "class_talents"
     | "class_knacks"
     | "class_upgrades"
     | "class_bomb_formulas"
@@ -716,6 +717,12 @@ export interface CustomAbility {
   concentration?: boolean
   isChoice?: boolean
   choices?: FeatureChoice | null
+  /**
+   * One-time package sub-choice (e.g. Psychokinesis Cryokinetic / Electrokinetic / Pyrokinetic)
+   * when `choices` is already used for Discipline Talents. Each option may carry replacement
+   * Alternate Effects spells_known modifiers.
+   */
+  specialization_choices?: FeatureChoice | null
   level_requirement?: number | null
   /** discipline | psionic_power | talent_pool | class_talent | knack | bomb_formula | discovery | alchemist_bomb — guides builder aggregation. */
   ability_role?:

@@ -414,7 +414,7 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
             cardImageAspect="21/9"
           />
 
-          <CompendiumEditorPanel title="Description">
+          <CompendiumEditorPanel title="Description" defaultOpen>
             <RichTextEditor
               value={form.description}
               onChange={(description) => setForm({ ...form, description })}

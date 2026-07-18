@@ -33,23 +33,33 @@ type FeatureCarrier = Omit<Feature, "level"> & {
   /** Class/subclass features use level; abilities may use level_requirement instead. */
   level?: number
   importModifierMeta?: ImportModifierMeta[]
+  psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
 }
 
 function abilityAsFeatureCarrier(
   ability: NonNullable<ImportContent["abilities"]>[number],
 ): FeatureCarrier {
+  const augments = (ability as { psionic_augments?: FeatureCarrier["psionic_augments"] })
+    .psionic_augments
   return {
     ...(ability as unknown as FeatureCarrier),
     name: ability.name,
     description: ability.description,
     level: ability.level_requirement ?? undefined,
+    ...(augments ? { psionic_augments: augments } : {}),
   }
+}
+
+function psionicAugmentCount(feature: FeatureCarrier): number {
+  const augments = (feature as { psionic_augments?: { augments?: unknown[] } | null }).psionic_augments
+  return augments?.augments?.length ?? 0
 }
 
 function featureHasLinkedModifiers(feature: FeatureCarrier): boolean {
   if ((feature.linkedModifiers?.length ?? 0) > 0) return true
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) return true
   if (feature.companion_stat_block) return true
+  if (psionicAugmentCount(feature) > 0) return true
   const name = feature.name ?? ""
   const description = feature.description ?? ""
   if (isSubclassSpellTableFeature(name, description)) {
@@ -134,7 +144,7 @@ function previewFromFeature(
     (feature.importModifierMeta ?? []).map((entry) => [entry.instanceId, entry]),
   )
 
-  return linked.map((instance, index) => {
+  const previews = linked.map((instance, index) => {
     const meta = metaByInstance.get(instance.instanceId)
     return {
       id: `${sourceLabel}::${feature.name}::${instance.instanceId || index}`,
@@ -148,6 +158,37 @@ function previewFromFeature(
       ruleId: meta?.ruleId ?? "unknown",
     }
   })
+
+  const augmentCount = psionicAugmentCount(feature)
+  if (augmentCount > 0) {
+    previews.push({
+      id: `${sourceLabel}::${feature.name}::psionic_augments`,
+      sourceLabel,
+      featureName: feature.name,
+      featureLevel: feature.level,
+      summary: `${augmentCount} psi augment${augmentCount === 1 ? "" : "s"}`,
+      confidence: "high",
+      matchedPhrase: "Parsed from augment list (spend psi points up to your per-use limit…)",
+      source: "detector",
+      ruleId: "psionic.augments",
+    })
+  }
+
+  if (feature.companion_stat_block && !previews.some((entry) => /companion/i.test(entry.summary))) {
+    previews.push({
+      id: `${sourceLabel}::${feature.name}::companion_stat_block`,
+      sourceLabel,
+      featureName: feature.name,
+      featureLevel: feature.level,
+      summary: "Companion stat block",
+      confidence: "high",
+      matchedPhrase: "Parsed companion / construct statistics",
+      source: "detector",
+      ruleId: "companion.stat_block",
+    })
+  }
+
+  return previews
 }
 
 export type ImportModifierReviewRow = {

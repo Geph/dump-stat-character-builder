@@ -9,6 +9,7 @@ import {
   WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
 } from "@/lib/compendium/system-option-catalogs"
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
+import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 
 function mockDb(existingRows: Record<string, Record<string, unknown> | null>) {
   const inserts: Record<string, unknown>[] = []
@@ -106,5 +107,20 @@ describe("ensureSystemOptionCatalogs", () => {
     await ensureSystemOptionCatalogs(db)
 
     expect(updates.some((row) => row.id === WEAPON_MASTERY_PROPERTIES_CATALOG_ID)).toBe(false)
+  })
+})
+
+describe("ensureModifierCatalog", () => {
+  it("still seeds Metamagic, Invocations, and Weapon Mastery when Common Modifiers is first created", async () => {
+    const { db, inserts } = mockDb({})
+    await ensureModifierCatalog(db)
+
+    const insertedIds = inserts.map((row) => row.id)
+    expect(insertedIds).toContain(COMMON_MODIFIERS_CATALOG_ID)
+    for (const id of SYSTEM_OPTION_CATALOG_IDS) {
+      expect(insertedIds).toContain(id)
+    }
+    // Common Modifiers + Metamagic + Invocations + Weapon Mastery
+    expect(insertedIds).toHaveLength(4)
   })
 })

@@ -94,6 +94,7 @@ import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipmen
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
 import { RollHistoryTrigger } from "@/components/character-sheet/roll-history-trigger"
+import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { collectClassResourceSpendKeys } from "@/lib/compendium/class-resource-display"
 import {
@@ -2313,6 +2314,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
                 <div className="flex flex-wrap items-center justify-end gap-2">
+                  <ManualRollTrigger />
                   <RollHistoryTrigger />
                   <button
                     type="button"
