@@ -3,7 +3,10 @@ import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-tale
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  CharacteristicModifier,
+  SpecialAttackCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
@@ -30,6 +33,8 @@ export type SheetActionEntry = {
   /** Custom ability backing this action, when surfaced from the compendium. */
   customAbilityId?: string | null
   psionicAugments?: PsionicAugmentsConfig | null
+  /** Structured attack/damage profile when this action is a special attack power. */
+  specialAttack?: SpecialAttackCharacteristic | null
   castingTime?: string | null
   range?: string | null
   components?: string[] | null
@@ -204,6 +209,19 @@ function resolveActionResourceKey(item: ActivatableItem): string | null {
       }
       const spendKey = (characteristic as { spendResourceKey?: string | null }).spendResourceKey
       if (spendKey) return spendKey
+    }
+  }
+  return null
+}
+
+function resolveSpecialAttack(
+  item: ActivatableItem,
+): SpecialAttackCharacteristic | null {
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type === "special_attack") {
+        return characteristic as SpecialAttackCharacteristic
+      }
     }
   }
   return null
@@ -406,6 +424,12 @@ function pushActivatableItemActions(
           description: feature.description ?? null,
           classId,
           classResourceKey: resolveActionResourceKey(feature),
+          specialAttack: resolveSpecialAttack(feature),
+          psionicAugments: resolvePsionicAugments({
+            name: feature.name,
+            description: feature.description ?? null,
+            psionic_augments: null,
+          }),
         })
       }
     }
@@ -571,6 +595,7 @@ function pushCustomAbilityActions(
       classResourceKey: resolveActionResourceKey(item),
       customAbilityId: ability.id,
       psionicAugments: resolvePsionicAugments(ability),
+      specialAttack: resolveSpecialAttack(item),
       castingTime: ability.casting_time ?? ability.execution ?? null,
       range: ability.range ?? null,
       components: ability.components ?? null,
@@ -635,6 +660,12 @@ function pushCustomAbilityActions(
         classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
         classResourceKey: resolveActionResourceKey(item),
         customAbilityId: ability.id,
+        psionicAugments: resolvePsionicAugments({
+          name: entryName,
+          description: entry.description ?? entry.summary ?? null,
+          psionic_augments: null,
+        }),
+        specialAttack: resolveSpecialAttack(item),
         castingTime: entry.summary?.match(/\b\d+\s+(?:bonus\s+)?action\b/i)?.[0] ?? null,
       })
     }

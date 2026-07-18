@@ -1,13 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { AlertTriangle, Info, X } from "lucide-react"
+import { AlertTriangle, Dices, X } from "lucide-react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   PsionicAugmentPicker,
   resolveAbilityPsionicAugments,
 } from "@/components/character-sheet/psionic-augment-picker"
+import { d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
+import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
+import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import {
   ACTION_KIND_LABELS,
   type ActionEconomyKind,
@@ -22,6 +25,15 @@ import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import type { UsesConfig } from "@/lib/types"
+import {
+  formatPsionicAugmentSelectionSummary,
+  totalPsionicAugmentCost,
+  type PsionicAugmentSelection,
+} from "@/lib/compendium/parse-psionic-augments"
+import type { SpecialAttackCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import { rollD20WithMode } from "@/lib/dice/d20-roll"
+import { formatDamageRollResult, rollDamageWithMode } from "@/lib/dice/damage-roll"
+import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
 
 type SheetActionsPanelProps = {
   actions: SheetActionEntry[]
@@ -50,6 +62,20 @@ type ActionUsage = {
   used: number
   setUsed: (next: number) => void
   resourceName?: string
+  resourceId?: string
+}
+
+function dieSides(dieType: string): number {
+  const match = dieType.match(/^d(\d+)$/i)
+  return match ? parseInt(match[1], 10) : 6
+}
+
+function attackModifierFromContext(ctx: ResolveUsesContext): number {
+  const mods = ctx.abilityModifiers ?? {}
+  const int = mods.INT ?? 0
+  const wis = mods.WIS ?? 0
+  const cha = mods.CHA ?? 0
+  return Math.max(int, wis, cha)
 }
 
 function UseDots({
@@ -89,17 +115,195 @@ function UseDots({
   )
 }
 
-function ActionInfoOverlay({
+function ActionRollStep({
+  action,
+  specialAttack,
+  attackMod,
+  proficiencyBonus,
+  psiSpent,
+  augmentSummary,
+  onClose,
+}: {
+  action: SheetActionEntry
+  specialAttack: SpecialAttackCharacteristic
+  attackMod: number
+  proficiencyBonus: number
+  psiSpent: number
+  augmentSummary: string | null
+  onClose: () => void
+}) {
+  const history = useSheetRollHistory()
+  const rollCtx = useSheetRollContext()
+  const [attackSummary, setAttackSummary] = useState<string | null>(null)
+  const [damageSummary, setDamageSummary] = useState<string | null>(null)
+
+  const isAttackRoll =
+    specialAttack.attackProfile === "melee" || specialAttack.attackProfile === "ranged"
+  const saveAbility = specialAttack.saveAbility?.trim() || null
+  const saveDc =
+    specialAttack.saveDCBase != null
+      ? specialAttack.saveDCBase
+      : 8 + proficiencyBonus + attackMod
+
+  const damageExpression = `${specialAttack.damageDiceCount}d${dieSides(specialAttack.damageDieType)}${
+    specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""
+  }`
+
+  const rollAttack = () => {
+    const resolved = resolveRollMode({
+      context: { kind: "attack" },
+      activeConditions: rollCtx.activeConditions,
+      exhaustionLevel: rollCtx.exhaustionLevel,
+      manualOverride: "normal",
+      classFeatures: rollCtx.classFeatures,
+      limitationContext: {
+        activeConditions: rollCtx.activeConditions,
+        activeSheetToggles: rollCtx.activeSheetToggles,
+        equippedArmor: rollCtx.equippedArmor,
+        equippedShield: rollCtx.equippedShield,
+        currentHp: rollCtx.featureEffectContext?.currentHp ?? rollCtx.currentHp,
+      },
+    })
+    const rolled = rollD20WithMode(resolved.mode, attackMod + proficiencyBonus)
+    const modeSuffix =
+      rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
+    const summary = `${rolled.natural} + ${attackMod + proficiencyBonus} = ${rolled.total}${modeSuffix}${d20CriticalSuffix(rolled.natural)}`
+    setAttackSummary(summary)
+    history?.logRoll({
+      kind: "d20",
+      label: `${action.name} attack`,
+      summary,
+      natural: rolled.natural,
+    })
+  }
+
+  const rollDamage = () => {
+    const result = rollDamageWithMode(
+      {
+        dice: [
+          {
+            count: specialAttack.damageDiceCount,
+            sides: dieSides(specialAttack.damageDieType),
+          },
+        ],
+        modifier: 0,
+      },
+      "normal",
+    )
+    const damageType = specialAttack.damageTypes[0]
+    const summary = `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${
+      damageType ? ` ${damageType}` : ""
+    }`
+    setDamageSummary(summary)
+    history?.logRoll({
+      kind: "damage",
+      label: `${action.name} damage`,
+      summary,
+    })
+  }
+
+  useEffect(() => {
+    if (isAttackRoll) rollAttack()
+    if (specialAttack.damageDiceCount > 0) rollDamage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- roll once when the step opens
+  }, [])
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-1">
+        <p className="text-sm font-semibold text-foreground">Using {action.name}</p>
+        {psiSpent > 0 ? (
+          <p className="text-xs text-muted-foreground">Spent {psiSpent} psi points</p>
+        ) : null}
+        {augmentSummary ? (
+          <p className="text-xs text-muted-foreground">{augmentSummary}</p>
+        ) : null}
+      </div>
+
+      {isAttackRoll ? (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Attack roll
+          </p>
+          <p className="text-lg font-black tabular-nums text-foreground">
+            {attackSummary ?? "—"}
+          </p>
+          <button
+            type="button"
+            onClick={rollAttack}
+            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-border px-3 py-1.5 text-xs font-semibold hover:border-primary/40"
+          >
+            <Dices className="h-3.5 w-3.5" />
+            Reroll attack
+          </button>
+        </div>
+      ) : saveAbility ? (
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Save DC
+          </p>
+          <p className="text-lg font-black tabular-nums text-foreground">
+            DC {saveDc} {saveAbility}
+            {specialAttack.saveHalfDamage ? " (half on success)" : ""}
+          </p>
+        </div>
+      ) : null}
+
+      {specialAttack.damageDiceCount > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Damage ({damageExpression})
+          </p>
+          <p className="text-lg font-black tabular-nums text-foreground">
+            {damageSummary ?? "—"}
+          </p>
+          <button
+            type="button"
+            onClick={rollDamage}
+            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-border px-3 py-1.5 text-xs font-semibold hover:border-primary/40"
+          >
+            <Dices className="h-3.5 w-3.5" />
+            Reroll damage
+          </button>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+      >
+        Done
+      </button>
+    </div>
+  )
+}
+
+function ActionDetailOverlay({
   action,
   usage,
   psiLimit,
+  availablePsiPoints,
+  psiResourceId,
+  onSpendPsi,
+  incapacitated,
+  resolveContext,
   onClose,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
   psiLimit?: number | null
+  availablePsiPoints: number
+  psiResourceId: string | null
+  onSpendPsi: (points: number) => void
+  incapacitated: boolean
+  resolveContext: ResolveUsesContext
   onClose: () => void
 }) {
+  const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
+  const [step, setStep] = useState<"detail" | "roll">("detail")
+  const [useFeedback, setUseFeedback] = useState<string | null>(null)
+
   const psionicAugments =
     action.psionicAugments ??
     (action.customAbilityId
@@ -109,6 +313,54 @@ function ActionInfoOverlay({
           psionic_augments: action.psionicAugments,
         })
       : null)
+
+  const specialAttack = action.specialAttack ?? null
+  const psiCost = psionicAugments
+    ? totalPsionicAugmentCost(psionicAugments, augmentSelections)
+    : 0
+  const augmentSummary =
+    psionicAugments && augmentSelections.length
+      ? formatPsionicAugmentSelectionSummary(psionicAugments, augmentSelections)
+      : null
+
+  const chargeExhausted = usage != null && usage.used >= usage.max
+  const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
+  const canUse =
+    !incapacitated &&
+    !chargeExhausted &&
+    canAffordPsi &&
+    (psiCost === 0 || Boolean(psiResourceId))
+
+  useEffect(() => {
+    setAugmentSelections([])
+    setStep("detail")
+    setUseFeedback(null)
+  }, [action.id])
+
+  const handleUse = () => {
+    if (!canUse) return
+
+    // Variable psi spends go through the psi pool; don't also tick a shared psi use-dot.
+    const spendViaAugments = psiCost > 0
+    if (usage && !spendViaAugments) {
+      usage.setUsed(usage.used + 1)
+    }
+    if (spendViaAugments) {
+      onSpendPsi(psiCost)
+    }
+
+    const parts: string[] = []
+    if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
+    if (augmentSummary) parts.push(augmentSummary)
+    if (usage && !spendViaAugments) parts.push("Marked one use")
+
+    if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
+      setStep("roll")
+      return
+    }
+
+    setUseFeedback(parts.join(" · ") || "Used!")
+  }
 
   return (
     <motion.div
@@ -143,85 +395,127 @@ function ActionInfoOverlay({
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-4 space-y-3">
-          {usage ? (
-            <p className="text-xs font-semibold text-foreground">
-              {usage.resourceName ? `${usage.resourceName}: ` : "Uses: "}
-              <span className="tabular-nums">
-                {usage.max - usage.used} / {usage.max} remaining
-              </span>
-            </p>
-          ) : null}
-          {(action.castingTime || action.range || action.duration) && (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-              {action.castingTime ? (
-                <>
-                  <dt className="text-muted-foreground">Casting Time</dt>
-                  <dd className="text-foreground">{action.castingTime}</dd>
-                </>
-              ) : null}
-              {action.range ? (
-                <>
-                  <dt className="text-muted-foreground">Range</dt>
-                  <dd className="text-foreground">{action.range}</dd>
-                </>
-              ) : null}
-              {action.components?.length ? (
-                <>
-                  <dt className="text-muted-foreground">Components</dt>
-                  <dd className="text-foreground">{action.components.join(", ")}</dd>
-                </>
-              ) : null}
-              {action.duration ? (
-                <>
-                  <dt className="text-muted-foreground">Duration</dt>
-                  <dd className="text-foreground">
-                    {action.duration}
-                    {action.concentration ? " (Concentration)" : ""}
-                  </dd>
-                </>
-              ) : null}
-            </dl>
-          )}
-          {psionicAugments ? (
-            <PsionicAugmentPicker
-              config={psionicAugments}
-              psiLimit={psiLimit}
-              selections={[]}
-              onChange={() => {}}
-              readOnly
-            />
-          ) : null}
-          {action.relatedTalentAlerts?.length ? (
-            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-                Related talents
-              </p>
-              {action.relatedTalentAlerts.map((alert) => (
-                <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-xs font-semibold text-foreground">{alert.name}</p>
-                    <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
-                    {alert.sourceLabel ? (
-                      <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
-                    ) : null}
-                    {alert.description ? (
-                      <RichTextContent
-                        html={alert.description}
-                        className="text-xs text-foreground/80 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0"
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <RichTextContent
-            html={action.description}
-            className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
+
+        {step === "roll" && specialAttack ? (
+          <ActionRollStep
+            action={action}
+            specialAttack={specialAttack}
+            attackMod={attackModifierFromContext(resolveContext)}
+            proficiencyBonus={resolveContext.proficiencyBonus ?? 0}
+            psiSpent={psiCost}
+            augmentSummary={augmentSummary}
+            onClose={onClose}
           />
-        </div>
+        ) : (
+          <>
+            <div className="p-4 space-y-3">
+              {usage ? (
+                <p className="text-xs font-semibold text-foreground">
+                  {usage.resourceName ? `${usage.resourceName}: ` : "Uses: "}
+                  <span className="tabular-nums">
+                    {usage.max - usage.used} / {usage.max} remaining
+                  </span>
+                </p>
+              ) : null}
+              {(action.castingTime || action.range || action.duration) && (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  {action.castingTime ? (
+                    <>
+                      <dt className="text-muted-foreground">Casting Time</dt>
+                      <dd className="text-foreground">{action.castingTime}</dd>
+                    </>
+                  ) : null}
+                  {action.range ? (
+                    <>
+                      <dt className="text-muted-foreground">Range</dt>
+                      <dd className="text-foreground">{action.range}</dd>
+                    </>
+                  ) : null}
+                  {action.components?.length ? (
+                    <>
+                      <dt className="text-muted-foreground">Components</dt>
+                      <dd className="text-foreground">{action.components.join(", ")}</dd>
+                    </>
+                  ) : null}
+                  {action.duration ? (
+                    <>
+                      <dt className="text-muted-foreground">Duration</dt>
+                      <dd className="text-foreground">
+                        {action.duration}
+                        {action.concentration ? " (Concentration)" : ""}
+                      </dd>
+                    </>
+                  ) : null}
+                </dl>
+              )}
+              {psionicAugments ? (
+                <PsionicAugmentPicker
+                  config={psionicAugments}
+                  psiLimit={psiLimit}
+                  availablePsiPoints={availablePsiPoints}
+                  selections={augmentSelections}
+                  onChange={setAugmentSelections}
+                />
+              ) : null}
+              {action.relatedTalentAlerts?.length ? (
+                <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                    Related talents
+                  </p>
+                  {action.relatedTalentAlerts.map((alert) => (
+                    <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-xs font-semibold text-foreground">{alert.name}</p>
+                        <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
+                        {alert.sourceLabel ? (
+                          <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
+                        ) : null}
+                        {alert.description ? (
+                          <RichTextContent
+                            html={alert.description}
+                            className="text-xs text-foreground/80 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <RichTextContent
+                html={action.description}
+                className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
+              />
+            </div>
+
+            <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
+              {useFeedback ? (
+                <p className="rounded-lg bg-primary/10 px-3 py-2 text-center text-xs font-semibold text-primary">
+                  {useFeedback}
+                </p>
+              ) : null}
+              {incapacitated ? (
+                <p className="text-xs text-destructive">Incapacitated — you cannot use this now.</p>
+              ) : chargeExhausted ? (
+                <p className="text-xs text-muted-foreground">No uses remaining.</p>
+              ) : !canAffordPsi ? (
+                <p className="text-xs text-muted-foreground">
+                  Not enough psi points
+                  {psiLimit != null ? ` (limit ${psiLimit})` : ""}.
+                </p>
+              ) : null}
+              <button
+                type="button"
+                disabled={!canUse}
+                onClick={handleUse}
+                className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Use {action.name}
+                {psiCost > 0 ? ` (${psiCost} psi)` : ""}
+              </button>
+            </div>
+          </>
+        )}
       </motion.div>
     </motion.div>
   )
@@ -238,13 +532,34 @@ export function SheetActionsPanel({
   incapacitated = false,
   psiLimit = null,
 }: SheetActionsPanelProps) {
-  const [infoActionId, setInfoActionId] = useState<string | null>(null)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
+
+  const resourceById = useMemo(
+    () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
+    [resourceEntries],
+  )
+
+  const psiResource = useMemo(() => {
+    return (
+      resourceEntries.find(
+        (row) =>
+          row.id.endsWith("_psi_points") ||
+          row.id === "psi_points" ||
+          /^psi points$/i.test(row.name),
+      ) ?? null
+    )
+  }, [resourceEntries])
+
+  const availablePsiPoints = useMemo(() => {
+    if (!psiResource) return 0
+    const max = resolveUsesAtLevel(psiResource.uses, psiResource.classLevel, resolveContext) ?? 0
+    const used = usedResourcesById[psiResource.id] ?? 0
+    return Math.max(0, max - used)
+  }, [psiResource, usedResourcesById, resolveContext])
 
   if (!actions.length) {
     return null
   }
-
-  const resourceById = new Map(resourceEntries.map((entry) => [entry.id, entry]))
 
   /** Resolve the spendable counter backing an action, if any. */
   const usageFor = (action: SheetActionEntry): ActionUsage | null => {
@@ -258,6 +573,7 @@ export function SheetActionsPanel({
             max,
             used: usedResourcesById[resourceId] ?? 0,
             resourceName: resource.name,
+            resourceId,
             setUsed: (next) =>
               onResourceUsedChange({
                 ...usedResourcesById,
@@ -280,10 +596,14 @@ export function SheetActionsPanel({
     return null
   }
 
-  const spend = (usage: ActionUsage | null) => {
-    if (incapacitated || !usage) return
-    if (usage.used >= usage.max) return
-    usage.setUsed(usage.used + 1)
+  const spendPsi = (points: number) => {
+    if (!psiResource || !onResourceUsedChange || points <= 0) return
+    const max = resolveUsesAtLevel(psiResource.uses, psiResource.classLevel, resolveContext) ?? 0
+    const used = usedResourcesById[psiResource.id] ?? 0
+    onResourceUsedChange({
+      ...usedResourcesById,
+      [psiResource.id]: Math.min(max, used + points),
+    })
   }
 
   const grouped: Record<ActionEconomyKind, SheetActionEntry[]> = {
@@ -299,8 +619,8 @@ export function SheetActionsPanel({
     }
   }
 
-  const infoAction = infoActionId
-    ? actions.find((entry) => entry.id === infoActionId) ?? null
+  const openAction = openActionId
+    ? actions.find((entry) => entry.id === openActionId) ?? null
     : null
 
   return (
@@ -321,20 +641,20 @@ export function SheetActionsPanel({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {entries.map((entry) => {
                 const usage = usageFor(entry)
-                const spendable = !incapacitated && usage != null && usage.used < usage.max
                 const usesClassResource = Boolean(entry.classResourceKey)
+                const interactive = !incapacitated
                 return (
                   <div
                     key={`${kind}-${entry.id}`}
-                    role={usage && !incapacitated ? "button" : undefined}
-                    tabIndex={usage && !incapacitated ? 0 : undefined}
-                    onClick={usage && !incapacitated ? () => spend(usage) : undefined}
+                    role={interactive ? "button" : undefined}
+                    tabIndex={interactive ? 0 : undefined}
+                    onClick={interactive ? () => setOpenActionId(entry.id) : undefined}
                     onKeyDown={
-                      usage && !incapacitated
+                      interactive
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault()
-                              spend(usage)
+                              setOpenActionId(entry.id)
                             }
                           }
                         : undefined
@@ -344,15 +664,11 @@ export function SheetActionsPanel({
                       usesClassResource
                         ? SHEET_ACTION_CARD.classResource
                         : SHEET_ACTION_CARD.default,
-                      spendable &&
+                      interactive &&
                         (usesClassResource
                           ? cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.classResourceHover)
                           : cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.defaultHover)),
-                      !spendable && usage
-                        ? incapacitated
-                          ? "opacity-50"
-                          : "opacity-80"
-                        : "",
+                      incapacitated ? "opacity-50" : "",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -364,33 +680,15 @@ export function SheetActionsPanel({
                       </div>
                       <div className="flex shrink-0 items-center gap-0.5">
                         {entry.relatedTalentAlerts?.length ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setInfoActionId(entry.id)
-                            }}
-                            className="rounded p-0.5 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15"
-                            aria-label={`Related talents for ${entry.name}`}
+                          <span
+                            className="rounded p-0.5 text-amber-600 dark:text-amber-400"
                             title={entry.relatedTalentAlerts
                               .map((alert) => `${alert.name}: ${alert.summary}`)
                               .join(" · ")}
                           >
                             <AlertTriangle className="w-3.5 h-3.5" />
-                          </button>
+                          </span>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setInfoActionId(entry.id)
-                          }}
-                          className="rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
-                          aria-label={`About ${entry.name}`}
-                          title="What does this do?"
-                        >
-                          <Info className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
                     {usage ? (
@@ -419,13 +717,18 @@ export function SheetActionsPanel({
       })}
 
       <AnimatePresence>
-        {infoAction ? (
-          <ActionInfoOverlay
-            key="action-info"
-            action={infoAction}
-            usage={usageFor(infoAction)}
+        {openAction ? (
+          <ActionDetailOverlay
+            key="action-detail"
+            action={openAction}
+            usage={usageFor(openAction)}
             psiLimit={psiLimit}
-            onClose={() => setInfoActionId(null)}
+            availablePsiPoints={availablePsiPoints}
+            psiResourceId={psiResource?.id ?? null}
+            onSpendPsi={spendPsi}
+            incapacitated={incapacitated}
+            resolveContext={resolveContext}
+            onClose={() => setOpenActionId(null)}
           />
         ) : null}
       </AnimatePresence>

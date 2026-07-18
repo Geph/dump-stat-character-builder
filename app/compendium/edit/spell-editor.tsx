@@ -425,52 +425,58 @@ export default function SpellEditorPage({ id }: { id: string }) {
           </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Level, school & flags" defaultOpen>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-2">
-                Level
-              </label>
-              <select
-                value={form.level}
-                onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })}
-                className={compendiumFieldClass}
-              >
-                <option value={0}>Cantrip</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl}{lvl === 1 ? "st" : lvl === 2 ? "nd" : lvl === 3 ? "rd" : "th"} Level
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Level
+                  </label>
+                  <select
+                    value={form.level}
+                    onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })}
+                    className={compendiumFieldClass}
+                  >
+                    <option value={0}>Cantrip</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => (
+                      <option key={lvl} value={lvl}>
+                        {lvl}
+                        {lvl === 1 ? "st" : lvl === 2 ? "nd" : lvl === 3 ? "rd" : "th"} Level
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <DropdownOrOtherField
+                  label="School"
+                  value={form.school}
+                  onChange={(school) => setForm({ ...form, school })}
+                  options={spellSchools.map((school) => ({ value: school, label: school }))}
+                  otherPlaceholder="e.g. Psionic Powers"
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-semibold text-foreground">Flags</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.ritual}
+                      onChange={(e) => setForm({ ...form, ritual: e.target.checked })}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-sm text-foreground">Ritual</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.concentration}
+                      onChange={(e) => setForm({ ...form, concentration: e.target.checked })}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-sm text-foreground">Concentration</span>
+                  </label>
+                </div>
+              </div>
             </div>
-            <div>
-              <DropdownOrOtherField
-                label="School"
-                value={form.school}
-                onChange={(school) => setForm({ ...form, school })}
-                options={spellSchools.map((school) => ({ value: school, label: school }))}
-                otherPlaceholder="e.g. Psionic Powers"
-              />
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer min-h-[50px] pb-1">
-              <input
-                type="checkbox"
-                checked={form.ritual}
-                onChange={(e) => setForm({ ...form, ritual: e.target.checked })}
-                className="w-4 h-4 rounded border-border accent-primary"
-              />
-              <span className="text-foreground font-semibold text-sm">Ritual</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer min-h-[50px] pb-1">
-              <input
-                type="checkbox"
-                checked={form.concentration}
-                onChange={(e) => setForm({ ...form, concentration: e.target.checked })}
-                className="w-4 h-4 rounded border-border accent-primary"
-              />
-              <span className="text-foreground font-semibold text-sm">Concentration</span>
-            </label>
-          </div>
           </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Casting time, range & duration" defaultOpen>
