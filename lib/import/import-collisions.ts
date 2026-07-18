@@ -15,7 +15,8 @@ export type ImportCollision = {
 
 export type ImportRenameMap = Record<string, string>
 
-export type ImportCollisionResolution = "overwrite" | "rename"
+export type ImportCollisionResolution = "overwrite" | "rename" | "link" | "skip"
+
 
 export type ImportCollisionResolutionMap = Record<string, ImportCollisionResolution>
 
@@ -108,7 +109,8 @@ export function defaultCollisionResolutionMap(
 ): ImportCollisionResolutionMap {
   const map: ImportCollisionResolutionMap = {}
   for (const collision of collisions) {
-    map[collision.id] = "rename"
+    // Existing spells should be matched/linked, not overwritten by import stubs.
+    map[collision.id] = collision.kind === "spell" ? "link" : "rename"
   }
   return map
 }
@@ -120,7 +122,13 @@ function effectiveRenameMap(
 ): ImportRenameMap {
   const effective: ImportRenameMap = { ...renameMap }
   for (const collision of collisions) {
-    if (resolutionMap[collision.id] === "overwrite") {
+    const resolution = resolutionMap[collision.id] ?? defaultResolutionFor(collision)
+    if (resolution === "skip") {
+      delete effective[collision.id]
+      continue
+    }
+    if (resolution === "overwrite" || resolution === "link") {
+      // Keep the existing name so references resolve to the compendium entry.
       effective[collision.id] = collision.incomingName
       continue
     }
@@ -131,7 +139,72 @@ function effectiveRenameMap(
   return effective
 }
 
-/** Apply collision resolutions (overwrite vs rename) before persisting. */
+function defaultResolutionFor(collision: ImportCollision): ImportCollisionResolution {
+  return collision.kind === "spell" ? "link" : "rename"
+}
+
+/** Drop spell rows that should link to existing compendium spells (do not upsert). */
+function stripLinkedSpellRows(
+  content: ImportContent,
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): ImportContent {
+  const linkedNames = new Set(
+    collisions
+      .filter((collision) => {
+        const resolution = resolutionMap[collision.id] ?? defaultResolutionFor(collision)
+        return collision.kind === "spell" && resolution === "link"
+      })
+      .map((collision) => collision.incomingName.trim().toLowerCase()),
+  )
+  if (!linkedNames.size || !content.spells?.length) return content
+  return {
+    ...content,
+    spells: content.spells.filter((spell) => !linkedNames.has(spell.name.trim().toLowerCase())),
+  }
+}
+
+const CONTENT_KEY_BY_KIND: Record<ImportCollisionKind, keyof ImportContent> = {
+  class: "classes",
+  feat: "feats",
+  species: "species",
+  spell: "spells",
+  background: "backgrounds",
+  ability: "abilities",
+}
+
+/** Drop rows the user chose not to import for a name collision. */
+function stripSkippedCollisionRows(
+  content: ImportContent,
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): ImportContent {
+  const skippedByKind = new Map<ImportCollisionKind, Set<string>>()
+  for (const collision of collisions) {
+    const resolution = resolutionMap[collision.id] ?? defaultResolutionFor(collision)
+    if (resolution !== "skip") continue
+    const set = skippedByKind.get(collision.kind) ?? new Set<string>()
+    set.add(collision.incomingName.trim().toLowerCase())
+    skippedByKind.set(collision.kind, set)
+  }
+  if (!skippedByKind.size) return content
+
+  let next: ImportContent = { ...content }
+  for (const [kind, names] of skippedByKind) {
+    const key = CONTENT_KEY_BY_KIND[kind]
+    const rows = next[key]
+    if (!Array.isArray(rows) || !rows.length) continue
+    next = {
+      ...next,
+      [key]: rows.filter(
+        (row) => !names.has(String((row as { name?: string }).name ?? "").trim().toLowerCase()),
+      ),
+    }
+  }
+  return next
+}
+
+/** Apply collision resolutions (overwrite / rename / link / skip) before persisting. */
 export function applyImportCollisionResolutions(
   content: ImportContent,
   collisions: ImportCollision[],
@@ -139,7 +212,12 @@ export function applyImportCollisionResolutions(
   renameMap: ImportRenameMap = {},
 ): ImportContent {
   if (!collisions.length) return content
-  return applyImportRenames(content, effectiveRenameMap(collisions, resolutionMap, renameMap))
+  const withoutSkipped = stripSkippedCollisionRows(content, collisions, resolutionMap)
+  const renamed = applyImportRenames(
+    withoutSkipped,
+    effectiveRenameMap(collisions, resolutionMap, renameMap),
+  )
+  return stripLinkedSpellRows(renamed, collisions, resolutionMap)
 }
 
 function renamedName(

@@ -75,6 +75,13 @@ export function getCompendiumItemIcon(
 ): string {
   const icon = item.icon
   if (typeof icon === "string" && icon.trim()) return icon.trim()
+  if (tab === "abilities") {
+    const role =
+      typeof item.ability_role === "string" ? item.ability_role.trim().toLowerCase() : ""
+    if (role === "discipline" || /\bdiscipline\b/i.test(String(item.name ?? ""))) {
+      return "psychic-waves"
+    }
+  }
   if (
     (tab === "equipment" || tab === "magic_items") &&
     item.category === "Weapon"

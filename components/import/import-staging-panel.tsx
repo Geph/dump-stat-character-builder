@@ -8,7 +8,7 @@ import {
   pageOverlayPanelTitleClass,
 } from "@/lib/compendium/editor-field-styles"
 import { cn } from "@/lib/utils"
-import { ChevronRight, Layers } from "lucide-react"
+import { ChevronLeft, ChevronRight, Layers } from "lucide-react"
 
 export type ImportReviewPhase = "content" | "modifiers"
 
@@ -20,6 +20,9 @@ type ImportStagingPanelProps = {
   hasModifiers: boolean
   onNext: () => void
   canNext: boolean
+  onBack?: () => void
+  canBack?: boolean
+  onCancel?: () => void
   /** Content review / collisions / card art for the active stage. */
   contentChildren: ReactNode
   /** Modifier wiring for the active stage (shown on the modifiers phase). */
@@ -34,6 +37,9 @@ export function ImportStagingPanel({
   hasModifiers,
   onNext,
   canNext,
+  onBack,
+  canBack = false,
+  onCancel,
   contentChildren,
   modifiersChildren,
 }: ImportStagingPanelProps) {
@@ -43,6 +49,7 @@ export function ImportStagingPanel({
   const stage = stages[safeIndex]
   const phaseLabel = phase === "content" ? "Parsed content" : "Modifier wiring"
   const showPhaseToggle = hasModifiers
+  const showFooter = Boolean(onCancel) || canBack || canNext
 
   return (
     <div className={cn(pageOverlayPanelClass, "space-y-4 p-4 text-sm")}>
@@ -129,18 +136,43 @@ export function ImportStagingPanel({
         {phase === "content" ? contentChildren : modifiersChildren}
       </div>
 
-      {canNext ? (
-        <div className="flex justify-end border-t border-border/70 pt-3">
-          <button
-            type="button"
-            onClick={onNext}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
-          >
-            {phase === "content" && hasModifiers
-              ? "Next: review modifier wiring"
-              : "Next stage"}
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-          </button>
+      {showFooter ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {onCancel ? (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+              >
+                Cancel
+              </button>
+            ) : null}
+            {canBack && onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                {phase === "modifiers" ? "Back: content" : "Previous stage"}
+              </button>
+            ) : null}
+          </div>
+          {canNext ? (
+            <button
+              type="button"
+              onClick={onNext}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
+            >
+              {phase === "content" && hasModifiers
+                ? "Next: review modifier wiring"
+                : "Next stage"}
+              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ) : (
+            <span />
+          )}
         </div>
       ) : null}
     </div>

@@ -16,6 +16,7 @@ import type { Feature } from "@/lib/types"
 import type { ImportSourceLabel } from "@/lib/import/import-material-source"
 import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
 import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
+import { classNamesFuzzyMatch, resolveParentClassRow } from "@/lib/import/resolve-parent-class"
 import {
   buildClassResourceRowsForClass,
   enrichImportedClassList,
@@ -142,28 +143,42 @@ export async function persistImportedContentLocal(
   }
 
   if (sanitized.classes?.length || sanitized.class_resources?.length) {
+    const preferNames = [
+      ...new Set([
+        ...(sanitized.classes?.map((c) => c.name) ?? []),
+        ...(sanitized.class_resources?.map((r) => r.class_name) ?? []),
+      ]),
+    ]
+    const classData = (await listRowsLocal("classes")).map((c) => ({
+      id: c.id as string,
+      name: c.name as string,
+      source: (c.source as string | null) ?? null,
+    }))
+    const sameSourceNames = classData
+      .filter((c) => c.source === source)
+      .map((c) => c.name)
+    const resolvePrefer = [...new Set([...preferNames, ...sameSourceNames])]
+
     const classNames = [
       ...new Set([
         ...(sanitized.classes?.map((c) => c.name) ?? []),
         ...(sanitized.class_resources?.map((r) => r.class_name) ?? []),
       ]),
     ]
-    const classData = await listRowsLocal("classes", {
-      filters: [{ op: "in", column: "name", values: classNames }],
-    })
-    const classIdByName = new Map(classData.map((c) => [c.name as string, c.id as string]))
 
     let resourceCount = 0
     for (const className of classNames) {
-      const classId = classIdByName.get(className)
-      if (!classId) {
+      const parent = resolveParentClassRow(className, classData, { preferNames: resolvePrefer })
+      if (!parent) {
         warnings.push(`Skipped class resources — class not found: ${className}`)
         continue
       }
+      const classId = parent.id
 
       const importClassRow =
         enrichedClasses.find((row) => row.name === className) ??
-        ({ name: className, description: null, features: [] } as unknown as Record<string, unknown>)
+        enrichedClasses.find((row) => row.name === parent.name) ??
+        ({ name: parent.name, description: null, features: [] } as unknown as Record<string, unknown>)
 
       const resourceRows = buildClassResourceRowsForClass(
         importClassRow,
@@ -219,35 +234,53 @@ export async function persistImportedContentLocal(
   }
 
   if (sanitized.subclasses?.length) {
-    const classNames = [...new Set(sanitized.subclasses.map((sc) => sc.class_name))]
-    const classData = await listRowsLocal("classes", {
-      filters: [{ op: "in", column: "name", values: classNames }],
-    })
-    classNameById = new Map(classData.map((c) => [c.id as string, c.name as string]))
-    const classIdMap = new Map(classData.map((c) => [c.name as string, c.id as string]))
+    const preferNames = [
+      ...new Set([
+        ...(sanitized.classes?.map((c) => c.name) ?? []),
+        ...(sanitized.class_resources?.map((r) => r.class_name) ?? []),
+        ...sanitized.subclasses.map((sc) => sc.class_name),
+      ]),
+    ]
+    const classData = (await listRowsLocal("classes")).map((c) => ({
+      id: c.id as string,
+      name: c.name as string,
+      source: (c.source as string | null) ?? null,
+    }))
+    classNameById = new Map(classData.map((c) => [c.id, c.name]))
+    const sameSourceNames = classData
+      .filter((c) => c.source === source)
+      .map((c) => c.name)
+    const resolvePrefer = [...new Set([...preferNames, ...sameSourceNames])]
 
-    skippedSubclasses = sanitized.subclasses
-      .filter((sc) => !classIdMap.get(sc.class_name))
-      .map((sc) => ({ name: sc.name, class_name: sc.class_name }))
+    skippedSubclasses = []
+    const subclassesWithIds = sanitized.subclasses
+      .map((sc) => {
+        const parent = resolveParentClassRow(sc.class_name, classData, {
+          preferNames: resolvePrefer,
+        })
+        if (!parent) {
+          skippedSubclasses.push({ name: sc.name, class_name: sc.class_name })
+          return null
+        }
+        return {
+          name: sc.name,
+          description: sc.description,
+          features: sc.features,
+          source,
+          class_id: parent.id,
+          class_name: parent.name,
+        }
+      })
+      .filter((sc): sc is NonNullable<typeof sc> => sc != null)
+      .map((sc) => stampSource(sc, source)) as Array<
+      Record<string, unknown> & { class_id: string; class_name: string }
+    >
+
     if (skippedSubclasses.length > 0) {
       warnings.push(
         `Skipped ${skippedSubclasses.length} subclass(es) — parent class not found: ${skippedSubclasses.map((s) => `${s.name} (${s.class_name})`).join(", ")}`,
       )
     }
-
-    const subclassesWithIds = sanitized.subclasses
-      .map((sc) => ({
-        name: sc.name,
-        description: sc.description,
-        features: sc.features,
-        source,
-        class_id: classIdMap.get(sc.class_name) || null,
-        class_name: sc.class_name,
-      }))
-      .map((sc) => stampSource(sc, source))
-      .filter((sc) => sc.class_id !== null) as Array<
-      Record<string, unknown> & { class_id: string; class_name: string }
-    >
 
     if (subclassesWithIds.length > 0) {
       enrichedSubclasses = enrichImportedSubclassRows(
@@ -265,7 +298,9 @@ export async function persistImportedContentLocal(
         const shouldLinkPsi =
           psiKey &&
           (importText.includes("psi point") ||
-            explicitResources?.some((resource) => resource.class_name === parentClassName))
+            explicitResources?.some((resource) =>
+              classNamesFuzzyMatch(resource.class_name, parentClassName),
+            ))
         const withPsi = shouldLinkPsi
           ? {
               ...row,

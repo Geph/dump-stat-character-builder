@@ -13,9 +13,11 @@ export function normalizePreviewTab(value: unknown): BuilderPreviewTab {
   return "summary"
 }
 
-/** Legacy builder had a removed Review step at id 7. */
+/** Legacy builder had a removed Review step at id 7. Class Abilities uses id 8. */
 export function normalizeBuilderStepId(step: number): number {
-  if (step >= 7) return 6
+  if (step === 7) return 6
+  if (step === 8) return 8
+  if (step > 8) return 6
   return step >= 1 ? step : 1
 }
 

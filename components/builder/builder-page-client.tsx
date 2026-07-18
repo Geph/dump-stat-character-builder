@@ -117,7 +117,7 @@ import { getCompendiumItemAccentColor, compendiumAccentColorStyles } from "@/lib
 import { cn } from "@/lib/utils"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
-import { CatalogFeatMultiPicker } from "@/components/builder/catalog-feat-multi-picker"
+import { ClassAbilitiesStepPanel } from "@/components/builder/class-abilities-step-panel"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import {
   buildWeaponMasteryDescriptionsLookup,
@@ -132,7 +132,8 @@ import {
   buildSkillPickSources,
   getSubclassesForClass,
   getTakenSkills,
-  SUBCLASS_LEVEL,
+  resolveSubclassUnlockLabel,
+  resolveSubclassUnlockLevel,
   validateClassStepChoices,
   validateOriginStepChoices,
   collectClassStepBlockers,
@@ -159,8 +160,10 @@ import {
 } from "@/lib/builder/feat-pick-keys"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import {
+  collapseWeaponCategoryPackageOptions,
   computeStartingCharacterGold,
-  findEquipmentByName,
+  equipmentCategoryKind,
+  equipmentForCategory,
   getEquipmentCostGp,
   getStartingEquipmentGroups,
   isGoldOnlyOption,
@@ -260,7 +263,15 @@ import {
   BUILDER_STANDARD_ARRAY,
   BUILDER_STEPS,
   BUILDER_STEP_IDS,
+  builderStepOrder,
 } from "@/lib/builder/builder-constants"
+import {
+  collectClassAbilityFeatures,
+  collectClassAbilityStepBlockers,
+  hasClassAbilityStep as characterHasClassAbilityStep,
+  isClassAbilityFeatureChoice,
+  isClassAbilityFeatSlot,
+} from "@/lib/builder/class-ability-step"
 import { formatSpellListGroupLabel } from "@/lib/compendium/spell-slots"
 import {
   formatMulticlassAbilityIssue,
@@ -275,7 +286,10 @@ import {
   getMulticlassToolPickRequirement,
   multiclassProficiencySummary,
 } from "@/lib/builder/multiclass-proficiencies"
-import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
+import {
+  enrichPsionicTalentGrantFeatures,
+  resolveFeatureChoiceOptions,
+} from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import {
@@ -405,6 +419,11 @@ export default function BuilderPageClient() {
   const [spellFilterLevelByClassId, setSpellFilterLevelByClassId] = useState<Record<string, string>>({})
   const [spellLevelPages, setSpellLevelPages] = useState<Record<string, number>>({})
   const [startingEquipmentOptionIndex, setStartingEquipmentOptionIndex] = useState<number | null>(null)
+  const [startingEquipmentCategoryPicks, setStartingEquipmentCategoryPicks] = useState<
+    Record<string, string>
+  >({})
+  const [backgroundStartingEquipmentCategoryPicks, setBackgroundStartingEquipmentCategoryPicks] =
+    useState<Record<string, string>>({})
   const [backgroundStartingEquipmentOptionIndex, setBackgroundStartingEquipmentOptionIndex] =
     useState<number | null>(null)
   const [goldPurchasedEquipmentIds, setGoldPurchasedEquipmentIds] = useState<string[]>([])
@@ -618,6 +637,8 @@ export default function BuilderPageClient() {
     setSpellLevelPages({})
     setStartingEquipmentOptionIndex(null)
     setBackgroundStartingEquipmentOptionIndex(null)
+    setStartingEquipmentCategoryPicks({})
+    setBackgroundStartingEquipmentCategoryPicks({})
     setGoldPurchasedEquipmentIds([])
     setCardViewMode("cinematic")
     setCurrentHp(null)
@@ -833,7 +854,12 @@ export default function BuilderPageClient() {
       const payload = await loadBuilderCompendium(db)
 
       setModifierCatalog(payload.modifierCatalog)
-      setClasses(payload.classes)
+      setClasses(
+        payload.classes.map((row) => ({
+          ...row,
+          features: enrichPsionicTalentGrantFeatures(row.features ?? []),
+        })),
+      )
       setSubclasses(payload.subclasses)
       setSpecies(payload.species)
       setBackgrounds(payload.backgrounds)
@@ -1024,8 +1050,26 @@ export default function BuilderPageClient() {
       ),
     [activeClassLevels, classes],
   )
-  const { catalogGroups: classCatalogFeatGroups, regularSlots: regularClassFeatSlots } = useMemo(
+  const { catalogGroups: classCatalogFeatGroups, regularSlots: allRegularClassFeatSlots } = useMemo(
     () => groupCatalogFeatPickSlots(featPickSlots),
+    [featPickSlots],
+  )
+  const classAbilityRegularFeatSlots = useMemo(
+    () => allRegularClassFeatSlots.filter(isClassAbilityFeatSlot),
+    [allRegularClassFeatSlots],
+  )
+  const regularClassFeatSlots = useMemo(
+    () => allRegularClassFeatSlots.filter((slot) => !isClassAbilityFeatSlot(slot)),
+    [allRegularClassFeatSlots],
+  )
+  const classStepFeatSlots = useMemo(
+    () => [...regularClassFeatSlots],
+    [regularClassFeatSlots],
+  )
+  const classAbilityFeatSlots = useMemo(
+    () => [
+      ...featPickSlots.filter(isClassAbilityFeatSlot),
+    ],
     [featPickSlots],
   )
   const speciesFeatPickSlots = useMemo(
@@ -1119,21 +1163,23 @@ export default function BuilderPageClient() {
       }),
     [featPickSlots, speciesFeatPickSlots, backgroundFeatPickSlots, featureChoicePicks, grantedFeatIds],
   )
-  const requiredFeatSlots = featPickSlots.length
-  const classSelectedFeatIds = featPickSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? "")
+  const requiredFeatSlots = classStepFeatSlots.length
+  const classSelectedFeatIds = classStepFeatSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? "")
   const speciesSelectedFeatIds = speciesFeatPickSlots.map(
     (slot) => featureChoicePicks[slot.key]?.[0] ?? "",
   )
   const selectedFeatIds = [...classSelectedFeatIds, ...speciesSelectedFeatIds].filter(Boolean)
   const selectedFeatCount = classSelectedFeatIds.filter(Boolean).length
+  const requiredClassAbilityFeatSlots = classAbilityFeatSlots.length
+  const selectedClassAbilityFeatCount = classAbilityFeatSlots.filter(
+    (slot) => (featureChoicePicks[slot.key]?.[0] ?? "").length > 0,
+  ).length
   const hasCatalogFeatPickOptions = useMemo(
     () =>
-      featPickSlots.some(
-        (slot) =>
-          slotUsesCatalogFeatPicks(slot.featCategories) &&
-          catalogFeatPickOptions(slot.featCategories, customAbilities).length > 0,
+      classCatalogFeatGroups.some(
+        (group) => catalogFeatPickOptions(group.featCategories, customAbilities).length > 0,
       ),
-    [featPickSlots, customAbilities],
+    [classCatalogFeatGroups, customAbilities],
   )
   const milestoneAsiFeatCount = countMilestoneAsiFeats(selectedFeatIds, feats)
   const milestoneAsiTotalPoints = milestoneAsiPointTotal(milestoneAsiFeatCount)
@@ -1401,13 +1447,29 @@ export default function BuilderPageClient() {
   const backgroundStartingEquipmentGroups =
     getBackgroundStartingEquipmentGroups(selectedBackground)
   const backgroundStartingGold = getBackgroundStartingGold(selectedBackground)
+  const classPackageOptions = useMemo(
+    () =>
+      collapseWeaponCategoryPackageOptions(
+        startingEquipmentGroups[0]?.options ?? [],
+        equipment,
+      ),
+    [startingEquipmentGroups, equipment],
+  )
+  const backgroundPackageOptions = useMemo(
+    () =>
+      collapseWeaponCategoryPackageOptions(
+        backgroundStartingEquipmentGroups[0]?.options ?? [],
+        equipment,
+      ),
+    [backgroundStartingEquipmentGroups, equipment],
+  )
   const selectedStartingOption =
-    startingEquipmentOptionIndex != null && startingEquipmentGroups[0]
-      ? startingEquipmentGroups[0].options[startingEquipmentOptionIndex]
+    startingEquipmentOptionIndex != null
+      ? (classPackageOptions[startingEquipmentOptionIndex] ?? null)
       : null
   const selectedBackgroundStartingOption =
-    backgroundStartingEquipmentOptionIndex != null && backgroundStartingEquipmentGroups[0]
-      ? backgroundStartingEquipmentGroups[0].options[backgroundStartingEquipmentOptionIndex]
+    backgroundStartingEquipmentOptionIndex != null
+      ? (backgroundPackageOptions[backgroundStartingEquipmentOptionIndex] ?? null)
       : null
   const useGoldEquipment =
     selectedStartingOption != null &&
@@ -1417,15 +1479,36 @@ export default function BuilderPageClient() {
     isGoldOnlyOption(selectedBackgroundStartingOption, backgroundStartingGold)
   const inGoldShoppingMode = useGoldEquipment || useBackgroundGoldEquipment
 
+  const packageCategoryPicksComplete = (
+    option: { items?: { name: string; quantity: number }[] } | null,
+    optionIndex: number | null,
+    picks: Record<string, string>,
+  ) => {
+    if (!option || optionIndex == null) return true
+    return (option.items ?? []).every((item, itemIndex) => {
+      if (!equipmentCategoryKind(item.name)) return true
+      return Boolean(picks[`${optionIndex}:${itemIndex}`])
+    })
+  }
+
   const packageEquipmentIds = useMemo(() => {
     const ids: string[] = []
     if (selectedStartingOption && !useGoldEquipment) {
-      ids.push(...resolvePackageEquipmentIds(selectedStartingOption.items ?? [], equipment))
+      ids.push(
+        ...resolvePackageEquipmentIds(
+          selectedStartingOption.items ?? [],
+          equipment,
+          startingEquipmentCategoryPicks,
+          `${startingEquipmentOptionIndex}:`,
+        ),
+      )
     }
     if (selectedBackgroundStartingOption && !useBackgroundGoldEquipment) {
       for (const id of resolvePackageEquipmentIds(
         selectedBackgroundStartingOption.items ?? [],
         equipment,
+        backgroundStartingEquipmentCategoryPicks,
+        `${backgroundStartingEquipmentOptionIndex}:`,
       )) {
         if (!ids.includes(id)) ids.push(id)
       }
@@ -1437,6 +1520,10 @@ export default function BuilderPageClient() {
     useGoldEquipment,
     useBackgroundGoldEquipment,
     equipment,
+    startingEquipmentCategoryPicks,
+    backgroundStartingEquipmentCategoryPicks,
+    startingEquipmentOptionIndex,
+    backgroundStartingEquipmentOptionIndex,
   ])
 
   const totalGoldBudget =
@@ -1529,11 +1616,39 @@ export default function BuilderPageClient() {
   }
 
   const selectStartingEquipmentOption = (index: number) => {
-    setStartingEquipmentOptionIndex(index)
+    setStartingEquipmentOptionIndex((prev) => {
+      if (prev !== index) setStartingEquipmentCategoryPicks({})
+      return index
+    })
   }
 
   const selectBackgroundStartingEquipmentOption = (index: number) => {
-    setBackgroundStartingEquipmentOptionIndex(index)
+    setBackgroundStartingEquipmentOptionIndex((prev) => {
+      if (prev !== index) setBackgroundStartingEquipmentCategoryPicks({})
+      return index
+    })
+  }
+
+  const setClassPackageCategoryPick = (
+    optionIndex: number,
+    itemIndex: number,
+    equipmentId: string,
+  ) => {
+    setStartingEquipmentCategoryPicks((prev) => ({
+      ...prev,
+      [`${optionIndex}:${itemIndex}`]: equipmentId,
+    }))
+  }
+
+  const setBackgroundPackageCategoryPick = (
+    optionIndex: number,
+    itemIndex: number,
+    equipmentId: string,
+  ) => {
+    setBackgroundStartingEquipmentCategoryPicks((prev) => ({
+      ...prev,
+      [`${optionIndex}:${itemIndex}`]: equipmentId,
+    }))
   }
 
   const pickerGridClass =
@@ -1625,6 +1740,32 @@ export default function BuilderPageClient() {
   const knownSpellNames = allSpellIds
     .map((id) => spells.find((spell) => spell.id === id)?.name)
     .filter((name): name is string => Boolean(name?.trim()))
+
+  /** Shared context for feat choice pools (disciplines, talents, upgrades). */
+  const featChoiceOptionContext = useMemo(
+    () => ({
+      customAbilities,
+      featureChoicePicks: { ...featureChoicePicks, ...featChoicePicks },
+      classNames: activeClassLevels
+        .map((entry) => classes.find((cls) => cls.id === entry.classId)?.name)
+        .filter((name): name is string => Boolean(name)),
+      classLevel: totalLevel,
+      equipmentCatalog: equipment,
+      knownSpellNames,
+      grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
+    }),
+    [
+      customAbilities,
+      featureChoicePicks,
+      featChoicePicks,
+      activeClassLevels,
+      classes,
+      totalLevel,
+      equipment,
+      knownSpellNames,
+      aggregatedCharacteristics.grantedCustomAbilityNames,
+    ],
+  )
 
   const characterDerived = useMemo(
     () => {
@@ -2007,16 +2148,48 @@ export default function BuilderPageClient() {
     { name: "Survival", ability: "wisdom" },
   ]
   
+  const classAbilityFeatures = useMemo(
+    () =>
+      collectClassAbilityFeatures({
+        classLevels: activeClassLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+      }),
+    [activeClassLevels, classes, subclasses, subclassByClassId],
+  )
+  const classAbilityFeatureKeys = useMemo(
+    () =>
+      new Set(
+        classAbilityFeatures.map((entry) =>
+          featureChoiceKey(entry.classId, entry.feature.name, entry.feature.level),
+        ),
+      ),
+    [classAbilityFeatures],
+  )
+
   const classStepFeatModifierSlots = useMemo(
     () =>
       nonSpellModifierPlayerChoiceSlots(
         modifierPlayerChoiceSlots.filter((slot) =>
-          featPickSlots.some(
+          classStepFeatSlots.some(
             (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
           ),
         ),
       ),
-    [modifierPlayerChoiceSlots, featPickSlots],
+    [modifierPlayerChoiceSlots, classStepFeatSlots],
+  )
+
+  const classAbilityFeatModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter((slot) =>
+          classAbilityFeatSlots.some(
+            (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+          ),
+        ),
+      ),
+    [modifierPlayerChoiceSlots, classAbilityFeatSlots],
   )
 
   const classStepClassFeatureModifierSlots = useMemo(
@@ -2029,15 +2202,29 @@ export default function BuilderPageClient() {
             ) &&
             !featPickSlots.some(
               (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-            ),
+            ) &&
+            !classAbilityFeatureKeys.has(slot.sourceKey),
         ),
       ),
-    [modifierPlayerChoiceSlots, activeClassLevels, featPickSlots],
+    [modifierPlayerChoiceSlots, activeClassLevels, featPickSlots, classAbilityFeatureKeys],
+  )
+
+  const classAbilityFeatureModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter((slot) => classAbilityFeatureKeys.has(slot.sourceKey)),
+      ),
+    [modifierPlayerChoiceSlots, classAbilityFeatureKeys],
   )
 
   const classStepAllModifierSlots = useMemo(
     () => [...classStepFeatModifierSlots, ...classStepClassFeatureModifierSlots],
     [classStepFeatModifierSlots, classStepClassFeatureModifierSlots],
+  )
+
+  const classAbilityStepAllModifierSlots = useMemo(
+    () => [...classAbilityFeatModifierSlots, ...classAbilityFeatureModifierSlots],
+    [classAbilityFeatModifierSlots, classAbilityFeatureModifierSlots],
   )
 
   const originStepModifierSlots = useMemo(
@@ -2084,9 +2271,17 @@ export default function BuilderPageClient() {
   const classStepFeatSelectionEntries = useMemo(
     () =>
       featSelectionEntries.filter((entry) =>
-        featPickSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
+        classStepFeatSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
       ),
-    [featSelectionEntries, featPickSlots],
+    [featSelectionEntries, classStepFeatSlots],
+  )
+
+  const classAbilityStepFeatSelectionEntries = useMemo(
+    () =>
+      featSelectionEntries.filter((entry) =>
+        classAbilityFeatSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
+      ),
+    [featSelectionEntries, classAbilityFeatSlots],
   )
 
   const originStepFeatSelectionEntries = useMemo(
@@ -2135,6 +2330,23 @@ export default function BuilderPageClient() {
           ) &&
           validateModifierPlayerChoices(classStepAllModifierSlots, modifierPlayerPicks)
         )
+      case BUILDER_STEP_IDS.CLASS_ABILITIES:
+        return (
+          collectClassAbilityStepBlockers({
+            classLevels: activeClassLevels,
+            classes,
+            subclasses,
+            subclassByClassId,
+            featureChoicePicks,
+            featPickSlots,
+          }).length === 0 &&
+          validateFeatModifierChoices(
+            feats,
+            classAbilityStepFeatSelectionEntries,
+            featChoicePicks,
+          ) &&
+          validateModifierPlayerChoices(classAbilityStepAllModifierSlots, modifierPlayerPicks)
+        )
       case 2:
         return (
           validateOriginStepChoices(
@@ -2167,7 +2379,19 @@ export default function BuilderPageClient() {
             )) &&
           (abilityMethod !== "standard" || isStandardArrayComplete(standardArrayAssignments))
         )
-      case BUILDER_STEP_IDS.GEAR: return true
+      case BUILDER_STEP_IDS.GEAR:
+        return (
+          packageCategoryPicksComplete(
+            selectedStartingOption,
+            startingEquipmentOptionIndex,
+            startingEquipmentCategoryPicks,
+          ) &&
+          packageCategoryPicksComplete(
+            selectedBackgroundStartingOption,
+            backgroundStartingEquipmentOptionIndex,
+            backgroundStartingEquipmentCategoryPicks,
+          )
+        )
       case BUILDER_STEP_IDS.SPELLS:
         return validateModifierPlayerChoices(spellGrantModifierSlots, modifierPlayerPicks)
       case BUILDER_STEP_IDS.DETAILS: return character.name.trim().length > 0
@@ -2209,6 +2433,31 @@ export default function BuilderPageClient() {
         blockers.push(
           ...collectModifierPlayerChoiceBlockers(
             classStepAllModifierSlots,
+            modifierPlayerPicks,
+          ),
+        )
+        break
+      case BUILDER_STEP_IDS.CLASS_ABILITIES:
+        blockers.push(
+          ...collectClassAbilityStepBlockers({
+            classLevels: activeClassLevels,
+            classes,
+            subclasses,
+            subclassByClassId,
+            featureChoicePicks,
+            featPickSlots,
+          }),
+        )
+        blockers.push(
+          ...collectFeatModifierChoiceBlockers(
+            feats,
+            classAbilityStepFeatSelectionEntries,
+            featChoicePicks,
+          ),
+        )
+        blockers.push(
+          ...collectModifierPlayerChoiceBlockers(
+            classAbilityStepAllModifierSlots,
             modifierPlayerPicks,
           ),
         )
@@ -2260,6 +2509,22 @@ export default function BuilderPageClient() {
           blockers.push("Assign every standard array score to an ability.")
         }
         break
+      case BUILDER_STEP_IDS.GEAR:
+        if (
+          !packageCategoryPicksComplete(
+            selectedStartingOption,
+            startingEquipmentOptionIndex,
+            startingEquipmentCategoryPicks,
+          ) ||
+          !packageCategoryPicksComplete(
+            selectedBackgroundStartingOption,
+            backgroundStartingEquipmentOptionIndex,
+            backgroundStartingEquipmentCategoryPicks,
+          )
+        ) {
+          blockers.push("Choose a specific weapon for each martial/simple weapon package slot.")
+        }
+        break
       case BUILDER_STEP_IDS.SPELLS:
         blockers.push(
           ...collectModifierPlayerChoiceBlockers(spellGrantModifierSlots, modifierPlayerPicks),
@@ -2293,6 +2558,9 @@ export default function BuilderPageClient() {
     classStepFeatModifierSlots,
     classStepClassFeatureModifierSlots,
     classStepAllModifierSlots,
+    classAbilityStepFeatSelectionEntries,
+    classAbilityStepAllModifierSlots,
+    featPickSlots,
     modifierPlayerPicks,
     character.species_id,
     character.background_id,
@@ -2311,6 +2579,12 @@ export default function BuilderPageClient() {
     abilityMethod,
     standardArrayAssignments,
     spellGrantModifierSlots,
+    selectedStartingOption,
+    selectedBackgroundStartingOption,
+    startingEquipmentOptionIndex,
+    backgroundStartingEquipmentOptionIndex,
+    startingEquipmentCategoryPicks,
+    backgroundStartingEquipmentCategoryPicks,
   ])
 
   const canSaveCharacter = () =>
@@ -2319,17 +2593,37 @@ export default function BuilderPageClient() {
     meetsMulticlassRequirements
 
   const hasSpellStep = spellcastingClasses.length > 0
-  const visibleSteps = BUILDER_STEPS.filter(
-    (step) => step.id !== BUILDER_STEP_IDS.SPELLS || hasSpellStep,
-  )
+  const hasClassAbilityStep = characterHasClassAbilityStep({
+    classLevels: activeClassLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    featPickSlots,
+    customAbilities,
+  })
+  const visibleSteps = BUILDER_STEPS.filter((step) => {
+    if (step.id === BUILDER_STEP_IDS.SPELLS) return hasSpellStep
+    if (step.id === BUILDER_STEP_IDS.CLASS_ABILITIES) return hasClassAbilityStep
+    return true
+  })
 
-  const nextVisibleStepId = (stepId: number) =>
-    visibleSteps.find((step) => step.id > stepId)?.id ?? null
-  const prevVisibleStepId = (stepId: number) =>
-    [...visibleSteps].reverse().find((step) => step.id < stepId)?.id ?? null
+  const nextVisibleStepId = (stepId: number) => {
+    const currentOrder = builderStepOrder(stepId)
+    return (
+      visibleSteps.find((step) => builderStepOrder(step.id) > currentOrder)?.id ?? null
+    )
+  }
+  const prevVisibleStepId = (stepId: number) => {
+    const currentOrder = builderStepOrder(stepId)
+    return (
+      [...visibleSteps].reverse().find((step) => builderStepOrder(step.id) < currentOrder)?.id ??
+      null
+    )
+  }
 
   const goToStep = (stepId: number) => {
-    if (stepId >= 1 && stepId <= maxStepReached) {
+    const maxOrder = builderStepOrder(maxStepReached)
+    if (builderStepOrder(stepId) <= maxOrder) {
       setCurrentStep(stepId)
     }
   }
@@ -2344,19 +2638,27 @@ export default function BuilderPageClient() {
     const next = nextVisibleStepId(currentStep)
     if (next == null) return
     setCurrentStep(next)
-    setMaxStepReached((prev) => Math.max(prev, next))
+    setMaxStepReached((prev) =>
+      builderStepOrder(next) > builderStepOrder(prev) ? next : prev,
+    )
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: "smooth" })
     })
   }
 
-  // If the character stops being a spellcaster while parked on the Spells step,
-  // bounce back to Gear so the user never lands on a hidden step.
+  // If the character stops being a spellcaster / loses class-ability pools while parked
+  // on a hidden step, bounce to a visible neighbor.
   useEffect(() => {
     if (currentStep === BUILDER_STEP_IDS.SPELLS && !hasSpellStep) {
       setCurrentStep(BUILDER_STEP_IDS.GEAR)
     }
   }, [currentStep, hasSpellStep])
+
+  useEffect(() => {
+    if (currentStep === BUILDER_STEP_IDS.CLASS_ABILITIES && !hasClassAbilityStep) {
+      setCurrentStep(BUILDER_STEP_IDS.CLASS)
+    }
+  }, [currentStep, hasClassAbilityStep])
 
   const getAbilityModifier = (score: number) => {
     const mod = Math.floor((score - 10) / 2)
@@ -2388,8 +2690,11 @@ export default function BuilderPageClient() {
             {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
-              const isReachable = step.id <= maxStepReached
-              const isComplete = step.id < currentStep || (step.id < maxStepReached && !isActive)
+              const stepOrd = builderStepOrder(step.id)
+              const currentOrd = builderStepOrder(currentStep)
+              const maxOrd = builderStepOrder(maxStepReached)
+              const isReachable = stepOrd <= maxOrd
+              const isComplete = stepOrd < currentOrd || (stepOrd < maxOrd && !isActive)
               
               return (
                 <div key={step.id} className="flex items-center">
@@ -2423,7 +2728,7 @@ export default function BuilderPageClient() {
                   </button>
                   {index < visibleSteps.length - 1 && (
                     <div className={`w-1.5 h-1.5 sm:w-10 sm:h-1 md:w-14 rounded-full sm:rounded mx-0.5 sm:mx-1 md:mx-2 shrink-0 ${
-                      step.id < maxStepReached ? "bg-success/80" : "bg-border/80"
+                      stepOrd < maxOrd ? "bg-success/80" : "bg-border/80"
                     }`} />
                   )}
                 </div>
@@ -2581,7 +2886,8 @@ export default function BuilderPageClient() {
                                   const newLevels = [...activeClassLevels]
                                   if (newLevels[idx].level > 1) {
                                     newLevels[idx].level--
-                                    if (newLevels[idx].level < SUBCLASS_LEVEL) {
+                                    const unlockLevel = resolveSubclassUnlockLevel(cls)
+                                    if (newLevels[idx].level < unlockLevel) {
                                       setSubclassByClassId((prev) => {
                                         const next = { ...prev }
                                         delete next[newLevels[idx].classId]
@@ -2606,7 +2912,8 @@ export default function BuilderPageClient() {
                                 onCommit={(level) => {
                                   const newLevels = [...activeClassLevels]
                                   newLevels[idx] = { ...newLevels[idx], level }
-                                  if (level < SUBCLASS_LEVEL) {
+                                  const unlockLevel = resolveSubclassUnlockLevel(cls)
+                                  if (level < unlockLevel) {
                                     setSubclassByClassId((prev) => {
                                       const next = { ...prev }
                                       delete next[newLevels[idx].classId]
@@ -2795,11 +3102,15 @@ export default function BuilderPageClient() {
                       if (!cls) return null
                       const isPrimary = entry.classId === resolvedPrimaryClassId
                       const classSubclasses = getSubclassesForClass(subclasses, entry.classId)
-                      const eligibleFeatures = (cls.features ?? []).filter(
+                          const eligibleFeatures = (cls.features ?? []).filter(
                         (feature) =>
                           feature.level <= entry.level &&
                           feature.isChoice &&
                           feature.choices &&
+                          !isClassAbilityFeatureChoice(feature) &&
+                          !classAbilityFeatureKeys.has(
+                            featureChoiceKey(entry.classId, feature.name, feature.level),
+                          ) &&
                           ((feature.choices.options?.length ?? 0) > 0 ||
                             feature.choices.optionsSource),
                       )
@@ -2868,10 +3179,16 @@ export default function BuilderPageClient() {
                             )
                           })()}
 
-                          {classNeedsSubclass(entry.level, classSubclasses.length) && (
+                          {(() => {
+                            const subclassUnlockLevel = resolveSubclassUnlockLevel(cls)
+                            const subclassUnlockLabel = resolveSubclassUnlockLabel(cls)
+                            if (!classNeedsSubclass(entry.level, classSubclasses.length, subclassUnlockLevel)) {
+                              return null
+                            }
+                            return (
                             <div className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
                               <h4 className="font-bold text-sm text-foreground mb-2">
-                                Subclass (Level {SUBCLASS_LEVEL}+)
+                                {subclassUnlockLabel} (Level {subclassUnlockLevel}+)
                               </h4>
                               <SwipeVisualPicker
                                 enabled={useSwipeVisualPicker}
@@ -2918,7 +3235,8 @@ export default function BuilderPageClient() {
                                 })}
                               </SwipeVisualPicker>
                             </div>
-                          )}
+                            )
+                          })()}
 
                           {eligibleFeatures.map((feature) => {
                             const key = featureChoiceKey(entry.classId, feature.name, feature.level)
@@ -2927,17 +3245,24 @@ export default function BuilderPageClient() {
                               null
                             const choiceOptions = resolveFeatureChoiceOptions(feature, {
                               customAbilities,
-                              featureChoicePicks,
+                              featureChoicePicks: { ...featureChoicePicks, ...featChoicePicks },
                               classNames: [cls.name],
                               classLevel: entry.level,
                               equipmentCatalog: equipment,
                               knownSpellNames,
                               subclassName: subclassForClass?.name ?? null,
+                              grantedCustomAbilityNames:
+                                aggregatedCharacteristics.grantedCustomAbilityNames,
                             })
                             const choiceCount = resolveFeatureChoiceCount(
                               feature.choices!,
                               entry.level,
                               cls.name,
+                              undefined,
+                              {
+                                featureName: feature.name,
+                                bonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
+                              },
                             )
                             const isWeaponMastery = isWeaponMasteryFeature(feature)
                             const isKnackPool =
@@ -3067,6 +3392,7 @@ export default function BuilderPageClient() {
                               .filter(
                                 (feature) =>
                                   feature.level <= entry.level &&
+                                  !isClassAbilityFeatureChoice(feature) &&
                                   !eligibleKeys.has(
                                     featureChoiceKey(entry.classId, feature.name, feature.level),
                                   ),
@@ -3115,57 +3441,7 @@ export default function BuilderPageClient() {
                   </div>
                 )}
 
-                {(() => {
-                  const pickedDisciplineNames = new Set(
-                    Object.entries(featureChoicePicks)
-                      .filter(([key]) => /discipline/i.test(key))
-                      .flatMap(([, picks]) => picks.map((name) => name.trim().toLowerCase())),
-                  )
-                  if (!pickedDisciplineNames.size) return null
-                  const specializationAbilities = customAbilities.filter((ability) => {
-                    const specialization = abilitySpecializationChoice(ability)
-                    if (!specialization?.options?.length) return false
-                    const name = ability.name.trim().toLowerCase()
-                    return [...pickedDisciplineNames].some(
-                      (pick) => name.includes(pick) || pick.includes(name),
-                    )
-                  })
-                  if (!specializationAbilities.length) return null
-                  return (
-                    <div className="mt-6 space-y-2 border-t border-border pt-6">
-                      <h3 className="text-lg font-bold text-foreground">Discipline Specializations</h3>
-                      <p className={`${pageFloatingHintClass} text-xs mb-2`}>
-                        Optional one-time specializations (e.g. Psychokinesis Cryokinetic). Selecting one
-                        replaces that discipline&apos;s default Alternate Effects spell list.
-                      </p>
-                      {specializationAbilities.map((ability) => {
-                        const specialization = abilitySpecializationChoice(ability)!
-                        const key = abilitySpecializationChoiceKey(ability.id)
-                        return (
-                          <MultiSelectChoices
-                            key={key}
-                            title={`${ability.name}: ${specialization.category}`}
-                            hint={`Choose up to ${specialization.count} (optional — leave empty for the default Alternate Effects list).`}
-                            options={specialization.options.map((option) => ({
-                              name: option.name,
-                              description: option.description,
-                            }))}
-                            maxCount={specialization.count}
-                            selected={featureChoicePicks[key] ?? []}
-                            onChange={(selected) =>
-                              setFeatureChoicePicks((prev) => ({
-                                ...prev,
-                                [key]: selected,
-                              }))
-                            }
-                          />
-                        )
-                      })}
-                    </div>
-                  )
-                })()}
-
-                {/* Feats granted by class features */}
+                {/* Feats granted by class features (ASI / General / Epic Boon — not Metamagic etc.) */}
                 {activeClassLevels.length > 0 && requiredFeatSlots > 0 && (
                   <div className="mt-6 p-4 bg-muted/40 rounded-xl border border-border">
                     <div className="flex items-start justify-between gap-3 mb-2">
@@ -3173,7 +3449,8 @@ export default function BuilderPageClient() {
                         <h3 className="text-lg font-bold text-foreground">Feats</h3>
                         <p className="text-xs text-muted-foreground">
                           Choose feats granted by linked common modifiers (Gain a Feat with category filters).
-                          Ability-score bonuses apply on later steps.
+                          Ability-score bonuses apply on later steps. Metamagic, invocations, and similar
+                          class ability pools are on the Class Abilities step.
                         </p>
                       </div>
                       <span className="text-xs font-bold text-muted-foreground">
@@ -3187,61 +3464,12 @@ export default function BuilderPageClient() {
                         <code className="font-mono">npm run db:migrate</code> and refresh the page.
                       </p>
                     )}
-                    {!featsLoadError && feats.length === 0 && !hasCatalogFeatPickOptions && (
+                    {!featsLoadError && feats.length === 0 && (
                       <p className={`${pageFloatingHintClass} text-xs mb-3`}>
                         No feats in your compendium yet. Seed SRD content from Settings or add feats
                         in the Compendium.
                       </p>
                     )}
-
-                    {classCatalogFeatGroups.map((group) => {
-                      const catalogOptions = catalogFeatPickOptions(
-                        group.featCategories,
-                        customAbilities,
-                      )
-                      const selectedPickIds = readCatalogFeatPicksFromSlots(
-                        group.slots,
-                        featureChoicePicks,
-                      )
-
-                      return (
-                        <CatalogFeatMultiPicker
-                          key={group.groupKey}
-                          className="mt-3"
-                          classPrefix={group.className || undefined}
-                          label={group.label}
-                          options={catalogOptions}
-                          maxCount={group.slots.length}
-                          selectedPickIds={selectedPickIds}
-                          customAbilities={customAbilities}
-                          cardViewMode={cardViewMode}
-                          onChange={(nextPickIds) => {
-                            const slotPicks = distributeCatalogFeatPicksToSlots(
-                              group.slots,
-                              nextPickIds,
-                            )
-                            setFeatureChoicePicks((prev) => ({ ...prev, ...slotPicks }))
-                            setFeatChoicePicks((prev) => {
-                              const next = { ...prev }
-                              for (const slot of group.slots) {
-                                delete next[featChoicePickKey(slot.key)]
-                              }
-                              return next
-                            })
-                            setModifierPlayerPicks((prev) => {
-                              let next = prev
-                              for (const slot of group.slots) {
-                                next = clearModifierPicksForSource(
-                                  next,
-                                  featChoicePickKey(slot.key),
-                                )
-                              }
-                              return next
-                            })
-                          }}
-                        />
-                      )
-                    })}
 
                     {regularClassFeatSlots.map((slot) => {
                       const pickedId = featureChoicePicks[slot.key]?.[0] ?? null
@@ -3393,7 +3621,7 @@ export default function BuilderPageClient() {
                               Allocate ability increases on the Abilities step.
                             </p>
                           )}
-                          {picked?.isChoice && picked.choices?.options?.length ? (
+                          {picked?.isChoice && (picked.choices?.options?.length || picked.choices?.optionsSource) ? (
                             <div className="mt-3">
                               <FeatModifierChoicePicker
                                 entry={{
@@ -3401,6 +3629,7 @@ export default function BuilderPageClient() {
                                   choicePickKey: featChoicePickKey(slot.key),
                                 }}
                                 feat={picked}
+                                choiceOptionContext={featChoiceOptionContext}
                                 selected={featChoicePicks[featChoicePickKey(slot.key)] ?? []}
                                 onChange={(selected) => {
                                   const choiceKey = featChoicePickKey(slot.key)
@@ -3455,6 +3684,49 @@ export default function BuilderPageClient() {
                 </div>
                 )}
               </div>
+            )}
+
+            {/* Class Abilities (Metamagic, Invocations, disciplines/talents, knacks, etc.) */}
+            {currentStep === BUILDER_STEP_IDS.CLASS_ABILITIES && hasClassAbilityStep && (
+              <ClassAbilitiesStepPanel
+                pageFloatingHintClass={pageFloatingHintClass}
+                abilityFeatures={classAbilityFeatures}
+                featureChoicePicks={featureChoicePicks}
+                setFeatureChoicePicks={setFeatureChoicePicks}
+                setFeatChoicePicks={setFeatChoicePicks}
+                setModifierPlayerPicks={setModifierPlayerPicks}
+                customAbilities={customAbilities}
+                equipment={equipment}
+                knownSpellNames={knownSpellNames}
+                grantedCustomAbilityNames={aggregatedCharacteristics.grantedCustomAbilityNames}
+                featChoicePicks={featChoicePicks}
+                featureChoiceCountBonuses={aggregatedCharacteristics.featureChoiceCountBonuses}
+                compactPickerLayout={compactPickerLayout}
+                skillPickerLayout={skillPickerLayout}
+                cardViewMode={cardViewMode}
+                weaponMasteryDescriptions={weaponMasteryDescriptions}
+                skillPickSources={skillPickSources}
+                customSkillIconByName={customSkillIconByName}
+                modifierPlayerChoiceSlots={modifierPlayerChoiceSlots}
+                modifierPlayerPicks={modifierPlayerPicks}
+                spells={spells}
+                modifierExpertisePickerProps={modifierExpertisePickerProps}
+                classCatalogFeatGroups={classCatalogFeatGroups}
+                classAbilityRegularFeatSlots={classAbilityRegularFeatSlots}
+                feats={feats}
+                featsLoadError={featsLoadError}
+                hasCatalogFeatPickOptions={hasCatalogFeatPickOptions}
+                totalLevel={totalLevel}
+                classIds={activeClassLevels.map((cl) => cl.classId)}
+                ownedFeatIds={ownedFeatIds}
+                speciesId={character.species_id}
+                backgroundId={character.background_id}
+                preferredFeatSources={preferredFeatSources}
+                onShowFeatDetails={(feat) => setDetailsModal({ type: "feat", item: feat })}
+                selectedClassAbilityFeatCount={selectedClassAbilityFeatCount}
+                requiredClassAbilityFeatSlots={requiredClassAbilityFeatSlots}
+                skillPickSourcesTaken={[...getTakenSkills(skillPickSources)]}
+              />
             )}
 
             {/* Step 2: Origin (Species + Background) */}
@@ -3743,7 +4015,7 @@ export default function BuilderPageClient() {
                                 <span className="font-semibold text-foreground">{picked.name}</span>
                               </p>
                             )}
-                            {picked?.isChoice && picked.choices?.options?.length ? (
+                            {picked?.isChoice && (picked.choices?.options?.length || picked.choices?.optionsSource) ? (
                               <div className="mt-3">
                                 <FeatModifierChoicePicker
                                   entry={{
@@ -3751,6 +4023,7 @@ export default function BuilderPageClient() {
                                     choicePickKey: featChoicePickKey(slot.key),
                                   }}
                                   feat={picked}
+                                  choiceOptionContext={featChoiceOptionContext}
                                   selected={featChoicePicks[featChoicePickKey(slot.key)] ?? []}
                                   onChange={(selected) => {
                                     const choiceKey = featChoicePickKey(slot.key)
@@ -3764,7 +4037,7 @@ export default function BuilderPageClient() {
                                   }}
                                   layout={compactPickerLayout}
                                 />
-                  </div>
+                              </div>
                             ) : null}
                             {picked ? (
                               <ModifierPlayerChoicePanel
@@ -4060,7 +4333,7 @@ export default function BuilderPageClient() {
                                 <span className="font-semibold text-foreground">{picked.name}</span>
                               </p>
                             )}
-                            {picked?.isChoice && picked.choices?.options?.length ? (
+                            {picked?.isChoice && (picked.choices?.options?.length || picked.choices?.optionsSource) ? (
                               <div className="mt-3">
                                 <FeatModifierChoicePicker
                                   entry={{
@@ -4068,6 +4341,7 @@ export default function BuilderPageClient() {
                                     choicePickKey: featChoicePickKey(slot.key),
                                   }}
                                   feat={picked}
+                                  choiceOptionContext={featChoiceOptionContext}
                                   selected={featChoicePicks[featChoicePickKey(slot.key)] ?? []}
                                   onChange={(selected) => {
                                     const choiceKey = featChoicePickKey(slot.key)
@@ -4081,7 +4355,7 @@ export default function BuilderPageClient() {
                                   }}
                                   layout={compactPickerLayout}
                                 />
-                  </div>
+                              </div>
                             ) : null}
                             {picked ? (
                               <ModifierPlayerChoicePanel
@@ -4115,7 +4389,7 @@ export default function BuilderPageClient() {
                     </div>
                   ) : null}
 
-                  {backgroundGrantedFeat?.isChoice && backgroundGrantedFeat.choices?.options?.length ? (
+                  {backgroundGrantedFeat?.isChoice && (backgroundGrantedFeat.choices?.options?.length || backgroundGrantedFeat.choices?.optionsSource) ? (
                     <div className="mt-4 border-t border-border pt-4">
                       <FeatModifierChoicePicker
                         entry={{
@@ -4123,6 +4397,7 @@ export default function BuilderPageClient() {
                           choicePickKey: grantedFeatChoicePickKey(backgroundGrantedFeat.id),
                         }}
                         feat={backgroundGrantedFeat}
+                        choiceOptionContext={featChoiceOptionContext}
                         selected={
                           featChoicePicks[grantedFeatChoicePickKey(backgroundGrantedFeat.id)] ?? []
                         }
@@ -4226,108 +4501,6 @@ export default function BuilderPageClient() {
                   </div>
                 )}
 
-                {showLegacyMilestoneAsi && (
-                  <div className="mb-6">
-                    <AsiAllocator
-                      allocation={milestoneAsiAllocation}
-                      totalPoints={milestoneAsiTotalPoints}
-                      pickCount={milestoneAsiFeatCount}
-                      variant={asiAllocatorVariant}
-                      onChange={(allocation) =>
-                        setAsiAllocationsByFeatId((prev) =>
-                          withCombinedMilestoneAsiAllocation(prev, allocation),
-                        )
-                      }
-                    />
-                  </div>
-                )}
-
-                {abilityScorePoolGrants.map((grant) => (
-                  <div key={grant.allocationKey} className="mb-6">
-                    <AsiAllocator
-                      title={grant.label}
-                      allocation={asiAllocationsByFeatId[grant.allocationKey] ?? {}}
-                      totalPoints={grant.points}
-                      variant={asiAllocatorVariant}
-                      onChange={(allocation) =>
-                        setAsiAllocationsByFeatId((prev) => ({
-                          ...prev,
-                          [grant.allocationKey]: allocation,
-                        }))
-                      }
-                    />
-                  </div>
-                ))}
-
-                {backgroundAbilityGrant.needsChoice && (
-                  <div className="mb-6">
-                    <AsiAllocator
-                      title={`${selectedBackground?.name ?? "Background"} Ability Scores`}
-                      allocation={asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {}}
-                      totalPoints={BACKGROUND_ASI_TOTAL_POINTS}
-                      allowedAbilities={backgroundAbilityGrant.eligible}
-                      maxPerAbility={2}
-                      helpText={getBackgroundAsiHelpText(backgroundAbilityGrant)}
-                      variant={asiAllocatorVariant}
-                      headerImageUrl={selectedBackgroundCardImage}
-                      onChange={(allocation) =>
-                        setAsiAllocationsByFeatId((prev) => ({
-                          ...prev,
-                          [BACKGROUND_ASI_KEY]: allocation,
-                        }))
-                      }
-                    />
-                  </div>
-                )}
-
-                {Object.keys(backgroundAbilityGrant.fixed).length > 0 && (
-                  <div
-                    className={
-                      asiAllocatorVariant === "visual"
-                        ? "mb-6 overflow-hidden rounded-xl border-2 border-border bg-gradient-to-b from-black via-zinc-950 to-black p-4"
-                        : "mb-6 p-3 rounded-lg border border-border bg-card/80"
-                    }
-                    style={
-                      asiAllocatorVariant === "visual"
-                        ? {
-                            boxShadow:
-                              "inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)",
-                          }
-                        : undefined
-                    }
-                  >
-                    {asiAllocatorVariant === "visual" && selectedBackgroundCardImage ? (
-                      <div className="relative -mx-4 -mt-4 mb-3 aspect-[21/9] max-h-[11.2rem] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={selectedBackgroundCardImage}
-                          alt=""
-                          className="h-full w-full object-cover object-top"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/45 to-black" />
-                      </div>
-                    ) : null}
-                    <p
-                      className={
-                        asiAllocatorVariant === "visual"
-                          ? "font-serif text-base font-black uppercase tracking-wide text-white"
-                          : "text-xs font-bold text-foreground mb-1"
-                      }
-                    >
-                      {selectedBackground?.name ?? "Background"} Ability Scores
-                    </p>
-                    <p
-                      className={
-                        asiAllocatorVariant === "visual"
-                          ? "mt-1 text-sm text-amber-400/90"
-                          : "text-sm text-foreground"
-                      }
-                    >
-                      {formatBackgroundAbilityBonuses(selectedBackground?.ability_bonuses)}
-                    </p>
-                  </div>
-                )}
-
                 {cardViewMode === "cinematic" ? (
                   <AbilityScoreCards
                     method={abilityMethod}
@@ -4358,7 +4531,7 @@ export default function BuilderPageClient() {
                           <input
                             type="number"
                             min={1}
-                            max={30}
+                            max={20}
                             value={character[ability]}
                             onChange={(e) => setCustomAbilityScore(ability, e.target.value)}
                             className="w-20 text-center text-3xl font-black text-foreground px-2 py-1 bg-background border-2 border-border rounded-lg focus:outline-none focus:border-primary"
@@ -4437,6 +4610,147 @@ export default function BuilderPageClient() {
                   ))}
                 </div>
                 )}
+
+                <div className="mt-8 space-y-6 border-t border-border pt-6">
+                  <div>
+                    <h3 className="text-lg font-black text-foreground">Ability Score Improvements</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Assign ASI and origin bonuses after setting your base scores. Totals from
+                      base + adjustments cannot exceed 20.
+                    </p>
+                  </div>
+
+                {showLegacyMilestoneAsi && (
+                  <div>
+                    <AsiAllocator
+                      allocation={milestoneAsiAllocation}
+                      totalPoints={milestoneAsiTotalPoints}
+                      pickCount={milestoneAsiFeatCount}
+                      variant={asiAllocatorVariant}
+                      baseScores={{
+                        strength: character.strength,
+                        dexterity: character.dexterity,
+                        constitution: character.constitution,
+                        intelligence: character.intelligence,
+                        wisdom: character.wisdom,
+                        charisma: character.charisma,
+                      }}
+                      scoreCap={20}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) =>
+                          withCombinedMilestoneAsiAllocation(prev, allocation),
+                        )
+                      }
+                    />
+                  </div>
+                )}
+
+                {abilityScorePoolGrants.map((grant) => (
+                  <div key={grant.allocationKey}>
+                    <AsiAllocator
+                      title={grant.label}
+                      allocation={asiAllocationsByFeatId[grant.allocationKey] ?? {}}
+                      totalPoints={grant.points}
+                      allowedAbilities={grant.allowedAbilities}
+                      variant={asiAllocatorVariant}
+                      baseScores={{
+                        strength: character.strength,
+                        dexterity: character.dexterity,
+                        constitution: character.constitution,
+                        intelligence: character.intelligence,
+                        wisdom: character.wisdom,
+                        charisma: character.charisma,
+                      }}
+                      scoreCap={20}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) => ({
+                          ...prev,
+                          [grant.allocationKey]: allocation,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+
+                {backgroundAbilityGrant.needsChoice && (
+                  <div>
+                    <AsiAllocator
+                      title={`${selectedBackground?.name ?? "Background"} Ability Scores`}
+                      allocation={asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {}}
+                      totalPoints={BACKGROUND_ASI_TOTAL_POINTS}
+                      allowedAbilities={backgroundAbilityGrant.eligible}
+                      maxPerAbility={2}
+                      helpText={getBackgroundAsiHelpText(backgroundAbilityGrant)}
+                      variant={asiAllocatorVariant}
+                      headerImageUrl={selectedBackgroundCardImage}
+                      baseScores={{
+                        strength: character.strength,
+                        dexterity: character.dexterity,
+                        constitution: character.constitution,
+                        intelligence: character.intelligence,
+                        wisdom: character.wisdom,
+                        charisma: character.charisma,
+                      }}
+                      scoreCap={20}
+                      onChange={(allocation) =>
+                        setAsiAllocationsByFeatId((prev) => ({
+                          ...prev,
+                          [BACKGROUND_ASI_KEY]: allocation,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {Object.keys(backgroundAbilityGrant.fixed).length > 0 && (
+                  <div
+                    className={
+                      asiAllocatorVariant === "visual"
+                        ? "overflow-hidden rounded-xl border-2 border-border bg-gradient-to-b from-black via-zinc-950 to-black p-4"
+                        : "p-3 rounded-lg border border-border bg-card/80"
+                    }
+                    style={
+                      asiAllocatorVariant === "visual"
+                        ? {
+                            boxShadow:
+                              "inset 0 0 0 1px rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.45)",
+                          }
+                        : undefined
+                    }
+                  >
+                    {asiAllocatorVariant === "visual" && selectedBackgroundCardImage ? (
+                      <div className="relative -mx-4 -mt-4 mb-3 aspect-[21/9] max-h-[11.2rem] overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedBackgroundCardImage}
+                          alt=""
+                          className="h-full w-full object-cover object-top"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/45 to-black" />
+                      </div>
+                    ) : null}
+                    <p
+                      className={
+                        asiAllocatorVariant === "visual"
+                          ? "font-serif text-base font-black uppercase tracking-wide text-white"
+                          : "text-xs font-bold text-foreground mb-1"
+                      }
+                    >
+                      {selectedBackground?.name ?? "Background"} Ability Scores
+                    </p>
+                    <p
+                      className={
+                        asiAllocatorVariant === "visual"
+                          ? "mt-1 text-sm text-amber-400/90"
+                          : "text-sm text-foreground"
+                      }
+                    >
+                      {formatBackgroundAbilityBonuses(selectedBackground?.ability_bonuses)}
+                    </p>
+                  </div>
+                )}
+
+                </div>
               </div>
             )}
 
@@ -4461,6 +4775,9 @@ export default function BuilderPageClient() {
                             selectedIndex={startingEquipmentOptionIndex}
                             startingGold={classStartingGold}
                             onSelect={selectStartingEquipmentOption}
+                            equipment={equipment}
+                            categoryPicks={startingEquipmentCategoryPicks}
+                            onCategoryPick={setClassPackageCategoryPick}
                             swipeLayout={useSwipeVisualPicker}
                           />
                         ))
@@ -4470,7 +4787,8 @@ export default function BuilderPageClient() {
                             <div key={gi}>
                               <p className="text-sm font-medium text-foreground mb-2">{group.description}</p>
                               <div className="space-y-2">
-                                {(group.options ?? []).map((option, oi) => (
+                                {(gi === 0 ? classPackageOptions : group.options ?? []).map(
+                                  (option, oi) => (
                                   <label
                                     key={oi}
                                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
@@ -4489,13 +4807,50 @@ export default function BuilderPageClient() {
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm text-foreground">{option.label}</p>
                                       {!isGoldOnlyOption(option, classStartingGold) ? (
-                                        <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                                          {(option.items ?? []).map((item, ii) => (
+                                        <ul className="mt-1 text-xs text-muted-foreground space-y-1">
+                                          {(option.items ?? []).map((item, ii) => {
+                                            const category = equipmentCategoryKind(item.name)
+                                            if (category) {
+                                              const choices = equipmentForCategory(
+                                                category,
+                                                equipment,
+                                              )
+                                              const pickKey = `${oi}:${ii}`
+                                              return (
+                                                <li key={ii} onClick={(event) => event.preventDefault()}>
+                                                  <label className="block text-[10px] font-bold uppercase text-muted-foreground mb-1">
+                                                    {item.quantity > 1 ? `${item.quantity}× ` : ""}
+                                                    {item.name}
+                                                  </label>
+                                                  <select
+                                                    value={startingEquipmentCategoryPicks[pickKey] ?? ""}
+                                                    onChange={(event) => {
+                                                      selectStartingEquipmentOption(oi)
+                                                      setClassPackageCategoryPick(
+                                                        oi,
+                                                        ii,
+                                                        event.target.value,
+                                                      )
+                                                    }}
+                                                    className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                                                  >
+                                                    <option value="">Choose weapon…</option>
+                                                    {choices.map((row) => (
+                                                      <option key={row.id} value={row.id}>
+                                                        {row.name}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                </li>
+                                              )
+                                            }
+                                            return (
                                             <li key={ii}>
                                               {item.quantity > 1 ? `${item.quantity}× ` : ""}
                                               {item.name}
                                             </li>
-                                          ))}
+                                            )
+                                          })}
                                         </ul>
                                       ) : (
                                         <p className="mt-1 text-xs text-muted-foreground">
@@ -4504,7 +4859,8 @@ export default function BuilderPageClient() {
                                       )}
                   </div>
                                   </label>
-                                ))}
+                                ),
+                                )}
                               </div>
                             </div>
                           ))}
@@ -4525,6 +4881,9 @@ export default function BuilderPageClient() {
                             selectedIndex={backgroundStartingEquipmentOptionIndex}
                             startingGold={backgroundStartingGold}
                             onSelect={selectBackgroundStartingEquipmentOption}
+                            equipment={equipment}
+                            categoryPicks={backgroundStartingEquipmentCategoryPicks}
+                            onCategoryPick={setBackgroundPackageCategoryPick}
                             imageSide="alternate"
                             swipeLayout={useSwipeVisualPicker}
                           />

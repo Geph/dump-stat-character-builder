@@ -1,5 +1,6 @@
 import {
   Dices,
+  Layers,
   Package,
   Shield,
   Sparkles,
@@ -15,16 +16,27 @@ export const BUILDER_STEP_IDS = {
   GEAR: 4,
   SPELLS: 5,
   DETAILS: 6,
+  /** Conditional — Metamagic, Invocations, disciplines/talents, knacks/exploits, etc. */
+  CLASS_ABILITIES: 8,
 } as const
 
+/**
+ * Builder steps in display order. `order` drives navigation/reachability so we can
+ * insert CLASS_ABILITIES without renumbering legacy draft step ids 1–6.
+ */
 export const BUILDER_STEPS = [
-  { id: BUILDER_STEP_IDS.CLASS, label: "Class & Level", icon: Shield },
-  { id: BUILDER_STEP_IDS.ORIGIN, label: "Origin", icon: Users },
-  { id: BUILDER_STEP_IDS.ABILITIES, label: "Abilities", icon: Dices },
-  { id: BUILDER_STEP_IDS.GEAR, label: "Gear", icon: Package },
-  { id: BUILDER_STEP_IDS.SPELLS, label: "Spells", icon: Sparkles },
-  { id: BUILDER_STEP_IDS.DETAILS, label: "Details", icon: UserCircle },
+  { id: BUILDER_STEP_IDS.CLASS, order: 1, label: "Class & Level", icon: Shield },
+  { id: BUILDER_STEP_IDS.CLASS_ABILITIES, order: 2, label: "Class Abilities", icon: Layers },
+  { id: BUILDER_STEP_IDS.ORIGIN, order: 3, label: "Origin", icon: Users },
+  { id: BUILDER_STEP_IDS.ABILITIES, order: 4, label: "Abilities", icon: Dices },
+  { id: BUILDER_STEP_IDS.GEAR, order: 5, label: "Gear", icon: Package },
+  { id: BUILDER_STEP_IDS.SPELLS, order: 6, label: "Spells", icon: Sparkles },
+  { id: BUILDER_STEP_IDS.DETAILS, order: 7, label: "Details", icon: UserCircle },
 ] as const
+
+export function builderStepOrder(stepId: number): number {
+  return BUILDER_STEPS.find((step) => step.id === stepId)?.order ?? stepId
+}
 
 export const BUILDER_ABILITY_NAMES = [
   "strength",

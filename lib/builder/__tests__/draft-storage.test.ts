@@ -33,4 +33,8 @@ describe("normalizeBuilderStepId", () => {
     expect(normalizeBuilderStepId(7)).toBe(6)
     expect(normalizeBuilderStepId(6)).toBe(6)
   })
+
+  it("preserves Class Abilities step id 8", () => {
+    expect(normalizeBuilderStepId(8)).toBe(8)
+  })
 })

@@ -7,6 +7,7 @@ import { detectPointPoolSpellcastingFromText } from "@/lib/import/detect-point-p
 import { detectSpecialAbilityFromText } from "@/lib/import/detect-special-ability"
 import { detectSpellcastingAbilityFromText } from "@/lib/import/detect-governing-ability"
 import { parseStartingEquipmentFromText } from "@/lib/import/parse-starting-equipment"
+import { resolveClassSkillChoices } from "@/lib/import/parse-class-shell"
 import {
   enrichClassFeaturesWithPresets,
   mergeAlternateRangerClassResources,
@@ -22,6 +23,14 @@ import {
 } from "@/lib/import/third-party-resources"
 import type { Feature, UsesConfig } from "@/lib/types"
 import { enrichImportedWeaponMasteryFromColumn } from "@/lib/compendium/weapon-mastery-choice"
+import { classNamesFuzzyMatch, classNamesMatch } from "@/lib/import/resolve-parent-class"
+
+function resourceBelongsToClass(resourceClassName: string, className: string): boolean {
+  return (
+    classNamesMatch(resourceClassName, className) ||
+    classNamesFuzzyMatch(resourceClassName, className)
+  )
+}
 
 export type ClassResourceImportRow = {
   class_name: string
@@ -165,7 +174,8 @@ function resolveResourceKeysForClass(
     trinkets?: string
     endurance?: string
   } = {}
-  const classResources = explicitResources?.filter((r) => r.class_name === className) ?? []
+  const classResources =
+    explicitResources?.filter((r) => resourceBelongsToClass(r.class_name, className)) ?? []
 
   for (const resource of classResources) {
     if (/psi\s*points?/i.test(resource.name)) keys.psi = resource.resource_key
@@ -286,7 +296,9 @@ export function buildClassResourceRowsForClass(
 ): Record<string, unknown>[] {
   const className = String(classRow.name ?? "")
   const parsed = parseClassProgressionTable(collectProgressionText(classRow))
-  const explicit = explicitResources?.filter((resource) => resource.class_name === className) ?? []
+  const explicit =
+    explicitResources?.filter((resource) => resourceBelongsToClass(resource.class_name, className)) ??
+    []
 
   const rows: Record<string, unknown>[] = []
 
@@ -426,6 +438,19 @@ export function enrichImportedClassRow(
     }
   }
 
+  const skill_choices = resolveClassSkillChoices(
+    row.skill_choices as
+      | { count: number; options: string[]; fixed?: string[] }
+      | null
+      | undefined,
+    [
+      typeof row.description === "string" ? row.description : null,
+      description,
+      featuresText,
+      progressionText,
+    ],
+  )
+
   return {
     ...row,
     description,
@@ -434,6 +459,7 @@ export function enrichImportedClassRow(
     special_ability: specialAbility ?? row.special_ability,
     starting_equipment_groups,
     starting_gold,
+    ...(skill_choices ? { skill_choices } : {}),
     ...multiclassFields,
   }
 }
@@ -458,7 +484,8 @@ export function resolvePsiResourceKeyForClass(
 ): string | null {
   const match = explicitResources?.find(
     (resource) =>
-      resource.class_name === className && /psi\s*points?/i.test(resource.name),
+      resourceBelongsToClass(resource.class_name, className) &&
+      /psi\s*points?/i.test(resource.name),
   )
   if (match) return match.resource_key
   return null
@@ -470,7 +497,8 @@ export function resolveExploitResourceKeyForClass(
 ): string | null {
   const match = explicitResources?.find(
     (resource) =>
-      resource.class_name === className && /exploit\s*dice/i.test(resource.name),
+      resourceBelongsToClass(resource.class_name, className) &&
+      /exploit\s*dice/i.test(resource.name),
   )
   if (match) return match.resource_key
   return null

@@ -60,9 +60,11 @@ Split layers. Do NOT mash an entire package/section into one ability description
 5) Leaf components (must be separate — completeness checklist)
    Psion — for EVERY discipline in the source, extract ALL of:
    a) Discipline package row (ability_role "discipline") as above.
+      Do NOT propose Primary/Secondary/Third Discipline class features as custom abilities — the archetype grants the first discipline; Secondary/Third are separate class_disciplines picks that also feed known_discipline_talents.
    b) EVERY discipline-gated talent → choices on the discipline (see pattern 3a).
       Put "(Prerequisite: …)" into options[].prerequisite when present; keep full rules in options[].description.
       Do not stop after a few talents — walk the full list under that discipline until the next discipline begins.
+      The class feature "Psionic Talents" stays a class feature (optionsSource known_discipline_talents) — not a custom ability.
    c) EVERY entry labeled "Psionic power" (or equivalent casting-header block: Casting Time / Range / Components / Duration) → its own import_proposals.custom_abilities[] row with ability_role "psionic_power".
       Do NOT put psionic powers in spells[] — they are not spells (even though they look similar).
       Keep casting headers as fields when possible (casting_time, range, components, duration, concentration) and full rules + augment list in description.
@@ -70,6 +72,7 @@ Split layers. Do NOT mash an entire package/section into one ability description
       In definition, note the parent discipline (e.g. "Psionic power from Enhancement Discipline").
    d) Default Alternate Effects tables stay on the discipline description (HTML table is fine).
    e) Class-level and feat-gated talents as ability_role "class_talent" rows (patterns 3b–3c) — do not nest those under a discipline.
+   f) Innate Psionics / Innate Psionic Ability stay as class features (spells_known / uses modifiers) — not custom abilities.
 
    Exploits — one proposal per exploit; keep "expend one Exploit Die" phrasing when present.
    Inventor — one proposal per upgrade option.

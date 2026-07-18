@@ -319,9 +319,37 @@ function buildFromMechanic(
     }
   }
 
-  // Captured in BYO mechanics[] for review; runtime wiring for ephemeral grants is not implemented yet.
+  // Captured in BYO mechanics[] — ephemeral free points (Psionic Mastery), not a pool refill.
   if (mechanic.kind === "turn_start_bonus_grant") {
-    return null
+    if (!mechanic.grantResourceKey) return null
+    const amountByLevel = mechanic.grantAmountByLevel?.length
+      ? mechanic.grantAmountByLevel
+      : null
+    const flatAmount =
+      mechanic.grantAmount ??
+      (amountByLevel?.length ? amountByLevel[0]!.amount : null)
+    if (flatAmount == null && !amountByLevel?.length) return null
+    return {
+      ruleId: "ai.turn_start_bonus_grant",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("turn_start_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "turn_start_bonus")),
+          type: "turn_start_trigger",
+          accrueResourceKey: mechanic.grantResourceKey,
+          ...(flatAmount != null ? { accrueResourceAmount: flatAmount } : {}),
+          ...(amountByLevel?.length ? { accrueResourceAmountByLevel: amountByLevel } : {}),
+          expiresEndOfTurn: mechanic.expiresEndOfTurn ?? true,
+          ...(mechanic.usageRestriction
+            ? { usageRestriction: mechanic.usageRestriction }
+            : {}),
+          label: mechanic.usageRestriction
+            ? `Turn-start ${mechanic.grantResourceKey} (+ restriction)`
+            : `Turn-start ${mechanic.grantResourceKey}`,
+        },
+      ]),
+    }
   }
 
   if (mechanic.kind === "turn_start_trigger") {

@@ -49,7 +49,7 @@ When extracting from a PDF, add source_page (integer, 1-based PDF page) on featu
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
   classes:
-    "Focus on classes[] and class_resources[] when present. Include hit_die, proficiencies, and features[] with level, name, description. Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature. If the source includes a dedicated class spell list (Spell / School / Special tables), also populate that class's spell_list and matching spells[] stubs in the same JSON.",
+    "Focus on classes[] and class_resources[] when present. Always include that class's subclasses/archetypes/paths in subclasses[] in the same JSON (class_name must match classes[].name). Include hit_die, proficiencies, and skill_choices from the Skills: line (count + options; use fixed for always-granted skills like Psionics). Put flavor/rules prose in description only — not the level progression table (features and resource columns are extracted separately). Wire Common Modifiers via description phrasing and optional mechanics[] on each feature. If the source includes a dedicated class spell list (Spell / School / Special tables), also populate that class's spell_list and matching spells[] stubs in the same JSON.",
   subclasses:
     "Focus on subclasses[] with class_name, features[] by level, and spell tables in feature descriptions when present. When a feature offers mutually exclusive subtype spell lists (Circle of the Land land types, similar circles/domains), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description.",
   species: "Focus on species[] with traits[] (name, description; isChoice + choices when applicable).",
@@ -150,7 +150,25 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         hit_die: 10,
         primary_ability: ["Strength", "Dexterity"],
         saving_throws: ["Strength", "Constitution"],
+        skill_choices: {
+          count: 2,
+          options: ["Acrobatics", "Athletics", "History", "Insight", "Perception", "Survival"],
+        },
         features: [{ level: 1, name: "Second Wind", description: "Regain hit points as a bonus action." }],
+      },
+    ],
+    subclasses: [
+      {
+        name: "Champion",
+        class_name: "Fighter",
+        description: "A simple martial subclass.",
+        features: [
+          {
+            level: 3,
+            name: "Improved Critical",
+            description: "Your weapon attacks score a critical hit on a roll of 19 or 20.",
+          },
+        ],
       },
     ],
     class_resources: [

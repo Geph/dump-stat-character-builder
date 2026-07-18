@@ -1,4 +1,4 @@
-import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import { featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import {
   ASI_POINTS_PER_PICK,
   isValidAsiAllocation,
@@ -24,6 +24,7 @@ export type AbilityScorePoolGrant = {
   allocationKey: string
   label: string
   points: number
+  allowedAbilities?: AbilityScoreKey[]
 }
 
 
@@ -46,6 +47,7 @@ function grantsFromLinkedModifiers(
         allocationKey: `${allocationKeyPrefix}::ref::${instance.catalogRefId}::${mod.id}`,
         label: mod.label?.trim() || entry?.name || label,
         points: mod.points ?? ASI_POINTS_PER_PICK,
+        ...(mod.allowedAbilities?.length ? { allowedAbilities: mod.allowedAbilities } : {}),
       })
     }
   }
@@ -168,7 +170,7 @@ export function collectAbilityScorePoolGrants(params: {
     }
 
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((s) => s.id === subclassId)
       if (subclass) {
         for (const feature of subclass.features ?? []) {
@@ -251,7 +253,11 @@ export function allAbilityScorePoolAllocationsValid(
 ): boolean {
   if (!grants.length) return true
   return grants.every((grant) =>
-    isValidAsiAllocation(allocations[grant.allocationKey] ?? {}, grant.points),
+    isValidAsiAllocation(
+      allocations[grant.allocationKey] ?? {},
+      grant.points,
+      grant.allowedAbilities,
+    ),
   )
 }
 

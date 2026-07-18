@@ -1,6 +1,6 @@
 import { FEAT_MILESTONES } from "@/lib/builder/feat-selection"
 import { scaledClassFeatGrantCount } from "@/lib/builder/scaled-feat-grant-counts"
-import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import { featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import {
   featureGrantsFeats,
   grantFeatsFromFeature,
@@ -89,7 +89,7 @@ export function getFeatPickSlots(
     )
 
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((s) => s.id === subclassId)
       if (subclass) {
         fromFeatures.push(

@@ -52,12 +52,16 @@ function SourceGroupCard({
             className={`rounded-lg border px-3 py-2 ${
               row.status === "wired"
                 ? "border-success/25 bg-success/5"
-                : "border-destructive/35 bg-destructive/5"
+                : row.status === "structural"
+                  ? "border-border/70 bg-muted/20"
+                  : "border-destructive/35 bg-destructive/5"
             }`}
           >
             <div className="flex flex-wrap items-center gap-2">
               {row.status === "wired" ? (
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+              ) : row.status === "structural" ? (
+                <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />
               ) : (
                 <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
               )}
@@ -71,10 +75,16 @@ function SourceGroupCard({
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                   row.status === "wired"
                     ? "bg-success/15 text-success"
-                    : "bg-destructive/15 text-destructive"
+                    : row.status === "structural"
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-destructive/15 text-destructive"
                 }`}
               >
-                {row.status === "wired" ? "Wired" : "Not wired"}
+                {row.status === "wired"
+                  ? "Wired"
+                  : row.status === "structural"
+                    ? "Structural"
+                    : "Not wired"}
               </span>
             </div>
 
@@ -115,6 +125,11 @@ function SourceGroupCard({
             ) : row.status === "wired" ? (
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Wired via choices / structured ability data (no separate common-modifier chips).
+              </p>
+            ) : row.status === "structural" ? (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {row.note ??
+                  "Structural / narrative — no common modifiers expected."}
               </p>
             ) : (
               <p className="mt-1.5 text-xs text-destructive/90">
@@ -165,7 +180,8 @@ export function ImportModifierReviewPanel({
 
   const activePagedGroup = pageOneAtATime ? pagedGroups[pageIndex] ?? null : null
   const wiredCount = rows.filter((row) => row.status === "wired").length
-  const unwiredCount = rows.length - wiredCount
+  const structuralCount = rows.filter((row) => row.status === "structural").length
+  const unwiredCount = rows.filter((row) => row.status === "unwired").length
 
   const shellClass = embedded
     ? "space-y-4 text-sm"
@@ -185,6 +201,14 @@ export function ImportModifierReviewPanel({
           {rows.length > 0 ? (
             <p className="mt-2 text-xs">
               <span className="font-medium text-success">{wiredCount} wired</span>
+              {structuralCount > 0 ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="font-medium text-muted-foreground">
+                    {structuralCount} structural
+                  </span>
+                </>
+              ) : null}
               <span className="text-muted-foreground"> · </span>
               <span className={`font-medium ${unwiredCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
                 {unwiredCount} not wired

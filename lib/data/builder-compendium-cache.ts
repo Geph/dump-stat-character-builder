@@ -3,6 +3,7 @@ import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -227,9 +228,13 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
   ) as unknown as DndClass[]
 
   const classes = filterEnabled(
-    enrichedClasses.map((cls) =>
-      attachClassResourcesToClass(cls, classResourceRows as never),
-    ) as (DndClass & { enabled?: boolean | number | null })[],
+    enrichedClasses.map((cls) => {
+      const withResources = attachClassResourcesToClass(cls, classResourceRows as never)
+      return {
+        ...withResources,
+        features: enrichPsionicTalentGrantFeatures(withResources.features ?? []),
+      }
+    }) as (DndClass & { enabled?: boolean | number | null })[],
   ) as unknown as DndClass[]
 
   const subclasses = filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[]

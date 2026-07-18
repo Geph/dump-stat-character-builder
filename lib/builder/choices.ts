@@ -3,10 +3,23 @@ import {
   getMulticlassToolPickRequirement,
 } from "@/lib/builder/multiclass-proficiencies"
 import { resolvePrimaryClassId } from "@/lib/builder/primary-class"
+import { isClassAbilityFeatureChoice } from "@/lib/builder/class-ability-feature-choice"
+import {
+  classNeedsSubclass,
+  resolveSubclassUnlockLevel,
+} from "@/lib/builder/subclass-unlock"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { legacyBackgroundOriginFeatPickComplete } from "@/lib/compendium/background-origin-feat"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import type { Background, DndClass, Species, Subclass } from "@/lib/types"
+
+export {
+  classNeedsSubclass,
+  DEFAULT_SUBCLASS_LEVEL,
+  resolveSubclassUnlockLabel,
+  resolveSubclassUnlockLevel,
+  SUBCLASS_LEVEL,
+} from "@/lib/builder/subclass-unlock"
 
 const DND_SKILL_SET = new Set<string>(DND_SKILLS)
 
@@ -60,8 +73,6 @@ export function buildSkillPickSources(params: {
   return sources
 }
 
-export const SUBCLASS_LEVEL = 3
-
 export function getSubclassesForClass(subclasses: Subclass[], classId: string): Subclass[] {
   const seenIds = new Set<string>()
   const seenNames = new Set<string>()
@@ -77,10 +88,6 @@ export function getSubclassesForClass(subclasses: Subclass[], classId: string): 
     if (nameKey) seenNames.add(nameKey)
     return true
   })
-}
-
-export function classNeedsSubclass(classLevel: number, subclassCount: number): boolean {
-  return classLevel >= SUBCLASS_LEVEL && subclassCount > 0
 }
 
 export function choiceCountMet(selected: string[], required: number): boolean {
@@ -141,16 +148,26 @@ export function collectClassStepBlockers(
     }
 
     const availableSubclasses = getSubclassesForClass(subclasses, entry.classId)
-    if (classNeedsSubclass(entry.level, availableSubclasses.length) && !subclassByClassId[entry.classId]) {
-      blockers.push(`${cls.name}: select a subclass (level ${entry.level}+).`)
+    const unlockLevel = resolveSubclassUnlockLevel(cls)
+    if (
+      classNeedsSubclass(entry.level, availableSubclasses.length, unlockLevel) &&
+      !subclassByClassId[entry.classId]
+    ) {
+      blockers.push(`${cls.name}: select a subclass (level ${unlockLevel}+).`)
     }
 
     for (const feature of cls.features ?? []) {
       if (feature.level > entry.level || !feature.isChoice || !feature.choices) continue
-      if ((feature.choices.options?.length ?? 0) === 0) continue
+      // Custom ability pools (talents, knacks, metamagic-style lists) validate on Class Abilities.
+      if (isClassAbilityFeatureChoice(feature)) continue
+      const hasStaticOptions = (feature.choices.options?.length ?? 0) > 0
+      const hasOptionsSource = Boolean(feature.choices.optionsSource)
+      if (!hasStaticOptions && !hasOptionsSource) continue
       const key = featureChoiceKey(entry.classId, feature.name, feature.level)
       const picks = featureChoicePicks[key] ?? []
-      const required = resolveFeatureChoiceCount(feature.choices, entry.level, cls.name)
+      const required = resolveFeatureChoiceCount(feature.choices, entry.level, cls.name, undefined, {
+        featureName: feature.name,
+      })
       if (!choiceCountMet(picks, required)) {
         blockers.push(
           `${cls.name}: complete “${feature.name}” (${picks.length}/${required}).`,

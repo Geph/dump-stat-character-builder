@@ -1,8 +1,14 @@
 "use client"
 
+import { useMemo } from "react"
 import { Coins } from "lucide-react"
-import type { StartingEquipmentOption } from "@/lib/types"
-import { isGoldOnlyOption } from "@/lib/builder/equipment-utils"
+import type { Equipment, StartingEquipmentOption } from "@/lib/types"
+import {
+  collapseWeaponCategoryPackageOptions,
+  equipmentCategoryKind,
+  equipmentForCategory,
+  isGoldOnlyOption,
+} from "@/lib/builder/equipment-utils"
 import { getCinematicPickerContainerClass } from "@/lib/builder/picker-pagination"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { STARTING_EQUIPMENT_CARD_IMAGES } from "@/lib/site-images"
@@ -15,6 +21,9 @@ type StartingEquipmentPackagePickerProps = {
   selectedIndex: number | null
   startingGold: number
   onSelect: (index: number) => void
+  equipment?: Equipment[]
+  categoryPicks?: Record<string, string>
+  onCategoryPick?: (optionIndex: number, itemIndex: number, equipmentId: string) => void
   /** Alternate image side per row for visual variety */
   imageSide?: "left" | "right" | "alternate"
   /** Phone swipe carousel (cinematic builder on narrow screens). */
@@ -28,10 +37,18 @@ export function StartingEquipmentPackagePicker({
   selectedIndex,
   startingGold,
   onSelect,
+  equipment = [],
+  categoryPicks = {},
+  onCategoryPick,
   imageSide = "alternate",
   swipeLayout = false,
 }: StartingEquipmentPackagePickerProps) {
-  if (!options.length) return null
+  const displayOptions = useMemo(
+    () => collapseWeaponCategoryPackageOptions(options, equipment),
+    [options, equipment],
+  )
+
+  if (!displayOptions.length) return null
 
   return (
     <div className="space-y-4">
@@ -51,7 +68,7 @@ export function StartingEquipmentPackagePicker({
             : "grid grid-cols-1 lg:grid-cols-2 gap-4",
         )}
       >
-        {options.map((option, index) => {
+        {displayOptions.map((option, index) => {
           const selected = selectedIndex === index
           const goldOnly = isGoldOnlyOption(option, startingGold)
           const side =
@@ -108,9 +125,38 @@ export function StartingEquipmentPackagePicker({
                     </span>
                   </div>
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul className="space-y-1.5">
                     {optionItems.map((item, ii) => {
                       const isGp = item.name.toLowerCase() === "gold pieces"
+                      const category = equipmentCategoryKind(item.name)
+                      if (category) {
+                        const choices = equipmentForCategory(category, equipment)
+                        const pickKey = `${index}:${ii}`
+                        const selectedId = categoryPicks[pickKey] ?? ""
+                        return (
+                          <li key={ii} onClick={(event) => event.stopPropagation()}>
+                            <label className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
+                              {item.quantity > 1 ? `${item.quantity}× ` : ""}
+                              {item.name}
+                            </label>
+                            <select
+                              value={selectedId}
+                              onChange={(event) => {
+                                onSelect(index)
+                                onCategoryPick?.(index, ii, event.target.value)
+                              }}
+                              className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs font-semibold text-foreground"
+                            >
+                              <option value="">Choose weapon…</option>
+                              {choices.map((row) => (
+                                <option key={row.id} value={row.id}>
+                                  {row.name}
+                                </option>
+                              ))}
+                            </select>
+                          </li>
+                        )
+                      }
                       return (
                         <li
                           key={ii}

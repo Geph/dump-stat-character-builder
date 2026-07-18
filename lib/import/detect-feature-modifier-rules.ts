@@ -21,6 +21,7 @@ import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
+import { PSIONIC_TALENT_WIRING_RULES } from "@/lib/import/psionic-talent-wiring"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import type { UsesConfig, FeatureEffect } from "@/lib/types"
 import {
@@ -116,6 +117,7 @@ const CONDITION_NAMES = [
   "Prone",
   "Restrained",
   "Stunned",
+  "Surprised",
   "Unconscious",
 ] as const
 
@@ -2026,6 +2028,31 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    // Projected Weaponry / similar: "use Intelligence instead of Strength or Dexterity
+    // for its attack and damage rolls".
+    id: "weapon.ability.override",
+    confidence: "high",
+    test:
+      /\buse\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+instead\s+of\s+(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)(?:\s+or\s+(?:Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma))?\s+for\s+(?:its\s+|their\s+|your\s+)?(?:attack\s+and\s+damage|damage\s+and\s+attack)\s+rolls?\b/i,
+    build: (match, ctx) => {
+      const ability = parseAbilityWord(match[1])
+      if (!ability) return null
+      return charInstance(
+        newInstanceId(),
+        characteristicCatalogRefId("weapon_ability_override"),
+        [
+          {
+            id: modId(instanceKey(ctx, "weapon_ability_override")),
+            type: "weapon_ability_override",
+            ability,
+            appliesTo: "both",
+            scope: "all",
+          },
+        ],
+      )
+    },
+  },
+  {
     // "Whenever you make an ability check using Strength or Dexterity, you can add 1d4
     // to the result" (Enhancing Skill).
     id: "check.bonus.ability_checks.die",
@@ -2644,4 +2671,5 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     test: /regain\s+\d+\s+(?:psi\s*(?:die|dice)|psionic\s+energy(?:\s+dice?)?|focus(?:\s+points?)?|sorcery\s+points?)\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
     build: (_match, ctx, text) => buildTurnStartResourceRestoreModifier(ctx, text),
   },
+  ...PSIONIC_TALENT_WIRING_RULES,
 ]

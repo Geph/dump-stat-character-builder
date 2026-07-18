@@ -1,3 +1,4 @@
+import { isCustomAbilityEligible } from "@/lib/builder/choice-option-eligibility"
 import type { CustomAbility, FeatureChoice } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -27,12 +28,21 @@ export function bombFormulaAbilitiesForClass(
 export function aggregateBombFormulaOptions(params: {
   customAbilities: CustomAbility[]
   classNames: string[]
+  classLevel?: number
 }): FeatureChoice["options"] {
+  const classLevel = params.classLevel ?? 20
   return bombFormulaAbilitiesForClass(params.customAbilities, params.classNames)
+    .filter((ability) =>
+      isCustomAbilityEligible(ability, {
+        classLevel,
+        selectedAbilityNames: [],
+      }),
+    )
     .map((ability) => ({
       name: ability.name,
       description: ability.description ?? "",
       prerequisite: ability.prerequisites,
+      level_requirement: ability.level_requirement ?? null,
       repeatable: ability.repeatable ?? false,
     }))
     .sort((a, b) => a.name.localeCompare(b.name))

@@ -13,10 +13,13 @@ export const SRD_SPECIES_ICONS_BY_NAME: Record<string, string> = {
   Tiefling: "devil-mask",
 }
 
-/** Default game-icons.net slugs for SRD feats (from bundled seed / local MySQL export). */
+/** Default game-icons.net slugs for feats (from local MySQL / curated PHB + SRD set). */
 export const SRD_FEAT_ICONS_BY_NAME: Record<string, string> = {
+  Actor: "theater-curtains",
   Alert: "extra-lucid",
   Archery: "bowman",
+  Athlete: "jump-across",
+  "Blind Fighting": "blindfold",
   "Boon of Combat Prowess": "running-ninja",
   "Boon of Dimensional Travel": "magic-portal",
   "Boon of Fate": "card-pickup",
@@ -24,13 +27,78 @@ export const SRD_FEAT_ICONS_BY_NAME: Record<string, string> = {
   "Boon of Spell Recall": "book-storm",
   "Boon of the Night Spirit": "ghost",
   "Boon of Truesight": "sheikah-eye",
+  Charger: "ram-profile",
+  Chef: "cook",
+  Crafter: "stone-crafting",
+  "Crossbow Expert": "crossbow",
+  Crusher: "armor-punch",
   Defense: "layered-armor",
+  "Defensive Duelist": "sword-clash",
+  "Dual Wielder": "rogue",
+  Dueling: "sword-hilt",
+  Durable: "life-bar",
+  "Elemental Adept": "fire-silhouette",
+  "Fey Touched": "fairy",
   Grappler: "grab",
   "Great Weapon Fighting": "glaive",
+  "Great Weapon Master": "halberd",
+  Healer: "healing",
+  "Heavily Armored": "cape-armor",
+  "Heavy Armor Master": "leather-armor",
+  "Inspiring Leader": "vertical-banner",
+  Interception: "crenulated-shield",
+  "Keen Mind": "brainstorm",
+  "Lightly Armored": "ninja-armor",
+  Lucky: "clover",
+  "Mage Slayer": "broken-shield",
   "Magic Initiate": "magic-hat",
+  "Martial Weapon Training": "war-axe",
+  "Medium Armor Master": "heart-armor",
+  "Moderately Armored": "chest-armor",
+  Musician: "music-spell",
+  Observant: "observatory",
+  Piercer: "pierced-body",
+  Poisoner: "bloody-sword",
+  "Polearm Master": "spears",
+  Protection: "bolt-shield",
+  Resilient: "heart-shield",
+  "Ritual Caster": "meeple-circle",
   "Savage Attacker": "sword-clash",
+  Sentinel: "battle-gear",
+  "Shadow Touched": "two-shadows",
+  Sharpshooter: "headshot",
+  "Shield Master": "shield-bash",
+  "Skill Expert": "book-aura",
   Skilled: "diploma",
+  Skulker: "stealth-bomber",
+  Slasher: "saber-slash",
+  Speedy: "fast-forward-button",
+  "Spell Sniper": "ion-cannon-blast",
+  "Tavern Brawler": "tavern-sign",
+  Telekinetic: "brain-dump",
+  Telepathic: "telepathy",
+  "Thrown Weapon Fighting": "flying-dagger",
+  Tough: "heart-plus",
   "Two-Weapon Fighting": "rogue",
+  "Unarmed Fighting": "punch-blast",
+  "War Caster": "magic-shield",
+  "Weapon Master": "battered-axe",
+}
+
+/**
+ * Apply a default icon by row name when none is set.
+ * Unlike applySrdItemIcon, does not require an SRD source (PHB feats use the same map).
+ */
+export function applyNamedItemIcon(
+  row: Record<string, unknown>,
+  defaults: Record<string, string>,
+): Record<string, unknown> {
+  if (typeof row.icon === "string" && row.icon.trim()) {
+    return { ...row, icon: row.icon.trim() }
+  }
+  const name = String(row.name ?? "")
+  const icon = defaults[name] ?? null
+  return { ...row, icon }
 }
 
 /** Default game-icons.net slugs for SRD backgrounds (from bundled seed / local MySQL export). */
@@ -114,7 +182,5 @@ export function applySrdItemIcon(
   if (!isSrdSource(row.source as string | null | undefined)) {
     return row
   }
-  const name = String(row.name ?? "")
-  const icon = defaults[name] ?? null
-  return { ...row, icon }
+  return applyNamedItemIcon(row, defaults)
 }

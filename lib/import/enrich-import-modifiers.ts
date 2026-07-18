@@ -37,8 +37,7 @@ import {
   specialAttackModifierFromPowerDescription,
 } from "@/lib/import/parse-special-attack-from-power"
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
-import { customFeatHasPresetRegistry } from "@/lib/compendium/custom-feat-modifier-presets"
-import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
+import { applyFeatNamePreset, featHasNamePreset } from "@/lib/compendium/apply-feat-name-preset"
 import type { Feature, Trait } from "@/lib/types"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
@@ -224,23 +223,47 @@ function enrichTraits(
   ) as unknown as Trait[]
 }
 
-function featHasKnownNamePreset(name: string): boolean {
-  return customFeatHasPresetRegistry(name) || name in FEAT_MODIFIER_PRESETS
-}
-
 function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | undefined {
   if (!feats?.length) return feats
   return feats.map((feat) => {
     const inferred = inferFeatImportFields(feat)
     const description = inferred.description ?? ""
-    // Named PHB/SRD feats have hand-written presets applied on load. Partial AI mechanics[]
-    // (or isChoice-only wiring) would persist as linkedModifiers and block those presets —
-    // prefer leaving modifiers empty so enrichCustomFeatRow / enrichSrdFeatRow can fill them.
-    if (featHasKnownNamePreset(inferred.name)) {
+    // Named PHB/SRD feats: apply hand-written presets at import time so review + persist
+    // see wired modifiers. Strip AI mechanics / partial linkedModifiers first so they cannot
+    // block or poison the preset (e.g. wrong grant_feat on Ability Score Improvement).
+    if (featHasNamePreset(inferred.name)) {
+      const stripped = {
+        name: inferred.name,
+        description,
+        source: (inferred as { source?: string | null }).source ?? "Player's Handbook",
+        category: (inferred as { category?: string | null }).category ?? null,
+        prerequisite: (inferred as { prerequisite?: string | null }).prerequisite ?? null,
+        repeatable: (inferred as { repeatable?: boolean | null }).repeatable ?? null,
+        // Clear AI shells that would block or replace the preset.
+        linkedModifiers: undefined,
+        linked_modifiers: undefined,
+        modifierRefs: undefined,
+        modifier_refs: undefined,
+        mechanics: undefined,
+        isChoice: false,
+        is_choice: false,
+        choices: null,
+      }
+      const applied = applyFeatNamePreset(stripped)
       return {
         ...inferred,
-        linkedModifiers: undefined,
-        modifierRefs: undefined,
+        description,
+        isChoice: Boolean(applied.isChoice ?? applied.is_choice),
+        choices: (applied.choices as Feature["choices"] | null | undefined) ?? undefined,
+        linkedModifiers: (applied.linkedModifiers ??
+          applied.linked_modifiers) as Feature["linkedModifiers"],
+        modifierRefs: (applied.modifierRefs ?? applied.modifier_refs) as
+          | Feature["modifierRefs"]
+          | undefined,
+        repeatable:
+          (inferred as { repeatable?: boolean | null }).repeatable ??
+          (applied.repeatable as boolean | null | undefined) ??
+          undefined,
         importModifierMeta: undefined,
       } as ImportFeatRow
     }

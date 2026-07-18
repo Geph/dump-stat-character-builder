@@ -41,7 +41,11 @@ export const classes = mysqlTable("classes", {
   saving_throws: json("saving_throws").$type<string[]>(),
   armor_proficiencies: json("armor_proficiencies").$type<string[]>(),
   weapon_proficiencies: json("weapon_proficiencies").$type<string[]>(),
-  skill_choices: json("skill_choices").$type<{ count: number; options: string[] } | null>(),
+  skill_choices: json("skill_choices").$type<{
+    count: number
+    options: string[]
+    fixed?: string[]
+  } | null>(),
   starting_equipment: json("starting_equipment"),
   starting_equipment_groups: json("starting_equipment_groups"),
   starting_gold: int("starting_gold").default(0),

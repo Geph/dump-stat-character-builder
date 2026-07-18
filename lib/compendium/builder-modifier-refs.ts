@@ -11,7 +11,7 @@ import {
   speciesModsSourceKey,
   speciesTraitSourceKey,
 } from "@/lib/builder/modifier-player-choices"
-import { featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import { featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import { normalizeCharacteristics, type CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
   effectiveLinkedModifiers,
@@ -120,7 +120,7 @@ export function classAndSubclassLinkedModifiers(params: {
     collectLinkedFromFeatures(cls.features ?? [], entry.classId, entry.level, featureChoicePicks, catalog, batch)
 
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((s) => s.id === subclassId)
       if (subclass) {
         collectLinkedFromFeatures(
@@ -204,7 +204,7 @@ function classCharacteristicsWithPlayerPicks(params: {
     processFeatures(cls.features ?? [])
 
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((candidate) => candidate.id === subclassId)
       if (subclass) processFeatures(subclass.features ?? [])
     }

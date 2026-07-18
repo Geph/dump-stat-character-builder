@@ -62,6 +62,25 @@ export function getClassSkillPickRequirement(
   return null
 }
 
+/** Always-granted class skills (e.g. Psionics) for the primary class only. */
+export function fixedClassSkillProficiencies(params: {
+  classLevels: ClassLevelEntry[]
+  classes: DndClass[]
+  primaryClassId: string | null
+}): string[] {
+  const { classLevels, classes, primaryClassId } = params
+  const fixed: string[] = []
+  for (const entry of classLevels) {
+    if (!isPrimaryClassEntry(entry.classId, primaryClassId)) continue
+    const cls = classes.find((candidate) => candidate.id === entry.classId)
+    for (const skill of cls?.skill_choices?.fixed ?? []) {
+      const name = skill.trim()
+      if (name && !fixed.includes(name)) fixed.push(name)
+    }
+  }
+  return fixed
+}
+
 export function getMulticlassToolPickRequirement(
   cls: DndClass,
   isPrimary: boolean,

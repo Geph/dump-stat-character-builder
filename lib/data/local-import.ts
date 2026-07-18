@@ -4,6 +4,7 @@ import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
+import { resolveParentClassRow } from "@/lib/import/resolve-parent-class"
 import {
   deleteIndexedDbRow,
   getAllFromStore,
@@ -46,9 +47,12 @@ async function resolveClassId(data: Record<string, unknown>): Promise<string | n
 
   const className = data.class_name ?? data.className
   if (typeof className === "string" && className.trim()) {
-    const classes = await getAllFromStore("classes")
-    const match = classes.find((c) => c.name === className.trim())
-    if (match?.id) return match.id as string
+    const classes = (await getAllFromStore("classes")).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+    }))
+    const match = resolveParentClassRow(className.trim(), classes)
+    if (match?.id) return match.id
   }
 
   return null

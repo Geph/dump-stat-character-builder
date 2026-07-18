@@ -24,8 +24,13 @@ export function inferClassSkillPicks(
       : rowsToClassAddOrder(classRows)
 
   const bgSkills = new Set(background?.skill_proficiencies ?? [])
+  const fixedSkills = new Set(
+    classes.flatMap((cls) => cls.skill_choices?.fixed ?? []).map((skill) => skill.trim()),
+  )
   const remaining = new Set(
-    (character.skill_proficiencies ?? []).filter((skill) => !bgSkills.has(skill)),
+    (character.skill_proficiencies ?? []).filter(
+      (skill) => !bgSkills.has(skill) && !fixedSkills.has(skill),
+    ),
   )
   const picks: Record<string, string[]> = {}
 

@@ -50,6 +50,8 @@ export const SHEET_BANNER_BUTTON = {
   inspirationActive: "border-amber-500/45 bg-amber-500/12 text-amber-700 dark:text-amber-300",
   inspirationIdle:
     "border-border/50 bg-card/45 text-muted-foreground hover:border-amber-500/30 hover:text-amber-600",
+  manualRoll:
+    "border-cyan/45 bg-cyan/12 text-cyan hover:border-cyan/65 hover:bg-cyan/18",
   toggleActive: "border-destructive/35 bg-destructive/10 text-destructive",
   toggleIdle: "border-border/50 bg-card/45 text-muted-foreground hover:bg-muted/35",
   rest: "border-border/50 bg-background/45 hover:bg-muted/35 hover:text-foreground",

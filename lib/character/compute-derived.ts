@@ -1,4 +1,7 @@
 import { resolveAllSpeeds } from "@/lib/character/resolve-all-speeds"
+import {
+  applyAbilityScoreOverrides,
+} from "@/lib/character/apply-characteristic-runtime"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import {
   inferClassSkillPicks,
@@ -11,6 +14,7 @@ import {
   aggregateClassArmorProficiencies,
   aggregateClassToolProficiencies,
   aggregateClassWeaponProficiencies,
+  fixedClassSkillProficiencies,
 } from "@/lib/builder/multiclass-proficiencies"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import {
@@ -633,16 +637,21 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     inputs.asiAllocations,
   )
 
-  const abilityScores = ABILITY_SCORE_KEYS.reduce(
-    (scores, key) => {
-      scores[key] =
-        inputs.baseAbilityScores[key] +
-        (aggregatedCharacteristics.abilityBonuses[key] ?? 0) +
-        (asiBonuses[key] ?? 0) +
-        (backgroundAbilityBonuses[key] ?? 0)
-      return scores
-    },
-    {} as Record<AbilityScoreKey, number>,
+  const abilityScores = applyAbilityScoreOverrides(
+    ABILITY_SCORE_KEYS.reduce(
+      (scores, key) => {
+        const uncapped =
+          inputs.baseAbilityScores[key] +
+          (aggregatedCharacteristics.abilityBonuses[key] ?? 0) +
+          (asiBonuses[key] ?? 0) +
+          (backgroundAbilityBonuses[key] ?? 0)
+        // Base + racial/fixed + ASI/background cannot exceed 20; feature overrides may still raise.
+        scores[key] = Math.min(20, uncapped)
+        return scores
+      },
+      {} as Record<AbilityScoreKey, number>,
+    ),
+    aggregatedCharacteristics.abilityScoreOverrides,
   )
 
   const abilityMods = abilityModsFromScores(abilityScores)
@@ -652,7 +661,15 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   const skillProficiencies = mergeSkillProficiencies(
     background?.skill_proficiencies,
     inputs.classSkillPicks,
-    [...inputs.extraSkillProficiencies, ...aggregatedCharacteristics.skills],
+    [
+      ...inputs.extraSkillProficiencies,
+      ...aggregatedCharacteristics.skills,
+      ...fixedClassSkillProficiencies({
+        classLevels: inputs.classLevels,
+        classes: inputs.classes,
+        primaryClassId: inputs.primaryClassId,
+      }),
+    ],
   )
   const skillExpertise = [...aggregatedCharacteristics.skillExpertise]
 
@@ -914,6 +931,10 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     restReplacement: aggregatedCharacteristics.restReplacement,
     magicalSleepImmunity: aggregatedCharacteristics.magicalSleepImmunity,
     noSleepRequired: aggregatedCharacteristics.noSleepRequired,
+    healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
+    grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
+    featureChoiceCountBonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
+    powerRiders: aggregatedCharacteristics.powerRiders,
     equippedWeaponAttack,
     equippedOffHandWeaponAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,

@@ -271,6 +271,7 @@ const SpellcastingAiSchema = z.object({
 const SkillChoicesAiSchema = z.object({
   count: z.number(),
   options: z.array(z.string()),
+  fixed: z.array(z.string()).nullable(),
 })
 
 const UsesAtLevelAiSchema = z.object({
@@ -719,6 +720,18 @@ function omitNull<T extends Record<string, unknown>>(row: T): Partial<T> {
   return next
 }
 
+function normalizeSkillChoices(
+  row: z.infer<typeof SkillChoicesAiSchema> | null | undefined,
+): NonNullable<ImportContent["classes"]>[number]["skill_choices"] {
+  if (!row?.options?.length || !(row.count > 0)) return undefined
+  const fixed = (row.fixed ?? []).map((entry) => entry.trim()).filter(Boolean)
+  return {
+    count: row.count,
+    options: row.options,
+    ...(fixed.length ? { fixed } : {}),
+  }
+}
+
 /** Drop null ability slots from structured-output objects; null/empty → null (legacy). */
 function compactBackgroundAbilityBonuses(
   bonuses: z.infer<typeof BackgroundAbilityBonusesAiSchema> | null | undefined,
@@ -804,7 +817,7 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
       saving_throws: row.saving_throws,
       armor_proficiencies: row.armor_proficiencies,
       weapon_proficiencies: row.weapon_proficiencies,
-      skill_choices: row.skill_choices,
+      skill_choices: normalizeSkillChoices(row.skill_choices),
       spell_list: row.spell_list,
       starting_equipment_groups: row.starting_equipment_groups,
       starting_gold: row.starting_gold,

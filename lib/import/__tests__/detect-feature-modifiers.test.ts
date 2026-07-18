@@ -596,6 +596,105 @@ describe("detectFeatureModifiers", () => {
     }
   })
 
+  it("wires Projected Weaponry Intelligence for attack and damage", () => {
+    const detections = detectFeatureModifiers(
+      "You can use Intelligence instead of Strength or Dexterity for its attack and damage rolls. If it has the thrown property, its throwing range is doubled.",
+      { ...baseCtx, featureName: "Projected Weaponry" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "weapon.ability.override")
+      ?.instance.characteristics?.[0]
+    expect(char?.type).toBe("weapon_ability_override")
+    if (char?.type === "weapon_ability_override") {
+      expect(char.ability).toBe("intelligence")
+      expect(char.appliesTo).toBe("both")
+      expect(char.scope).toBe("all")
+    }
+  })
+
+  it("wires One Step Ahead Intelligence save bonus", () => {
+    const detections = detectFeatureModifiers(
+      "You add your Intelligence modifier to the saving throw.",
+      { ...baseCtx, featureName: "One Step Ahead" },
+    )
+    const fx = detections.find((entry) => entry.ruleId === "save.bonus.ability_modifier")
+      ?.instance.activation?.effects?.[0]
+    expect(fx?.kind).toBe("check_roll_modifier")
+    if (fx?.kind === "check_roll_modifier") {
+      expect(fx.bonusConfig).toEqual({ mode: "ability_modifier", ability: "INT" })
+    }
+  })
+
+  it("wires Physical Surge ability score override behind a sheet toggle", () => {
+    const detections = detectFeatureModifiers(
+      "As a bonus action, you can make your Strength or Dexterity ability score equal to your Intelligence ability score.",
+      { ...baseCtx, featureName: "Physical Surge" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "ability.score.override.physical_surge")
+      ?.instance.characteristics?.[0]
+    expect(char?.type).toBe("ability_score_override")
+    if (char?.type === "ability_score_override") {
+      expect(char.sourceAbility).toBe("intelligence")
+      expect(char.targets.sort()).toEqual(["dexterity", "strength"])
+      expect(char.requiresSheetToggle).toBe("physical_surge_active")
+    }
+  })
+
+  it("wires Magical Anathema half healing received", () => {
+    const detections = detectFeatureModifiers(
+      "Magical healing effects on you restore only half as many hit points as normal.",
+      { ...baseCtx, featureName: "Magical Anathema" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "healing.received.half_magical")
+      ?.instance.characteristics?.[0]
+    expect(char?.type).toBe("healing_received_modifier")
+    if (char?.type === "healing_received_modifier") {
+      expect(char.multiplier).toBe(0.5)
+      expect(char.magicalOnly).toBe(true)
+    }
+  })
+
+  it("wires Flickering Escape as a Phase Rift power rider", () => {
+    const detections = detectFeatureModifiers(
+      "When you use Phase Rift to flicker, you can bring one willing creature with you.",
+      { ...baseCtx, featureName: "Flickering Escape" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "power.rider.from_prose")
+      ?.instance.characteristics?.[0]
+    expect(char?.type).toBe("power_rider")
+    if (char?.type === "power_rider") {
+      expect(char.parentPowerNames).toContain("Phase Rift")
+    }
+  })
+
+  it("wires Unlimited Imagination choice count bonus", () => {
+    const detections = detectFeatureModifiers(
+      "You can select two options from Boundless Imagination instead of one.",
+      { ...baseCtx, featureName: "Unlimited Imagination" },
+    )
+    const char = detections.find(
+      (entry) => entry.ruleId === "choice.count.bonus.unlimited_imagination",
+    )?.instance.characteristics?.[0]
+    expect(char?.type).toBe("feature_choice_count_bonus")
+    if (char?.type === "feature_choice_count_bonus") {
+      expect(char.targetFeatureName).toBe("Boundless Imagination")
+      expect(char.bonus).toBe(1)
+    }
+  })
+
+  it("wires archetype primary discipline as grant_custom_ability", () => {
+    const detections = detectFeatureModifiers(
+      "When you choose this archetype, you gain heightened awareness, granting the psionic discipline of Telepathy.",
+      { ...baseCtx, featureName: "Awakened Mind", contentKind: "subclass_feature", sourceName: "Awakened Mind" },
+    )
+    const char = detections.find(
+      (entry) => entry.ruleId === "grant.custom_ability.named_discipline",
+    )?.instance.characteristics?.[0]
+    expect(char).toMatchObject({
+      type: "grant_custom_ability",
+      abilityNames: ["Telepathy Discipline"],
+    })
+  })
+
   it("gates Primordial Aspect's speed bonus behind the Lightning aspect toggle", () => {
     const detections = detectFeatureModifiers(
       "<ul><li><strong>Cold.</strong> Icy shell.</li><li><strong>Fire.</strong> Fiery aura.</li><li><strong>Lightning.</strong> Your walking speed increases by 5 feet.</li></ul>",

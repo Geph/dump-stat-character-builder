@@ -42,6 +42,7 @@ function pickerToChoice(picker: LegacyFeatureOptionPicker, fallbackName: string)
     count: typeof picker.choiceCount === "number" && picker.choiceCount > 0 ? picker.choiceCount : 1,
     swappableOnRest: picker.swappableOnRest ?? undefined,
     resourceKey: picker.resourceKey ?? undefined,
+    optionsSource: (picker.optionsSource as FeatureChoice["optionsSource"]) ?? undefined,
     choiceCountByLevel: Array.isArray(picker.choiceCountByLevel)
       ? picker.choiceCountByLevel
       : undefined,
@@ -65,6 +66,7 @@ function mergeChoice(existing: FeatureChoice | undefined, incoming: FeatureChoic
     swappableOnRest: existing.swappableOnRest ?? incoming.swappableOnRest,
     swapRestType: existing.swapRestType ?? incoming.swapRestType,
     resourceKey: existing.resourceKey ?? incoming.resourceKey,
+    optionsSource: existing.optionsSource ?? incoming.optionsSource,
     choiceCountByLevel: existing.choiceCountByLevel?.length
       ? existing.choiceCountByLevel
       : incoming.choiceCountByLevel,

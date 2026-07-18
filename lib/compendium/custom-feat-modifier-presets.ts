@@ -50,6 +50,7 @@ import {
 } from "@/lib/compendium/feat-modifier-presets"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { SRD_MUSICAL_INSTRUMENTS } from "@/lib/compendium/srd-tool-names"
+import { KIBBLES_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/kibbles-feat-modifier-presets"
 
 const LORE_SKILLS = ["Arcana", "History", "Investigation", "Nature", "Religion"] as const
 const OBSERVER_SKILLS = ["Insight", "Investigation", "Perception"] as const
@@ -69,6 +70,8 @@ const CRAFTER_ARTISAN_TOOLS = [
 
 /** Non-SRD feat name → common modifier presets (PHB Origin + General + Fighting Style feats). */
 export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
+  ...KIBBLES_FEAT_MODIFIER_PRESETS,
+
   // —— Origin ——
   Alert: {
     linkedModifiers: [
@@ -202,7 +205,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Actor: {
     linkedModifiers: [
-      asiOne("actor_asi", "+1 Charisma"),
+      asiOne("actor_asi", "+1 Charisma", ["charisma"]),
       checkFx(
         "actor_impersonation",
         {
@@ -217,7 +220,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Athlete: {
     linkedModifiers: [
-      asiOne("athlete_asi", "+1 Strength or Dexterity"),
+      asiOne("athlete_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       speedMod("athlete_climb", "climb", "equal_to_walk", 0, "Climb Speed equal to your Speed"),
       movementEffectsPassive(
         "athlete_hop_up",
@@ -234,7 +237,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Charger: {
     linkedModifiers: [
-      asiOne("charger_asi", "+1 Strength or Dexterity"),
+      asiOne("charger_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       speedMod("charger_dash", "walk", "add", 10, "Improved Dash: +10 Speed when you take the Dash action"),
       riderFx("charger_attack", { bonusDice: "1d8 bonus damage or push 10 ft. after 10 ft. charge (once/turn)" }),
     ],
@@ -242,7 +245,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Chef: {
     linkedModifiers: [
-      asiOne("chef_asi", "+1 Constitution or Wisdom"),
+      asiOne("chef_asi", "+1 Constitution or Wisdom", ["constitution", "wisdom"]),
       toolProf("chef_utensils", "Cook's Utensils", "Cook's Utensils proficiency"),
       healingDicePool("chef_replenishing", {
         dieType: "d8",
@@ -256,7 +259,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Crossbow Expert": {
     linkedModifiers: [
-      asiOne("crossbow_expert_asi", "+1 Dexterity"),
+      asiOne("crossbow_expert_asi", "+1 Dexterity", ["dexterity"]),
       attackMod(
         "crossbow_expert_loading",
         [{ bonus: 0, target: "custom", customTarget: "Ignore Loading on crossbows; load without free hand" }],
@@ -284,7 +287,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Crusher: {
     linkedModifiers: [
-      asiOne("crusher_asi", "+1 Strength or Constitution"),
+      asiOne("crusher_asi", "+1 Strength or Constitution", ["strength", "constitution"]),
       onHitTrigger("crusher_push", {
         appliesTo: "bludgeoning",
         label: "Push 5 ft. on bludgeoning hit (once/turn)",
@@ -299,14 +302,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Defensive Duelist": {
     linkedModifiers: [
-      asiOne("defensive_duelist_asi", "+1 Dexterity"),
+      asiOne("defensive_duelist_asi", "+1 Dexterity", ["dexterity"]),
       damageReductionFx("defensive_duelist_parry", { reaction: true }),
     ],
   },
 
   "Dual Wielder": {
     linkedModifiers: [
-      asiOne("dual_wielder_asi", "+1 Strength or Dexterity"),
+      asiOne("dual_wielder_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       bonusActionAttackFx("dual_wielder_extra"),
       movementEffectsPassive(
         "dual_wielder_quick_draw",
@@ -318,7 +321,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Durable: {
     linkedModifiers: [
-      asiOne("durable_asi", "+1 Constitution"),
+      asiOne("durable_asi", "+1 Constitution", ["constitution"]),
       checkFx(
         "durable_defy_death",
         { kind: "check_advantage", checkCategory: "death_save" },
@@ -336,7 +339,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   "Elemental Adept": {
     repeatable: true,
     linkedModifiers: [
-      asiOne("elemental_adept_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("elemental_adept_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       damageResistanceChoice(
         "elemental_adept_type",
         [...ELEMENTAL_DAMAGE_TYPES],
@@ -352,14 +355,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Fey Touched": {
     linkedModifiers: [
-      asiOne("fey_touched_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("fey_touched_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       ...feyShadowTouchedSpells("fey_touched", "Divination or Enchantment", "Misty Step", "Fey Magic"),
     ],
   },
 
   Grappler: {
     linkedModifiers: [
-      asiOne("grappler_asi", "+1 Strength or Dexterity"),
+      asiOne("grappler_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       onHitTrigger("grappler_punch_grab", {
         appliesTo: "unarmed",
         label: "Punch and Grab: damage + grapple on unarmed hit (once/turn)",
@@ -379,7 +382,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Great Weapon Master": {
     linkedModifiers: [
-      asiOne("gwm_asi", "+1 Strength"),
+      asiOne("gwm_asi", "+1 Strength", ["strength"]),
       onHitTrigger("gwm_heavy", {
         appliesTo: "heavy",
         label: "Heavy Weapon Mastery: extra damage equal to Proficiency Bonus on hit",
@@ -390,28 +393,28 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Heavily Armored": {
     linkedModifiers: [
-      asiOne("heavily_armored_asi", "+1 Constitution or Strength"),
+      asiOne("heavily_armored_asi", "+1 Constitution or Strength", ["constitution", "strength"]),
       armorProf("heavily_armored", ["Heavy"], "Armor Training: Heavy armor"),
     ],
   },
 
   "Heavy Armor Master": {
     linkedModifiers: [
-      asiOne("heavy_armor_master_asi", "+1 Constitution or Strength"),
+      asiOne("heavy_armor_master_asi", "+1 Constitution or Strength", ["constitution", "strength"]),
       damageReductionFx("heavy_armor_master"),
     ],
   },
 
   "Inspiring Leader": {
     linkedModifiers: [
-      asiOne("inspiring_leader_asi", "+1 Wisdom or Charisma"),
+      asiOne("inspiring_leader_asi", "+1 Wisdom or Charisma", ["wisdom", "charisma"]),
       grantTempHpFx("inspiring_leader", {}),
     ],
   },
 
   "Keen Mind": {
     linkedModifiers: [
-      asiOne("keen_mind_asi", "+1 Intelligence"),
+      asiOne("keen_mind_asi", "+1 Intelligence", ["intelligence"]),
       skillChoice("keen_mind_lore", {
         count: 1,
         entries: LORE_SKILLS.map((skill) => ({ skill, expertise: false })),
@@ -423,14 +426,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Lightly Armored": {
     linkedModifiers: [
-      asiOne("lightly_armored_asi", "+1 Strength or Dexterity"),
+      asiOne("lightly_armored_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       armorProf("lightly_armored", ["Light", "Shield"], "Armor Training: Light armor and Shields"),
     ],
   },
 
   "Mage Slayer": {
     linkedModifiers: [
-      asiOne("mage_slayer_asi", "+1 Strength or Dexterity"),
+      asiOne("mage_slayer_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       onHitTrigger("mage_slayer_concentration", {
         label: "Concentration Breaker: target has Disadvantage on Concentration save when damaged",
       }),
@@ -449,14 +452,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Martial Weapon Training": {
     linkedModifiers: [
-      asiOne("martial_weapon_training_asi", "+1 Strength or Dexterity"),
+      asiOne("martial_weapon_training_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       weaponProf("martial_weapon_training", "martial_weapons", [], "Weapon Proficiency: Martial weapons"),
     ],
   },
 
   "Medium Armor Master": {
     linkedModifiers: [
-      asiOne("medium_armor_master_asi", "+1 Strength or Dexterity"),
+      asiOne("medium_armor_master_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       acBonus("medium_armor_master", {
         flatBonus: 0,
         requiresArmor: true,
@@ -467,14 +470,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Moderately Armored": {
     linkedModifiers: [
-      asiOne("moderately_armored_asi", "+1 Strength or Dexterity"),
+      asiOne("moderately_armored_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       armorProf("moderately_armored", ["Medium"], "Armor Training: Medium armor"),
     ],
   },
 
   "Mounted Combatant": {
     linkedModifiers: [
-      asiOne("mounted_combatant_asi", "+1 Strength, Dexterity, or Wisdom"),
+      asiOne("mounted_combatant_asi", "+1 Strength, Dexterity, or Wisdom", ["strength", "dexterity", "wisdom"]),
       checkFx(
         "mounted_strike",
         { kind: "check_advantage", checkCategory: "attack" },
@@ -491,7 +494,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Observant: {
     linkedModifiers: [
-      asiOne("observant_asi", "+1 Intelligence or Wisdom"),
+      asiOne("observant_asi", "+1 Intelligence or Wisdom", ["intelligence", "wisdom"]),
       skillChoice("observant_keen", {
         count: 1,
         entries: OBSERVER_SKILLS.map((skill) => ({ skill, expertise: false })),
@@ -503,7 +506,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Piercer: {
     linkedModifiers: [
-      asiOne("piercer_asi", "+1 Strength or Dexterity"),
+      asiOne("piercer_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       onHitTrigger("piercer_puncture", {
         appliesTo: "piercing",
         label: "Puncture: reroll one piercing damage die (once/turn)",
@@ -518,7 +521,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Poisoner: {
     linkedModifiers: [
-      asiOne("poisoner_asi", "+1 Dexterity or Intelligence"),
+      asiOne("poisoner_asi", "+1 Dexterity or Intelligence", ["dexterity", "intelligence"]),
       damageMod(
         "poisoner_potent",
         [{ bonus: 0, target: "custom", customTarget: "Poison damage ignores Resistance" }],
@@ -533,7 +536,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Polearm Master": {
     linkedModifiers: [
-      asiOne("polearm_master_asi", "+1 Strength or Dexterity"),
+      asiOne("polearm_master_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       bonusActionAttackFx("polearm_master_strike"),
       reactionAttackFx("polearm_master_reactive"),
     ],
@@ -548,7 +551,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Ritual Caster": {
     linkedModifiers: [
-      asiOne("ritual_caster_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("ritual_caster_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       spellsKnown("ritual_caster_spells", {
         choiceGrants: [{ level: 1, count: 1 }],
         alwaysPrepared: true,
@@ -565,7 +568,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Sentinel: {
     linkedModifiers: [
-      asiOne("sentinel_asi", "+1 Strength or Dexterity"),
+      asiOne("sentinel_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       reactionAttackFx("sentinel_guardian"),
       modifyCreatureFx("sentinel_halt", { reaction: true }),
     ],
@@ -573,14 +576,14 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Shadow Touched": {
     linkedModifiers: [
-      asiOne("shadow_touched_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("shadow_touched_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       ...feyShadowTouchedSpells("shadow_touched", "Illusion or Necromancy", "Invisibility", "Shadow Magic"),
     ],
   },
 
   Sharpshooter: {
     linkedModifiers: [
-      asiOne("sharpshooter_asi", "+1 Dexterity"),
+      asiOne("sharpshooter_asi", "+1 Dexterity", ["dexterity"]),
       attackMod(
         "sharpshooter_cover",
         [
@@ -609,7 +612,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Shield Master": {
     linkedModifiers: [
-      asiOne("shield_master_asi", "+1 Strength"),
+      asiOne("shield_master_asi", "+1 Strength", ["strength"]),
       forceSaveFx("shield_master_bash", { action: true }),
       damageHalvingReaction("shield_master_interpose", "Interpose Shield: no damage on successful DEX save vs. half"),
     ],
@@ -630,7 +633,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Skulker: {
     linkedModifiers: [
-      asiOne("skulker_asi", "+1 Dexterity"),
+      asiOne("skulker_asi", "+1 Dexterity", ["dexterity"]),
       visionMod("skulker_blindsight", "blindsight", 10, "Blindsight 10 ft."),
       checkFx(
         "skulker_fog",
@@ -647,7 +650,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Slasher: {
     linkedModifiers: [
-      asiOne("slasher_asi", "+1 Strength or Dexterity"),
+      asiOne("slasher_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       onHitTrigger("slasher_hamstring", {
         appliesTo: "slashing",
         label: "Hamstring: reduce target Speed by 10 ft. until your next turn (once/turn)",
@@ -662,7 +665,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Speedy: {
     linkedModifiers: [
-      asiOne("speedy_asi", "+1 Dexterity or Constitution"),
+      asiOne("speedy_asi", "+1 Dexterity or Constitution", ["dexterity", "constitution"]),
       speedMod("speedy_walk", "walk", "add", 10, "Speed Increase: +10 feet"),
       movementEffectsPassive(
         "speedy_dash",
@@ -679,7 +682,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Spell Sniper": {
     linkedModifiers: [
-      asiOne("spell_sniper_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("spell_sniper_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       attackMod(
         "spell_sniper_cover",
         [
@@ -705,7 +708,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Telekinetic: {
     linkedModifiers: [
-      asiOne("telekinetic_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("telekinetic_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       spellsKnown("telekinetic_mage_hand", {
         spells: [{ spellId: "Mage Hand", alwaysPrepared: true }],
         label: "Minor Telekinesis: Mage Hand without V/S, invisible, +30 ft. range",
@@ -717,7 +720,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Telepathic: {
     linkedModifiers: [
-      asiOne("telepathic_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("telepathic_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       telepathyMod("telepathic_utterance", 60, "Telepathic Utterance 60 ft."),
       spellsKnown("telepathic_detect", {
         spells: [{ spellId: "Detect Thoughts", alwaysPrepared: true }],
@@ -734,7 +737,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "War Caster": {
     linkedModifiers: [
-      asiOne("war_caster_asi", "+1 Intelligence, Wisdom, or Charisma"),
+      asiOne("war_caster_asi", "+1 Intelligence, Wisdom, or Charisma", ["intelligence", "wisdom", "charisma"]),
       checkFx(
         "war_caster_concentration",
         { kind: "check_advantage", checkCategory: "save", checkAbility: "Constitution" },
@@ -749,7 +752,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Weapon Master": {
     linkedModifiers: [
-      asiOne("weapon_master_asi", "+1 Strength or Dexterity"),
+      asiOne("weapon_master_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       weaponProf("weapon_master", "specific", [], "Mastery Property: one Simple or Martial weapon kind (change on Long Rest)"),
     ],
   },

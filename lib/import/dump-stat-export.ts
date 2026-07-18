@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/repository"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { sanitizeImportRowSource } from "@/lib/import/sanitize-import-source"
+import { resolveParentClassRow } from "@/lib/import/resolve-parent-class"
 import type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
 
 export type { DumpStatExportItem, ExportItemType } from "@/lib/import/dump-stat-export-format"
@@ -48,11 +49,12 @@ async function resolveClassId(data: Record<string, unknown>): Promise<string | n
 
   const className = data.class_name ?? data.className
   if (typeof className === "string" && className.trim()) {
-    const matches = await listRows("classes", {
-      filters: [{ op: "eq", column: "name", value: className.trim() }],
-      limit: 1,
-    })
-    if (matches[0]?.id) return matches[0].id as string
+    const classes = (await listRows("classes")).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+    }))
+    const match = resolveParentClassRow(className.trim(), classes)
+    if (match?.id) return match.id
   }
 
   return null

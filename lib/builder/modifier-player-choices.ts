@@ -1,4 +1,4 @@
-import { choiceCountMet, featureChoiceKey, SUBCLASS_LEVEL } from "@/lib/builder/choices"
+import { choiceCountMet, featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import {
   linkedModifiersForFeat,
   type FeatSelectionEntry,
@@ -460,7 +460,7 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
     }
 
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((candidate) => candidate.id === subclassId)
       if (!subclass) continue
       for (const feature of subclass.features ?? []) {
@@ -916,7 +916,7 @@ export function classFeatureSpellGrantSlots(
       }
     }
     const subclassId = subclassByClassId[entry.classId]
-    if (subclassId && entry.level >= SUBCLASS_LEVEL) {
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((row) => row.id === subclassId)
       for (const feature of subclass?.features ?? []) {
         if (feature.level <= entry.level) {

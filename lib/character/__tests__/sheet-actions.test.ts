@@ -478,4 +478,57 @@ describe("collectSheetActions", () => {
     expect(eagle?.kinds).toEqual(["bonus"])
     expect(eagle?.description).toContain("Disengage and Dash")
   })
+
+  it("attaches related talent alerts to matching custom ability actions", () => {
+    const actions = collectSheetActions({
+      classDetails: [],
+      species: null,
+      featureChoicePicks: {
+        "class-1:L2:Psychoportation Talents": ["Flickering Escape"],
+      },
+      customAbilities: [
+        {
+          id: "ability-phase-rift",
+          name: "Phase Rift",
+          description: "Teleport briefly.",
+          ability_role: "psionic_power",
+          casting_time: "1 action",
+        } as unknown as import("@/lib/types").CustomAbility,
+        {
+          id: "ability-flicker",
+          name: "Psychoportation Discipline",
+          description: "Talents",
+          ability_role: "discipline",
+          choices: {
+            count: 1,
+            options: [
+              {
+                name: "Flickering Escape",
+                description: "Bring a friend when you flicker.",
+                linkedModifiers: [
+                  {
+                    instanceId: "modinst_rider",
+                    catalogRefId: "cat_char_power_rider",
+                    characteristics: [
+                      {
+                        id: "mod_rider",
+                        type: "power_rider",
+                        parentPowerNames: ["Phase Rift"],
+                        alertSummary: "Can bring one willing creature when you flicker",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        } as unknown as import("@/lib/types").CustomAbility,
+      ],
+    })
+    const phaseRift = actions.find((action) => action.name === "Phase Rift")
+    expect(phaseRift?.relatedTalentAlerts?.map((alert) => alert.name)).toEqual([
+      "Flickering Escape",
+    ])
+    expect(phaseRift?.relatedTalentAlerts?.[0]?.summary).toContain("willing creature")
+  })
 })

@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
+import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
 import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
 import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
 import { enrichSrdToolRow } from "@/lib/compendium/enrich-srd-tools"
@@ -30,6 +31,15 @@ describe("SRD item icon defaults", () => {
       description: "Always on guard.",
     })
     expect(row.icon).toBe(SRD_FEAT_ICONS_BY_NAME.Alert)
+  })
+
+  it("maps PHB feat icons by name without requiring SRD source", () => {
+    const row = enrichCustomFeatRow({
+      name: "Tough",
+      source: "Player's Handbook",
+      description: "Hit points",
+    })
+    expect(row.icon).toBe(SRD_FEAT_ICONS_BY_NAME.Tough)
   })
 
   it("maps bundled background icons on seed enrich", () => {

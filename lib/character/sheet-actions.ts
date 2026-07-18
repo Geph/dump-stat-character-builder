@@ -35,6 +35,17 @@ export type SheetActionEntry = {
   components?: string[] | null
   duration?: string | null
   concentration?: boolean
+  /** Talent / rider alerts that modify this action without their own roll card. */
+  relatedTalentAlerts?: SheetActionTalentAlert[]
+}
+
+export type SheetActionTalentAlert = {
+  name: string
+  summary: string
+  description?: string | null
+  sourceLabel?: string | null
+  /** Internal: powers this alert attaches to (stripped before UI if needed). */
+  parentPowerNames?: string[]
 }
 
 /** Trigger characteristics that represent a player-elected reaction when `useReaction` is set. */
@@ -495,6 +506,122 @@ function pushCustomAbilityActions(
   }
 }
 
+function normalizePickName(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function collectTalentAlertsFromCustomAbilities(
+  abilities: CustomAbility[] | undefined,
+  featureChoicePicks: Record<string, string[]> | undefined,
+): SheetActionTalentAlert[] {
+  if (!abilities?.length) return []
+  const picked = new Set(
+    Object.values(featureChoicePicks ?? {})
+      .flat()
+      .map(normalizePickName)
+      .filter(Boolean),
+  )
+  const alerts: SheetActionTalentAlert[] = []
+  const seen = new Set<string>()
+
+  const considerOption = (
+    option: {
+      name: string
+      description?: string | null
+      linkedModifiers?: LinkedModifierInstance[]
+    },
+    sourceLabel: string,
+    forceInclude: boolean,
+  ) => {
+    const isPicked =
+      forceInclude ||
+      picked.has(normalizePickName(option.name)) ||
+      [...picked].some(
+        (pick) =>
+          normalizePickName(option.name).includes(pick) || pick.includes(normalizePickName(option.name)),
+      )
+    if (!isPicked) return
+    for (const instance of option.linkedModifiers ?? []) {
+      for (const char of instance.characteristics ?? []) {
+        if (char.type !== "power_rider") continue
+        const key = `${option.name}::${char.parentPowerNames.join("|")}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        alerts.push({
+          name: option.name,
+          summary: char.alertSummary?.trim() || char.label?.trim() || option.name,
+          description: option.description ?? null,
+          sourceLabel,
+          parentPowerNames: char.parentPowerNames,
+        })
+      }
+    }
+  }
+
+  for (const ability of abilities) {
+    const sourceLabel = customAbilitySourceLabel(ability)
+    for (const option of ability.choices?.options ?? []) {
+      considerOption(option, sourceLabel, false)
+    }
+    for (const option of ability.specialization_choices?.options ?? []) {
+      considerOption(option, sourceLabel, false)
+    }
+    const talentPicked =
+      picked.size === 0 ||
+      picked.has(normalizePickName(ability.name)) ||
+      [...picked].some(
+        (pick) =>
+          normalizePickName(ability.name).includes(pick) ||
+          pick.includes(normalizePickName(ability.name)),
+      )
+    if (ability.ability_role === "class_talent" && talentPicked) {
+      for (const instance of ability.linked_modifiers ?? []) {
+        for (const char of instance.characteristics ?? []) {
+          if (char.type !== "power_rider") continue
+          const key = `${ability.name}::${char.parentPowerNames.join("|")}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          alerts.push({
+            name: ability.name,
+            summary: char.alertSummary?.trim() || char.label?.trim() || ability.name,
+            description: ability.description ?? null,
+            sourceLabel,
+            parentPowerNames: char.parentPowerNames,
+          })
+        }
+      }
+    }
+  }
+
+  return alerts
+}
+
+function attachTalentAlertsToActions(
+  actions: SheetActionEntry[],
+  alerts: SheetActionTalentAlert[],
+): SheetActionEntry[] {
+  if (!alerts.length) return actions
+  return actions.map((action) => {
+    const matched = alerts.filter((alert) =>
+      (alert.parentPowerNames ?? []).some((parent) => {
+        const p = normalizePickName(parent)
+        const n = normalizePickName(action.name)
+        return n === p || n.includes(p) || p.includes(n)
+      }),
+    )
+    if (!matched.length) return action
+    return {
+      ...action,
+      relatedTalentAlerts: matched.map(({ name, summary, description, sourceLabel }) => ({
+        name,
+        summary,
+        description,
+        sourceLabel,
+      })),
+    }
+  })
+}
+
 export function collectSheetActions(params: {
   classDetails: CharacterClassDetail[]
   species: Species | null
@@ -557,8 +684,13 @@ export function collectSheetActions(params: {
     pushCustomAbilityActions(actions, params.customAbilities, Math.max(totalLevel, 1), null)
   }
 
+  const withRiders = attachTalentAlertsToActions(
+    actions,
+    collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
+  )
+
   const seen = new Set<string>()
-  return actions.filter((action) => {
+  return withRiders.filter((action) => {
     if (seen.has(action.id)) return false
     seen.add(action.id)
     return true

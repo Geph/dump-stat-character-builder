@@ -1,26 +1,16 @@
-import { applySrdItemIcon, SRD_FEAT_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
-import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
+import { applyNamedItemIcon, SRD_FEAT_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
+import {
+  applyFeatMechanicalDetection,
+  applyFeatNamePreset,
+  resolveFeatNamePreset,
+} from "@/lib/compendium/apply-feat-name-preset"
 import {
   FEAT_MODIFIER_PRESETS,
   type FeatModifierPreset,
 } from "@/lib/compendium/feat-modifier-presets"
 export { FEAT_MODIFIER_CATALOG, SRD_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
-import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import { shouldSkipFeatPreset } from "@/lib/import/resolve-feat-preset-conflict"
-import type { Feature } from "@/lib/types"
+import { type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { isSrdSource } from "@/lib/srd/source"
-
-function featHasLinkedModifiers(row: Record<string, unknown>): boolean {
-  const linked = row.linkedModifiers ?? row.linked_modifiers
-  if (Array.isArray(linked) && linked.length > 0) return true
-  const refs = row.modifierRefs ?? row.modifier_refs
-  return Array.isArray(refs) && refs.length > 0
-}
-
-/** True when the row already has linked modifiers. `isChoice` alone does not block presets. */
-function featHasModifierConfig(row: Record<string, unknown>): boolean {
-  return featHasLinkedModifiers(row)
-}
 
 function isLegacySkilledRow(row: Record<string, unknown>): boolean {
   if (String(row.name ?? "") !== "Skilled") return false
@@ -53,85 +43,22 @@ function migrateSkilledRow(row: Record<string, unknown>, preset: FeatModifierPre
   }
 }
 
-function applyFeatMechanicalDetection(row: Record<string, unknown>): Record<string, unknown> {
-  if (Boolean(row.is_choice ?? row.isChoice)) return row
-  const description = typeof row.description === "string" ? row.description : ""
-  if (!description.trim()) return row
-
-  const name = String(row.name ?? "")
-  const linked = (row.linkedModifiers ?? row.linked_modifiers) as LinkedModifierInstance[] | undefined
-  const refs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
-  const detected = enrichFeatureWithMechanicalDetection(
-    {
-      name,
-      description,
-      linkedModifiers: Array.isArray(linked) ? linked : undefined,
-      modifierRefs: Array.isArray(refs) ? refs : undefined,
-    } as Feature,
-    {
-      contentKind: "feat",
-      sourceName: name,
-      featureName: name,
-    },
-  )
-
-  return {
-    ...row,
-    linked_modifiers: detected.linkedModifiers,
-    linkedModifiers: detected.linkedModifiers,
-    modifier_refs: detected.modifierRefs,
-    modifierRefs: detected.modifierRefs,
-  }
-}
-
 /** Apply bundled feat modifier presets when not already configured. */
 export function enrichSrdFeatRow(row: Record<string, unknown>): Record<string, unknown> {
-  return applySrdItemIcon(enrichSrdFeatRowCore(row), SRD_FEAT_ICONS_BY_NAME)
+  return applyNamedItemIcon(enrichSrdFeatRowCore(row), SRD_FEAT_ICONS_BY_NAME)
 }
 
 function enrichSrdFeatRowCore(row: Record<string, unknown>): Record<string, unknown> {
   if (!isSrdSource(row.source as string | null | undefined)) return row
   const name = String(row.name ?? "")
-  const preset = FEAT_MODIFIER_PRESETS[name]
+  const preset = FEAT_MODIFIER_PRESETS[name] ?? resolveFeatNamePreset(name)
 
   if (name === "Skilled" && isLegacySkilledRow(row) && preset?.linkedModifiers) {
     return applyFeatMechanicalDetection(migrateSkilledRow(row, preset))
   }
 
-  if (preset && !featHasModifierConfig(row)) {
-    const description = typeof row.description === "string" ? row.description : ""
-    if (shouldSkipFeatPreset(name, description, preset)) {
-      return applyFeatMechanicalDetection(row)
-    }
-    if (preset.isChoice && preset.choices) {
-      const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
-      return {
-        ...row,
-        is_choice: true,
-        isChoice: true,
-        choices: preset.choices,
-        linked_modifiers: synced.linkedModifiers,
-        linkedModifiers: synced.linkedModifiers,
-        modifier_refs: synced.modifierRefs,
-        modifierRefs: synced.modifierRefs,
-        benefits: row.benefits ?? null,
-        repeatable: row.repeatable ?? preset.repeatable ?? false,
-      }
-    }
-
-    const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers ?? [] })
-    return applyFeatMechanicalDetection({
-      ...row,
-      is_choice: false,
-      isChoice: false,
-      choices: null,
-      linked_modifiers: synced.linkedModifiers,
-      linkedModifiers: synced.linkedModifiers,
-      modifier_refs: synced.modifierRefs,
-      modifierRefs: synced.modifierRefs,
-      benefits: row.benefits ?? null,
-      repeatable: row.repeatable ?? preset.repeatable ?? false,
-    })
+  if (preset) {
+    return applyFeatNamePreset(row)
   }
 
   return applyFeatMechanicalDetection(row)
@@ -141,7 +68,7 @@ export function enrichSrdFeatList(rows: Record<string, unknown>[]): Record<strin
   return rows.map(enrichSrdFeatRow)
 }
 
-/** Resolve preset by feat name (for tests / tooling). */
+/** Resolve SRD bundled preset by feat name (for tests / tooling). */
 export function presetForFeatName(name: string): FeatModifierPreset | undefined {
   return FEAT_MODIFIER_PRESETS[name]
 }

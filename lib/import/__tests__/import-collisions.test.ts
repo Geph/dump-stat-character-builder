@@ -3,6 +3,7 @@ import {
   applyImportCollisionResolutions,
   applyImportRenames,
   buildImportCollisions,
+  defaultCollisionResolutionMap,
   defaultRenameMap,
   type ImportCollisionKind,
 } from "@/lib/import/import-collisions"
@@ -85,12 +86,75 @@ describe("buildImportCollisions", () => {
       spell: [{ name: "Searing Orb", source: "Homebrew" }],
     })
     const next = applyImportCollisionResolutions(
-      content,
+      content as unknown as ImportContent,
       collisions,
       { [collisions[0].id]: "overwrite" },
       defaultRenameMap(collisions),
     )
     expect(next.spells?.[0].name).toBe("Searing Orb")
     expect(next.spells?.[0].description).toBe("Updated text")
+  })
+
+  it("defaults spell collisions to link and drops them from the import payload", () => {
+    const content = {
+      spells: [
+        {
+          name: "Fireball",
+          level: 3,
+          school: "Evocation",
+          casting_time: "1 action",
+          range: "150 feet",
+          components: ["V", "S", "M"],
+          duration: "Instantaneous",
+          concentration: false,
+          description: "Import stub — should not overwrite SRD",
+          classes: ["Wizard"],
+        },
+        {
+          name: "Brand New Bolt",
+          level: 1,
+          school: "Evocation",
+          casting_time: "1 action",
+          range: "60 feet",
+          components: ["V"],
+          duration: "Instantaneous",
+          concentration: false,
+          description: "Novel spell",
+          classes: [],
+        },
+      ],
+    }
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
+      spell: [{ name: "Fireball", source: "SRD" }],
+    })
+    expect(defaultCollisionResolutionMap(collisions)).toEqual({
+      [collisions[0].id]: "link",
+    })
+    const next = applyImportCollisionResolutions(
+      content as unknown as ImportContent,
+      collisions,
+      defaultCollisionResolutionMap(collisions),
+      defaultRenameMap(collisions),
+    )
+    expect(next.spells?.map((spell) => spell.name)).toEqual(["Brand New Bolt"])
+  })
+
+  it("drops skipped collision rows from the import payload", () => {
+    const content = {
+      feats: [
+        { name: "Alert", description: "Incoming", level_requirement: 1 },
+        { name: "Fresh Feat", description: "Keep me", level_requirement: 1 },
+      ],
+    }
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
+      feat: [{ name: "Alert", source: "SRD" }],
+    })
+    const next = applyImportCollisionResolutions(
+      content as unknown as ImportContent,
+      collisions,
+      { [collisions[0].id]: "skip" },
+      defaultRenameMap(collisions),
+    )
+    expect(next.feats?.map((feat) => feat.name)).toEqual(["Fresh Feat"])
   })
 })

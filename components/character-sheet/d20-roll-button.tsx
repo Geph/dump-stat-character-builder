@@ -17,6 +17,8 @@ type D20RollButtonProps = {
   modifier: number
   title?: string
   size?: "sm" | "md" | "lg"
+  /** `stack` puts adv/dis above the roll button (centered). Default is side-by-side. */
+  layout?: "inline" | "stack"
   breakdown?: { label: string; value: number }[]
   onRoll?: () => void
   rollContext?: RollContext
@@ -58,6 +60,7 @@ export function D20RollButton({
   modifier,
   title,
   size = "sm",
+  layout = "inline",
   breakdown,
   onRoll,
   rollContext,
@@ -172,48 +175,65 @@ export function D20RollButton({
     onRoll?.()
   }
 
+  const modeToggle = (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
+        setManualOverride((current) => cycleManualOverride(current))
+      }}
+      className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
+        modeBadge || manualOverride !== "normal"
+          ? "border-primary/40 text-primary"
+          : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+      }`}
+      title="Cycle manual advantage / disadvantage override"
+      aria-label="Cycle roll mode override"
+    >
+      {modeBadge ?? (manualOverride === "normal" ? "···" : manualOverride === "advantage" ? "Adv" : "Dis")}
+    </button>
+  )
+
+  const rollButton = (
+    <button
+      type="button"
+      onClick={handleRoll}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center rounded border border-border bg-muted/80 font-bold tabular-nums hover:bg-muted shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClass}`}
+      title={disabledReason ?? tooltip}
+      aria-label={title ?? `Roll d20 ${modLabel}`}
+    >
+      <RollDiceIcon />
+      {effectiveMode === "auto_fail" ? (
+        <span className="font-medium text-destructive">Fail</span>
+      ) : result != null ? (
+        <span className="font-medium">
+          {result.natural}
+          <span className="text-muted-foreground">=</span>
+          <span className="font-black text-primary">{result.total}</span>
+          {isNat20OrNat1(result.natural) ? (
+            <span className="text-primary" aria-label="Natural 20 or natural 1">
+              !!
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </button>
+  )
+
+  if (layout === "stack") {
+    return (
+      <span className="inline-flex flex-col items-center gap-0.5 shrink-0">
+        {modeToggle}
+        {rollButton}
+      </span>
+    )
+  }
+
   return (
     <span className="inline-flex items-center gap-1 shrink-0">
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation()
-          setManualOverride((current) => cycleManualOverride(current))
-        }}
-        className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
-          modeBadge || manualOverride !== "normal"
-            ? "border-primary/40 text-primary"
-            : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
-        }`}
-        title="Cycle manual advantage / disadvantage override"
-        aria-label="Cycle roll mode override"
-      >
-        {modeBadge ?? (manualOverride === "normal" ? "···" : manualOverride === "advantage" ? "Adv" : "Dis")}
-      </button>
-      <button
-        type="button"
-        onClick={handleRoll}
-        disabled={disabled}
-        className={`inline-flex items-center justify-center rounded border border-border bg-muted/80 font-bold tabular-nums hover:bg-muted shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClass}`}
-        title={disabledReason ?? tooltip}
-        aria-label={title ?? `Roll d20 ${modLabel}`}
-      >
-        <RollDiceIcon />
-        {effectiveMode === "auto_fail" ? (
-          <span className="font-medium text-destructive">Fail</span>
-        ) : result != null ? (
-          <span className="font-medium">
-            {result.natural}
-            <span className="text-muted-foreground">=</span>
-            <span className="font-black text-primary">{result.total}</span>
-            {isNat20OrNat1(result.natural) ? (
-              <span className="text-primary" aria-label="Natural 20 or natural 1">
-                !!
-              </span>
-            ) : null}
-          </span>
-        ) : null}
-      </button>
+      {modeToggle}
+      {rollButton}
     </span>
   )
 }
