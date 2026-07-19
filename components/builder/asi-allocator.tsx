@@ -79,7 +79,7 @@ export function AsiAllocator({
       className={cn(
         "grid gap-2",
         visual
-          ? "max-sm:grid-cols-1 max-sm:gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          ? "max-sm:grid-cols-1 max-sm:gap-3 sm:grid-cols-2"
           : "max-sm:grid-cols-1 sm:grid-cols-3",
       )}
     >

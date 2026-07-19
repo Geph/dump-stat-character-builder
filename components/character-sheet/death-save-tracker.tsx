@@ -6,7 +6,11 @@ import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-his
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
 import { isNat20OrNat1 } from "@/components/character-sheet/d20-roll-button"
 import { collectDeathSaveCritThreshold } from "@/lib/character/collect-feature-roll-modes"
-import { resolveRollMode, rollModeBadgeLabel } from "@/lib/character/resolve-roll-mode"
+import {
+  resolveRollMode,
+  rollModeBadgeLabel,
+  type ManualRollOverride,
+} from "@/lib/character/resolve-roll-mode"
 import {
   applyDeathSaveRoll,
   deathSaveRollSummary,
@@ -22,6 +26,12 @@ type DeathSaveTrackerProps = {
   onDeathSavesChange: (next: DeathSaveState) => void
   /** Compact row aligned with saving throw rows. */
   variant?: "stacked" | "inline"
+}
+
+function cycleManualOverride(current: ManualRollOverride): ManualRollOverride {
+  if (current === "normal") return "advantage"
+  if (current === "advantage") return "disadvantage"
+  return "normal"
 }
 
 function DeathSaveDots({
@@ -81,6 +91,7 @@ export function DeathSaveTracker({
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
   const [lastRoll, setLastRoll] = useState<number | null>(null)
+  const [manualOverride, setManualOverride] = useState<ManualRollOverride>("normal")
 
   const critThreshold = collectDeathSaveCritThreshold(rollCtx.classFeatures, {
     activeConditions: rollCtx.activeConditions,
@@ -93,6 +104,7 @@ export function DeathSaveTracker({
     context: { kind: "death_save" },
     activeConditions: rollCtx.activeConditions,
     exhaustionLevel: rollCtx.exhaustionLevel,
+    manualOverride,
     classFeatures: rollCtx.classFeatures,
     limitationContext: {
       activeConditions: rollCtx.activeConditions,
@@ -103,6 +115,9 @@ export function DeathSaveTracker({
     },
   })
   const modeBadge = rollModeBadgeLabel(resolvedMode.mode)
+  const modeToggleLabel =
+    modeBadge ??
+    (manualOverride === "normal" ? "···" : manualOverride === "advantage" ? "Adv" : "Dis")
 
   const toggleSuccess = (index: number) => {
     const active = index < deathSaves.successes
@@ -141,15 +156,28 @@ export function DeathSaveTracker({
     <div className="flex items-center gap-1 shrink-0">
       <button
         type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          setManualOverride((current) => cycleManualOverride(current))
+        }}
+        className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
+          modeBadge || manualOverride !== "normal"
+            ? "border-primary/40 text-primary"
+            : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+        }`}
+        title="Cycle manual advantage / disadvantage override"
+        aria-label="Cycle death save roll mode override"
+      >
+        {modeToggleLabel}
+      </button>
+      <button
+        type="button"
         onClick={handleRoll}
         className="inline-flex h-7 min-w-[2rem] items-center justify-center gap-1 rounded border border-border bg-muted/80 px-1.5 text-xs font-bold tabular-nums hover:bg-muted"
         title={`Roll death saving throw (d20${modeBadge ? `, ${modeBadge}` : ""}, 10+ success, nat 1 = 2 failures, ${critThreshold < 20 ? `${critThreshold}-20` : "nat 20"} = regain 1 HP)`}
         aria-label="Roll death save"
       >
         <Dices className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden />
-        {modeBadge ? (
-          <span className="text-[9px] font-bold uppercase text-primary">{modeBadge}</span>
-        ) : null}
         {lastRoll != null ? (
           <span className="font-medium">
             {lastRoll}
