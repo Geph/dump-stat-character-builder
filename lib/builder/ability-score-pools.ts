@@ -23,6 +23,8 @@ import { isAsiFeat, milestoneAsiPointTotal } from "@/lib/builder/asi-allocation"
 export type AbilityScorePoolGrant = {
   allocationKey: string
   label: string
+  /** Where this pool comes from (feat, species trait, class feature, etc.). */
+  sourceLabel?: string
   points: number
   allowedAbilities?: AbilityScoreKey[]
 }
@@ -33,7 +35,7 @@ function grantsFromLinkedModifiers(
   legacyRefs: string[] | null | undefined,
   catalog: ModifierCatalogEntry[],
   allocationKeyPrefix: string,
-  label: string,
+  sourceLabel: string,
 ): AbilityScorePoolGrant[] {
   const instances = effectiveLinkedModifiers(linked, legacyRefs, catalog)
   if (!instances.length) return []
@@ -45,7 +47,8 @@ function grantsFromLinkedModifiers(
       if (mod.type !== "ability_scores" || mod.mode !== "asi_pool") continue
       grants.push({
         allocationKey: `${allocationKeyPrefix}::ref::${instance.catalogRefId}::${mod.id}`,
-        label: mod.label?.trim() || entry?.name || label,
+        label: mod.label?.trim() || entry?.name || sourceLabel,
+        sourceLabel,
         points: mod.points ?? ASI_POINTS_PER_PICK,
         ...(mod.allowedAbilities?.length ? { allowedAbilities: mod.allowedAbilities } : {}),
       })
@@ -68,7 +71,7 @@ function collectFromFeature(
       feature.modifierRefs,
       catalog,
       `class_feature:${featureKey}`,
-      feature.name,
+      `Feature · ${feature.name}`,
     ),
   )
 
@@ -83,7 +86,7 @@ function collectFromFeature(
         option.modifierRefs,
         catalog,
         `class_feature_choice:${featureKey}:${optionName}`,
-        `${feature.name}: ${optionName}`,
+        `Feature · ${feature.name}: ${optionName}`,
       ),
     )
   }
@@ -129,7 +132,7 @@ export function collectAbilityScorePoolGrants(params: {
       species?.modifierRefs,
       catalog,
       "species_refs",
-      species?.name ?? "Species",
+      species?.name ? `Species · ${species.name}` : "Species",
     ),
   )
 
@@ -140,7 +143,7 @@ export function collectAbilityScorePoolGrants(params: {
         trait.modifierRefs,
         catalog,
         `species_trait:${index}`,
-        trait.name,
+        `Species · ${trait.name}`,
       ),
     )
     if (!trait.isChoice || !trait.choices?.options?.length) return
@@ -154,7 +157,7 @@ export function collectAbilityScorePoolGrants(params: {
           option.modifierRefs,
           catalog,
           `species_trait_choice:${index}:${optionName}`,
-          `${trait.name}: ${optionName}`,
+          `Species · ${trait.name}: ${optionName}`,
         ),
       )
     }
@@ -201,7 +204,7 @@ export function collectAbilityScorePoolGrants(params: {
         feat.modifierRefs ?? readModifierRefs(feat as unknown as unknown as Record<string, unknown>),
         catalog,
         choicePickKey,
-        feat.name,
+        `Feat · ${feat.name}`,
       ),
     )
   })

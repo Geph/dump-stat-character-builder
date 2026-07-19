@@ -216,6 +216,7 @@ import {
   nonSpellModifierPlayerChoiceSlots,
   spellModifierPlayerChoiceSlots,
 } from "@/lib/builder/modifier-player-choices"
+import { backgroundFeatureModsSourceKey } from "@/lib/compendium/wire-background-proficiency-choices"
 import {
   allAbilityScorePoolAllocationsValid,
   collectAbilityScorePoolGrants,
@@ -2621,6 +2622,8 @@ export default function BuilderPageClient() {
     if (step.id === BUILDER_STEP_IDS.CLASS_ABILITIES) return hasClassAbilityStep
     return true
   })
+  const lastVisibleStepId =
+    visibleSteps[visibleSteps.length - 1]?.id ?? BUILDER_STEP_IDS.DETAILS
 
   const nextVisibleStepId = (stepId: number) => {
     const currentOrder = builderStepOrder(stepId)
@@ -2844,7 +2847,7 @@ export default function BuilderPageClient() {
                   onContinue={advanceStep}
                   onSave={saveCharacter}
                   saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
-                  lastStep={BUILDER_STEP_IDS.DETAILS}
+                  lastStep={lastVisibleStepId}
                 />
               </div>
             </div>
@@ -4123,6 +4126,18 @@ export default function BuilderPageClient() {
                             }
                             return next
                           })
+                          setModifierPlayerPicks((prev) => {
+                            const next = { ...prev }
+                            for (const key of Object.keys(next)) {
+                              if (
+                                key.startsWith("background:") ||
+                                key.startsWith("feat:granted:")
+                              ) {
+                                delete next[key]
+                              }
+                            }
+                            return next
+                          })
                           setAsiAllocationsByFeatId((prev) => {
                             if (!nextId) {
                               const { [BACKGROUND_ASI_KEY]: _, ...rest } = prev
@@ -4181,6 +4196,34 @@ export default function BuilderPageClient() {
                       </>
                     )
                   })()}
+
+                  {selectedBackground ? (
+                    <ModifierPlayerChoicePanel
+                      sourceKey={backgroundFeatureModsSourceKey(selectedBackground.id)}
+                      sourceLabel={selectedBackground.name}
+                      slots={modifierPlayerChoiceSlots}
+                      picks={modifierPlayerPicks}
+                      spells={spells}
+                      excludeKinds={["spell"]}
+                      accentClass="border-accent bg-accent/10"
+                      unavailableOptions={[...getTakenSkills(skillPickSources)]}
+                      {...modifierExpertisePickerProps}
+                      onChange={(slotKey, selected) => {
+                        const slot = modifierPlayerChoiceSlots.find(
+                          (entry) => entry.slotKey === slotKey,
+                        )
+                        if (!slot) return
+                        setModifierPlayerPicks((prev) =>
+                          setModifierPlayerPickValue(
+                            prev,
+                            slot,
+                            modifierPlayerChoiceSlots,
+                            selected,
+                          ),
+                        )
+                      }}
+                    />
+                  ) : null}
 
                   {selectedBackground && isLegacyBackground(selectedBackground) ? (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
@@ -4601,6 +4644,11 @@ export default function BuilderPageClient() {
                       allocation={milestoneAsiAllocation}
                       totalPoints={milestoneAsiTotalPoints}
                       pickCount={milestoneAsiFeatCount}
+                      sourceLabel={
+                        milestoneAsiFeatCount > 0
+                          ? `Feat${milestoneAsiFeatCount === 1 ? "" : "s"} · Ability Score Improvement`
+                          : null
+                      }
                       variant={asiAllocatorVariant}
                       baseScores={{
                         strength: character.strength,
@@ -4624,6 +4672,7 @@ export default function BuilderPageClient() {
                   <div key={grant.allocationKey}>
                     <AsiAllocator
                       title={grant.label}
+                      sourceLabel={grant.sourceLabel}
                       allocation={asiAllocationsByFeatId[grant.allocationKey] ?? {}}
                       totalPoints={grant.points}
                       allowedAbilities={grant.allowedAbilities}
@@ -4651,6 +4700,11 @@ export default function BuilderPageClient() {
                   <div>
                     <AsiAllocator
                       title={`${selectedBackground?.name ?? "Background"} Ability Scores`}
+                      sourceLabel={
+                        selectedBackground?.name
+                          ? `Background · ${selectedBackground.name}`
+                          : "Background"
+                      }
                       allocation={asiAllocationsByFeatId[BACKGROUND_ASI_KEY] ?? {}}
                       totalPoints={BACKGROUND_ASI_TOTAL_POINTS}
                       allowedAbilities={backgroundAbilityGrant.eligible}
@@ -5448,7 +5502,7 @@ export default function BuilderPageClient() {
                 onContinue={advanceStep}
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
-                lastStep={BUILDER_STEP_IDS.DETAILS}
+                lastStep={lastVisibleStepId}
               />
             </div>
           </div>
