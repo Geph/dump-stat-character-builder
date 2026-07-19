@@ -16,6 +16,8 @@ type Props = {
   totalPoints: number
   pickCount?: number
   title?: string
+  /** Origin of this pool (e.g. "Feat · Observant"). */
+  sourceLabel?: string | null
   allowedAbilities?: (typeof ABILITY_SCORE_KEYS)[number][]
   maxPerAbility?: number
   helpText?: string
@@ -46,6 +48,7 @@ export function AsiAllocator({
   totalPoints,
   pickCount = 1,
   title = "Ability Score Improvement",
+  sourceLabel = null,
   allowedAbilities,
   maxPerAbility,
   helpText: helpTextOverride,
@@ -148,6 +151,9 @@ export function AsiAllocator({
     return (
       <div className="mt-2 p-3 rounded-lg border border-border bg-card/80">
         <p className="text-xs font-bold text-foreground mb-1">{title}</p>
+        {sourceLabel ? (
+          <p className="text-[11px] text-muted-foreground mb-1">{sourceLabel}</p>
+        ) : null}
         {pickCount > 1 && (
           <p className="text-[11px] text-muted-foreground mb-1">
             From {pickCount} selected feats ({totalPoints} points total)
@@ -180,6 +186,11 @@ export function AsiAllocator({
 
       <div className={cn("relative p-4", !bannerUrl && "pt-4")}>
         <p className="font-serif text-base font-black uppercase tracking-wide text-white">{title}</p>
+        {sourceLabel ? (
+          <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-400/80">
+            {sourceLabel}
+          </p>
+        ) : null}
         {pickCount > 1 && (
           <p className="mt-0.5 text-[11px] text-white/50">
             From {pickCount} selected feats ({totalPoints} points total)

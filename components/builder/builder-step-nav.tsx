@@ -18,7 +18,11 @@ type BuilderStepNavProps = {
   onSave: () => void
   saveLabel?: string
   className?: string
-  /** The final step id; the Save action shows on this step. Defaults to 6. */
+  /**
+   * The final step id among visible steps; the Save action shows on this step.
+   * Compare by identity (not numeric order) — step ids are not monotonic with display order
+   * (e.g. CLASS_ABILITIES is 8, DETAILS is 6).
+   */
   lastStep?: number
 }
 
@@ -107,7 +111,7 @@ export function BuilderStepNav({
         Back
       </button>
 
-      {currentStep < lastStep ? (
+      {currentStep !== lastStep ? (
         showBlockerPopover ? (
           <BlockedContinueButton blockers={proceedBlockers} />
         ) : (
