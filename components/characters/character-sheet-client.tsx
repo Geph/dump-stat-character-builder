@@ -191,6 +191,7 @@ import { StatExplainPopover } from "@/components/character-sheet/stat-explain-po
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
 import { SheetPersistentStatsBar, SheetInitiativeBlock } from "@/components/character-sheet/sheet-persistent-stats-bar"
+import { HitDiceTracker } from "@/components/character-sheet/hit-dice-tracker"
 import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
@@ -1242,6 +1243,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const resourceEntries = useMemo<ResourceTrackerEntry[]>(() => {
     if (!classDetails.length) return []
     const entries: ResourceTrackerEntry[] = []
+    const seenIds = new Set<string>()
     for (const entry of classDetails) {
       const className = entry.class?.name
       if (!className || !entry.class) continue
@@ -1249,8 +1251,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       for (const resource of resources) {
         if (resource.uses.type === "unlimited" || resource.uses.type === "class_resource") continue
         if (resource.id === "spell_slots") continue
+        const id = `${entry.row.class_id}_${resource.id}`
+        if (seenIds.has(id)) continue
+        seenIds.add(id)
         entries.push({
-          id: `${entry.row.class_id}_${resource.id}`,
+          id,
           name:
             classDetails.length > 1 || resources.length > 1
               ? `${resource.name} (${className})`
@@ -1260,7 +1265,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         })
       }
     }
-    return [...entries, ...collectFeatureUsesResources(classDetails, modifierCatalog)]
+    for (const featureEntry of collectFeatureUsesResources(classDetails, modifierCatalog)) {
+      if (seenIds.has(featureEntry.id)) continue
+      seenIds.add(featureEntry.id)
+      entries.push(featureEntry)
+    }
+    return entries
   }, [classDetails, modifierCatalog])
 
   const hasUnleashedMind = useMemo(
@@ -2904,6 +2914,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         />
                       </span>
                     </div>
+                    {hitDicePool.length > 0 ? (
+                      <HitDiceTracker
+                        pool={hitDicePool}
+                        conMod={abilityMods.constitution}
+                        currentHp={currentHp}
+                        maxHp={maxHp}
+                        onHeal={(amount) =>
+                          setCurrentHp((hp) => Math.min(maxHp, hp + amount))
+                        }
+                        onSetSpent={(classId, spent) =>
+                          setUsedHitDiceByClassId((prev) => {
+                            const next = { ...prev }
+                            if (spent <= 0) delete next[classId]
+                            else next[classId] = spent
+                            return next
+                          })
+                        }
+                      />
+                    ) : null}
                   </div>
                 </div>
 
@@ -3222,6 +3251,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         ...prev,
                         [classId]: (prev[classId] ?? 0) + count,
                       }))
+                    }
+                    onSetHitDiceSpent={(classId, spent) =>
+                      setUsedHitDiceByClassId((prev) => {
+                        const next = { ...prev }
+                        if (spent <= 0) delete next[classId]
+                        else next[classId] = spent
+                        return next
+                      })
                     }
                     onInitiativeRoll={handleInitiativeRoll}
                     formatMod={formatMod}

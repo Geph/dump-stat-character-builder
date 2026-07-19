@@ -122,7 +122,7 @@ export function AbilityScoreCards({
   isStandardValueUsedElsewhere,
 }: AbilityScoreCardsProps) {
   return (
-    <div className="grid grid-cols-1 max-sm:gap-4 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 max-sm:gap-4 sm:grid-cols-2 gap-4">
       {BUILDER_ABILITY_NAMES.map((ability, index) => {
         const theme = ABILITY_THEME[ability]
         const assigned = method === "standard" ? standardAssignments[ability] ?? null : scores[ability]

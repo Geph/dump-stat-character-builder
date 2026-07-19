@@ -374,7 +374,7 @@ function ActionDetailOverlay({
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 24, opacity: 0 }}
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
+        className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm">
@@ -691,7 +691,12 @@ export function SheetActionsPanel({
                         ) : null}
                       </div>
                     </div>
-                    {usage ? (
+                    {usage && usesClassResource ? (
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        Costs {entry.limitedUses?.classResourceAmount ?? 1}
+                        {usage.resourceName ? ` ${usage.resourceName}` : ""}
+                      </span>
+                    ) : usage ? (
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] tabular-nums text-muted-foreground">
                           {usage.max - usage.used} / {usage.max}

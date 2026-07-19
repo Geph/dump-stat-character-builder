@@ -7,15 +7,27 @@ export function resolveClassResourcesForClass(
   cls: Pick<DndClass, "id" | "name" | "class_resources">,
   tableRows?: ClassResourceRow[],
 ): ClassResource[] {
-  if (tableRows?.length && cls.id) {
-    const fromTable = resourcesForClass(cls.id, tableRows)
-    if (fromTable.length) return fromTable
+  const raw = (() => {
+    if (tableRows?.length && cls.id) {
+      const fromTable = resourcesForClass(cls.id, tableRows)
+      if (fromTable.length) return fromTable
+    }
+
+    const embedded = cls.class_resources
+    if (Array.isArray(embedded) && embedded.length > 0) return embedded
+
+    return SRD_CLASS_RESOURCES_BY_NAME[cls.name] ?? []
+  })()
+
+  const seen = new Set<string>()
+  const deduped: ClassResource[] = []
+  for (const resource of raw) {
+    const key = resource.id?.trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    deduped.push(resource)
   }
-
-  const embedded = cls.class_resources
-  if (Array.isArray(embedded) && embedded.length > 0) return embedded
-
-  return SRD_CLASS_RESOURCES_BY_NAME[cls.name] ?? []
+  return deduped
 }
 
 export function attachClassResourcesToClass(

@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { Footprints, Heart, Shield, ShieldPlus, Zap } from "lucide-react"
 import type { CharacterSpeedEntry } from "@/lib/character/resolve-all-speeds"
 import type { HitDicePoolEntry } from "@/lib/character/hit-dice"
+import { HitDiceTracker } from "@/components/character-sheet/hit-dice-tracker"
 import { ShortRestHitDiceBox } from "@/components/character-sheet/short-rest-hit-dice-box"
 import type { DerivedStatBreakdowns } from "@/lib/character/stat-contributions"
 import { breakdownLines } from "@/lib/character/get-derived-breakdowns"
@@ -35,6 +36,8 @@ type SheetPersistentStatsBarProps = {
   showShortRestHitDice?: boolean
   onShortRestHeal?: (amount: number) => void
   onSpendHitDice?: (classId: string, count: number) => void
+  /** Set spent hit dice for a class (manual remaining edit). */
+  onSetHitDiceSpent?: (classId: string, spent: number) => void
   onInitiativeRoll: () => void
   formatMod: (mod: number) => string
 }
@@ -132,6 +135,7 @@ function CombatStatsCompactRow({
   showShortRestHitDice = false,
   onShortRestHeal,
   onSpendHitDice,
+  onSetHitDiceSpent,
 }: Omit<
   SheetPersistentStatsBarProps,
   "embedded" | "panel" | "initiative" | "onInitiativeRoll" | "formatMod"
@@ -242,7 +246,17 @@ function CombatStatsCompactRow({
               className="w-8 min-h-6 text-center bg-background/80 border border-cyan/30 rounded text-[11px] font-bold text-cyan tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
-          {showShortRestHitDice && onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
+          {hitDicePool.length > 0 && onShortRestHeal && onSetHitDiceSpent ? (
+            <HitDiceTracker
+              variant="compact"
+              pool={hitDicePool}
+              conMod={conMod}
+              currentHp={currentHp}
+              maxHp={maxHp}
+              onHeal={onShortRestHeal}
+              onSetSpent={onSetHitDiceSpent}
+            />
+          ) : showShortRestHitDice && onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
             <ShortRestHitDiceBox
               pool={hitDicePool}
               conMod={conMod}
@@ -292,6 +306,7 @@ export function SheetPersistentStatsBar({
   showShortRestHitDice,
   onShortRestHeal,
   onSpendHitDice,
+  onSetHitDiceSpent,
   onInitiativeRoll,
   formatMod,
 }: SheetPersistentStatsBarProps) {
@@ -314,6 +329,7 @@ export function SheetPersistentStatsBar({
         showShortRestHitDice={showShortRestHitDice}
         onShortRestHeal={onShortRestHeal}
         onSpendHitDice={onSpendHitDice}
+        onSetHitDiceSpent={onSetHitDiceSpent}
       />
     )
   }

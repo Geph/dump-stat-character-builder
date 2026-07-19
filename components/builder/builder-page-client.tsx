@@ -2872,108 +2872,6 @@ export default function BuilderPageClient() {
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Class & Level</h2>
                 <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
                 
-                {/* Current Class Levels */}
-                {activeClassLevels.length > 0 && (
-                  <div className="mb-4 p-3 bg-muted rounded-xl">
-                    <p className="text-xs text-muted-foreground mb-2 uppercase font-bold">Current Classes (Total Level: {totalLevel})</p>
-                    <div className="space-y-2">
-                      {activeClassLevels.map((cl, idx) => {
-                        const cls = classes.find(c => c.id === cl.classId)
-                        const isPrimary = cl.classId === resolvedPrimaryClassId
-                        return (
-                          <div
-                            key={cl.classId}
-                            className={`flex items-center gap-2 rounded-lg p-2 ${
-                              isPrimary
-                                ? "bg-primary/10 border border-primary/40"
-                                : "bg-card border border-border"
-                            }`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <span className="font-bold text-sm text-foreground">{cls?.name}</span>
-                              {isPrimary && (
-                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 max-sm:gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newLevels = [...activeClassLevels]
-                                  if (newLevels[idx].level > 1) {
-                                    newLevels[idx].level--
-                                    const unlockLevel = resolveSubclassUnlockLevel(cls)
-                                    if (newLevels[idx].level < unlockLevel) {
-                                      setSubclassByClassId((prev) => {
-                                        const next = { ...prev }
-                                        delete next[newLevels[idx].classId]
-                                        return next
-                                      })
-                                    }
-                                    setClassLevels(newLevels)
-                                  } else {
-                                    removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
-                                  }
-                                }}
-                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-destructive/20 rounded"
-                                aria-label={`Decrease ${cls?.name ?? "class"} level`}
-                              >
-                                <Minus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
-                              </button>
-                              <ClassLevelInput
-                                value={cl.level}
-                                min={1}
-                                max={20 - (totalLevel - cl.level)}
-                                aria-label={`${cls?.name ?? "Class"} level`}
-                                onCommit={(level) => {
-                                  const newLevels = [...activeClassLevels]
-                                  newLevels[idx] = { ...newLevels[idx], level }
-                                  const unlockLevel = resolveSubclassUnlockLevel(cls)
-                                  if (level < unlockLevel) {
-                                    setSubclassByClassId((prev) => {
-                                      const next = { ...prev }
-                                      delete next[newLevels[idx].classId]
-                                      return next
-                                    })
-                                  }
-                                  setClassLevels(newLevels)
-                                }}
-                                className="w-8 max-sm:w-11 text-center font-bold text-sm max-sm:text-base bg-background border border-border rounded px-0.5 py-0.5 max-sm:py-1.5 focus:outline-none focus:border-primary"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (totalLevel < 20) {
-                                    const newLevels = [...activeClassLevels]
-                                    newLevels[idx].level++
-                                    setClassLevels(newLevels)
-                                  }
-                                }}
-                                disabled={totalLevel >= 20}
-                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
-                                aria-label={`Increase ${cls?.name ?? "class"} level`}
-                              >
-                                <Plus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
-                              }}
-                              className="p-1 text-muted-foreground hover:text-destructive"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-                
                 {/* Search */}
                 <div className="relative mb-4">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -3091,6 +2989,108 @@ export default function BuilderPageClient() {
                     </>
                   )
                 })()}
+
+                {/* Current Class Levels */}
+                {activeClassLevels.length > 0 && (
+                  <div className="mt-4 mb-4 p-3 bg-muted rounded-xl">
+                    <p className="text-xs text-muted-foreground mb-2 uppercase font-bold">Current Classes (Total Level: {totalLevel})</p>
+                    <div className="space-y-2">
+                      {activeClassLevels.map((cl, idx) => {
+                        const cls = classes.find(c => c.id === cl.classId)
+                        const isPrimary = cl.classId === resolvedPrimaryClassId
+                        return (
+                          <div
+                            key={cl.classId}
+                            className={`flex items-center gap-2 rounded-lg p-2 ${
+                              isPrimary
+                                ? "bg-primary/10 border border-primary/40"
+                                : "bg-card border border-border"
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="font-bold text-sm text-foreground">{cls?.name}</span>
+                              {isPrimary && (
+                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">
+                                  Primary
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 max-sm:gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newLevels = [...activeClassLevels]
+                                  if (newLevels[idx].level > 1) {
+                                    newLevels[idx].level--
+                                    const unlockLevel = resolveSubclassUnlockLevel(cls)
+                                    if (newLevels[idx].level < unlockLevel) {
+                                      setSubclassByClassId((prev) => {
+                                        const next = { ...prev }
+                                        delete next[newLevels[idx].classId]
+                                        return next
+                                      })
+                                    }
+                                    setClassLevels(newLevels)
+                                  } else {
+                                    removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
+                                  }
+                                }}
+                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-destructive/20 rounded"
+                                aria-label={`Decrease ${cls?.name ?? "class"} level`}
+                              >
+                                <Minus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
+                              </button>
+                              <ClassLevelInput
+                                value={cl.level}
+                                min={1}
+                                max={20 - (totalLevel - cl.level)}
+                                aria-label={`${cls?.name ?? "Class"} level`}
+                                onCommit={(level) => {
+                                  const newLevels = [...activeClassLevels]
+                                  newLevels[idx] = { ...newLevels[idx], level }
+                                  const unlockLevel = resolveSubclassUnlockLevel(cls)
+                                  if (level < unlockLevel) {
+                                    setSubclassByClassId((prev) => {
+                                      const next = { ...prev }
+                                      delete next[newLevels[idx].classId]
+                                      return next
+                                    })
+                                  }
+                                  setClassLevels(newLevels)
+                                }}
+                                className="w-8 max-sm:w-11 text-center font-bold text-sm max-sm:text-base bg-background border border-border rounded px-0.5 py-0.5 max-sm:py-1.5 focus:outline-none focus:border-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (totalLevel < 20) {
+                                    const newLevels = [...activeClassLevels]
+                                    newLevels[idx].level++
+                                    setClassLevels(newLevels)
+                                  }
+                                }}
+                                disabled={totalLevel >= 20}
+                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
+                                aria-label={`Increase ${cls?.name ?? "class"} level`}
+                              >
+                                <Plus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
+                              }}
+                              className="p-1 text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {multiclassAbilityIssues.length > 0 && (
                   <div className="mt-4 rounded-xl border border-warning/50 bg-warning/10 p-4">
