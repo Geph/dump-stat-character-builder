@@ -21,6 +21,8 @@ import {
   getEnrichmentPresets,
 } from "@/lib/import/enrichment-presets/registry"
 import { sanitizeGunslingerImportContent } from "@/lib/import/enrichment-presets/packs/gunslinger"
+import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
+import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import type {
   EnrichmentOperation,
   EnrichmentPreset,
@@ -531,6 +533,8 @@ export function applyImportEnrichmentPresets(
 
   next = patchInitiativeRechargeFromFeatures(next)
   next = sanitizeGunslingerImportContent(next)
+  next = sanitizeInvestigatorImportContent(next)
+  next = sanitizeNecromancerImportContent(next)
 
   return next
 }
