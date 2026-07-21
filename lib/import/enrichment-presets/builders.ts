@@ -265,6 +265,12 @@ export function resolveNamedPreset(
           preset.characteristics as CharacteristicModifier[],
         ),
       ]
+    case "fx_instance":
+      return [
+        fxInstance(createModifierInstanceId(), preset.catalogRefId, {
+          effects: preset.effects as never[],
+        }),
+      ]
     default:
       return []
   }

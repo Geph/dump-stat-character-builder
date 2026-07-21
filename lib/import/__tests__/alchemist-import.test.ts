@@ -438,3 +438,103 @@ describe("enrichImportContentModifiers integration", () => {
     expect(options.map((row) => row.name)).toEqual(["Acid Bomb"])
   })
 })
+
+describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
+  function enrichSubclassFeature(name: string, subclassName = "Apothecary") {
+    const enriched = enrichAlchemistFeatures({
+      subclasses: [
+        {
+          name: subclassName,
+          class_name: "Alchemist",
+          description: null,
+          features: [{ level: 3, name, description: `${name} feature text.` }],
+        },
+      ],
+    } as unknown as ImportContent)
+    return enriched.subclasses?.[0]?.features?.[0] as import("@/lib/types").Feature
+  }
+
+  it("wires Self-Medication save advantage behind optional toggle", () => {
+    const feature = enrichSubclassFeature("Self-Medication")
+    const effects = (feature.linkedModifiers ?? []).flatMap((mod) => mod.activation?.effects ?? [])
+    expect(effects.some((fx) => fx.kind === "check_roll_modifier")).toBe(true)
+    expect(feature.description).toMatch(/Self-Medication/i)
+  })
+
+  it("wires Alchemical Assassin BA + Sleight of Hand/Stealth advantage", () => {
+    const feature = enrichSubclassFeature("Alchemical Assassin", "Venomsmith")
+    expect(feature.activation?.bonusAction).toBe(true)
+    const effects = (feature.linkedModifiers ?? []).flatMap((mod) => mod.activation?.effects ?? [])
+    const check = effects.find((fx) => fx.kind === "check_roll_modifier") as
+      | { checkSkills?: string[]; checkRollMode?: string }
+      | undefined
+    expect(check?.checkRollMode).toBe("advantage")
+    expect(check?.checkSkills).toEqual(expect.arrayContaining(["Sleight of Hand", "Stealth"]))
+  })
+
+  it("wires Concentrated Healing and Overloaded Charge power_riders", () => {
+    const healing = enrichSubclassFeature("Concentrated Healing")
+    const healingChars = (healing.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(healingChars.some((char) => char.type === "power_rider")).toBe(true)
+
+    const overloaded = enrichSubclassFeature("Overloaded Charge", "Mad Bomber")
+    const overloadedChars = (overloaded.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(overloadedChars.some((char) => char.type === "power_rider")).toBe(true)
+  })
+
+  it("wires Surgical Strike, Toxic Recompense, Beguiling Perfume, Alchemical Resurrection", () => {
+    const surgical = enrichSubclassFeature("Surgical Strike", "Xenoalchemist")
+    expect(surgical.activation?.bonusAction).toBe(true)
+    expect(surgical.limitedUses?.type).toBe("fixed")
+
+    const toxic = enrichSubclassFeature("Toxic Recompense", "Venomsmith")
+    expect(toxic.activation?.reaction).toBe(true)
+    const toxicChars = (toxic.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(toxicChars.some((char) => char.type === "special_attack")).toBe(true)
+
+    const perfume = enrichSubclassFeature("Beguiling Perfume", "Amorist")
+    expect(perfume.activation?.reaction).toBe(true)
+
+    const rez = enrichSubclassFeature("Alchemical Resurrection")
+    expect(rez.activation?.action).toBe(true)
+    const rezChars = (rez.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(rezChars.some((char) => char.type === "craftable_items")).toBe(true)
+  })
+
+  it("wires Mutated Blood rest-swappable ability bump", () => {
+    const feature = enrichSubclassFeature("Mutated Blood", "Mutagenist")
+    expect(feature.isChoice).toBe(true)
+    expect(feature.choices?.swappableOnRest).toBe(true)
+    expect(feature.choices?.options?.map((opt) => opt.name)).toEqual([
+      "Strength",
+      "Dexterity",
+      "Constitution",
+    ])
+    const strMods = feature.choices?.options?.[0]?.linkedModifiers ?? []
+    const chars = strMods.flatMap((mod) => mod.characteristics ?? [])
+    expect(chars.some((char) => char.type === "ability_scores")).toBe(true)
+  })
+
+  it("wires Counter-Discharge, Timed Demolition, Elemental Oozes", () => {
+    const counter = enrichSubclassFeature("Counter-Discharge", "Dynamo Engineer")
+    expect(counter.activation?.reaction).toBe(true)
+    expect(counter.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "spell_dynamos",
+    })
+
+    const timed = enrichSubclassFeature("Timed Demolition", "Mad Bomber")
+    const timedChars = (timed.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(timedChars.some((char) => char.type === "power_rider")).toBe(true)
+
+    const oozes = enrichSubclassFeature("Elemental Oozes", "Ooze Rancher")
+    expect(oozes.choices?.options?.map((opt) => opt.name)).toEqual([
+      "Acid",
+      "Cold",
+      "Fire",
+      "Lightning",
+      "Poison",
+      "Thunder",
+    ])
+  })
+})
