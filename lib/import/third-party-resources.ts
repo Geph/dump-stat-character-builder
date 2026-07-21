@@ -150,17 +150,205 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /battle\s*dice/i,
     displayName: "Battle Dice",
     definition:
-      "Pool of dice spent on Captain maneuvers and battle tactics. Regain all expended Battle Dice when you roll Initiative or finish a Short or Long Rest.",
+      "Pool of dice spent on Captain/Vagabond maneuvers and battle tactics. Regain all expended Battle Dice when you roll Initiative or finish a Short or Long Rest.",
     defaultUses: {
       type: "at_level",
       atLevelMode: "tier",
       recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+      rechargeOnInitiative: true,
     },
     spendPatterns: [
       /\bexpend\s+(?:one|an?|1)\s+battle\s+die\b/i,
       /\bexpend\s+(?:up\s+to\s+)?(\d+)\s+battle\s+dice\b/i,
       /\bexpend\s+a\s+battle\s+die\b/i,
     ],
+  },
+  {
+    resourceKey: "risk_dice",
+    namePattern: /risk\s*dice/i,
+    displayName: "Risk Dice",
+    definition:
+      "Pool of dice spent on Gunslinger maneuvers and deeds. Die size and count scale on the class table; regain all on a Short or Long Rest. Dire Gambit restores 1 die on Initiative (and on a Critical Hit).",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+risk\s+die\b/i,
+      /\bexpend\s+(?:up\s+to\s+)?(\d+)\s+risk\s+dice\b/i,
+      /\bexpend\s+a\s+risk\s+die\b/i,
+      /\bspend\s+(?:one|an?|1)\s+risk\s+die\b/i,
+    ],
+  },
+  {
+    resourceKey: "spell_uses",
+    namePattern: /^spell\s*uses$/i,
+    displayName: "Spell Uses",
+    definition:
+      "Martyr (and similar) per-day casts of level 1+ spells. Separate from Hit Point Spellcasting damage costs; regain all on a Long Rest.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+spell\s+use\b/i,
+      /\bexpend\s+one\s+use\s+of\s+your\s+spell\s+uses\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: [{ level: 1, count: 2 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+  },
+  {
+    resourceKey: "interrupt",
+    namePattern: /^interrupts?$/i,
+    displayName: "Interrupt",
+    definition:
+      "Mage Hand Press Warden uses of the Interrupt reaction. Regain 1 use on a Short Rest and all uses on a Long Rest; some subclass riders also restore a use on Initiative.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\buse\s+this\s+reaction\b/i,
+      /\bexpend\s+(?:one|an?|1)\s+interrupt\b/i,
+    ],
+  },
+  {
+    resourceKey: "thralls",
+    namePattern: /^thralls$/i,
+    displayName: "Thralls",
+    definition:
+      "Maximum number of Necromancer thralls under your control — a count cap from the Thralls column, not a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Maximum thralls under your control at each Necromancer level (see class table).",
+      atLevelMode: "tier",
+    },
+  },
+  {
+    resourceKey: "thrall_cr_total",
+    namePattern: /^(?:cr\s*total|thrall\s*cr(?:\s*total)?)$/i,
+    displayName: "CR Total",
+    definition:
+      "Combined Challenge Rating cap for Necromancer thralls (fractions allowed, e.g. 1/4). A cap, not a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Combined thrall CR cap at each Necromancer level (see CR Total column).",
+      atLevelMode: "tier",
+    },
+  },
+  {
+    resourceKey: "dances",
+    namePattern: /^dances?$/i,
+    displayName: "Dances",
+    definition:
+      "Uses of the Dancer's Dance (Bonus Action flow state). Typically regain 1 expended use on a Short Rest and all uses on a Long Rest.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+dance(?:\s+uses?)?\b/i,
+      /\bspend\s+(?:one|an?|1)\s+dance(?:\s+uses?)?\b/i,
+      /\bexpend\s+(\d+)\s+dance(?:\s+uses?)?\b/i,
+      /\bspend\s+(\d+)\s+dance(?:\s+uses?)?\b/i,
+      /\bexpend\s+(\d+)\s+dances?\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: [{ level: 2, count: 2 }],
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+  },
+  {
+    resourceKey: "dance_die",
+    namePattern: /dance\s*die/i,
+    displayName: "Dance Die",
+    definition:
+      "Die size rolled for Graceful Dodge, Dance Styles, and similar Dancer features. Scales on the Dance Die column; not a depleting pool (Dances tracks uses).",
+    spendPatterns: [
+      // Dance Die is a size tracker, not a pool — only treat explicit "expend" as a spend.
+      /\bexpend\s+(?:one|an?|1)\s+dance\s+die\b/i,
+    ],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Dance Die size at each Dancer level (see class table).",
+      atLevelMode: "tier",
+      dieType: "d4",
+    },
+    proposeFromText: true,
+    textProposalUses: {
+      type: "special",
+      specialDescription: "Dance Die size at each Dancer level (see class table).",
+      atLevelMode: "tier",
+      dieType: "d4",
+      atLevelTable: [
+        { level: 2, count: 4 },
+        { level: 5, count: 6 },
+        { level: 11, count: 8 },
+        { level: 17, count: 10 },
+      ],
+    },
+  },
+  {
+    resourceKey: "cantrip_bonus_dice",
+    namePattern: /cantrip\s*bonus\s*dice/i,
+    displayName: "Cantrip Bonus Dice",
+    definition:
+      "Extra damage dice Warmage Edge adds to a cantrip damage roll from level 5+. A scaling rider count, not a depleting pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Bonus damage dice added by Warmage Edge (see Cantrip Bonus Dice column).",
+      atLevelMode: "tier",
+    },
+  },
+  {
+    resourceKey: "arcane_surge",
+    namePattern: /arcane\s*surge/i,
+    displayName: "Arcane Surge",
+    definition:
+      "Uses of Arcane Surge — once per turn, double a cantrip's damage dice. Regain 1 use on a Short Rest and all uses on a Long Rest.",
+    defaultUses: {
+      type: "fixed",
+      fixedAmount: 2,
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+arcane\s+surge\b/i,
+      /\buse\s+(?:one|an?|1)\s+arcane\s+surge\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "fixed",
+      fixedAmount: 2,
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    },
+  },
+  {
+    resourceKey: "tricks_known",
+    namePattern: /^tricks?(?:\s*known)?$/i,
+    displayName: "Tricks",
+    definition:
+      "Number of Warmage Tricks known — chosen from the Tricks list; a choice count, not a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Number of Warmage Tricks known at each Warmage level.",
+      atLevelMode: "tier",
+    },
   },
   {
     resourceKey: "exploit_dice",

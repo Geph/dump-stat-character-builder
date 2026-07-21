@@ -27,6 +27,7 @@ import type { UsesConfig, FeatureEffect } from "@/lib/types"
 import {
   blockedWhenConditionLimitation,
   notWearingArmorLimitation,
+  requiresActiveToggleLimitation,
   type ModifierLimitation,
 } from "@/lib/compendium/modifier-limitations"
 
@@ -138,6 +139,14 @@ function textMentionsWhileRaging(text: string): boolean {
   return (
     /\bwhile\s+(?:your\s+)?rage\s+is\s+active\b/i.test(text) ||
     /\bwhile\s+(?:you\s+are\s+)?raging\b/i.test(text)
+  )
+}
+
+function textMentionsWhileBloodied(text: string): boolean {
+  return (
+    /\bwhile\s+(?:you\s+are\s+)?bloodied\b/i.test(text) ||
+    /\bwhile\s+bloodied\b/i.test(text) ||
+    /\bif\s+you\s+are\s+bloodied\b/i.test(text)
   )
 }
 
@@ -280,6 +289,20 @@ function parseLimitationsFromText(text: string): ModifierLimitation[] {
   }
   if (/not wielding a shield/i.test(text) || /without a shield/i.test(text)) {
     limitations.push(notWearingArmorLimitation("Shield"))
+  }
+  if (
+    /\bwhile\s+(?:you\s+are\s+)?bloodied\b/i.test(text) ||
+    /\bwhile\s+bloodied\b/i.test(text) ||
+    /\bif\s+you\s+are\s+bloodied\b/i.test(text)
+  ) {
+    limitations.push(requiresActiveToggleLimitation("below_half_hp"))
+  }
+  if (
+    /\bwhile\s+(?:you\s+are\s+)?dancing\b/i.test(text) ||
+    /\bwhile\s+(?:in|using)\s+(?:a\s+)?dance\b/i.test(text) ||
+    /\bwhile\s+your\s+dance\s+is\s+active\b/i.test(text)
+  ) {
+    limitations.push(requiresActiveToggleLimitation("while_dancing"))
   }
   return limitations
 }
@@ -571,8 +594,16 @@ function parseResourceDieKey(text: string): string | null {
   const match = text.match(/your\s+(\w+(?:\s+\w+)?)\s+Die\b/i)
   if (!match) return null
   const phrase = match[1].trim()
+  const withDie = `${phrase} Die`
+  // Prefer die-named resources first so "Dance Die" maps to dance_die, not dances.
   for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
-    if (pattern.namePattern.test(`${phrase} Die`) || pattern.namePattern.test(phrase)) {
+    if (pattern.namePattern.test(withDie)) {
+      if (pattern.resourceKey === "exploit_die_size") return "exploit_dice"
+      return pattern.resourceKey
+    }
+  }
+  for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
+    if (pattern.namePattern.test(phrase)) {
       if (pattern.resourceKey === "exploit_die_size") return "exploit_dice"
       return pattern.resourceKey
     }
@@ -582,7 +613,7 @@ function parseResourceDieKey(text: string): string | null {
 }
 
 const RESOURCE_DIE_BONUS_PHRASE =
-  /bonus to (?:the|your) roll equal to your \w+(?:\s+\w+)?\s+Die/i
+  /(?:bonus to (?:the|your) (?:roll|AC|Armor Class) equal to your \w+(?:\s+\w+)?\s+Die|add (?:the|your) \w+(?:\s+\w+)?\s+Die to (?:the|your) (?:roll|AC|Armor Class))/i
 
 function buildResourceDieCheckBonus(
   ctx: DetectFeatureContext,
@@ -598,6 +629,28 @@ function buildResourceDieCheckBonus(
     classResourceKey: resourceKey,
   }
   const abilities = parseSaveAbilitiesFromText(text)
+  const isAcBonus = /\b(?:AC|Armor Class)\b/i.test(text)
+
+  if (isAcBonus) {
+    const isDieSizeOnly = resourceKey === "dance_die"
+    return charInstance(newInstanceId(), characteristicCatalogRefId("resource_ability_menu"), [
+      {
+        id: modId(instanceKey(ctx, "resource_die_ac")),
+        type: "resource_ability_menu",
+        resourceKey,
+        options: [
+          {
+            name: "Add die to AC",
+            description: "Add this class resource die to your AC against one attack.",
+            resourceCost: isDieSizeOnly ? 0 : 1,
+            bonusConfig,
+          },
+        ],
+        label: `Roll ${resourceKey.replace(/_/g, " ")} for AC`,
+      },
+    ])
+  }
+
   const rollKind = /saving throw/i.test(text) ? "save" : "ability"
 
   const effects: FeatureEffect[] =
@@ -609,6 +662,7 @@ function buildResourceDieCheckBonus(
           checkCategory: "save" as const,
           checkAbility: ability,
           bonusConfig,
+          limitations: parseLimitationsFromText(text),
         }))
       : [
           {
@@ -617,6 +671,7 @@ function buildResourceDieCheckBonus(
             checkRollMode: "bonus" as const,
             checkCategory: rollKind as FeatureEffect["checkCategory"],
             bonusConfig,
+            limitations: parseLimitationsFromText(text),
           },
         ]
 
@@ -1348,10 +1403,15 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       // Ally/enemy pack-tactics style auras are not self check modifiers.
       if (/\b(?:your\s+)?allies\s+have\s+advantage\b/i.test(text)) return null
       if (/\benemies\b[\s\S]{0,80}\bdisadvantage\s+on\s+attack\s+rolls?\b/i.test(text)) return null
-      return buildCheckRollModifier(ctx, "atk_adv", {
-        checkRollMode: "advantage",
-        checkCategory: "attack",
-      })
+      return buildCheckRollModifier(
+        ctx,
+        "atk_adv",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "attack",
+        },
+        text,
+      )
     },
   },
   {
@@ -1460,15 +1520,19 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       )
       if (!types.length) return null
       const whileRaging = textMentionsWhileRaging(text)
+      const whileBloodied = textMentionsWhileBloodied(text)
+      const toggle = whileRaging ? "while_raging" : whileBloodied ? "below_half_hp" : undefined
       return charInstance(newInstanceId(), characteristicCatalogRefId("damage_resistance"), [
         {
           id: modId(instanceKey(ctx, "resistance_except")),
           type: "damage_resistance",
           damageTypes: types,
-          requiresSheetToggle: whileRaging ? "while_raging" : undefined,
+          requiresSheetToggle: toggle,
           label: whileRaging
             ? `Resistance to all damage except ${match[1].trim()} (while raging)`
-            : `Resistance to all damage except ${match[1].trim()}`,
+            : whileBloodied
+              ? `Resistance to all damage except ${match[1].trim()} (while Bloodied)`
+              : `Resistance to all damage except ${match[1].trim()}`,
         },
       ])
     },
@@ -1492,16 +1556,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "resistance.damage",
     confidence: "high",
     test: /\bresistance\s+to\s+([^.;\n]+?)\s+damage\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
       if (/\b(?:every|all)\s+damage\s+types?\s+except\b/i.test(match[0])) return null
       if (/\bexcept\b/i.test(match[1])) return null
       const types = parseDamageTypes(match[1])
       if (!types.length) return null
+      const whileRaging = textMentionsWhileRaging(text)
+      const whileBloodied = textMentionsWhileBloodied(text)
+      const toggle = whileRaging ? "while_raging" : whileBloodied ? "below_half_hp" : undefined
       return charInstance(newInstanceId(), characteristicCatalogRefId("damage_resistance"), [
         {
           id: modId(instanceKey(ctx, "resistance")),
           type: "damage_resistance",
           damageTypes: types,
+          requiresSheetToggle: toggle,
+          label: whileBloodied
+            ? `Resistance to ${types.join(", ")} (while Bloodied)`
+            : whileRaging
+              ? `Resistance to ${types.join(", ")} (while raging)`
+              : undefined,
         },
       ])
     },

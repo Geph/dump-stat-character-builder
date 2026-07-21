@@ -529,6 +529,40 @@ export function ResourceAbilityMenuEditor({
             placeholder="Ability name"
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
           />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
+                Resource cost
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={option.resourceCost ?? ""}
+                onChange={(e) =>
+                  updateOption(index, {
+                    resourceCost: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                  })
+                }
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
+                Hit Dice cost
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={option.hitDiceCost ?? ""}
+                onChange={(e) =>
+                  updateOption(index, {
+                    hitDiceCost: e.target.value ? parseInt(e.target.value, 10) : null,
+                  })
+                }
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+          </div>
           <NestedModifierEffectEditor
             value={option.effect}
             onChange={(effect) => updateOption(index, { effect })}

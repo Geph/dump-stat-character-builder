@@ -22,6 +22,7 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "tides_of_chaos_active", label: "Tides of Chaos", sourceType: "builtin" },
   { id: "dragon_wings_active", label: "Dragon Wings", sourceType: "builtin" },
   { id: "below_half_hp", label: "Bloodied", sourceType: "builtin" },
+  { id: "while_dancing", label: "Dancing", sourceType: "builtin" },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
 ]
 
@@ -59,6 +60,36 @@ export const PRIMORDIAL_ASPECT_TOGGLES: SheetToggleDefinition[] = [
     exclusiveGroup: "primordial_aspect",
   },
 ]
+
+/** Active Guardian Tactics option — exclusive; set when you Use Block / Challenge / Grasp. */
+export const GUARDIAN_TACTICS_TOGGLES: SheetToggleDefinition[] = [
+  {
+    id: "guardian_tactics_block",
+    label: "Guardian Tactics: Block",
+    sourceType: "class_feature",
+    exclusiveGroup: "guardian_tactics",
+  },
+  {
+    id: "guardian_tactics_challenge",
+    label: "Guardian Tactics: Challenge",
+    sourceType: "class_feature",
+    exclusiveGroup: "guardian_tactics",
+  },
+  {
+    id: "guardian_tactics_grasp",
+    label: "Guardian Tactics: Grasp",
+    sourceType: "class_feature",
+    exclusiveGroup: "guardian_tactics",
+  },
+]
+
+export function guardianTacticsToggleIdForOption(optionName: string): string | null {
+  const n = optionName.toLowerCase().replace(/[^a-z]+/g, " ").trim()
+  if (n === "block" || n.includes("block")) return "guardian_tactics_block"
+  if (n === "challenge" || n.includes("challenge")) return "guardian_tactics_challenge"
+  if (n === "grasp" || n.includes("grasp")) return "guardian_tactics_grasp"
+  return null
+}
 
 /** Converts a class/subclass's declared new_toggles into sheet toggle definitions. */
 export function sheetToggleDefinitionsFromNewToggles(

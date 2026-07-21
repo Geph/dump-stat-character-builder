@@ -19,6 +19,12 @@ export type ImportWorkflow = {
 export const ONE_CLASS_AT_A_TIME_WARNING =
   "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are not likely to work — use a page range or split the extract."
 
+export const SCHEMA_FIT_WARNING =
+  "Match each upload to the content type. Whole-book PDFs, spell chapters inside a class extract, or weapons+masteries+feats mashed together will not wire correctly — split them (and tell your LLM to warn you instead of inventing oversized JSON)."
+
+export const WEAPON_MASTERY_IMPORT_TIP =
+  "Homebrew weapon masteries (Parry, Shift, Explode, …): import as a separate Custom Abilities pass so they extend Weapon Mastery Properties, then import weapons with properties.mastery set to those names. Novel non-SRD properties (Firearm, Reload, …) store as string tags — they display on the item but are not fully simulated."
+
 export const MULTI_FILE_IMPORT_TIP =
   "Happy path: usually two LLM extracts, then one import. (1) Supporting library — disciplines, exploits, full spell write-ups. (2) Class chapter — core class + every archetype in the same JSON (classes[] + subclasses[]), including Spell/School/Special list stubs when present. Paste both as a JSON array in Step 2 for one staged review (Dump Stat auto-orders libraries before the class even if you paste them reversed). Use page ranges to skip other classes — not to split a class from its own subclasses. Use content type Subclasses only when adding archetypes to a class already in your compendium."
 
@@ -106,6 +112,29 @@ export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
     notes: [
       "Battle Master maneuvers and Martial Exploits with isChoice + choices[] are detected as custom ability proposals.",
       "Exploit dice pools wire from the class level table and “expend an exploit die” phrasing in feature text.",
+    ],
+  },
+  {
+    id: "weapons-masteries",
+    title: "Weapons & homebrew masteries",
+    summary:
+      "Import novel weapon masteries as a Custom Abilities / Weapon Mastery Properties pass first, then the equipment weapons table with properties.mastery names.",
+    examples: ["Mage Hand Press weapons", "Valda's Spire weapons", "Firearm / Reload homebrew kits"],
+    steps: [
+      {
+        label: "Weapon Mastery Properties (custom abilities)",
+        hint: "One ability row per novel mastery (Parry, Shift, Explode, …) with rule text. SRD Cleave/Graze/Nick/Push/Sap/Slow/Topple/Vex are already seeded — only add homebrew names.",
+        contentType: "abilities",
+      },
+      {
+        label: "Weapons & equipment tables",
+        hint: "properties.mastery = mastery name; Switch weapons use properties.forms[]; novel properties (Firearm, Reload, …) as string tags in properties.properties[].",
+        contentType: "equipment",
+      },
+    ],
+    notes: [
+      "Non-SRD properties display as tags on the item; they are not fully structured combat engines.",
+      "If you skip the mastery catalog pass, weapons still keep properties.mastery names but sheet tooltips may lack rule text until you add them to Weapon Mastery Properties.",
     ],
   },
   {

@@ -93,3 +93,44 @@ export function recoverHitDiceOnLongRest(
 
   return next
 }
+
+/** Spend Hit Dice from the pool (feature fuel: Mortal Metamagic, Draconic Vengeance, etc.). */
+export function spendHitDiceFromPool(params: {
+  usedByClassId: Record<string, number>
+  pool: HitDicePoolEntry[]
+  amount: number
+  /** Prefer this class id when multiclassing; otherwise spend from the largest remaining pool. */
+  preferClassId?: string | null
+}): { nextUsedByClassId: Record<string, number>; applied: boolean; classId: string | null } {
+  const amount = Math.max(0, Math.floor(params.amount))
+  if (amount <= 0) {
+    return { nextUsedByClassId: params.usedByClassId, applied: true, classId: null }
+  }
+
+  const preferred =
+    params.preferClassId != null
+      ? params.pool.find((entry) => entry.classId === params.preferClassId && entry.remaining >= amount)
+      : null
+  const entry =
+    preferred ??
+    [...params.pool]
+      .filter((row) => row.remaining >= amount)
+      .sort((a, b) => b.remaining - a.remaining)[0] ??
+    null
+
+  if (!entry) {
+    return { nextUsedByClassId: params.usedByClassId, applied: false, classId: null }
+  }
+
+  const next = { ...params.usedByClassId }
+  next[entry.classId] = (next[entry.classId] ?? 0) + amount
+  return { nextUsedByClassId: next, applied: true, classId: entry.classId }
+}
+
+export function hitDiceRemainingForClass(
+  pool: HitDicePoolEntry[],
+  classId: string | null | undefined,
+): number {
+  if (!classId) return totalHitDiceRemaining(pool)
+  return pool.find((entry) => entry.classId === classId)?.remaining ?? 0
+}

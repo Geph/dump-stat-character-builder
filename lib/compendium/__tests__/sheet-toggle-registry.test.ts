@@ -16,6 +16,7 @@ describe("sheet-toggle-registry", () => {
     expect(ids).toContain("tides_of_chaos_active")
     expect(ids).toContain("dragon_wings_active")
     expect(ids).toContain("below_half_hp")
+    expect(ids).toContain("while_dancing")
     expect(ids).not.toContain("in_combat_or_high_stakes")
   })
 
@@ -24,6 +25,7 @@ describe("sheet-toggle-registry", () => {
     expect(getSheetToggleDefinition("first_turn_of_combat")?.label).toBe("First turn of combat")
     expect(getSheetToggleDefinition("while_concentrating")?.id).toBe("while_concentrating")
     expect(getSheetToggleDefinition("while_flying")?.id).toBe("while_flying")
+    expect(getSheetToggleDefinition("while_dancing")?.label).toBe("Dancing")
   })
 
   it("recognizes magic item toggle ids", () => {

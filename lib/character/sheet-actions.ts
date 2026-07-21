@@ -42,6 +42,20 @@ export type SheetActionEntry = {
   concentration?: boolean
   /** Talent / rider alerts that modify this action without their own roll card. */
   relatedTalentAlerts?: SheetActionTalentAlert[]
+  /** Menu options from resource_ability_menu (for HD spend pickers and rider matching). */
+  menuOptions?: SheetActionMenuOption[]
+  /** Hit Dice spent when this action is used (feature activation.spendHitDice). */
+  spendHitDice?: number | null
+  /** Hit die sides for this action's owning class (e.g. Draconic Vengeance damage). */
+  hitDieSides?: number | null
+}
+
+export type SheetActionMenuOption = {
+  name: string
+  description?: string
+  resourceCost?: number
+  hitDiceCost?: number | null
+  unlocksAtLevel?: number | null
 }
 
 export type SheetActionTalentAlert = {
@@ -51,6 +65,8 @@ export type SheetActionTalentAlert = {
   sourceLabel?: string | null
   /** Internal: powers this alert attaches to (stripped before UI if needed). */
   parentPowerNames?: string[]
+  /** When set, attach only if the parent action lists a matching menu option. */
+  parentMenuOptionNames?: string[]
 }
 
 /** Trigger characteristics that represent a player-elected reaction when `useReaction` is set. */
@@ -107,6 +123,7 @@ const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
 const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
   { re: /\bas a bonus action\b/i, kind: "bonus" },
   { re: /\bas a reaction\b/i, kind: "reaction" },
+  { re: /\btake a reaction\b/i, kind: "reaction" },
   { re: /\bas an? (?:magic )?action\b/i, kind: "action" },
 ]
 
@@ -130,6 +147,8 @@ export function activationKinds(activation?: FeatureActivation | null): ActionEc
   if (activation.action) kinds.push("action")
   if (activation.bonusAction) kinds.push("bonus")
   if (activation.reaction) kinds.push("reaction")
+  // Drop-to-0 features (Survive) surface as reactions so they appear on the combat panel.
+  if (activation.onDropToZeroHp && !kinds.includes("reaction")) kinds.push("reaction")
   return kinds
 }
 
@@ -216,13 +235,55 @@ function resolveActionResourceKey(item: ActivatableItem): string | null {
 
 function resolveSpecialAttack(
   item: ActivatableItem,
+  classLevel?: number,
 ): SpecialAttackCharacteristic | null {
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "special_attack") {
-        return characteristic as SpecialAttackCharacteristic
+        const attack = characteristic as SpecialAttackCharacteristic
+        // Earthshatter: 5 ft → 10 ft at Warden 14.
+        if (/^earthshatter$/i.test(item.name) && (classLevel ?? 0) >= 14) {
+          return {
+            ...attack,
+            areaLengthFeet: 10,
+            rangeFeet: 10,
+            label:
+              attack.label?.replace(/5\s*ft/i, "10 ft") ??
+              "Earthshatter — replace one Attack; 10-foot slam (Warden 14+)",
+          }
+        }
+        return attack
       }
     }
+  }
+  return null
+}
+
+function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
+  const options: SheetActionMenuOption[] = []
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type !== "resource_ability_menu") continue
+      for (const option of characteristic.options ?? []) {
+        options.push({
+          name: option.name,
+          description: option.description,
+          resourceCost: option.resourceCost,
+          hitDiceCost: option.hitDiceCost ?? null,
+          unlocksAtLevel: option.unlocksAtLevel ?? null,
+        })
+      }
+    }
+  }
+  return options
+}
+
+function resolveSpendHitDice(item: ActivatableItem): number | null {
+  const fromActivation = item.activation?.spendHitDice
+  if (fromActivation != null && fromActivation > 0) return fromActivation
+  for (const instance of item.linkedModifiers ?? []) {
+    const linked = instance.activation?.spendHitDice
+    if (linked != null && linked > 0) return linked
   }
   return null
 }
@@ -243,11 +304,22 @@ export type { ActivatableItem }
 export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
   const baseKinds = activationKinds(item.activation)
   const linkedKinds = baseKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
-  return baseKinds.length
+  const fromText = baseKinds.length || linkedKinds.length ? [] : kindsFromText(item.description)
+  const resolved = baseKinds.length
     ? baseKinds
     : linkedKinds.length
       ? linkedKinds
-      : kindsFromText(item.description)
+      : fromText
+  if (resolved.length) return resolved
+  // Hit Dice–fueled menus (Mortal Metamagic) and spend activations need a sheet card
+  // even when the source is "when you cast" rather than a discrete action economy cost.
+  if (
+    resolveSpendHitDice(item) != null ||
+    resolveMenuOptions(item).some((option) => (option.hitDiceCost ?? 0) > 0)
+  ) {
+    return ["action"]
+  }
+  return []
 }
 
 /** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
@@ -393,6 +465,7 @@ function pushActivatableItemActions(
   sourceLabel: string,
   idPrefix: string,
   classId: string | null,
+  hitDieSides?: number | null,
 ) {
   if ((feature.level ?? 1) > levelCap) return
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
@@ -413,6 +486,7 @@ function pushActivatableItemActions(
         (category !== "combat" || display.combatActions) &&
         (category !== "utility" || display.abilitiesActions)
       ) {
+        const menuOptions = resolveMenuOptions(feature)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: feature.name,
@@ -424,7 +498,10 @@ function pushActivatableItemActions(
           description: feature.description ?? null,
           classId,
           classResourceKey: resolveActionResourceKey(feature),
-          specialAttack: resolveSpecialAttack(feature),
+          specialAttack: resolveSpecialAttack(feature, levelCap),
+          menuOptions: menuOptions.length ? menuOptions : undefined,
+          spendHitDice: resolveSpendHitDice(feature),
+          hitDieSides: hitDieSides ?? null,
           psionicAugments: resolvePsionicAugments({
             name: feature.name,
             description: feature.description ?? null,
@@ -449,6 +526,8 @@ function pushActivatableItemActions(
       description: expansion.description,
       classId,
       classResourceKey: resolveActionResourceKey(feature),
+      spendHitDice: resolveSpendHitDice(feature),
+      hitDieSides: hitDieSides ?? null,
     })
   }
 }
@@ -462,6 +541,7 @@ function pushPickedChoiceOptionActions(
   idPrefix: string,
   classId: string | null,
   featureChoicePicks: Record<string, string[]> | undefined,
+  hitDieSides?: number | null,
 ) {
   if (!classId || !featureChoicePicks) return
   if (!feature.isChoice || !feature.choices?.options?.length) return
@@ -481,6 +561,7 @@ function pushPickedChoiceOptionActions(
       sourceLabel,
       `${idPrefix}:opt`,
       classId,
+      hitDieSides,
     )
   }
 }
@@ -493,9 +574,18 @@ function pushFeatureActions(
   idPrefix: string,
   classId: string | null,
   featureChoicePicks?: Record<string, string[]>,
+  hitDieSides?: number | null,
 ) {
   for (const feature of features ?? []) {
-    pushActivatableItemActions(actions, feature, levelCap, sourceLabel, idPrefix, classId)
+    pushActivatableItemActions(
+      actions,
+      feature,
+      levelCap,
+      sourceLabel,
+      idPrefix,
+      classId,
+      hitDieSides,
+    )
     pushPickedChoiceOptionActions(
       actions,
       feature as Feature,
@@ -504,6 +594,7 @@ function pushFeatureActions(
       idPrefix,
       classId,
       featureChoicePicks,
+      hitDieSides,
     )
   }
 }
@@ -682,6 +773,19 @@ function collectTalentAlertsFromFeatures(
   const alerts: SheetActionTalentAlert[] = []
   const seen = new Set<string>()
 
+  const resolvePowerRiderSummary = (
+    featureName: string,
+    char: { alertSummary?: string; label?: string },
+    levelCap: number,
+  ): string => {
+    if (/^grasping vines$/i.test(featureName)) {
+      return levelCap >= 14
+        ? "Grasp Emanation is 15 feet for creatures on the ground."
+        : "Grasp Emanation is 10 feet for creatures on the ground (15 feet at Warden 14)."
+    }
+    return char.alertSummary?.trim() || char.label?.trim() || featureName
+  }
+
   const considerFeature = (
     feature: ActivatableItem,
     sourceLabel: string,
@@ -696,10 +800,11 @@ function collectTalentAlertsFromFeatures(
         seen.add(key)
         alerts.push({
           name: feature.name,
-          summary: char.alertSummary?.trim() || char.label?.trim() || feature.name,
+          summary: resolvePowerRiderSummary(feature.name, char, levelCap),
           description: feature.description ?? null,
           sourceLabel,
           parentPowerNames: char.parentPowerNames,
+          parentMenuOptionNames: char.parentMenuOptionNames,
         })
       }
     }
@@ -763,6 +868,7 @@ function collectTalentAlertsFromCustomAbilities(
           description: option.description ?? null,
           sourceLabel,
           parentPowerNames: char.parentPowerNames,
+          parentMenuOptionNames: char.parentMenuOptionNames,
         })
       }
     }
@@ -797,6 +903,7 @@ function collectTalentAlertsFromCustomAbilities(
             description: ability.description ?? null,
             sourceLabel,
             parentPowerNames: char.parentPowerNames,
+            parentMenuOptionNames: char.parentMenuOptionNames,
           })
         }
       }
@@ -812,22 +919,37 @@ function attachTalentAlertsToActions(
 ): SheetActionEntry[] {
   if (!alerts.length) return actions
   return actions.map((action) => {
-    const matched = alerts.filter((alert) =>
-      (alert.parentPowerNames ?? []).some((parent) => {
+    const matched = alerts.filter((alert) => {
+      const powerMatch = (alert.parentPowerNames ?? []).some((parent) => {
         const p = normalizePickName(parent)
         const n = normalizePickName(action.name)
         return n === p || n.includes(p) || p.includes(n)
-      }),
-    )
+      })
+      if (!powerMatch) return false
+      const menuFilters = (alert.parentMenuOptionNames ?? [])
+        .map((name) => normalizePickName(name))
+        .filter(Boolean)
+      if (!menuFilters.length) return true
+      const actionMenus = (action.menuOptions ?? []).map((option) => normalizePickName(option.name))
+      return menuFilters.some((filter) =>
+        actionMenus.some(
+          (optionName) =>
+            optionName === filter || optionName.includes(filter) || filter.includes(optionName),
+        ),
+      )
+    })
     if (!matched.length) return action
     return {
       ...action,
-      relatedTalentAlerts: matched.map(({ name, summary, description, sourceLabel }) => ({
-        name,
-        summary,
-        description,
-        sourceLabel,
-      })),
+      relatedTalentAlerts: matched.map(
+        ({ name, summary, description, sourceLabel, parentMenuOptionNames }) => ({
+          name,
+          summary,
+          description,
+          sourceLabel,
+          parentMenuOptionNames,
+        }),
+      ),
     }
   })
 }
@@ -844,6 +966,7 @@ export function collectSheetActions(params: {
 
   for (const entry of params.classDetails) {
     const className = entry.class?.name ?? "Class"
+    const hitDieSides = entry.class?.hit_die ?? null
     pushFeatureActions(
       actions,
       entry.class?.features as Feature[] | undefined,
@@ -852,6 +975,7 @@ export function collectSheetActions(params: {
       entry.row.class_id,
       entry.row.class_id,
       featureChoicePicks,
+      hitDieSides,
     )
     if (entry.subclass) {
       pushFeatureActions(
@@ -862,6 +986,7 @@ export function collectSheetActions(params: {
         `sub-${entry.subclass.id}`,
         entry.row.class_id,
         featureChoicePicks,
+        hitDieSides,
       )
     }
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   metamagicOptionsForCharacter,
   metamagicOptionsFromFeats,
+  mortalMetamagicOptionsFromFeatures,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
 import { buildCatalogFeatPickId } from "@/lib/builder/catalog-feat-options"
@@ -191,5 +192,69 @@ describe("resolveSpellCastCost", () => {
     expect(result.mode).toBe("resource")
     expect(result.canCast).toBe(false)
     expect(result.blockReason).toBe("base_over_spell_limit")
+  })
+
+  it("reads Mortal Metamagic Hit Dice options and gates casts on remaining HD", () => {
+    const options = mortalMetamagicOptionsFromFeatures([
+      {
+        name: "Mortal Metamagic",
+        linkedModifiers: [
+          {
+            characteristics: [
+              {
+                type: "resource_ability_menu",
+                options: [
+                  { name: "Empowered Spell", hitDiceCost: 1 },
+                  { name: "Quickened Spell", hitDiceCost: 2 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ])
+    expect(options).toEqual([
+      {
+        id: "mortal_metamagic:Empowered Spell",
+        name: "Empowered Spell",
+        cost: 0,
+        hitDiceCost: 1,
+        effectHint: "empowered_reroll",
+      },
+      {
+        id: "mortal_metamagic:Quickened Spell",
+        name: "Quickened Spell",
+        cost: 0,
+        hitDiceCost: 2,
+        effectHint: "quicken",
+      },
+    ])
+
+    const blocked = resolveSpellCastCost({
+      spellLevel: 1,
+      spellcasting: null,
+      classRow: { class_resources: null },
+      classLevel: 5,
+      availablePoints: 0,
+      selectedMetamagic: [options[1]!],
+      ctx,
+      availableHitDice: 1,
+    })
+    expect(blocked.canCast).toBe(false)
+    expect(blocked.blockReason).toBe("insufficient_hit_dice")
+    expect(blocked.hitDiceCost).toBe(2)
+
+    const ok = resolveSpellCastCost({
+      spellLevel: 1,
+      spellcasting: null,
+      classRow: { class_resources: null },
+      classLevel: 5,
+      availablePoints: 0,
+      selectedMetamagic: [options[0]!],
+      ctx,
+      availableHitDice: 1,
+    })
+    expect(ok.canCast).toBe(true)
+    expect(ok.hitDiceCost).toBe(1)
   })
 })

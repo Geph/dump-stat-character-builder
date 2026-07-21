@@ -55,6 +55,7 @@ export const AI_MECHANIC_KINDS = [
   "healing_received_modifier",
   "grant_custom_ability",
   "feature_choice_count_bonus",
+  "power_rider",
 ] as const
 
 /**
@@ -68,8 +69,6 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "feature_option_picker",
   // Complex nested characteristic — auto-wired by phrase detection, not hand-authored by the LLM.
   "on_cast_spell_trigger",
-  // Sheet alert only — no numeric mechanic for the model to emit.
-  "power_rider",
   "*",
 ])
 
@@ -1204,10 +1203,13 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "When you use Phase Rift to flicker",
       "When you cast Enhancing Surge",
       "When you use a power or alternate effect of psychkinetics",
+      "When you use the Block option of your Guardian Tactics",
+      "When you use the Challenge option of your Guardian Tactics",
       "gain the benefit of this talent from a range of 30 feet when the creature is killed by one of your Psionic powers",
     ],
+    mechanicsKind: "power_rider",
     notes:
-      "Narrative rider talents (Flickering Escape, Living Power, Ravenous Powers range, etc.) — alert overlay on related sheet actions; no roll card of their own.",
+      "Rider talents — alert overlay on related sheet actions. Prefer parentPowerNames + parentMenuOptionNames when the source names a menu option (Block / Challenge / Grasp).",
   },
 ]
 
@@ -1329,8 +1331,38 @@ export const HOMEBREW_WIRING_PATTERNS = [
     guidance: [
       "Extract Risk Dice, Weapon Mastery, Exploit Dice, Superiority Dice, etc. as class_resources[] from the level table (resource_key snake_case).",
       "Keep spend phrases in feature descriptions: \"expend 1 risk die\", \"spend 2 exploit dice\" — links limited uses to the pool.",
+      "Risk Dice maneuvers: ability_role knack + \"expend one Risk Die\" — proposals use resourceKey risk_dice (not battle_dice).",
+      "Dire Gambit: regain 1 Risk Die on Initiative → uses.rechargeOnInitiative: 1 (enrichment sets this when the feature is present).",
       "Quick Draw / initiative features: preserve \"Advantage on Initiative rolls\" wording.",
       "Fighting Style milestone: name + \"You gain a Fighting Style feat of your choice\" in description.",
+    ],
+  },
+  {
+    source: "Martyr / HP-cost casters",
+    guidance: [
+      "Spell Uses column → class_resources.spell_uses (long rest). Do not invent normal spell-slot progression for Hit Point Spellcasting.",
+      "Keep the Hit Point Spellcasting damage table in the Spellcasting feature description — Radiant self-cost is narrative/play-time.",
+      "Sacrifice / Sacrificial Strike self-damage riders stay narrative unless a clear passive sheet bonus exists.",
+    ],
+  },
+  {
+    source: "Necromancer / thrall controllers",
+    guidance: [
+      "Charnel Touch: propose class_resources.charnel_touch (5 × level, long rest) from prose.",
+      "Thralls + CR Total columns → special caps (thralls, thrall_cr_total). Fractions like 1/4 are valid CR Total values.",
+      "Import thrall creatures[] before the class; Thralls feature → grant_creature with creatureChoiceOptions.",
+    ],
+  },
+  {
+    source: "Mage Hand Press Warden (not Kibbles)",
+    guidance: [
+      "Distinct from KibblesTasty Warden (Endurance Dice / Primal Manifestations). On name collision, the import UI asks the user what to rename to (suggestion: \"Mage Hand Press Warden\").",
+      "Interrupt column → class_resources.interrupt (short regain 1 / long all). Interdict subclass may add rechargeOnInitiative: 1.",
+      "Unyielding Resolve / Improved Resolve: \"While you are Bloodied\" → damage_resistance gated with below_half_hp.",
+      "Guardian Tactics: resource_ability_menu (Block / Challenge / Grasp + Extended Tactics unlock at 14, waive cost); ally/enemy effects remain play-time. Interrupt: reaction + class_resource interrupt. Survive / Selfless Survival / Undying share useShareKey \"survive\".",
+      "Subclass riders: power_rider with parentPowerNames + parentMenuOptionNames (Anointed Block/Stonewall→Block, Death's Gambit→Challenge, Hold the Line/Thunderblast/Grasping Vines→Grasp, Legendary Interruption→Interrupt, Verdant Resilience/Undying→Survive).",
+      "Subclass activations: Roar / Arcane Strike / Earthshatter (combat panel), Mortal Metamagic (Hit Dice menu: Empowered 1 / Quickened 2), Draconic Vengeance (reaction special_attack + spendHitDice 1).",
+      "Grey Watchman Battle Dice: subclass_name on the class_resources proposal; sheet-gated to Grey Watchman; Battle Tactics wires optionsSource class_knacks for maneuvers.",
     ],
   },
   {
@@ -1355,14 +1387,35 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Dancer / performance classes",
     guidance: [
-      "Dance Style / subclass picks: isChoice + choices (not grant_feat).",
-      "Bardic-Inspiration-style pools: class_resources + limited-uses phrasing in features.",
+      "Dances column → class_resources.dances (spendable uses; short rest regain 1, long rest all).",
+      "Dance Die column → class_resources.dance_die (die size only — special, not a depleting pool).",
+      "Dance feature: limitedUses class_resource dances; while Dance is active players enable the while_dancing sheet toggle for style riders.",
+      "Dance Style / subclass picks: isChoice + choices or knack-style custom_abilities (not grant_feat).",
+      "Graceful Dodge / \"add your Dance Die to your AC\": resource_ability_menu on dance_die (auto-detected from AC + Dance Die phrasing).",
+    ],
+  },
+  {
+    source: "Warmage / cantrip specialists",
+    guidance: [
+      "Tricks column → class_resources.tricks_known (special choice count) + Warmage Tricks as ability_role knack with optionsSource class_knacks.",
+      "Cantrip Bonus Dice column → class_resources.cantrip_bonus_dice (special rider count for Warmage Edge).",
+      "Arcane Surge → class_resources.arcane_surge (uses; short regain 1 / long all) + feature limitedUses.",
+      "Warmage Edge: keep \"add your Intelligence modifier to one damage roll of a cantrip\" phrasing — enrichment wires on_cast_spell_trigger for cantrip damage.",
+      "Import Warmage-exclusive cantrips (Force Dart, Force Buckler, etc.) before or with Tricks so prerequisite gates resolve.",
+    ],
+  },
+  {
+    source: "Vagabond / Bloodied martials",
+    guidance: [
+      "Battle Dice refill on Initiative: set uses.rechargeOnInitiative: true (table parse adds this for battle_dice automatically).",
+      "Bloodied / Desperate features: gate with requiresSheetToggle below_half_hp (built-in Bloodied state when HP ≤ half max) — phrase \"while you are Bloodied\".",
+      "Maneuvers: ability_role knack + optionsSource class_knacks; choiceCountByLevel from Maneuvers column — do not set choices.resourceKey to battle_dice.",
     ],
   },
   {
     source: "Captain / battle-dice martials",
     guidance: [
-      "Battle Dice column on the class table → class_resources.battle_dice (NdM pool notation, e.g. 2d6 → 3d8).",
+      "Battle Dice column on the class table → class_resources.battle_dice (NdM pool notation, e.g. 2d6 → 3d8) with rechargeOnInitiative: true when the source refills on Initiative.",
       "Maneuver options in abilities[] with \"expend one Battle Die\" — proposed as custom abilities linked to battle_dice.",
       "Cohort feature → companion stat block; wire Weapon Mastery and Fighting Style via standard feature names.",
       "Blitz, Valiant Surge, Legendary Commander stay narrative unless clear passive phrasing is present.",
@@ -1426,7 +1479,8 @@ function formatMechanicsCheatsheet(): string {
     "- turn_start_trigger: general turn-start effect (heal, grant temp HP via nested text, etc.). Optional hpBelowFraction 0.5, restoreResourceKey/Amount, grantResourceKey/Amount, blockedByConditions. Prefer the narrow kinds below when the effect is ONLY a pool refill or ephemeral bonus grant.",
     "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
-    "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] when the source lists named options",
+    "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] when the source lists named options. For Hit Point Dice costs on options (Mortal Metamagic), put the spend in description and prefer Dump Stat presets; menu option hitDiceCost is enrichment-wired.",
+    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. Optional alertSummary for the badge text.",
     "- temporary_hit_points: amount N (fixed) OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier|proficiency. For amountScaling \"character_level\" (\"three times your level\"), put the per-level multiplier in amount (amount: 3), NOT amountMultiplier — amountMultiplier is ONLY for doubling/tripling a class_resource_die roll (\"twice the number rolled on your Bardic Inspiration die\": amountScaling class_resource_die, classResourceKey bardic_inspiration, amountMultiplier 2). For ability_modifier scaling, pair with ability. For proficiency (\"temporary hit points equal to your proficiency bonus\"), use amountScaling proficiency (optional amount/amountMultiplier for N×PB). thpTrigger on_activation|turn_start|on_use|on_hit (field name is thpTrigger, not trigger); thpTarget self|chosen_creature_in_range|allies_in_range (field name is thpTarget, not target; rangeFeet when not self) — only thpTarget \"self\" is auto-wired today; ally/chosen targets stay review-only. targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
     "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS; OR usesProficiency true when uses equal Proficiency Bonus (Lucky). ALWAYS wire the base usesFixed/usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an alternate early refresh — alternateRefresh is additive, never a reason to omit the base wire. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost } for resource spends OR { spendSpellSlotMinLevel: 3, actionCost } for \"expend a level 3+ spell slot\".",
     "- uses / check_roll_modifier resource spend caps: classResourceKey + classResourceCostMode fixed (default, use classResourceCost) | up_to_proficiency_bonus | up_to_ability_modifier (pair with classResourceCostAbility). Use when the source caps spend per use by a scaling value — e.g. \"expend Exploit Dice (up to your Proficiency Bonus)\" — not a separate Limit class_resource.",
@@ -1443,7 +1497,7 @@ function formatMechanicsCheatsheet(): string {
     "- extra_weapon_mastery: masteryProperties [\"Push\", \"Topple\"] — apply these Weapon Mastery properties in addition to the weapon's normal mastery (not the tier-table known-count)",
     "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
     "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
-    "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, while_wild_shape, concentrating, …) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them. new_toggles goes on the class/subclass object itself (sibling of features[]) — never inside an individual feature.",
+    "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, while_wild_shape, while_dancing, below_half_hp / Bloodied, etc.) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them. new_toggles goes on the class/subclass object itself (sibling of features[]) — never inside an individual feature.",
     "- Renamed / lightly-modified SRD features: set basedOnSrdFeature to the exact INDEX — SRD-standard feature name (e.g. \"Evasion\") while keeping the homebrew display name. Auto-wire applies the base; description/mechanics[] carry deltas (party share, extra gates).",
     "- targetCount (shared): { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } for \"a number of creatures equal to your Charisma modifier (minimum of one)\" — use on temporary_hit_points, movement_grant, and similar targeted effects (not uses.ability_modifier, which is for use counts).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
@@ -1495,7 +1549,9 @@ When the homebrew name differs (e.g. "Leading Evasion"), keep that name and set 
     ]),
 
     "INDEX — Sheet toggles (new_toggles[]):",
-    "- Standard toggles (while_raging, while_wild_shape, concentrating, …) need no declaration — use requiresSheetToggle directly.",
+    "- Standard toggles (while_raging, while_wild_shape, while_dancing, below_half_hp / Bloodied, concentrating, …) need no declaration — use requiresSheetToggle directly.",
+    "- below_half_hp is auto-active while current HP ≤ half max (Bloodied). Prefer \"while you are Bloodied\" in feature text.",
+    "- while_dancing: players enable it while the Dancer Dance feature is active so style riders apply.",
     "- When a feature invents a new transformation / conditional state (\"while in this form\", Rage of the Gods, etc.), add ONE entry under new_toggles on the class or subclass: { key: \"rage_of_the_gods_form\", name: \"Rage of the Gods\", grantingFeature: \"Rage of the Gods\" }.",
     "- Derive key as snake_case from the feature name. Sub-benefits (flight, resistance, reaction) then set requiresSheetToggle to that same key.",
     "- Do not invent mismatched keys silently inside individual mechanics[] rows — declare once, then reference.",

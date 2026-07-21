@@ -33,12 +33,23 @@ function collisionId(kind: ImportCollisionKind, name: string): string {
   return `${kind}:${name.trim().toLowerCase()}`
 }
 
-function suggestRenamedName(name: string, kind: ImportCollisionKind): string {
+function suggestRenamedName(
+  name: string,
+  kind: ImportCollisionKind,
+  existingSource?: string | null,
+): string {
   const trimmed = name.trim()
   if (kind === "class") {
     if (/^fighter$/i.test(trimmed)) return "Alternate Fighter"
     if (/^psion$/i.test(trimmed)) return "KibblesTasty Psion"
     if (/^kibblestasty psion$/i.test(trimmed)) return trimmed
+    // Distinct homebrew classes that commonly share a short name (Kibbles vs Mage Hand Press).
+    if (/^warden$/i.test(trimmed)) {
+      const existing = (existingSource ?? "").toLowerCase()
+      if (/mage\s*hand|mhp/.test(existing)) return "KibblesTasty Warden"
+      if (/kibble/.test(existing)) return "Mage Hand Press Warden"
+      return "Mage Hand Press Warden"
+    }
     if (!/\balternate\b/i.test(trimmed) && !/\bhomebrew\b/i.test(trimmed)) {
       return `${trimmed} (Alternate)`
     }
@@ -78,8 +89,8 @@ export function buildImportCollisions(
       if (seen.has(id)) continue
       seen.add(id)
 
-      const suggestedName = suggestRenamedName(name, kind)
       const existing = existingByName.get(lower)
+      const suggestedName = suggestRenamedName(name, kind, existing?.source)
       collisions.push({
         id,
         kind,
@@ -99,9 +110,48 @@ export function buildImportCollisions(
 export function defaultRenameMap(collisions: ImportCollision[]): ImportRenameMap {
   const map: ImportRenameMap = {}
   for (const collision of collisions) {
+    // Classes: leave blank so the user explicitly chooses the import name
+    // (suggestion is shown as a placeholder / Use suggestion control).
+    if (collision.kind === "class") continue
     map[collision.id] = collision.suggestedName
   }
   return map
+}
+
+/** True when a rename resolution still needs a distinct, non-empty Import-as name. */
+export function isRenameUnresolved(
+  collision: ImportCollision,
+  resolution: ImportCollisionResolution,
+  renameMap: ImportRenameMap,
+): boolean {
+  if (resolution !== "rename") return false
+  // Only classes require an explicit typed name; other kinds keep a prefilled suggestion.
+  if (collision.kind !== "class") return false
+  const next = (renameMap[collision.id] ?? "").trim()
+  if (!next) return true
+  return next.toLowerCase() === collision.incomingName.trim().toLowerCase()
+}
+
+export function unresolvedRenameCollisions(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+  renameMap: ImportRenameMap,
+): ImportCollision[] {
+  return collisions.filter((collision) =>
+    isRenameUnresolved(
+      collision,
+      resolutionMap[collision.id] ?? defaultResolutionFor(collision),
+      renameMap,
+    ),
+  )
+}
+
+export function collisionRenamesResolved(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+  renameMap: ImportRenameMap,
+): boolean {
+  return unresolvedRenameCollisions(collisions, resolutionMap, renameMap).length === 0
 }
 
 export function defaultCollisionResolutionMap(
@@ -132,9 +182,17 @@ function effectiveRenameMap(
       effective[collision.id] = collision.incomingName
       continue
     }
-    if (!effective[collision.id]) {
-      effective[collision.id] = collision.suggestedName
+    const typed = (effective[collision.id] ?? "").trim()
+    if (typed) {
+      effective[collision.id] = typed
+      continue
     }
+    // Classes must be explicitly renamed in the UI — do not silently apply the suggestion.
+    if (collision.kind === "class") {
+      delete effective[collision.id]
+      continue
+    }
+    effective[collision.id] = collision.suggestedName
   }
   return effective
 }

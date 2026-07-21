@@ -3,6 +3,7 @@ import {
   buildHitDicePool,
   recoverHitDiceOnLongRest,
   rollHitDiceHeal,
+  spendHitDiceFromPool,
 } from "@/lib/character/hit-dice"
 
 describe("hit-dice", () => {
@@ -56,5 +57,40 @@ describe("hit-dice", () => {
     )
 
     expect(recoverHitDiceOnLongRest({ fighter: 4 }, pool)).toEqual({ fighter: 1 })
+  })
+
+  it("spends hit dice for feature fuel from the preferred class pool", () => {
+    const pool = buildHitDicePool(
+      [
+        {
+          row: { class_id: "warden", level: 5, order: 0 },
+          class: { id: "warden", name: "Warden", hit_die: 10 } as never,
+        },
+      ],
+      {},
+    )
+    const result = spendHitDiceFromPool({
+      usedByClassId: {},
+      pool,
+      amount: 2,
+      preferClassId: "warden",
+    })
+    expect(result.applied).toBe(true)
+    expect(result.nextUsedByClassId).toEqual({ warden: 2 })
+    expect(
+      spendHitDiceFromPool({
+        usedByClassId: { warden: 4 },
+        pool: buildHitDicePool(
+          [
+            {
+              row: { class_id: "warden", level: 5, order: 0 },
+              class: { id: "warden", name: "Warden", hit_die: 10 } as never,
+            },
+          ],
+          { warden: 4 },
+        ),
+        amount: 2,
+      }).applied,
+    ).toBe(false)
   })
 })

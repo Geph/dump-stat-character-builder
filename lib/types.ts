@@ -322,6 +322,8 @@ export interface FeatureActivation {
   /** Spend this class resource pool to activate. */
   spendClassResourceKey?: string | null
   spendClassResourceAmount?: number | null
+  /** Spend this many Hit Point Dice (Hit Dice tracker) to activate. */
+  spendHitDice?: number | null
   requirements?: FeatureActivationRequirement[]
   /** @deprecated Use effects[] */
   effect?: string | null

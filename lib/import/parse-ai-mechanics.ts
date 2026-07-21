@@ -511,7 +511,10 @@ function buildFromMechanic(
   }
 
   if (mechanic.kind === "resource_ability_menu") {
-    const resourceKey = mechanic.classResourceKey ?? mechanic.spendResourceKey
+    const resourceKey =
+      mechanic.classResourceKey ??
+      mechanic.spendResourceKey ??
+      mechanic.resourceKey
     if (!resourceKey) return null
     return {
       ruleId: "ai.resource_ability_menu",
@@ -524,6 +527,27 @@ function buildFromMechanic(
           resourceKey,
           waiveResourceCost: mechanic.waiveResourceCost ?? false,
           options: (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "power_rider") {
+    const parents = (mechanic.parentPowerNames ?? []).map((name) => name.trim()).filter(Boolean)
+    if (!parents.length) return null
+    return {
+      ruleId: "ai.power_rider",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("power_rider"), [
+        {
+          id: modId(instanceKey(ctx, "power_rider")),
+          type: "power_rider",
+          parentPowerNames: parents,
+          parentMenuOptionNames: (mechanic.parentMenuOptionNames ?? [])
+            .map((name) => name.trim())
+            .filter(Boolean),
+          alertSummary: mechanic.alertSummary?.trim() || undefined,
         },
       ]),
     }

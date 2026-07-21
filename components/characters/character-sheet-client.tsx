@@ -84,6 +84,7 @@ import {
 import { getPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import {
   metamagicOptionsForCharacter,
+  mortalMetamagicOptionsFromFeatures,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
 import {
@@ -101,6 +102,7 @@ import { RollHistoryTrigger } from "@/components/character-sheet/roll-history-tr
 import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { collectClassResourceSpendKeys } from "@/lib/compendium/class-resource-display"
+import { isGatedClassResourceUnlockedForClass } from "@/lib/compendium/subclass-gated-class-resources"
 import {
   ClassResourceStaticDisplay,
   partitionResourceTrackerEntries,
@@ -147,6 +149,7 @@ import {
 } from "@/lib/character/sheet-session-state"
 import {
   applySheetToggleChange,
+  GUARDIAN_TACTICS_TOGGLES,
   PRIMORDIAL_ASPECT_TOGGLES,
   sheetToggleDefinitionsFromNewToggles,
   type SheetToggleDefinition,
@@ -175,7 +178,7 @@ import {
 } from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
-import { buildHitDicePool, recoverHitDiceOnLongRest } from "@/lib/character/hit-dice"
+import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
@@ -1055,6 +1058,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       /elemental mind/i.test(entry.subclass?.name ?? ""),
     )
     if (hasElementalMind) dynamic.push(...PRIMORDIAL_ASPECT_TOGGLES)
+    const hasGuardianTactics = classDetails.some((entry) =>
+      [...(entry.class?.features ?? []), ...(entry.subclass?.features ?? [])].some((feature) =>
+        /^guardian tactics$/i.test(feature.name ?? ""),
+      ),
+    )
+    if (hasGuardianTactics) dynamic.push(...GUARDIAN_TACTICS_TOGGLES)
     dynamic.push(...magicItemToggleDefinitions(magicItemPowers, equipmentById))
     for (const entry of classDetails) {
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.class?.new_toggles))
@@ -1104,6 +1113,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       setActiveSheetToggleIds((prev) =>
         applySheetToggleChange(prev, toggleId, sheetToggleDefinitions),
       )
+    },
+    [sheetToggleDefinitions],
+  )
+
+  /** Force a toggle on (does not turn it off if already active). Exclusive groups still clear peers. */
+  const activateSheetToggle = useCallback(
+    (toggleId: string) => {
+      setActiveSheetToggleIds((prev) => {
+        if (prev.includes(toggleId)) return prev
+        return applySheetToggleChange(prev, toggleId, sheetToggleDefinitions)
+      })
     },
     [sheetToggleDefinitions],
   )
@@ -1247,10 +1267,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     for (const entry of classDetails) {
       const className = entry.class?.name
       if (!className || !entry.class) continue
+      const subclassNames = entry.subclass?.name ? [entry.subclass.name] : []
       const resources = resolveClassResourcesForClass(entry.class)
       for (const resource of resources) {
         if (resource.uses.type === "unlimited" || resource.uses.type === "class_resource") continue
         if (resource.id === "spell_slots") continue
+        if (!isGatedClassResourceUnlockedForClass(resource.id, className, subclassNames)) {
+          continue
+        }
         const id = `${entry.row.class_id}_${resource.id}`
         if (seenIds.has(id)) continue
         seenIds.add(id)
@@ -1497,26 +1521,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [resourceEntries, usedResourcesById, usesResolveContext, sorceryPointsState],
   )
 
-  const metamagicOptions = useMemo(
-    () =>
-      metamagicOptionsForCharacter({
-        featIds: [
-          ...(character?.feat_ids ?? []),
-          ...characterFeats.map((feat) => feat.id),
-          ...(originFeat ? [originFeat.id] : []),
-        ],
-        feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
-        customAbilities: sheetCustomAbilities,
-        spellLevel: selectedSpell?.level ?? 1,
-      }),
-    [
-      character?.feat_ids,
-      characterFeats,
-      originFeat,
-      sheetCustomAbilities,
-      selectedSpell?.level,
-    ],
-  )
+  const metamagicOptions = useMemo(() => {
+    const fromFeats = metamagicOptionsForCharacter({
+      featIds: [
+        ...(character?.feat_ids ?? []),
+        ...characterFeats.map((feat) => feat.id),
+        ...(originFeat ? [originFeat.id] : []),
+      ],
+      feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
+      customAbilities: sheetCustomAbilities,
+      spellLevel: selectedSpell?.level ?? 1,
+    })
+    const fromMortal = mortalMetamagicOptionsFromFeatures(
+      classDetails.flatMap((entry) => [
+        ...(entry.class?.features ?? []),
+        ...(entry.subclass?.features ?? []),
+      ]) as Parameters<typeof mortalMetamagicOptionsFromFeatures>[0],
+    )
+    const seen = new Set(fromFeats.map((row) => row.id))
+    const merged = [...fromFeats]
+    for (const option of fromMortal) {
+      if (seen.has(option.id)) continue
+      seen.add(option.id)
+      merged.push(option)
+    }
+    return merged.sort((a, b) => a.name.localeCompare(b.name))
+  }, [
+    character?.feat_ids,
+    characterFeats,
+    originFeat,
+    sheetCustomAbilities,
+    selectedSpell?.level,
+    classDetails,
+  ])
 
   const selectedMetamagic = useMemo(
     () => metamagicOptions.filter((option) => selectedMetamagicIds.includes(option.id)),
@@ -1567,6 +1604,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       availablePoints,
       selectedMetamagic,
       ctx: usesResolveContext,
+      availableHitDice: totalHitDiceRemaining(
+        buildHitDicePool(classDetails, usedHitDiceByClassId),
+      ),
       arcanumAvailable,
       spellResourceCost,
       resourceSpendCap:
@@ -1586,6 +1626,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     selectedMetamagic,
     usesResolveContext,
     psiLimit,
+    usedHitDiceByClassId,
   ])
 
   useEffect(() => {
@@ -2185,6 +2226,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const initiative = derived?.initiative ?? character.initiative ?? abilityMods.dexterity
   const maxHp = derived?.maxHp ?? character.hit_point_max ?? 0
   const hitDicePool = buildHitDicePool(classDetails, usedHitDiceByClassId)
+  const hitDiceRemainingTotal = totalHitDiceRemaining(hitDicePool)
+  const spendHitDiceForAction = (amount: number, preferClassId?: string | null): boolean => {
+    const result = spendHitDiceFromPool({
+      usedByClassId: usedHitDiceByClassId,
+      pool: hitDicePool,
+      amount,
+      preferClassId,
+    })
+    if (!result.applied) return false
+    setUsedHitDiceByClassId(result.nextUsedByClassId)
+    return true
+  }
   const savingThrowProficiencies = derived?.savingThrowProficiencies ?? character.classes?.saving_throws ?? []
 
   const classLabel = classDetails.length
@@ -3084,6 +3137,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onResourceUsedChange={setUsedResourcesById}
                     incapacitated={incapacitated}
                     psiLimit={psiLimit}
+                    hitDiceRemaining={hitDiceRemainingTotal}
+                    onSpendHitDice={spendHitDiceForAction}
+                    onActivateSheetToggle={activateSheetToggle}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
@@ -3334,6 +3390,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onResourceUsedChange={setUsedResourcesById}
                     incapacitated={incapacitated}
                     psiLimit={psiLimit}
+                    hitDiceRemaining={hitDiceRemainingTotal}
+                    onSpendHitDice={spendHitDiceForAction}
+                    onActivateSheetToggle={activateSheetToggle}
                   />
                   {!equippedWeaponCards.length && !combatActions.length ? (
                     <p className="text-xs text-muted-foreground italic">
@@ -4021,9 +4080,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             metamagicOptions={metamagicOptions}
             selectedMetamagicIds={selectedMetamagicIds}
             onMetamagicChange={setSelectedMetamagicIds}
+            empoweredRerollCap={Math.max(1, abilityMods.charisma ?? 0)}
             onCast={(result) => {
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
+              }
+              if ((result.hitDiceSpent ?? 0) > 0) {
+                spendHitDiceForAction(result.hitDiceSpent!)
               }
               if (result.psiPointsSpent) {
                 const spendKey =

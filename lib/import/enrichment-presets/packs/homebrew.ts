@@ -422,3 +422,876 @@ export const ALTERNATE_SORCERER_PRESETS: EnrichmentPreset[] = [
     ],
   },
 ]
+
+export const WARMAGE_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "warmage.class.warmage_edge",
+    pack: "warmage",
+    target: "class_feature",
+    match: { className: /warmage/i, name: /^warmage edge$/i },
+    skipIfCharacteristicTypes: ["on_cast_spell_trigger"],
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "warmage_edge",
+          catalogRefId: "cat_char_on_cast_spell_trigger",
+          characteristics: [
+            {
+              id: "mod_warmage_edge",
+              type: "on_cast_spell_trigger",
+              spellTags: ["cantrip", "damage"],
+              effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
+              label:
+                "Warmage Edge: once per turn add INT (and Cantrip Bonus Dice from level 5+) to one cantrip damage roll",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "warmage.class.arcane_surge",
+    pack: "warmage",
+    target: "class_feature",
+    match: { className: /warmage/i, name: /^arcane surge$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "arcane_surge",
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Dump Stat tracks Arcane Surge uses on the sheet. Doubling (or tripling on a crit) cantrip damage dice when you surge remains a play-time damage adjustment.",
+      },
+    ],
+  },
+  {
+    id: "warmage.class.reliable_cantrip",
+    pack: "warmage",
+    target: "class_feature",
+    match: { className: /warmage/i, name: /^reliable cantrip$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Reliable Cantrip minimum damage on a miss or successful save is tracked narratively — apply minimum dice + Edge when resolving the roll.",
+      },
+    ],
+  },
+]
+
+export const DANCER_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "dancer.class.dance",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^dance$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "dances",
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "While Dance is active, enable the Dancing sheet toggle so Dance Style riders gated with while_dancing apply.",
+      },
+    ],
+  },
+  {
+    id: "dancer.class.graceful_dodge",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^graceful dodge$/i },
+    skipIfCharacteristicTypes: ["resource_ability_menu"],
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "graceful_dodge",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_graceful_dodge",
+              type: "resource_ability_menu",
+              resourceKey: "dance_die",
+              options: [
+                {
+                  name: "Graceful Dodge",
+                  description: "Add your Dance Die to your AC against one attack.",
+                  resourceCost: 0,
+                  bonusConfig: {
+                    mode: "die",
+                    dieScaling: "class_resource",
+                    classResourceKey: "dance_die",
+                  },
+                },
+              ],
+              label: "Graceful Dodge — Dance Die to AC",
+            },
+          ],
+        },
+      },
+    ],
+  },
+]
+
+export const VAGABOND_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "vagabond.class.desperate_attack",
+    pack: "vagabond",
+    target: "class_feature",
+    match: {
+      className: /vagabond/i,
+      name: /^desperate attack$/i,
+    },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "While you are Bloodied, you have Advantage on attack rolls. Dump Stat gates this with the built-in Bloodied sheet state (below_half_hp).",
+      },
+    ],
+  },
+]
+
+export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "gunslinger.class.dire_gambit",
+    pack: "gunslinger",
+    target: "class_feature",
+    match: { className: /gunslinger/i, name: /^dire gambit$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Dump Stat sets Risk Dice rechargeOnInitiative: 1 when this feature is present (regain one die on Initiative). Critical Hit restores remain play-time.",
+      },
+    ],
+  },
+]
+
+export const MARTYR_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "martyr.class.spellcasting",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^spellcasting$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Hit Point Spellcasting (Radiant self-damage to create a temporary slot) is tracked narratively — apply the Hit Point Spellcasting table damage when you cast. Spell Uses are a separate long-rest pool on the sheet.",
+      },
+    ],
+  },
+]
+
+export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "necromancer.class.thralls",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^thralls$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools.",
+      },
+    ],
+  },
+]
+
+export const ALCHEMIST_PHILOSOPHER_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "alchemist.class.philosophers_stone",
+    pack: "alchemist",
+    target: "class_feature",
+    match: { className: /alchemist/i, name: /^philosopher[’']?s stone$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Regenerating Reagents (fill Reagents up to 6 on Initiative when at 5 or fewer) is a fill-to-cap rule — track narratively; Dump Stat's numeric initiative restore adds uses rather than filling to 6.",
+      },
+    ],
+  },
+]
+
+export const MHP_WARDEN_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "mhp_warden.class.interrupt",
+    pack: "mhp_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^interrupt$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: { reaction: true },
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true },
+      },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "interrupt",
+          classResourceAmount: 1,
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.class.survive",
+    pack: "mhp_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^survive$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: { onDropToZeroHp: true },
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true },
+      },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          useShareKey: "survive",
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.class.guardian_tactics",
+    pack: "mhp_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^guardian tactics$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: { bonusAction: true },
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["resource_ability_menu"],
+        preset: {
+          kind: "char_instance",
+          idKey: "guardian_tactics",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_guardian_tactics",
+              type: "resource_ability_menu",
+              resourceKey: "guardian_tactics",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Block",
+                  description:
+                    "Bonus Action: choose one ally you can see. Until the start of your next turn, the ally's AC equals your AC if it is lower, while the ally is within 5 feet of you (10 feet with Extended Tactics). Ends early if you or the ally are Incapacitated.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Challenge",
+                  description:
+                    "Bonus Action: goad an enemy that can see or hear you. Until the start of your next turn, that enemy has Disadvantage on attack rolls against creatures other than you while within 5 feet of you (10 feet with Extended Tactics). Ends early if you are Incapacitated.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Grasp",
+                  description:
+                    "Bonus Action: block retreat of foes in a 5-foot Emanation from you (10-foot with Extended Tactics) until the start of your next turn. A creature in the Emanation can't willingly move further away unless it first takes the Disengage action. Ends early if you are Incapacitated.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Extended Tactics",
+                  description:
+                    "Unlocked at Warden 14: Block and Challenge reach 10 feet; Grasp is a 10-foot Emanation. Use the Block / Challenge / Grasp options with the wider ranges.",
+                  resourceCost: 0,
+                  unlocksAtLevel: 14,
+                },
+              ],
+              label: "Guardian Tactics",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Block / Challenge / Grasp ally and enemy effects (AC share, goad, emanation) are play-time. Extended Tactics (14th) is listed on the menu when unlocked and widens those ranges to 10 feet.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.class.extended_tactics",
+    pack: "mhp_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^extended tactics$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Unlocks the Extended Tactics entry on the Guardian Tactics Bonus Action menu (10-foot Block/Challenge reach and Grasp emanation). Track the wider ranges when using Block, Challenge, or Grasp.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.class.unyielding_resolve",
+    pack: "mhp_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^unyielding resolve$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "While Bloodied resistance is auto-gated with below_half_hp when the feature text says \"While you are Bloodied\".",
+      },
+    ],
+  },
+  // --- Subclass features (parent class_name Warden) ---
+  {
+    id: "mhp_warden.subclass.roar",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^roar$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "appendDescription",
+        text: "Push and Opportunity Attack denial are play-time; this feature appears as a Bonus Action on the combat actions panel.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.mortal_metamagic",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^mortal metamagic$/i },
+    operations: [
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, abilitiesActions: true } },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["resource_ability_menu"],
+        preset: {
+          kind: "char_instance",
+          idKey: "mortal_metamagic",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_mortal_metamagic",
+              type: "resource_ability_menu",
+              resourceKey: "",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Empowered Spell",
+                  description:
+                    "When you roll damage for a spell, reroll up to your Charisma modifier (minimum 1) of the damage dice; use the new rolls. Can stack with another Metamagic option on the same cast.",
+                  resourceCost: 0,
+                  hitDiceCost: 1,
+                },
+                {
+                  name: "Quickened Spell",
+                  description:
+                    "Change a spell with casting time of an action to a Bonus Action for this casting (same turn restrictions as Sorcerer Quickened Spell).",
+                  resourceCost: 0,
+                  hitDiceCost: 2,
+                },
+              ],
+              label: "Mortal Metamagic (Hit Point Dice)",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Spend Hit Point Dice from the sheet Hit Dice tracker when you Use this ability (1 for Empowered, 2 for Quickened). Empowered Spell rerolls happen on the damage roll; Quickened Spell changes casting time to a Bonus Action.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.arcane_strike",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^arcane strike$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: {
+          action: true,
+          usesExistingClassFeature: true,
+          existingClassFeatureName: "Extra Attack",
+        },
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "appendDescription",
+        text: "When you take the Attack action, replace one attack with a Sorcerer cantrip that has a casting time of an action — shown on the combat actions panel.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.draconic_vengeance",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^draconic vengeance$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: { reaction: true, spendHitDice: 1 },
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["special_attack"],
+        preset: {
+          kind: "char_instance",
+          idKey: "draconic_vengeance",
+          catalogRefId: "cat_char_special_attack",
+          characteristics: [
+            {
+              id: "mod_draconic_vengeance",
+              type: "special_attack",
+              attackName: "Draconic Vengeance",
+              attackProfile: "force_save",
+              targetMode: "area",
+              areaShape: "sphere",
+              areaLengthFeet: 10,
+              rangeFeet: 10,
+              properties: [],
+              damageTypes: ["Acid", "Cold", "Fire", "Lightning", "Poison"],
+              damageDiceCount: 2,
+              damageDieType: "d10",
+              saveAbility: "Dexterity",
+              saveHalfDamage: true,
+              label: "Draconic Vengeance — spend 1 Hit Point Die (die size = your Hit Die + CON)",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Reaction when you take damage from a creature within 10 feet. Using this spends 1 Hit Point Die from the sheet tracker. Damage is two rolls of your Hit Die + Constitution modifier (choose Acid/Cold/Fire/Lightning/Poison). Spell save DC; half on success.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.anointed_block",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^anointed block$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "anointed_block",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_anointed_block",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Block"],
+              alertSummary:
+                "Chosen ally also adds 1d4 to attack rolls and saving throws while within 5 feet (until start of your next turn).",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.selfless_survival",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^selfless survival$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: {
+          onDropToZeroHp: true,
+          usesExistingClassFeature: true,
+          existingClassFeatureName: "Survive",
+        },
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true },
+      },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          useShareKey: "survive",
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Shares the Survive use pool (useShareKey \"survive\"). Expend Survive to drop an ally within 30 feet to 1 HP and heal them for twice your Warden level instead of yourself.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.battle_tactics",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^battle tactics$/i },
+    operations: [
+      {
+        op: "setChoices",
+        isChoice: true,
+        choices: {
+          category: "Maneuver",
+          count: 1,
+          options: [],
+          optionsSource: "class_knacks",
+          choiceCountByLevel: [
+            { level: 3, count: 3 },
+            { level: 7, count: 4 },
+            { level: 13, count: 5 },
+            { level: 19, count: 6 },
+          ],
+          swappableOnRest: false,
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Battle Dice pool comes from the Grey Watchman class_resources proposal (subclass-scoped; gated on the sheet). Import maneuver custom abilities (ability_role knack) before or with this class so picks resolve.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.unyielding_surge",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^unyielding surge$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+          rechargeOnInitiative: true,
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "When you become Bloodied (below_half_hp), regain one expended Battle Die. Once per Short/Long Rest or until you roll Initiative again.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.hold_the_line",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^hold the line$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "hold_the_line",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_hold_the_line",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Grasp"],
+              alertSummary:
+                "While in the Grasp Emanation, you and allies have Advantage on Strength, Dexterity, and Constitution saving throws.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.deaths_gambit",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^death'?s gambit$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "deaths_gambit",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_deaths_gambit",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Challenge"],
+              alertSummary:
+                "After you damage a Challenged enemy, if it has fewer HP than twice your Warden level, it drops to 0 HP.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.undying",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^undying$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 3,
+          useShareKey: "survive",
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "undying",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_undying",
+              type: "power_rider",
+              parentPowerNames: ["Survive"],
+              alertSummary: "Survive pool is 3 uses per Long Rest (shared with Survive / Selfless Survival).",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Raises the shared Survive pool (useShareKey \"survive\") to 3 uses; regain all on a Long Rest.",
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.stonewall",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^stonewall$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "stonewall",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_stonewall",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Block"],
+              alertSummary:
+                "While holding a Shield: you and the Block ally reduce B/P/S damage by your Shield's AC bonus until the start of your next turn.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.legendary_interruption",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^legendary interruption$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "legendary_interruption",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_legendary_interruption",
+              type: "power_rider",
+              parentPowerNames: ["Interrupt"],
+              alertSummary:
+                "You can use Interrupt when an enemy you can see takes a Legendary Action to make an attack, preventing that attack.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.thunderblast",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^thunderblast$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "thunderblast",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_thunderblast",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Grasp"],
+              alertSummary:
+                "When you use Grasp, each creature you choose in the Emanation takes 1d8 Lightning damage.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.grasping_vines",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^grasping vines$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "grasping_vines",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_grasping_vines",
+              type: "power_rider",
+              parentPowerNames: ["Guardian Tactics"],
+              parentMenuOptionNames: ["Grasp"],
+              alertSummary:
+                "Grasp Emanation is 10 feet for creatures on the ground (15 feet at Warden 14).",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.verdant_resilience",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^verdant resilience$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "verdant_resilience",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_verdant_resilience",
+              type: "power_rider",
+              parentPowerNames: ["Survive"],
+              alertSummary:
+                "When you use Survive, you and allies within 10 feet gain Temporary Hit Points equal to twice your Warden level.",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.earthshatter",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^earthshatter$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: {
+          action: true,
+          usesExistingClassFeature: true,
+          existingClassFeatureName: "Extra Attack",
+        },
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["special_attack"],
+        preset: {
+          kind: "char_instance",
+          idKey: "earthshatter",
+          catalogRefId: "cat_char_special_attack",
+          characteristics: [
+            {
+              id: "mod_earthshatter",
+              type: "special_attack",
+              attackName: "Earthshatter",
+              attackProfile: "force_save",
+              targetMode: "area",
+              areaShape: "sphere",
+              areaLengthFeet: 5,
+              rangeFeet: 5,
+              properties: [],
+              damageTypes: [],
+              damageDiceCount: 0,
+              damageDieType: "d6",
+              saveAbility: "Strength",
+              saveHalfDamage: false,
+              label: "Earthshatter — replace one Attack; Large or smaller on ground: Str save or Prone (10 ft at 14)",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "When you take the Attack action, replace one attack with a slam. Each Large or smaller creature you choose on the ground within 5 feet (10 feet at Warden 14) must succeed on a Strength saving throw (DC 8 + Str mod + PB) or fall Prone.",
+      },
+    ],
+  },
+]
+
+export const MHP_WARDEN_SEEDS: ContentSeed[] = [
+  {
+    id: "mhp_warden.seed.guardian_tactics",
+    pack: "mhp_warden",
+    seedClassResource: {
+      className: /warden/i,
+      requiresFeatureName: /^guardian tactics$/i,
+      resourceKey: "guardian_tactics",
+      build: (className) => ({
+        class_name: className,
+        resource_key: "guardian_tactics",
+        name: "Guardian Tactics",
+        description:
+          "Unlimited Bonus Action menu for Block, Challenge, Grasp, and (at 14th) Extended Tactics range note.",
+        uses: { type: "unlimited" },
+      }),
+    },
+  },
+]

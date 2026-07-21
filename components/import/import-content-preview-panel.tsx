@@ -5,8 +5,14 @@ import type { ImportContent } from "@/lib/import/content-schema"
 import {
   collectImportContentPreview,
   importContentPreviewLimit,
+  type ImportContentPreviewItem,
   type ImportContentPreviewSection,
 } from "@/lib/import/import-content-preview"
+import {
+  importCardArtUsesPortraitArt,
+  type ImportCardArtUrlMap,
+} from "@/lib/import/import-card-art"
+import { ImportCardArtControls } from "@/components/import/import-card-art-panel"
 import { BookOpen, Package, ScrollText, Users } from "lucide-react"
 
 type ImportContentPreviewPanelProps = {
@@ -22,6 +28,9 @@ type ImportContentPreviewPanelProps = {
    * directly under the stage header without another bordered panel.
    */
   embedded?: boolean
+  /** Optional card-art URLs for rows that expose `cardArtKey` (e.g. subclasses). */
+  cardArtUrls?: ImportCardArtUrlMap
+  onCardArtChange?: (map: ImportCardArtUrlMap) => void
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
@@ -34,12 +43,76 @@ const SECTION_ICONS: Record<string, typeof BookOpen> = {
   backgrounds: BookOpen,
 }
 
+function PreviewItem({
+  item,
+  bare,
+  cardArtUrl,
+  onCardArtUrlChange,
+}: {
+  item: ImportContentPreviewItem
+  bare?: boolean
+  cardArtUrl?: string
+  onCardArtUrlChange?: (next: string) => void
+}) {
+  const showCardArt = Boolean(item.cardArtKey && onCardArtUrlChange)
+
+  return (
+    <li
+      className={
+        bare
+          ? "rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
+          : "rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-foreground">{item.name}</span>
+        {item.badges.map((badge) => (
+          <span
+            key={badge}
+            className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+          >
+            {badge}
+          </span>
+        ))}
+      </div>
+      {item.details.length > 0 ? (
+        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+          {item.details.map((detail) => (
+            <div key={`${item.id}-${detail.label}`} className="contents">
+              <dt className="text-muted-foreground">{detail.label}</dt>
+              <dd className="text-foreground">{detail.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {item.descriptionSnippet ? (
+        <p className="mt-1.5 text-xs text-muted-foreground line-clamp-3">{item.descriptionSnippet}</p>
+      ) : null}
+      {showCardArt && item.cardArtKey ? (
+        <div className="mt-3 border-t border-border/50 pt-3">
+          <ImportCardArtControls
+            rowKey={item.cardArtKey}
+            name={item.name}
+            portrait={importCardArtUsesPortraitArt("subclasses")}
+            url={cardArtUrl ?? ""}
+            onUrlChange={onCardArtUrlChange!}
+          />
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
 function PreviewSection({
   section,
   bare,
+  cardArtUrls,
+  onCardArtChange,
 }: {
   section: ImportContentPreviewSection
   bare?: boolean
+  cardArtUrls?: ImportCardArtUrlMap
+  onCardArtChange?: (map: ImportCardArtUrlMap) => void
 }) {
   const limit = importContentPreviewLimit()
   const [expanded, setExpanded] = useState(false)
@@ -51,39 +124,17 @@ function PreviewSection({
     <>
       <ul className="space-y-2">
         {visibleItems.map((item) => (
-          <li
+          <PreviewItem
             key={item.id}
-            className={
-              bare
-                ? "rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
-                : "rounded-md border border-border/60 bg-muted/20 px-3 py-2"
+            item={item}
+            bare={bare}
+            cardArtUrl={item.cardArtKey ? cardArtUrls?.[item.cardArtKey] : undefined}
+            onCardArtUrlChange={
+              item.cardArtKey && onCardArtChange
+                ? (next) => onCardArtChange({ ...cardArtUrls, [item.cardArtKey!]: next })
+                : undefined
             }
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-foreground">{item.name}</span>
-              {item.badges.map((badge) => (
-                <span
-                  key={badge}
-                  className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
-            {item.details.length > 0 ? (
-              <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-                {item.details.map((detail) => (
-                  <div key={`${item.id}-${detail.label}`} className="contents">
-                    <dt className="text-muted-foreground">{detail.label}</dt>
-                    <dd className="text-foreground">{detail.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-            {item.descriptionSnippet ? (
-              <p className="mt-1.5 text-xs text-muted-foreground line-clamp-3">{item.descriptionSnippet}</p>
-            ) : null}
-          </li>
+          />
         ))}
       </ul>
       {hiddenCount > 0 ? (
@@ -119,6 +170,8 @@ export function ImportContentPreviewPanel({
   sectionKeys,
   hideSummary = false,
   embedded = false,
+  cardArtUrls,
+  onCardArtChange,
 }: ImportContentPreviewPanelProps) {
   const sections = useMemo(
     () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
@@ -166,6 +219,8 @@ export function ImportContentPreviewPanel({
               key={section.key}
               section={section}
               bare={embedded && singleSection}
+              cardArtUrls={cardArtUrls}
+              onCardArtChange={onCardArtChange}
             />
           ))}
         </div>
