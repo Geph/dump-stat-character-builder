@@ -24,6 +24,16 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "below_half_hp", label: "Bloodied", sourceType: "builtin" },
   { id: "while_dancing", label: "Dancing", sourceType: "builtin" },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
+  {
+    id: "masterwork_weapon_active",
+    label: "Masterwork weapon",
+    sourceType: "builtin",
+  },
+  {
+    id: "masterwork_armor_active",
+    label: "Masterwork armor",
+    sourceType: "builtin",
+  },
 ]
 
 /** Feature-specific toggles resolvable by id but not shown on every character sheet. */
@@ -42,6 +52,24 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
     id: "counter_discharge_active",
     label: "Counter-Discharge (vs this spell)",
     sourceType: "class_feature",
+  },
+  {
+    id: "dance_style_dueling_stance",
+    label: "Dance Style: Dueling Stance",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+  },
+  {
+    id: "dance_style_inspiring_chant",
+    label: "Dance Style: Inspiring Chant",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+  },
+  {
+    id: "dance_style_pantomime",
+    label: "Dance Style: Pantomime",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
   },
 ]
 

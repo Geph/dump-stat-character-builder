@@ -91,6 +91,7 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   checkSkills: z.array(z.string()).nullable(),
   conditionNote: z.string().nullable(),
+  checkConditionTypes: z.array(z.string()).nullable(),
   targets: z
     .enum([
       "self",

@@ -100,6 +100,8 @@ export function computeRollBonusAmount(
     characterLevel: number
     /** Current die size (sides) per class-resource key, for "die" + "class_resource" bonuses. */
     classResourceDieSides?: Record<string, number>
+    /** Current Class Cap / pool size per resource_key (Masterwork Bonus, etc.). */
+    classResourceCounts?: Record<string, number>
   },
 ): number {
   if (!config) return 0
@@ -127,6 +129,11 @@ export function computeRollBonusAmount(
     case "character_level":
       amount = params.characterLevel
       break
+    case "class_resource_count": {
+      const key = config.classResourceKey?.trim()
+      amount = key ? params.classResourceCounts?.[key] ?? 0 : 0
+      break
+    }
     case "die": {
       const sides = resolveRollBonusDieSides(config, params.classResourceDieSides)
       amount = sides != null ? rollDice(config.dieCount ?? 1, sides) : 0

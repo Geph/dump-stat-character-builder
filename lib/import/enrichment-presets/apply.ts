@@ -20,6 +20,7 @@ import {
   getEnrichmentHook,
   getEnrichmentPresets,
 } from "@/lib/import/enrichment-presets/registry"
+import { sanitizeGunslingerImportContent } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import type {
   EnrichmentOperation,
   EnrichmentPreset,
@@ -32,6 +33,7 @@ const CLASS_ROW_PACKS = new Set([
   "alternate_sorcerer",
   "warmage",
   "dancer",
+  "craftsman",
   "vagabond",
   "gunslinger",
   "martyr",
@@ -44,6 +46,7 @@ const CONTENT_PACKS = new Set([
   "psion",
   "warmage",
   "dancer",
+  "craftsman",
   "vagabond",
   "gunslinger",
   "martyr",
@@ -527,6 +530,7 @@ export function applyImportEnrichmentPresets(
   }
 
   next = patchInitiativeRechargeFromFeatures(next)
+  next = sanitizeGunslingerImportContent(next)
 
   return next
 }
@@ -549,9 +553,17 @@ function patchInitiativeRechargeFromFeatures(content: ImportContent): ImportCont
 
       const features = cls.features ?? []
       const hasDireGambit = features.some((f) => /^dire gambit$/i.test(f.name ?? ""))
-      if (hasDireGambit && resourceKey === "risk_dice" && row.uses.rechargeOnInitiative !== 1) {
-        changed = true
-        return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+      if (resourceKey === "risk_dice") {
+        if (hasDireGambit && row.uses.rechargeOnInitiative !== 1) {
+          changed = true
+          return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+        }
+        // LLM extracts often set initiative recharge on the pool even before Dire Gambit.
+        if (!hasDireGambit && row.uses.rechargeOnInitiative != null) {
+          changed = true
+          const { rechargeOnInitiative: _drop, ...restUses } = row.uses
+          return { ...row, uses: restUses }
+        }
       }
 
       const subclassHit = (content.subclasses ?? []).some(

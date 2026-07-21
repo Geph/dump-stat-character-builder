@@ -1,11 +1,12 @@
 import { ALCHEMIST_PRESETS, ALCHEMIST_SEEDS } from "@/lib/import/enrichment-presets/packs/alchemist"
+import { CRAFTSMAN_PRESETS } from "@/lib/import/enrichment-presets/packs/craftsman"
+import { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
+import { GUNSLINGER_PRESETS } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import {
   ALTERNATE_RANGER_PRESETS,
   ALTERNATE_RANGER_SEEDS,
   ALTERNATE_SORCERER_PRESETS,
   ALCHEMIST_PHILOSOPHER_PRESETS,
-  DANCER_PRESETS,
-  GUNSLINGER_PRESETS,
   INVESTIGATOR_PRESETS,
   INVESTIGATOR_SEEDS,
   MARTYR_PRESETS,
@@ -33,6 +34,7 @@ const PRESETS: EnrichmentPreset[] = [
   ...ALTERNATE_SORCERER_PRESETS,
   ...WARMAGE_PRESETS,
   ...DANCER_PRESETS,
+  ...CRAFTSMAN_PRESETS,
   ...VAGABOND_PRESETS,
   ...GUNSLINGER_PRESETS,
   ...MARTYR_PRESETS,

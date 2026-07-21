@@ -89,6 +89,11 @@ export const ImportMechanicSchema = z.object({
   checkSkills: z.array(z.string()).optional(),
   /** Freeform qualifier that cannot be auto-enforced (e.g. "that involves you dancing"). */
   conditionNote: z.string().optional(),
+  /**
+   * Enforced condition scope for check_roll_modifier (e.g. ["Frightened"] for saves to avoid/end
+   * Frightened). Prefer this over conditionNote when the gate is a named condition.
+   */
+  checkConditionTypes: z.array(z.string()).optional(),
   /** Shared multi-target / beneficiary scope for die bonuses, THP, movement, etc. */
   targets: z
     .enum(["self", "self_and_allies_in_range", "self_and_chosen_ally", "chosen_creatures", "chosen_creatures_in_range"])
@@ -232,6 +237,12 @@ export const ImportMechanicSchema = z.object({
   telepathyRangeFeet: z.number().optional(),
   /** unarmed_strike_damage */
   dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).optional(),
+  /** weapon_damage_die_override — sides to rewrite weapon dice to (e.g. 4 for Deadly D4s). */
+  dieSides: z.number().optional(),
+  /** weapon_damage_die_override scope. */
+  weaponDamageScope: z
+    .enum(["all", "melee", "ranged", "unarmed", "weapons", "specific"])
+    .optional(),
   /** resource_ability_menu */
   waiveResourceCost: z.boolean().optional(),
   menuAbilityNames: z.array(z.string()).optional(),
@@ -936,15 +947,19 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
 - **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, Battle Dice, Dances, Arcane Surge, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
 - **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
-- **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; Dire Gambit → rechargeOnInitiative: 1 (not full refill). Keep "expend one Risk Die" on maneuvers.
+- **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → rechargeOnInitiative: 1 (not full refill; enrichment sets this from the feature — do not set initiative recharge from the table alone). Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
 - **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Mage Hand Press Warden").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools. Import thrall creatures[] before the class and grant_creature with creatureChoiceOptions.
 - **Dancer:** Dances = spendable uses (often short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool
+- **Craftsman:** Masterwork Bonus = special Class Cap (not spendable). Thunderlords Charge Points = spendable multiply_level pool (long rest) with subclass_name \"Thunderlords' Guild\" (subclass-gated). Do not model "uses equal to Masterwork Bonus" as spending masterwork_bonus — enrichment creates a separate at_level tracker. Masterwork weapon/armor live math uses sheet toggles masterwork_weapon_active / masterwork_armor_active.
+- **Dancer Momentum:** subclass-gated class_resources.momentum (fixed cap 3) with subclass_name matching the Momentum archetype; spend phrases on the Momentum feature.
 - **Warmage:** Tricks / Tricks Known = special choice count; Cantrip Bonus Dice = special rider count for Warmage Edge; Arcane Surge = spendable uses
-- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level, Tricks Known, Thralls, CR Total): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
-- **Bloodied gates:** use requiresSheetToggle "below_half_hp" (built-in Bloodied when HP ≤ half). **Dance Style riders:** use "while_dancing" and have players toggle Dancing while Dance is active
+- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level, Tricks Known, Thralls, CR Total, Masterwork Bonus): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
+- **Bloodied gates:** use requiresSheetToggle "below_half_hp" (built-in Bloodied when HP ≤ half). **Dance Style riders:** use "while_dancing" for generic styles; when a subclass ability only applies to one named style (Dueling Stance, Inspiring Chant, Pantomime), use a per-style toggle (dance_style_*). **Dance Styles picker:** choices.optionsSource "class_upgrades" + ability_role "upgrade" on base style custom_abilities (resourceKey dance_styles_known). Saves vs Frightened: checkConditionTypes ["Frightened"], not conditionNote.
+- **Weapon damage die rewrite** (Deadly D4s): mechanics kind weapon_damage_die_override with dieSides 4, scope weapons — not damage_roll_modifiers.
+
 - **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
 - When the table has a separate "Die Size" / "Die Type" column alongside the pool count (e.g. Psionic Energy Dice: d6→d8→d10→d12 as the Number column also grows), set uses.dieSidesByLevel: [{ level, count: <die sides as a number, e.g. 6/8/10/12> }, ...] in addition to atLevelTable — do not drop the die-size progression just because it scales separately from the count
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
@@ -974,7 +989,8 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Do NOT put Primary/Secondary/Third Discipline, Psionic Talents, Class Talents, or Innate Psionics / Innate Psionic Ability shells in custom_abilities[] — those stay as class features. Primary Discipline comes from the Psionic Archetype (subclass) via grant_custom_ability; Secondary/Third Discipline are separate class_disciplines picks. Psionic Talents is a class feature with optionsSource known_discipline_talents (options = talents from all known disciplines). Innate Psionics wires spells_known on the class feature.
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
 - Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
-- For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-only upgrade lists stay deferred when extracted with the subclass.
+- For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-attached upgrade lists (Craftsman Trappers' traps, Dancer Dance Styles) ARE included when the character has that subclass — set source_type "subclass" / source_name to the guild/style subclass and ability_role "upgrade".
+- Craftsman mastery-property catalog entries and Trappers' Guild traps: one custom_abilities row each with ability_role "upgrade". Traps feature: choices { category: "Trap", resourceKey: "traps_known", optionsSource: "class_upgrades", options: [] }.
 - Talent pools (three patterns — do not conflate):
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).
   2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; the importer also builds a "General Psionic Talents" talent_pool package. Wire the class feature with choices.category "Class Talents" or "General Psionic Talents", resourceKey class_talents_known, and optionsSource: "class_talents". Capture level/subclass gates in options[].prerequisite or the row's prerequisite.

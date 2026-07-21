@@ -34,12 +34,15 @@ import {
   applyHpCharacteristics,
   computeInitiative,
   resolveAggregatedAcFormula,
+  resolveWeaponDamageDieSidesOverride,
   type SheetToggleKey,
   sumAttackRollModifiers,
   sumDamageRollModifiers,
   type AbilityScoreKey,
   type AggregatedCharacteristics,
 } from "@/lib/compendium/characteristic-modifiers"
+import { replaceDamageDiceSides } from "@/lib/compendium/weapon-damage-die-override"
+import { resolveClassResourceCounts } from "@/lib/character/resolve-class-resource-counts"
 import {
   calculateArmorClass,
   calculateWeaponAttack,
@@ -121,6 +124,7 @@ function buildWeaponAttackDerived(
     aggregatedCharacteristics: AggregatedCharacteristics
     featureDamageBonus: number
     includeAbilityModifier?: boolean
+    characterLevel?: number
   },
 ): WeaponAttackDerived | null {
   const overrides = params.aggregatedCharacteristics.weaponAbilityOverrides
@@ -154,7 +158,16 @@ function buildWeaponAttackDerived(
     attackBreakdown.push({ label: "Feature damage", value: params.featureDamageBonus })
   }
 
-  const damageDice = parseWeaponDamageDice(getWeaponDamageText(weapon)).oneHanded
+  const parsed = parseWeaponDamageDice(getWeaponDamageText(weapon)).oneHanded
+  const overrideSides = resolveWeaponDamageDieSidesOverride(
+    params.aggregatedCharacteristics,
+    weapon,
+    params.characterLevel ?? 1,
+  )
+  const damageDice =
+    parsed != null && overrideSides != null
+      ? replaceDamageDiceSides(parsed, overrideSides)
+      : parsed
   const damageDisplay =
     damageDice != null && params.includeAbilityModifier != null
       ? buildWeaponDamageExpression({
@@ -609,6 +622,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       ? inputs.classLevels.reduce((sum, row) => sum + row.level, 0)
       : 1
 
+  const classResourceCounts = resolveClassResourceCounts({
+    classLevels: inputs.classLevels,
+    classes: inputs.classes,
+  })
+
   const aggregatedCharacteristics = aggregateCharacteristics(
     [...builderCharacteristicMods, ...equipmentMagicMods],
     {
@@ -618,6 +636,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       equippedShield,
       currentHp: inputs.currentHp,
       characterLevel: totalLevel,
+      classResourceCounts,
     },
   )
   // Source IDs the character currently has, used to discard orphaned ability-score
@@ -850,6 +869,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     weaponProficiencies,
     aggregatedCharacteristics,
     featureDamageBonus,
+    characterLevel: totalLevel,
   }
 
   const equippedWeaponAttack =

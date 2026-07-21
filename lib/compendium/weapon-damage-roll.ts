@@ -1,5 +1,6 @@
 import { getWeaponAttackAbility, getWeaponDamageText } from "@/lib/compendium/combat-stats"
 import { hasWeaponProperty } from "@/lib/compendium/combat-stats"
+import { replaceDamageDiceSides } from "@/lib/compendium/weapon-damage-die-override"
 import type { Equipment } from "@/lib/types"
 
 export type DamageRollMode = "normal" | "advantage" | "disadvantage"
@@ -37,22 +38,30 @@ export function parseWeaponDamageDice(damageText: string | null): {
   return { oneHanded: primary, twoHanded: null }
 }
 
-export function weaponDamageDiceOptions(weapon: Equipment): WeaponDamageDiceOption[] {
+export function weaponDamageDiceOptions(
+  weapon: Equipment,
+  options?: { overrideDieSides?: number | null },
+): WeaponDamageDiceOption[] {
   const damageText = getWeaponDamageText(weapon)
   const { oneHanded, twoHanded } = parseWeaponDamageDice(damageText)
   if (!oneHanded) return []
 
-  const options: WeaponDamageDiceOption[] = [
-    { id: "one-handed", label: "One-handed", dice: oneHanded },
+  const applyOverride = (dice: string) =>
+    options?.overrideDieSides != null ? replaceDamageDiceSides(dice, options.overrideDieSides) : dice
+
+  const one = applyOverride(oneHanded)
+  const optionsList: WeaponDamageDiceOption[] = [
+    { id: "one-handed", label: "One-handed", dice: one },
   ]
 
-  const versatile =
+  const versatileRaw =
     twoHanded ??
     (hasWeaponProperty(weapon, "versatile") ? bumpVersatileDie(oneHanded) : null)
-  if (versatile && versatile !== oneHanded) {
-    options.push({ id: "two-handed", label: "Two-handed", dice: versatile })
+  const versatile = versatileRaw ? applyOverride(versatileRaw) : null
+  if (versatile && versatile !== one) {
+    optionsList.push({ id: "two-handed", label: "Two-handed", dice: versatile })
   }
-  return options
+  return optionsList
 }
 
 export function buildWeaponDamageExpression(params: {

@@ -64,6 +64,32 @@ function abilityScoreToModifierKey(
   return ability ? map[ability] : "CHA"
 }
 
+const KNOWN_CHECK_CONDITION_TYPES = [
+  "Frightened",
+  "Charmed",
+  "Poisoned",
+  "Blinded",
+  "Deafened",
+  "Paralyzed",
+  "Petrified",
+  "Restrained",
+  "Stunned",
+  "Incapacitated",
+  "Prone",
+  "Exhaustion",
+  "spell",
+] as const
+
+/** Pull named conditions from a freeform conditionNote so Frightened/Charmed gates still wire. */
+function extractConditionTypesFromNote(note: string | null | undefined): string[] | null {
+  const text = note?.trim()
+  if (!text) return null
+  const found = KNOWN_CHECK_CONDITION_TYPES.filter((condition) =>
+    new RegExp(`\\b${condition}\\b`, "i").test(text),
+  )
+  return found.length ? [...found] : null
+}
+
 function usesRechargesFromImport(
   recharge: ImportMechanic["usesRecharge"],
 ): UsesConfig["recharges"] {
@@ -255,7 +281,13 @@ function buildFromMechanic(
     if (!mechanic.checkRollMode) return null
     // Freeform qualifiers (e.g. "that involves you dancing") cannot be enforced on the sheet —
     // skip wiring so we don't silently over-grant unrestricted advantage/bonus.
-    if (mechanic.conditionNote?.trim()) return null
+    // Named conditions in conditionNote (Frightened, Charmed, …) map to checkConditionTypes.
+    const conditionTypesFromNote = extractConditionTypesFromNote(mechanic.conditionNote)
+    const checkConditionTypes = [
+      ...(mechanic.checkConditionTypes ?? []),
+      ...(conditionTypesFromNote ?? []),
+    ].filter((value, index, all) => all.indexOf(value) === index)
+    if (mechanic.conditionNote?.trim() && !checkConditionTypes.length) return null
     return {
       ruleId: "ai.check_roll_modifier",
       confidence: aiConfidence(mechanic),
@@ -269,6 +301,7 @@ function buildFromMechanic(
             checkCategory: mechanic.checkCategory ?? (mechanic.checkSkills?.length ? "skill" : "save"),
             checkAbility: mechanic.checkAbility ?? undefined,
             checkSkills: mechanic.checkSkills,
+            ...(checkConditionTypes.length ? { checkConditionTypes } : {}),
             ...(mechanic.requiresSheetToggle
               ? {
                   limitations: [
@@ -601,6 +634,37 @@ function buildFromMechanic(
           id: modId(instanceKey(ctx, "unarmed_die")),
           type: "unarmed_strike_damage",
           dieByLevel,
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "weapon_damage_die_override") {
+    const dieSides = mechanic.dieSides
+    if (dieSides == null || !Number.isFinite(dieSides)) return null
+    return {
+      ruleId: "ai.weapon_damage_die_override",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("weapon_damage_die_override"), [
+        {
+          id: modId(instanceKey(ctx, "weapon_die_override")),
+          type: "weapon_damage_die_override",
+          dieSides,
+          scope: mechanic.weaponDamageScope ?? "weapons",
+          weaponNames: mechanic.weaponNames ?? [],
+          ...(mechanic.requiresSheetToggle
+            ? {
+                limitations: [
+                  {
+                    id: `lim_${instanceKey(ctx, "weapon_die_toggle")}`,
+                    kind: "sheet_toggle" as const,
+                    rule: "requires_active" as const,
+                    value: mechanic.requiresSheetToggle,
+                  },
+                ],
+              }
+            : {}),
         },
       ]),
     }

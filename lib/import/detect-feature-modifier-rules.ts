@@ -439,10 +439,14 @@ function parseAttackCoverFlags(text: string): Pick<
   import("@/lib/compendium/characteristic-modifiers").RollModifierEntry,
   "ignoreHalfCover" | "treatThreeQuartersCoverAsHalf"
 > {
+  const ignoreHalf = /\bignore(?:s)?\s+half[- ]cover\b/i.test(text)
+  const ignoreThreeQuarters =
+    /\bignore(?:s)?\s+(?:half(?:\s+cover)?\s+and\s+)?three[- ]quarter(?:s|'s)?\s+cover\b/i.test(text) ||
+    /\btreat\s+three[- ]quarter(?:s|'s)?\s+cover\s+as\s+half\s+cover\b/i.test(text) ||
+    /\bthree[- ]quarter(?:s|'s)?\s+cover\s+counts\s+as\s+half\s+cover\b/i.test(text)
   return {
-    ignoreHalfCover: /\bignore\s+half[- ]cover\b/i.test(text),
-    treatThreeQuartersCoverAsHalf:
-      /\btreat\s+three[- ]quarter(?:s|'s)?\s+cover\s+as\s+half\s+cover\b/i.test(text),
+    ignoreHalfCover: ignoreHalf || ignoreThreeQuarters,
+    treatThreeQuartersCoverAsHalf: ignoreThreeQuarters,
   }
 }
 
@@ -1345,6 +1349,30 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "attack.cover.ignore",
+    confidence: "high",
+    test: /\bignore(?:s)?\s+(?:half(?:\s+cover)?\s+and\s+)?(?:half[- ]cover|three[- ]quarter(?:s|'s)?\s+cover)\b/i,
+    build: (_match, ctx, text) => {
+      const cover = parseAttackCoverFlags(text)
+      if (!cover.ignoreHalfCover && !cover.treatThreeQuartersCoverAsHalf) return null
+      const target = /ranged/i.test(text) ? "ranged" : parseAttackTargetFromText(text)
+      return charInstance(newInstanceId(), characteristicCatalogRefId("attack_roll_modifiers"), [
+        {
+          id: modId(instanceKey(ctx, "attack_cover")),
+          type: "attack_roll_modifiers",
+          entries: [
+            {
+              bonus: 0,
+              target,
+              ...(cover.ignoreHalfCover ? { ignoreHalfCover: true } : {}),
+              ...(cover.treatThreeQuartersCoverAsHalf ? { treatThreeQuartersCoverAsHalf: true } : {}),
+            },
+          ],
+        },
+      ])
+    },
+  },
+  {
     id: "damage.rider.dice",
     confidence: "medium",
     test: /\b(?:deal|deals)\s+(?:an?\s+)?extra\s+(\d+d\d+)\s+([a-z]+)?\s*damage\b/i,
@@ -1462,6 +1490,23 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         text,
       )
     },
+  },
+  {
+    id: "save.advantage.frightened",
+    confidence: "high",
+    test:
+      /\badvantage\s+on\s+saving\s+throws?\s+(?:you\s+make\s+)?(?:to\s+avoid\s+or\s+end|against(?:\s+being)?)\s+(?:the\s+)?Frightened(?:\s+condition)?\b/i,
+    build: (_match, ctx, text) =>
+      buildCheckRollModifier(
+        ctx,
+        "save_adv_frightened",
+        {
+          checkRollMode: "advantage",
+          checkCategory: "save",
+          checkConditionTypes: ["Frightened"],
+        },
+        text,
+      ),
   },
   {
     id: "save.advantage.magic",
@@ -1639,6 +1684,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           speedType: "walk",
           mode: "add",
           value: feet,
+          limitations: parseLimitationsFromText(text),
           ...(primordialLightning
             ? {
                 requiresSheetToggle: "primordial_aspect_lightning",
