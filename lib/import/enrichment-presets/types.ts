@@ -65,9 +65,19 @@ export type EnrichmentOperation =
   | { op: "setAbilityRole"; role: string }
   | { op: "setChoices"; isChoice?: boolean; choices: FeatureChoice }
   | {
+      op: "setActivation"
+      activation: NonNullable<Feature["activation"]>
+    }
+  | {
+      op: "setSheetDisplay"
+      sheetDisplay: NonNullable<Feature["sheetDisplay"]>
+    }
+  | {
       op: "attachNamedPreset"
       preset: NamedModifierPreset
       skipIfCharacteristicTypes?: string[]
+      /** Drop existing linkedModifiers that include these characteristic types before attaching. */
+      replaceCharacteristicTypes?: string[]
       /** When true, do not call syncModifierRefs (legacy psion Climactic Moment). */
       skipSyncRefs?: boolean
     }
@@ -91,6 +101,10 @@ export type EnrichmentOperation =
       /** Prepend synthesis-style ability_modifier short rest if missing. */
       synthesisAbility?: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
       ensureLongRest?: boolean
+    }
+  | {
+      op: "patchUsesFields"
+      fields: Partial<UsesConfig>
     }
 
 export type EnrichmentTarget =

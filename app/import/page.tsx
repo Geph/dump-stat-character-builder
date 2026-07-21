@@ -68,6 +68,7 @@ import type {
   ImportProposalSet,
 } from "@/lib/import/import-proposals"
 import {
+  collisionRenamesResolved,
   defaultCollisionResolutionMap,
   defaultRenameMap,
   type ImportCollision,
@@ -108,7 +109,7 @@ const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Clipboard
 ]
 
 const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
-  { id: "clipboard", label: "BYO JSON", icon: ClipboardPaste },
+  { id: "clipboard", label: "BYO LLM", icon: ClipboardPaste },
   { id: "pack", label: "JSON pack", icon: Upload },
 ]
 
@@ -292,16 +293,6 @@ export default function ImportPage() {
   const isLastReviewStage = stagedReview
     ? reviewStageIndex >= pendingImport!.stages.length - 1
     : true
-  const reviewReadyToConfirm =
-    !stagedReview ||
-    (isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers))
-
-  const canGoPreviousReview =
-    stagedReview && (reviewPhase === "modifiers" || reviewStageIndex > 0)
-  const canGoNextReview =
-    stagedReview &&
-    ((reviewPhase === "content" && stageHasModifiers) ||
-      (!isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers)))
 
   const goPreviousReview = () => {
     if (!stagedReview || !pendingImport) return
@@ -336,6 +327,31 @@ export default function ImportPage() {
     const kinds = new Set(IMPORT_STAGE_COLLISION_KINDS[activeReviewStage.id])
     return pendingImport.collisions.filter((collision) => kinds.has(collision.kind))
   }, [pendingImport, activeReviewStage])
+
+  const stageCollisionsResolved = collisionRenamesResolved(
+    stageCollisions,
+    collisionResolutionMap,
+    renameMap,
+  )
+  const allCollisionsResolved = pendingImport
+    ? collisionRenamesResolved(
+        pendingImport.collisions,
+        collisionResolutionMap,
+        renameMap,
+      )
+    : true
+  const reviewReadyToConfirm =
+    allCollisionsResolved &&
+    (!stagedReview ||
+      (isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers)))
+
+  const canGoPreviousReview =
+    stagedReview && (reviewPhase === "modifiers" || reviewStageIndex > 0)
+  const canGoNextReview =
+    stagedReview &&
+    stageCollisionsResolved &&
+    ((reviewPhase === "content" && stageHasModifiers) ||
+      (!isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers)))
 
   const stagePreviewKeys = activeReviewStage
     ? IMPORT_STAGE_PREVIEW_KEYS[activeReviewStage.id]
@@ -443,7 +459,7 @@ export default function ImportPage() {
       message += ` (${data.completedChunks}/${data.totalChunks} sections completed before failure)`
     }
     if (data.code === "quota_exceeded" || data.code === "rate_limit") {
-      message += " Try Clipboard → BYO JSON import, or a different server AI model."
+      message += " Try Clipboard → BYO LLM import, or a different server AI model."
     }
     return message
   }
@@ -942,13 +958,13 @@ export default function ImportPage() {
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className={pageHeaderSubtitleClass}>
             {staticMode
-              ? "Import homebrew with BYO JSON (paste LLM output), share JSON packs, or reload the bundled SRD — data stays in your browser."
+              ? "Import homebrew with BYO LLM (paste LLM output), share JSON packs, or reload the bundled SRD — data stays in your browser."
               : "Add new content from PDFs or pasted text and JSON"}
           </p>
           {staticMode && (
             <p className={`${pageFloatingHintClass} mt-2`}>
               Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with MySQL.
-              Use <strong className="font-medium text-foreground">BYO JSON</strong> to copy a prompt into your own LLM and paste the result here.
+              Use <strong className="font-medium text-foreground">BYO LLM</strong> to copy a prompt into your own LLM and paste the result here.
             </p>
           )}
         </div>
@@ -1018,6 +1034,8 @@ export default function ImportPage() {
                       hideSummary
                       embedded
                       showModifierReviewHint={stageHasModifiers}
+                      cardArtUrls={cardArtUrlMap}
+                      onCardArtChange={setCardArtUrlMap}
                     />
                     <ImportCardArtPanel
                       key={`card-art-${activeReviewStage?.id ?? "all"}`}
@@ -1025,6 +1043,7 @@ export default function ImportPage() {
                       value={cardArtUrlMap}
                       onChange={setCardArtUrlMap}
                       sections={stageCardArtSections}
+                      excludeSections={["subclasses"]}
                     />
                   </>
                 }
@@ -1053,6 +1072,8 @@ export default function ImportPage() {
                   content={pendingImport.content}
                   previewSummary={pendingImport.previewSummary}
                   showModifierReviewHint={modifierReviewRows.length > 0}
+                  cardArtUrls={cardArtUrlMap}
+                  onCardArtChange={setCardArtUrlMap}
                 />
                 {modifierReviewRows.length > 0 ? (
                   <ImportModifierReviewPanel
@@ -1065,6 +1086,7 @@ export default function ImportPage() {
                   content={pendingImport.content}
                   value={cardArtUrlMap}
                   onChange={setCardArtUrlMap}
+                  excludeSections={["subclasses"]}
                 />
               </>
             )}

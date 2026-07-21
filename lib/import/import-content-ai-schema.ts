@@ -78,6 +78,7 @@ const ImportMechanicAiSchema = z.object({
     })
     .nullable(),
   classResourceKey: z.string().nullable(),
+  resourceKey: z.string().nullable(),
   classResourceCost: z.number().nullable(),
   classResourceCostMode: z
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])

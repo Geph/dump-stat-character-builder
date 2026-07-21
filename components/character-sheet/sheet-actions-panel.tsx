@@ -16,6 +16,7 @@ import {
   type ActionEconomyKind,
   type SheetActionEntry,
 } from "@/lib/character/sheet-actions"
+import { guardianTacticsToggleIdForOption } from "@/lib/compendium/sheet-toggle-registry"
 import {
   SHEET_ACTION_CARD,
   SHEET_ACTION_USAGE_DOT,
@@ -45,6 +46,12 @@ type SheetActionsPanelProps = {
   onResourceUsedChange?: (next: Record<string, number>) => void
   incapacitated?: boolean
   psiLimit?: number | null
+  /** Remaining Hit Dice for the preferred class (or total). */
+  hitDiceRemaining?: number
+  /** Spend Hit Dice when an action/menu option requires them. Returns false if unaffordable. */
+  onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
+  /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
+  onActivateSheetToggle?: (toggleId: string) => void
 }
 
 function resolveActionMax(
@@ -120,7 +127,9 @@ function ActionRollStep({
   specialAttack,
   attackMod,
   proficiencyBonus,
+  damageModifier,
   psiSpent,
+  hitDiceSpent,
   augmentSummary,
   onClose,
 }: {
@@ -128,7 +137,9 @@ function ActionRollStep({
   specialAttack: SpecialAttackCharacteristic
   attackMod: number
   proficiencyBonus: number
+  damageModifier: number
   psiSpent: number
+  hitDiceSpent: number
   augmentSummary: string | null
   onClose: () => void
 }) {
@@ -145,9 +156,13 @@ function ActionRollStep({
       ? specialAttack.saveDCBase
       : 8 + proficiencyBonus + attackMod
 
-  const damageExpression = `${specialAttack.damageDiceCount}d${dieSides(specialAttack.damageDieType)}${
-    specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""
-  }`
+  const sides =
+    action.hitDieSides != null && action.hitDieSides > 0
+      ? action.hitDieSides
+      : dieSides(specialAttack.damageDieType)
+  const damageExpression = `${specialAttack.damageDiceCount}d${sides}${
+    damageModifier ? ` ${damageModifier >= 0 ? "+" : ""}${damageModifier}` : ""
+  }${specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""}`
 
   const rollAttack = () => {
     const resolved = resolveRollMode({
@@ -183,10 +198,10 @@ function ActionRollStep({
         dice: [
           {
             count: specialAttack.damageDiceCount,
-            sides: dieSides(specialAttack.damageDieType),
+            sides,
           },
         ],
-        modifier: 0,
+        modifier: damageModifier,
       },
       "normal",
     )
@@ -214,6 +229,11 @@ function ActionRollStep({
         <p className="text-sm font-semibold text-foreground">Using {action.name}</p>
         {psiSpent > 0 ? (
           <p className="text-xs text-muted-foreground">Spent {psiSpent} psi points</p>
+        ) : null}
+        {hitDiceSpent > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Spent {hitDiceSpent} Hit Dice
+          </p>
         ) : null}
         {augmentSummary ? (
           <p className="text-xs text-muted-foreground">{augmentSummary}</p>
@@ -286,6 +306,9 @@ function ActionDetailOverlay({
   availablePsiPoints,
   psiResourceId,
   onSpendPsi,
+  hitDiceRemaining,
+  onSpendHitDice,
+  onActivateSheetToggle,
   incapacitated,
   resolveContext,
   onClose,
@@ -296,6 +319,10 @@ function ActionDetailOverlay({
   availablePsiPoints: number
   psiResourceId: string | null
   onSpendPsi: (points: number) => void
+  hitDiceRemaining: number
+  onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
+  /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
+  onActivateSheetToggle?: (toggleId: string) => void
   incapacitated: boolean
   resolveContext: ResolveUsesContext
   onClose: () => void
@@ -303,6 +330,12 @@ function ActionDetailOverlay({
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
+  const menuOptions = (action.menuOptions ?? []).filter(
+    (option) => option.unlocksAtLevel == null || option.unlocksAtLevel <= action.classLevel,
+  )
+  const [selectedMenuOption, setSelectedMenuOption] = useState<string | null>(
+    menuOptions[0]?.name ?? null,
+  )
 
   const psionicAugments =
     action.psionicAugments ??
@@ -323,24 +356,44 @@ function ActionDetailOverlay({
       ? formatPsionicAugmentSelectionSummary(psionicAugments, augmentSelections)
       : null
 
+  const selectedOption = menuOptions.find((option) => option.name === selectedMenuOption)
+  const hitDiceCost =
+    selectedOption?.hitDiceCost ??
+    action.spendHitDice ??
+    (menuOptions.length === 0 ? null : menuOptions[0]?.hitDiceCost ?? null)
+  const hitDiceNeeded = hitDiceCost != null && hitDiceCost > 0 ? hitDiceCost : 0
+
   const chargeExhausted = usage != null && usage.used >= usage.max
   const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
+  const canAffordHitDice = hitDiceNeeded <= 0 || hitDiceNeeded <= hitDiceRemaining
   const canUse =
     !incapacitated &&
     !chargeExhausted &&
     canAffordPsi &&
-    (psiCost === 0 || Boolean(psiResourceId))
+    canAffordHitDice &&
+    (psiCost === 0 || Boolean(psiResourceId)) &&
+    (hitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
+    (menuOptions.length === 0 || Boolean(selectedMenuOption))
 
   useEffect(() => {
     setAugmentSelections([])
     setStep("detail")
     setUseFeedback(null)
+    setSelectedMenuOption(menuOptions[0]?.name ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
 
   const handleUse = () => {
     if (!canUse) return
 
-    // Variable psi spends go through the psi pool; don't also tick a shared psi use-dot.
+    if (hitDiceNeeded > 0 && onSpendHitDice) {
+      const ok = onSpendHitDice(hitDiceNeeded, action.classId)
+      if (!ok) {
+        setUseFeedback("Not enough Hit Dice")
+        return
+      }
+    }
+
     const spendViaAugments = psiCost > 0
     if (usage && !spendViaAugments) {
       usage.setUsed(usage.used + 1)
@@ -350,6 +403,15 @@ function ActionDetailOverlay({
     }
 
     const parts: string[] = []
+    if (selectedOption) {
+      parts.push(selectedOption.name)
+      const toggleId = guardianTacticsToggleIdForOption(selectedOption.name)
+      if (toggleId && onActivateSheetToggle) {
+        onActivateSheetToggle(toggleId)
+        parts.push("Tactics toggle on")
+      }
+    }
+    if (hitDiceNeeded > 0) parts.push(`Spent ${hitDiceNeeded} Hit Dice`)
     if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
     if (augmentSummary) parts.push(augmentSummary)
     if (usage && !spendViaAugments) parts.push("Marked one use")
@@ -361,6 +423,10 @@ function ActionDetailOverlay({
 
     setUseFeedback(parts.join(" · ") || "Used!")
   }
+
+  const conMod = resolveContext.abilityModifiers?.CON ?? 0
+  const vengeanceDamageMod =
+    hitDiceNeeded > 0 && specialAttack && /vengeance/i.test(action.name) ? conMod : 0
 
   return (
     <motion.div
@@ -402,7 +468,9 @@ function ActionDetailOverlay({
             specialAttack={specialAttack}
             attackMod={attackModifierFromContext(resolveContext)}
             proficiencyBonus={resolveContext.proficiencyBonus ?? 0}
+            damageModifier={vengeanceDamageMod}
             psiSpent={psiCost}
+            hitDiceSpent={hitDiceNeeded}
             augmentSummary={augmentSummary}
             onClose={onClose}
           />
@@ -416,6 +484,53 @@ function ActionDetailOverlay({
                     {usage.max - usage.used} / {usage.max} remaining
                   </span>
                 </p>
+              ) : null}
+              {hitDiceNeeded > 0 || menuOptions.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Hit Dice available:{" "}
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {hitDiceRemaining}
+                  </span>
+                </p>
+              ) : null}
+              {menuOptions.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    Choose option
+                  </p>
+                  <div className="grid gap-2">
+                    {menuOptions.map((option) => {
+                      const selected = option.name === selectedMenuOption
+                      const cost = option.hitDiceCost ?? 0
+                      const affordable = cost <= 0 || cost <= hitDiceRemaining
+                      return (
+                        <button
+                          key={option.name}
+                          type="button"
+                          disabled={!affordable}
+                          onClick={() => setSelectedMenuOption(option.name)}
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                            selected
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/40",
+                            !affordable && "opacity-50",
+                          )}
+                        >
+                          <span className="font-semibold text-foreground">{option.name}</span>
+                          {cost > 0 ? (
+                            <span className="ml-2 text-muted-foreground">{cost} Hit Dice</span>
+                          ) : null}
+                          {option.description ? (
+                            <p className="mt-1 text-muted-foreground leading-relaxed">
+                              {option.description}
+                            </p>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               ) : null}
               {(action.castingTime || action.range || action.duration) && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
@@ -468,6 +583,11 @@ function ActionDetailOverlay({
                       <div className="min-w-0 space-y-1">
                         <p className="text-xs font-semibold text-foreground">{alert.name}</p>
                         <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
+                        {alert.parentMenuOptionNames?.length ? (
+                          <p className="text-[10px] text-muted-foreground">
+                            Applies to: {alert.parentMenuOptionNames.join(", ")}
+                          </p>
+                        ) : null}
                         {alert.sourceLabel ? (
                           <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
                         ) : null}
@@ -498,6 +618,10 @@ function ActionDetailOverlay({
                 <p className="text-xs text-destructive">Incapacitated — you cannot use this now.</p>
               ) : chargeExhausted ? (
                 <p className="text-xs text-muted-foreground">No uses remaining.</p>
+              ) : !canAffordHitDice ? (
+                <p className="text-xs text-muted-foreground">
+                  Not enough Hit Dice (need {hitDiceNeeded}).
+                </p>
               ) : !canAffordPsi ? (
                 <p className="text-xs text-muted-foreground">
                   Not enough psi points
@@ -511,6 +635,7 @@ function ActionDetailOverlay({
                 className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Use {action.name}
+                {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
               </button>
             </div>
@@ -531,6 +656,9 @@ export function SheetActionsPanel({
   onResourceUsedChange,
   incapacitated = false,
   psiLimit = null,
+  hitDiceRemaining = 0,
+  onSpendHitDice,
+  onActivateSheetToggle,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -538,6 +666,18 @@ export function SheetActionsPanel({
     () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
     [resourceEntries],
   )
+
+  const sharedUseMaxByKey = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const action of actions) {
+      const share = action.limitedUses?.useShareKey?.trim()
+      if (!share) continue
+      const max = resolveActionMax(action.limitedUses, action.classLevel, resolveContext)
+      if (max == null || max <= 0) continue
+      map.set(share, Math.max(map.get(share) ?? 0, max))
+    }
+    return map
+  }, [actions, resolveContext])
 
   const psiResource = useMemo(() => {
     return (
@@ -583,7 +723,11 @@ export function SheetActionsPanel({
         }
       }
     }
-    const max = resolveActionMax(action.limitedUses, action.classLevel, resolveContext)
+    const share = action.limitedUses?.useShareKey?.trim()
+    const max =
+      share && sharedUseMaxByKey.has(share)
+        ? sharedUseMaxByKey.get(share)!
+        : resolveActionMax(action.limitedUses, action.classLevel, resolveContext)
     if (max != null && max > 0) {
       const trackingId = resolveActionUsesTrackingKey(action)
       return {
@@ -731,6 +875,9 @@ export function SheetActionsPanel({
             availablePsiPoints={availablePsiPoints}
             psiResourceId={psiResource?.id ?? null}
             onSpendPsi={spendPsi}
+            hitDiceRemaining={hitDiceRemaining}
+            onSpendHitDice={onSpendHitDice}
+            onActivateSheetToggle={onActivateSheetToggle}
             incapacitated={incapacitated}
             resolveContext={resolveContext}
             onClose={() => setOpenActionId(null)}

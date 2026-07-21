@@ -16,6 +16,7 @@ import {
   resolveSpellPsionicAugments,
 } from "@/components/character-sheet/psionic-augment-picker"
 import { MetamagicCastDropdown } from "@/components/character-sheet/metamagic-cast-dropdown"
+import { EmpoweredSpellReroll } from "@/components/character-sheet/empowered-spell-reroll"
 import type {
   MetamagicCastOption,
   ResolvedSpellCastCost,
@@ -39,6 +40,7 @@ type SpellDetailOverlayProps = {
     slotUsed?: boolean
     psionicAugments?: PsionicAugmentSelection[]
     psiPointsSpent?: number
+    hitDiceSpent?: number
     arcanumUsed?: boolean
   }) => void
   canUseSlot: boolean
@@ -47,6 +49,8 @@ type SpellDetailOverlayProps = {
   metamagicOptions?: MetamagicCastOption[]
   selectedMetamagicIds?: string[]
   onMetamagicChange?: (next: string[]) => void
+  /** Charisma modifier (min 1) for Empowered Spell reroll cap. */
+  empoweredRerollCap?: number
 }
 
 export function SpellDetailOverlay({
@@ -61,10 +65,12 @@ export function SpellDetailOverlay({
   metamagicOptions = [],
   selectedMetamagicIds = [],
   onMetamagicChange,
+  empoweredRerollCap = 1,
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
+  const [showEmpoweredReroll, setShowEmpoweredReroll] = useState(false)
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
   const psionicAugments = resolveSpellPsionicAugments(spell)
@@ -78,6 +84,13 @@ export function SpellDetailOverlay({
   const hasMetamagic = metamagicOptions.length > 0
   const metamagicSelected = selectedMetamagicIds.length > 0
   const metamagicReady = !metamagicSelected || (castCost?.canCast ?? true)
+  const selectedMetamagicOptions = metamagicOptions.filter((row) =>
+    selectedMetamagicIds.includes(row.id),
+  )
+  const hasEmpowered = selectedMetamagicOptions.some(
+    (row) => row.effectHint === "empowered_reroll",
+  )
+  const hasQuickened = selectedMetamagicOptions.some((row) => row.effectHint === "quicken")
   const canCastSpell = isCantrip
     ? spendsResourcePoints
       ? (castCost?.canCast ?? true)
@@ -92,6 +105,7 @@ export function SpellDetailOverlay({
     setConcentrationWarningOpen(false)
     setCastFeedback(null)
     setAugmentSelections([])
+    setShowEmpoweredReroll(false)
   }, [spell.id])
 
   const augmentSummary =
@@ -106,6 +120,7 @@ export function SpellDetailOverlay({
       slotUsed?: boolean
       psionicAugments?: PsionicAugmentSelection[]
       psiPointsSpent?: number
+      hitDiceSpent?: number
       arcanumUsed?: boolean
     } = {}
 
@@ -164,6 +179,17 @@ export function SpellDetailOverlay({
     } else if (isCantrip && castCost?.metamagicCost) {
       result.psiPointsSpent = castCost.metamagicCost
       feedbackParts.push(`Spent ${castCost.metamagicCost} ${resourceLabel} on Metamagic`)
+    }
+    if ((castCost?.hitDiceCost ?? 0) > 0) {
+      result.hitDiceSpent = castCost!.hitDiceCost
+      feedbackParts.push(`Spent ${castCost!.hitDiceCost} Hit Dice`)
+    }
+    if (hasQuickened) {
+      feedbackParts.push("Quickened: Bonus Action this cast")
+    }
+    if (hasEmpowered) {
+      feedbackParts.push("Empowered: reroll damage dice below")
+      setShowEmpoweredReroll(true)
     }
     if (psionicAugments && augmentSelections.length) {
       result.psionicAugments = augmentSelections
@@ -289,6 +315,9 @@ export function SpellDetailOverlay({
               maxTotalCost={castCost?.metamagicCap ?? null}
             />
           ) : null}
+          {showEmpoweredReroll ? (
+            <EmpoweredSpellReroll maxRerolls={Math.max(1, empoweredRerollCap)} />
+          ) : null}
           {castFeedback && (
             <p className="text-xs text-center font-semibold text-primary bg-primary/10 rounded-lg px-3 py-2">
               {castFeedback}
@@ -330,18 +359,22 @@ export function SpellDetailOverlay({
                 ? `Base cost exceeds ${isResourceCast ? "spend limit" : "Spell Limit"} (${castCost.baseCost} ${resourceLabel})`
                 : castCost?.blockReason === "metamagic_over_proficiency_cap"
                   ? "Metamagic cost exceeds Proficiency Bonus cap"
-                  : castCost?.blockReason === "insufficient_points"
-                    ? hasMetamagic && selectedMetamagicIds.length > 0 && canUseSlot
-                      ? `Not enough ${resourceLabel} for Metamagic`
-                      : `Not enough ${resourceLabel}`
-                    : `No ${spell.level} slots remaining`}
+                  : castCost?.blockReason === "insufficient_hit_dice"
+                    ? `Not enough Hit Dice for Mortal Metamagic (need ${castCost.hitDiceCost})`
+                    : castCost?.blockReason === "insufficient_points"
+                      ? hasMetamagic && selectedMetamagicIds.length > 0 && canUseSlot
+                        ? `Not enough ${resourceLabel} for Metamagic`
+                        : `Not enough ${resourceLabel}`
+                      : `No ${spell.level} slots remaining`}
             </p>
           )}
           {isCantrip && hasMetamagic && selectedMetamagicIds.length > 0 && !metamagicReady && (
             <p className="text-xs text-destructive text-center">
               {castCost?.blockReason === "metamagic_over_proficiency_cap"
                 ? "Metamagic cost exceeds Proficiency Bonus cap"
-                : `Not enough ${resourceLabel} for Metamagic`}
+                : castCost?.blockReason === "insufficient_hit_dice"
+                  ? `Not enough Hit Dice for Mortal Metamagic (need ${castCost.hitDiceCost})`
+                  : `Not enough ${resourceLabel} for Metamagic`}
             </p>
           )}
           {!concentrationWarningOpen && (

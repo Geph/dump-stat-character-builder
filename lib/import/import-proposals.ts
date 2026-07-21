@@ -232,16 +232,24 @@ function isBattleMasterManeuverLikeFeature(feature: {
   if (/\bexpend\s+(?:one|an?)\s+superiority\s+die\b/i.test(feature.description ?? "")) return true
   if (/\bexpend\s+(?:one|an?)\s+superiority\s+dice\b/i.test(feature.description ?? "")) return true
   if (/\bexpend\s+(?:one|an?|a)\s+battle\s+die\b/i.test(feature.description ?? "")) return true
+  if (/\bexpend\s+(?:one|an?|a)\s+risk\s+die\b/i.test(feature.description ?? "")) return true
   return false
 }
 
 function maneuverResourceKey(feature: { description?: string }): string {
-  if (/\bbattle\s+die\b/i.test(feature.description ?? "")) return "battle_dice"
+  const description = feature.description ?? ""
+  if (/\brisk\s+die\b/i.test(description)) return "risk_dice"
+  if (/\bbattle\s+die\b/i.test(description)) return "battle_dice"
   return "superiority_dice"
 }
 
 function maneuverDefinition(name: string, className: string, resourceKey: string): string {
-  const resourceLabel = resourceKey === "battle_dice" ? "Battle Die" : "Superiority Die"
+  const resourceLabel =
+    resourceKey === "battle_dice"
+      ? "Battle Die"
+      : resourceKey === "risk_dice"
+        ? "Risk Die"
+        : "Superiority Die"
   return `${className} maneuver (${name}). Expend a ${resourceLabel} when you use this technique.`
 }
 
@@ -809,6 +817,7 @@ export function applyProposalSelections(
 
   const classResources: ClassResourceImportRow[] = selectedResources.map((row) => ({
     class_name: row.className,
+    ...(row.subclassName ? { subclass_name: row.subclassName } : {}),
     resource_key: row.resourceKey,
     name: row.name,
     description: row.description,

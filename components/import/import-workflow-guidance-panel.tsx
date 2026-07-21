@@ -6,6 +6,8 @@ import {
   JSON_ARRAY_IMPORT_TIP,
   MULTI_FILE_IMPORT_TIP,
   ONE_CLASS_AT_A_TIME_WARNING,
+  SCHEMA_FIT_WARNING,
+  WEAPON_MASTERY_IMPORT_TIP,
 } from "@/lib/import/import-workflow-guidance"
 import { CLEAN_SOURCE_TEXT_GUIDELINES } from "@/lib/import/byo-import-kit"
 import {
@@ -18,7 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 import { AlertTriangle, BookOpen, ChevronRight, Layers } from "lucide-react"
 
-type GuidanceTopic = "one-class" | "import-order" | "clean-source"
+type GuidanceTopic = "one-class" | "import-order" | "clean-source" | "schema-fit"
 
 const TOPIC_BUTTONS: {
   id: GuidanceTopic
@@ -31,6 +33,13 @@ const TOPIC_BUTTONS: {
     id: "one-class",
     title: "One class at a time",
     blurb: "Why multi-class extracts fail",
+    icon: AlertTriangle,
+    accent: "text-amber-700 dark:text-amber-300",
+  },
+  {
+    id: "schema-fit",
+    title: "Schema fit",
+    blurb: "Masteries, whole books, bad shapes",
     icon: AlertTriangle,
     accent: "text-amber-700 dark:text-amber-300",
   },
@@ -116,6 +125,23 @@ export function ImportWorkflowGuidancePanel() {
         description="Keep each import pass focused on a single class chapter."
       >
         <p className="leading-relaxed text-muted-foreground">{ONE_CLASS_AT_A_TIME_WARNING}</p>
+      </GuidanceDialog>
+
+      <GuidanceDialog
+        open={topic === "schema-fit"}
+        onOpenChange={(open) => setTopic(open ? "schema-fit" : null)}
+        title="Schema fit & masteries"
+        description="Upload shapes that match the JSON schema — and how homebrew masteries land."
+        contentClassName="sm:max-w-xl"
+      >
+        <div className="space-y-3">
+          <p className="leading-relaxed text-muted-foreground">{SCHEMA_FIT_WARNING}</p>
+          <p className="leading-relaxed text-muted-foreground">{WEAPON_MASTERY_IMPORT_TIP}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Same-name classes (e.g. Mage Hand Press Warden vs Kibbles): keep the source header name
+            in JSON; the import review asks you what to rename the class to.
+          </p>
+        </div>
       </GuidanceDialog>
 
       <GuidanceDialog

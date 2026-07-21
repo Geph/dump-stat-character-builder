@@ -76,6 +76,8 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   /** Cap how many units of a class resource may be spent per use. */
   classResourceKey: z.string().optional(),
+  /** Alias accepted for resource_ability_menu (same as classResourceKey). */
+  resourceKey: z.string().optional(),
   classResourceCost: z.number().optional(),
   classResourceCostMode: z
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
@@ -217,6 +219,10 @@ export const ImportMechanicSchema = z.object({
   /** resource_ability_menu */
   waiveResourceCost: z.boolean().optional(),
   menuAbilityNames: z.array(z.string()).optional(),
+  /** power_rider — attach sheet alert to named actions / menu options */
+  parentPowerNames: z.array(z.string()).optional(),
+  parentMenuOptionNames: z.array(z.string()).optional(),
+  alertSummary: z.string().optional(),
   /** temporary_hit_points */
   amount: z.number().optional(),
   amountDice: z.string().optional(),
@@ -897,14 +903,24 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - name: display name from the table header (e.g. "Psi Points")
 - When a level-scaling pool has no formal name in the source (referred to only as "the pool" / "your pool"), derive the display name from the granting feature (e.g. "Warrior of the Gods" → "Warrior of the Gods Dice") so repeated extractions converge — do not invent a flavor name
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
-- **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
-- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
+- **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, Battle Dice, Dances, Arcane Surge, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
+- **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
+- **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; Dire Gambit → rechargeOnInitiative: 1 (not full refill). Keep "expend one Risk Die" on maneuvers.
+- **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
+- **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Mage Hand Press Warden").
+- **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
+- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools. Import thrall creatures[] before the class and grant_creature with creatureChoiceOptions.
+- **Dancer:** Dances = spendable uses (often short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool
+- **Warmage:** Tricks / Tricks Known = special choice count; Cantrip Bonus Dice = special rider count for Warmage Edge; Arcane Surge = spendable uses
+- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level, Tricks Known, Thralls, CR Total): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
+- **Bloodied gates:** use requiresSheetToggle "below_half_hp" (built-in Bloodied when HP ≤ half). **Dance Style riders:** use "while_dancing" and have players toggle Dancing while Dance is active
 - **Weapon Mastery** table columns do NOT become class_resources — wire the tier table into the Weapon Mastery feature's choices.choiceCountByLevel instead
 - When the table has a separate "Die Size" / "Die Type" column alongside the pool count (e.g. Psionic Energy Dice: d6→d8→d10→d12 as the Number column also grows), set uses.dieSidesByLevel: [{ level, count: <die sides as a number, e.g. 6/8/10/12> }, ...] in addition to atLevelTable — do not drop the die-size progression just because it scales separately from the count
 - Also extract class_resources when rules text clearly defines a level-scaling pool even without a full table`
 
 export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Designer> <Class Name>, Gunslinger):
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
+- **Known same-name collisions:** Mage Hand Press Warden ≠ KibblesTasty Warden (Endurance Dice / Primal Manifestations). Keep the source header name "Warden" in JSON; Dump Stat's collision UI will ask the user to choose a rename (suggestion: "Mage Hand Press Warden" or "KibblesTasty Warden") when the other already exists — do not invent a prefix unless the user asks.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
 - Put the full class in classes[] with hit_die, armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
 - Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options

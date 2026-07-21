@@ -595,4 +595,79 @@ describe("collectSheetActions", () => {
     ])
     expect(phaseRift?.relatedTalentAlerts?.[0]?.summary).toContain("willing creature")
   })
+
+  it("attaches menu-scoped power_riders only when the parent lists that option", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        {
+          row: { class_id: "w1", level: 3, subclass_id: "s1", order: 0 },
+          class: {
+            id: "w1",
+            name: "Warden",
+            hit_die: 10,
+            features: [
+              {
+                level: 1,
+                name: "Guardian Tactics",
+                description: "Bonus Action tactics.",
+                activation: { bonusAction: true },
+                sheetDisplay: { combatActions: true },
+                linkedModifiers: [
+                  {
+                    instanceId: "menu",
+                    catalogRefId: "cat_char_resource_ability_menu",
+                    characteristics: [
+                      {
+                        id: "mod_menu",
+                        type: "resource_ability_menu",
+                        resourceKey: "",
+                        waiveResourceCost: true,
+                        options: [
+                          { name: "Block", resourceCost: 0 },
+                          { name: "Challenge", resourceCost: 0 },
+                          { name: "Grasp", resourceCost: 0 },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          } as never,
+          subclass: {
+            id: "s1",
+            name: "Nightgaunt",
+            features: [
+              {
+                level: 3,
+                name: "Death's Gambit",
+                description: "When you damage a Challenged foe…",
+                linkedModifiers: [
+                  {
+                    instanceId: "rider",
+                    catalogRefId: "cat_char_power_rider",
+                    characteristics: [
+                      {
+                        id: "mod_rider",
+                        type: "power_rider",
+                        parentPowerNames: ["Guardian Tactics"],
+                        parentMenuOptionNames: ["Challenge"],
+                        alertSummary: "May drop Challenged foes to 0 HP",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          } as never,
+        },
+      ],
+      species: null,
+    })
+
+    const tactics = actions.find((action) => action.name === "Guardian Tactics")
+    expect(tactics?.menuOptions?.map((o) => o.name)).toEqual(["Block", "Challenge", "Grasp"])
+    expect(tactics?.relatedTalentAlerts?.map((a) => a.name)).toEqual(["Death's Gambit"])
+    expect(tactics?.relatedTalentAlerts?.[0]?.parentMenuOptionNames).toEqual(["Challenge"])
+  })
 })

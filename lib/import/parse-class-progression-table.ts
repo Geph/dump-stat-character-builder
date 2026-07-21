@@ -138,6 +138,13 @@ function parseCountCell(cell: string): number | null {
   if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed === "─") return null
   const digits = trimmed.match(/^(\d+)$/)
   if (digits) return parseInt(digits[1], 10)
+  // CR Total style fractions (e.g. 1/4 → 0.25) for thrall caps.
+  const fraction = trimmed.match(/^(\d+)\s*\/\s*(\d+)$/)
+  if (fraction) {
+    const num = parseInt(fraction[1], 10)
+    const den = parseInt(fraction[2], 10)
+    if (Number.isFinite(num) && Number.isFinite(den) && den > 0) return num / den
+  }
   const prof = trimmed.match(/^\+(\d+)$/)
   if (prof) return null
   return null
@@ -162,7 +169,12 @@ function parseDicePoolCell(cell: string): { count: number; dieSides: number } | 
 }
 
 function headerUsesDicePool(header: string): boolean {
-  return /risk\s*dice/i.test(header) || /battle\s*dice/i.test(header) || /\bfinisher\b/i.test(header)
+  return (
+    /risk\s*dice/i.test(header) ||
+    /battle\s*dice/i.test(header) ||
+    /dance\s*die/i.test(header) ||
+    /\bfinisher\b/i.test(header)
+  )
 }
 
 function parseResourceCell(header: string, cell: string): number | null {
@@ -199,6 +211,15 @@ function isResourceHeader(cell: string): boolean {
   if (/^weapon\s+mastery$/i.test(normalized)) return true
   if (/^risk\s+dice$/i.test(normalized)) return true
   if (/^battle\s+dice$/i.test(normalized)) return true
+  if (/^spell\s+uses$/i.test(normalized)) return true
+  if (/^interrupts?$/i.test(normalized)) return true
+  if (/^thralls$/i.test(normalized)) return true
+  if (/^cr\s+total$/i.test(normalized)) return true
+  if (/^dances?$/i.test(normalized)) return true
+  if (/^dance\s+die$/i.test(normalized)) return true
+  if (/^tricks?(?:\s+known)?$/i.test(normalized)) return true
+  if (/^cantrip\s+bonus\s+dice$/i.test(normalized)) return true
+  if (/^arcane\s+surge$/i.test(normalized)) return true
   if (isGenericKnownCountHeader(normalized)) return true
   if (isGenericDieSizeHeader(normalized)) return true
 
@@ -553,6 +574,48 @@ export function usesConfigForProgressionColumn(
     }
   }
 
+  if (/^spell\s*uses$/i.test(column.header) || column.resourceKey === "spell_uses") {
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      recharges: [{ rest: "long_rest" }],
+    }
+  }
+
+  if (/^interrupts?$/i.test(column.header) || column.resourceKey === "interrupt") {
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    }
+  }
+
+  if (/^thralls$/i.test(column.header) || column.resourceKey === "thralls") {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Maximum thralls under your control at each ${className} level${
+        latest ? ` (up to ${latest.count})` : ""
+      }. A count cap, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
+  if (/cr\s*total/i.test(column.header) || column.resourceKey === "thrall_cr_total") {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Combined thrall Challenge Rating cap at each ${className} level${
+        latest != null ? ` (up to ${latest.count})` : ""
+      }. A cap, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
   if (/battle\s*dice/i.test(column.header) || column.resourceKey === "battle_dice") {
     const dieSides = column.dieSidesByLevel?.length
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
@@ -564,7 +627,64 @@ export function usesConfigForProgressionColumn(
       atLevelMode: "tier",
       atLevelTable: sorted,
       dieType: dieLabel,
+      dieSidesByLevel: dieSides.length ? dieSides : undefined,
       recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+      rechargeOnInitiative: true,
+    }
+  }
+
+  if (/^dances?$/i.test(column.header) || column.resourceKey === "dances") {
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+    }
+  }
+
+  if (/dance\s*die/i.test(column.header) || column.resourceKey === "dance_die") {
+    const dieSides = column.dieSidesByLevel?.length
+      ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
+      : sorted.map((row) => ({ level: row.level, count: row.count }))
+    const latestDie = dieSides[dieSides.length - 1]
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d4"
+    return {
+      type: "special",
+      specialDescription: `Dance Die size at each ${className} level (e.g. ${dieLabel}). Rolled by Graceful Dodge and Dance Styles — not a depleting pool (see Dances).`,
+      atLevelTable: dieSides,
+      atLevelMode: "tier",
+      dieType: dieLabel,
+      dieSidesByLevel: dieSides,
+    }
+  }
+
+  if (/cantrip\s*bonus\s*dice/i.test(column.header) || column.resourceKey === "cantrip_bonus_dice") {
+    return {
+      type: "special",
+      specialDescription: `Bonus damage dice Warmage Edge adds to a cantrip damage roll at each ${className} level. A scaling rider, not a depleting pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
+  if (/^tricks?(?:\s*known)?$/i.test(column.header) || column.resourceKey === "tricks_known") {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Number of Warmage Tricks known at each ${className} level${
+        latest ? ` (up to ${latest.count})` : ""
+      }. A choice count, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
+  if (/arcane\s*surge/i.test(column.header) || column.resourceKey === "arcane_surge") {
+    return {
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: sorted,
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
     }
   }
 

@@ -228,6 +228,7 @@ export function syncFeatureActivationTiming(
     oncePerTurn: Boolean(featureActivation?.oncePerTurn),
     spendClassResourceKey: featureActivation?.spendClassResourceKey ?? null,
     spendClassResourceAmount: featureActivation?.spendClassResourceAmount ?? null,
+    spendHitDice: featureActivation?.spendHitDice ?? null,
     usesExistingClassFeature: Boolean(featureActivation?.usesExistingClassFeature),
     existingClassFeatureName: featureActivation?.existingClassFeatureName ?? null,
   }

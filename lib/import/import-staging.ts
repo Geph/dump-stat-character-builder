@@ -42,7 +42,8 @@ export const IMPORT_STAGE_CARD_ART_SECTIONS: Record<
   readonly ImportCardArtSection[]
 > = {
   core: ["classes", "species", "backgrounds"],
-  subclasses: ["subclasses"],
+  /** Subclass art is inlined on each preview row — no separate card-art panel. */
+  subclasses: [],
   feats: [],
   spells: ["spells"],
   equipment: ["equipment"],

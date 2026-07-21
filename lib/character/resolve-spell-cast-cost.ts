@@ -20,13 +20,19 @@ import type { CustomAbility, DndClass, Feat } from "@/lib/types"
 export type MetamagicCastOption = {
   id: string
   name: string
+  /** Sorcery Points (or similar point-pool) cost. 0 when the option spends Hit Dice instead. */
   cost: number
+  /** Hit Point Dice spent when this option is used (Mortal Metamagic). */
+  hitDiceCost?: number
+  /** Sheet helper after cast (Empowered Spell damage rerolls). */
+  effectHint?: "empowered_reroll" | "quicken" | null
 }
 
 export type SpellCastCostBlockReason =
   | "insufficient_points"
   | "base_over_spell_limit"
   | "metamagic_over_proficiency_cap"
+  | "insufficient_hit_dice"
   | "no_casting_mode"
 
 export type ResolvedSpellCastCost = {
@@ -35,6 +41,8 @@ export type ResolvedSpellCastCost = {
   castKind?: "pool" | "arcanum" | "resource"
   baseCost: number
   metamagicCost: number
+  /** Total Hit Dice required by selected Mortal Metamagic options. */
+  hitDiceCost: number
   totalCost: number
   canCast: boolean
   blockReason?: SpellCastCostBlockReason
@@ -131,6 +139,54 @@ export function metamagicOptionsForCharacter(params: {
   return options.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** Mortal Metamagic (and similar) options from subclass feature menus that spend Hit Dice. */
+export function mortalMetamagicOptionsFromFeatures(
+  features: Array<{
+    name?: string | null
+    linkedModifiers?: Array<{
+      characteristics?: Array<{
+        type?: string
+        options?: Array<{ name?: string; hitDiceCost?: number | null }>
+      }>
+    }>
+  }>,
+): MetamagicCastOption[] {
+  const options: MetamagicCastOption[] = []
+  const seen = new Set<string>()
+  for (const feature of features) {
+    if (!/mortal\s+metamagic/i.test(feature.name ?? "")) continue
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const characteristic of instance.characteristics ?? []) {
+        if (characteristic.type !== "resource_ability_menu") continue
+        for (const option of characteristic.options ?? []) {
+          const name = option.name?.trim()
+          if (!name) continue
+          const id = `mortal_metamagic:${name}`
+          if (seen.has(id)) continue
+          seen.add(id)
+          const hitDiceCost = option.hitDiceCost != null && option.hitDiceCost > 0 ? option.hitDiceCost : undefined
+          options.push({
+            id,
+            name,
+            cost: 0,
+            hitDiceCost,
+            effectHint: /empowered/i.test(name)
+              ? "empowered_reroll"
+              : /quickened/i.test(name)
+                ? "quicken"
+                : null,
+          })
+        }
+      }
+    }
+  }
+  return options
+}
+
+export function totalMetamagicHitDiceCost(selected: MetamagicCastOption[]): number {
+  return selected.reduce((sum, row) => sum + (row.hitDiceCost ?? 0), 0)
+}
+
 export function resolveSpellLimitCap(
   cls: Pick<DndClass, "class_resources">,
   capResourceKey: string | undefined,
@@ -152,6 +208,8 @@ export function resolveSpellCastCost(params: {
   availablePoints: number
   selectedMetamagic: MetamagicCastOption[]
   ctx: ResolveUsesContext
+  /** Remaining Hit Dice for Mortal Metamagic affordability. */
+  availableHitDice?: number
   /** When casting Innate Arcanum tiers (above the point-pool table). */
   arcanumAvailable?: boolean
   /**
@@ -163,7 +221,22 @@ export function resolveSpellCastCost(params: {
   resourceSpendCap?: number | null
 }): ResolvedSpellCastCost {
   const metamagicCost = params.selectedMetamagic.reduce((sum, row) => sum + row.cost, 0)
+  const hitDiceCost = totalMetamagicHitDiceCost(params.selectedMetamagic)
   const metamagicCap = params.ctx.proficiencyBonus ?? 2
+  const availableHitDice = params.availableHitDice ?? Number.POSITIVE_INFINITY
+
+  const applyHitDiceGate = (result: ResolvedSpellCastCost): ResolvedSpellCastCost => {
+    if (!result.canCast) return { ...result, hitDiceCost }
+    if (hitDiceCost > 0 && hitDiceCost > availableHitDice) {
+      return {
+        ...result,
+        hitDiceCost,
+        canCast: false,
+        blockReason: "insufficient_hit_dice",
+      }
+    }
+    return { ...result, hitDiceCost }
+  }
 
   if (params.spellResourceCost && params.spellResourceCost.amount > 0) {
     const baseCost = params.spellResourceCost.amount
@@ -186,11 +259,12 @@ export function resolveSpellCastCost(params: {
       blockReason = "metamagic_over_proficiency_cap"
     }
 
-    return {
+    return applyHitDiceGate({
       mode: "resource",
       castKind: "resource",
       baseCost,
       metamagicCost,
+      hitDiceCost,
       totalCost,
       canCast,
       blockReason,
@@ -198,7 +272,7 @@ export function resolveSpellCastCost(params: {
       resourceDisplayName: formatResourceKeyDisplayName(resourceKey),
       spellLimit: params.resourceSpendCap ?? null,
       metamagicCap,
-    }
+    })
   }
 
   const pool = getPointPoolSpellcasting(params.spellcasting)
@@ -215,32 +289,34 @@ export function resolveSpellCastCost(params: {
       blockReason = "metamagic_over_proficiency_cap"
     }
 
-    return {
+    return applyHitDiceGate({
       mode: "slots",
       baseCost: 0,
       metamagicCost,
+      hitDiceCost,
       totalCost: metamagicCost,
       canCast,
       blockReason,
       metamagicCap,
-    }
+    })
   }
 
   const poolMaxLevel = maxPointPoolSpellLevel(pool)
   if (params.spellLevel > poolMaxLevel) {
     const canCast = params.arcanumAvailable !== false
-    return {
+    return applyHitDiceGate({
       mode: "point_pool",
       castKind: "arcanum",
       baseCost: 0,
       metamagicCost: 0,
+      hitDiceCost,
       totalCost: 0,
       canCast,
       blockReason: canCast ? undefined : "insufficient_points",
       pointPool: pool,
       resourceKey: pool.resource_key,
       resourceDisplayName: formatResourceKeyDisplayName(pool.resource_key),
-    }
+    })
   }
 
   const baseCost = pointCostForSpellLevel(pool, params.spellLevel)
@@ -276,11 +352,12 @@ export function resolveSpellCastCost(params: {
     blockReason = "metamagic_over_proficiency_cap"
   }
 
-  return {
+  return applyHitDiceGate({
     mode: "point_pool",
     castKind: "pool",
     baseCost,
     metamagicCost,
+    hitDiceCost,
     totalCost,
     canCast,
     blockReason,
@@ -289,5 +366,5 @@ export function resolveSpellCastCost(params: {
     resourceDisplayName: formatResourceKeyDisplayName(pool.resource_key),
     spellLimit,
     metamagicCap: metamagicCapFromPool,
-  }
+  })
 }

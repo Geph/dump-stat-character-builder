@@ -32,6 +32,12 @@ describe("subclass-gated class resources", () => {
     expect(gatedClassResourcesUnlockedBySubclass("Psion", "Unleashed Mind").map((r) => r.id)).toEqual([
       "rampage_die",
     ])
+    expect(gatedClassResourcesUnlockedBySubclass("Warden", "Grey Watchman").map((r) => r.id)).toEqual([
+      "battle_dice",
+    ])
+    expect(
+      gatedClassResourcesUnlockedBySubclass("Mage Hand Press Warden", "Grey Watchman").map((r) => r.id),
+    ).toEqual(["battle_dice"])
     expect(gatedClassResourcesUnlockedBySubclass("Fighter", "Champion")).toEqual([])
   })
 
@@ -99,5 +105,11 @@ describe("subclass-gated class resources", () => {
       isGatedClassResourceUnlockedForClass("superiority_dice", "Fighter", ["Battle Master"]),
     ).toBe(true)
     expect(isGatedClassResourceUnlockedForClass("second_wind", "Fighter", [])).toBe(true)
+    expect(isGatedClassResourceUnlockedForClass("battle_dice", "Warden", [])).toBe(false)
+    expect(
+      isGatedClassResourceUnlockedForClass("battle_dice", "Warden", ["Grey Watchman"]),
+    ).toBe(true)
+    // Captain (and other non-Warden Battle Dice classes) stay ungated.
+    expect(isGatedClassResourceUnlockedForClass("battle_dice", "Captain", [])).toBe(true)
   })
 })

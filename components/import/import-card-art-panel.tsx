@@ -23,19 +23,19 @@ type ImportCardArtPanelProps = {
   onChange: (map: ImportCardArtUrlMap) => void
   /** When set, only these card-art sections are shown (staged review). */
   sections?: readonly ImportCardArtSection[]
+  /** Hide targets for these sections (e.g. subclasses inlined in content preview). */
+  excludeSections?: readonly ImportCardArtSection[]
 }
 
-function CardArtRow({
+export function ImportCardArtControls({
   rowKey,
   name,
-  detail,
   portrait,
   url,
   onUrlChange,
 }: {
   rowKey: string
   name: string
-  detail?: string
   portrait: boolean
   url: string
   onUrlChange: (next: string) => void
@@ -47,25 +47,19 @@ function CardArtRow({
     : "h-full w-full object-cover object-center"
 
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/80 p-3 sm:flex-row sm:items-start">
-      <div className="min-w-0 flex-1 space-y-2">
-        <div>
-          <p className="font-medium text-foreground">{name}</p>
-          {detail ? <p className="text-xs text-muted-foreground">{detail}</p> : null}
-        </div>
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-          <label className="sr-only" htmlFor={`card-art-${rowKey}`}>
-            Image URL for {name}
-          </label>
-          <input
-            id={`card-art-${rowKey}`}
-            type="url"
-            value={url}
-            onChange={(event) => onUrlChange(event.target.value)}
-            placeholder="https://… (optional)"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="min-w-0 flex-1">
+        <label className="sr-only" htmlFor={`card-art-${rowKey}`}>
+          Image URL for {name}
+        </label>
+        <input
+          id={`card-art-${rowKey}`}
+          type="url"
+          value={url}
+          onChange={(event) => onUrlChange(event.target.value)}
+          placeholder="https://… (optional card art)"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+        />
       </div>
       <div
         className={cn(
@@ -84,6 +78,38 @@ function CardArtRow({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function CardArtRow({
+  rowKey,
+  name,
+  detail,
+  portrait,
+  url,
+  onUrlChange,
+}: {
+  rowKey: string
+  name: string
+  detail?: string
+  portrait: boolean
+  url: string
+  onUrlChange: (next: string) => void
+}) {
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border border-border/70 bg-background/80 p-3">
+      <div>
+        <p className="font-medium text-foreground">{name}</p>
+        {detail ? <p className="text-xs text-muted-foreground">{detail}</p> : null}
+      </div>
+      <ImportCardArtControls
+        rowKey={rowKey}
+        name={name}
+        portrait={portrait}
+        url={url}
+        onUrlChange={onUrlChange}
+      />
     </li>
   )
 }
@@ -93,13 +119,18 @@ export function ImportCardArtPanel({
   value,
   onChange,
   sections,
+  excludeSections,
 }: ImportCardArtPanelProps) {
   const targets = useMemo(() => {
     const all = collectImportCardArtTargets(content)
-    if (!sections) return all
-    const allowed = new Set(sections)
-    return all.filter((target) => allowed.has(target.section))
-  }, [content, sections])
+    const excluded = excludeSections?.length ? new Set(excludeSections) : null
+    const allowed = sections ? new Set(sections) : null
+    return all.filter((target) => {
+      if (excluded?.has(target.section)) return false
+      if (allowed && !allowed.has(target.section)) return false
+      return true
+    })
+  }, [content, sections, excludeSections])
   const [expanded, setExpanded] = useState(targets.length <= 6)
   const [query, setQuery] = useState("")
 

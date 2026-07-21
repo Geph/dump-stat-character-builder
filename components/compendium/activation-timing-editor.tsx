@@ -223,6 +223,28 @@ export function ActivationEditor({
         </div>
       </div>
 
+      <div>
+        <label className="block text-xs font-semibold text-foreground mb-1">
+          Hit Dice to spend (activation)
+        </label>
+        <input
+          type="number"
+          min={0}
+          value={activation.spendHitDice ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...activation,
+              spendHitDice: e.target.value ? parseInt(e.target.value, 10) : null,
+            })
+          }
+          placeholder="e.g. 1 for Draconic Vengeance"
+          className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Spends from the sheet Hit Dice tracker (separate from class resource pools).
+        </p>
+      </div>
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold text-foreground">Requirements</label>

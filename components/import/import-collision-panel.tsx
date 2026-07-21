@@ -213,26 +213,65 @@ export function ImportCollisionPanel({
                   existing compendium entry stays unchanged.
                 </p>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">Incoming name</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={collision.incomingName}
-                      className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-sm"
-                    />
+                <div className="space-y-2">
+                  {collision.kind === "class" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Choose what to call this class in your compendium. Suggestion:{" "}
+                      <span className="font-medium text-foreground">{collision.suggestedName}</span>
+                      {collision.existingSource
+                        ? ` (existing entry source: ${collision.existingSource})`
+                        : ""}
+                      .
+                    </p>
+                  ) : null}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Incoming name</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={collision.incomingName}
+                        className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Import as</label>
+                      <input
+                        type="text"
+                        value={
+                          collision.kind === "class"
+                            ? (value[collision.id] ?? "")
+                            : (value[collision.id] ?? collision.suggestedName)
+                        }
+                        placeholder={
+                          collision.kind === "class" ? collision.suggestedName : undefined
+                        }
+                        onChange={(e) => updateName(collision, e.target.value)}
+                        disabled={renameDisabled}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm disabled:opacity-60"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">Import as</label>
-                    <input
-                      type="text"
-                      value={value[collision.id] ?? collision.suggestedName}
-                      onChange={(e) => updateName(collision, e.target.value)}
-                      disabled={renameDisabled}
-                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm disabled:opacity-60"
-                    />
-                  </div>
+                  {collision.kind === "class" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={renameDisabled}
+                        onClick={() => updateName(collision, collision.suggestedName)}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:opacity-60"
+                      >
+                        Use suggested name
+                      </button>
+                      {!(value[collision.id] ?? "").trim() ||
+                      (value[collision.id] ?? "").trim().toLowerCase() ===
+                        collision.incomingName.trim().toLowerCase() ? (
+                        <span className="text-xs text-amber-700 dark:text-amber-300">
+                          Enter a new name (different from &quot;{collision.incomingName}&quot;) to
+                          continue.
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               )}
 

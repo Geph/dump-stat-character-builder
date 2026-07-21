@@ -1055,8 +1055,12 @@ export interface ResourceAbilityMenuOption {
   name: string
   description?: string
   resourceCost?: number
+  /** Spend this many Hit Point Dice when this menu option is used. */
+  hitDiceCost?: number | null
   /** Waive resourceCost when character's element specialization matches. */
   waiveWhenSpecializedElement?: "cold" | "fire" | "lightning" | null
+  /** When set, hide/disable this menu option until the character reaches this class level. */
+  unlocksAtLevel?: number | null
   effect?: NestedModifierEffect | null
   /**
    * Structured bonus this option grants (e.g. add the menu's resource die to AC or damage).
@@ -1154,8 +1158,13 @@ export interface CatalogOptionCharacteristic extends CharacteristicModifierBase 
 /** Alert attached to named sheet actions / powers (talent riders without their own roll). */
 export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   type: "power_rider"
-  /** Action / custom ability names that should show the alert (e.g. "Phase Rift"). */
+  /** Action / custom ability names that should show the alert (e.g. "Phase Rift", "Guardian Tactics"). */
   parentPowerNames: string[]
+  /**
+   * Optional menu option names on the parent action (e.g. "Block", "Challenge", "Grasp").
+   * When set, the alert attaches only if the parent action's resource_ability_menu lists a matching option.
+   */
+  parentMenuOptionNames?: string[]
   /** Short summary for the alert badge (defaults to feature label). */
   alertSummary?: string
 }
@@ -1421,7 +1430,7 @@ export function createCharacteristicModifier(
     case "grant_creature":
       return { id, type, creatureNames: [], count: 1 }
     case "power_rider":
-      return { id, type, parentPowerNames: [], alertSummary: "" }
+      return { id, type, parentPowerNames: [], parentMenuOptionNames: [], alertSummary: "" }
     case "ability_score_override":
       return {
         id,
@@ -1704,10 +1713,24 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     return {
       ...raw,
       resourceKey: raw.resourceKey ?? "",
-      options: raw.options ?? [],
+      options: (raw.options ?? []).map((option) => ({
+        ...option,
+        unlocksAtLevel: option.unlocksAtLevel ?? null,
+        hitDiceCost: option.hitDiceCost ?? null,
+      })),
       waiveResourceCost: raw.waiveResourceCost ?? false,
       appliesOnRollKinds: raw.appliesOnRollKinds ?? [],
       appliesOnAbilities: raw.appliesOnAbilities ?? [],
+    }
+  }
+
+  if (value.type === "power_rider") {
+    const raw = value as PowerRiderCharacteristic
+    return {
+      ...raw,
+      parentPowerNames: coerceStringArray(raw.parentPowerNames),
+      parentMenuOptionNames: coerceStringArray(raw.parentMenuOptionNames),
+      alertSummary: raw.alertSummary ?? "",
     }
   }
 

@@ -68,12 +68,24 @@ export function detectBattleDieCost(text: string): number | null {
   return detectThirdPartyResourceSpend(text, "battle_dice")
 }
 
+export function detectRiskDieCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "risk_dice")
+}
+
 export function detectTrinketCost(text: string): number | null {
   return detectThirdPartyResourceSpend(text, "trinkets")
 }
 
 export function detectEnduranceDieCost(text: string): number | null {
   return detectThirdPartyResourceSpend(text, "endurance_dice")
+}
+
+export function detectDanceCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "dances")
+}
+
+export function detectDanceDieCost(text: string): number | null {
+  return detectThirdPartyResourceSpend(text, "dance_die")
 }
 
 function linkResourceCostsOnFeatures(
@@ -85,6 +97,8 @@ function linkResourceCostsOnFeatures(
     battle?: string
     trinkets?: string
     endurance?: string
+    dances?: string
+    danceDie?: string
   },
 ): Feature[] {
   return features.map((feature) => {
@@ -121,6 +135,16 @@ function linkResourceCostsOnFeatures(
       }
     }
 
+    const riskCost = resourceKeys.risk ? detectRiskDieCost(description) : null
+    if (riskCost != null && resourceKeys.risk) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.risk,
+        classResourceAmount: riskCost,
+      }
+    }
+
     const trinketCost = resourceKeys.trinkets ? detectTrinketCost(description) : null
     if (trinketCost != null && resourceKeys.trinkets) {
       limitedUses = {
@@ -138,6 +162,26 @@ function linkResourceCostsOnFeatures(
         type: "class_resource",
         classResourceKey: resourceKeys.endurance,
         classResourceAmount: enduranceCost,
+      }
+    }
+
+    const danceCost = resourceKeys.dances ? detectDanceCost(description) : null
+    if (danceCost != null && resourceKeys.dances) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.dances,
+        classResourceAmount: danceCost,
+      }
+    }
+
+    const danceDieCost = resourceKeys.danceDie ? detectDanceDieCost(description) : null
+    if (danceDieCost != null && resourceKeys.danceDie) {
+      limitedUses = {
+        ...(limitedUses ?? {}),
+        type: "class_resource",
+        classResourceKey: resourceKeys.danceDie,
+        classResourceAmount: danceDieCost,
       }
     }
 
@@ -166,7 +210,7 @@ function resolveResourceKeysForClass(
   className: string,
   explicitResources: ClassResourceImportRow[] | undefined,
   progressionText: string,
-): { psi?: string; exploit?: string; risk?: string; battle?: string; trinkets?: string; endurance?: string } {
+): { psi?: string; exploit?: string; risk?: string; battle?: string; trinkets?: string; endurance?: string; dances?: string; danceDie?: string } {
   const keys: {
     psi?: string
     exploit?: string
@@ -174,6 +218,8 @@ function resolveResourceKeysForClass(
     battle?: string
     trinkets?: string
     endurance?: string
+    dances?: string
+    danceDie?: string
   } = {}
   const classResources =
     explicitResources?.filter((r) => resourceBelongsToClass(r.class_name, className)) ?? []
@@ -185,6 +231,8 @@ function resolveResourceKeysForClass(
     if (/battle\s*dice/i.test(resource.name)) keys.battle = resource.resource_key
     if (/\btrinkets?\b/i.test(resource.name)) keys.trinkets = resource.resource_key
     if (/endurance\s*dice/i.test(resource.name)) keys.endurance = resource.resource_key
+    if (/^dances?$/i.test(resource.name)) keys.dances = resource.resource_key
+    if (/dance\s*die/i.test(resource.name)) keys.danceDie = resource.resource_key
   }
 
   const lower = progressionText.toLowerCase()
@@ -194,6 +242,8 @@ function resolveResourceKeysForClass(
   if (!keys.battle && /\bbattle\s+dice\b/.test(lower)) keys.battle = "battle_dice"
   if (!keys.trinkets && /\btrinkets?\b/.test(lower)) keys.trinkets = "trinkets"
   if (!keys.endurance && /\bendurance\s+dice\b/.test(lower)) keys.endurance = "endurance_dice"
+  if (!keys.dances && /\bdances?\b/.test(lower)) keys.dances = "dances"
+  if (!keys.danceDie && /\bdance\s+die\b/.test(lower)) keys.danceDie = "dance_die"
 
   return keys
 }
@@ -220,6 +270,10 @@ export function mergeUsesFromProgressionTable(
     dieType: fromTable.dieType ?? explicit.dieType,
     dieSidesByLevel: fromTable.dieSidesByLevel ?? explicit.dieSidesByLevel,
     recharges: explicit.recharges?.length ? explicit.recharges : fromTable.recharges,
+    rechargeOnInitiative:
+      explicit.rechargeOnInitiative != null
+        ? explicit.rechargeOnInitiative
+        : fromTable.rechargeOnInitiative,
     specialDescription: explicit.specialDescription ?? fromTable.specialDescription,
   }
 }
@@ -367,6 +421,8 @@ export function enrichImportedClassRow(
     resourceKeys.battle ||
     resourceKeys.trinkets ||
     resourceKeys.endurance ||
+    resourceKeys.dances ||
+    resourceKeys.danceDie ||
     explicitResources?.some((resource) => resource.class_name === className)
 
   const nextFeatures = enrichClassFeaturesWithPresets(

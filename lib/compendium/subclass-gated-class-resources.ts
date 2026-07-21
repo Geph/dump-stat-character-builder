@@ -7,6 +7,8 @@ export const SUBCLASS_GATED_CLASS_RESOURCE_KEYS = new Set([
   "superiority_dice",
   "psionic_energy_dice",
   "rampage_die",
+  /** Grey Watchman (MHP Warden) — not Captain/Vagabond class-table Battle Dice. */
+  "battle_dice",
 ])
 
 type SubclassGatedResource = {
@@ -100,7 +102,28 @@ const PSION_RAMPAGE_DIE: ClassResource = {
   },
 }
 
-/** Subclass-only pools (Battle Master, Psi Warrior / Psi Knight, Soulknife). */
+/** Stub for gated upsert — import proposals usually supply the real at_level table. */
+const WARDEN_GREY_WATCHMAN_BATTLE_DICE: ClassResource = {
+  id: "battle_dice",
+  name: "Battle Dice",
+  description:
+    "Spent when you use a Grey Watchman maneuver. Pool size and die size scale by Warden level. Regain on Initiative, and on a short or long rest.",
+  uses: {
+    type: "at_level",
+    atLevelMode: "tier",
+    dieType: "d6",
+    recharges: SHORT_OR_LONG_REST,
+    rechargeOnInitiative: true,
+    atLevelTable: [
+      { level: 3, count: 2 },
+      { level: 7, count: 3 },
+      { level: 13, count: 4 },
+      { level: 19, count: 5 },
+    ],
+  },
+}
+
+/** Subclass-only pools (Battle Master, Psi Warrior / Psi Knight, Soulknife, Grey Watchman). */
 export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
   {
     className: "Fighter",
@@ -122,6 +145,11 @@ export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
     subclassMatchers: ["unleashed mind"],
     resource: PSION_RAMPAGE_DIE,
   },
+  {
+    className: "Warden",
+    subclassMatchers: ["grey watchman", "gray watchman"],
+    resource: WARDEN_GREY_WATCHMAN_BATTLE_DICE,
+  },
 ]
 
 export function normalizeSubclassNameForGate(name: string): string {
@@ -131,6 +159,15 @@ export function normalizeSubclassNameForGate(name: string): string {
 function matchesSubclassGate(subclassName: string, matchers: string[]): boolean {
   const normalized = normalizeSubclassNameForGate(subclassName)
   return matchers.some((matcher) => normalized === matcher || normalized.includes(matcher))
+}
+
+/** Match "Warden" to imported renames like "Mage Hand Press Warden". */
+export function classNamesMatchGate(actual: string, expected: string): boolean {
+  if (actual === expected) return true
+  const a = normalizeSubclassNameForGate(actual)
+  const e = normalizeSubclassNameForGate(expected)
+  if (!a || !e) return false
+  return a === e || a.includes(e) || e.includes(a)
 }
 
 export function isSubclassGatedClassResourceKey(resourceKey: string): boolean {
@@ -143,11 +180,16 @@ export function isGatedClassResourceUnlockedForClass(
   subclassNames: readonly string[],
 ): boolean {
   if (!isSubclassGatedClassResourceKey(resourceKey)) return true
-  return SUBCLASS_GATED_CLASS_RESOURCES.some(
-    (entry) =>
-      entry.className === className &&
-      entry.resource.id === resourceKey &&
-      subclassNames.some((name) => matchesSubclassGate(name, entry.subclassMatchers)),
+  const entriesForKey = SUBCLASS_GATED_CLASS_RESOURCES.filter(
+    (entry) => entry.resource.id === resourceKey,
+  )
+  const classEntries = entriesForKey.filter((entry) =>
+    classNamesMatchGate(className, entry.className),
+  )
+  // Gated only for classes that appear in the table (e.g. Captain battle_dice stays open).
+  if (classEntries.length === 0) return true
+  return classEntries.some((entry) =>
+    subclassNames.some((name) => matchesSubclassGate(name, entry.subclassMatchers)),
   )
 }
 
@@ -180,7 +222,8 @@ export function gatedClassResourcesUnlockedBySubclass(
 ): ClassResource[] {
   return SUBCLASS_GATED_CLASS_RESOURCES.filter(
     (entry) =>
-      entry.className === className && matchesSubclassGate(subclassName, entry.subclassMatchers),
+      classNamesMatchGate(className, entry.className) &&
+      matchesSubclassGate(subclassName, entry.subclassMatchers),
   ).map((entry) => entry.resource)
 }
 

@@ -26,8 +26,30 @@ import type {
   FeatureLike,
 } from "@/lib/import/enrichment-presets/types"
 
-const CLASS_ROW_PACKS = new Set(["monk", "alternate_ranger", "alternate_sorcerer"])
-const CONTENT_PACKS = new Set(["alchemist", "investigator", "psion"])
+const CLASS_ROW_PACKS = new Set([
+  "monk",
+  "alternate_ranger",
+  "alternate_sorcerer",
+  "warmage",
+  "dancer",
+  "vagabond",
+  "gunslinger",
+  "martyr",
+  "necromancer",
+  "mhp_warden",
+])
+const CONTENT_PACKS = new Set([
+  "alchemist",
+  "investigator",
+  "psion",
+  "warmage",
+  "dancer",
+  "vagabond",
+  "gunslinger",
+  "martyr",
+  "necromancer",
+  "mhp_warden",
+])
 
 function presetsForPacks(packs: Set<string>, target?: EnrichmentPreset["target"]): EnrichmentPreset[] {
   return getEnrichmentPresets().filter(
@@ -96,6 +118,24 @@ function applyOperations(
       case "setAbilityRole":
         next = { ...next, ability_role: operation.role }
         break
+      case "setActivation":
+        next = {
+          ...next,
+          activation: {
+            ...(next.activation ?? {}),
+            ...operation.activation,
+          },
+        }
+        break
+      case "setSheetDisplay":
+        next = {
+          ...next,
+          sheetDisplay: {
+            ...(next.sheetDisplay ?? {}),
+            ...operation.sheetDisplay,
+          },
+        }
+        break
       case "setChoices": {
         const base = next.choices ?? {
           category: "Skills",
@@ -123,6 +163,15 @@ function applyOperations(
         if (hasCharacteristicType(next.linkedModifiers, operation.skipIfCharacteristicTypes)) {
           break
         }
+        let baseModifiers = next.linkedModifiers ?? []
+        if (operation.replaceCharacteristicTypes?.length) {
+          baseModifiers = baseModifiers.filter(
+            (mod) =>
+              !mod.characteristics?.some((char) =>
+                operation.replaceCharacteristicTypes!.includes(char.type),
+              ),
+          )
+        }
         const attached = resolveNamedPreset(operation.preset, {
           className: ctx.className,
           name: ctx.name ?? next.name,
@@ -130,7 +179,7 @@ function applyOperations(
         if (!attached.length) break
         const merged = {
           ...next,
-          linkedModifiers: [...(next.linkedModifiers ?? []), ...attached],
+          linkedModifiers: [...baseModifiers, ...attached],
         }
         // Match legacy psion Climactic Moment (no syncModifierRefs) when requested.
         next = operation.skipSyncRefs
@@ -264,6 +313,9 @@ function applyResourcePreset(
     if (operation.op === "ensureResourceRecharges") {
       uses = enrichReagentResourceUses(uses)
     }
+    if (operation.op === "patchUsesFields") {
+      uses = { ...uses, ...operation.fields }
+    }
   }
   return uses === resource.uses ? resource : { ...resource, uses }
 }
@@ -348,19 +400,33 @@ export function applyImportEnrichmentPresets(
   const presets = presetsForPacks(packs)
 
   if (next.classes?.length) {
-    next = {
-      ...next,
-      classes: next.classes.map((cls) => {
-        const className = cls.name
-        const features = (cls.features ?? []).map((feature) => {
-          let row = feature as unknown as FeatureLike
-          for (const preset of presets.filter((p) => p.target === "class_feature")) {
-            row = applyPresetToFeature(row, preset, { className })
-          }
-          return row as unknown as (typeof cls.features)[number]
-        })
-        return { ...cls, features }
-      }),
+    const enrichedClasses = next.classes.map((cls) => {
+      const className = cls.name
+      const features = (cls.features ?? []).map((feature) => {
+        let row = feature as unknown as FeatureLike
+        for (const preset of presets.filter((p) => p.target === "class_feature")) {
+          row = applyPresetToFeature(row, preset, { className })
+        }
+        return row as unknown as (typeof cls.features)[number]
+      })
+      return { ...cls, features }
+    })
+    next = { ...next, classes: enrichedClasses }
+
+    // Feature-gated class resource seeds (e.g. Guardian Tactics unlimited menu pool).
+    let resources = [...(next.class_resources ?? [])] as ClassResourceImportRow[]
+    for (const cls of enrichedClasses) {
+      resources = mergeClassResourcesWithPresets(
+        cls.name,
+        (cls.features ?? []) as Feature[],
+        resources,
+      )
+    }
+    if (resources.length) {
+      next = {
+        ...next,
+        class_resources: resources as NonNullable<ImportContent["class_resources"]>,
+      }
     }
   }
 
@@ -368,16 +434,14 @@ export function applyImportEnrichmentPresets(
     next = {
       ...next,
       subclasses: next.subclasses.map((subclass) => {
-        // Legacy: enrich when class_name is empty OR matches /psion/i
-        if (subclass.class_name && !/psion/i.test(subclass.class_name)) {
-          return subclass
-        }
+        const parentClass = subclass.class_name || ""
         const features = (subclass.features ?? []).map((feature) => {
           let row = feature as unknown as FeatureLike
           for (const preset of presets.filter((p) => p.target === "subclass_feature")) {
             row = applyPresetToFeature(row, preset, {
-              className: subclass.class_name || "Psion",
-              subclassClassName: subclass.class_name || "Psion",
+              className: parentClass,
+              subclassClassName: parentClass,
+              sourceName: subclass.name,
             })
           }
           return row as unknown as (typeof subclass.features)[number]
@@ -462,5 +526,86 @@ export function applyImportEnrichmentPresets(
     }
   }
 
+  next = patchInitiativeRechargeFromFeatures(next)
+
+  return next
+}
+
+/** Feature-gated initiative restores that must not apply from the level table alone. */
+function patchInitiativeRechargeFromFeatures(content: ImportContent): ImportContent {
+  const classes = content.classes ?? []
+  if (!classes.length) return content
+
+  const patchRows = <T extends { class_name?: string; className?: string; resource_key?: string; resourceKey?: string; uses: UsesConfig }>(
+    rows: T[] | undefined,
+  ): { rows: T[]; changed: boolean } => {
+    if (!rows?.length) return { rows: rows ?? [], changed: false }
+    let changed = false
+    const nextRows = rows.map((row) => {
+      const className = row.class_name ?? row.className ?? ""
+      const resourceKey = row.resource_key ?? row.resourceKey ?? ""
+      const cls = classes.find((c) => c.name === className)
+      if (!cls) return row
+
+      const features = cls.features ?? []
+      const hasDireGambit = features.some((f) => /^dire gambit$/i.test(f.name ?? ""))
+      if (hasDireGambit && resourceKey === "risk_dice" && row.uses.rechargeOnInitiative !== 1) {
+        changed = true
+        return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+      }
+
+      const subclassHit = (content.subclasses ?? []).some(
+        (sub) =>
+          sub.class_name === className &&
+          (sub.features ?? []).some(
+            (f) =>
+              /^interdict$/i.test(f.name ?? "") ||
+              /regain a use of Interrupt when you roll Initiative/i.test(f.description ?? ""),
+          ),
+      )
+      const featureHit = features.some(
+        (f) =>
+          /^interdict$/i.test(f.name ?? "") ||
+          (/interrupt/i.test(f.name ?? "") &&
+            /regain a use of Interrupt when you roll Initiative/i.test(f.description ?? "")),
+      )
+      if (
+        (featureHit || subclassHit) &&
+        resourceKey === "interrupt" &&
+        row.uses.rechargeOnInitiative !== 1
+      ) {
+        changed = true
+        return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+      }
+      return row
+    })
+    return { rows: nextRows, changed }
+  }
+
+  let next = content
+  const classResources = patchRows(next.class_resources)
+  if (classResources.changed) {
+    next = { ...next, class_resources: classResources.rows }
+  }
+  const proposals = next.import_proposals?.class_resources
+  if (proposals?.length) {
+    const patched = patchRows(
+      proposals.map((row) => ({
+        ...row,
+        class_name: row.class_name,
+        resource_key: row.resource_key,
+        uses: row.uses,
+      })),
+    )
+    if (patched.changed) {
+      next = {
+        ...next,
+        import_proposals: {
+          ...next.import_proposals!,
+          class_resources: patched.rows as typeof proposals,
+        },
+      }
+    }
+  }
   return next
 }

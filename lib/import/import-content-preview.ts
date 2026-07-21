@@ -1,6 +1,7 @@
 import type { ImportContent, PrerequisiteRule } from "@/lib/import/content-schema"
 import { formatEquipmentCost } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
+import { importCardArtTargetKey } from "@/lib/import/import-card-art"
 import type { Equipment } from "@/lib/types"
 
 export type ImportContentPreviewDetail = {
@@ -14,6 +15,8 @@ export type ImportContentPreviewItem = {
   details: ImportContentPreviewDetail[]
   badges: string[]
   descriptionSnippet?: string
+  /** When set, the review UI shows an inline card-art URL field for this row. */
+  cardArtKey?: string
 }
 
 export type ImportContentPreviewSection = {
@@ -201,9 +204,10 @@ function previewSubclasses(content: ImportContent): ImportContentPreviewSection 
   const subclasses = content.subclasses
   if (!subclasses?.length) return null
 
-  const items = [...subclasses]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((row) => {
+  const items = subclasses
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => a.row.name.localeCompare(b.row.name))
+    .map(({ row, index }) => {
       const details: ImportContentPreviewDetail[] = [
         { label: "Class", value: row.class_name },
       ]
@@ -222,6 +226,7 @@ function previewSubclasses(content: ImportContent): ImportContentPreviewSection 
         details,
         badges: [],
         descriptionSnippet: snippet(row.description),
+        cardArtKey: importCardArtTargetKey("subclasses", index),
       }
     })
 

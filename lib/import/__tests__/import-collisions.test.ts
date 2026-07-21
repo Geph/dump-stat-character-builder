@@ -58,11 +58,20 @@ describe("buildImportCollisions", () => {
     const collisions = buildImportCollisions(content as unknown as ImportContent, {
       class: [{ name: "Fighter", source: "SRD" }],
     })
-    const renameMap = defaultRenameMap(collisions)
+    const renameMap = { [collisions[0].id]: collisions[0].suggestedName }
     const next = applyImportRenames(content as unknown as ImportContent, renameMap)
     expect(next.classes?.[0].name).toBe("Alternate Fighter")
     expect(next.class_resources?.[0].resource_key).toBe("alternate_fighter_exploit_dice")
     expect(next.spells?.[0].classes).toEqual(["Alternate Fighter"])
+  })
+
+  it("leaves class Import-as blank until the user chooses a name", () => {
+    const collisions = buildImportCollisions(
+      { classes: [{ name: "Warden", features: [] }] } as unknown as ImportContent,
+      { class: [{ name: "Warden", source: "KibblesTasty" }] },
+    )
+    expect(defaultRenameMap(collisions)).toEqual({})
+    expect(collisions[0]?.suggestedName).toBe("Mage Hand Press Warden")
   })
 
   it("keeps the original name when overwrite is selected", () => {

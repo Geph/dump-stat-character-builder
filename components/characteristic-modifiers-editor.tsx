@@ -2639,9 +2639,33 @@ function ModifierFields({
                 })
               }
               rows={3}
-              placeholder={"Phase Rift"}
+              placeholder={"Guardian Tactics\nSurvive"}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Parent menu option names (optional)
+            </label>
+            <textarea
+              value={(mod.parentMenuOptionNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  parentMenuOptionNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={2}
+              placeholder={"Block\nChallenge\nGrasp"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              When set, the alert only attaches if the parent action&apos;s resource menu lists a
+              matching option.
+            </p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">Alert summary</label>
