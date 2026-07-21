@@ -74,7 +74,7 @@ describe("Alchemist unified Bomb import", () => {
       bonusDicePerResource: "1d10",
     })
     expect(attack?.maxResourcesSpentByLevel).toEqual(
-      expect.arrayContaining([expect.objectContaining({ level: 5, fixed: 1 })]),
+      expect.arrayContaining([expect.objectContaining({ level: 5, fixed: 2 })]),
     )
   })
 
@@ -317,6 +317,94 @@ describe("enrichImportContentModifiers integration", () => {
     expect(content.classes?.[0]?.features?.[0]?.choices?.optionsSource).toBe("class_bomb_formulas")
     const bomb = content.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
     expect(bomb.ability_role).toBe("alchemist_bomb")
+  })
+
+  it("wires Potion Brewing craftable table + held cap from HTML potions table", () => {
+    const enriched = enrichImportContentModifiers({
+      classes: [
+        {
+          name: "Alchemist",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [
+            {
+              level: 1,
+              name: "Potion Brewing",
+              description:
+                "<p>Brew potions.</p><table><tbody><tr><td colspan=\"2\"><strong>Alchemist Level 1</strong></td></tr><tr><td>Potion of Healing</td><td>1</td></tr><tr><td>Potion of Climbing</td><td>1</td></tr></tbody></table>",
+            },
+            {
+              level: 1,
+              name: "Bombs",
+              description: "You create Bombs. Intelligent Explosions add Intelligence to Explode damage.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const brewing = enriched.classes?.[0]?.features?.find((f) => f.name === "Potion Brewing") as
+      | import("@/lib/types").Feature
+      | undefined
+    const brewingChars = (brewing?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(brewingChars.some((char) => char.type === "craftable_items")).toBe(true)
+    expect(brewingChars.some((char) => char.type === "held_items_cap")).toBe(true)
+
+    const bombs = enriched.classes?.[0]?.features?.find((f) => f.name === "Bombs") as
+      | import("@/lib/types").Feature
+      | undefined
+    const bombChars = (bombs?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(bombChars.filter((char) => char.type === "special_attack")).toHaveLength(2)
+  })
+
+  it("clears false-positive immunity on Alchemical Romance and wires Poisoner grant", () => {
+    const enriched = enrichImportContentModifiers({
+      subclasses: [
+        {
+          name: "Amorist",
+          class_name: "Alchemist",
+          description: null,
+          features: [
+            {
+              level: 14,
+              name: "Alchemical Romance",
+              description:
+                "Ignore Immunity. Your Pheromone Bomb ignores Immunity to the Charmed condition.",
+            },
+          ],
+        },
+        {
+          name: "Venomsmith",
+          class_name: "Alchemist",
+          description: null,
+          features: [
+            {
+              level: 3,
+              name: "Poisoner",
+              description: "You gain the Alchemy of Poison discovery.",
+              mechanics: [
+                {
+                  kind: "grant_custom_ability",
+                  abilityNames: ["Alchemy of Poison"],
+                  sourcePhrase: "You gain the Alchemy of Poison discovery",
+                  confidence: "high",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const romance = enriched.subclasses?.[0]?.features?.[0] as import("@/lib/types").Feature
+    const romanceChars = (romance.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(romanceChars.some((char) => char.type === "condition_immunity")).toBe(false)
+    expect(romanceChars.some((char) => char.type === "power_rider")).toBe(true)
+
+    const poisoner = enriched.subclasses?.[1]?.features?.[0] as import("@/lib/types").Feature
+    const poisonerChars = (poisoner.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(poisonerChars.some((char) => char.type === "grant_custom_ability")).toBe(true)
   })
 
   it("resolves bomb formula choices dynamically", () => {

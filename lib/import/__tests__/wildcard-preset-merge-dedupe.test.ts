@@ -143,6 +143,89 @@ describe("wildcard preset merge dedupes against AI mechanics", () => {
     expect(char?.uses?.recharges).toEqual([{ rest: "short_rest" }, { rest: "long_rest" }])
   })
 
+  it("AI uses recharge patches a stale preset uses pool instead of being dropped", () => {
+    const base: Feature = {
+      level: 3,
+      name: "War Priest",
+      description: "Bonus Action weapon attack.",
+      limitedUses: {
+        type: "ability_modifier",
+        abilityModifier: "WIS",
+        recharges: [{ rest: "long_rest" }],
+      },
+      linkedModifiers: [
+        {
+          instanceId: "modinst_stale_war_priest_uses",
+          catalogRefId: "cat_char_uses",
+          characteristics: [
+            {
+              id: "char_stale_war_priest_uses",
+              type: "uses",
+              uses: {
+                type: "ability_modifier",
+                abilityModifier: "WIS",
+                recharges: [{ rest: "long_rest" }],
+              },
+              label: "War Priest",
+            },
+          ],
+        },
+      ],
+    }
+
+    const ai = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          usesAbility: "WIS",
+          usesRecharge: "both",
+          sourcePhrase: "regain all expended uses when you finish a Short or Long Rest",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "War Priest" },
+    )
+    expect(ai).toHaveLength(1)
+
+    const merged = mergeFeatureModifierDetections(base, ai, [])
+    const uses = usesInstances(merged)
+    expect(uses).toHaveLength(1)
+    const char = uses[0]?.characteristics?.find((c) => c.type === "uses") as
+      | { uses?: { recharges?: { rest: string }[] } }
+      | undefined
+    expect(char?.uses?.recharges).toEqual([{ rest: "short_rest" }, { rest: "long_rest" }])
+    expect(merged.limitedUses?.recharges).toEqual([{ rest: "short_rest" }, { rest: "long_rest" }])
+  })
+
+  it("wires Guided Strike and Channel Divinity narrative actions via wildcards", () => {
+    const guided = enrichWildcardFeaturePresets({
+      level: 3,
+      name: "Guided Strike",
+      description:
+        "When you or a creature within 30 feet of you misses with an attack roll, you can expend Channel Divinity to give that roll a +10 bonus.",
+    })
+    expect(
+      guided.linkedModifiers?.some((instance) =>
+        instance.characteristics?.some((char) => char.type === "failed_roll_trigger"),
+      ),
+    ).toBe(true)
+    expect(guided.activation?.reaction).toBe(true)
+
+    const radiance = enrichWildcardFeaturePresets({
+      level: 3,
+      name: "Radiance of the Dawn",
+      description: "Channel Divinity: radiant emanation.",
+    })
+    expect(radiance.activation?.action).toBe(true)
+    expect(
+      radiance.linkedModifiers?.some((instance) =>
+        instance.characteristics?.some((char) => char.type === "special_attack"),
+      ),
+    ).toBe(true)
+    expect(radiance.limitedUses?.type).toBe("class_resource")
+    expect(radiance.limitedUses?.classResourceKey).toBe("channel_divinity")
+  })
+
   it("treats Medium Armor and Medium armor as the same armor_proficiencies fingerprint", () => {
     const ai = aiMechanicsToDetections(
       [

@@ -446,6 +446,102 @@ function buildFromMechanic(
     }
   }
 
+  if (mechanic.kind === "failed_roll_trigger") {
+    const rollKind = mechanic.rollKind ?? "attack"
+    const bonusFixed = mechanic.bonusFixed
+    const effectActivation =
+      bonusFixed != null
+        ? {
+            effects: [
+              {
+                id: modId(instanceKey(ctx, "failed_roll_bonus")),
+                kind: "check_roll_modifier" as const,
+                checkRollMode: "bonus" as const,
+                checkCategory: rollKind === "attack" ? ("attack" as const) : ("other" as const),
+                bonusConfig: { mode: "fixed" as const, fixed: bonusFixed },
+                label: `+${bonusFixed} to the roll`,
+              },
+            ],
+          }
+        : null
+    return {
+      ruleId: "ai.failed_roll_trigger",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("failed_roll_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "failed_roll")),
+          type: "failed_roll_trigger",
+          triggerOn: mechanic.failedTriggerOn ?? "fail",
+          rollKind,
+          targetScope: mechanic.targetScope ?? "self",
+          rangeFeet: mechanic.rangeFeet ?? null,
+          useReaction: mechanic.useReaction ?? false,
+          ...(mechanic.spendResourceKey
+            ? {
+                spendResourceKey: mechanic.spendResourceKey,
+                spendResourceAmount: mechanic.spendResourceAmount ?? 1,
+              }
+            : {}),
+          effect: {
+            catalogRefId: effectCatalogRefId("check_roll_modifier"),
+            ...(effectActivation ? { activation: effectActivation } : {}),
+          },
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "special_attack") {
+    const diceMatch = (mechanic.damageDice ?? mechanic.bonusDice)?.trim().match(
+      /^(\d+)\s*d\s*(4|6|8|10|12)\b/i,
+    )
+    if (!diceMatch && !mechanic.attackProfile) return null
+    const damageDiceCount = diceMatch ? parseInt(diceMatch[1]!, 10) || 1 : 1
+    const damageDieType = (`d${diceMatch?.[2] ?? "6"}`) as
+      | "d4"
+      | "d6"
+      | "d8"
+      | "d10"
+      | "d12"
+    const damageTypes = (mechanic.damageTypes?.length
+      ? mechanic.damageTypes
+      : mechanic.damageType
+        ? [mechanic.damageType]
+        : []
+    ).map(titleCaseWords)
+    const attackProfile = mechanic.attackProfile ?? (mechanic.saveAbility ? "force_save" : "ranged")
+    return {
+      ruleId: "ai.special_attack",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: {
+        ...charInstance(instanceId, characteristicCatalogRefId("special_attack"), [
+          {
+            id: modId(instanceKey(ctx, "special_attack")),
+            type: "special_attack",
+            attackName: mechanic.attackName?.trim() || ctx.featureName || "Special Attack",
+            attackProfile,
+            targetMode: mechanic.targetMode ?? (mechanic.areaShape ? "area" : "single"),
+            areaShape: mechanic.areaShape ?? null,
+            areaLengthFeet: mechanic.areaLengthFeet ?? null,
+            areaWidthFeet: mechanic.areaWidthFeet ?? null,
+            properties: [],
+            damageTypes,
+            damageDiceCount,
+            damageDieType,
+            saveAbility: mechanic.saveAbility ?? null,
+            saveDCBase: attackProfile === "force_save" || attackProfile === "emanation" ? 8 : null,
+            saveHalfDamage: mechanic.saveHalfDamage ?? Boolean(mechanic.saveAbility),
+            rangeFeet: mechanic.rangeFeet ?? null,
+            label: matchedPhrase || mechanic.attackName || ctx.featureName,
+          },
+        ]),
+        activation: { action: true },
+      },
+    }
+  }
+
   if (mechanic.kind === "initiative") {
     const mode = mechanic.initiativeMode ?? "flat_bonus"
     return {
@@ -1199,6 +1295,25 @@ function buildFromMechanic(
             appliesTo: mechanic.weaponAbilityAppliesTo ?? "both",
             scope: mechanic.weaponAbilityScope ?? "all",
             weaponNames: mechanic.weaponNames ?? [],
+          },
+        ]),
+      }
+    }
+    case "grant_custom_ability": {
+      const abilityNames = (mechanic.abilityNames ?? [])
+        .map((name) => name.trim())
+        .filter(Boolean)
+      if (!abilityNames.length) return null
+      return {
+        ruleId: "ai.grant_custom_ability",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("grant_custom_ability"), [
+          {
+            id: modId(instanceKey(ctx, "grant_custom_ability")),
+            type: "grant_custom_ability",
+            abilityNames,
+            label: matchedPhrase || `Gain ${abilityNames.join(", ")}`,
           },
         ]),
       }

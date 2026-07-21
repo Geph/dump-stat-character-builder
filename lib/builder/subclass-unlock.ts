@@ -10,7 +10,7 @@ const SUBCLASS_GATE_TEXT =
   /\b(subclass|bard college|primal path|arcane tradition|divine domain|sacred oath|roguish archetype|martial archetype|druid circle|sorcerous origin|otherworldly patron|monastic tradition|wizard school|psionic archetype)\b/i
 
 const SUBCLASS_GATE_NAME =
-  /\b(subclass|college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|covenant|specialty|calling)\b/i
+  /\b(subclass|college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|covenant|calling)\b/i
 
 const SUBCLASS_CHOICE_CATEGORY =
   /\b(college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|way of|subclass|covenant|specialty|calling)\b/i

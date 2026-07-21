@@ -1439,6 +1439,9 @@ function failedRollTriggerPreset(
     useReaction?: boolean
     rangeFeet?: number
     refundResourceOnStillFailed?: boolean
+    label?: string
+    /** Nested check_roll_modifier (etc.) when the bonus is not a resource die. */
+    effectActivation?: import("@/lib/types").FeatureActivation | null
   },
 ): LinkedModifierInstance {
   return charInstance(`modinst_${instanceKey}`, FAILED_ROLL_TRIGGER_CATALOG_ID, [
@@ -1453,7 +1456,11 @@ function failedRollTriggerPreset(
       spendResourceKey: config.spendResourceKey ?? null,
       spendResourceAmount: config.spendResourceKey ? 1 : null,
       refundResourceOnStillFailed: config.refundResourceOnStillFailed ?? false,
-      effect: { catalogRefId: config.effectCatalogRefId },
+      effect: {
+        catalogRefId: config.effectCatalogRefId,
+        ...(config.effectActivation ? { activation: config.effectActivation } : {}),
+      },
+      label: config.label,
     },
   ])
 }
@@ -3736,6 +3743,148 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       fxInstance("modinst_war_priest", "cat_fx_bonus_action_attack", {
         bonusAction: true,
         effects: [{ id: modId("war_priest"), kind: "bonus_action_attack" }],
+      }),
+    ],
+  },
+  "*::Preserve Life": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "Preserve Life",
+      ),
+      fxInstance("modinst_preserve_life", "cat_fx_heal_from_pool", {
+        action: true,
+        effects: [
+          {
+            id: modId("preserve_life"),
+            kind: "heal_from_pool",
+            label:
+              "Distribute HP equal to 5 × Cleric level among Bloodied creatures within 30 ft (max half HP each)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Radiance of the Dawn": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "Radiance of the Dawn",
+      ),
+      charInstance("modinst_radiance_of_the_dawn", characteristicCatalogRefId("special_attack"), [
+        {
+          id: modId("radiance_of_the_dawn"),
+          type: "special_attack",
+          attackName: "Radiance of the Dawn",
+          attackProfile: "emanation",
+          targetMode: "area",
+          areaShape: "sphere",
+          areaLengthFeet: 30,
+          properties: [],
+          damageTypes: ["Radiant"],
+          damageDiceCount: 2,
+          damageDieType: "d10",
+          saveAbility: "Constitution",
+          saveHalfDamage: true,
+          label: "30-ft emanation: CON save, 2d10 + Cleric level Radiant (half on success)",
+        },
+      ]),
+    ],
+  },
+  "*::War God's Blessing": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "War God's Blessing",
+      ),
+      fxInstance("modinst_war_gods_blessing", SELF_BUFF_CASTER_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("war_gods_blessing"),
+            kind: "self_buff_caster",
+            casterBuffLabel:
+              "Cast Shield of Faith or Spiritual Weapon without a spell slot (no concentration for Spiritual Weapon)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Invoke Duplicity": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "Invoke Duplicity",
+      ),
+      fxInstance("modinst_invoke_duplicity", SELF_BUFF_CASTER_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("invoke_duplicity"),
+            kind: "self_buff_caster",
+            casterBuffLabel:
+              "Create an illusory duplicate; cast from its space, distract, and move it (see feature text)",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Trickster's Transposition": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_tricksters_transposition", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("tricksters_transposition"),
+            kind: "movement_option",
+            label: "Bonus Action: teleport-swap places with your Invoke Duplicity illusion",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Improved Duplicity": {
+    linkedModifiers: [
+      charInstance("modinst_improved_duplicity", characteristicCatalogRefId("power_rider"), [
+        {
+          id: modId("improved_duplicity"),
+          type: "power_rider",
+          parentPowerNames: ["Invoke Duplicity"],
+          alertSummary: "Improved Duplicity upgrades your Invoke Duplicity illusion (see feature text).",
+          label: "Improved Duplicity",
+        },
+      ]),
+    ],
+  },
+  "*::Guided Strike": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      failedRollTriggerPreset("guided_strike", {
+        rollKind: "attack",
+        triggerOn: "fail",
+        targetScope: "allied_creature",
+        rangeFeet: 30,
+        useReaction: true,
+        spendResourceKey: "channel_divinity",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        label: "When you or an ally within 30 ft. misses an attack: Channel Divinity for +10 to the roll",
+        effectActivation: {
+          effects: [
+            {
+              id: modId("guided_strike_bonus"),
+              kind: "check_roll_modifier",
+              checkRollMode: "bonus",
+              checkCategory: "attack",
+              bonusConfig: { mode: "fixed", fixed: 10 },
+              label: "+10 to the missed attack roll",
+            },
+          ],
+        },
       }),
     ],
   },

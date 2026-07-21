@@ -188,6 +188,20 @@ const ImportMechanicAiSchema = z.object({
   maximizeWeaponDamageAtLevel: z.number().nullable(),
   spendResourceKey: z.string().nullable(),
   spendResourceAmount: z.number().nullable(),
+  failedTriggerOn: z.enum(["fail", "success"]).nullable(),
+  rollKind: z.enum(["ability", "skill", "attack", "save"]).nullable(),
+  targetScope: z
+    .enum([
+      "self",
+      "target_creature",
+      "allied_creature",
+      "targets_in_area",
+      "allies_in_area",
+      "enemies_in_area",
+    ])
+    .nullable(),
+  useReaction: z.boolean().nullable(),
+  bonusFixed: z.number().nullable(),
   automaticBonusMode: z
     .enum(["character_level", "half_character_level_round_down", "none"])
     .nullable(),
@@ -202,6 +216,9 @@ const ImportMechanicAiSchema = z.object({
   dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).nullable(),
   waiveResourceCost: z.boolean().nullable(),
   menuAbilityNames: z.array(z.string()).nullable(),
+  parentPowerNames: z.array(z.string()).nullable(),
+  parentMenuOptionNames: z.array(z.string()).nullable(),
+  alertSummary: z.string().nullable(),
   amount: z.number().nullable(),
   amountDice: z.string().nullable(),
   amountScaling: z
@@ -220,6 +237,20 @@ const ImportMechanicAiSchema = z.object({
   reachBonusFeet: z.number().nullable(),
   weaponPropertyFilter: z.array(z.string()).nullable(),
   masteryProperties: z.array(z.string()).nullable(),
+  attackName: z.string().nullable(),
+  attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).nullable(),
+  targetMode: z.enum(["single", "multi", "area"]).nullable(),
+  areaShape: z
+    .enum(["cone", "line", "sphere", "cylinder", "cube", "cone_or_line"])
+    .nullable(),
+  areaLengthFeet: z.number().nullable(),
+  areaWidthFeet: z.number().nullable(),
+  damageDice: z.string().nullable(),
+  saveAbility: z
+    .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
+    .nullable(),
+  saveHalfDamage: z.boolean().nullable(),
+  abilityNames: z.array(z.string()).nullable(),
 })
 
 const ClassFeatureAiSchema = z.object({
