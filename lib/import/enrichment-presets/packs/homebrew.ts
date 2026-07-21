@@ -141,6 +141,18 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
       },
     ],
   },
+  {
+    id: "investigator.class.artifact_hoarder_note",
+    pack: "investigator",
+    target: "subclass_feature",
+    match: { subclassClassName: /investigator/i, name: /^artifact hoarder$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Extra Trinkets use is play-time (+1 to your Trinkets pool while this feature applies) — not a separate resource key.",
+      },
+    ],
+  },
 ]
 
 export const INVESTIGATOR_SEEDS: ContentSeed[] = []
@@ -515,7 +527,61 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "appendDescription",
-        text: "Hit Point Spellcasting (Radiant self-damage to create a temporary slot) is tracked narratively — apply the Hit Point Spellcasting table damage when you cast. Spell Uses are a separate long-rest pool on the sheet.",
+        text: "Hit Point Spellcasting (Radiant self-damage to create a temporary slot) is tracked narratively — apply the Hit Point Spellcasting table damage when you cast. Spell Uses are a separate long-rest pool on the sheet. Do not invent normal spell-slot progression.",
+      },
+    ],
+  },
+  {
+    id: "martyr.class.miraculous_healing",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^miraculous healing$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Spend one unexpended Hit Point Die from the sheet Hit Dice tracker when you use this (play-time).",
+      },
+    ],
+  },
+  {
+    id: "martyr.class.reprisal",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^reprisal$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "martyr.class.undying",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^undying$/i },
+    operations: [
+      { op: "setActivation", activation: { onDropToZeroHp: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+    ],
+  },
+  {
+    id: "martyr.class.sacrifice",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^sacrifice$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Sacrificial Strike / Sacrificial Skill self-damage riders stay narrative/play-time unless a clear passive sheet bonus exists.",
       },
     ],
   },
@@ -530,8 +596,94 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "appendDescription",
-        text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools.",
+        text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools — never optionsSource class_upgrades.",
       },
+    ],
+  },
+  {
+    id: "necromancer.class.charnel_touch",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^charnel touch$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Spend from class_resources.charnel_touch (5 × Necromancer level, long rest). Per-use cap is 5 × Proficiency Bonus — track spend amount play-time.",
+      },
+    ],
+  },
+  {
+    id: "necromancer.class.dark_arcana",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^dark arcana$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Expend a spell slot to restore Charnel Touch points (INT mod + 1d8 per slot level) — play-time restore into the charnel_touch pool.",
+      },
+    ],
+  },
+  {
+    id: "necromancer.class.undying_servitude",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^undying servitude$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.class.lichdom",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^lichdom$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "lichdom_damage_immunity",
+          catalogRefId: "cat_char_damage_immunity",
+          characteristics: [
+            {
+              id: "mod_lichdom_damage_immunity",
+              type: "damage_immunity",
+              damageTypes: ["Necrotic", "Poison"],
+              label: "Lichdom undead immunities",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_resistance", "damage_immunity"],
+      },
+      {
+        op: "appendDescription",
+        text: "Creature type Undead + Spirit Jar rejuvenation stay narrative/play-time. Truesight and condition immunities are sheet-wired when present in mechanics.",
+      },
+    ],
+  },
+  {
+    id: "necromancer.subclass.lazarus_bolt",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^lazarus bolt$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
+          restoreByResource: { resourceKey: "charnel_touch", resourceAmount: 20, restores: 1 },
+        },
+      },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
     ],
   },
 ]

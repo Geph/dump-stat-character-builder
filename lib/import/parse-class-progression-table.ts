@@ -701,6 +701,21 @@ export function usesConfigForProgressionColumn(
     }
   }
 
+  if (
+    column.resourceKey === "max_spell_level" ||
+    /^max(?:imum)?\s*spell\s*levels?$/i.test(column.header)
+  ) {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Maximum spell slot level you can create with Hit Point Spellcasting at each ${className} level${
+        latest ? ` (up to level ${latest.count})` : ""
+      }. This is a cap, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
   if (column.resourceKey === "finisher" || /\bfinisher\b/i.test(column.header)) {
     const dieSides = column.dieSidesByLevel?.length
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)

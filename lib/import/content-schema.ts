@@ -822,6 +822,11 @@ const UsesConfigImportSchema = z.object({
     })
     .optional(),
   useShareKey: z.string().optional(),
+  classResourceKey: z.string().optional(),
+  classResourceAmount: z.number().optional(),
+  dieType: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]).nullable().optional(),
+  dieSidesByLevel: z.array(UsesAtLevelImportSchema).optional(),
+  rechargeOnInitiative: z.union([z.boolean(), z.number()]).optional(),
 })
 
 export const ClassResourceImportSchema = z.object({
@@ -949,14 +954,17 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
 - **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → rechargeOnInitiative: 1 (not full refill; enrichment sets this from the feature — do not set initiative recharge from the table alone). Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
 - **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
+- **Martyr Max Spell Levels:** special cap (resource_key "max_spell_level") from the Max Spell Levels column — not a spendable pool and not normal caster progression.
+- **Investigator Ritual Level / Finisher / Rushed Incantation / Trinkets:** Ritual Level = special cap; Finisher = special NdM rider with resource_key "finisher" (never "finisher_dice"); Rushed Incantation + Trinkets = spendable short-regain-1 / long-all pools.
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Mage Hand Press Warden").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
-- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools. Import thrall creatures[] before the class and grant_creature with creatureChoiceOptions.
+- **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\".
+- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with creatureChoiceOptions. Deadnaught is a companion (level-scaled HP).
 - **Dancer:** Dances = spendable uses (often short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool
 - **Craftsman:** Masterwork Bonus = special Class Cap (not spendable). Thunderlords Charge Points = spendable multiply_level pool (long rest) with subclass_name \"Thunderlords' Guild\" (subclass-gated). Do not model "uses equal to Masterwork Bonus" as spending masterwork_bonus — enrichment creates a separate at_level tracker. Masterwork weapon/armor live math uses sheet toggles masterwork_weapon_active / masterwork_armor_active.
 - **Dancer Momentum:** subclass-gated class_resources.momentum (fixed cap 3) with subclass_name matching the Momentum archetype; spend phrases on the Momentum feature.
 - **Warmage:** Tricks / Tricks Known = special choice count; Cantrip Bonus Dice = special rider count for Warmage Edge; Arcane Surge = spendable uses
-- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level, Tricks Known, Thralls, CR Total, Masterwork Bonus): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
+- **Counters and caps** (Exploits Known, Psi Limit, Hexes Known, Ritual Level, Max Spell Levels, Tricks Known, Thralls, CR Total, Masterwork Bonus, Finisher): use type "special" with atLevelTable and no recharges — these render as static caps, not depleting pools
 - **Bloodied gates:** use requiresSheetToggle "below_half_hp" (built-in Bloodied when HP ≤ half). **Dance Style riders:** use "while_dancing" for generic styles; when a subclass ability only applies to one named style (Dueling Stance, Inspiring Chant, Pantomime), use a per-style toggle (dance_style_*). **Dance Styles picker:** choices.optionsSource "class_upgrades" + ability_role "upgrade" on base style custom_abilities (resourceKey dance_styles_known). Saves vs Frightened: checkConditionTypes ["Frightened"], not conditionNote.
 - **Weapon damage die rewrite** (Deadly D4s): mechanics kind weapon_damage_die_override with dieSides 4, scope weapons — not damage_roll_modifiers.
 
@@ -990,6 +998,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - For knack pools, put a class feature with choices { category: "Knack", count: 1, resourceKey: "knacks_known", optionsSource: "class_knacks", swappableOnRest: true } — individual Knacks are separate custom_abilities rows
 - Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-attached upgrade lists (Craftsman Trappers' traps, Dancer Dance Styles) ARE included when the character has that subclass — set source_type "subclass" / source_name to the guild/style subclass and ability_role "upgrade".
+- Investigator subclass Trinkets are the exception: emit one upgrade row per trinket, but do NOT wire the class Trinkets feature as optionsSource "class_upgrades" / resourceKey "trinkets" (that pool is spendable uses, not a pick count). Enrichment auto-grants subclass trinkets via grant_custom_ability.
 - Craftsman mastery-property catalog entries and Trappers' Guild traps: one custom_abilities row each with ability_role "upgrade". Traps feature: choices { category: "Trap", resourceKey: "traps_known", optionsSource: "class_upgrades", options: [] }.
 - Talent pools (three patterns — do not conflate):
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).

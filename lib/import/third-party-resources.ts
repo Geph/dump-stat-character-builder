@@ -205,6 +205,20 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     },
   },
   {
+    resourceKey: "max_spell_level",
+    namePattern: /^max(?:imum)?\s*spell\s*levels?$/i,
+    displayName: "Max Spell Levels",
+    definition:
+      "Maximum spell slot level a Martyr can create with Hit Point Spellcasting — a cap from the Max Spell Levels column, not a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription:
+        "Maximum spell slot level you can create with Hit Point Spellcasting at each Martyr level. This is a cap, not a spendable pool.",
+      atLevelMode: "tier",
+    },
+  },
+  {
     resourceKey: "interrupt",
     namePattern: /^interrupts?$/i,
     displayName: "Interrupt",
@@ -578,10 +592,10 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
   },
   {
     resourceKey: "finisher",
-    namePattern: /\bfinisher\b/i,
+    namePattern: /\bfinisher(?:\s*dice)?\b/i,
     displayName: "Finisher",
     definition:
-      "Bonus damage dice dealt by your Finisher (e.g. 1d8 → 3d8). The die count and size scale on the class level table; this is a damage rider, not a spendable pool.",
+      "Bonus damage dice dealt by your Finisher (e.g. 1d8 → 3d8). The die count and size scale on the class level table; this is a damage rider, not a spendable pool. Always use resource_key \"finisher\" (never finisher_dice).",
     spendPatterns: [],
   },
   {
@@ -589,7 +603,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /charnel\s*touch/i,
     displayName: "Charnel Touch",
     definition:
-      "Pool of Charnel Touch points equal to 5 × your Necromancer level. Spend points (up to 5 × your Proficiency Bonus per use) to channel necrotic energy; the pool replenishes on a Long Rest and can be refilled by Dark Arcana.",
+      "Pool of Charnel Touch points equal to 5 × your Necromancer level. Spend points (up to 5 × your Proficiency Bonus per use) to channel necrotic energy; the pool replenishes on a Long Rest and can be refilled by Dark Arcana. uses.shape MUST be type at_level + atLevelMode multiply_level + atLevelTable [{level:1,count:5}] — never uses.type multiply_level.",
     proposeFromText: true,
     textProposalUses: {
       type: "at_level",
