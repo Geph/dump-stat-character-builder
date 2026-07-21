@@ -1,3 +1,4 @@
+import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import type { ImportContent, PrerequisiteRule } from "@/lib/import/content-schema"
 import { formatEquipmentCost } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
@@ -9,6 +10,8 @@ export type ImportContentPreviewDetail = {
   value: string
 }
 
+export type ImportContentPreviewNameKind = "class" | "subclass"
+
 export type ImportContentPreviewItem = {
   id: string
   name: string
@@ -17,6 +20,12 @@ export type ImportContentPreviewItem = {
   descriptionSnippet?: string
   /** When set, the review UI shows an inline card-art URL field for this row. */
   cardArtKey?: string
+  /** Compendium tab for portrait vs wide preview framing. */
+  cardArtTab?: CompendiumContentType
+  /** When set with sourceIndex, the review UI allows editing this row's name. */
+  nameKind?: ImportContentPreviewNameKind
+  /** Index into the import content array for renames / card art. */
+  sourceIndex?: number
 }
 
 export type ImportContentPreviewSection = {
@@ -166,7 +175,7 @@ function previewClasses(content: ImportContent): ImportContentPreviewSection | n
   const classes = content.classes
   if (!classes?.length) return null
 
-  const items = classes.map((row) => {
+  const items = classes.map((row, index) => {
     const details: ImportContentPreviewDetail[] = [
       { label: "Hit die", value: `d${row.hit_die}` },
     ]
@@ -189,11 +198,15 @@ function previewClasses(content: ImportContent): ImportContentPreviewSection | n
     if (row.complexity) badges.push(row.complexity)
 
     return {
-      id: `class:${row.name}`,
+      id: `class:${index}:${row.name}`,
       name: row.name,
       details,
       badges,
       descriptionSnippet: snippet(row.description),
+      cardArtKey: importCardArtTargetKey("classes", index),
+      cardArtTab: "classes" as const,
+      nameKind: "class" as const,
+      sourceIndex: index,
     }
   })
 
@@ -221,12 +234,15 @@ function previewSubclasses(content: ImportContent): ImportContentPreviewSection 
       appendPrerequisiteRules(details, row)
 
       return {
-        id: `subclass:${row.class_name}:${row.name}`,
+        id: `subclass:${index}:${row.class_name}:${row.name}`,
         name: row.name,
         details,
         badges: [],
         descriptionSnippet: snippet(row.description),
         cardArtKey: importCardArtTargetKey("subclasses", index),
+        cardArtTab: "subclasses" as const,
+        nameKind: "subclass" as const,
+        sourceIndex: index,
       }
     })
 

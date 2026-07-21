@@ -33,6 +33,10 @@ function collisionId(kind: ImportCollisionKind, name: string): string {
   return `${kind}:${name.trim().toLowerCase()}`
 }
 
+export function importCollisionId(kind: ImportCollisionKind, name: string): string {
+  return collisionId(kind, name)
+}
+
 function suggestRenamedName(
   name: string,
   kind: ImportCollisionKind,

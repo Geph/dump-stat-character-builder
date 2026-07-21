@@ -71,6 +71,7 @@ import {
   collisionRenamesResolved,
   defaultCollisionResolutionMap,
   defaultRenameMap,
+  importCollisionId,
   type ImportCollision,
   type ImportCollisionResolutionMap,
   type ImportRenameMap,
@@ -92,6 +93,10 @@ import {
   buildInitialImportCardArtUrlMap,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import {
+  renameImportClassAtIndex,
+  renameImportSubclassAtIndex,
+} from "@/lib/import/rename-import-preview"
 import {
   SPELLS_PDF_MAX_PAGES,
   maxPdfPagesForContentTypeHint,
@@ -408,6 +413,60 @@ export default function ImportPage() {
         ? { ...current, content: removeImportModifierPreview(current.content, previewId) }
         : null,
     )
+  }
+
+  const handleRenameImportPreview = (
+    kind: "class" | "subclass",
+    sourceIndex: number,
+    nextName: string,
+  ) => {
+    if (kind === "subclass") {
+      setPendingImport((current) =>
+        current
+          ? {
+              ...current,
+              content: renameImportSubclassAtIndex(current.content, sourceIndex, nextName),
+            }
+          : null,
+      )
+      return
+    }
+
+    const oldName = pendingImport?.content.classes?.[sourceIndex]?.name
+    if (!oldName) return
+
+    setPendingImport((current) => {
+      if (!current) return null
+      const content = renameImportClassAtIndex(current.content, sourceIndex, nextName)
+      const newName = content.classes?.[sourceIndex]?.name
+      if (!newName || newName === oldName) return { ...current, content }
+
+      const newId = importCollisionId("class", newName)
+      const collisions = current.collisions.map((collision) => {
+        if (collision.kind !== "class" || collision.incomingName !== oldName) return collision
+        return { ...collision, id: newId, incomingName: newName }
+      })
+      return { ...current, content, collisions }
+    })
+
+    const oldId = importCollisionId("class", oldName)
+    const newId = importCollisionId("class", nextName.trim())
+    if (oldId === newId) return
+
+    setRenameMap((map) => {
+      if (!(oldId in map)) return map
+      const next = { ...map }
+      next[newId] = next[oldId]
+      delete next[oldId]
+      return next
+    })
+    setCollisionResolutionMap((map) => {
+      if (!(oldId in map)) return map
+      const next = { ...map }
+      next[newId] = next[oldId]
+      delete next[oldId]
+      return next
+    })
   }
 
   const resetImportForm = () => {
@@ -1036,6 +1095,7 @@ export default function ImportPage() {
                       showModifierReviewHint={stageHasModifiers}
                       cardArtUrls={cardArtUrlMap}
                       onCardArtChange={setCardArtUrlMap}
+                      onRenameItem={handleRenameImportPreview}
                     />
                     <ImportCardArtPanel
                       key={`card-art-${activeReviewStage?.id ?? "all"}`}
@@ -1043,7 +1103,7 @@ export default function ImportPage() {
                       value={cardArtUrlMap}
                       onChange={setCardArtUrlMap}
                       sections={stageCardArtSections}
-                      excludeSections={["subclasses"]}
+                      excludeSections={["classes", "subclasses"]}
                     />
                   </>
                 }
@@ -1074,6 +1134,7 @@ export default function ImportPage() {
                   showModifierReviewHint={modifierReviewRows.length > 0}
                   cardArtUrls={cardArtUrlMap}
                   onCardArtChange={setCardArtUrlMap}
+                  onRenameItem={handleRenameImportPreview}
                 />
                 {modifierReviewRows.length > 0 ? (
                   <ImportModifierReviewPanel
@@ -1086,7 +1147,7 @@ export default function ImportPage() {
                   content={pendingImport.content}
                   value={cardArtUrlMap}
                   onChange={setCardArtUrlMap}
-                  excludeSections={["subclasses"]}
+                  excludeSections={["classes", "subclasses"]}
                 />
               </>
             )}
