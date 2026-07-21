@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   collectImportContentPreview,
   importContentPreviewLimit,
   type ImportContentPreviewItem,
+  type ImportContentPreviewNameKind,
   type ImportContentPreviewSection,
 } from "@/lib/import/import-content-preview"
 import {
@@ -28,9 +29,11 @@ type ImportContentPreviewPanelProps = {
    * directly under the stage header without another bordered panel.
    */
   embedded?: boolean
-  /** Optional card-art URLs for rows that expose `cardArtKey` (e.g. subclasses). */
+  /** Optional card-art URLs for rows that expose `cardArtKey` (e.g. classes/subclasses). */
   cardArtUrls?: ImportCardArtUrlMap
   onCardArtChange?: (map: ImportCardArtUrlMap) => void
+  /** Commit a class/subclass name edit (applied on blur). */
+  onRenameItem?: (kind: ImportContentPreviewNameKind, sourceIndex: number, nextName: string) => void
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
@@ -48,13 +51,31 @@ function PreviewItem({
   bare,
   cardArtUrl,
   onCardArtUrlChange,
+  onRename,
 }: {
   item: ImportContentPreviewItem
   bare?: boolean
   cardArtUrl?: string
   onCardArtUrlChange?: (next: string) => void
+  onRename?: (nextName: string) => void
 }) {
   const showCardArt = Boolean(item.cardArtKey && onCardArtUrlChange)
+  const canRename = Boolean(item.nameKind != null && item.sourceIndex != null && onRename)
+  const [draftName, setDraftName] = useState(item.name)
+
+  useEffect(() => {
+    setDraftName(item.name)
+  }, [item.name, item.id])
+
+  const commitName = () => {
+    if (!onRename) return
+    const trimmed = draftName.trim()
+    if (!trimmed || trimmed === item.name) {
+      setDraftName(item.name)
+      return
+    }
+    onRename(trimmed)
+  }
 
   return (
     <li
@@ -65,7 +86,23 @@ function PreviewItem({
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium text-foreground">{item.name}</span>
+        {canRename ? (
+          <input
+            type="text"
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            onBlur={commitName}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur()
+              }
+            }}
+            aria-label={`${item.nameKind === "subclass" ? "Subclass" : "Class"} name`}
+            className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm font-medium text-foreground"
+          />
+        ) : (
+          <span className="font-medium text-foreground">{item.name}</span>
+        )}
         {item.badges.map((badge) => (
           <span
             key={badge}
@@ -93,7 +130,7 @@ function PreviewItem({
           <ImportCardArtControls
             rowKey={item.cardArtKey}
             name={item.name}
-            portrait={importCardArtUsesPortraitArt("subclasses")}
+            portrait={importCardArtUsesPortraitArt(item.cardArtTab ?? "subclasses")}
             url={cardArtUrl ?? ""}
             onUrlChange={onCardArtUrlChange!}
           />
@@ -108,11 +145,13 @@ function PreviewSection({
   bare,
   cardArtUrls,
   onCardArtChange,
+  onRenameItem,
 }: {
   section: ImportContentPreviewSection
   bare?: boolean
   cardArtUrls?: ImportCardArtUrlMap
   onCardArtChange?: (map: ImportCardArtUrlMap) => void
+  onRenameItem?: (kind: ImportContentPreviewNameKind, sourceIndex: number, nextName: string) => void
 }) {
   const limit = importContentPreviewLimit()
   const [expanded, setExpanded] = useState(false)
@@ -132,6 +171,11 @@ function PreviewSection({
             onCardArtUrlChange={
               item.cardArtKey && onCardArtChange
                 ? (next) => onCardArtChange({ ...cardArtUrls, [item.cardArtKey!]: next })
+                : undefined
+            }
+            onRename={
+              item.nameKind != null && item.sourceIndex != null && onRenameItem
+                ? (nextName) => onRenameItem(item.nameKind!, item.sourceIndex!, nextName)
                 : undefined
             }
           />
@@ -172,6 +216,7 @@ export function ImportContentPreviewPanel({
   embedded = false,
   cardArtUrls,
   onCardArtChange,
+  onRenameItem,
 }: ImportContentPreviewPanelProps) {
   const sections = useMemo(
     () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
@@ -207,8 +252,8 @@ export function ImportContentPreviewPanel({
       ) : sections.length > 0 ? (
         <p className="text-xs text-muted-foreground">
           {showModifierReviewHint
-            ? "Check the parsed entries below, then continue to modifier wiring."
-            : "Check the parsed entries below before confirming."}
+            ? "Edit names and optional card art below, then continue to modifier wiring."
+            : "Edit names and optional card art below before confirming."}
         </p>
       ) : null}
 
@@ -221,6 +266,7 @@ export function ImportContentPreviewPanel({
               bare={embedded && singleSection}
               cardArtUrls={cardArtUrls}
               onCardArtChange={onCardArtChange}
+              onRenameItem={onRenameItem}
             />
           ))}
         </div>

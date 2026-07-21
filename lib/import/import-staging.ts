@@ -4,7 +4,6 @@ import type { ImportCollisionKind } from "@/lib/import/import-collisions"
 
 export type ImportStageId =
   | "core"
-  | "subclasses"
   | "feats"
   | "spells"
   | "equipment"
@@ -20,8 +19,8 @@ export type ImportStage = {
 
 /** Preview section keys shown for each stage (order matches staged review). */
 export const IMPORT_STAGE_PREVIEW_KEYS: Record<ImportStageId, readonly string[]> = {
-  core: ["classes", "species", "backgrounds"],
-  subclasses: ["subclasses"],
+  /** Class first, then chassis extras, then subclasses stacked below. */
+  core: ["classes", "species", "backgrounds", "subclasses"],
   feats: ["feats"],
   spells: ["spells"],
   equipment: ["equipment"],
@@ -30,7 +29,6 @@ export const IMPORT_STAGE_PREVIEW_KEYS: Record<ImportStageId, readonly string[]>
 
 export const IMPORT_STAGE_COLLISION_KINDS: Record<ImportStageId, readonly ImportCollisionKind[]> = {
   core: ["class", "species", "background"],
-  subclasses: [],
   feats: ["feat"],
   spells: ["spell"],
   equipment: [],
@@ -41,9 +39,8 @@ export const IMPORT_STAGE_CARD_ART_SECTIONS: Record<
   ImportStageId,
   readonly ImportCardArtSection[]
 > = {
-  core: ["classes", "species", "backgrounds"],
-  /** Subclass art is inlined on each preview row — no separate card-art panel. */
-  subclasses: [],
+  /** Class/subclass art is inlined on preview rows. */
+  core: ["species", "backgrounds"],
   feats: [],
   spells: ["spells"],
   equipment: ["equipment"],
@@ -58,11 +55,10 @@ export function importModifierMatchesStage(
     case "core":
       return (
         sourceLabel.startsWith("Class: ") ||
+        sourceLabel.startsWith("Subclass: ") ||
         sourceLabel.startsWith("Species: ") ||
         sourceLabel.startsWith("Background: ")
       )
-    case "subclasses":
-      return sourceLabel.startsWith("Subclass: ")
     case "feats":
       return sourceLabel.startsWith("Feat: ")
     case "proposals":
@@ -110,26 +106,28 @@ export function buildImportStages(content: ImportContent): ImportStage[] {
     classes: content.classes?.length ?? 0,
     species: content.species?.length ?? 0,
     backgrounds: content.backgrounds?.length ?? 0,
+    subclasses: content.subclasses?.length ?? 0,
   }
   const coreTotal = Object.values(coreCounts).reduce((sum, count) => sum + count, 0)
   if (coreTotal > 0) {
+    const hasClass = coreCounts.classes > 0
+    const hasSubclass = coreCounts.subclasses > 0
     stages.push({
       id: "core",
-      label: "Core class & chassis",
-      description: "Class features, proficiencies, and progression tables.",
+      label:
+        hasClass && hasSubclass
+          ? "Class & subclasses"
+          : hasSubclass
+            ? "Subclasses & archetypes"
+            : "Core class & chassis",
+      description:
+        hasClass && hasSubclass
+          ? "Review the class, then each subclass — optional card art and name edits."
+          : hasSubclass
+            ? "Warrior archetypes, domains, paths, and subclass spell lists."
+            : "Class features, proficiencies, and progression tables.",
       counts: coreCounts,
       total: coreTotal,
-    })
-  }
-
-  const subclassCount = content.subclasses?.length ?? 0
-  if (subclassCount > 0) {
-    stages.push({
-      id: "subclasses",
-      label: "Subclasses & archetypes",
-      description: "Warrior archetypes, domains, paths, and subclass spell lists.",
-      counts: { subclasses: subclassCount },
-      total: subclassCount,
     })
   }
 
