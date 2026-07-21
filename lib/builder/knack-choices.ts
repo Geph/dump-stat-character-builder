@@ -13,8 +13,12 @@ function normalizeName(value: string): string {
 export function knackAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
+  options?: { subclassName?: string | null },
 ): CustomAbility[] {
   const classKeys = new Set(classNames.map(normalizeName))
+  const subclassKey = options?.subclassName?.trim()
+    ? normalizeName(options.subclassName)
+    : null
   return customAbilities.filter((ability) => {
     if (ability.ability_role !== "knack") return false
     if (ability.attached_to_type === "class" && ability.attached_to_id) {
@@ -23,8 +27,17 @@ export function knackAbilitiesForClass(
         (classKey) => attachKey.includes(classKey) || classKey.includes(attachKey),
       )
     }
+    if (ability.attached_to_type === "subclass" && ability.attached_to_id) {
+      if (!subclassKey) return false
+      const attachKey = normalizeName(ability.attached_to_id)
+      return attachKey.includes(subclassKey) || subclassKey.includes(attachKey)
+    }
     if (ability.source?.trim()) {
-      return [...classKeys].some((classKey) => normalizeName(ability.source).includes(classKey))
+      const sourceKey = normalizeName(ability.source)
+      if ([...classKeys].some((classKey) => sourceKey.includes(classKey))) return true
+      if (subclassKey && (sourceKey.includes(subclassKey) || subclassKey.includes(sourceKey))) {
+        return true
+      }
     }
     return classNames.length === 0
   })
@@ -62,7 +75,9 @@ export function aggregateKnackOptions(params: {
   knownSpellNames?: string[]
   subclassName?: string | null
 }): { name: string; description: string; prerequisite?: string | null; repeatable?: boolean | null }[] {
-  const knacks = knackAbilitiesForClass(params.customAbilities, params.classNames)
+  const knacks = knackAbilitiesForClass(params.customAbilities, params.classNames, {
+    subclassName: params.subclassName,
+  })
   const selected = params.selectedKnackNames
   const context: KnackEligibilityContext = {
     classLevel: params.classLevel,

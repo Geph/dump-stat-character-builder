@@ -303,6 +303,84 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     },
   },
   {
+    resourceKey: "masterwork_bonus",
+    namePattern: /masterwork\s*bonus/i,
+    displayName: "Masterwork Bonus",
+    definition:
+      "Craftsman Masterwork Bonus (+1/+2/+3/+4 by level). Applied to Masterwork weapons/armor and several subclass use counts — a Class Cap, not a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Masterwork Bonus at each Craftsman level (see Masterwork Bonus column).",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 1, count: 1 },
+        { level: 5, count: 2 },
+        { level: 13, count: 3 },
+        { level: 17, count: 4 },
+      ],
+    },
+    proposeFromText: true,
+    textProposalUses: {
+      type: "special",
+      specialDescription: "Masterwork Bonus at each Craftsman level (see Masterwork Bonus column).",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 1, count: 1 },
+        { level: 5, count: 2 },
+        { level: 13, count: 3 },
+        { level: 17, count: 4 },
+      ],
+    },
+  },
+  {
+    resourceKey: "charge_points",
+    namePattern: /charge\s*points?/i,
+    displayName: "Charge Points",
+    definition:
+      "Thunderlords' Guild Power Cell charges. Pool equals Craftsman level; regain all on a Long Rest. Spent for Shock and other Power Cell features.",
+    spendPatterns: [
+      /\bexpend\s+(?:a\s+number\s+of\s+)?charge\s+points?\b/i,
+      /\bexpend\s+(\d+)\s+charge\s+points?\b/i,
+      /\bspend\s+(\d+)\s+charge\s+points?\b/i,
+    ],
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 3, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+  },
+  {
+    resourceKey: "momentum",
+    namePattern: /^momentum$/i,
+    displayName: "Momentum",
+    definition:
+      "Dancer Momentum tokens (subclass-gated). Gain while Dancing; expend for +Dance Die damage. Cap 3 with Deadly Momentum.",
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1)\s+momentum\b/i,
+      /\bspend\s+(?:one|an?|1)\s+momentum\b/i,
+    ],
+    defaultUses: {
+      type: "fixed",
+      fixedAmount: 3,
+      recharges: [{ rest: "long_rest" }],
+    },
+    proposeFromText: true,
+    textProposalUses: {
+      type: "fixed",
+      fixedAmount: 3,
+      recharges: [{ rest: "long_rest" }],
+    },
+  },
+  {
     resourceKey: "cantrip_bonus_dice",
     namePattern: /cantrip\s*bonus\s*dice/i,
     displayName: "Cantrip Bonus Dice",

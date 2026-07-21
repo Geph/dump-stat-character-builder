@@ -114,6 +114,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   damage_roll_modifiers: "Attack & damage",
   weapon_ability_override: "Attack & damage",
   unarmed_strike_damage: "Special attacks",
+  weapon_damage_die_override: "Special attacks",
   special_attack: "Special attacks",
   damage_resistance: "Damage mitigation",
   damage_immunity: "Damage mitigation",

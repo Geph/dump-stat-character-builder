@@ -279,6 +279,28 @@ describe("aiMechanicsToDetections", () => {
     ).toEqual([])
   })
 
+  it("wires check_roll_modifier when conditionNote names Frightened", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "check_roll_modifier",
+          checkRollMode: "advantage",
+          checkCategory: "save",
+          conditionNote: "saving throws to avoid or end the Frightened condition",
+          sourcePhrase: "Advantage on saving throws to avoid or end Frightened",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Team Player" },
+    )
+    expect(detections).toHaveLength(1)
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect).toMatchObject({
+      kind: "check_roll_modifier",
+      checkRollMode: "advantage",
+      checkConditionTypes: ["Frightened"],
+    })
+  })
+
   it("wires flat damageBonus on damage_roll_modifiers", () => {
     const detections = aiMechanicsToDetections(
       [

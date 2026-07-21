@@ -27,9 +27,9 @@ function featureChars(feature: {
   return { types, effects, isChoice: feature.isChoice === true }
 }
 
-describe.runIf(
-  hasHomebrewFixture("eberron-artificer-class.json", "eberron-artificer-subclasses.json"),
-)("Eberron Artificer local import fixtures", () => {
+describe.runIf(hasHomebrewFixture("eberron-artificer-class.json"))(
+  "Eberron Artificer local import fixtures",
+  () => {
   it("class JSON has Artificer L1 slots + Tinker's Magic + Flash of Genius wiring after enrich", () => {
     const raw = loadFixture("eberron-artificer-class.json")
     expect(raw).not.toBeNull()
@@ -62,10 +62,10 @@ describe.runIf(
     expect(cls?.spell_list).toBeUndefined()
   })
 
-  it("subclass JSON wires presets for all five Eberron subclasses", () => {
-    const raw = loadFixture("eberron-artificer-subclasses.json")
+  it("merged class JSON includes all five Eberron subclasses with expected wiring", () => {
+    const raw = loadFixture("eberron-artificer-class.json")
     expect(raw).not.toBeNull()
-    const content = enrichImportContentModifiers(raw!)
+    const content = enrichImportContentModifiers(applyClassSpellListsToImport(raw!))
     expect(content.subclasses?.map((s) => s.name).sort()).toEqual([
       "Alchemist",
       "Armorer",
@@ -82,13 +82,22 @@ describe.runIf(
       expect.arrayContaining(["damage_resistance", "condition_immunity", "spells_known"]),
     )
     expect(by("Armorer", "Armor Model")?.isChoice).toBe(true)
+    expect(by("Armorer", "Armor Model")?.choices?.swappableOnRest).toBe(true)
+    expect(by("Armorer", "Armor Model")?.choices?.options?.map((o) => o.name).sort()).toEqual([
+      "Dreadnaught",
+      "Guardian",
+      "Infiltrator",
+    ])
     expect(
       featureChars(by("Artillerist", "Eldritch Cannon")!).isChoice ||
-        featureChars(by("Artillerist", "Eldritch Cannon")!).types.length,
+        featureChars(by("Artillerist", "Eldritch Cannon")!).types.length ||
+        by("Artillerist", "Eldritch Cannon")?.companion_stat_block?.name,
     ).toBeTruthy()
+    expect(by("Artillerist", "Eldritch Cannon")?.companion_stat_block?.name).toBe("Eldritch Cannon")
     expect(featureChars(by("Battle Smith", "Battle Ready")!).types).toContain("weapon_proficiencies")
     expect(by("Battle Smith", "Steel Defender")?.companion_stat_block?.name).toBe("Steel Defender")
     expect(featureChars(by("Cartographer", "Mapping Magic")!).types).toContain("uses")
     expect(featureChars(by("Cartographer", "Ingenious Movement")!).effects).toContain("movement_option")
   })
-})
+  },
+)

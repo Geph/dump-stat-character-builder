@@ -9,6 +9,10 @@ export const SUBCLASS_GATED_CLASS_RESOURCE_KEYS = new Set([
   "rampage_die",
   /** Grey Watchman (MHP Warden) — not Captain/Vagabond class-table Battle Dice. */
   "battle_dice",
+  /** Dancer Momentum tokens — only when a Momentum-style subclass is selected. */
+  "momentum",
+  /** Thunderlords' Guild Power Cell — only when Thunderlords is selected. */
+  "charge_points",
 ])
 
 type SubclassGatedResource = {
@@ -123,6 +127,31 @@ const WARDEN_GREY_WATCHMAN_BATTLE_DICE: ClassResource = {
   },
 }
 
+const DANCER_MOMENTUM: ClassResource = {
+  id: "momentum",
+  name: "Momentum",
+  description:
+    "Tokens gained while Dancing (leave reach / move 15 ft). Expend for +Dance Die damage. Deadly Momentum raises the cap to 3 and tokens no longer expire at end of turn.",
+  uses: {
+    type: "fixed",
+    fixedAmount: 3,
+    recharges: [{ rest: "long_rest" }],
+  },
+}
+
+const CRAFTSMAN_CHARGE_POINTS: ClassResource = {
+  id: "charge_points",
+  name: "Charge Points",
+  description:
+    "Thunderlords' Guild Power Cell charges. Pool equals Craftsman level; regain all on a Long Rest.",
+  uses: {
+    type: "at_level",
+    atLevelMode: "multiply_level",
+    atLevelTable: [{ level: 1, count: 1 }],
+    recharges: [{ rest: "long_rest" }],
+  },
+}
+
 /** Subclass-only pools (Battle Master, Psi Warrior / Psi Knight, Soulknife, Grey Watchman). */
 export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
   {
@@ -149,6 +178,16 @@ export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
     className: "Warden",
     subclassMatchers: ["grey watchman", "gray watchman"],
     resource: WARDEN_GREY_WATCHMAN_BATTLE_DICE,
+  },
+  {
+    className: "Dancer",
+    subclassMatchers: ["momentum", "deadly momentum"],
+    resource: DANCER_MOMENTUM,
+  },
+  {
+    className: "Craftsman",
+    subclassMatchers: ["thunderlords", "thunderlord"],
+    resource: CRAFTSMAN_CHARGE_POINTS,
   },
 ]
 

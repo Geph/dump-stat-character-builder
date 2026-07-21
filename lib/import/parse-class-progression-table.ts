@@ -564,12 +564,13 @@ export function usesConfigForProgressionColumn(
       ? [...column.dieSidesByLevel].sort((a, b) => a.level - b.level)
       : []
     const latestDie = dieSides[dieSides.length - 1]
-    const dieLabel = latestDie ? (`d${latestDie.count}` as unknown as unknown as unknown as UsesConfig["dieType"]) : "d8"
+    const dieLabel = latestDie ? (`d${latestDie.count}` as UsesConfig["dieType"]) : "d8"
     return {
       type: "at_level",
       atLevelMode: "tier",
       atLevelTable: sorted,
       dieType: dieLabel,
+      dieSidesByLevel: dieSides.length ? dieSides : undefined,
       recharges: shortAndLong,
     }
   }

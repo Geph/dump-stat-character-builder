@@ -170,6 +170,7 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "attack_roll_modifiers", label: "Attack Roll and Crit Modifiers" },
   { value: "damage_roll_modifiers", label: "Weapon Damage Modifiers" },
   { value: "unarmed_strike_damage", label: "Unarmed Strike Damage Die" },
+  { value: "weapon_damage_die_override", label: "Weapon Damage Die Override" },
   { value: "special_attack", label: "Special Attack" },
   { value: "damage_resistance", label: "Damage Resistances" },
   { value: "damage_immunity", label: "Damage Immunities" },
@@ -347,6 +348,8 @@ export type AcFormulaOption = {
 export type AggregateCharacteristicsOptions = LimitationEvaluationContext & {
   selectedAcFormulaId?: string | null
   characterLevel?: number
+  /** Current Class Cap / pool sizes by resource_key (Masterwork Bonus, etc.). */
+  classResourceCounts?: Record<string, number>
 }
 
 export type AbilityScoresMode = "fixed" | "asi_pool"
@@ -508,6 +511,12 @@ export interface AcCharacteristic extends CharacteristicModifierBase {
   includeProficiency?: boolean
   /** When true, flat_bonus only applies while wearing armor (Fighting Style: Defense). */
   requiresArmor?: boolean
+  /**
+   * When set, flatBonus is ignored and the current Class Cap / pool size for this
+   * resource_key is used (e.g. Masterwork armor → ⌈Masterwork Bonus / 2⌉).
+   */
+  flatBonusFromClassResourceKey?: string | null
+  flatBonusClassResourceScale?: "full" | "half_ceil" | null
 }
 
 export type HitPointsCharacteristicMode = "flat" | "per_level"
@@ -587,6 +596,13 @@ export interface RollModifierEntry {
   ignoreHalfCover?: boolean
   /** Archery (extended): three-quarters cover counts as half cover. */
   treatThreeQuartersCoverAsHalf?: boolean
+  /**
+   * When set, `bonus` is ignored and the current Class Cap / pool size for this
+   * resource_key is used (Masterwork Bonus, etc.).
+   */
+  bonusFromClassResourceKey?: string | null
+  /** How to scale bonusFromClassResourceKey (default full). */
+  bonusClassResourceScale?: "full" | "half_ceil" | null
 }
 
 export interface AttackRollModifiersCharacteristic extends CharacteristicModifierBase {
@@ -617,6 +633,30 @@ export interface UnarmedStrikeDamageCharacteristic extends CharacteristicModifie
   damageType?: string | null
   /** Ability modifier added to damage (default strength). */
   ability?: AbilityScoreKey | null
+}
+
+export type WeaponDamageDieOverrideScope =
+  | "all"
+  | "melee"
+  | "ranged"
+  | "unarmed"
+  | "weapons"
+  | "specific"
+
+/**
+ * Replace weapon (or unarmed) damage die sides — Deadly D4s, Monk-adjacent weapon ladders, etc.
+ * Does not add flat damage; rewrites NdX → NdY (same count).
+ */
+export interface WeaponDamageDieOverrideCharacteristic extends CharacteristicModifierBase {
+  type: "weapon_damage_die_override"
+  /** Fixed die sides when dieByLevel is empty (e.g. 4 for Deadly D4s). */
+  dieSides?: number | null
+  /** Level-scaled die sides (fixed = sides). */
+  dieSidesByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  scope?: WeaponDamageDieOverrideScope
+  /** When scope is "specific", match these weapon names (case-insensitive). */
+  weaponNames?: string[]
+  conditionLabel?: string
 }
 
 export interface SpecialAttackCharacteristic extends CharacteristicModifierBase {
@@ -1220,6 +1260,7 @@ export type CharacteristicModifier =
   | AttackRollModifiersCharacteristic
   | DamageRollModifiersCharacteristic
   | UnarmedStrikeDamageCharacteristic
+  | WeaponDamageDieOverrideCharacteristic
   | SpecialAttackCharacteristic
   | RestReplacementCharacteristic
   | MagicalSleepImmunityCharacteristic
@@ -1330,6 +1371,15 @@ export function createCharacteristicModifier(
       return { id, type, entries: [{ bonus: 2, target: "one_handed_melee" }] }
     case "unarmed_strike_damage":
       return { id, type, die: "1d6", dieByLevel: [], damageType: null, ability: null }
+    case "weapon_damage_die_override":
+      return {
+        id,
+        type,
+        dieSides: 4,
+        dieSidesByLevel: [],
+        scope: "weapons",
+        weaponNames: [],
+      }
     case "special_attack":
       return {
         id,
@@ -1788,6 +1838,17 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     }
   }
 
+  if (value.type === "weapon_damage_die_override") {
+    const raw = value as WeaponDamageDieOverrideCharacteristic
+    return {
+      ...raw,
+      dieSides: raw.dieSides ?? 4,
+      dieSidesByLevel: normalizeBonusByLevel(raw.dieSidesByLevel),
+      scope: raw.scope ?? "weapons",
+      weaponNames: raw.weaponNames ?? [],
+    }
+  }
+
   if (value.type === "special_attack") {
     const raw = value as SpecialAttackCharacteristic
     return {
@@ -2028,6 +2089,7 @@ export type AggregatedCharacteristics = {
   unarmedStrikeDieByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   unarmedStrikeDamageType: string | null
   unarmedStrikeAbility: AbilityScoreKey | null
+  weaponDamageDieOverrides: WeaponDamageDieOverrideCharacteristic[]
   resistances: string[]
   immunities: string[]
   conditionImmunities: string[]
@@ -2129,6 +2191,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   unarmedStrikeDieByLevel: [],
   unarmedStrikeDamageType: null,
   unarmedStrikeAbility: null,
+  weaponDamageDieOverrides: [],
   resistances: [],
   immunities: [],
   conditionImmunities: [],
@@ -2191,6 +2254,35 @@ function pickHigherUnarmedDie(
 ): UnarmedStrikeDie {
   if (!current) return next
   return UNARMED_DIE_RANK[next] > UNARMED_DIE_RANK[current] ? next : current
+}
+
+function resolveResourceScaledFlatBonus(
+  mod: {
+    flatBonus?: number
+    flatBonusFromClassResourceKey?: string | null
+    flatBonusClassResourceScale?: "full" | "half_ceil" | null
+  },
+  counts: Record<string, number> | undefined,
+): number {
+  const key = mod.flatBonusFromClassResourceKey?.trim()
+  if (key && counts) {
+    const raw = counts[key] ?? 0
+    if (mod.flatBonusClassResourceScale === "half_ceil") return Math.ceil(raw / 2)
+    return raw
+  }
+  return mod.flatBonus ?? 0
+}
+
+function resolveRollEntryBonus(
+  entry: RollModifierEntry,
+  counts: Record<string, number> | undefined,
+): RollModifierEntry {
+  const key = entry.bonusFromClassResourceKey?.trim()
+  if (!key || !counts) return entry
+  const raw = counts[key] ?? 0
+  const bonus =
+    entry.bonusClassResourceScale === "half_ceil" ? Math.ceil(raw / 2) : raw
+  return { ...entry, bonus }
 }
 
 function isModifierActive(
@@ -2275,6 +2367,7 @@ export function aggregateCharacteristics(
     currentHp: options?.currentHp,
   }
   const characterLevel = options?.characterLevel ?? 1
+  const classResourceCounts = options?.classResourceCounts
 
   for (const mod of mods) {
     if (!isModifierActive(mod, limitationCtx)) continue
@@ -2338,10 +2431,11 @@ export function aggregateCharacteristics(
         break
       case "ac":
         if (mod.mode === "flat_bonus") {
+          const flat = resolveResourceScaledFlatBonus(mod, classResourceCounts)
           if (mod.requiresArmor) {
-            result.acFlatBonusWhileArmored += mod.flatBonus ?? 0
+            result.acFlatBonusWhileArmored += flat
           } else {
-            result.acFlatBonus += mod.flatBonus ?? 0
+            result.acFlatBonus += flat
           }
         } else if (mod.mode === "set_fixed") {
           result.acFormulaOptions.push({
@@ -2418,7 +2512,9 @@ export function aggregateCharacteristics(
         result.weaponReachModifiers.push(mod)
         break
       case "attack_roll_modifiers":
-        result.attackRollModifiers.push(...mod.entries)
+        result.attackRollModifiers.push(
+          ...mod.entries.map((entry) => resolveRollEntryBonus(entry, classResourceCounts)),
+        )
         if (mod.criticalHitMinimum != null) {
           result.criticalHitMinimum =
             result.criticalHitMinimum == null
@@ -2433,7 +2529,9 @@ export function aggregateCharacteristics(
         }
         break
       case "damage_roll_modifiers":
-        result.damageRollModifiers.push(...mod.entries)
+        result.damageRollModifiers.push(
+          ...mod.entries.map((entry) => resolveRollEntryBonus(entry, classResourceCounts)),
+        )
         break
       case "unarmed_strike_damage":
         if (mod.dieByLevel?.length) {
@@ -2451,6 +2549,9 @@ export function aggregateCharacteristics(
         if (mod.ability) {
           result.unarmedStrikeAbility = mod.ability
         }
+        break
+      case "weapon_damage_die_override":
+        result.weaponDamageDieOverrides.push(mod)
         break
       case "special_attack":
         result.specialAttacks.push(mod)
@@ -2934,4 +3035,41 @@ export function resolveUnarmedStrikeDieAtLevel(
     }
   }
   return fallbackDie ?? null
+}
+
+function weaponMatchesDieOverrideScope(
+  weapon: { name?: string | null; subcategory?: string | null },
+  override: WeaponDamageDieOverrideCharacteristic,
+): boolean {
+  const scope = override.scope ?? "weapons"
+  if (scope === "all" || scope === "weapons") return true
+  if (scope === "unarmed") return false
+  const subcategory = (weapon.subcategory ?? "").toLowerCase()
+  if (scope === "melee") return subcategory.includes("melee") || !subcategory.includes("ranged")
+  if (scope === "ranged") return subcategory.includes("ranged")
+  if (scope === "specific") {
+    const names = (override.weaponNames ?? []).map((name) => name.trim().toLowerCase()).filter(Boolean)
+    if (!names.length) return false
+    const weaponName = (weapon.name ?? "").trim().toLowerCase()
+    return names.some((name) => weaponName === name || weaponName.includes(name))
+  }
+  return true
+}
+
+/** Resolve die sides for a weapon from active weapon_damage_die_override characteristics. */
+export function resolveWeaponDamageDieSidesOverride(
+  aggregated: AggregatedCharacteristics,
+  weapon: { name?: string | null; subcategory?: string | null },
+  characterLevel = 1,
+): number | null {
+  let sides: number | null = null
+  for (const override of aggregated.weaponDamageDieOverrides) {
+    if (!weaponMatchesDieOverrideScope(weapon, override)) continue
+    const fromLevel = override.dieSidesByLevel?.length
+      ? resolveFixedValueAtLevel(override.dieSidesByLevel, characterLevel, override.dieSides ?? null)
+      : override.dieSides ?? null
+    if (fromLevel == null) continue
+    sides = sides == null ? fromLevel : Math.min(sides, fromLevel)
+  }
+  return sides
 }

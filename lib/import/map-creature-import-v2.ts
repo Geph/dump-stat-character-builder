@@ -121,7 +121,12 @@ function mapAbilityScores(
   return result
 }
 
-function splitList(value: string | null | undefined): string[] | undefined {
+function splitList(value: string | string[] | null | undefined): string[] | undefined {
+  // LLM extracts sometimes emit string[]; coerce so immunities are not silently dropped.
+  if (Array.isArray(value)) {
+    const parts = value.map((s) => String(s).trim()).filter(Boolean)
+    return parts.length ? parts : undefined
+  }
   if (!value?.trim()) return undefined
   return value
     .split(/[,;]/)

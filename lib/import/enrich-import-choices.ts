@@ -224,6 +224,64 @@ function buildUpgradesResourcePicker(feature: Feature): LinkedModifierInstance {
   ])
 }
 
+function enrichDanceStylesFeature(feature: Feature): Feature {
+  if (!/^dance styles?$/i.test(feature.name.trim())) return feature
+  if (feature.choices?.optionsSource === "class_upgrades") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        ...feature.choices,
+        category: feature.choices.category || "Dance Style",
+        resourceKey: feature.choices.resourceKey || "dance_styles_known",
+        optionsSource: "class_upgrades",
+        choiceCountByLevel:
+          feature.choices.choiceCountByLevel ??
+          [
+            { level: 2, count: 1 },
+            { level: 13, count: 2 },
+          ],
+      },
+    }
+  }
+  if ((feature.linkedModifiers ?? []).some((mod) =>
+    mod.characteristics?.some((char) => {
+      const legacy = char as { type?: string; resourceKey?: string | null }
+      return legacy.type === "feature_option_picker" && legacy.resourceKey === "dance_styles_known"
+    }),
+  )) {
+    return feature
+  }
+  return syncModifierRefs({
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: "Dance Style",
+      count: feature.choices?.count ?? 1,
+      options: [],
+      resourceKey: "dance_styles_known",
+      optionsSource: "class_upgrades",
+      choiceCountByLevel: feature.choices?.choiceCountByLevel ?? [
+        { level: 2, count: 1 },
+        { level: 13, count: 2 },
+      ],
+    },
+    linkedModifiers: [
+      ...(feature.linkedModifiers ?? []),
+      charInstance(createModifierInstanceId(), FEATURE_OPTION_PICKER_CATALOG_ID, [
+        legacyFeatureOptionPickerCharacteristic({
+          id: modId("dance_styles_known"),
+          category: "Dance Style",
+          choiceCount: feature.choices?.count ?? 1,
+          resourceKey: "dance_styles_known",
+          optionsSource: "class_upgrades",
+          label: "Dance Styles (count scales; Freestyle at 13 = 2)",
+        }),
+      ]),
+    ],
+  })
+}
+
 function enrichUpgradesFeature(feature: Feature): Feature {
   if (!isUpgradeSelectionFeature(feature)) return feature
   if ((feature.linkedModifiers ?? []).some((mod) =>
@@ -462,6 +520,7 @@ function enrichFeatureChoices(
 ): Feature {
   let next = fillChoiceOptionPrerequisites(feature)
   next = enrichKnacksFeature(next)
+  next = enrichDanceStylesFeature(next)
   next = enrichUpgradesFeature(next)
   next = enrichBombFormulasFeature(next)
   next = enrichDiscoveriesFeature(next)

@@ -318,6 +318,7 @@ export function resolveFeatureChoiceOptions(
       classNames: params.classNames,
       classLevel,
       selectedUpgradeNames: selected,
+      subclassName: params.subclassName,
     })
   }
   if (choices.optionsSource === "class_bomb_formulas") {

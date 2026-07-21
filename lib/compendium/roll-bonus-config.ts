@@ -8,6 +8,7 @@ export type RollBonusMode =
   | "die"
   | "spell_attack"
   | "character_level"
+  | "class_resource_count"
 
 export type RollBonusResultFloorMode = "none" | "fixed" | "ability"
 
@@ -45,6 +46,7 @@ export const ROLL_BONUS_MODE_LABELS: Record<RollBonusMode, string> = {
   die: "Die roll",
   spell_attack: "Spell attack modifier",
   character_level: "Character level",
+  class_resource_count: "Class resource count (Class Cap)",
 }
 
 export function defaultRollBonusConfig(mode: RollBonusMode = "fixed"): RollBonusConfig {
@@ -92,6 +94,10 @@ export function formatRollBonusSummary(
       return "Die bonus"
     case "character_level":
       return "Character level"
+    case "class_resource_count":
+      return config.classResourceKey
+        ? `${config.classResourceKey} (Class Cap)`
+        : "Class resource count"
     case "spell_attack":
       return "Spell attack modifier"
     default:

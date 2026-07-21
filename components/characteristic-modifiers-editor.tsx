@@ -2134,6 +2134,48 @@ function ModifierFields({
         <UnarmedStrikeDamageEditor mod={mod} onChange={onChange} />
       )
 
+    case "weapon_damage_die_override":
+      return (
+        <div className="space-y-2">
+          <label className="block text-sm text-muted-foreground">
+            Die sides
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={mod.dieSides ?? 4}
+              onChange={(e) =>
+                onChange({ ...mod, dieSides: parseInt(e.target.value, 10) || 4 })
+              }
+              className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="block text-sm text-muted-foreground">
+            Scope
+            <select
+              value={mod.scope ?? "weapons"}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  scope: e.target.value as typeof mod.scope,
+                })
+              }
+              className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+            >
+              <option value="weapons">All weapons</option>
+              <option value="all">All</option>
+              <option value="melee">Melee</option>
+              <option value="ranged">Ranged</option>
+              <option value="unarmed">Unarmed only</option>
+              <option value="specific">Specific weapon names</option>
+            </select>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Rewrites NdX damage dice to Nd(sides). Used by Deadly D4s and similar features.
+          </p>
+        </div>
+      )
+
     case "special_attack":
       return <SpecialAttackFieldsEditor mod={mod} onChange={onChange} />
 

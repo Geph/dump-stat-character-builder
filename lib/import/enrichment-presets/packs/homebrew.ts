@@ -485,65 +485,8 @@ export const WARMAGE_PRESETS: EnrichmentPreset[] = [
   },
 ]
 
-export const DANCER_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "dancer.class.dance",
-    pack: "dancer",
-    target: "class_feature",
-    match: { className: /dancer/i, name: /^dance$/i },
-    operations: [
-      {
-        op: "setLimitedUses",
-        uses: {
-          type: "class_resource",
-          classResourceKey: "dances",
-          classResourceAmount: 1,
-        },
-      },
-      {
-        op: "appendDescription",
-        text: "While Dance is active, enable the Dancing sheet toggle so Dance Style riders gated with while_dancing apply.",
-      },
-    ],
-  },
-  {
-    id: "dancer.class.graceful_dodge",
-    pack: "dancer",
-    target: "class_feature",
-    match: { className: /dancer/i, name: /^graceful dodge$/i },
-    skipIfCharacteristicTypes: ["resource_ability_menu"],
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: {
-          kind: "char_instance",
-          idKey: "graceful_dodge",
-          catalogRefId: "cat_char_resource_ability_menu",
-          characteristics: [
-            {
-              id: "mod_graceful_dodge",
-              type: "resource_ability_menu",
-              resourceKey: "dance_die",
-              options: [
-                {
-                  name: "Graceful Dodge",
-                  description: "Add your Dance Die to your AC against one attack.",
-                  resourceCost: 0,
-                  bonusConfig: {
-                    mode: "die",
-                    dieScaling: "class_resource",
-                    classResourceKey: "dance_die",
-                  },
-                },
-              ],
-              label: "Graceful Dodge — Dance Die to AC",
-            },
-          ],
-        },
-      },
-    ],
-  },
-]
+/** @deprecated Import from packs/dancer — re-exported for registry compatibility. */
+export { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
 
 export const VAGABOND_PRESETS: EnrichmentPreset[] = [
   {
@@ -558,21 +501,6 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "While you are Bloodied, you have Advantage on attack rolls. Dump Stat gates this with the built-in Bloodied sheet state (below_half_hp).",
-      },
-    ],
-  },
-]
-
-export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "gunslinger.class.dire_gambit",
-    pack: "gunslinger",
-    target: "class_feature",
-    match: { className: /gunslinger/i, name: /^dire gambit$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Dump Stat sets Risk Dice rechargeOnInitiative: 1 when this feature is present (regain one die on Initiative). Critical Hit restores remain play-time.",
       },
     ],
   },
