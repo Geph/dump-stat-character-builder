@@ -50,6 +50,12 @@ export type NamedModifierPreset =
       catalogRefId: string
       characteristics: unknown[]
     }
+  | {
+      kind: "fx_instance"
+      idKey: string
+      catalogRefId: string
+      effects: unknown[]
+    }
 
 export type EnrichmentOperation =
   | { op: "appendDescription"; text: string }

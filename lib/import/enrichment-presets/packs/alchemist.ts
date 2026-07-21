@@ -1,5 +1,12 @@
 import type { ContentSeed, EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
 import { REAGENTS_KEY } from "@/lib/import/enrichment-presets/builders"
+import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
+import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
+import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
+import type { FeatureChoice } from "@/lib/types"
+
+const SPELL_DYNAMOS_KEY = "spell_dynamos"
 
 function grantNamedAbility(
   abilityName: string,
@@ -23,6 +30,34 @@ function grantNamedAbility(
     },
     replaceCharacteristicTypes: ["grant_custom_ability", ...replaceExtra],
   }
+}
+
+function mutatedBloodOptions(): FeatureChoice["options"] {
+  return (["strength", "dexterity", "constitution"] as const).map((ability) => {
+    const label = ability.charAt(0).toUpperCase() + ability.slice(1)
+    return {
+      name: label,
+      description: `+2 ${label} (max 22; 25 while a Mutagen applies to this score).`,
+      linkedModifiers: [
+        charInstance(createModifierInstanceId(), characteristicCatalogRefId("ability_scores"), [
+          {
+            id: modId(`mutated_blood_${ability}`),
+            type: "ability_scores",
+            mode: "fixed",
+            bonuses: { [ability]: 2 },
+            label: `Mutated Blood: +2 ${label}`,
+          },
+        ]),
+      ],
+    }
+  })
+}
+
+function elementalOozeOptions(): FeatureChoice["options"] {
+  return ["Acid", "Cold", "Fire", "Lightning", "Poison", "Thunder"].map((damageType) => ({
+    name: damageType,
+    description: `Bottled Ooze: Immunity to ${damageType}; heal for half when subjected to that damage.`,
+  }))
 }
 
 export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
@@ -482,6 +517,358 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
           ],
         },
         replaceCharacteristicTypes: ["condition_immunity", "power_rider"],
+      },
+    ],
+  },
+  // --- Tier 1: Apothecary / Venomsmith / Xenoalchemist / Mad Bomber stubs ---
+  {
+    id: "alchemist.subclass.self_medication",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^self[- ]?medication$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "self_medication",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("self_medication_saves"),
+              kind: "check_roll_modifier",
+              checkRollMode: "advantage",
+              checkCategory: "save",
+              label: "Self-Medication: Advantage on saves (after healing potion)",
+              limitations: [requiresActiveToggleLimitation("self_medication_active")],
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Sheet toggle: enable Self-Medication after you drink a healing potion (Advantage on saves until the end of your next turn).",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.concentrated_healing",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^concentrated healing$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "concentrated_healing",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_concentrated_healing",
+              type: "power_rider",
+              parentPowerNames: ["Potion Brewing", "Potions", "Healing Potion", "Potion of Healing"],
+              alertSummary:
+                "Concentrated Healing: replace up to half the healing dice with their maximum.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["power_rider"],
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.alchemical_resurrection",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^alchemical resurrection$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "craftable_items_static",
+          idKey: "alchemical_resurrection",
+          label: "Alchemical Resurrection recipe",
+          category: "Potion",
+          items: [
+            {
+              itemName: "Potion of Resurrection",
+              resourceCost: 0,
+              unlocksAtClassLevel: 1,
+              category: "Potion",
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["craftable_items"],
+      },
+      {
+        op: "appendDescription",
+        text: "Magic action: mix diamond dust worth 1,000 GP+ into a Potion of Superior or Supreme Healing to create a Potion of Resurrection (does not become inert after 24 hours).",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.alchemical_assassin",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^alchemical assassin$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "alchemical_assassin",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("alchemical_assassin_conceal"),
+              kind: "check_roll_modifier",
+              checkRollMode: "advantage",
+              checkCategory: "skill",
+              checkSkills: ["Sleight of Hand", "Stealth"],
+              label: "Alchemical Assassin: Advantage to conceal/use the poison ring",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Bonus Action: deal 1 Piercing damage to a creature within 5 ft, subjecting it to contact and injury poisons on the ring.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.toxic_recompense",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^toxic recompense$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "toxic_recompense",
+          catalogRefId: "cat_char_special_attack",
+          characteristics: [
+            {
+              id: "char_toxic_recompense",
+              type: "special_attack",
+              attackName: "Toxic Recompense",
+              attackProfile: "force_save",
+              attackVariant: "explode",
+              targetMode: "single",
+              rangeFeet: 5,
+              damageTypes: ["Poison"],
+              damageDiceCount: 1,
+              damageDieType: "d10",
+              saveAbility: "CON",
+              saveDCBase: 8,
+              label:
+                "Reaction (melee hit): CON save vs Alchemist DC or Poisoned 1 min; 1d10 Poison at start of turns (repeat save ends)",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["special_attack"],
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.beguiling_perfume",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^beguiling perfume$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "appendDescription",
+        text: "Reaction: when an enemy within 5 ft attacks you, WIS save vs Alchemist DC or choose a new target / lose the attack. Immune 1 hour after taking damage from you.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.surgical_strike",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^surgical strike$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          useShareKey: "surgical_strike",
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Bonus Action Study: learn creature type; DC 15 INT check (Examine Specimen table). On success learn AC, Immunities, Resistances, or Bloodied. Per creature kind until rest — tracker is 1/rest as a reminder.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.overloaded_charge",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^overloaded charge$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "overloaded_charge",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_overloaded_charge",
+              type: "power_rider",
+              parentPowerNames: ["Bomb", "Bombs", "Prime Bomb"],
+              alertSummary:
+                "Overloaded Charge: spend PB Reagents to empower → gain +2 Reagents you may spend immediately (can exceed max).",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["power_rider"],
+      },
+    ],
+  },
+  // --- Tier 2: Mutagenist / Dynamo / Mad Bomber / Ooze Rancher ---
+  {
+    id: "alchemist.subclass.mutated_blood",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^mutated blood$/i },
+    operations: [
+      {
+        op: "setChoices",
+        isChoice: true,
+        choices: {
+          category: "Mutated Blood",
+          count: 1,
+          options: mutatedBloodOptions(),
+          swappableOnRest: true,
+          swapRestType: "long",
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Chosen score max increases to 22 (25 while a Mutagen applies to that score). Track the raised maximum manually — sheet applies the +2 only.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.counter_discharge",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^counter[- ]?discharge$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: SPELL_DYNAMOS_KEY,
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "counter_discharge_saves",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("counter_discharge_saves"),
+              kind: "check_roll_modifier",
+              checkRollMode: "advantage",
+              checkCategory: "save",
+              label: "Counter-Discharge: Advantage on saves vs this spell",
+              limitations: [requiresActiveToggleLimitation("counter_discharge_active")],
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "counter_discharge_resist",
+          catalogRefId: "cat_char_damage_resistance",
+          characteristics: [
+            {
+              id: "char_counter_discharge_resist",
+              type: "damage_resistance",
+              damageTypes: ["Spells"],
+              label: "Counter-Discharge: Resistance to that spell's damage",
+              requiresSheetToggle: "counter_discharge_active",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_resistance"],
+      },
+      {
+        op: "appendDescription",
+        text: "Reaction (spell affecting you within 60 ft): spend 1 Spell Dynamo. Flip Counter-Discharge while resolving the spell for save Advantage + spell-damage Resistance.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.elemental_oozes",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^elemental oozes$/i },
+    operations: [
+      {
+        op: "setChoices",
+        isChoice: true,
+        choices: {
+          category: "Elemental Ooze damage type",
+          count: 1,
+          options: elementalOozeOptions(),
+          swappableOnRest: true,
+          swapRestType: "long",
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "When you create a Bottled Ooze, pick its Elemental type (Immunity + heal half). Re-pick on a Long Rest as a reminder of your preferred default — apply at create time.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.timed_demolition",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^timed demolition$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "timed_demolition",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_timed_demolition",
+              type: "power_rider",
+              parentPowerNames: ["Bomb", "Bombs"],
+              alertSummary:
+                "Timed Demolition: when priming, set delay (rounds up to 10 min); Explode at end of your turn after duration. Overlapping blasts: one Bomb of your choice.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["power_rider"],
       },
     ],
   },

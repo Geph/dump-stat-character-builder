@@ -33,6 +33,16 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "while_concentrating", label: "Concentrating", sourceType: "class_feature" },
   { id: "while_flying", label: "Flying", sourceType: "class_feature" },
   { id: "physical_surge_active", label: "Physical Surge", sourceType: "class_feature" },
+  {
+    id: "self_medication_active",
+    label: "Self-Medication (after healing potion)",
+    sourceType: "class_feature",
+  },
+  {
+    id: "counter_discharge_active",
+    label: "Counter-Discharge (vs this spell)",
+    sourceType: "class_feature",
+  },
 ]
 
 export const EDITOR_SHEET_TOGGLE_OPTIONS: SheetToggleDefinition[] = [
