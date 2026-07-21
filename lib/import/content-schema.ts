@@ -194,6 +194,22 @@ export const ImportMechanicSchema = z.object({
   maximizeWeaponDamageAtLevel: z.number().optional(),
   spendResourceKey: z.string().optional(),
   spendResourceAmount: z.number().optional(),
+  /** failed_roll_trigger — fail (Guided Strike / Peerless Skill) or success (Cutting Words). */
+  failedTriggerOn: z.enum(["fail", "success"]).optional(),
+  rollKind: z.enum(["ability", "skill", "attack", "save"]).optional(),
+  targetScope: z
+    .enum([
+      "self",
+      "target_creature",
+      "allied_creature",
+      "targets_in_area",
+      "allies_in_area",
+      "enemies_in_area",
+    ])
+    .optional(),
+  useReaction: z.boolean().optional(),
+  /** Flat bonus applied by a failed_roll_trigger nested check_roll_modifier (e.g. Guided Strike +10). */
+  bonusFixed: z.number().optional(),
   automaticBonusMode: z
     .enum(["character_level", "half_character_level_round_down", "none"])
     .optional(),
@@ -234,6 +250,8 @@ export const ImportMechanicSchema = z.object({
   thpTarget: z.enum(["self", "chosen_creature_in_range", "allies_in_range"]).optional(),
   rangeFeet: z.number().optional(),
   expiresOnTriggerEnd: z.boolean().optional(),
+  /** grant_custom_ability — names of custom abilities / formulas / discoveries to unlock. */
+  abilityNames: z.array(z.string()).optional(),
   /** speed hover */
   canHover: z.boolean().optional(),
   /** turn_start_trigger */
@@ -244,6 +262,19 @@ export const ImportMechanicSchema = z.object({
   weaponPropertyFilter: z.array(z.string()).optional(),
   /** extra_weapon_mastery */
   masteryProperties: z.array(z.string()).optional(),
+  /** special_attack */
+  attackName: z.string().optional(),
+  attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).optional(),
+  targetMode: z.enum(["single", "multi", "area"]).optional(),
+  areaShape: z
+    .enum(["cone", "line", "sphere", "cylinder", "cube", "cone_or_line"])
+    .optional(),
+  areaLengthFeet: z.number().optional(),
+  areaWidthFeet: z.number().optional(),
+  /** Damage dice for special_attack (e.g. "2d6", "6d6"). Prefer over inventing bonusDice here. */
+  damageDice: z.string().optional(),
+  saveAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
+  saveHalfDamage: z.boolean().optional(),
 })
 
 export type ImportMechanic = z.infer<typeof ImportMechanicSchema>

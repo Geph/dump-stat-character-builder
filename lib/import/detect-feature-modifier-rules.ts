@@ -1559,6 +1559,14 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: (match, ctx, text) => {
       if (/\b(?:every|all)\s+damage\s+types?\s+except\b/i.test(match[0])) return null
       if (/\bexcept\b/i.test(match[1])) return null
+      // Target-relative wording (Black Powder Bomb): "If a target has Resistance… loses that Resistance"
+      if (
+        /\b(?:target|creature|it)\s+has\s+resistance\b/i.test(text) ||
+        /\bloses?\s+that\s+resistance\b/i.test(text) ||
+        /\binstead\s+has\s+resistance\b/i.test(text)
+      ) {
+        return null
+      }
       const types = parseDamageTypes(match[1])
       if (!types.length) return null
       const whileRaging = textMentionsWhileRaging(text)
@@ -1591,6 +1599,12 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         !/\bimmunity\b/i.test(text) &&
         !/\bcan'?t\s+be\b/i.test(text)
       ) {
+        return null
+      }
+      // "ignores Immunity to the Charmed condition" / "have Immunity to X … automatically succeed"
+      // describes enemy/target immunities, not a self grant.
+      if (/\bignores?\s+immunity\b/i.test(text)) return null
+      if (/\b(?:have|has|with)\s+immunity\s+to\b[\s\S]{0,80}\bautomatically\s+succeed/i.test(text)) {
         return null
       }
       const conditions = parseConditions(match[1])

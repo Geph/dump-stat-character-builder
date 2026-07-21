@@ -608,20 +608,7 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
   },
 ]
 
-export const ALCHEMIST_PHILOSOPHER_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "alchemist.class.philosophers_stone",
-    pack: "alchemist",
-    target: "class_feature",
-    match: { className: /alchemist/i, name: /^philosopher[’']?s stone$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Regenerating Reagents (fill Reagents up to 6 on Initiative when at 5 or fewer) is a fill-to-cap rule — track narratively; Dump Stat's numeric initiative restore adds uses rather than filling to 6.",
-      },
-    ],
-  },
-]
+export const ALCHEMIST_PHILOSOPHER_PRESETS: EnrichmentPreset[] = []
 
 export const MHP_WARDEN_PRESETS: EnrichmentPreset[] = [
   {

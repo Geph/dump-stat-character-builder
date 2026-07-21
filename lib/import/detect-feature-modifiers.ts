@@ -6,7 +6,7 @@ import {
   type DetectionConfidence,
   type FeatureModifierRule,
 } from "@/lib/import/detect-feature-modifier-rules"
-import type { Feature } from "@/lib/types"
+import type { Feature, RechargeRule, UsesConfig } from "@/lib/types"
 
 export type { DetectionConfidence, FeatureModifierRule }
 
@@ -159,6 +159,83 @@ export function isModifierRedundantAgainst(
   return candidateValues.every((value) => covered.has(value))
 }
 
+function usesCharacteristic(
+  instance: LinkedModifierInstance,
+): Extract<CharacteristicModifier, { type: "uses" }> | null {
+  const char = instance.characteristics?.find((entry) => entry.type === "uses")
+  return char?.type === "uses" ? char : null
+}
+
+function rechargesSignature(recharges: RechargeRule[] | undefined): string {
+  return JSON.stringify(recharges ?? [])
+}
+
+function usesIdentityMatches(a: UsesConfig, b: UsesConfig): boolean {
+  return (
+    a.type === b.type &&
+    (a.fixedAmount ?? null) === (b.fixedAmount ?? null) &&
+    (a.abilityModifier ?? null) === (b.abilityModifier ?? null) &&
+    (a.classResourceKey ?? null) === (b.classResourceKey ?? null)
+  )
+}
+
+/**
+ * When AI/detector `uses` matches a preset uses fingerprint but brings different
+ * `recharges`, patch the existing instance (and feature.limitedUses) instead of
+ * dropping the candidate as a duplicate.
+ */
+export function patchExistingUsesRechargesFromCandidate(
+  feature: Feature,
+  candidate: LinkedModifierInstance,
+): Feature | null {
+  const candidateUses = usesCharacteristic(candidate)
+  const candidateRecharges = candidateUses?.uses?.recharges
+  if (!candidateUses?.uses || !candidateRecharges?.length) return null
+
+  const fingerprint = modifierInstanceFingerprint(candidate)
+  const existing = feature.linkedModifiers ?? []
+  let didPatch = false
+  const linkedModifiers = existing.map((entry) => {
+    if (modifierInstanceFingerprint(entry) !== fingerprint) return entry
+    const existingUses = usesCharacteristic(entry)
+    if (!existingUses?.uses) return entry
+    if (rechargesSignature(existingUses.uses.recharges) === rechargesSignature(candidateRecharges)) {
+      return entry
+    }
+    didPatch = true
+    return {
+      ...entry,
+      characteristics: (entry.characteristics ?? []).map((char) => {
+        if (char.type !== "uses" || !char.uses) return char
+        return {
+          ...char,
+          uses: {
+            ...char.uses,
+            recharges: candidateRecharges,
+            recharge: undefined,
+          },
+        }
+      }),
+    }
+  })
+  if (!didPatch) return null
+
+  let limitedUses = feature.limitedUses ?? null
+  if (limitedUses && usesIdentityMatches(limitedUses, candidateUses.uses)) {
+    limitedUses = {
+      ...limitedUses,
+      recharges: candidateRecharges,
+      recharge: undefined,
+    }
+  }
+
+  return syncModifierRefs({
+    ...feature,
+    linkedModifiers,
+    limitedUses,
+  })
+}
+
 function runRulesOnSegment(
   segment: string,
   ctx: DetectFeatureContext,
@@ -278,16 +355,23 @@ export function mergeDetectionsIntoFeature(
 ): Feature {
   if (!detections.length) return feature
 
-  const existing = feature.linkedModifiers ?? []
-  const toAdd = detections
-    .map((entry) => entry.instance)
-    .filter((instance) => !isModifierRedundantAgainst(instance, existing))
+  let current = feature
+  const toAdd: LinkedModifierInstance[] = []
+  for (const detection of detections) {
+    const patched = patchExistingUsesRechargesFromCandidate(current, detection.instance)
+    if (patched) {
+      current = patched
+      continue
+    }
+    if (isModifierRedundantAgainst(detection.instance, current.linkedModifiers ?? [])) continue
+    toAdd.push(detection.instance)
+  }
 
-  if (!toAdd.length) return feature
+  if (!toAdd.length) return current
 
   return syncModifierRefs({
-    ...feature,
-    linkedModifiers: [...existing, ...toAdd],
+    ...current,
+    linkedModifiers: [...(current.linkedModifiers ?? []), ...toAdd],
   })
 }
 
@@ -305,6 +389,24 @@ export function mergeFeatureModifierDetections(
   const applyBatch = (batch: DetectedModifier[], source: ImportModifierMeta["source"]) => {
     for (const detection of batch) {
       const fingerprint = modifierInstanceFingerprint(detection.instance)
+      const patched = patchExistingUsesRechargesFromCandidate(current, detection.instance)
+      if (patched) {
+        current = patched
+        seenFingerprints.add(fingerprint)
+        const usesInstance = (current.linkedModifiers ?? []).find(
+          (entry) => modifierInstanceFingerprint(entry) === fingerprint,
+        )
+        if (usesInstance) {
+          meta.push({
+            instanceId: usesInstance.instanceId,
+            ruleId: detection.ruleId,
+            confidence: detection.confidence,
+            matchedPhrase: detection.matchedPhrase,
+            source,
+          })
+        }
+        continue
+      }
       if (seenFingerprints.has(fingerprint)) continue
       if (isModifierRedundantAgainst(detection.instance, current.linkedModifiers ?? [])) continue
       const beforeCount = current.linkedModifiers?.length ?? 0

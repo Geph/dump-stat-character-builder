@@ -234,6 +234,19 @@ export function ImportModifierReviewPanel({
 
       {rows.length > 0 ? (
         <div className="space-y-3">
+          {otherGroups.length > 0 ? (
+            <ul className="space-y-3">
+              {otherGroups.map(([sourceLabel, items]) => (
+                <SourceGroupCard
+                  key={sourceLabel}
+                  sourceLabel={sourceLabel}
+                  items={items}
+                  onRemoveModifier={onRemoveModifier}
+                />
+              ))}
+            </ul>
+          ) : null}
+
           {pageOneAtATime && activePagedGroup ? (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -306,19 +319,6 @@ export function ImportModifierReviewPanel({
                 items={pagedGroups[0]![1]}
                 onRemoveModifier={onRemoveModifier}
               />
-            </ul>
-          ) : null}
-
-          {otherGroups.length > 0 ? (
-            <ul className="space-y-3">
-              {otherGroups.map(([sourceLabel, items]) => (
-                <SourceGroupCard
-                  key={sourceLabel}
-                  sourceLabel={sourceLabel}
-                  items={items}
-                  onRemoveModifier={onRemoveModifier}
-                />
-              ))}
             </ul>
           ) : null}
         </div>

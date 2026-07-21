@@ -58,6 +58,17 @@ function psionicAugmentCount(feature: FeatureCarrier): number {
 
 function featureHasLinkedModifiers(feature: FeatureCarrier): boolean {
   if ((feature.linkedModifiers?.length ?? 0) > 0) return true
+  if (feature.limitedUses) return true
+  if (
+    feature.activation &&
+    (feature.activation.action ||
+      feature.activation.bonusAction ||
+      feature.activation.reaction ||
+      feature.activation.onInitiative ||
+      feature.activation.onDropToZeroHp)
+  ) {
+    return true
+  }
   if (feature.isChoice && (feature.choices?.options?.length ?? 0) > 0) return true
   if (feature.isChoice && feature.choices?.optionsSource) return true
   if (feature.companion_stat_block) return true

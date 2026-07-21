@@ -30,6 +30,13 @@ export function isStructuralOrNarrativeFeature(
   // Capstone shells that are prose / transformation rather than a roll modifier.
   if (/^ascension$/i.test(name)) return true
 
+  // Alchemist (and similar) resource / unlock shells — the pool or list lives elsewhere.
+  if (/^reagents$/i.test(name)) return true
+  if (/^potions$/i.test(name)) return true
+  if (/^experimentalist$/i.test(name)) return true
+  // Object/structure damage riders with no sheet modifier yet.
+  if (/^blasting specialty$/i.test(name)) return true
+
   return false
 }
 

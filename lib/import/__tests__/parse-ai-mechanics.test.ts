@@ -9,6 +9,97 @@ import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-co
 import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("aiMechanicsToDetections", () => {
+  it("builds failed_roll_trigger with flat bonus from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "failed_roll_trigger",
+          rollKind: "attack",
+          failedTriggerOn: "fail",
+          targetScope: "allied_creature",
+          rangeFeet: 30,
+          useReaction: true,
+          spendResourceKey: "channel_divinity",
+          bonusFixed: 10,
+          sourcePhrase: "give that roll a +10 bonus",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Guided Strike" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.failed_roll_trigger")
+    const char = detections[0]?.instance.characteristics?.[0] as
+      | {
+          type?: string
+          rollKind?: string
+          effect?: { activation?: { effects?: { bonusConfig?: { fixed?: number } }[] } }
+        }
+      | undefined
+    expect(char?.type).toBe("failed_roll_trigger")
+    expect(char?.rollKind).toBe("attack")
+    expect(char?.effect?.activation?.effects?.[0]?.bonusConfig?.fixed).toBe(10)
+  })
+
+  it("builds special_attack from AI mechanics (Bile Blast shape)", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "special_attack",
+          attackName: "Bile Blast",
+          attackProfile: "force_save",
+          targetMode: "area",
+          areaShape: "cone",
+          areaLengthFeet: 15,
+          damageDice: "2d6",
+          damageType: "Acid",
+          saveAbility: "Dexterity",
+          saveHalfDamage: true,
+          sourcePhrase: "15-foot cone, Dexterity saving throw, 2d6 acid",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "ability", featureName: "Bile Blast" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.special_attack")
+    const char = detections[0]?.instance.characteristics?.[0] as
+      | {
+          type?: string
+          attackProfile?: string
+          damageDiceCount?: number
+          damageDieType?: string
+          saveAbility?: string
+        }
+      | undefined
+    expect(char?.type).toBe("special_attack")
+    expect(char?.attackProfile).toBe("force_save")
+    expect(char?.damageDiceCount).toBe(2)
+    expect(char?.damageDieType).toBe("d6")
+    expect(char?.saveAbility).toBe("Dexterity")
+    expect(detections[0]?.instance.activation?.action).toBe(true)
+  })
+
+  it("builds grant_custom_ability from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "grant_custom_ability",
+          abilityNames: ["Alchemy of Poison"],
+          sourcePhrase: "You gain the Alchemy of Poison discovery",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "subclass_feature", featureName: "Poisoner" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.grant_custom_ability")
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "grant_custom_ability",
+      abilityNames: ["Alchemy of Poison"],
+    })
+  })
+
   it("builds skill proficiency from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [{ kind: "skills", skills: ["Stealth"], sourcePhrase: "You gain proficiency in Stealth." }],
