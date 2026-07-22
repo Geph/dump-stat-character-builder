@@ -539,30 +539,49 @@ function enrichFeatureChoices(
   }
 
   if (/^grand hex$/i.test(feature.name.trim())) {
-    const grandHexOptions = ((content as ImportContentWithAbilities).abilities ?? [])
-      .filter(
-        (ability: { source_name?: string | null; level_requirement?: number | null; name: string }) =>
-          /witch/i.test(ability.source_name ?? "") &&
-          (ability.level_requirement ?? 0) >= 11 &&
-          !/creature form/i.test(ability.name),
-      )
-      .map((ability: { name: string; description: string }) => ({ name: ability.name, description: ability.description }))
-    if (grandHexOptions.length) {
-      next = syncModifierRefs({
-        ...next,
-        linkedModifiers: [
-          ...(next.linkedModifiers ?? []),
-          buildGrandHexPicker(feature, grandHexOptions),
-        ],
-      })
+    // Prefer inline isChoice options already on the feature (Drive MHP Witch).
+    // Only scrape content.abilities when the feature has no options yet.
+    const existingOptions = feature.choices?.options?.length ?? 0
+    if (!existingOptions) {
+      const grandHexOptions = ((content as ImportContentWithAbilities).abilities ?? [])
+        .filter(
+          (ability: { source_name?: string | null; level_requirement?: number | null; name: string }) =>
+            /witch/i.test(ability.source_name ?? "") &&
+            (ability.level_requirement ?? 0) >= 11 &&
+            !/creature form/i.test(ability.name),
+        )
+        .map((ability: { name: string; description: string }) => ({
+          name: ability.name,
+          description: ability.description,
+        }))
+      if (grandHexOptions.length) {
+        next = syncModifierRefs({
+          ...next,
+          linkedModifiers: [
+            ...(next.linkedModifiers ?? []),
+            buildGrandHexPicker(feature, grandHexOptions),
+          ],
+        })
+      }
     }
   }
 
   if (/^hexes$/i.test(feature.name.trim())) {
-    next = syncModifierRefs({
-      ...next,
-      linkedModifiers: [...(next.linkedModifiers ?? []), buildHexesResourcePicker(feature)],
-    })
+    // Hexes are Hex:… cantrips via spells_known — skip the legacy feature_option_picker
+    // when spells_known is already present (avoids a second Hex pick UI).
+    const importMechanics = (feature as Feature & { mechanics?: { kind?: string }[] }).mechanics
+    const hasSpellsKnown =
+      (Array.isArray(importMechanics) &&
+        importMechanics.some((m) => m?.kind === "spells_known")) ||
+      (next.linkedModifiers ?? []).some((mod) =>
+        mod.characteristics?.some((c) => c.type === "spells_known"),
+      )
+    if (!hasSpellsKnown) {
+      next = syncModifierRefs({
+        ...next,
+        linkedModifiers: [...(next.linkedModifiers ?? []), buildHexesResourcePicker(feature)],
+      })
+    }
   }
 
   if (/^weapon mastery$/i.test(feature.name.trim())) {

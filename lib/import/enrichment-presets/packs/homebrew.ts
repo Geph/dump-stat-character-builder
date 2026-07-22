@@ -435,88 +435,14 @@ export const ALTERNATE_SORCERER_PRESETS: EnrichmentPreset[] = [
   },
 ]
 
-export const WARMAGE_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "warmage.class.warmage_edge",
-    pack: "warmage",
-    target: "class_feature",
-    match: { className: /warmage/i, name: /^warmage edge$/i },
-    skipIfCharacteristicTypes: ["on_cast_spell_trigger"],
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: {
-          kind: "char_instance",
-          idKey: "warmage_edge",
-          catalogRefId: "cat_char_on_cast_spell_trigger",
-          characteristics: [
-            {
-              id: "mod_warmage_edge",
-              type: "on_cast_spell_trigger",
-              spellTags: ["cantrip", "damage"],
-              effect: { catalogRefId: "cat_fx_bonus_damage_by_level" },
-              label:
-                "Warmage Edge: once per turn add INT (and Cantrip Bonus Dice from level 5+) to one cantrip damage roll",
-            },
-          ],
-        },
-      },
-    ],
-  },
-  {
-    id: "warmage.class.arcane_surge",
-    pack: "warmage",
-    target: "class_feature",
-    match: { className: /warmage/i, name: /^arcane surge$/i },
-    operations: [
-      {
-        op: "setLimitedUses",
-        uses: {
-          type: "class_resource",
-          classResourceKey: "arcane_surge",
-          classResourceAmount: 1,
-        },
-      },
-      {
-        op: "appendDescription",
-        text: "Dump Stat tracks Arcane Surge uses on the sheet. Doubling (or tripling on a crit) cantrip damage dice when you surge remains a play-time damage adjustment.",
-      },
-    ],
-  },
-  {
-    id: "warmage.class.reliable_cantrip",
-    pack: "warmage",
-    target: "class_feature",
-    match: { className: /warmage/i, name: /^reliable cantrip$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Reliable Cantrip minimum damage on a miss or successful save is tracked narratively — apply minimum dice + Edge when resolving the roll.",
-      },
-    ],
-  },
-]
+/** @deprecated Import from packs/warmage — re-exported for registry compatibility. */
+export { WARMAGE_PRESETS } from "@/lib/import/enrichment-presets/packs/warmage"
 
 /** @deprecated Import from packs/dancer — re-exported for registry compatibility. */
 export { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
 
-export const VAGABOND_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "vagabond.class.desperate_attack",
-    pack: "vagabond",
-    target: "class_feature",
-    match: {
-      className: /vagabond/i,
-      name: /^desperate attack$/i,
-    },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "While you are Bloodied, you have Advantage on attack rolls. Dump Stat gates this with the built-in Bloodied sheet state (below_half_hp).",
-      },
-    ],
-  },
-]
+/** @deprecated Import from packs/vagabond — re-exported for registry compatibility. */
+export { VAGABOND_PRESETS } from "@/lib/import/enrichment-presets/packs/vagabond"
 
 export const MARTYR_PRESETS: EnrichmentPreset[] = [
   {

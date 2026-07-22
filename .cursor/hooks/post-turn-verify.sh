@@ -113,6 +113,34 @@ fi
 run_check "eslint ." "${LINT[@]}"
 run_check "tsc --noEmit" "${TYPECHECK[@]}"
 
+# (#6) When this turn touched homebrew import enrichment / LLM hints / ops,
+# also run the focused import vitest pack (Drive smoke skips if files missing).
+should_run_import_smoke() {
+  if [ "${CURSOR_HOOK_SKIP_IMPORT_SMOKE:-0}" = "1" ]; then
+    return 1
+  fi
+  if [ "${CURSOR_HOOK_IMPORT_SMOKE:-0}" = "1" ]; then
+    return 0
+  fi
+  local changed
+  changed="$(git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
+  printf '%s\n' "$changed" | grep -Eq \
+    '(^|/)(lib/import/(homebrew-import-ops|enrichment-presets|content-schema\.ts|modifier-wiring-registry\.ts|third-party-resources\.ts|parse-class-progression-table\.ts)|lib/import/__tests__/(homebrew-|investigator-|necromancer-|martyr-)|scripts/homebrew-import-ops\.ts|docs/homebrew-import-review\.md)'
+}
+
+if should_run_import_smoke; then
+  if [ -f node_modules/vitest/vitest.mjs ]; then
+    IMPORT_SMOKE=(node node_modules/vitest/vitest.mjs run lib/import/__tests__/homebrew-import-ops.test.ts lib/import/__tests__/homebrew-prompt-footguns.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/investigator-martyr-drive-import.test.ts lib/import/__tests__/necromancer-drive-import.test.ts lib/import/__tests__/vagabond-import.test.ts)
+  elif [ -x node_modules/.bin/vitest ]; then
+    IMPORT_SMOKE=(node_modules/.bin/vitest run lib/import/__tests__/homebrew-import-ops.test.ts lib/import/__tests__/homebrew-prompt-footguns.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/investigator-martyr-drive-import.test.ts lib/import/__tests__/necromancer-drive-import.test.ts lib/import/__tests__/vagabond-import.test.ts)
+  else
+    IMPORT_SMOKE=(npx --no-install vitest run lib/import/__tests__/homebrew-import-ops.test.ts lib/import/__tests__/homebrew-prompt-footguns.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/investigator-martyr-drive-import.test.ts lib/import/__tests__/necromancer-drive-import.test.ts lib/import/__tests__/vagabond-import.test.ts)
+  fi
+  run_check "vitest import-homebrew smoke" "${IMPORT_SMOKE[@]}"
+else
+  echo "post-turn-verify: import-homebrew smoke skipped (no matching changed files)" >&2
+fi
+
 if [ "${CURSOR_HOOK_RUN_BUILD:-0}" = "1" ]; then
   run_check "next build" node scripts/build-hosted.mjs
 fi

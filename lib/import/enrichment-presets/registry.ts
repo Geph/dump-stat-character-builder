@@ -2,6 +2,8 @@ import { ALCHEMIST_PRESETS, ALCHEMIST_SEEDS } from "@/lib/import/enrichment-pres
 import { CRAFTSMAN_PRESETS } from "@/lib/import/enrichment-presets/packs/craftsman"
 import { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
 import { GUNSLINGER_PRESETS } from "@/lib/import/enrichment-presets/packs/gunslinger"
+import { WITCH_PRESETS } from "@/lib/import/enrichment-presets/packs/witch"
+import { WARMAGE_PRESETS } from "@/lib/import/enrichment-presets/packs/warmage"
 import {
   ALTERNATE_RANGER_PRESETS,
   ALTERNATE_RANGER_SEEDS,
@@ -16,7 +18,6 @@ import {
   NECROMANCER_PRESETS,
   PSION_PRESETS,
   VAGABOND_PRESETS,
-  WARMAGE_PRESETS,
 } from "@/lib/import/enrichment-presets/packs/homebrew"
 import type {
   ContentSeed,
@@ -36,6 +37,7 @@ const PRESETS: EnrichmentPreset[] = [
   ...DANCER_PRESETS,
   ...CRAFTSMAN_PRESETS,
   ...VAGABOND_PRESETS,
+  ...WITCH_PRESETS,
   ...GUNSLINGER_PRESETS,
   ...MARTYR_PRESETS,
   ...NECROMANCER_PRESETS,

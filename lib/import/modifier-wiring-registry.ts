@@ -1475,11 +1475,15 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Warmage / cantrip specialists",
     guidance: [
-      "Tricks column → class_resources.tricks_known (special choice count) + Warmage Tricks as ability_role knack with optionsSource class_knacks.",
-      "Cantrip Bonus Dice column → class_resources.cantrip_bonus_dice (special rider count for Warmage Edge).",
-      "Arcane Surge → class_resources.arcane_surge (uses; short regain 1 / long all) + feature limitedUses.",
-      "Warmage Edge: keep \"add your Intelligence modifier to one damage roll of a cantrip\" phrasing — enrichment wires on_cast_spell_trigger for cantrip damage.",
+      "Base Warmage is Intelligence cantrip casting only — set classes[].spellcasting { ability: \"Intelligence\" } with NO caster_progression / spell slots.",
+      "Cantrips column → incremental spells_known grants (start at 4, +1 at 3/5/9/13/17/20) — never cumulative absolute totals (4 then 5 then 6 as separate mechanics).",
+      "Tricks column → class_resources.tricks_known (special) + Warmage Tricks optionsSource class_knacks; ability_role knack on trick custom_abilities.",
+      "Cantrip Bonus Dice column → class_resources.cantrip_bonus_dice (special rider for Warmage Edge).",
+      "Arcane Surge → class_resources.arcane_surge (2 at L5, 3 at L11; short regain 1 / long all; Master Warmage rechargeOnInitiative: 1).",
+      "Warmage Edge: keep \"add your Intelligence modifier to one damage roll of a cantrip\" phrasing — enrichment wires on_cast_spell_trigger.",
       "Import Warmage-exclusive cantrips (Force Dart, Force Buckler, etc.) before or with Tricks so prerequisite gates resolve.",
+      "House of Bishops: subclass.spellcasting { ability: Intelligence, caster_progression: third, prepared: true } — Wizard list prepared slots.",
+      "House of Kings Battle Tactics: auto-grant all listed maneuvers (not a Maneuvers Known / Tricks picker); battle_dice subclass-scoped with rechargeOnInitiative.",
     ],
   },
   {
@@ -1487,7 +1491,20 @@ export const HOMEBREW_WIRING_PATTERNS = [
     guidance: [
       "Battle Dice refill on Initiative: set uses.rechargeOnInitiative: true (table parse adds this for battle_dice automatically).",
       "Bloodied / Desperate features: gate with requiresSheetToggle below_half_hp (built-in Bloodied state when HP ≤ half max) — phrase \"while you are Bloodied\".",
-      "Maneuvers: ability_role knack + optionsSource class_knacks; choiceCountByLevel from Maneuvers column — do not set choices.resourceKey to battle_dice.",
+      "Battle Tactics / Maneuvers Known: ability_role knack on CLASS maneuvers + optionsSource class_knacks + choiceCountByLevel from the Maneuvers column. Do NOT set choices.resourceKey to battle_dice or invent maneuvers_known. This is NOT the Gunslinger Risk auto-grant pattern.",
+      "Subclass [Maneuver] features (Ambush, Carve, …): keep as subclass features + auto-grant; do NOT put them as ability_role knack (they must not appear in the Maneuvers Known picker and do not count against known).",
+      "Mage Brand Spellbranding: CHA + Sorcerer list cantrips/prepared; cast by expending Battle Dice up to mage_brand_max_slot_level — never normal caster_progression slots. Do not merge the shared magehandpress-spells catalog into the class JSON.",
+      "Wayworn / Desperate Survival: usually narrative (always-Bloodied for features; crits miss while Bloodied).",
+    ],
+  },
+  {
+    source: "Witch / Hex casters",
+    guidance: [
+      "Mage Hand Press Witch is a Charisma full prepared caster — set classes[].spellcasting { ability: \"Charisma\", caster_progression: \"full\", prepared: true }.",
+      "Hexes are Hex:… cantrips on the Witch spell list via spells_known + class_resources.hexes_known (special cap). Do NOT put Hexes in custom_abilities / class_knacks.",
+      "spellChoiceGrants for Hexes/cantrips must be incremental (+1 at each tier) with unlocksAtClassLevel on each grant — never emit cumulative counts (2 then 3 then 4 as separate absolute totals).",
+      "Grand Hexes resource_key is grand_hexes (not grand_hexes_known). Options live on the Grand Hex feature (isChoice + choiceCountByLevel). Abominable Familiar is an option only — never grant_creature on the feature itself.",
+      "Do not dump the shared magehandpress-spells catalog into the class JSON when the class already has spells[]; merge only missing Witch-list rows if needed.",
     ],
   },
   {
