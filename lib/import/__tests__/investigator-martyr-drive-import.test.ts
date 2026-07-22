@@ -1,24 +1,27 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
+import { homebrewImportJsonDir } from "@/lib/import/homebrew-import-ops"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { Feature } from "@/lib/types"
 
-const DIR =
-  "/Users/geph/Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files/import-json"
+const DIR = homebrewImportJsonDir()
+const hasInvestigator = existsSync(join(DIR, "magehandpress-investigator-class"))
+const hasMartyr = existsSync(join(DIR, "magehandpress-martyr-class"))
 
 function load(name: string) {
-  return parseImportContentJson(readFileSync(`${DIR}/${name}`, "utf8"))!
+  return parseImportContentJson(readFileSync(join(DIR, name), "utf8"))!
 }
 
 function enrich(name: string) {
   return enrichImportContentModifiers(applyClassSpellListsToImport(applyImportEnrichmentPresets(load(name))))
 }
 
-describe("Investigator Drive import wiring", () => {
+describe.skipIf(!hasInvestigator)("Investigator Drive import wiring", () => {
   it("remaps finisher_dice to finisher and strips Trinkets picker", () => {
     const content = enrich("magehandpress-investigator-class")
     expect(content.class_resources?.some((r) => r.resource_key === "finisher_dice")).toBe(false)
@@ -62,7 +65,7 @@ describe("Investigator Drive import wiring", () => {
   })
 })
 
-describe("Martyr Drive import wiring", () => {
+describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
   it("keeps spell_uses + max_spell_level and does not invent slots", () => {
     const content = enrich("magehandpress-martyr-class")
     expect(content.class_resources?.map((r) => r.resource_key).sort()).toEqual([

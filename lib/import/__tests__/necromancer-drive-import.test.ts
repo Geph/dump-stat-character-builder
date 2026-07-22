@@ -1,14 +1,16 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { homebrewImportJsonDir } from "@/lib/import/homebrew-import-ops"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { Feature } from "@/lib/types"
 
-const PATH =
-  "/Users/geph/Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files/import-json/magehandpress-necromancer-class"
+const PATH = join(homebrewImportJsonDir(), "magehandpress-necromancer-class")
+const hasDriveFixture = existsSync(PATH)
 
 function load() {
   return parseImportContentJson(readFileSync(PATH, "utf8"))!
@@ -18,21 +20,7 @@ function enrich() {
   return enrichImportContentModifiers(applyClassSpellListsToImport(applyImportEnrichmentPresets(load())))
 }
 
-describe("Necromancer Drive import wiring", () => {
-  it("keeps charnel_touch as at_level multiply_level and thrall caps as special", () => {
-    const content = enrich()
-    const charnel = content.class_resources?.find((r) => r.resource_key === "charnel_touch")
-    expect(charnel?.uses).toMatchObject({
-      type: "at_level",
-      atLevelMode: "multiply_level",
-      atLevelTable: [{ level: 1, count: 5 }],
-    })
-    expect(content.class_resources?.find((r) => r.resource_key === "thralls")?.uses.type).toBe("special")
-    expect(content.class_resources?.find((r) => r.resource_key === "thrall_cr_total")?.uses.type).toBe(
-      "special",
-    )
-  })
-
+describe("Necromancer import sanitizer (synthetic)", () => {
   it("sanitizes bare multiply_level charnel_touch shapes", () => {
     const next = sanitizeNecromancerImportContent({
       classes: [{ name: "Necromancer", description: "", hit_die: 6, primary_ability: ["Intelligence"], features: [] }],
@@ -50,6 +38,22 @@ describe("Necromancer Drive import wiring", () => {
       atLevelMode: "multiply_level",
       atLevelTable: [{ level: 1, count: 5 }],
     })
+  })
+})
+
+describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
+  it("keeps charnel_touch as at_level multiply_level and thrall caps as special", () => {
+    const content = enrich()
+    const charnel = content.class_resources?.find((r) => r.resource_key === "charnel_touch")
+    expect(charnel?.uses).toMatchObject({
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 5 }],
+    })
+    expect(content.class_resources?.find((r) => r.resource_key === "thralls")?.uses.type).toBe("special")
+    expect(content.class_resources?.find((r) => r.resource_key === "thrall_cr_total")?.uses.type).toBe(
+      "special",
+    )
   })
 
   it("wires Thralls grant_creature without class_upgrades picker", () => {
