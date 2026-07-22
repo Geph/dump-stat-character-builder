@@ -423,6 +423,75 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
   }
 
+  // --- Occultist (KibblesTasty) ---
+  if (/occultist/i.test(name)) {
+    const cls = asRecord(Array.isArray(root.classes) ? root.classes[0] : null)
+    const nested = Array.isArray(cls?.subclasses) ? cls!.subclasses : []
+    const topSubs = Array.isArray(root.subclasses) ? root.subclasses : []
+    if (nested.length && !topSubs.length) {
+      findings.push({
+        id: "occultist.nested_subclasses",
+        severity: "error",
+        message:
+          "Traditions must be top-level subclasses[] — hoist out of classes[0].subclasses (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher)",
+        path: "classes[0].subclasses",
+      })
+    }
+    const spellcasting = asRecord(cls?.spellcasting)
+    if (!spellcasting?.ability || spellcasting.caster_progression !== "full") {
+      findings.push({
+        id: "occultist.spellcasting_field",
+        severity: "error",
+        message:
+          'Set classes[].spellcasting { ability: "Wisdom", caster_progression: "full", prepared: false } (Spells Known — not Investigator Occultist pact magic)',
+        path: "classes[0].spellcasting",
+      })
+    } else if (spellcasting.prepared === true) {
+      findings.push({
+        id: "occultist.not_prepared",
+        severity: "warn",
+        message: "Occultist uses Spells Known — set prepared: false (not a prepared caster)",
+        path: "classes[0].spellcasting",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "occult_rites_known")) {
+      findings.push({
+        id: "occultist.rites_known",
+        severity: "error",
+        message: "Missing class_resources.occult_rites_known (special choice count from Occult Rites column)",
+        path: "class_resources",
+      })
+    }
+    const rites = featureNamed(features, /^occult rites$/i)
+    const riteChoices = asRecord(rites?.choices)
+    if (rites && riteChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "occultist.rites_knacks",
+        severity: "error",
+        message: 'Occult Rites must use choices.optionsSource "class_knacks"',
+        path: "classes[0].features[Occult Rites].choices",
+      })
+    }
+    if (rites && riteChoices?.swappableOnRest === true) {
+      findings.push({
+        id: "occultist.rites_no_rest_swap",
+        severity: "warn",
+        message:
+          "Occult Rites swap on level-up only — set swappableOnRest: false (do not treat as rest-swappable)",
+        path: "classes[0].features[Occult Rites].choices",
+      })
+    }
+    if (!topSubs.length && !nested.length) {
+      findings.push({
+        id: "occultist.missing_traditions",
+        severity: "error",
+        message:
+          "Missing Occult Traditions in subclasses[] (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher)",
+        path: "subclasses",
+      })
+    }
+  }
+
   // --- Generic ---
   for (const row of res) {
     const uses = asRecord(row.uses)

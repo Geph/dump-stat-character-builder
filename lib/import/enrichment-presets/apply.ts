@@ -25,6 +25,7 @@ import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-prese
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
+import { sanitizeOccultistImportContent } from "@/lib/import/enrichment-presets/packs/occultist"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import type {
   EnrichmentOperation,
@@ -37,6 +38,7 @@ const CLASS_ROW_PACKS = new Set([
   "alternate_ranger",
   "alternate_sorcerer",
   "warmage",
+  "occultist",
   "dancer",
   "craftsman",
   "vagabond",
@@ -51,6 +53,7 @@ const CONTENT_PACKS = new Set([
   "investigator",
   "psion",
   "warmage",
+  "occultist",
   "dancer",
   "craftsman",
   "vagabond",
@@ -542,6 +545,7 @@ export function applyImportEnrichmentPresets(
   next = sanitizeNecromancerImportContent(next)
   next = sanitizeVagabondImportContent(next)
   next = sanitizeWarmageImportContent(next)
+  next = sanitizeOccultistImportContent(next)
   next = sanitizeWitchImportContent(next)
 
   return next
