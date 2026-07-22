@@ -4,6 +4,7 @@ import { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
 import { GUNSLINGER_PRESETS } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import { WITCH_PRESETS } from "@/lib/import/enrichment-presets/packs/witch"
 import { WARMAGE_PRESETS } from "@/lib/import/enrichment-presets/packs/warmage"
+import { OCCULTIST_PRESETS } from "@/lib/import/enrichment-presets/packs/occultist"
 import {
   ALTERNATE_RANGER_PRESETS,
   ALTERNATE_RANGER_SEEDS,
@@ -34,6 +35,7 @@ const PRESETS: EnrichmentPreset[] = [
   ...ALTERNATE_RANGER_PRESETS,
   ...ALTERNATE_SORCERER_PRESETS,
   ...WARMAGE_PRESETS,
+  ...OCCULTIST_PRESETS,
   ...DANCER_PRESETS,
   ...CRAFTSMAN_PRESETS,
   ...VAGABOND_PRESETS,

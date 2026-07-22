@@ -6,6 +6,7 @@
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
+import { sanitizeOccultistImportContent } from "@/lib/import/enrichment-presets/packs/occultist"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 type JsonRecord = Record<string, unknown>
@@ -177,6 +178,7 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
   if (/witch/i.test(name)) out = sanitizeWitchImportContent(out)
   if (/vagabond/i.test(name)) out = sanitizeVagabondImportContent(out)
   if (/warmage/i.test(name)) out = sanitizeWarmageImportContent(out)
+  if (/occultist/i.test(name)) out = sanitizeOccultistImportContent(out)
 
   return out as Record<string, unknown>
 }

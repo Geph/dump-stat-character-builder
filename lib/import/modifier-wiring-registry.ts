@@ -1389,7 +1389,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Subclass Trinkets: one custom_abilities row per trinket with ability_role upgrade + source_type subclass / exact archetype name. Class Trinkets is NOT a class_upgrades picker — you know all subclass trinkets; enrichment grants them via grant_custom_ability on the subclass Trinkets feature (Gunslinger Risk pattern).",
       "Holy Trinkets (Amulet of Warding, Restorative Ankh, Rune of Banishment): ALSO emit equipment[] rows with those exact names + source prose so name-wiring can attach Trinkets-pool spend. Do not invent item text Dump Stat does not ship.",
       "Ritualist: no normal spell slots / caster_progression — grimoire Ritual casting only. Intelligence is the spellcasting ability for Investigator spells.",
-      "Occultist Pact Magic: set the subclass spellcasting field (Warlock-style slots from the Occultist Spellcasting table).",
+      "Investigator archetype Occultist (not KibblesTasty Occultist class): Pact Magic → set the subclass spellcasting field (Warlock-style slots from the Occultist Spellcasting table).",
       "PDF page breaks scramble Antiquarian / Medium / Occultist blocks — verify each feature against its subclass header; Antiquarian higher levels are often truncated in extracts.",
     ],
   },
@@ -1484,6 +1484,19 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Import Warmage-exclusive cantrips (Force Dart, Force Buckler, etc.) before or with Tricks so prerequisite gates resolve.",
       "House of Bishops: subclass.spellcasting { ability: Intelligence, caster_progression: third, prepared: true } — Wizard list prepared slots.",
       "House of Kings Battle Tactics: auto-grant all listed maneuvers (not a Maneuvers Known / Tricks picker); battle_dice subclass-scoped with rechargeOnInitiative.",
+    ],
+  },
+  {
+    source: "Occultist / KibblesTasty traditions",
+    guidance: [
+      "KibblesTasty Occultist is Wisdom full caster with Spells Known — set classes[].spellcasting { ability: \"Wisdom\", caster_progression: \"full\", prepared: false }. Not prepared; not Investigator Occultist pact magic.",
+      "Cantrips Known / Spells Known → incremental spells_known grants (cantrips 3 then +1 at 4/10; spells 3 then +1 each level through 18).",
+      "Occult Rites column → class_resources.occult_rites_known (special) + Occult Rites optionsSource class_knacks; ability_role knack. swappableOnRest false — replace on level-up only.",
+      "Emit Occult Traditions in top-level subclasses[] (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher). Never nest under classes[0].subclasses. Occult Tradition feature is a short unlock blurb — no stub isChoice listing tradition names.",
+      "Tradition-specific rites: keep ability_role knack with source_type subclass / exact tradition name; copy Prerequisite lines (level, coven, mystery, prior rites).",
+      "Coven / Mystery / Eschatological Conclusion / Totem pickers: isChoice + options with HTML spell tables where present; alwaysPrepared spells_known with unlocksAtClassLevel for bonus-spell tiers.",
+      "Name collisions: Occultist tradition Witch ≠ Mage Hand Press Witch class. Keep tradition name \"Witch\" under class_name Occultist.",
+      "Do not dump the shared kibbles-spells catalog into the class JSON when spells[] already exists — merge only missing Kibbles-exclusive rows if needed.",
     ],
   },
   {

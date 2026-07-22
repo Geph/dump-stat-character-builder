@@ -35,6 +35,7 @@ export const IMPORT_TO_SOURCE_BASENAME: Record<string, string> = {
   "magehandpress-warmage-class": "magehandpress-warmage-class",
   "magehandpress-witch-class": "magehandpress-witch-class",
   "magehandpress-vagabond-class": "magehandpress-vagabond-class",
+  "kibbles-occultist-class": "kibbles-occultist-class",
   "eberron-artificer-class": "eberron-artificer-class",
   "eberron-artificer-class.json": "eberron-artificer-class",
 }
@@ -46,4 +47,5 @@ export const DRIVE_SMOKE_IMPORT_FILES = [
   "magehandpress-vagabond-class",
   "magehandpress-witch-class",
   "magehandpress-warmage-class",
+  "kibbles-occultist-class",
 ] as const

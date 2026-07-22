@@ -9,7 +9,7 @@ import { HOMEBREW_WIRING_PATTERNS } from "@/lib/import/modifier-wiring-registry"
  * must remain in LLM hint strings so future class passes don't regress.
  */
 describe("homebrew prompt footguns", () => {
-  it("keeps Investigator / Martyr / Necromancer / Vagabond / Witch / Warmage resource bullets in CLASS_RESOURCE_IMPORT_HINT", () => {
+  it("keeps Investigator / Martyr / Necromancer / Vagabond / Witch / Warmage / Occultist resource bullets in CLASS_RESOURCE_IMPORT_HINT", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/finisher/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/never "finisher_dice"/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Martyr Spell Uses/i)
@@ -23,6 +23,8 @@ describe("homebrew prompt footguns", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/grand_hexes/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Warmage/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/cantrips only/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Occultist \(KibblesTasty\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/occult_rites_known/i)
   })
 
   it("keeps Investigator trinket auto-grant exception in IMPORT_PROPOSALS_HINT", () => {
@@ -30,7 +32,7 @@ describe("homebrew prompt footguns", () => {
     expect(IMPORT_PROPOSALS_HINT).toMatch(/do NOT wire the class Trinkets feature as optionsSource "class_upgrades"/i)
   })
 
-  it("documents Investigator, Necromancer, Vagabond, Witch, and Warmage patterns in HOMEBREW_WIRING_PATTERNS", () => {
+  it("documents Investigator, Necromancer, Vagabond, Witch, Warmage, and Occultist patterns in HOMEBREW_WIRING_PATTERNS", () => {
     const blob = HOMEBREW_WIRING_PATTERNS.flatMap((p) => [p.source, ...p.guidance]).join("\n")
     expect(blob).toMatch(/Investigator/i)
     expect(blob).toMatch(/finisher_dice/i)
@@ -47,6 +49,9 @@ describe("homebrew prompt footguns", () => {
     expect(blob).toMatch(/Warmage/i)
     expect(blob).toMatch(/House of Bishops/i)
     expect(blob).toMatch(/NO caster_progression/i)
+    expect(blob).toMatch(/Occultist \/ KibblesTasty traditions/i)
+    expect(blob).toMatch(/occult_rites_known/i)
+    expect(blob).toMatch(/never nest under classes\[0\]\.subclasses/i)
   })
 
   it("third-party charnel_touch definition still warns about uses.shape", () => {
