@@ -550,7 +550,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /upgrades?/i,
     displayName: "Upgrades",
     definition:
-      "Inventor subclass upgrades chosen from your specialization list; count scales on the class level table.",
+      "Inventor subclass upgrades chosen from your specialization list; count scales on the class level table. uses.shape MUST be type special (choice count) — never a spendable at_level pool with recharges.",
     spendPatterns: [],
   },
   {

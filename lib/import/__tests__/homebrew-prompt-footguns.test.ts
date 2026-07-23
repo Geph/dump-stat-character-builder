@@ -9,7 +9,7 @@ import { HOMEBREW_WIRING_PATTERNS } from "@/lib/import/modifier-wiring-registry"
  * must remain in LLM hint strings so future class passes don't regress.
  */
 describe("homebrew prompt footguns", () => {
-  it("keeps Investigator / Martyr / Necromancer / Vagabond / Witch / Warmage / Occultist resource bullets in CLASS_RESOURCE_IMPORT_HINT", () => {
+  it("keeps Investigator / Martyr / Necromancer / Vagabond / Witch / Warmage / Occultist / Beastheart / Kibbles Warden / Inventor resource bullets in CLASS_RESOURCE_IMPORT_HINT", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/finisher/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/never "finisher_dice"/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Martyr Spell Uses/i)
@@ -25,6 +25,13 @@ describe("homebrew prompt footguns", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/cantrips only/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Occultist \(KibblesTasty\)/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/occult_rites_known/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Beastheart \(MCDM\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/ferocity/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Warden \(KibblesTasty\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/primal_manifestations/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/endurance_die_size/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Inventor \(KibblesTasty\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/class_resources\.upgrades/i)
   })
 
   it("keeps Investigator trinket auto-grant exception in IMPORT_PROPOSALS_HINT", () => {
@@ -32,7 +39,7 @@ describe("homebrew prompt footguns", () => {
     expect(IMPORT_PROPOSALS_HINT).toMatch(/do NOT wire the class Trinkets feature as optionsSource "class_upgrades"/i)
   })
 
-  it("documents Investigator, Necromancer, Vagabond, Witch, Warmage, and Occultist patterns in HOMEBREW_WIRING_PATTERNS", () => {
+  it("documents Investigator, Necromancer, Vagabond, Witch, Warmage, Occultist, Beastheart, Kibbles Warden, and Inventor patterns in HOMEBREW_WIRING_PATTERNS", () => {
     const blob = HOMEBREW_WIRING_PATTERNS.flatMap((p) => [p.source, ...p.guidance]).join("\n")
     expect(blob).toMatch(/Investigator/i)
     expect(blob).toMatch(/finisher_dice/i)
@@ -52,6 +59,14 @@ describe("homebrew prompt footguns", () => {
     expect(blob).toMatch(/Occultist \/ KibblesTasty traditions/i)
     expect(blob).toMatch(/occult_rites_known/i)
     expect(blob).toMatch(/never nest under classes\[0\]\.subclasses/i)
+    expect(blob).toMatch(/Beastheart \/ MCDM companions/i)
+    expect(blob).toMatch(/mix them into Primal Exploits/i)
+    expect(blob).toMatch(/Warden \/ KibblesTasty bonds/i)
+    expect(blob).toMatch(/never primal_manifestations_known/i)
+    expect(blob).toMatch(/endurance_die_size/i)
+    expect(blob).toMatch(/Inventor \/ KibblesTasty specializations/i)
+    expect(blob).toMatch(/never emit upgrades as a spendable/i)
+    expect(blob).toMatch(/grant_creature/i)
   })
 
   it("third-party charnel_touch definition still warns about uses.shape", () => {

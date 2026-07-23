@@ -10,6 +10,7 @@ import {
   NAME_SOURCE_MATCHING_HINT,
 } from "@/lib/import/content-schema"
 import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-import-hints"
+import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 
 describe("BYO prompt guidance (Psion audit follow-up)", () => {
   it("places name/source matching before the Common Modifier wiring index", () => {
@@ -218,5 +219,24 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     const classes = buildByoExtractionPrompt("classes")
     expect(classes).toContain("plain language")
     expect(classes).toContain("do NOT invent JSON")
+  })
+
+  it("covers Metamagic library cost/prose rules, split-table rebuild, and OCR repair", () => {
+    const metamagic = buildByoExtractionPrompt("invocations_metamagic")
+    expect(metamagic).toContain("Keep Sorcery Point / resource cost sentences verbatim")
+    expect(metamagic).toContain("equal to the spell's level")
+    expect(metamagic).toContain("Do NOT emit mechanics[] for per-cast spell modifications")
+    expect(metamagic).toContain("extract every supplied entry as written")
+    expect(metamagic).not.toContain('ability_role: "metamagic"')
+
+    expect(RICH_TEXT_TABLE_HINT).toContain("rebuild the fragments into a single HTML table")
+    expect(RICH_TEXT_TABLE_HINT).toContain("[Source ends mid-entry]")
+
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("Narrow OCR / line-join repair")
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("to to cast")
+    expect(GENERAL_SOURCE_CLEANUP_HINT).toContain("Never alter numbers")
+    const prompt = buildByoExtractionPrompt("invocations_metamagic")
+    expect(prompt).toContain("Narrow OCR / line-join repair")
+    expect(prompt).toContain("rebuild the fragments into a single HTML table")
   })
 })

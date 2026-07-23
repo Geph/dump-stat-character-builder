@@ -37,9 +37,10 @@ Important D&D 2024 rules:
 - Class features are tied to specific levels
 - Subclass features typically come at levels 3, 6, 7, 10, 14, 15, and 18 (homebrew may use 1, 3, 6, 10, 14)
 
-Extract ONLY the content types you find in the text. Return empty arrays for types not present.
+Extract ONLY the content types you find in the text. For content types not present, set those top-level arrays to null (or omit them); use [] only when the source contains that type but yields zero valid entries.
 Be thorough and extract all instances of each content type found.
 For class features, include the level they are gained at.
+If an entry is visibly incomplete (cut off mid-sentence, missing its ending), emit only the supplied text and end that description with "[Source ends mid-entry]" — do not infer or invent the missing rules.
 
 For equipment: use cost { amount, unit } separate from name; strip HTML/markdown from names only.
 

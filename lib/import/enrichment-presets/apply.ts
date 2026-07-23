@@ -26,6 +26,9 @@ import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-preset
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
 import { sanitizeOccultistImportContent } from "@/lib/import/enrichment-presets/packs/occultist"
+import { sanitizeBeastheartImportContent } from "@/lib/import/enrichment-presets/packs/beastheart"
+import { sanitizeKibblesWardenImportContent } from "@/lib/import/enrichment-presets/packs/kibbles-warden"
+import { sanitizeInventorImportContent } from "@/lib/import/enrichment-presets/packs/inventor"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import type {
   EnrichmentOperation,
@@ -39,6 +42,9 @@ const CLASS_ROW_PACKS = new Set([
   "alternate_sorcerer",
   "warmage",
   "occultist",
+  "beastheart",
+  "kibbles_warden",
+  "inventor",
   "dancer",
   "craftsman",
   "vagabond",
@@ -54,6 +60,9 @@ const CONTENT_PACKS = new Set([
   "psion",
   "warmage",
   "occultist",
+  "beastheart",
+  "kibbles_warden",
+  "inventor",
   "dancer",
   "craftsman",
   "vagabond",
@@ -546,6 +555,9 @@ export function applyImportEnrichmentPresets(
   next = sanitizeVagabondImportContent(next)
   next = sanitizeWarmageImportContent(next)
   next = sanitizeOccultistImportContent(next)
+  next = sanitizeBeastheartImportContent(next)
+  next = sanitizeKibblesWardenImportContent(next)
+  next = sanitizeInventorImportContent(next)
   next = sanitizeWitchImportContent(next)
 
   return next
@@ -576,6 +588,19 @@ function patchInitiativeRechargeFromFeatures(content: ImportContent): ImportCont
         }
         // LLM extracts often set initiative recharge on the pool even before Dire Gambit.
         if (!hasDireGambit && row.uses.rechargeOnInitiative != null) {
+          changed = true
+          const { rechargeOnInitiative: _drop, ...restUses } = row.uses
+          return { ...row, uses: restUses }
+        }
+      }
+
+      const hasEmpoweredEndurance = features.some((f) => /^empowered endurance$/i.test(f.name ?? ""))
+      if (resourceKey === "endurance_dice") {
+        if (hasEmpoweredEndurance && row.uses.rechargeOnInitiative !== 1) {
+          changed = true
+          return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+        }
+        if (!hasEmpoweredEndurance && row.uses.rechargeOnInitiative != null) {
           changed = true
           const { rechargeOnInitiative: _drop, ...restUses } = row.uses
           return { ...row, uses: restUses }

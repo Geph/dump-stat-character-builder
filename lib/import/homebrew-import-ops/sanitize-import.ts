@@ -7,6 +7,12 @@ import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/pack
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
 import { sanitizeOccultistImportContent } from "@/lib/import/enrichment-presets/packs/occultist"
+import { sanitizeBeastheartImportContent } from "@/lib/import/enrichment-presets/packs/beastheart"
+import {
+  isKibblesTastyWarden,
+  sanitizeKibblesWardenImportContent,
+} from "@/lib/import/enrichment-presets/packs/kibbles-warden"
+import { sanitizeInventorImportContent } from "@/lib/import/enrichment-presets/packs/inventor"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 type JsonRecord = Record<string, unknown>
@@ -179,6 +185,9 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
   if (/vagabond/i.test(name)) out = sanitizeVagabondImportContent(out)
   if (/warmage/i.test(name)) out = sanitizeWarmageImportContent(out)
   if (/occultist/i.test(name)) out = sanitizeOccultistImportContent(out)
+  if (/beastheart/i.test(name)) out = sanitizeBeastheartImportContent(out)
+  if (isKibblesTastyWarden(out)) out = sanitizeKibblesWardenImportContent(out)
+  if (/inventor/i.test(name)) out = sanitizeInventorImportContent(out)
 
   return out as Record<string, unknown>
 }

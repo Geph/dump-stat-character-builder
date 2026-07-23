@@ -755,6 +755,18 @@ export function usesConfigForProgressionColumn(
     }
   }
 
+  if (column.resourceKey === "upgrades" || /^upgrades?$/i.test(column.header)) {
+    const latest = sorted[sorted.length - 1]
+    return {
+      type: "special",
+      specialDescription: `Number of specialization upgrades known at each ${className} level${
+        latest ? ` (up to ${latest.count})` : ""
+      }. A choice count from the subclass upgrade list, not a spendable pool.`,
+      atLevelTable: sorted,
+      atLevelMode: "tier",
+    }
+  }
+
   if (/_known$/.test(column.resourceKey) || isGenericKnownCountHeader(column.header)) {
     const latest = sorted[sorted.length - 1]
     return {
