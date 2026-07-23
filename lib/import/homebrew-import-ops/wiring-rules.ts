@@ -492,6 +492,335 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
   }
 
+  // --- Beastheart (MCDM) ---
+  if (/beastheart/i.test(name)) {
+    if (!res.some((r) => r.resource_key === "ferocity")) {
+      findings.push({
+        id: "beastheart.ferocity",
+        severity: "error",
+        message:
+          "Missing class_resources.ferocity (companion-owned special tracker — no class level table)",
+        path: "class_resources",
+      })
+    } else {
+      const ferocity = res.find((r) => r.resource_key === "ferocity")
+      const uses = asRecord(ferocity?.uses)
+      if (uses && uses.type !== "special") {
+        findings.push({
+          id: "beastheart.ferocity_special",
+          severity: "warn",
+          message: 'ferocity should use uses.type "special" (companion tracker, not a long-rest pool)',
+          path: "class_resources[ferocity].uses",
+        })
+      }
+    }
+    const primal = featureNamed(features, /^primal exploits$/i)
+    const primalChoices = asRecord(primal?.choices)
+    if (primal && primalChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "beastheart.primal_knacks",
+        severity: "error",
+        message: 'Primal Exploits must use choices.optionsSource "class_knacks"',
+        path: "classes[0].features[Primal Exploits].choices",
+      })
+    }
+    const companion = featureNamed(features, /^companion$/i)
+    const companionMechs = Array.isArray(companion?.mechanics) ? companion!.mechanics : []
+    const hasGrant = companionMechs.some((m) => asRecord(m)?.kind === "grant_creature")
+    if (companion && !hasGrant) {
+      findings.push({
+        id: "beastheart.companion_grant",
+        severity: "error",
+        message: "Companion feature needs grant_creature + creatureChoiceOptions for companion creatures[]",
+        path: "classes[0].features[Companion].mechanics",
+      })
+    }
+    const creatures = Array.isArray(root.creatures) ? root.creatures : []
+    if (creatures.length < 1) {
+      findings.push({
+        id: "beastheart.creatures",
+        severity: "warn",
+        message: "Beastheart should import companion creatures[] (Basilisk Companion, Owlbear Companion, …)",
+        path: "creatures",
+      })
+    }
+    const proposals = asRecord(root.import_proposals)
+    const customs = Array.isArray(proposals?.custom_abilities) ? proposals!.custom_abilities : []
+    for (const row of customs) {
+      const a = asRecord(row)
+      if (!a || a.ability_role !== "knack") continue
+      if (
+        a.source_type === "subclass" &&
+        (/infernal bond/i.test(String(a.source_name ?? "")) ||
+          /primordial bond/i.test(String(a.source_name ?? "")))
+      ) {
+        findings.push({
+          id: "beastheart.subclass_exploit_knack",
+          severity: "error",
+          message: `Subclass exploit "${String(a.name)}" should not be ability_role knack (pollutes Primal Exploits) — use Infernal/Nature Exploits choices.options instead`,
+          path: "import_proposals.custom_abilities",
+        })
+      }
+    }
+  }
+
+  // --- KibblesTasty Warden (Endurance Dice) — not Mage Hand Press Warden ---
+  if (/^warden$/i.test(name)) {
+    const isKibbles =
+      features.some(
+        (f) =>
+          /^endurance dice$/i.test(String(f.name ?? "")) ||
+          /^mystic bulwark$/i.test(String(f.name ?? "")) ||
+          /^primal manifestations$/i.test(String(f.name ?? "")),
+      ) ||
+      res.some(
+        (r) =>
+          r.resource_key === "endurance_dice" ||
+          r.resource_key === "primal_manifestations" ||
+          r.resource_key === "primal_manifestations_known",
+      )
+    const isMhp = features.some(
+      (f) => /^interrupt$/i.test(String(f.name ?? "")) || /^survive$/i.test(String(f.name ?? "")),
+    )
+    if (isKibbles && !isMhp) {
+      if (!res.some((r) => r.resource_key === "endurance_dice")) {
+        findings.push({
+          id: "kibbles_warden.endurance_dice",
+          severity: "error",
+          message: "Missing class_resources.endurance_dice (at_level pool from Endurance Dice column)",
+          path: "class_resources",
+        })
+      }
+      if (!res.some((r) => r.resource_key === "endurance_die_size")) {
+        findings.push({
+          id: "kibbles_warden.endurance_die_size",
+          severity: "error",
+          message:
+            "Missing class_resources.endurance_die_size (special die-size companion to endurance_dice)",
+          path: "class_resources",
+        })
+      }
+      if (
+        res.some((r) => r.resource_key === "primal_manifestations_known") &&
+        !res.some((r) => r.resource_key === "primal_manifestations")
+      ) {
+        findings.push({
+          id: "kibbles_warden.manifestations_key",
+          severity: "error",
+          message:
+            'Use resource_key "primal_manifestations" (not primal_manifestations_known) for the Manifestations Known column',
+          path: "class_resources",
+        })
+      }
+      if (!res.some((r) => r.resource_key === "primal_manifestations")) {
+        findings.push({
+          id: "kibbles_warden.primal_manifestations",
+          severity: "error",
+          message:
+            "Missing class_resources.primal_manifestations (special choice count from Primal Manifestation column)",
+          path: "class_resources",
+        })
+      }
+      const manifestations = featureNamed(features, /^primal manifestations$/i)
+      const manChoices = asRecord(manifestations?.choices)
+      if (manifestations && manChoices?.optionsSource !== "class_knacks") {
+        findings.push({
+          id: "kibbles_warden.manifestations_knacks",
+          severity: "error",
+          message: 'Primal Manifestations must use choices.optionsSource "class_knacks"',
+          path: "classes[0].features[Primal Manifestations].choices",
+        })
+      }
+      if (manifestations && manChoices?.resourceKey === "primal_manifestations_known") {
+        findings.push({
+          id: "kibbles_warden.manifestations_resource_key",
+          severity: "error",
+          message: 'Primal Manifestations choices.resourceKey must be "primal_manifestations"',
+          path: "classes[0].features[Primal Manifestations].choices.resourceKey",
+        })
+      }
+      if (manifestations && manChoices?.swappableOnRest === true) {
+        findings.push({
+          id: "kibbles_warden.manifestations_no_rest_swap",
+          severity: "warn",
+          message:
+            "Primal Manifestations swap on level-up only — set swappableOnRest: false",
+          path: "classes[0].features[Primal Manifestations].choices",
+        })
+      }
+      const bond = featureNamed(features, /^warden bond$/i)
+      if (bond && (bond.isChoice === true || asRecord(bond.choices))) {
+        findings.push({
+          id: "kibbles_warden.bond_not_picker",
+          severity: "warn",
+          message:
+            "Warden Bond should be a short unlock blurb — bonds live in subclasses[], not isChoice stub options",
+          path: "classes[0].features[Warden Bond]",
+        })
+      }
+      const clsRow = asRecord(Array.isArray(root.classes) ? root.classes[0] : null)
+      const nestedBonds = Array.isArray(clsRow?.subclasses) ? clsRow!.subclasses : []
+      const topBonds = Array.isArray(root.subclasses) ? root.subclasses : []
+      if (!topBonds.length && !nestedBonds.length) {
+        findings.push({
+          id: "kibbles_warden.missing_bonds",
+          severity: "warn",
+          message:
+            "Missing Warden Bonds in subclasses[] (Elemental Soul, Beasthide, Elderheart, …) — usually in a separate subclasses paste",
+          path: "subclasses",
+        })
+      }
+      const proposals = asRecord(root.import_proposals)
+      const customs = Array.isArray(proposals?.custom_abilities) ? proposals!.custom_abilities : []
+      const knacks = customs.filter((row) => asRecord(row)?.ability_role === "knack")
+      if (knacks.length < 1) {
+        findings.push({
+          id: "kibbles_warden.missing_manifestation_knacks",
+          severity: "warn",
+          message:
+            "Primal Manifestations library missing — emit import_proposals.custom_abilities with ability_role knack (usually from subclasses / manifestations paste)",
+          path: "import_proposals.custom_abilities",
+        })
+      }
+    }
+  }
+
+  // --- KibblesTasty Inventor ---
+  if (/inventor/i.test(name)) {
+    if (!res.some((r) => r.resource_key === "upgrades")) {
+      findings.push({
+        id: "inventor.upgrades",
+        severity: "error",
+        message: "Missing class_resources.upgrades (special choice count from Upgrades column)",
+        path: "class_resources",
+      })
+    } else {
+      const upgrades = res.find((r) => r.resource_key === "upgrades")
+      const uses = asRecord(upgrades?.uses)
+      if (uses && uses.type !== "special") {
+        findings.push({
+          id: "inventor.upgrades_special",
+          severity: "error",
+          message: 'upgrades must use uses.type "special" (choice count, not a spendable pool)',
+          path: "class_resources[upgrades].uses",
+        })
+      }
+    }
+    const upgradeFeat = featureNamed(features, /^specialization upgrade$/i)
+    const upgradeChoices = asRecord(upgradeFeat?.choices)
+    if (upgradeFeat && upgradeChoices?.optionsSource !== "class_upgrades") {
+      findings.push({
+        id: "inventor.upgrades_picker",
+        severity: "error",
+        message: 'Specialization Upgrade must use choices.optionsSource "class_upgrades"',
+        path: "classes[0].features[Specialization Upgrade].choices",
+      })
+    }
+    if (upgradeFeat && upgradeChoices?.swappableOnRest === true) {
+      findings.push({
+        id: "inventor.upgrades_no_rest_swap",
+        severity: "warn",
+        message: "Specialization Upgrades swap on level-up only — set swappableOnRest: false",
+        path: "classes[0].features[Specialization Upgrade].choices",
+      })
+    }
+    const clsRow = asRecord(Array.isArray(root.classes) ? root.classes[0] : null)
+    const spellcasting = asRecord(clsRow?.spellcasting)
+    if (spellcasting && spellcasting.prepared === true) {
+      findings.push({
+        id: "inventor.not_prepared",
+        severity: "warn",
+        message: "Inventor uses Spells Known — set prepared: false (not Artificer-style prepared)",
+        path: "classes[0].spellcasting",
+      })
+    }
+    if (spellcasting && spellcasting.caster_progression && spellcasting.caster_progression !== "half") {
+      findings.push({
+        id: "inventor.half_caster",
+        severity: "warn",
+        message: 'Inventor should use caster_progression "half"',
+        path: "classes[0].spellcasting",
+      })
+    }
+    const nestedSpecs = Array.isArray(clsRow?.subclasses) ? clsRow!.subclasses : []
+    const topSpecs = Array.isArray(root.subclasses) ? root.subclasses : []
+    if (!topSpecs.length && !nestedSpecs.length) {
+      findings.push({
+        id: "inventor.missing_specializations",
+        severity: "error",
+        message:
+          "Missing Inventor specializations in subclasses[] (Gadgetsmith, Golemsmith, Infusionsmith, …)",
+        path: "subclasses",
+      })
+    }
+    const proposals = asRecord(root.import_proposals)
+    const customs = Array.isArray(proposals?.custom_abilities) ? proposals!.custom_abilities : []
+    const upgradeRows = customs.filter((row) => asRecord(row)?.ability_role === "upgrade")
+    if (upgradeRows.length < 1) {
+      findings.push({
+        id: "inventor.missing_upgrade_leaves",
+        severity: "warn",
+        message:
+          "Upgrade library missing — emit import_proposals.custom_abilities with ability_role upgrade (one row per upgrade, not section headers)",
+        path: "import_proposals.custom_abilities",
+      })
+    }
+    const allSpecs = [
+      ...(Array.isArray(topSpecs) ? topSpecs : []),
+      ...(Array.isArray(nestedSpecs) ? nestedSpecs : []),
+    ]
+    const hasRunesmith = allSpecs.some((sc) => /^runesmith$/i.test(String(asRecord(sc)?.name ?? "")))
+    if (hasRunesmith) {
+      const runes = res.find((r) => r.resource_key === "runes_marked")
+      if (!runes) {
+        findings.push({
+          id: "inventor.runes_marked",
+          severity: "error",
+          message:
+            "Runesmith present but missing class_resources.runes_marked (special subclass-scoped cap from Runic Marks)",
+          path: "class_resources",
+        })
+      } else {
+        const uses = asRecord(runes.uses)
+        if (uses && uses.type !== "special") {
+          findings.push({
+            id: "inventor.runes_marked_special",
+            severity: "error",
+            message: 'runes_marked must use uses.type "special" (static cap, not a spendable pool)',
+            path: "class_resources[runes_marked].uses",
+          })
+        }
+        if (!/^runesmith$/i.test(String(runes.subclass_name ?? ""))) {
+          findings.push({
+            id: "inventor.runes_marked_subclass",
+            severity: "warn",
+            message: 'runes_marked should set subclass_name "Runesmith"',
+            path: "class_resources[runes_marked].subclass_name",
+          })
+        }
+      }
+    }
+    const hasRelicsmith = allSpecs.some((sc) => /^relicsmith$/i.test(String(asRecord(sc)?.name ?? "")))
+    if (hasRelicsmith) {
+      const justicar = allSpecs
+        .flatMap((sc) => {
+          const row = asRecord(sc)
+          return Array.isArray(row?.features) ? (row!.features as JsonRecord[]) : []
+        })
+        .find((f) => /^justicar savant$/i.test(String(f.name ?? "")))
+      const choices = asRecord(justicar?.choices)
+      if (justicar && (!Array.isArray(choices?.options) || choices!.options.length < 1)) {
+        findings.push({
+          id: "inventor.justicar_second_path",
+          severity: "warn",
+          message:
+            "Justicar Savant should be isChoice with Ordained Path options (additional path at 14th)",
+          path: "subclasses[Relicsmith].features[Justicar Savant].choices",
+        })
+      }
+    }
+  }
+
   // --- Generic ---
   for (const row of res) {
     const uses = asRecord(row.uses)

@@ -683,6 +683,29 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
+  it("wires damage_immunity AI mechanics to a cat_char_damage_immunity characteristic", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_immunity",
+          damageTypes: ["Necrotic", "Poison"],
+          sourcePhrase: "You are immune to Necrotic and Poison damage",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Necromancer", featureName: "Lichdom" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.damage_immunity")
+    expect(detections[0]?.instance.catalogRefId).toBe("cat_char_damage_immunity")
+    const characteristic = detections[0]?.instance.characteristics?.[0]
+    expect(characteristic?.type).toBe("damage_immunity")
+    expect(characteristic && "damageTypes" in characteristic ? characteristic.damageTypes : []).toEqual([
+      "Necrotic",
+      "Poison",
+    ])
+  })
+
   it("threads requiresSheetToggle through damage_resistance and condition_immunity AI mechanics", () => {
     const resistance = aiMechanicsToDetections(
       [

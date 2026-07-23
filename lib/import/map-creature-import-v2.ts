@@ -223,18 +223,23 @@ function legacyToPersistRow(creature: CreatureImportLegacy, source: string): Cre
       category: "creature",
     }
 
+  const category =
+    creature.category === "companion" || template.category === "companion"
+      ? "companion"
+      : "creature"
+
   return {
     name: creature.name,
     description: prose || null,
     creature_type: creature.creature_type ?? parsed?.creatureType ?? null,
     size: creature.size ?? parsed?.size ?? null,
     alignment: creature.alignment ?? parsed?.alignment ?? null,
-    cr: creature.cr ?? parsed?.cr ?? null,
-    category: "creature",
+    cr: category === "companion" ? null : (creature.cr ?? parsed?.cr ?? null),
+    category,
     xp: null,
-    scaling: null,
+    scaling: creature.scaling ?? template.scaling ?? null,
     import_payload: null,
-    stat_block: { ...template, name: creature.name, category: template.category ?? "creature" },
+    stat_block: { ...template, name: creature.name, category: template.category ?? category },
     prerequisite_rules: creature.prerequisite_rules ?? null,
     source: creature.source?.trim() || source,
   }

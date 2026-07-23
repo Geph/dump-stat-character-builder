@@ -163,6 +163,15 @@ export const CreatureImportLegacySchema = z.object({
   size: z.string().nullable().optional(),
   alignment: z.string().nullable().optional(),
   cr: z.string().nullable().optional(),
+  /** When set without full v2 fields, persist uses this category (companion vs creature). */
+  category: z.enum(["creature", "companion"]).nullable().optional(),
+  scaling: z
+    .object({
+      scales_with: z.string(),
+      notes: z.string(),
+    })
+    .nullable()
+    .optional(),
   /** Pre-parsed CompanionStatBlockTemplate or opaque record. */
   stat_block: z.record(z.unknown()).nullable().optional(),
   prerequisite_rules: z

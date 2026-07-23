@@ -39,6 +39,7 @@ import {
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import { applyFeatNamePreset, featHasNamePreset } from "@/lib/compendium/apply-feat-name-preset"
 import type { Feature, Trait } from "@/lib/types"
+import { hoistCompanionStatBlocksToCreatures } from "@/lib/import/hoist-companion-stat-blocks"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
 
@@ -514,5 +515,7 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   )
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 
-  return applyImportEnrichmentPresets(enrichImportChoiceFeatures(withSubclassSpells))
+  return hoistCompanionStatBlocksToCreatures(
+    applyImportEnrichmentPresets(enrichImportChoiceFeatures(withSubclassSpells)),
+  )
 }

@@ -1086,6 +1086,23 @@ function buildFromMechanic(
         ]),
       }
     }
+    case "damage_immunity": {
+      const types = (mechanic.damageTypes ?? []).map(titleCaseWords).filter(Boolean)
+      if (!types.length) return null
+      return {
+        ruleId: "ai.damage_immunity",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("damage_immunity"), [
+          {
+            id: modId(instanceKey(ctx, "damage_immune")),
+            type: "damage_immunity",
+            damageTypes: types,
+            ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+          },
+        ]),
+      }
+    }
     case "condition_immunity": {
       const conditions = (mechanic.conditions ?? []).map(titleCaseWords).filter(Boolean)
       if (!conditions.length) return null
