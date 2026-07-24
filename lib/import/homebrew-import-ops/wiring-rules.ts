@@ -913,6 +913,90 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
   }
 
+  // --- LaserLlama Alternate Monk ---
+  if (/alternate\s+monk/i.test(name) || (/^monk$/i.test(name) && res.some((r) => r.resource_key === "techniques_known"))) {
+    if (/^monk$/i.test(name)) {
+      findings.push({
+        id: "altmonk.rename",
+        severity: "error",
+        message: 'Class name must be "Alternate Monk" (not bare "Monk") to avoid PHB collision',
+        path: "classes[0].name",
+      })
+    }
+    const kiKeys = ["alternate_monk_ki_points", "ki", "ki_points", "focus_points"]
+    const ki = res.find((r) => kiKeys.includes(String(r.resource_key)))
+    if (!ki) {
+      findings.push({
+        id: "altmonk.ki",
+        severity: "error",
+        message: "Missing class_resources.alternate_monk_ki_points (prefixed Ki pool)",
+        path: "class_resources",
+      })
+    } else if (ki.resource_key !== "alternate_monk_ki_points") {
+      findings.push({
+        id: "altmonk.ki_key",
+        severity: "error",
+        message:
+          'Ki pool must use resource_key "alternate_monk_ki_points" (never bare "ki" / "ki_points" / "focus_points")',
+        path: `class_resources[${String(ki.resource_key)}]`,
+      })
+    }
+    if (!res.some((r) => r.resource_key === "techniques_known")) {
+      findings.push({
+        id: "altmonk.techniques_known",
+        severity: "error",
+        message: "Missing class_resources.techniques_known (special choice count)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "martial_arts_die")) {
+      findings.push({
+        id: "altmonk.martial_arts_die",
+        severity: "warn",
+        message: "Missing class_resources.martial_arts_die (special dieSidesByLevel)",
+        path: "class_resources",
+      })
+    }
+    const mystic = featureNamed(features, /^mystic techniques$/i)
+    const mysticChoices = asRecord(mystic?.choices)
+    if (mystic && mysticChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altmonk.mystic_techniques",
+        severity: "error",
+        message:
+          'Mystic Techniques must use choices.optionsSource "class_knacks" + resourceKey techniques_known',
+        path: "classes[0].features[Mystic Techniques].choices",
+      })
+    }
+    const brawler = (Array.isArray(root.subclasses) ? root.subclasses : [])
+      .map(asRecord)
+      .find((s) => /^way of the brawler$/i.test(String(s?.name ?? "")))
+    if (brawler) {
+      const savage = ((Array.isArray(brawler.features) ? brawler.features : []) as unknown[])
+        .map(asRecord)
+        .find((f) => /^savage exploits$/i.test(String(f?.name ?? "")))
+      const savageChoices = asRecord(savage?.choices)
+      if (savage && savageChoices?.optionsSource === "class_knacks") {
+        findings.push({
+          id: "altmonk.brawler_exploits",
+          severity: "error",
+          message:
+            "Way of the Brawler Savage Exploits must use inline choices.options (not class_knacks — would pollute Mystic Techniques)",
+          path: "subclasses[Way of the Brawler].features[Savage Exploits].choices",
+        })
+      }
+      if (!res.some((r) => r.resource_key === "exploit_degree")) {
+        findings.push({
+          id: "altmonk.exploit_degree",
+          severity: "warn",
+          message:
+            "Brawler High Degree column should be class_resources.exploit_degree (special cap 1/2/3)",
+          path: "class_resources",
+        })
+      }
+    }
+  }
+
   // --- LaserLlama Alternate Barbarian ---
   if (/alternate\s+barbarian/i.test(name)) {
     if (!res.some((r) => r.resource_key === "rage" || r.resource_key === "rages")) {
@@ -968,6 +1052,192 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
         message:
           'Savage Exploits must use choices.optionsSource "class_knacks" + resourceKey exploits_known',
         path: "classes[0].features[Savage Exploits].choices",
+      })
+    }
+  }
+
+  // --- LaserLlama Alternate Rogue ---
+  if (
+    /alternate\s+rogue/i.test(name) ||
+    (/^rogue$/i.test(name) &&
+      res.some((r) => r.resource_key === "exploits_known") &&
+      res.some((r) => r.resource_key === "exploit_dice"))
+  ) {
+    if (/^rogue$/i.test(name)) {
+      findings.push({
+        id: "altrogue.rename",
+        severity: "error",
+        message: 'Class name must be "Alternate Rogue" (not bare "Rogue") to avoid PHB collision',
+        path: "classes[0].name",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "exploit_dice")) {
+      findings.push({
+        id: "altrogue.exploit_dice",
+        severity: "error",
+        message: "Missing class_resources.exploit_dice (with dieSidesByLevel)",
+        path: "class_resources",
+      })
+    } else {
+      const dice = res.find((r) => r.resource_key === "exploit_dice")
+      const uses = asRecord(dice?.uses)
+      const table = Array.isArray(uses?.atLevelTable) ? (uses!.atLevelTable as JsonRecord[]) : []
+      if (!table.some((t) => Number(t.level) === 17 && Number(t.count) === 5)) {
+        findings.push({
+          id: "altrogue.exploit_dice_l17",
+          severity: "error",
+          message: "exploit_dice atLevelTable must include level 17 → 5 dice",
+          path: "class_resources[exploit_dice].uses.atLevelTable",
+        })
+      }
+    }
+    if (!res.some((r) => r.resource_key === "exploits_known")) {
+      findings.push({
+        id: "altrogue.exploits_known",
+        severity: "error",
+        message: "Missing class_resources.exploits_known (special choice count)",
+        path: "class_resources",
+      })
+    }
+    const devious = featureNamed(features, /^devious exploits$/i)
+    const deviousChoices = asRecord(devious?.choices)
+    if (devious && deviousChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altrogue.devious_exploits",
+        severity: "error",
+        message:
+          'Devious Exploits must use choices.optionsSource "class_knacks" + resourceKey exploits_known',
+        path: "classes[0].features[Devious Exploits].choices",
+      })
+    }
+    if (devious && !Array.isArray(deviousChoices?.choiceCountByLevel)) {
+      findings.push({
+        id: "altrogue.devious_choice_count",
+        severity: "error",
+        message: "Devious Exploits needs choices.choiceCountByLevel from the Exploits Known column",
+        path: "classes[0].features[Devious Exploits].choices.choiceCountByLevel",
+      })
+    }
+    if (featureNamed(features, /^expertise\s*\(\s*uncanny dodge\s*\)$/i)) {
+      findings.push({
+        id: "altrogue.uncanny_dodge_name",
+        severity: "error",
+        message: 'Level 6 feature must be named "Uncanny Dodge" (not "Expertise (Uncanny Dodge)")',
+        path: "classes[0].features",
+      })
+    }
+    const abilities = Array.isArray(asRecord(root.import_proposals)?.custom_abilities)
+      ? (asRecord(root.import_proposals)!.custom_abilities as unknown[])
+      : []
+    const saboteurPolluters = abilities
+      .map(asRecord)
+      .filter(
+        (a) =>
+          a &&
+          /^saboteur$/i.test(String(a.source_name ?? "")) &&
+          Array.isArray(a.eligible_classes) &&
+          (a.eligible_classes as unknown[]).some((c) =>
+            /^(alternate\s+)?rogue$/i.test(String(c)),
+          ),
+      )
+    if (saboteurPolluters.length) {
+      findings.push({
+        id: "altrogue.saboteur_pollution",
+        severity: "error",
+        message:
+          "Saboteur explosives must not use eligible_classes Alternate Rogue (pollutes Devious Exploits) — keep subclass-scoped with eligible_classes null",
+        path: "import_proposals.custom_abilities",
+      })
+    }
+  }
+
+  // --- LaserLlama Alternate Fighter ---
+  if (
+    /alternate\s+fighter/i.test(name) ||
+    (/^fighter$/i.test(name) &&
+      res.some((r) => r.resource_key === "exploits_known") &&
+      res.some((r) => r.resource_key === "exploit_dice"))
+  ) {
+    if (/^fighter$/i.test(name)) {
+      findings.push({
+        id: "altfighter.rename",
+        severity: "error",
+        message: 'Class name must be "Alternate Fighter" (not bare "Fighter") to avoid PHB collision',
+        path: "classes[0].name",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "exploit_dice")) {
+      findings.push({
+        id: "altfighter.exploit_dice",
+        severity: "error",
+        message: "Missing class_resources.exploit_dice (with dieSidesByLevel)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "exploits_known")) {
+      findings.push({
+        id: "altfighter.exploits_known",
+        severity: "error",
+        message: "Missing class_resources.exploits_known (special choice count)",
+        path: "class_resources",
+      })
+    }
+    const martial = featureNamed(features, /^martial exploits$/i)
+    const martialChoices = asRecord(martial?.choices)
+    if (martial && martialChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altfighter.martial_exploits",
+        severity: "error",
+        message:
+          'Martial Exploits must use choices.optionsSource "class_knacks" + resourceKey exploits_known',
+        path: "classes[0].features[Martial Exploits].choices",
+      })
+    }
+    if (martial && !Array.isArray(martialChoices?.choiceCountByLevel)) {
+      findings.push({
+        id: "altfighter.martial_choice_count",
+        severity: "error",
+        message: "Martial Exploits needs choices.choiceCountByLevel from the Exploits Known column",
+        path: "classes[0].features[Martial Exploits].choices.choiceCountByLevel",
+      })
+    }
+    const dice = res.find((r) => r.resource_key === "exploit_dice")
+    const diceUses = asRecord(dice?.uses)
+    if (
+      featureNamed(features, /^relentless$/i) &&
+      diceUses &&
+      diceUses.rechargeOnInitiative == null
+    ) {
+      findings.push({
+        id: "altfighter.relentless_initiative",
+        severity: "warn",
+        message:
+          "Relentless restores all Exploit Dice on initiative — set exploit_dice.uses.rechargeOnInitiative: true",
+        path: "class_resources[exploit_dice].uses",
+      })
+    }
+    const abilities = Array.isArray(asRecord(root.import_proposals)?.custom_abilities)
+      ? (asRecord(root.import_proposals)!.custom_abilities as unknown[])
+      : []
+    const catalogPolluters = abilities
+      .map(asRecord)
+      .filter(
+        (a) =>
+          a &&
+          a.source_type === "subclass" &&
+          /^(runecarver|sylvan archer|tinker|quartermaster)$/i.test(String(a.source_name ?? "")) &&
+          Array.isArray(a.eligible_classes) &&
+          (a.eligible_classes as unknown[]).some((c) =>
+            /^(alternate\s+)?fighter$/i.test(String(c)),
+          ),
+      )
+    if (catalogPolluters.length) {
+      findings.push({
+        id: "altfighter.catalog_pollution",
+        severity: "error",
+        message:
+          "Runecarver/Sylvan Archer/Tinker/Quartermaster catalogs must not use eligible_classes Alternate Fighter (pollutes Martial Exploits) — use inline choices.options",
+        path: "import_proposals.custom_abilities",
       })
     }
   }

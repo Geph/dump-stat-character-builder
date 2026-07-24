@@ -39,9 +39,26 @@ describe("Ravenloft mixed subclass set wiring", () => {
       // feature.isChoice/choices rather than staying as a "feature_option_picker" characteristic.
       expect(chars(feature).length > 0 || feature.isChoice === true, name).toBe(true)
     }
+
+    const strange = wire("Artificer", "Reanimator", "Strange Modifications")
+    expect(strange.isChoice).toBe(true)
+    expect(strange.choices?.choiceCountByLevel).toEqual([
+      { level: 5, count: 1 },
+      { level: 9, count: 2 },
+      { level: 15, count: 3 },
+    ])
+    expect((strange.choices?.options ?? []).map((o) => o.name)).toEqual(
+      expect.arrayContaining(["Arcane Conduit", "Ferocity", "Bloated", "Gaunt", "Moist"]),
+    )
+    expect((strange.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0)).toBe(true)
+
+    // Macabre/Superior are unlock blurbs — not a second polluting picker.
+    const macabre = wire("Artificer", "Reanimator", "Macabre Modifications")
+    expect(macabre.isChoice ?? false).toBe(false)
+    expect(chars(macabre).some((c) => c.type === "uses")).toBe(true)
   })
 
-  it("wires Bard College of Spirits: Channeler, Spirits from Beyond, Empowered Channeling", () => {
+  it("wires Bard College of Spirits: Channeler, Spirits from Beyond, Empowered Channeling, Mystical Connection", () => {
     const channeler = wire("Bard", "College of Spirits", "Channeler")
     const channelerTypes = chars(channeler).map((c) => c.type)
     expect(channelerTypes).toContain("spells_known")
@@ -54,6 +71,9 @@ describe("Ravenloft mixed subclass set wiring", () => {
     const empoweredTypes = chars(empowered).map((c) => c.type)
     expect(empoweredTypes).toContain("spells_known")
     expect(empoweredTypes).toContain("uses")
+
+    const mystical = wire("Bard", "College of Spirits", "Mystical Connection")
+    expect(chars(mystical).some((c) => c.type === "uses")).toBe(true)
   })
 
   it("wires Cleric Grave Domain: Circle of Mortality, Path to the Grave, Sentinel, Divine Reaper", () => {
@@ -81,6 +101,9 @@ describe("Ravenloft mixed subclass set wiring", () => {
       const feature = wire("Ranger", "Hollow Warden", name)
       expect(chars(feature).length + fxKinds(feature).length, name).toBeGreaterThan(0)
     }
+    const wrath = wire("Ranger", "Hollow Warden", "Wrath of the Wild")
+    const wrathBlob = JSON.stringify(wrath.linkedModifiers ?? [])
+    expect(wrathBlob).toContain("wrath_of_the_wild_form")
   })
 
   it("wires Rogue Phantom: Wails from the Grave, Tokens, Ghost Walk, Voice of Death", () => {
@@ -91,6 +114,7 @@ describe("Ravenloft mixed subclass set wiring", () => {
     const ghostWalk = wire("Rogue", "Phantom", "Ghost Walk")
     expect(ghostWalk.activation?.bonusAction).toBe(true)
     expect(chars(ghostWalk).some((c) => c.type === "speed")).toBe(true)
+    expect(JSON.stringify(ghostWalk.linkedModifiers ?? [])).toContain("ghost_walk_form")
 
     const voiceOfDeath = wire("Rogue", "Phantom", "Voice of Death")
     expect(chars(voiceOfDeath).some((c) => c.type === "uses")).toBe(true)
@@ -107,6 +131,13 @@ describe("Ravenloft mixed subclass set wiring", () => {
 
     const umbral = wire("Sorcerer", "Shadow Sorcery", "Umbral Form")
     expect(chars(umbral).some((c) => c.type === "damage_resistance")).toBe(true)
+    expect(JSON.stringify(umbral.linkedModifiers ?? [])).toContain("umbral_form")
+    const res = chars(umbral).find((c) => c.type === "damage_resistance") as {
+      damageTypes?: string[]
+    }
+    expect(res?.damageTypes?.length).toBeGreaterThanOrEqual(10)
+    expect(res?.damageTypes ?? []).not.toContain("Force")
+    expect(res?.damageTypes ?? []).not.toContain("Radiant")
   })
 
   it("wires Warlock Undead Patron: Form of Dread, Necrotic Husk, Superior Dread", () => {

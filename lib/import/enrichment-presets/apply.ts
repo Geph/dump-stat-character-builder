@@ -38,6 +38,12 @@ import {
   sanitizeAlternateRangerImportContent,
   sanitizeLaserLlamaRangerKnacksImportContent,
 } from "@/lib/import/enrichment-presets/packs/alternate-ranger"
+import {
+  sanitizeAlternateMonkImportContent,
+  sanitizeLaserLlamaMonkTechniquesImportContent,
+} from "@/lib/import/enrichment-presets/packs/alternate-monk"
+import { sanitizeAlternateRogueImportContent } from "@/lib/import/enrichment-presets/packs/alternate-rogue"
+import { sanitizeAlternateFighterImportContent } from "@/lib/import/enrichment-presets/packs/alternate-fighter"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import type {
   EnrichmentOperation,
@@ -569,7 +575,12 @@ export function applyImportEnrichmentPresets(
   next = sanitizeInventorImportContent(next)
   next = sanitizeAlternateSorcererImportContent(next)
   next = sanitizeAlternateBarbarianImportContent(next)
+  next = sanitizeAlternateMonkImportContent(next)
+  next = sanitizeAlternateRogueImportContent(next)
+  next = sanitizeAlternateFighterImportContent(next)
+  // Exploits after Alternate Barbarian/Monk/Rogue/Fighter so eligibility is already normalized.
   next = sanitizeLaserLlamaExploitsImportContent(next)
+  next = sanitizeLaserLlamaMonkTechniquesImportContent(next)
   next = sanitizeAlternateRangerImportContent(next)
   next = sanitizeLaserLlamaRangerKnacksImportContent(next)
   next = sanitizeWitchImportContent(next)

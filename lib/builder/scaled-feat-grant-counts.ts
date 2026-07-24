@@ -16,6 +16,14 @@ const ALTERNATE_SORCERER_METAMAGIC_THRESHOLDS = [
 /** Alternate Monk: +1 Mystic Technique known at each listed class level. */
 const MYSTIC_TECHNIQUE_THRESHOLDS = [3, 5, 7, 9, 11, 13, 15, 17, 19] as const
 
+/** LaserLlama Alternate Fighter: Fighting Styles Known column. */
+const ALTERNATE_FIGHTER_FIGHTING_STYLE_THRESHOLDS = [
+  { level: 1, count: 1 },
+  { level: 6, count: 2 },
+  { level: 12, count: 3 },
+  { level: 18, count: 4 },
+] as const
+
 export function scaledClassFeatGrantCount(
   className: string,
   featureName: string,
@@ -40,6 +48,16 @@ export function scaledClassFeatGrantCount(
     /mystic techniques?/i.test(featureName)
   ) {
     return MYSTIC_TECHNIQUE_THRESHOLDS.filter((level) => level <= classLevel).length
+  }
+  if (
+    /alternate fighter/i.test(className) &&
+    /^fighting styles?$/i.test(featureName)
+  ) {
+    let count = baseCount
+    for (const tier of ALTERNATE_FIGHTER_FIGHTING_STYLE_THRESHOLDS) {
+      if (tier.level <= classLevel) count = tier.count
+    }
+    return count
   }
   return baseCount
 }
