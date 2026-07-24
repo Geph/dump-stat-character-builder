@@ -821,6 +821,236 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
   }
 
+  // --- LaserLlama Alternate Ranger ---
+  if (/alternate\s+ranger/i.test(name) || ( /^ranger$/i.test(name) && res.some((r) => r.resource_key === "quarry_die"))) {
+    if (!res.some((r) => r.resource_key === "quarry")) {
+      findings.push({
+        id: "altranger.quarry",
+        severity: "error",
+        message: "Missing class_resources.quarry (WIS-mod spendable pool with restoreBySpellSlot)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "quarry_die")) {
+      findings.push({
+        id: "altranger.quarry_die",
+        severity: "error",
+        message: "Missing class_resources.quarry_die (special die size with dieSidesByLevel)",
+        path: "class_resources",
+      })
+    } else {
+      const die = res.find((r) => r.resource_key === "quarry_die")
+      const uses = asRecord(die?.uses)
+      if (!Array.isArray(uses?.dieSidesByLevel) || (uses!.dieSidesByLevel as unknown[]).length < 1) {
+        findings.push({
+          id: "altranger.quarry_die_sides",
+          severity: "error",
+          message: "quarry_die must use uses.dieSidesByLevel (not atLevelTable counts as die sides)",
+          path: "class_resources[quarry_die].uses",
+        })
+      }
+    }
+    if (!res.some((r) => r.resource_key === "knacks_known")) {
+      findings.push({
+        id: "altranger.knacks_known",
+        severity: "error",
+        message: "Missing class_resources.knacks_known (special choice count)",
+        path: "class_resources",
+      })
+    }
+    const knacks = featureNamed(features, /^knacks$/i)
+    const knackChoices = asRecord(knacks?.choices)
+    if (knacks && knackChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altranger.knacks_picker",
+        severity: "error",
+        message: 'Knacks must use choices.optionsSource "class_knacks" + resourceKey knacks_known',
+        path: "classes[0].features[Knacks].choices",
+      })
+    }
+    const bounty = (Array.isArray(root.subclasses) ? root.subclasses : [])
+      .map(asRecord)
+      .find((sc) => /^bounty hunter$/i.test(String(sc?.name ?? "")))
+    if (bounty) {
+      const martial = Array.isArray(bounty.features)
+        ? bounty.features.map(asRecord).find((f) => /^martial exploits$/i.test(String(f?.name ?? "")))
+        : null
+      const martialChoices = asRecord(martial?.choices)
+      if (martial && martialChoices?.optionsSource === "class_knacks") {
+        findings.push({
+          id: "altranger.bounty_exploits_knacks",
+          severity: "error",
+          message:
+            'Bounty Hunter Martial Exploits must NOT use optionsSource class_knacks (pollutes Ranger Knacks) — use inline choices.options like Beastheart Infernal/Nature',
+          path: "subclasses[Bounty Hunter].features[Martial Exploits].choices",
+        })
+      }
+      if (martial && (!Array.isArray(martialChoices?.options) || martialChoices!.options.length < 1)) {
+        findings.push({
+          id: "altranger.bounty_exploits_options",
+          severity: "error",
+          message: "Bounty Hunter Martial Exploits needs inline choices.options (Fighter exploit list)",
+          path: "subclasses[Bounty Hunter].features[Martial Exploits].choices.options",
+        })
+      }
+      if (!res.some((r) => r.resource_key === "exploit_degree")) {
+        findings.push({
+          id: "altranger.high_degree",
+          severity: "warn",
+          message:
+            "Bounty Hunter High Degree column should be class_resources.exploit_degree (special cap 1/2/3)",
+          path: "class_resources",
+        })
+      }
+    }
+    if (/^ranger$/i.test(name)) {
+      findings.push({
+        id: "altranger.rename",
+        severity: "error",
+        message: 'Class name must be "Alternate Ranger" (not bare "Ranger") to avoid PHB collision',
+        path: "classes[0].name",
+      })
+    }
+  }
+
+  // --- LaserLlama Alternate Barbarian ---
+  if (/alternate\s+barbarian/i.test(name)) {
+    if (!res.some((r) => r.resource_key === "rage" || r.resource_key === "rages")) {
+      findings.push({
+        id: "altbarbarian.rage",
+        severity: "error",
+        message: 'Missing class_resources.rage (use resource_key "rage", not "rages")',
+        path: "class_resources",
+      })
+    } else if (res.some((r) => r.resource_key === "rages")) {
+      findings.push({
+        id: "altbarbarian.rage_key",
+        severity: "error",
+        message: 'Rage pool must use resource_key "rage" (SRD/spend patterns), not "rages"',
+        path: "class_resources[rages]",
+      })
+    } else {
+      const rage = res.find((r) => r.resource_key === "rage")
+      const uses = asRecord(rage?.uses)
+      const table = Array.isArray(uses?.atLevelTable) ? (uses!.atLevelTable as JsonRecord[]) : []
+      if (table.some((t) => Number(t.level) === 20 && Number(t.count) >= 50)) {
+        findings.push({
+          id: "altbarbarian.rage_unlimited",
+          severity: "error",
+          message:
+            "Rage at 20th is Unlimited — use uses.freeUseAfterLevel: 20 (not a placeholder count of 100)",
+          path: "class_resources[rage].uses",
+        })
+      }
+    }
+    if (!res.some((r) => r.resource_key === "exploit_dice")) {
+      findings.push({
+        id: "altbarbarian.exploit_dice",
+        severity: "error",
+        message: "Missing class_resources.exploit_dice (with dieSidesByLevel)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "exploits_known")) {
+      findings.push({
+        id: "altbarbarian.exploits_known",
+        severity: "error",
+        message: "Missing class_resources.exploits_known (special choice count)",
+        path: "class_resources",
+      })
+    }
+    const savage = featureNamed(features, /^savage exploits$/i)
+    const savageChoices = asRecord(savage?.choices)
+    if (savage && savageChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altbarbarian.savage_exploits",
+        severity: "error",
+        message:
+          'Savage Exploits must use choices.optionsSource "class_knacks" + resourceKey exploits_known',
+        path: "classes[0].features[Savage Exploits].choices",
+      })
+    }
+  }
+
+  // --- LaserLlama Alternate Sorcerer ---
+  if (/alternate\s+sorcerer/i.test(name)) {
+    if (!res.some((r) => r.resource_key === "sorcery_points")) {
+      findings.push({
+        id: "altsorcerer.sorcery_points",
+        severity: "error",
+        message: "Missing class_resources.sorcery_points (point-pool caster)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "spell_limit")) {
+      findings.push({
+        id: "altsorcerer.spell_limit",
+        severity: "error",
+        message: "Missing class_resources.spell_limit (base cast cost cap)",
+        path: "class_resources",
+      })
+    }
+    if (!res.some((r) => r.resource_key === "metamagics_known")) {
+      findings.push({
+        id: "altsorcerer.metamagics_known",
+        severity: "error",
+        message: "Missing class_resources.metamagics_known (special choice count)",
+        path: "class_resources",
+      })
+    } else {
+      const known = res.find((r) => r.resource_key === "metamagics_known")
+      const uses = asRecord(known?.uses)
+      if (uses && uses.type !== "special") {
+        findings.push({
+          id: "altsorcerer.metamagics_special",
+          severity: "error",
+          message: 'metamagics_known must use uses.type "special"',
+          path: "class_resources[metamagics_known].uses",
+        })
+      }
+    }
+    const metamagic = featureNamed(features, /^metamagic$/i)
+    const mmChoices = asRecord(metamagic?.choices)
+    if (metamagic && mmChoices?.optionsSource !== "class_knacks") {
+      findings.push({
+        id: "altsorcerer.metamagic_picker",
+        severity: "error",
+        message:
+          'Metamagic must use choices.optionsSource "class_knacks" + resourceKey metamagics_known (not grant_feat / PHB catalog)',
+        path: "classes[0].features[Metamagic].choices",
+      })
+    }
+    if (features.some((f) => /^subclass feature$/i.test(String(f.name ?? "")))) {
+      findings.push({
+        id: "altsorcerer.subclass_placeholders",
+        severity: "error",
+        message: 'Remove "Subclass Feature" placeholders — real Origin features live on subclasses[]',
+        path: "classes[0].features",
+      })
+    }
+    const draconic = (Array.isArray(root.subclasses) ? root.subclasses : [])
+      .map(asRecord)
+      .find((sc) => /^draconic sorcery$/i.test(String(sc?.name ?? "")))
+    if (draconic) {
+      const dFeats = Array.isArray(draconic.features) ? draconic.features : []
+      const hasGap = dFeats.some((f) =>
+        /level 3 content missing|open gap/i.test(String(asRecord(f)?.name ?? asRecord(f)?.description ?? "")),
+      )
+      const hasAncestor = dFeats.some((f) =>
+        /^dragon ancestor$/i.test(String(asRecord(f)?.name ?? "")),
+      )
+      if (hasGap || !hasAncestor) {
+        findings.push({
+          id: "altsorcerer.draconic_gap",
+          severity: "error",
+          message:
+            "Draconic Sorcery needs Dragon Ancestor / Draconic Resilience / Draconic Sorcery Spells at 3rd (fill from source — do not leave gap placeholders)",
+          path: "subclasses[Draconic Sorcery].features",
+        })
+      }
+    }
+  }
+
   // --- Generic ---
   for (const row of res) {
     const uses = asRecord(row.uses)

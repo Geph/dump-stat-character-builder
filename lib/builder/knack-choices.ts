@@ -10,6 +10,16 @@ function normalizeName(value: string): string {
   return value.trim().toLowerCase()
 }
 
+function classNameMatches(abilityClass: string, classKey: string): boolean {
+  const left = normalizeName(abilityClass)
+  const right = classKey
+  if (!left || !right) return false
+  if (left === right) return true
+  // "Barbarian" matches "Alternate Barbarian" and vice versa.
+  if (left.includes(right) || right.includes(left)) return true
+  return false
+}
+
 export function knackAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
@@ -20,12 +30,24 @@ export function knackAbilitiesForClass(
     ? normalizeName(options.subclassName)
     : null
   return customAbilities.filter((ability) => {
-    if (ability.ability_role !== "knack") return false
+    const isKnackRole = ability.ability_role === "knack"
+    const eligible = ability.eligible_classes ?? []
+    const eligibleHit =
+      eligible.length > 0 &&
+      [...classKeys].some((classKey) =>
+        eligible.some((name) => classNameMatches(name, classKey)),
+      )
+    // Exploit / shared libraries often omit ability_role and use eligible_classes only.
+    if (!isKnackRole && !eligibleHit) return false
+    if (isKnackRole && !eligibleHit) {
+      // Fall through to attachment / source matching for single-class knacks.
+    } else if (eligibleHit) {
+      return true
+    }
+
     if (ability.attached_to_type === "class" && ability.attached_to_id) {
       const attachKey = normalizeName(ability.attached_to_id)
-      return [...classKeys].some(
-        (classKey) => attachKey.includes(classKey) || classKey.includes(attachKey),
-      )
+      return [...classKeys].some((classKey) => classNameMatches(attachKey, classKey))
     }
     if (ability.attached_to_type === "subclass" && ability.attached_to_id) {
       if (!subclassKey) return false
@@ -34,7 +56,7 @@ export function knackAbilitiesForClass(
     }
     if (ability.source?.trim()) {
       const sourceKey = normalizeName(ability.source)
-      if ([...classKeys].some((classKey) => sourceKey.includes(classKey))) return true
+      if ([...classKeys].some((classKey) => classNameMatches(sourceKey, classKey))) return true
       if (subclassKey && (sourceKey.includes(subclassKey) || subclassKey.includes(sourceKey))) {
         return true
       }

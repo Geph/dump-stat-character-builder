@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { resolveHomebrewImportJsonPath } from "@/lib/import/homebrew-import-ops/paths"
 
 /**
  * Optional local homebrew / third-party JSON imports for development tests.
@@ -28,6 +29,9 @@ export function resolveHomebrewFixtureDir(): string | null {
 }
 
 export function homebrewFixturePath(name: string): string | null {
+  // Prefer recursive Drive import-json lookup (publisher subfolders).
+  const fromOps = resolveHomebrewImportJsonPath(name)
+  if (fromOps) return fromOps
   const dir = resolveHomebrewFixtureDir()
   if (!dir) return null
   const path = join(dir, name)

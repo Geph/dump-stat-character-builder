@@ -1,4 +1,9 @@
-export { homebrewImportJsonDir, homebrewSourceTextsDir, DRIVE_SMOKE_IMPORT_FILES } from "@/lib/import/homebrew-import-ops/paths"
+export {
+  homebrewImportJsonDir,
+  homebrewSourceTextsDir,
+  resolveHomebrewImportJsonPath,
+  DRIVE_SMOKE_IMPORT_FILES,
+} from "@/lib/import/homebrew-import-ops/paths"
 export {
   auditImportWiring,
   summarizeFindings,

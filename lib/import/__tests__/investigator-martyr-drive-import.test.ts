@@ -1,20 +1,21 @@
-import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
-import { homebrewImportJsonDir } from "@/lib/import/homebrew-import-ops"
+import { resolveHomebrewImportJsonPath } from "@/lib/import/homebrew-import-ops"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { Feature } from "@/lib/types"
 
-const DIR = homebrewImportJsonDir()
-const hasInvestigator = existsSync(join(DIR, "magehandpress-investigator-class"))
-const hasMartyr = existsSync(join(DIR, "magehandpress-martyr-class"))
+const investigatorPath = resolveHomebrewImportJsonPath("magehandpress-investigator-class")
+const martyrPath = resolveHomebrewImportJsonPath("magehandpress-martyr-class")
+const hasInvestigator = Boolean(investigatorPath)
+const hasMartyr = Boolean(martyrPath)
 
 function load(name: string) {
-  return parseImportContentJson(readFileSync(join(DIR, name), "utf8"))!
+  const path = resolveHomebrewImportJsonPath(name)!
+  return parseImportContentJson(readFileSync(path, "utf8"))!
 }
 
 function enrich(name: string) {

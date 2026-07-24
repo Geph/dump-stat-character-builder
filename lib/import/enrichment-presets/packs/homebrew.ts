@@ -364,7 +364,7 @@ export const ALTERNATE_RANGER_PRESETS: EnrichmentPreset[] = [
     id: "alternate_ranger.class.quarry",
     pack: "alternate_ranger",
     target: "class_feature",
-    match: { className: /alternate\s+ranger/i, name: /^quarry$/i },
+    match: { className: /alternate\s+ranger/i, name: /^(ranger'?s\s+)?quarry$/i },
     skipIfCharacteristicTypes: ["on_hit_trigger"],
     operations: [{ op: "attachNamedPreset", preset: { kind: "quarry_on_hit" } }],
   },
@@ -376,7 +376,7 @@ export const ALTERNATE_RANGER_SEEDS: ContentSeed[] = [
     pack: "alternate_ranger",
     seedClassResource: {
       className: /alternate\s+ranger/i,
-      requiresFeatureName: /^quarry$/i,
+      requiresFeatureName: /^(ranger'?s\s+)?quarry$/i,
       resourceKey: "quarry",
       build: buildQuarryClassResource,
     },

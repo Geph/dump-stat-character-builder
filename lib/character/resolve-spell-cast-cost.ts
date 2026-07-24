@@ -107,10 +107,44 @@ export function metamagicOptionsFromFeats(
     }))
 }
 
+export function metamagicOptionsFromCustomAbilities(
+  abilities: CustomAbility[],
+  selectedNames: string[],
+  spellLevel = 1,
+): MetamagicCastOption[] {
+  if (!selectedNames.length || !abilities.length) return []
+  const selected = new Set(selectedNames.map((name) => name.trim().toLowerCase()).filter(Boolean))
+  const options: MetamagicCastOption[] = []
+  for (const ability of abilities) {
+    const key = ability.name.trim().toLowerCase()
+    if (!selected.has(key)) continue
+    if (!isMetamagicCustomAbility(ability)) continue
+    options.push({
+      id: ability.id,
+      name: ability.name,
+      cost: parseMetamagicCost(null, ability.description, spellLevel),
+    })
+  }
+  return options
+}
+
+function isMetamagicCustomAbility(ability: CustomAbility): boolean {
+  const description = ability.description ?? ""
+  if (/\b(?:costs?|spend|expend)\s+\d+\s+sorcery\s+points?\b/i.test(description)) return true
+  if (/\bequal to the spell'?s level\b/i.test(description) && /sorcery\s+points?/i.test(description)) {
+    return true
+  }
+  // Dynamic Presence and similar option-library rows often omit a cast-time SP cost line.
+  if (ability.ability_role === "knack" && /metamagic/i.test(description)) return true
+  return false
+}
+
 export function metamagicOptionsForCharacter(params: {
   featIds: string[]
   feats: Feat[]
   customAbilities: CustomAbility[]
+  /** Selected Metamagic knack names (class_knacks picks / grants). */
+  selectedCustomAbilityNames?: string[]
   spellLevel?: number
 }): MetamagicCastOption[] {
   const spellLevel = params.spellLevel ?? 1
@@ -134,6 +168,17 @@ export function metamagicOptionsForCharacter(params: {
       cost: parseMetamagicCost(entry.summary, entry.description, spellLevel),
     })
     seen.add(pickId)
+  }
+
+  for (const option of metamagicOptionsFromCustomAbilities(
+    params.customAbilities,
+    params.selectedCustomAbilityNames ?? [],
+    spellLevel,
+  )) {
+    if (seen.has(option.id) || seen.has(option.name.toLowerCase())) continue
+    options.push(option)
+    seen.add(option.id)
+    seen.add(option.name.toLowerCase())
   }
 
   return options.sort((a, b) => a.name.localeCompare(b.name))
