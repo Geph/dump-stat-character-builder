@@ -27,4 +27,11 @@ describe("scaledClassFeatGrantCount", () => {
   it("returns base count for unrelated features", () => {
     expect(scaledClassFeatGrantCount("Fighter", "Fighting Style", 10, 1)).toBe(1)
   })
+
+  it("scales Alternate Fighter Fighting Style from the LaserLlama table", () => {
+    expect(scaledClassFeatGrantCount("Alternate Fighter", "Fighting Style", 1, 1)).toBe(1)
+    expect(scaledClassFeatGrantCount("Alternate Fighter", "Fighting Style", 6, 1)).toBe(2)
+    expect(scaledClassFeatGrantCount("Alternate Fighter", "Fighting Style", 12, 1)).toBe(3)
+    expect(scaledClassFeatGrantCount("Alternate Fighter", "Fighting Style", 18, 1)).toBe(4)
+  })
 })

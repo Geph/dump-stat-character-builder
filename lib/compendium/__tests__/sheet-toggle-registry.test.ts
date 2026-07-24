@@ -28,6 +28,20 @@ describe("sheet-toggle-registry", () => {
     expect(getSheetToggleDefinition("while_dancing")?.label).toBe("Dancing")
   })
 
+  it("resolves Heroes of Faerûn transformation toggles by id", () => {
+    expect(getSheetToggleDefinition("bladesong_active")?.label).toBe("Bladesong")
+    expect(getSheetToggleDefinition("frozen_haunt_form")?.label).toBe("Frozen Haunt")
+    expect(getSheetToggleDefinition("crown_of_spellfire_active")?.label).toBe("Crown of Spellfire")
+  })
+
+  it("resolves Ravenloft transformation toggles by id", () => {
+    expect(getSheetToggleDefinition("wrath_of_the_wild_form")?.label).toBe("Wrath of the Wild")
+    expect(getSheetToggleDefinition("ghost_walk_form")?.label).toBe("Ghost Walk")
+    expect(getSheetToggleDefinition("umbral_form")?.label).toBe("Umbral Form")
+    expect(getSheetToggleDefinition("form_of_dread")?.label).toBe("Form of Dread")
+    expect(getSheetToggleDefinition("form_of_dread")?.sourceType).toBe("builtin")
+  })
+
   it("recognizes magic item toggle ids", () => {
     expect(isKnownSheetToggleId("magic_item:abc:power")).toBe(true)
     expect(getSheetToggleDefinition("magic_item:abc:power")?.sourceType).toBe("magic_item")

@@ -91,7 +91,13 @@ export const IMPORT_TO_SOURCE_BASENAME: Record<string, string> = {
   "laserllama-metamagic-custom": "laserllama-alt-sorcerer-metamagic-custom",
   "laserllama-altbarbarian-class": "laserllama-altbarbarian-class",
   "laserllama-altranger-class": "laserllama-altranger-class",
+  "laserllama-altmonk-class": "laserllama-altmonk-class",
+  "laserllama-altrogue-class": "laserllama-altrogue-class",
+  "laserllama-altfighter-class": "laserllama-altfighter-class",
+  "faerun-subclasses": "faerun-subclasses",
+  "ravenloft-subclasses": "ravenloft-subclasses",
   "laserllama-knacks-custom": "laserllama-altranger-custom-knacks",
+  "laserllama-monk-techniques-custom": "laserllama-monk-mystic-techniques-custom",
   "eberron-artificer-class": "eberron-artificer-class",
   "eberron-artificer-class.json": "eberron-artificer-class",
 }
@@ -111,4 +117,9 @@ export const DRIVE_SMOKE_IMPORT_FILES = [
   "laserllama-altsorcerer-class",
   "laserllama-altbarbarian-class",
   "laserllama-altranger-class",
+  "laserllama-altmonk-class",
+  "laserllama-altrogue-class",
+  "laserllama-altfighter-class",
+  "faerun-subclasses",
+  "ravenloft-subclasses",
 ] as const

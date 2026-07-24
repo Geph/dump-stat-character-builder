@@ -40,6 +40,10 @@ describe("homebrew prompt footguns", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Ranger \(LaserLlama\)/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/quarry_die/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/knacks_known/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Rogue \(LaserLlama\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Devious Exploits/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Fighter \(LaserLlama\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Martial Exploits/i)
   })
 
   it("keeps Investigator trinket auto-grant exception in IMPORT_PROPOSALS_HINT", () => {
@@ -81,6 +85,10 @@ describe("homebrew prompt footguns", () => {
     expect(blob).toMatch(/never invent a placeholder count of 100/i)
     expect(blob).toMatch(/Alternate Ranger \/ LaserLlama knacks/i)
     expect(blob).toMatch(/NEVER a second class_knacks picker/i)
+    expect(blob).toMatch(/Alternate Rogue \/ LaserLlama exploits/i)
+    expect(blob).toMatch(/Saboteur bombs stay subclass-scoped/i)
+    expect(blob).toMatch(/Alternate Fighter \/ exploit martials/i)
+    expect(blob).toMatch(/NEVER eligible_classes Alternate Fighter/i)
   })
 
   it("third-party charnel_touch definition still warns about uses.shape", () => {

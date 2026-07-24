@@ -1203,6 +1203,153 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
     }
   }
 
+  // Heroes of Faerûn — Oath of the Noble Genies (free swap each turn; no swappableOnRest).
+  if (name === "Aura of Elemental Shielding") {
+    const prior = feature.choices?.options ?? []
+    const types = ["Acid", "Cold", "Fire", "Lightning", "Thunder"] as const
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: feature.choices?.category || "Damage Type",
+        count: 1,
+        options: types.map((type) => {
+          const priorOpt = prior.find((o) => o.name === type)
+          return {
+            name: type,
+            description:
+              priorOpt?.description ??
+              `You and your allies have Resistance to ${type} damage while in your Aura of Protection.`,
+            linkedModifiers: [
+              damageResistance([type], `Aura of Elemental Shielding (${type})`),
+            ],
+          }
+        }),
+      },
+    }
+  }
+
+  // Ravenloft Reanimator — one staged picker (1→2→3 at 5/9/15); Macabre/Superior stay unlock blurbs.
+  if (name === "Strange Modifications") {
+    const prior = feature.choices?.options ?? []
+    const options: { name: string; description: string; special: string }[] = [
+      {
+        name: "Arcane Conduit",
+        description:
+          "You can cast spells as though you were in the companion's space, but you must use your own senses. Once per turn, when you cast an Artificer spell from the Evocation or Necromancy school and deal damage while your companion is within 120 feet of you, you can add your Intelligence modifier to one damage roll of that spell.",
+        special: "Cast from companion's space; once/turn +INT to Evocation/Necromancy Artificer spell damage",
+      },
+      {
+        name: "Ferocity",
+        description: "The damage die of the companion's Dreadful Swipe increases to 1d6.",
+        special: "Companion Dreadful Swipe damage die → 1d6",
+      },
+      {
+        name: "Bloated",
+        description:
+          "The companion becomes Large. Whenever it hits a Large or smaller creature with its Dreadful Swipe action, that creature is pushed up to 10 feet away from the companion. Additionally, you can add your Intelligence modifier to the damage dealt by the companion's Death Burst.",
+        special: "Companion Large; push 10 ft on Dreadful Swipe; +INT to Death Burst (requires Macabre Modifications)",
+      },
+      {
+        name: "Gaunt",
+        description:
+          "The companion's Speed increases to 45 feet, and it gains a Climb Speed equal to its Speed. It can climb difficult surfaces, including along ceilings, without needing to make an ability check. In addition, whenever a creature of your choice starts its turn within a 10-foot Emanation originating from your companion, the creature must succeed on a Wisdom saving throw against your spell save DC or have the Frightened condition until the start of its next turn.",
+        special: "Companion Speed 45 + climb; 10-ft Frightened aura (requires Macabre Modifications)",
+      },
+      {
+        name: "Moist",
+        description:
+          "The companion gains a Swim Speed equal to its Speed, and it can move through a space as narrow as 1 inch without expending extra movement to do so. In addition, whenever the companion is hit by an attack roll from a creature within 10 feet of itself, the attacker takes Acid damage equal to your Intelligence modifier.",
+        special: "Companion swim + squeeze 1 in; Acid INT retaliate on hit within 10 ft (requires Macabre Modifications)",
+      },
+    ]
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: feature.choices?.category || "Strange Modification",
+        count: feature.choices?.count ?? 1,
+        choiceCountByLevel: feature.choices?.choiceCountByLevel?.length
+          ? feature.choices.choiceCountByLevel
+          : [
+              { level: 5, count: 1 },
+              { level: 9, count: 2 },
+              { level: 15, count: 3 },
+            ],
+        options: options.map((option) => {
+          const priorOpt = prior.find((o) => o.name === option.name)
+          return {
+            name: option.name,
+            description: priorOpt?.description ?? option.description,
+            prerequisite: priorOpt?.prerequisite,
+            linkedModifiers: [
+              usesPool(
+                { type: "special", specialDescription: option.special },
+                `Strange Modifications (${option.name})`,
+              ),
+            ],
+          }
+        }),
+      },
+    }
+  }
+
+  if (name === "Dread Allegiance") {
+    // Heroes of Faerûn — Scion of the Three (Dead Three patron pick).
+    const prior = feature.choices?.options ?? []
+    const patrons: { name: string; damage: string; cantrip: string; description: string }[] = [
+      {
+        name: "Bane",
+        damage: "Psychic",
+        cantrip: "Minor Illusion",
+        description:
+          "You gain Resistance to Psychic damage and can cast the Minor Illusion cantrip. Intelligence is your spellcasting ability for this cantrip.",
+      },
+      {
+        name: "Bhaal",
+        damage: "Poison",
+        cantrip: "Blade Ward",
+        description:
+          "You gain Resistance to Poison damage and can cast the Blade Ward cantrip. Intelligence is your spellcasting ability for this cantrip.",
+      },
+      {
+        name: "Myrkul",
+        damage: "Necrotic",
+        cantrip: "Chill Touch",
+        description:
+          "You gain Resistance to Necrotic damage and can cast the Chill Touch cantrip. Intelligence is your spellcasting ability for this cantrip.",
+      },
+    ]
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: feature.choices?.category || "Dead Three God",
+        count: 1,
+        swappableOnRest: true,
+        swapRestType: "long",
+        options: patrons.map((patron) => {
+          const priorOpt = prior.find((o) => o.name === patron.name)
+          return {
+            name: patron.name,
+            description: priorOpt?.description ?? patron.description,
+            linkedModifiers: [
+              damageResistance(
+                [patron.damage],
+                `Dread Allegiance (${patron.name}): ${patron.damage} Resistance`,
+              ),
+              spellsKnownChar(`dread_allegiance_${patron.name.toLowerCase()}`, {
+                spells: [{ spellId: patron.cantrip, alwaysPrepared: true }],
+                castingAbility: "intelligence",
+                label: `${patron.cantrip} (INT; Dread Allegiance)`,
+              }),
+            ],
+          }
+        }),
+      },
+    }
+  }
+
   if (name === "Blessed Strikes") {
     return {
       ...feature,
@@ -1952,7 +2099,12 @@ function damageResReaction(instanceKey: string, label: string): LinkedModifierIn
   })
 }
 
-function weaponMasterySwap(instanceKey: string, properties: string[], label?: string): LinkedModifierInstance {
+function weaponMasterySwap(
+  instanceKey: string,
+  properties: string[],
+  label?: string,
+  limitations?: ModifierLimitation[],
+): LinkedModifierInstance {
   return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.attackRollModifiers, [
     {
       id: modId(instanceKey),
@@ -1960,6 +2112,7 @@ function weaponMasterySwap(instanceKey: string, properties: string[], label?: st
       entries: [{ bonus: 0, target: "all" }],
       weaponMasteryOverrides: properties,
       label,
+      limitations,
     },
   ])
 }
@@ -3254,7 +3407,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           type: "ability_modifier",
           abilityModifier: "INT",
           recharges: [{ rest: "long_rest" }],
-          specialDescription: "Regain one expended use when you use Arcane Recovery",
+          specialDescription:
+            "Regain one expended use when you use Arcane Recovery (partial refresh — no alternateRefresh shape)",
         },
         "Bladesong",
       ),
@@ -3265,6 +3419,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             id: modId("bladesong"),
             kind: "self_buff_caster",
             casterBuffLabel: "Bladesong: +INT AC (min +1), +10 Speed, Advantage on Acrobatics",
+            limitations: [requiresActiveToggleLimitation("bladesong_active")],
           },
         ],
       }),
@@ -3272,6 +3427,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         category: "save",
         ability: "CON",
         bonusConfig: { mode: "ability_modifier", ability: "INT" },
+        limitations: [requiresActiveToggleLimitation("bladesong_active")],
       }),
     ],
   },
@@ -4150,7 +4306,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Awakened Mind": [telepathyPreset("awakened_mind", 60, "Telepathy 60 ft.")],
-  "*::Unfettered Mind": [telepathyPreset("unfettered_mind", 60, "Telepathy 60 ft.")],
+  "*::Unfettered Mind": [
+    telepathyPreset("unfettered_mind", 60, "Telepathy 60 ft."),
+    savingThrows(["Intelligence"], "Intelligence saving throw proficiency"),
+  ],
   "*::Cosmic Omen": {
     linkedModifiers: [
       d20TestReactionPreset("cosmic_omen_boon", {
@@ -4502,6 +4661,81 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
     ],
   },
+  // —— College of the Moon (Heroes of Faerûn) ——
+  "*::Moon's Inspiration": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Inspired Eclipse: when you Bonus Action grant Bardic Inspiration, become Invisible and teleport up to 30 ft. Lunar Vitality: once/turn when you restore HP with a spell, expend a Bardic Inspiration die to increase HP restored by the die roll.",
+        },
+        "Moon's Inspiration",
+      ),
+      fxInstance("modinst_lunar_vitality", FEAT_MODIFIER_CATALOG.healSelf, {
+        effects: [
+          {
+            id: modId("lunar_vitality"),
+            kind: "heal_self",
+            healMode: "dice",
+            healDiceCount: 1,
+            healDieType: "d6",
+            label: "Lunar Vitality: expend Bardic Inspiration die to boost healing spell HP restored",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Primal Lore": {
+    linkedModifiers: [
+      languages(["Druidic"], undefined, "Druidic"),
+      spellsKnownChar("primal_lore_druid_cantrip", {
+        choiceGrants: [{ level: 0, count: 1 }],
+        spellListClassOptions: ["Druid"],
+        label: "Druid cantrip (counts as Bard spell)",
+      }),
+      skillChoice(1, "Primal Lore skill"),
+    ],
+  },
+  "*::Blessing of Moonlight": {
+    linkedModifiers: [
+      alwaysPreparedSpells("Moonbeam"),
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "When you cast Moonbeam, you can glow (Dim Light 5 ft.) and emit a 5-ft Emanation that deals Radiant damage equal to your Bardic Inspiration die once per turn",
+        },
+        "Blessing of Moonlight glow",
+      ),
+    ],
+  },
+  "*::Eventide's Splendor": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "Shadow of the New Moon: Inspired Eclipse also grants the BI recipient Invisible + Reaction teleport 30 ft. Vibrance of the Full Moon: Lunar Vitality can roll 1d6 instead of expending a Bardic Inspiration die.",
+        },
+        "Eventide's Splendor",
+      ),
+    ],
+  },
+  "*::Mind Magic": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "channel_divinity", classResourceAmount: 1 },
+        "Mind Magic",
+      ),
+      onCastSpellChar("mind_magic", {
+        spellSchool: "Divination",
+        label:
+          "Channel Divinity: cast a prepared Divination spell from the Knowledge Domain Spells table without a spell slot or Material components",
+      }),
+    ],
+  },
   "*::Combat Inspiration": {
     linkedModifiers: [
       charInstance("modinst_combat_inspiration", RESOURCE_ABILITY_MENU_CATALOG_ID, [
@@ -4654,6 +4888,18 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       usesPool(
         { type: "special", specialDescription: "Power from Beyond: once/turn, +1d6 to a spell's damage or healing" },
         "Power from Beyond",
+      ),
+    ],
+  },
+  "*::Mystical Connection": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "special",
+          specialDescription:
+            "When rolling Spirits from Beyond: roll twice and choose; same number on both → choose any effect",
+        },
+        "Mystical Connection",
       ),
     ],
   },
@@ -5284,7 +5530,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Aura of Elemental Shielding": [
-    featureOptionPicker("Elemental Shielding damage type (swappable each turn)", true),
+    // Choice options (Acid/Cold/Fire/Lightning/Thunder) wired in enrichCanonicalFeatureChoices.
+    // No swappableOnRest — damage type can change freely at the start of each turn.
     auraPreset("aura_elemental_shield", {
       radiusFeet: 10,
       label: "Allies in Aura of Protection: Resistance to chosen elemental type",
@@ -5567,6 +5814,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             id: modId("wrath_wild"),
             kind: "boost_ac",
             label: "Transform: +1 AC (+2 at 11), Frightened aura, retribution Opportunity Attack",
+            limitations: [requiresActiveToggleLimitation("wrath_of_the_wild_form")],
           },
         ],
       }),
@@ -5587,13 +5835,22 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           healDiceCount: 1,
           healDieType: "d10",
           label: "Once/turn while transformed and Bloodied: heal 1d10+WIS on hit",
+          limitations: [
+            requiresActiveToggleLimitation("wrath_of_the_wild_form"),
+            requiresActiveToggleLimitation("below_half_hp"),
+          ],
         },
       ],
     }),
   ],
   "*::Rot and Violence": {
     linkedModifiers: [
-      weaponMasterySwap("rot_violence", ["Sap", "Slow"], "Sap or Slow mastery in addition while transformed"),
+      weaponMasterySwap(
+        "rot_violence",
+        ["Sap", "Slow"],
+        "Sap or Slow mastery in addition while transformed",
+        [requiresActiveToggleLimitation("wrath_of_the_wild_form")],
+      ),
     ],
   },
   "*::Ancient Might": {
@@ -5617,6 +5874,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             healMode: "character_level",
             healLevelMultiplier: 2,
             label: "While transformed at 0 HP: surge to 2× Ranger level HP",
+            limitations: [requiresActiveToggleLimitation("wrath_of_the_wild_form")],
           },
         ],
       }),
@@ -5696,8 +5954,12 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         undefined,
         { minSpellLevel: 4, restores: 1 },
       ),
-      damageResistance(["Cold"], "Frozen Soul immunity while in form"),
-      conditionImmunity(["Grappled", "Prone", "Restrained"], "Partially Incorporeal"),
+      damageImmunity(["Cold"], "Frozen Soul immunity while in form", [
+        requiresActiveToggleLimitation("frozen_haunt_form"),
+      ]),
+      conditionImmunity(["Grappled", "Prone", "Restrained"], "Partially Incorporeal", [
+        requiresActiveToggleLimitation("frozen_haunt_form"),
+      ]),
     ],
   },
 
@@ -5816,7 +6078,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         },
         "Ghost Walk",
       ),
-      speedTypeAdd("fly", 10, "Fly Speed 10 ft. (hover) while spectral"),
+      speedTypeAdd("fly", 10, "Fly Speed 10 ft. (hover) while spectral", [
+        requiresActiveToggleLimitation("ghost_walk_form"),
+      ]),
     ],
   },
   "*::Death's Friend": {
@@ -5846,10 +6110,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Dread Allegiance": {
-    linkedModifiers: [
-      featureOptionPicker("Dread Allegiance (Bane/Bhaal/Myrkul)", true),
-      damageResistance([], "Resistance from chosen Dead Three patron"),
-    ],
+    // Triggers enrichCanonicalFeatureChoices → Bane/Bhaal/Myrkul options with resistance + cantrip.
+    linkedModifiers: [featureOptionPicker("Dread Allegiance (Bane/Bhaal/Myrkul)", true)],
   },
   "*::Strike Fear": {
     linkedModifiers: [
@@ -6108,7 +6370,24 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         "Umbral Form",
         { resourceKey: "sorcery_points", resourceAmount: 6, restores: 1 },
       ),
-      damageResistance([], "Resistance to all damage except Force and Radiant while Umbral"),
+      // Schema has no "all except" shorthand — expand Force/Radiant exclusion explicitly.
+      damageResistance(
+        [
+          "Acid",
+          "Bludgeoning",
+          "Cold",
+          "Fire",
+          "Lightning",
+          "Necrotic",
+          "Piercing",
+          "Poison",
+          "Psychic",
+          "Slashing",
+          "Thunder",
+        ],
+        "Umbral Form: Resistance to all damage except Force and Radiant",
+        [requiresActiveToggleLimitation("umbral_form")],
+      ),
     ],
   },
   "*::Spellfire Burst": {
@@ -6136,8 +6415,24 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         "Crown of Spellfire",
         { resourceKey: "sorcery_points", resourceAmount: 5, restores: 1 },
       ),
-      speedTypeAdd("fly", 60, "Fly Speed 60 ft. (hover)"),
-      evasion(),
+      speedTypeAdd("fly", 60, "Fly Speed 60 ft. (hover)", [
+        requiresActiveToggleLimitation("crown_of_spellfire_active"),
+      ]),
+      fxInstance("modinst_crown_spellfire_evasion", DAMAGE_REDUCTION_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("crown_spellfire_evasion"),
+            kind: "damage_reduction",
+            mitigation: "reduction",
+            defensiveSaveScope: true,
+            checkCategory: "save",
+            checkAbility: "Dexterity",
+            defensiveSaveSuccess: "none",
+            label: "Evasion while Crown of Spellfire is active",
+            limitations: [requiresActiveToggleLimitation("crown_of_spellfire_active")],
+          },
+        ],
+      }),
     ],
   },
   "*::Wild Magic Surge": {
@@ -6521,8 +6816,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ),
     ],
   },
+  // Choice options + choiceCountByLevel (1→2→3) wired in enrichCanonicalFeatureChoices.
   "*::Strange Modifications": {
-    linkedModifiers: [featureOptionPicker("Strange Modifications (companion upgrade)", true)],
+    linkedModifiers: [featureOptionPicker("Strange Modifications (companion upgrade)", false)],
   },
   "*::Improved Reanimation": {
     linkedModifiers: [
@@ -6535,11 +6831,15 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ),
     ],
   },
+  // Unlock blurb only — option count staging lives on Strange Modifications.choiceCountByLevel.
   "*::Macabre Modifications": {
     linkedModifiers: [
-      featureOptionPicker("Macabre Modifications (Bloated / Gaunt / Moist)", true),
       usesPool(
-        { type: "special", specialDescription: "Companion gains two Strange Modifications options" },
+        {
+          type: "special",
+          specialDescription:
+            "Companion gains two Strange Modifications options; unlocks Bloated, Gaunt, and Moist",
+        },
         "Macabre Modifications",
       ),
     ],

@@ -168,7 +168,7 @@ function wireAsiAndPrimalChampion(content: ImportContent): ImportContent {
 
 /**
  * Promote LaserLlama exploit library rows so class_knacks pickers resolve them.
- * Shared libraries use eligible_classes; Alternate Barbarian must match "Barbarian".
+ * Shared libraries use eligible_classes; Alternate Barbarian/Rogue must match bare class names.
  * Do not touch Beastheart Infernal/Nature exploit leaves (subclass source_type).
  */
 export function sanitizeLaserLlamaExploitsImportContent(content: ImportContent): ImportContent {
@@ -178,13 +178,24 @@ export function sanitizeLaserLlamaExploitsImportContent(content: ImportContent):
   const next = proposals.map((ability) => {
     const eligible = [...(ability.eligible_classes ?? [])]
     const hasBarb = eligible.some((name) => /^barbarian$/i.test(name))
-    const hasAlt = eligible.some((name) => /alternate\s+barbarian/i.test(name))
-    if (hasBarb && !hasAlt) eligible.push("Alternate Barbarian")
+    const hasAltBarb = eligible.some((name) => /alternate\s+barbarian/i.test(name))
+    if (hasBarb && !hasAltBarb) eligible.push("Alternate Barbarian")
+
+    const hasRogue = eligible.some((name) => /^rogue$/i.test(name))
+    const hasAltRogue = eligible.some((name) => /alternate\s+rogue/i.test(name))
+    if (hasRogue && !hasAltRogue) eligible.push("Alternate Rogue")
+
+    const hasFighter = eligible.some((name) => /^fighter$/i.test(name))
+    const hasAltFighter = eligible.some((name) => /alternate\s+fighter/i.test(name))
+    if (hasFighter && !hasAltFighter) eligible.push("Alternate Fighter")
 
     // LaserLlama shared exploit rows list eligible martial classes (+ Execution).
     // Skip subclass-gated lists (Beastheart Infernal/Nature) even if they say "exploit".
     const isSharedExploitLibraryRow =
-      (hasBarb || (eligible.length >= 2 && Boolean(ability.execution?.trim()))) &&
+      (hasBarb ||
+        hasRogue ||
+        hasFighter ||
+        (eligible.length >= 2 && Boolean(ability.execution?.trim()))) &&
       ability.source_type !== "subclass"
 
     if (!isSharedExploitLibraryRow) return ability

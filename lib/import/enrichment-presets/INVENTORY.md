@@ -40,6 +40,10 @@ Replaces class-specific enricher modules with declarative presets under
 | Alternate Sorcerer | Metamagic class_knacks + knack library sanitize | (b) | LaserLlama point-pool |
 | Alternate Barbarian | Rage remap + freeUseAfterLevel 20 | (b) | LaserLlama |
 | Alternate Barbarian | Savage Exploits class_knacks + exploits library sanitize | (b) | Shared exploits custom |
+| Alternate Rogue | Exploit dice L17 + Devious Exploits class_knacks | (b) | LaserLlama |
+| Alternate Rogue | Signature exploits grant_custom_ability + Saboteur de-pollute | (b) | Shared exploits custom |
+| Alternate Fighter | Martial Exploits class_knacks + Relentless initiative | (b) | LaserLlama |
+| Alternate Fighter | Signature exploits + Runecarver/Sylvan/Tinker inline catalogs | (b) | Shared exploits custom |
 
 ## Call sites
 

@@ -71,6 +71,14 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
     sourceType: "class_feature",
     exclusiveGroup: "dance_style",
   },
+  // Heroes of Faerûn subclass transformation toggles
+  { id: "bladesong_active", label: "Bladesong", sourceType: "class_feature" },
+  { id: "frozen_haunt_form", label: "Frozen Haunt", sourceType: "class_feature" },
+  { id: "crown_of_spellfire_active", label: "Crown of Spellfire", sourceType: "class_feature" },
+  // Ravenloft subclass transformation toggles (form_of_dread is builtin)
+  { id: "wrath_of_the_wild_form", label: "Wrath of the Wild", sourceType: "class_feature" },
+  { id: "ghost_walk_form", label: "Ghost Walk", sourceType: "class_feature" },
+  { id: "umbral_form", label: "Umbral Form", sourceType: "class_feature" },
 ]
 
 export const EDITOR_SHEET_TOGGLE_OPTIONS: SheetToggleDefinition[] = [

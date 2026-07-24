@@ -1434,10 +1434,11 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Alternate Fighter / exploit martials",
     guidance: [
-      "Fighting Style options: also add matching feats[] with category \"Fighting Style\".",
-      "Split multi-sentence features into full descriptions — e.g. \"+2 ranged attacks\" and \"+1 AC while wearing armor\" wire as separate modifiers from one paragraph.",
-      "Action Surge / once-per-rest: \"Once during your turn... finish a short or long rest before you can use this feature again\".",
-      "Resource-scaled saves: \"bonus equal to your Exploit Die\" — keep resource name consistent with class_resources.",
+      "Name the class \"Alternate Fighter\" (not bare Fighter). Emit exploit_dice (2→6 at 2/4/8/12/16 + dieSidesByLevel d6→d12) and exploits_known (special 2→11).",
+      "Martial Exploits → optionsSource class_knacks + resourceKey exploits_known + choiceCountByLevel. Shared LaserLlama exploit library → ability_role knack + eligible_classes including Alternate Fighter (Fighter alone fuzzy-matches).",
+      "Fighting Style options: grant_feat Fighting Style + matching feats[] with category \"Fighting Style\". Styles Known scales 1/2/3/4 at 1/6/12/18 (enrichment scales grant count).",
+      "Subclass \"X Exploits\" signature tables → grant_custom_ability. Runecarver/Sylvan Archer/Tinker catalogs → inline choices.options on Rune Carving / Enchanted Shots / Inventive Arsenal — NEVER eligible_classes Alternate Fighter (would pollute Martial Exploits).",
+      "Relentless → exploit_dice.uses.rechargeOnInitiative: true. 19th level is ASI (not Epic Boon). Split multi-sentence features into full descriptions so ranged +2 and AC +1 wire as separate modifiers.",
     ],
   },
   {
@@ -1565,6 +1566,25 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Knacks → optionsSource class_knacks + resourceKey knacks_known + choiceCountByLevel; swappableOnRest false (level-up swap only).",
       "Bounty Hunter Martial Exploits → inline choices.options from the Fighter exploit list — NEVER a second class_knacks picker (shared pool would mix Knacks and Exploits). High Degree → exploit_degree special cap 1/2/3.",
       "Fighting Style may stay grant_feat Fighting Style when the style list is missing from the paste. Keep undefined cross-refs (e.g. Frozen Revenge) flagged in description rather than inventing them.",
+    ],
+  },
+  {
+    source: "Alternate Monk / LaserLlama techniques",
+    guidance: [
+      "Name the class \"Alternate Monk\" (not bare Monk). Ki pool uses resource_key alternate_monk_ki_points (never bare ki / ki_points / focus_points).",
+      "Emit martial_arts_die (special dieSidesByLevel) + techniques_known (special). Mystic Techniques → optionsSource class_knacks + resourceKey techniques_known + choiceCountByLevel.",
+      "Technique library → ability_role knack + source_name \"Alternate Monk\" + eligible_classes including Alternate Monk.",
+      "Way of the Brawler Savage Exploits → inline choices.options from Brawler-eligible exploits — NEVER a second class_knacks picker (would pollute Techniques). Also emit subclass-scoped exploit_dice / exploits_known / exploit_degree.",
+      "19th level is ASI (not Epic Boon) on this class table. Tradition Signature Techniques are grant_custom_ability and do not consume techniques_known.",
+    ],
+  },
+  {
+    source: "Alternate Rogue / LaserLlama exploits",
+    guidance: [
+      "Name the class \"Alternate Rogue\" (not bare Rogue). Emit exploit_dice (count 2/3/4/5 at 2/5/11/17 + dieSidesByLevel d4→d10) and exploits_known (special 2→8).",
+      "Devious Exploits → optionsSource class_knacks + resourceKey exploits_known + choiceCountByLevel. Shared LaserLlama exploit library → ability_role knack + eligible_classes including Alternate Rogue (Rogue alone fuzzy-matches).",
+      "Subclass \"X Exploits\" signature tables → grant_custom_ability auto-grants (do not count against exploits_known). Saboteur bombs stay subclass-scoped — never eligible_classes Alternate Rogue (would pollute Devious Exploits).",
+      "Level 6 is Uncanny Dodge — do not mash it into \"Expertise (Uncanny Dodge)\". Expertise already scales on the L1 feature.",
     ],
   },
   {

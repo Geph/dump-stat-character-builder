@@ -22,6 +22,8 @@ import {
   sanitizeAlternateRangerImportContent,
   sanitizeLaserLlamaRangerKnacksImportContent,
 } from "@/lib/import/enrichment-presets/packs/alternate-ranger"
+import { sanitizeAlternateRogueImportContent } from "@/lib/import/enrichment-presets/packs/alternate-rogue"
+import { sanitizeAlternateFighterImportContent } from "@/lib/import/enrichment-presets/packs/alternate-fighter"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 type JsonRecord = Record<string, unknown>
@@ -199,6 +201,12 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
   if (/inventor/i.test(name)) out = sanitizeInventorImportContent(out)
   if (/alternate\s+sorcerer/i.test(name)) out = sanitizeAlternateSorcererImportContent(out)
   if (/alternate\s+barbarian/i.test(name)) out = sanitizeAlternateBarbarianImportContent(out)
+  if (/alternate\s+rogue/i.test(name) || /^rogue$/i.test(name)) {
+    out = sanitizeAlternateRogueImportContent(out)
+  }
+  if (/alternate\s+fighter/i.test(name) || /^fighter$/i.test(name)) {
+    out = sanitizeAlternateFighterImportContent(out)
+  }
   if (/alternate\s+ranger/i.test(name) || /^ranger$/i.test(name)) {
     out = sanitizeAlternateRangerImportContent(out)
   }
