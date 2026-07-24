@@ -23,7 +23,7 @@ export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated 
   - Special column legend (often explained in the intro prose): C = Concentration, R = Ritual, M = specific Material component. Values may be "—"/en-dash (none), a single letter, or comma-separated (e.g. "C, R", "R, M").
   - Map Special → JSON: concentration true when C is present; include "M" in components when M is present (V/S unknown → omit or null). There is no separate ritual field — do not invent one; R does not change concentration.
   - Skip footnote-only lines (e.g. "*Appears in this chapter.") and intro paragraphs about the Special column.
-- Also emit spells[] rows for each list entry with at least: name, level, school, concentration, components (or null), classes: ["<ClassName>"]. Full casting_time/range/duration/description when the document has them; otherwise null is fine for list-only stubs.
+- Also emit spells[] rows for each list entry with at least: name, level, school, concentration, components (or null), classes: ["<ClassName>"]. Full casting_time/range/duration/description when the document has them; otherwise null is fine for list-only stubs. This is one row per list entry — a spell_list of 80 names must produce 80 spells[] rows, not just the handful with full write-ups.
 - For each spell on that list, include the class's exact name in the spell's classes array (e.g. "Artificer").
 - Custom/non-SRD classes are not among the standard eight (Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard); use the class name directly — never store the literal word "Other".
 - Spells may also appear on standard class lists; include all applicable class names in classes.

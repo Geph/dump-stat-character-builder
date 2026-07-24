@@ -846,6 +846,37 @@ const CIRCLE_OF_THE_LAND_RESISTANCES: Record<string, string> = {
  * carries the matching Nature's Ward damage resistance, so a single sheet control drives both.
  */
 function buildCircleOfTheLandChoice(feature: Feature): Feature {
+  // Imports often arrive with the four land options already split out (each carrying its
+  // spell table); attach the matching Nature's Ward resistance to those options in place.
+  const existingOptions = feature.choices?.options ?? []
+  if (existingOptions.length >= 2) {
+    const options = existingOptions.map((option) => {
+      if ((option.linkedModifiers?.length ?? 0) > 0) return option
+      const land = Object.keys(CIRCLE_OF_THE_LAND_RESISTANCES).find((key) =>
+        (option.name ?? "").toLowerCase().startsWith(key.toLowerCase()),
+      )
+      if (!land) return option
+      return {
+        ...option,
+        linkedModifiers: [
+          damageResistance([CIRCLE_OF_THE_LAND_RESISTANCES[land]], `Nature's Ward resistance (${land} land)`),
+        ],
+      }
+    })
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        ...feature.choices,
+        category: feature.choices?.category ?? "Land type",
+        count: feature.choices?.count ?? 1,
+        swappableOnRest: true,
+        swapRestType: "long",
+        options,
+      },
+    }
+  }
+
   const description = feature.description ?? ""
   const sectionRe = /\*\*(\w+)\s+Land\*\*([\s\S]*?)(?=\*\*\w+\s+Land\*\*|$)/gi
   const options: NonNullable<FeatureChoice["options"]> = []
@@ -879,7 +910,8 @@ function buildCircleOfTheLandChoice(feature: Feature): Feature {
 
 /** Fill option-level modifiers for known SRD choice features that only had empty pickers. */
 function enrichCanonicalFeatureChoices(feature: Feature): Feature {
-  const name = feature.name?.trim()
+  // Normalize curly apostrophes so imported names like "Hunter’s Prey" match these keys.
+  const name = feature.name?.trim().replace(/[\u2018\u2019\u201B]/g, "'")
   if (!name) return feature
 
   if (name === "Circle of the Land Spells") {
@@ -1065,6 +1097,106 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
             name: "Wolf",
             description:
               "While your Rage is active, your allies have Advantage on attack rolls against any enemy of yours within 5 feet of you.",
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Aspect of the Wilds") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Aspect of the Wilds",
+        count: 1,
+        swappableOnRest: true,
+        swapRestType: "long",
+        options: [
+          {
+            name: "Owl",
+            description:
+              "You have Darkvision with a range of 60 feet. If you already have Darkvision, its range increases by 60 feet.",
+            linkedModifiers: [vision(60, "darkvision", "Owl: Darkvision 60 ft. (or +60 ft. if you already have it)")],
+          },
+          {
+            name: "Panther",
+            description: "You have a Climb Speed equal to your Speed.",
+            linkedModifiers: [
+              charInstance("modinst_wilds_panther_climb", "cat_char_speed", [
+                {
+                  id: modId("wilds_panther_climb"),
+                  type: "speed",
+                  speedType: "climb",
+                  mode: "equal_to_walk",
+                  value: 0,
+                  label: "Panther: Climb Speed equal to Speed",
+                },
+              ]),
+            ],
+          },
+          {
+            name: "Salmon",
+            description: "You have a Swim Speed equal to your Speed.",
+            linkedModifiers: [
+              charInstance("modinst_wilds_salmon_swim", "cat_char_speed", [
+                {
+                  id: modId("wilds_salmon_swim"),
+                  type: "speed",
+                  speedType: "swim",
+                  mode: "equal_to_walk",
+                  value: 0,
+                  label: "Salmon: Swim Speed equal to Speed",
+                },
+              ]),
+            ],
+          },
+        ],
+      },
+    }
+  }
+
+  if (name === "Power of the Wilds") {
+    return {
+      ...feature,
+      isChoice: true,
+      choices: {
+        category: "Power of the Wilds",
+        count: 1,
+        options: [
+          {
+            name: "Falcon",
+            description:
+              "While your Rage is active, you have a Fly Speed equal to your Speed if you aren't wearing any armor.",
+            linkedModifiers: [
+              charInstance("modinst_wilds_falcon_fly", "cat_char_speed", [
+                {
+                  id: modId("wilds_falcon_fly"),
+                  type: "speed",
+                  speedType: "fly",
+                  mode: "equal_to_walk",
+                  value: 0,
+                  requiresSheetToggle: "while_raging",
+                  label: "Falcon: Fly Speed equal to Speed while raging (no armor)",
+                },
+              ]),
+            ],
+          },
+          {
+            name: "Lion",
+            description:
+              "While your Rage is active, any of your enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian who has this option active.",
+          },
+          {
+            name: "Ram",
+            description:
+              "While your Rage is active, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.",
+            linkedModifiers: [
+              onHitTriggerPreset("wilds_ram_prone", {
+                appliesTo: "Melee attack (while raging, target Large or smaller)",
+                effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+              }),
+            ],
           },
         ],
       },
@@ -3985,6 +4117,38 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       label: "Healing Light d6 pool",
     }),
   ],
+  "*::Celestial Resilience": {
+    linkedModifiers: [
+      fxInstance("modinst_celestial_resilience", GRANT_TEMP_HP_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("celestial_resilience"),
+            kind: "grant_temp_hp",
+            tempHpTrigger: "on_action",
+            healMode: "character_level",
+            healLevelMultiplier: 1,
+            label:
+              "On Magical Cunning or any rest: Temp HP = Warlock level + CHA; up to five creatures gain half Warlock level + CHA",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Create Thrall": {
+    linkedModifiers: [
+      castSpellFx(
+        "create_thrall",
+        {
+          castSpellName: "Summon Aberration",
+          castSpellLevel: 4,
+          castSpellListClasses: ["Warlock"],
+          label:
+            "Cast Summon Aberration without Concentration (duration 1 min); aberration gains Temp HP = Warlock level + CHA and adds your Hex's bonus damage once per turn",
+        },
+        { action: true },
+      ),
+    ],
+  },
   "*::Awakened Mind": [telepathyPreset("awakened_mind", 60, "Telepathy 60 ft.")],
   "*::Unfettered Mind": [telepathyPreset("unfettered_mind", 60, "Telepathy 60 ft.")],
   "*::Cosmic Omen": {
@@ -4083,6 +4247,81 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Wrath of the Sea": {
     linkedModifiers: [
       usesPool({ type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 }, "Wrath of the Sea"),
+    ],
+  },
+  "*::Land's Aid": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 },
+        "Land's Aid",
+      ),
+      charInstance("modinst_lands_aid", characteristicCatalogRefId("special_attack"), [
+        {
+          id: modId("lands_aid"),
+          type: "special_attack",
+          attackName: "Land's Aid",
+          attackProfile: "force_save",
+          targetMode: "area",
+          areaShape: "sphere",
+          areaLengthFeet: 10,
+          rangeFeet: 60,
+          properties: [],
+          damageTypes: ["Necrotic"],
+          damageDiceCount: 2,
+          damageDieType: "d6",
+          damageByLevel: [diceTier(10, "3d6"), diceTier(14, "4d6")],
+          saveAbility: "Constitution",
+          saveHalfDamage: true,
+          label: "10-ft Sphere within 60 ft: CON save or Necrotic damage; one creature in the area regains the same amount",
+        },
+      ]),
+    ],
+  },
+  "*::Circle Forms": {
+    linkedModifiers: [
+      fxInstance("modinst_circle_forms_thp", GRANT_TEMP_HP_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("circle_forms_thp"),
+            kind: "grant_temp_hp",
+            tempHpTrigger: "on_action",
+            healMode: "character_level",
+            healLevelMultiplier: 3,
+            label: "Circle Forms: 3 × Druid level Temp HP when you assume a Wild Shape form",
+          },
+        ],
+      }),
+      charInstance("modinst_circle_forms_ac", FEAT_MODIFIER_CATALOG.ac, [
+        {
+          id: modId("circle_forms_ac"),
+          type: "ac",
+          mode: "ability_modifiers",
+          base: 13,
+          abilities: ["WIS"],
+          requiresSheetToggle: "wild_shape_active",
+          label: "Circle Forms: AC 13 + WIS in Wild Shape (if higher than the form's AC); max CR = Druid level / 3",
+        },
+      ]),
+    ],
+  },
+  "*::Improved Circle Forms": {
+    linkedModifiers: [
+      checkBonus("improved_circle_forms_con", {
+        category: "save",
+        ability: "Constitution",
+        bonusConfig: { mode: "ability_modifier", ability: "WIS" },
+        limitations: [requiresActiveToggleLimitation("wild_shape_active")],
+        label: "Increased Toughness: +WIS to CON saves in Wild Shape; Lunar Radiance: attacks can deal Radiant damage",
+      }),
+    ],
+  },
+  "*::Oceanic Gift": {
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "wild_shape", classResourceAmount: 1 },
+        "Oceanic Gift — manifest Wrath of the Sea on a willing creature within 60 ft (2 uses: on both of you)",
+      ),
     ],
   },
 
@@ -4220,6 +4459,36 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Leading Evasion": [evasion()],
+  "*::Inspiring Movement": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "bardic_inspiration", classResourceAmount: 1 },
+        "Inspiring Movement",
+      ),
+      fxInstance("modinst_inspiring_movement", FEAT_MODIFIER_CATALOG.movementOption, {
+        reaction: true,
+        effects: [
+          {
+            id: modId("inspiring_movement"),
+            kind: "movement_option",
+            label:
+              "Reaction when an enemy ends its turn within 5 ft: move half your Speed, then an ally within 30 ft moves half theirs — no Opportunity Attacks",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Tandem Footwork": {
+    linkedModifiers: [
+      checkBonus("tandem_footwork", {
+        category: "initiative",
+        bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "bardic_inspiration" },
+        label:
+          "Spend 1 Bardic Inspiration when you roll Initiative: you and each ally within 30 ft add the BI die roll",
+      }),
+    ],
+  },
   "*::Cutting Words": {
     linkedModifiers: [
       failedRollTriggerPreset("cutting_words", {
@@ -4552,6 +4821,22 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ]),
     ],
   },
+  "*::War Bond": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      fxInstance("modinst_war_bond", "cat_fx_weapon_attack", {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("war_bond"),
+            kind: "weapon_attack",
+            label:
+              "Bond up to two weapons (1-hour ritual); Bonus Action: summon a bonded weapon to hand; can't be disarmed unless Incapacitated",
+          },
+        ],
+      }),
+    ],
+  },
   "*::War Magic": {
     linkedModifiers: [
       fxInstance("modinst_war_magic", "cat_fx_weapon_attack", {
@@ -4560,6 +4845,34 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
             id: modId("war_magic"),
             kind: "weapon_attack",
             label: "Replace one Attack action attack with a Wizard cantrip",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Eldritch Strike": {
+    linkedModifiers: [
+      charInstance("modinst_eldritch_strike", ON_HIT_TRIGGER_CATALOG_ID, [
+        {
+          id: modId("eldritch_strike"),
+          type: "on_hit_trigger",
+          oncePerTurn: false,
+          appliesTo: "Weapon attack",
+          effect: { catalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID },
+          label:
+            "On weapon hit: target has Disadvantage on its next saving throw against a spell you cast before the end of your next turn",
+        },
+      ]),
+    ],
+  },
+  "*::Improved War Magic": {
+    linkedModifiers: [
+      fxInstance("modinst_improved_war_magic", "cat_fx_weapon_attack", {
+        effects: [
+          {
+            id: modId("improved_war_magic"),
+            kind: "weapon_attack",
+            label: "Replace two Attack action attacks with a level 1 or 2 Wizard spell (casting time: one action)",
           },
         ],
       }),
@@ -4592,6 +4905,29 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         },
         "Psionic Energy Dice",
       ),
+    ],
+  },
+  "*::Telekinetic Adept": {
+    linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+        "Psi-Powered Leap",
+        { resourceKey: "psionic_energy_dice", restores: 1 },
+      ),
+      fxInstance("modinst_psi_powered_leap", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("psi_powered_leap"),
+            kind: "movement_option",
+            label: "Psi-Powered Leap (Bonus Action): Fly Speed = 2 × Speed until the end of the current turn",
+          },
+        ],
+      }),
+      onHitTriggerPreset("telekinetic_thrust", {
+        appliesTo: "Psionic Strike",
+        effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
+      }),
     ],
   },
   "*::Guarded Mind": [damageResistance(["Psychic"], "Psychic Resistance")],
@@ -4654,6 +4990,58 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           },
         ],
       }),
+    ],
+  },
+  "*::Improved Shadow Step": {
+    activation: { bonusAction: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "focus_points", classResourceAmount: 1 },
+        "Improved Shadow Step (optional Focus spend)",
+      ),
+      fxInstance("modinst_improved_shadow_step", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("improved_shadow_step"),
+            kind: "movement_option",
+            movementTeleport: true,
+            moveDistanceMode: "fixed",
+            moveDistanceFixed: 60,
+            label: "Spend 1 Focus Point: Shadow Step without the light requirement, then make an Unarmed Strike",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Cloak of Shadows": {
+    activation: { action: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "focus_points", classResourceAmount: 3 },
+        "Cloak of Shadows",
+      ),
+      fxInstance("modinst_cloak_of_shadows", MODIFY_CREATURE_CATALOG_ID, {
+        action: true,
+        effects: [
+          {
+            id: modId("cloak_of_shadows"),
+            kind: "modify_creature",
+            rollTarget: "self",
+            creatureModifyMode: "roll",
+            label:
+              "1 min while in Dim Light/Darkness: Invisible, move through occupied spaces, Flurry of Blows costs no Focus",
+          },
+        ],
+      }),
+    ],
+  },
+  "*::Flurry of Healing and Harm": {
+    linkedModifiers: [
+      usesPool(
+        { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+        "Flurry of Healing and Harm",
+      ),
     ],
   },
   "*::Elemental Attunement": [featureOptionPicker("Martial Form / Elemental Attunement")],
