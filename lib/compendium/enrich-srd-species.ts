@@ -822,19 +822,46 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
   "Tiefling::Fiendish Legacy::Abyssal": {
     linkedModifiers: [
       damageResistance(["Poison"], "Poison resistance"),
-      spellsKnownChoice("abyssal_spells", [{ level: 0, count: 1 }], { label: "Poison Spray" }),
+      spellcastingAbilityChoice("abyssal_legacy_ability"),
+      spellsKnownFixed(
+        "abyssal_spells",
+        [
+          { name: "Poison Spray", unlocksAtLevel: 1 },
+          { name: "Ray of Sickness", unlocksAtLevel: 3 },
+          { name: "Hold Person", unlocksAtLevel: 5 },
+        ],
+        "Abyssal legacy spells",
+      ),
     ],
   },
   "Tiefling::Fiendish Legacy::Chthonic": {
     linkedModifiers: [
       damageResistance(["Necrotic"], "Necrotic resistance"),
-      spellsKnownChoice("chthonic_spells", [{ level: 0, count: 1 }], { label: "Chill Touch" }),
+      spellcastingAbilityChoice("chthonic_legacy_ability"),
+      spellsKnownFixed(
+        "chthonic_spells",
+        [
+          { name: "Chill Touch", unlocksAtLevel: 1 },
+          { name: "False Life", unlocksAtLevel: 3 },
+          { name: "Ray of Enfeeblement", unlocksAtLevel: 5 },
+        ],
+        "Chthonic legacy spells",
+      ),
     ],
   },
   "Tiefling::Fiendish Legacy::Infernal": {
     linkedModifiers: [
       damageResistance(["Fire"], "Fire resistance"),
-      spellsKnownChoice("infernal_spells", [{ level: 0, count: 1 }], { label: "Fire Bolt" }),
+      spellcastingAbilityChoice("infernal_legacy_ability"),
+      spellsKnownFixed(
+        "infernal_spells",
+        [
+          { name: "Fire Bolt", unlocksAtLevel: 1 },
+          { name: "Hellish Rebuke", unlocksAtLevel: 3 },
+          { name: "Darkness", unlocksAtLevel: 5 },
+        ],
+        "Infernal legacy spells",
+      ),
     ],
   },
 
@@ -843,6 +870,46 @@ const SRD_SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
     linkedModifiers: [skillProficiency("Perception", "Keen Senses — Perception")],
   },
   "Elf::Keen Senses::Survival": { linkedModifiers: [skillProficiency("Survival", "Keen Senses — Survival")] },
+}
+
+/** Resolve an SRD species choice-option preset, including short Goliath ancestry names. */
+export function lookupSrdSpeciesChoiceOptionPreset(
+  speciesName: string,
+  traitName: string,
+  optionName: string,
+): TraitPreset | undefined {
+  const aliases = [...new Set([
+    speciesName,
+    speciesName.replace(/\s*\([^)]*\)\s*$/u, "").trim(),
+  ].filter(Boolean))]
+
+  for (const alias of aliases) {
+    const exact = SRD_SPECIES_CHOICE_OPTION_PRESETS[`${alias}::${traitName}::${optionName}`]
+    if (exact) return exact
+  }
+
+  const needle = optionName.trim().toLowerCase()
+  if (!needle) return undefined
+
+  for (const alias of aliases) {
+    const prefix = `${alias}::${traitName}::`
+    for (const [key, preset] of Object.entries(SRD_SPECIES_CHOICE_OPTION_PRESETS)) {
+      if (!key.startsWith(prefix)) continue
+      const optPart = key.slice(prefix.length)
+      const beforeParen = optPart.split("(")[0]?.trim().toLowerCase() ?? ""
+      const optLower = optPart.toLowerCase()
+      if (
+        optLower === needle ||
+        beforeParen === needle ||
+        optLower.startsWith(`${needle} `) ||
+        optLower.startsWith(`${needle}(`)
+      ) {
+        return preset
+      }
+    }
+  }
+
+  return undefined
 }
 
 /** Traits with no satisfactory common-modifier mapping (descriptive-only for now). */
@@ -879,14 +946,17 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
-  if (trait.isChoice && trait.choices?.options?.length) {
+      if (trait.isChoice && trait.choices?.options?.length) {
     next = {
       ...next,
       choices: {
         ...trait.choices,
         options: trait.choices.options.map((option) => {
-          const optionKey = `${speciesName}::${trait.name}::${option.name}`
-          const optionPreset = SRD_SPECIES_CHOICE_OPTION_PRESETS[optionKey]
+          const optionPreset = lookupSrdSpeciesChoiceOptionPreset(
+            speciesName,
+            trait.name,
+            option.name ?? "",
+          )
           if (!optionPreset?.linkedModifiers?.length || optionHasModifierConfig(option)) {
             return option
           }

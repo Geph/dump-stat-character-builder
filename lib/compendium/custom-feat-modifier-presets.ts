@@ -972,7 +972,18 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     ],
   },
   "Cohort of Chaos": {
-    linkedModifiers: [asiOne("cohort_of_chaos_asi", "+1 to one ability score")],
+    linkedModifiers: [
+      asiOne("cohort_of_chaos_asi", "+1 to one ability score"),
+      uses(
+        "cohort_of_chaos_flare",
+        {
+          type: "special",
+          specialDescription:
+            "When you roll a 1 or 20 on an attack roll or saving throw, roll a d4 on the Chaotic Flares table (Battle Fury / Disruption Field / Unbound / Wailing Winds). Lasts until the end of your next turn; a new flare can't occur until after the first ends.",
+        },
+        "Chaotic Flare (on attack/save nat 1 or 20)",
+      ),
+    ],
   },
   "Outlands Envoy": {
     linkedModifiers: [
@@ -994,6 +1005,17 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         "planar_wanderer_adapt",
         ["Acid", "Cold", "Fire"],
         "Planar Adaptation: choose Acid, Cold, or Fire resistance after each Long Rest",
+      ),
+      checkFx(
+        "planar_wanderer_portal_cracker",
+        {
+          kind: "check_roll_modifier",
+          checkCategory: "ability",
+          checkAbility: "intelligence",
+          label:
+            "Portal Cracker: DC 20 Intelligence (Arcana) to force a portal open/closed for 1 hour (fail: 3d8 psychic; can't retry that portal until Long Rest)",
+        },
+        { action: true },
       ),
       uses(
         "planar_wanderer_portal_sense",

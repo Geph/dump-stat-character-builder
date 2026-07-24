@@ -867,16 +867,26 @@ function buildFromMechanic(
     }
     case "tool_proficiencies": {
       const tools = mechanic.tools?.map(titleCaseWords).filter(Boolean) ?? []
-      if (!tools.length && !mechanic.grantExpertise) return null
+      const choiceCount =
+        typeof mechanic.choiceCount === "number" && mechanic.choiceCount > 0
+          ? mechanic.choiceCount
+          : 0
+      if (!tools.length && !mechanic.grantExpertise && choiceCount <= 0) return null
       return {
-        ruleId: mechanic.grantExpertise ? "ai.tools.expertise" : "ai.tools",
+        ruleId:
+          choiceCount > 0
+            ? "ai.tools.choice"
+            : mechanic.grantExpertise
+              ? "ai.tools.expertise"
+              : "ai.tools",
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: charInstance(instanceId, characteristicCatalogRefId("tool_proficiencies"), [
           {
-            id: modId(instanceKey(ctx, "tools")),
+            id: modId(instanceKey(ctx, choiceCount > 0 ? "tools_choice" : "tools")),
             type: "tool_proficiencies",
             values: tools,
+            ...(choiceCount > 0 ? { choiceCount } : {}),
             ...(mechanic.grantExpertise ? { grantExpertise: true } : {}),
           },
         ]),

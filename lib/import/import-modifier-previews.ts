@@ -1,5 +1,9 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
+  parseBackgroundFeatGrantChoice,
+  parseBackgroundOriginFeat,
+} from "@/lib/compendium/background-origin-feat"
+import {
   modifierSummaryFromInstance,
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
@@ -127,6 +131,12 @@ export function collectUnmatchedModifierFeatures(
 
   for (const background of content.backgrounds ?? []) {
     if (background.feature) {
+      const featGranted = background.feat_granted?.trim()
+      const fixedFeatGrant =
+        Boolean(featGranted) &&
+        !parseBackgroundFeatGrantChoice(featGranted) &&
+        Boolean(parseBackgroundOriginFeat(featGranted))
+      if (fixedFeatGrant) continue
       collectUnmatchedFromFeature(
         `Background: ${background.name}`,
         background.feature as unknown as Feature,
@@ -314,12 +324,31 @@ export function collectImportModifierReview(content: ImportContent): ImportModif
 
   for (const background of content.backgrounds ?? []) {
     if (!background.feature) continue
-    pushReviewRow(
-      rows,
-      `Background: ${background.name}`,
-      background.feature as FeatureCarrier,
-      previewFromFeature(`Background: ${background.name}`, background.feature as FeatureCarrier),
-    )
+    const label = `Background: ${background.name}`
+    const previews = previewFromFeature(label, background.feature as FeatureCarrier)
+    // Fixed feat_granted (e.g. Gate Warden → Scion) is applied by the builder from the
+    // background row; surface it on the feature so Planar Infusion / Conviction review as wired.
+    const featGranted = background.feat_granted?.trim()
+    if (
+      featGranted &&
+      !parseBackgroundFeatGrantChoice(featGranted) &&
+      parseBackgroundOriginFeat(featGranted) &&
+      !previews.some((entry) => entry.ruleId === "background.feat_granted")
+    ) {
+      const parsed = parseBackgroundOriginFeat(featGranted)!
+      previews.push({
+        id: `${label}::${background.feature.name}::feat_granted`,
+        sourceLabel: label,
+        featureName: background.feature.name,
+        featureLevel: (background.feature as FeatureCarrier).level,
+        summary: `Grants feat: ${parsed.featName}${parsed.spellList ? ` (${parsed.spellList})` : ""}`,
+        confidence: "high",
+        matchedPhrase: featGranted,
+        source: "detector",
+        ruleId: "background.feat_granted",
+      })
+    }
+    pushReviewRow(rows, label, background.feature as FeatureCarrier, previews)
   }
 
   for (const feat of content.feats ?? []) {

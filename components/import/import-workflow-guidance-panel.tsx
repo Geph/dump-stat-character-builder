@@ -2,14 +2,15 @@
 
 import { useState, type ReactNode } from "react"
 import {
-  IMPORT_WORKFLOWS,
+  CLASS_IMPORT_NOTES,
+  CLASS_IMPORT_STEPS,
   JSON_ARRAY_IMPORT_TIP,
   MULTI_FILE_IMPORT_TIP,
   ONE_CLASS_AT_A_TIME_WARNING,
   SCHEMA_FIT_WARNING,
   WEAPON_MASTERY_IMPORT_TIP,
 } from "@/lib/import/import-workflow-guidance"
-import { CLEAN_SOURCE_TEXT_GUIDELINES } from "@/lib/import/byo-import-kit"
+import { CLEAN_SOURCE_TEXT_UI_GUIDELINES } from "@/lib/import/byo-import-kit"
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { AlertTriangle, BookOpen, ChevronRight, Layers } from "lucide-react"
+import {
+  AlertTriangle,
+  BookOpen,
+  ChevronRight,
+  ClipboardPaste,
+  Library,
+  ScrollText,
+} from "lucide-react"
 
 type GuidanceTopic = "one-class" | "import-order" | "clean-source" | "schema-fit"
 
@@ -45,19 +53,21 @@ const TOPIC_BUTTONS: {
   },
   {
     id: "import-order",
-    title: "Import order",
-    blurb: "Usually 2 extracts → 1 paste",
-    icon: Layers,
+    title: "Importing a class",
+    blurb: "Library → class chapter → one paste",
+    icon: ScrollText,
     accent: "text-sky-700 dark:text-sky-300",
   },
   {
     id: "clean-source",
-    title: "Clean source text guidelines",
-    blurb: "PDF & paste tips for better extraction",
+    title: "Clean source text",
+    blurb: "PDF & paste tips before extract",
     icon: BookOpen,
     accent: "text-lime",
   },
 ]
+
+const STEP_ICONS = [Library, ScrollText, ClipboardPaste] as const
 
 function GuidanceDialog({
   open,
@@ -89,8 +99,6 @@ function GuidanceDialog({
 
 export function ImportWorkflowGuidancePanel() {
   const [topic, setTopic] = useState<GuidanceTopic | null>(null)
-  const [activeId, setActiveId] = useState(IMPORT_WORKFLOWS[0]?.id ?? "")
-  const active = IMPORT_WORKFLOWS.find((workflow) => workflow.id === activeId) ?? IMPORT_WORKFLOWS[0]
 
   return (
     <div className="space-y-2">
@@ -138,8 +146,8 @@ export function ImportWorkflowGuidancePanel() {
           <p className="leading-relaxed text-muted-foreground">{SCHEMA_FIT_WARNING}</p>
           <p className="leading-relaxed text-muted-foreground">{WEAPON_MASTERY_IMPORT_TIP}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Same-name classes (e.g. Mage Hand Press Warden vs Kibbles): keep the source header name
-            in JSON; the import review asks you what to rename the class to.
+            Same-name classes (e.g. Mage Hand Press Warden vs Kibbles Tasty Warden): keep the source
+            header name in JSON; the import review asks you what to rename the class to.
           </p>
         </div>
       </GuidanceDialog>
@@ -147,81 +155,61 @@ export function ImportWorkflowGuidancePanel() {
       <GuidanceDialog
         open={topic === "import-order"}
         onOpenChange={(open) => setTopic(open ? "import-order" : null)}
-        title="Import order"
-        description="Usually two LLM extracts, then one Step 2 paste — libraries auto-merge with the class chapter."
+        title="Importing a class"
+        description="The usual pattern for homebrew classes — works for casters, martials, psions, and similar."
         contentClassName="sm:max-w-xl"
       >
         <div className="space-y-4">
           <p className="leading-relaxed text-muted-foreground">{MULTI_FILE_IMPORT_TIP}</p>
-          <p className="flex gap-2 leading-relaxed text-muted-foreground">
-            <Layers className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-700 dark:text-sky-300" />
-            <span>{JSON_ARRAY_IMPORT_TIP}</span>
+
+          <ol className="space-y-3">
+            {CLASS_IMPORT_STEPS.map((step, index) => {
+              const Icon = STEP_ICONS[index] ?? ScrollText
+              return (
+                <li key={step.label} className="flex gap-3">
+                  <div className="flex shrink-0 flex-col items-center">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-sm shadow-primary/20">
+                      {index + 1}
+                    </span>
+                    {index < CLASS_IMPORT_STEPS.length - 1 ? (
+                      <span className="mt-1 h-full min-h-[0.75rem] w-px grow bg-border" aria-hidden />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1 rounded-xl border border-border/70 bg-muted/15 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                      <p className="font-semibold text-foreground">{step.label}</p>
+                    </div>
+                    {step.hint ? (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{step.hint}</p>
+                    ) : null}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+
+          <p className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            {JSON_ARRAY_IMPORT_TIP}
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            {IMPORT_WORKFLOWS.map((workflow) => (
-              <button
-                key={workflow.id}
-                type="button"
-                onClick={() => setActiveId(workflow.id)}
-                className={
-                  workflow.id === active?.id
-                    ? "rounded-lg border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-semibold text-foreground"
-                    : "rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/60"
-                }
-              >
-                {workflow.title.split("(")[0].trim()}
-              </button>
+          <ul className="list-disc space-y-1.5 pl-4 text-[11px] leading-relaxed text-muted-foreground">
+            {CLASS_IMPORT_NOTES.map((note) => (
+              <li key={note}>{note}</li>
             ))}
-          </div>
-
-          {active ? (
-            <div className="space-y-3 border-t border-border pt-4">
-              <div>
-                <h3 className="font-semibold text-foreground">{active.title}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{active.summary}</p>
-                {active.examples.length ? (
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    Examples: {active.examples.join(", ")}
-                  </p>
-                ) : null}
-              </div>
-
-              <ol className="space-y-2">
-                {active.steps.map((step, index) => (
-                  <li key={step.label} className="flex gap-2">
-                    <span className="shrink-0 font-bold text-lime">{index + 1}.</span>
-                    <span>
-                      <span className="font-medium text-foreground">{step.label}</span>
-                      {step.hint ? (
-                        <span className="text-muted-foreground"> — {step.hint}</span>
-                      ) : null}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-
-              {active.notes?.length ? (
-                <ul className="list-disc space-y-1.5 pl-4 text-[11px] leading-relaxed text-muted-foreground">
-                  {active.notes.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
+          </ul>
         </div>
       </GuidanceDialog>
 
       <GuidanceDialog
         open={topic === "clean-source"}
         onOpenChange={(open) => setTopic(open ? "clean-source" : null)}
-        title="Clean source text guidelines"
-        description="Prep PDF text and pastes so extraction stays reliable."
+        title="Clean source text"
+        description="Quick prep tips before you extract a class chapter."
         contentClassName="sm:max-w-xl"
       >
         <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
-          {CLEAN_SOURCE_TEXT_GUIDELINES}
+          {CLEAN_SOURCE_TEXT_UI_GUIDELINES}
         </pre>
       </GuidanceDialog>
     </div>

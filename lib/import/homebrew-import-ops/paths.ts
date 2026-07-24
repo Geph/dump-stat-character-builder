@@ -96,6 +96,7 @@ export const IMPORT_TO_SOURCE_BASENAME: Record<string, string> = {
   "laserllama-altfighter-class": "laserllama-altfighter-class",
   "faerun-subclasses": "faerun-subclasses",
   "ravenloft-subclasses": "ravenloft-subclasses",
+  "wotc-species": "wotc-species",
   "laserllama-knacks-custom": "laserllama-altranger-custom-knacks",
   "laserllama-monk-techniques-custom": "laserllama-monk-mystic-techniques-custom",
   "eberron-artificer-class": "eberron-artificer-class",

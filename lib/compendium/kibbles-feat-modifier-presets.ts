@@ -74,6 +74,27 @@ function poolChoice(
   }
 }
 
+const AQUATIC_ADAPTATION_PRESET: FeatModifierPreset = {
+  linkedModifiers: [
+    asiOne("aquatic_adaptation_asi", "+1 Constitution", ["constitution"]),
+    charInstance("modinst_aquatic_adaptation_swim", FEAT_MODIFIER_CATALOG.speed, [
+      {
+        id: modId("aquatic_adaptation_swim"),
+        type: "speed",
+        speedType: "swim",
+        mode: "set",
+        value: 40,
+        label: "Swim speed 40 ft.",
+      },
+    ]),
+    damageResistanceChoice(
+      "aquatic_adaptation_resist",
+      ["Acid", "Cold"],
+      "Resistance to acid or cold (choose one)",
+    ),
+  ],
+}
+
 export const KIBBLES_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   // —— Crafting ——
   "Adept Poisoner": {
@@ -299,26 +320,26 @@ export const KIBBLES_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> =
       ),
     ],
   },
-  "Aquatic Adaptation": {
+  /**
+   * Author sidebar under Alien Weapon Training (not a separate rules feat). Extractors
+   * often promote the heading; wire as optional downtime retrain of that feat's picks.
+   */
+  "Alien Weapon Retraining": {
     linkedModifiers: [
-      asiOne("aquatic_adaptation_asi", "+1 Constitution", ["constitution"]),
-      charInstance("modinst_aquatic_adaptation_swim", FEAT_MODIFIER_CATALOG.speed, [
+      uses(
+        "alien_weapon_retraining",
         {
-          id: modId("aquatic_adaptation_swim"),
-          type: "speed",
-          speedType: "swim",
-          mode: "set",
-          value: 40,
-          label: "Swim speed 40 ft.",
+          type: "special",
+          specialDescription:
+            "Optional downtime: change the weapon and/or property chosen for Alien Weapon Training (DM discretion).",
         },
-      ]),
-      damageResistanceChoice(
-        "aquatic_adaptation_resist",
-        ["Acid", "Cold"],
-        "Resistance to acid or cold (choose one)",
+        "Retrain Alien Weapon Training weapon/property (downtime, DM optional)",
       ),
     ],
   },
+  "Aquatic Adaptation": AQUATIC_ADAPTATION_PRESET,
+  // Source / extractors use the misspelling "Adaption".
+  "Aquatic Adaption": AQUATIC_ADAPTATION_PRESET,
   "Flexible Form": {
     linkedModifiers: [
       damageResistanceChoice(
