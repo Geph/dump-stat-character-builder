@@ -13,6 +13,15 @@ import {
   sanitizeKibblesWardenImportContent,
 } from "@/lib/import/enrichment-presets/packs/kibbles-warden"
 import { sanitizeInventorImportContent } from "@/lib/import/enrichment-presets/packs/inventor"
+import { sanitizeAlternateSorcererImportContent } from "@/lib/import/enrichment-presets/packs/alternate-sorcerer"
+import {
+  sanitizeAlternateBarbarianImportContent,
+  sanitizeLaserLlamaExploitsImportContent,
+} from "@/lib/import/enrichment-presets/packs/alternate-barbarian"
+import {
+  sanitizeAlternateRangerImportContent,
+  sanitizeLaserLlamaRangerKnacksImportContent,
+} from "@/lib/import/enrichment-presets/packs/alternate-ranger"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 type JsonRecord = Record<string, unknown>
@@ -188,6 +197,51 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
   if (/beastheart/i.test(name)) out = sanitizeBeastheartImportContent(out)
   if (isKibblesTastyWarden(out)) out = sanitizeKibblesWardenImportContent(out)
   if (/inventor/i.test(name)) out = sanitizeInventorImportContent(out)
+  if (/alternate\s+sorcerer/i.test(name)) out = sanitizeAlternateSorcererImportContent(out)
+  if (/alternate\s+barbarian/i.test(name)) out = sanitizeAlternateBarbarianImportContent(out)
+  if (/alternate\s+ranger/i.test(name) || /^ranger$/i.test(name)) {
+    out = sanitizeAlternateRangerImportContent(out)
+  }
+  // Shared LaserLlama exploit library (no class row).
+  if (
+    !name &&
+    Array.isArray(asRecord(out.import_proposals)?.custom_abilities) &&
+    (asRecord(out.import_proposals)?.custom_abilities as unknown[]).some((row) => {
+      const a = asRecord(row)
+      return Boolean(a?.execution) || /exploit/i.test(String(a?.definition ?? ""))
+    })
+  ) {
+    out = sanitizeLaserLlamaExploitsImportContent(out)
+  }
+  // Metamagic-only library paste (no class row) — still normalize knack role / source.
+  if (
+    !name &&
+    Array.isArray(asRecord(out.import_proposals)?.custom_abilities) &&
+    (asRecord(out.import_proposals)?.custom_abilities as unknown[]).some((row) => {
+      const a = asRecord(row)
+      return (
+        String(a?.ability_role ?? "") === "metamagic" ||
+        /^(alternate\s+)?sorcerer$/i.test(String(a?.source_name ?? "")) ||
+        /metamagic\s+option/i.test(String(a?.definition ?? ""))
+      )
+    })
+  ) {
+    out = sanitizeAlternateSorcererImportContent(out)
+  }
+  // Ranger knacks-only library paste.
+  if (
+    !name &&
+    Array.isArray(asRecord(out.import_proposals)?.custom_abilities) &&
+    (asRecord(out.import_proposals)?.custom_abilities as unknown[]).some((row) => {
+      const a = asRecord(row)
+      return (
+        /^(alternate\s+)?ranger$/i.test(String(a?.source_name ?? "")) ||
+        /ranger\s+knack/i.test(String(a?.definition ?? ""))
+      )
+    })
+  ) {
+    out = sanitizeLaserLlamaRangerKnacksImportContent(out)
+  }
 
   return out as Record<string, unknown>
 }

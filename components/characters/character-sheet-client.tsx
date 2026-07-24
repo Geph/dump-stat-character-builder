@@ -1530,6 +1530,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       ],
       feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
       customAbilities: sheetCustomAbilities,
+      selectedCustomAbilityNames: sheetCustomAbilities.map((ability) => ability.name),
       spellLevel: selectedSpell?.level ?? 1,
     })
     const fromMortal = mortalMetamagicOptionsFromFeatures(

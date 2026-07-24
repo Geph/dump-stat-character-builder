@@ -1538,6 +1538,36 @@ export const HOMEBREW_WIRING_PATTERNS = [
     ],
   },
   {
+    source: "Alternate Sorcerer / LaserLlama point-pool",
+    guidance: [
+      "Point-pool CHA full known caster — Sorcery Points cast spells (no slots). Emit class_resources.sorcery_points + spell_limit (special) + metamagics_known (special 2/3/4/5/6 at 2/5/9/14/19). Enrichment detects spellcasting.point_pool from Sorcery prose.",
+      "Metamagic feature → optionsSource class_knacks + resourceKey metamagics_known + choiceCountByLevel from the Metamagics Known column. Do NOT use grant_feat / PHB Metamagic Options catalog (homebrew list replaces it).",
+      "Metamagic library → import_proposals.custom_abilities with ability_role knack + source_name \"Alternate Sorcerer\" (never invent ability_role metamagic; never source_name Sorcerer — that attaches to SRD Sorcerer). Keep Sorcery Point cost sentences verbatim.",
+      "Do not emit \"Subclass Feature\" placeholders at 6/14/18 — Origins live in subclasses[]. Draconic Sorcery needs Dragon Ancestor (isChoice) + Draconic Resilience + Draconic Sorcery Spells at 3rd; Gem Ancestries are optional isChoice options on Dragon Ancestor.",
+      "Sorcerous Regeneration / Innate Arcanum / Innate Sorcery: keep feature prose; enrichment owns point-pool recharge templates and arcanum presets.",
+    ],
+  },
+  {
+    source: "Alternate Barbarian / LaserLlama exploits",
+    guidance: [
+      "Rage pool uses resource_key \"rage\" (never \"rages\"). Short rest regain 1 / long rest all. Unlimited at 20th → uses.freeUseAfterLevel: 20 (never invent a placeholder count of 100).",
+      "Also emit exploit_dice (at_level + dieSidesByLevel) and exploits_known (special choice count from the Exploits Known column).",
+      "Savage Exploits → optionsSource class_knacks + resourceKey exploits_known + choiceCountByLevel. Shared LaserLlama exploit library → ability_role knack + eligible_classes including Alternate Barbarian (Barbarian alone fuzzy-matches).",
+      "Path pickers with named lists (Giant Bloodline, Draconic Ancestry, Heart of Chaos, Bestial Spirits) should be isChoice when practical. Mutant Mutations nested catalogs may stay HTML unless a real picker is requested.",
+      "Fixed starting gear lines that are not (a)/(b)/(c) choices belong in starting_equipment, not a fake fourth equipment group.",
+    ],
+  },
+  {
+    source: "Alternate Ranger / LaserLlama knacks",
+    guidance: [
+      "Name the class \"Alternate Ranger\" (not bare Ranger) to avoid PHB collision. Knack library source_name must be Alternate Ranger too.",
+      "Emit quarry (WIS-mod spendable + restoreBySpellSlot; Tireless → rechargeOverrides at 10) + quarry_die (special dieSidesByLevel d4→d12) + knacks_known (special).",
+      "Knacks → optionsSource class_knacks + resourceKey knacks_known + choiceCountByLevel; swappableOnRest false (level-up swap only).",
+      "Bounty Hunter Martial Exploits → inline choices.options from the Fighter exploit list — NEVER a second class_knacks picker (shared pool would mix Knacks and Exploits). High Degree → exploit_degree special cap 1/2/3.",
+      "Fighting Style may stay grant_feat Fighting Style when the style list is missing from the paste. Keep undefined cross-refs (e.g. Frozen Revenge) flagged in description rather than inventing them.",
+    ],
+  },
+  {
     source: "Vagabond / Bloodied martials",
     guidance: [
       "Battle Dice refill on Initiative: set uses.rechargeOnInitiative: true (table parse adds this for battle_dice automatically).",

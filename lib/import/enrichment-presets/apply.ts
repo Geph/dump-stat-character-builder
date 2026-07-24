@@ -29,6 +29,15 @@ import { sanitizeOccultistImportContent } from "@/lib/import/enrichment-presets/
 import { sanitizeBeastheartImportContent } from "@/lib/import/enrichment-presets/packs/beastheart"
 import { sanitizeKibblesWardenImportContent } from "@/lib/import/enrichment-presets/packs/kibbles-warden"
 import { sanitizeInventorImportContent } from "@/lib/import/enrichment-presets/packs/inventor"
+import { sanitizeAlternateSorcererImportContent } from "@/lib/import/enrichment-presets/packs/alternate-sorcerer"
+import {
+  sanitizeAlternateBarbarianImportContent,
+  sanitizeLaserLlamaExploitsImportContent,
+} from "@/lib/import/enrichment-presets/packs/alternate-barbarian"
+import {
+  sanitizeAlternateRangerImportContent,
+  sanitizeLaserLlamaRangerKnacksImportContent,
+} from "@/lib/import/enrichment-presets/packs/alternate-ranger"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import type {
   EnrichmentOperation,
@@ -558,6 +567,11 @@ export function applyImportEnrichmentPresets(
   next = sanitizeBeastheartImportContent(next)
   next = sanitizeKibblesWardenImportContent(next)
   next = sanitizeInventorImportContent(next)
+  next = sanitizeAlternateSorcererImportContent(next)
+  next = sanitizeAlternateBarbarianImportContent(next)
+  next = sanitizeLaserLlamaExploitsImportContent(next)
+  next = sanitizeAlternateRangerImportContent(next)
+  next = sanitizeLaserLlamaRangerKnacksImportContent(next)
   next = sanitizeWitchImportContent(next)
 
   return next

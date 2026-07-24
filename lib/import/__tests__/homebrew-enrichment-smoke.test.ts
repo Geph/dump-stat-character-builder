@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
@@ -8,7 +7,7 @@ import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import {
   auditImportWiring,
   DRIVE_SMOKE_IMPORT_FILES,
-  homebrewImportJsonDir,
+  resolveHomebrewImportJsonPath,
   summarizeFindings,
 } from "@/lib/import/homebrew-import-ops"
 import type { Feature } from "@/lib/types"
@@ -18,14 +17,11 @@ import type { Feature } from "@/lib/types"
  * audit is clean (or only warnings) after enrichment sanitizers run.
  */
 describe("homebrew enrichment Drive smoke", () => {
-  const dir = homebrewImportJsonDir()
-
   for (const file of DRIVE_SMOKE_IMPORT_FILES) {
-    const path = join(dir, file)
-    const present = existsSync(path)
+    const path = resolveHomebrewImportJsonPath(file)
 
-    it.skipIf(!present)(`${file}: structural audit passes after sanitize/enrich path`, () => {
-      const raw = parseImportContentJson(readFileSync(path, "utf8"))!
+    it.skipIf(!path)(`${file}: structural audit passes after sanitize/enrich path`, () => {
+      const raw = parseImportContentJson(readFileSync(path!, "utf8"))!
       const enriched = enrichImportContentModifiers(
         applyClassSpellListsToImport(applyImportEnrichmentPresets(raw)),
       )
@@ -34,13 +30,13 @@ describe("homebrew enrichment Drive smoke", () => {
     })
   }
 
-  it.skipIf(!existsSync(join(dir, "magehandpress-investigator-class")))(
+  const investigatorPath = resolveHomebrewImportJsonPath("magehandpress-investigator-class")
+  it.skipIf(!investigatorPath)(
     "investigator enrichment still remaps finisher and grants Antiquarian trinkets",
     () => {
-      const path = join(dir, "magehandpress-investigator-class")
       const content = enrichImportContentModifiers(
         applyClassSpellListsToImport(
-          applyImportEnrichmentPresets(parseImportContentJson(readFileSync(path, "utf8"))!),
+          applyImportEnrichmentPresets(parseImportContentJson(readFileSync(investigatorPath!, "utf8"))!),
         ),
       )
       expect(content.class_resources?.some((r) => r.resource_key === "finisher")).toBe(true)

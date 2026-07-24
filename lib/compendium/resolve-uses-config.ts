@@ -55,6 +55,13 @@ export function resolveUsesAtLevel(
   characterLevel: number,
   ctx: ResolveUsesContext = {},
 ): number | null {
+  if (
+    uses.freeUseAfterLevel != null &&
+    Number.isFinite(uses.freeUseAfterLevel) &&
+    characterLevel >= uses.freeUseAfterLevel
+  ) {
+    return null
+  }
   switch (uses.type) {
     case "fixed":
       return uses.fixedAmount ?? 1

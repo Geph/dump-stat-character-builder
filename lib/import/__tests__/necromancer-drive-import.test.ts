@@ -1,19 +1,18 @@
-import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
-import { homebrewImportJsonDir } from "@/lib/import/homebrew-import-ops"
+import { resolveHomebrewImportJsonPath } from "@/lib/import/homebrew-import-ops"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { Feature } from "@/lib/types"
 
-const PATH = join(homebrewImportJsonDir(), "magehandpress-necromancer-class")
-const hasDriveFixture = existsSync(PATH)
+const PATH = resolveHomebrewImportJsonPath("magehandpress-necromancer-class")
+const hasDriveFixture = Boolean(PATH)
 
 function load() {
-  return parseImportContentJson(readFileSync(PATH, "utf8"))!
+  return parseImportContentJson(readFileSync(PATH!, "utf8"))!
 }
 
 function enrich() {

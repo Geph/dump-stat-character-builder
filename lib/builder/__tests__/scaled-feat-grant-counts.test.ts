@@ -16,6 +16,14 @@ describe("scaledClassFeatGrantCount", () => {
     expect(scaledClassFeatGrantCount("Sorcerer", "Metamagic", 16, 1)).toBe(4)
   })
 
+  it("scales Alternate Sorcerer Metamagic from the LaserLlama table", () => {
+    expect(scaledClassFeatGrantCount("Alternate Sorcerer", "Metamagic", 2, 2)).toBe(2)
+    expect(scaledClassFeatGrantCount("Alternate Sorcerer", "Metamagic", 5, 2)).toBe(3)
+    expect(scaledClassFeatGrantCount("Alternate Sorcerer", "Metamagic", 9, 2)).toBe(4)
+    expect(scaledClassFeatGrantCount("Alternate Sorcerer", "Metamagic", 14, 2)).toBe(5)
+    expect(scaledClassFeatGrantCount("Alternate Sorcerer", "Metamagic", 19, 2)).toBe(6)
+  })
+
   it("returns base count for unrelated features", () => {
     expect(scaledClassFeatGrantCount("Fighter", "Fighting Style", 10, 1)).toBe(1)
   })

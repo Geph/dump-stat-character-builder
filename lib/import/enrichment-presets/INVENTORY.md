@@ -34,8 +34,12 @@ Replaces class-specific enricher modules with declarative presets under
 | Monk | Resource key + feat ki remap helpers | (b) | |
 | Alternate Ranger | Quarry on-hit trigger | (b) | |
 | Alternate Ranger | Quarry class resource seed | (b) | Content seed |
+| Alternate Ranger | Rename + quarry_die/knacks/Bounty Hunter sanitize | (b) | LaserLlama |
 | Alternate Sorcerer | Innate Arcanum / Innate Sorcery presets | (b) | Reuses SRD factories |
 | Alternate Sorcerer | Sorcerous Regeneration description | (b) | Prefixed resource template |
+| Alternate Sorcerer | Metamagic class_knacks + knack library sanitize | (b) | LaserLlama point-pool |
+| Alternate Barbarian | Rage remap + freeUseAfterLevel 20 | (b) | LaserLlama |
+| Alternate Barbarian | Savage Exploits class_knacks + exploits library sanitize | (b) | Shared exploits custom |
 
 ## Call sites
 

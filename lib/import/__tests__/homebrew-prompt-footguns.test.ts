@@ -32,6 +32,14 @@ describe("homebrew prompt footguns", () => {
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/endurance_die_size/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Inventor \(KibblesTasty\)/i)
     expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/class_resources\.upgrades/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Sorcerer \(LaserLlama\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/metamagics_known/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Barbarian \(LaserLlama\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/freeUseAfterLevel: 20/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/exploits_known/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/Alternate Ranger \(LaserLlama\)/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/quarry_die/i)
+    expect(CLASS_RESOURCE_IMPORT_HINT).toMatch(/knacks_known/i)
   })
 
   it("keeps Investigator trinket auto-grant exception in IMPORT_PROPOSALS_HINT", () => {
@@ -67,6 +75,12 @@ describe("homebrew prompt footguns", () => {
     expect(blob).toMatch(/Inventor \/ KibblesTasty specializations/i)
     expect(blob).toMatch(/never emit upgrades as a spendable/i)
     expect(blob).toMatch(/grant_creature/i)
+    expect(blob).toMatch(/Alternate Sorcerer \/ LaserLlama point-pool/i)
+    expect(blob).toMatch(/never invent ability_role metamagic/i)
+    expect(blob).toMatch(/Alternate Barbarian \/ LaserLlama exploits/i)
+    expect(blob).toMatch(/never invent a placeholder count of 100/i)
+    expect(blob).toMatch(/Alternate Ranger \/ LaserLlama knacks/i)
+    expect(blob).toMatch(/NEVER a second class_knacks picker/i)
   })
 
   it("third-party charnel_touch definition still warns about uses.shape", () => {

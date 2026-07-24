@@ -24,6 +24,7 @@ import {
   sanitizeHomebrewImportJson,
   summarizeFindings,
   DRIVE_SMOKE_IMPORT_FILES,
+  resolveHomebrewImportJsonPath,
 } from "@/lib/import/homebrew-import-ops"
 import { IMPORT_TO_SOURCE_BASENAME } from "@/lib/import/homebrew-import-ops/paths"
 
@@ -175,12 +176,11 @@ function cmdCompleteness(jsonPath: string, flags: Record<string, string | boolea
 }
 
 function cmdSmoke() {
-  const dir = homebrewImportJsonDir()
   let failed = 0
   for (const file of DRIVE_SMOKE_IMPORT_FILES) {
-    const path = join(dir, file)
-    if (!existsSync(path)) {
-      console.log(`[skip] missing ${path}`)
+    const path = resolveHomebrewImportJsonPath(file)
+    if (!path) {
+      console.log(`[skip] missing ${file}`)
       continue
     }
     const findings = auditImportWiring(loadJson(path))
