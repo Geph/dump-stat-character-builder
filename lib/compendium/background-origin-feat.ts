@@ -46,7 +46,8 @@ export type BackgroundFeatGrantChoice = {
 export function parseBackgroundFeatGrantChoice(
   featGranted: string | null | undefined,
 ): BackgroundFeatGrantChoice | null {
-  const text = featGranted?.trim() ?? ""
+  // Strip trailing recommendations like "(Mist Walker recommended)"
+  const text = (featGranted?.trim() ?? "").replace(/\s*\([^)]*\)\s*$/g, "").trim()
   if (!text) return null
 
   // "Survivor or a Dark Gift feat of your choice"

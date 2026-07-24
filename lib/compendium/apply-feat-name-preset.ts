@@ -175,5 +175,7 @@ export function applyFeatNamePreset(
     benefits: row.benefits ?? null,
     repeatable: row.repeatable ?? preset.repeatable ?? false,
   }
-  return applyFeatMechanicalDetection(withPreset)
+  // Trust hand-written presets; phrase detection on feat body/tables often mis-wires
+  // (e.g. Cohort of Chaos flare table text → spurious check advantage).
+  return withPreset
 }

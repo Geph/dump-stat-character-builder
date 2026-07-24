@@ -24,6 +24,8 @@ import {
 import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { enrichWildcardFeaturePresets } from "@/lib/compendium/enrich-srd-class-features"
+import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
+import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
@@ -251,13 +253,23 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
         choices: null,
       }
       const applied = applyFeatNamePreset(stripped)
+      const linkedModifiers = (applied.linkedModifiers ??
+        applied.linked_modifiers) as Feature["linkedModifiers"]
+      const importModifierMeta: ImportModifierMeta[] | undefined = linkedModifiers?.length
+        ? linkedModifiers.map((instance) => ({
+            instanceId: instance.instanceId,
+            ruleId: "feat.name_preset",
+            confidence: "high" as const,
+            matchedPhrase: "Name preset",
+            source: "detector" as const,
+          }))
+        : undefined
       return {
         ...inferred,
         description,
         isChoice: Boolean(applied.isChoice ?? applied.is_choice),
         choices: (applied.choices as Feature["choices"] | null | undefined) ?? undefined,
-        linkedModifiers: (applied.linkedModifiers ??
-          applied.linked_modifiers) as Feature["linkedModifiers"],
+        linkedModifiers,
         modifierRefs: (applied.modifierRefs ?? applied.modifier_refs) as
           | Feature["modifierRefs"]
           | undefined,
@@ -265,7 +277,7 @@ function enrichFeats(feats: ImportFeatRow[] | undefined): ImportFeatRow[] | unde
           (inferred as { repeatable?: boolean | null }).repeatable ??
           (applied.repeatable as boolean | null | undefined) ??
           undefined,
-        importModifierMeta: undefined,
+        importModifierMeta,
       } as ImportFeatRow
     }
     const ctx = {
@@ -370,27 +382,53 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   }
 
   if (content.species?.length) {
-    next.species = content.species.map((species) => ({
-      ...species,
-      traits: enrichTraits(species.traits as Trait[], species.name) as typeof species.traits,
-    }))
+    next.species = content.species.map((species) => {
+      // Mechanics phrase/AI detection first, then named trait presets (Talons, Trance, etc.).
+      const withDetected = {
+        ...species,
+        traits: enrichTraits(species.traits as Trait[], species.name) as typeof species.traits,
+      }
+      const withPresets = enrichCustomSpeciesRow({
+        ...withDetected,
+        source: (species as { source?: string | null }).source ?? "Custom",
+      })
+      return {
+        ...withDetected,
+        traits: (withPresets.traits as typeof species.traits) ?? withDetected.traits,
+        size_options:
+          (withPresets.size_options as string[] | null | undefined) ??
+          (species as { size_options?: string[] | null }).size_options ??
+          null,
+      }
+    })
   }
 
   if (content.backgrounds?.length) {
     next.backgrounds = content.backgrounds.map((background) => {
-      if (!background.feature?.description) return background
-      const enriched = enrichFeatureLike(background.feature as ImportMechanicsCarrier, {
+      // Wire Dark Gift / Planar Pact choice grants and proficiency choice phrases
+      // before phrase detection so import review matches persist-time normalize.
+      const normalized = normalizeBackgroundRow(
+        background as unknown as Record<string, unknown>,
+      ) as typeof background
+      if (!normalized.feature?.description) return normalized
+      const feature = normalized.feature as ImportMechanicsCarrier & { name: string; description: string }
+      const existing = feature.linkedModifiers ?? []
+      const enriched = enrichFeatureLike(feature, {
         contentKind: "background_feature",
-        sourceName: background.name,
-        featureName: background.feature.name,
+        sourceName: normalized.name,
+        featureName: feature.name,
       })
+      const detected = enriched.linkedModifiers ?? []
+      const merged = [...existing]
+      for (const instance of detected) {
+        if (!isModifierRedundantAgainst(instance, merged)) merged.push(instance)
+      }
       return {
-        ...background,
+        ...normalized,
         feature: syncModifierRefs({
-          ...background.feature,
-          linkedModifiers: enriched.linkedModifiers,
-          modifierRefs: enriched.modifierRefs,
-          importModifierMeta: (enriched as ImportMechanicsCarrier).importModifierMeta,
+          ...feature,
+          linkedModifiers: merged,
+          importModifierMeta: enriched.importModifierMeta,
         }),
       }
     })

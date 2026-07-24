@@ -25,11 +25,36 @@ export const SCHEMA_FIT_WARNING =
 export const WEAPON_MASTERY_IMPORT_TIP =
   "Homebrew weapon masteries (Parry, Shift, Explode, …): import as a separate Custom Abilities pass so they extend Weapon Mastery Properties, then import weapons with properties.mastery set to those names. Novel non-SRD properties (Firearm, Reload, …) store as string tags — they display on the item but are not fully simulated."
 
+/** Short lead-in for the Import order dialog (class-focused). */
 export const MULTI_FILE_IMPORT_TIP =
-  "Happy path: usually two LLM extracts, then one import. (1) Supporting library — disciplines, exploits, full spell write-ups. (2) Class chapter — core class + every archetype in the same JSON (classes[] + subclasses[]), including Spell/School/Special list stubs when present. Paste both as a JSON array in Step 2 for one staged review (Dump Stat auto-orders libraries before the class even if you paste them reversed). Use page ranges to skip other classes — not to split a class from its own subclasses. Use content type Subclasses only when adding archetypes to a class already in your compendium."
+  "Most class imports are two extracts, then one paste in Step 2."
 
 export const JSON_ARRAY_IMPORT_TIP =
-  "Paste a JSON array in Step 2 — e.g. [{\"abilities\": [...]}, {\"classes\": [...], \"subclasses\": [...]}] — and Dump Stat merges it into one batch before wiring. Libraries are auto-sorted ahead of the class chapter; keep archetypes in the same object as classes[] (not a later separate pass)."
+  "Paste both JSON objects as an array in Step 2 — e.g. [{…library…}, {…class + subclasses…}]. Dump Stat merges them and sorts the library ahead of the class automatically."
+
+/** Visual steps for the typical class import (shown in Import order dialog). */
+export const CLASS_IMPORT_STEPS: ImportWorkflowStep[] = [
+  {
+    label: "Supporting library (optional)",
+    hint: "Disciplines, exploits, maneuvers, or full homebrew spell write-ups the class depends on. Skip if everything is already in your compendium.",
+    contentType: "abilities",
+  },
+  {
+    label: "Class chapter",
+    hint: "One class + every subclass/archetype in the same extract (classes[] + subclasses[]). Include class spell-list tables here when present.",
+    contentType: "classes",
+  },
+  {
+    label: "One import",
+    hint: "Paste both JSON objects as an array in Step 2. Staged review walks the class, then subclasses, then modifier wiring.",
+  },
+]
+
+export const CLASS_IMPORT_NOTES: string[] = [
+  "One class per pass — page-range out other classes in the same book.",
+  "Keep subclasses with the class chapter; use Subclasses only when adding archetypes later to a class already in your compendium.",
+  "Same-name collisions (e.g. Mage Hand Press Warden vs Kibbles Tasty Warden) are renamed in import review.",
+]
 
 export const IMPORT_WORKFLOWS: ImportWorkflow[] = [
   {

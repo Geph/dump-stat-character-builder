@@ -340,6 +340,11 @@ describe("background Planar Pact grant wiring", () => {
       category: "Dark Gift",
       alsoFeatNames: ["Sharp Eye"],
     })
+    expect(
+      parseBackgroundFeatGrantChoice(
+        "A Dark Gift feat of your choice (Mist Walker recommended)",
+      ),
+    ).toEqual({ category: "Dark Gift" })
   })
 
   it("creates a background feat pick slot from imported background data", () => {

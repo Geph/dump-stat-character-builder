@@ -121,16 +121,31 @@ describe("Planescape + Ravenloft feat presets", () => {
     const cohort = enrichCustomFeatRow({
       name: "Cohort of Chaos",
       source: PHB,
-      description: "Chaotic Flare",
+      description: "Chaotic Flare. When you roll a 1 or a 20 on an attack roll or a saving throw, the magic of chaos flows through you. A creature of your choice that you can see is filled with reckless fury. It has advantage on attack rolls and disadvantage on ability checks.",
     })
     expect(chars(cohort).some((c) => c.type === "ability_scores")).toBe(true)
+    expect(chars(cohort).some((c) => c.type === "uses")).toBe(true)
+    // Flare table text must not become a self check-advantage modifier.
+    expect(
+      ((cohort.linked_modifiers ?? []) as { activation?: { effects?: { kind?: string }[] } }[]).some(
+        (m) => m.activation?.effects?.some((e) => e.kind === "check_advantage"),
+      ),
+    ).toBe(false)
 
     const wanderer = enrichCustomFeatRow({
       name: "Planar Wanderer",
       source: PHB,
-      description: "Planar Adaptation",
+      description: "Planar Adaptation. Portal Cracker. Portal Sense.",
     })
     expect(chars(wanderer).some((c) => c.type === "damage_resistance")).toBe(true)
+    expect(chars(wanderer).some((c) => c.type === "uses")).toBe(true)
+    expect(
+      ((wanderer.linked_modifiers ?? []) as { activation?: { action?: boolean; effects?: { label?: string }[] } }[]).some(
+        (m) =>
+          m.activation?.action &&
+          m.activation.effects?.some((e) => /Portal Cracker/i.test(e.label ?? "")),
+      ),
+    ).toBe(true)
 
     const sharp = enrichCustomFeatRow({
       name: "Sharp Eye",

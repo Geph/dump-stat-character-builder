@@ -49,6 +49,20 @@ Multi-file homebrew (spellcasters, psionics, martial exploits, and similar):
 - You can paste a JSON array of import objects in one run — Dump Stat merges them before wiring modifiers (libraries sorted first; keep subclasses[] with the class object)
 - SRD spell names resolve from your seeded compendium; only import homebrew spells for non-SRD names`
 
+/** Shorter user-facing copy for the Import tips dialog (LLM prompt still uses CLEAN_SOURCE_TEXT_GUIDELINES). */
+export const CLEAN_SOURCE_TEXT_UI_GUIDELINES = `Prep PDF or web text so extraction stays clean:
+
+- One class per pass (that class + its subclasses is fine).
+- Keep feature headings with their full rules paragraphs.
+- Keep level tables in the source; do not paste them into description fields.
+- Drop running heads, page numbers, and nav chrome when you can.
+- Fix squished PDF paste (e.g. "Cleric LevelPrepared Spells3Aid…") into real tables or spaced lines.
+- Fix doubled ALL-CAPS glyphs (LaserLlama: "S ST T R R" → "STR") and trailing superscript letters (Kibbles: "Returning WeaponK" → "Returning Weapon").
+- Prefer vector PDF text; OCR scanned pages first.
+- Use page ranges to skip other classes or isolate a library section — not to split a class from its subclasses.
+- Stay under ${PASTED_SOURCE_TEXT_MAX_CHARS.toLocaleString()} characters of pasted source text.`
+
+
 const JSON_OUTPUT_RULES = `Output format (required)
 
 If the source does not fit this content type / schema (whole book, multi-class PDF, spell chapter inside a class pass, etc.), do NOT invent JSON — reply in plain language telling the user how to split or re-scope the upload.
