@@ -3,6 +3,7 @@ import {
   getAllSeedToolNames,
   getMusicalInstrumentNames,
   getStandardProficiencyToolNames,
+  getToolDescription,
   groupToolOptionsForPicker,
   toolNamesForPool,
 } from "@/lib/compendium/tool-options"
@@ -33,6 +34,12 @@ describe("SRD tools compendium seed", () => {
     expect(groups.length).toBeGreaterThanOrEqual(1)
     expect(groups.some((group) => group.label.includes("Musical"))).toBe(true)
     expect(groups.flatMap((group) => group.names)).toContain("Lute")
+  })
+
+  it("builds short ability-check blurbs for artisan tools", () => {
+    expect(getToolDescription("Carpenter's Tools")).toMatch(/Strength/)
+    expect(getToolDescription("Carpenter's Tools")).toMatch(/Artisan/)
+    expect(getToolDescription("Not A Real Tool")).toBeNull()
   })
 })
 

@@ -221,7 +221,10 @@ export function ClassAbilityFeatureChoices({
                 layout={
                   feature.choices!.category.toLowerCase().includes("skill")
                     ? skillPickerLayout
-                    : compactPickerLayout
+                    : /tool/i.test(`${feature.choices!.category} ${feature.name}`) &&
+                        cardViewMode === "cinematic"
+                      ? "visual"
+                      : compactPickerLayout
                 }
                 skillIconByName={
                   feature.choices!.category.toLowerCase().includes("skill")

@@ -205,6 +205,7 @@ export function ModifierPlayerChoicePanel({
         }
 
         const isSkillKind = slot.kind === "skill" || slot.kind === "skill_or_tool"
+        const isToolKind = slot.kind === "tool" || slot.kind === "skill_or_tool"
         const useToolGroups =
           slot.kind === "tool" &&
           (slot.toolChoicePool === "artisans" ||
@@ -231,6 +232,8 @@ export function ModifierPlayerChoicePanel({
             : slot.grantsExpertise
               ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
               : `Choose ${slot.maxCount}`
+        const toolLayout =
+          skillPickerLayout === "visual" ? "visual" : choiceLayout === "compact" ? "compact" : "default"
         if (useToolGroups) {
           return (
             <div key={slot.slotKey} className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
@@ -249,6 +252,7 @@ export function ModifierPlayerChoicePanel({
                 accentClass={accentClass}
                 unavailableOptions={unavailableOptions}
                 compact={choiceLayout === "compact"}
+                layout={toolLayout}
               />
             </div>
           )
@@ -269,7 +273,14 @@ export function ModifierPlayerChoicePanel({
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
             showSkillInfo={isSkillKind}
-            layout={isSkillKind ? skillPickerLayout : choiceLayout}
+            showOptionInfo={isToolKind && !isSkillKind}
+            layout={
+              isSkillKind
+                ? skillPickerLayout
+                : isToolKind
+                  ? toolLayout
+                  : choiceLayout
+            }
             skillIconByName={isSkillKind ? skillIconByName : undefined}
             unavailableOptions={isSkillKind && !slot.grantsExpertise ? unavailableOptions : []}
             allowCustom={slot.allowCustom ?? false}

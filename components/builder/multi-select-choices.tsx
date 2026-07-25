@@ -1,12 +1,19 @@
 "use client"
 
-import { useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GameIcon } from "@/components/game-icon-picker"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
+import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
+import { paginateList } from "@/lib/builder/picker-pagination"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
 import { skillIconSlug } from "@/lib/compendium/skill-icons"
+import { getToolDescription } from "@/lib/compendium/tool-options"
+
+/** Phone multi-select grids — 6 options per page. */
+const PHONE_CHOICE_PAGE_SIZE = 6
 
 type ChoiceOption = {
   name: string
@@ -82,6 +89,19 @@ function groupOptionsBySource(options: ChoiceOption[]): { label: string | null; 
   }))
 }
 
+function optionInfoText(
+  option: ChoiceOption,
+  showSkillInfoButtons: boolean,
+): string | null {
+  const explicit = option.description?.trim() || null
+  if (explicit) return explicit
+  if (showSkillInfoButtons) {
+    const skill = getSkillDescription(option.name)
+    if (skill) return skill
+  }
+  return getToolDescription(option.name)
+}
+
 export function MultiSelectChoices({
   title,
   hint,
@@ -105,11 +125,14 @@ export function MultiSelectChoices({
   const isLockedName = (name: string) => lockedKeys.has(normalizeKey(name))
   const compact = layout === "compact"
   const visual = layout === "visual"
+  const isPhone = useIsPhonePickerScreen()
   const showSkillInfoButtons = showSkillInfo && !compact
-  const showInfoButtons = showOptionInfo || showSkillInfoButtons
+  const showInfoButtons = showOptionInfo || showSkillInfoButtons || visual
   const showSkillIcons = visual && showSkillInfo
   const [infoOption, setInfoOption] = useState<ChoiceOption | null>(null)
   const [customDraft, setCustomDraft] = useState("")
+  const [flatPage, setFlatPage] = useState(0)
+  const [groupPages, setGroupPages] = useState<Record<string, number>>({})
   const pendingScrollY = useRef<number | null>(null)
 
   useLayoutEffect(() => {
@@ -137,6 +160,12 @@ export function MultiSelectChoices({
   ]
 
   const optionGroups = groupOptionsBySource(displayOptions)
+  const isFlatList = optionGroups.length === 1 && optionGroups[0]?.label == null
+
+  useEffect(() => {
+    setFlatPage(0)
+    setGroupPages({})
+  }, [options, isPhone, title])
 
   const freeSelected = selected.filter((name) => !isLockedName(name))
 
@@ -158,10 +187,7 @@ export function MultiSelectChoices({
   }
 
   const infoDescription =
-    infoOption == null
-      ? null
-      : infoOption.description?.trim() ||
-        (showSkillInfoButtons ? getSkillDescription(infoOption.name) : null)
+    infoOption == null ? null : optionInfoText(infoOption, showSkillInfoButtons)
 
   const gridClass = compact
     ? "grid grid-cols-1 sm:grid-cols-3 gap-1.5"
@@ -173,9 +199,8 @@ export function MultiSelectChoices({
     const isTakenElsewhere = !isSelected && unavailable.has(option.name)
     const isDisabled =
       locked || isTakenElsewhere || (!isSelected && freeSelected.length >= maxCount)
-    const skillDescription = showSkillInfoButtons ? getSkillDescription(option.name) : null
-    const hasOptionDescription = Boolean(option.description?.trim())
-    const canShowInfo = showInfoButtons && (hasOptionDescription || Boolean(skillDescription))
+    const description = optionInfoText(option, showSkillInfoButtons)
+    const canShowInfo = showInfoButtons && Boolean(description)
     const iconSlug = showSkillIcons ? skillIconSlug(option.name, skillIconByName) : null
     const prereq = option.prerequisite?.trim() || null
 
@@ -232,13 +257,40 @@ export function MultiSelectChoices({
             aria-label={`About ${option.name}`}
             onClick={() => setInfoOption(option)}
             className={`shrink-0 self-center rounded-lg border border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors ${
-              compact ? "p-1.5" : "p-2"
+              compact ? "p-1.5" : visual ? "p-2.5" : "p-2"
             }`}
           >
             <Info className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
           </button>
         ) : null}
       </div>
+    )
+  }
+
+  const renderPaginatedOptions = (
+    list: ChoiceOption[],
+    page: number,
+    setPage: (next: number) => void,
+    paginationLabel: string,
+  ) => {
+    const pageSize = isPhone ? PHONE_CHOICE_PAGE_SIZE : Math.max(list.length, 1)
+    const { pageItems, pageCount, safePage } = paginateList(list, page, pageSize)
+    const visible = isPhone ? pageItems : list
+    return (
+      <>
+        <div className={gridClass}>{visible.map(renderOption)}</div>
+        {isPhone ? (
+          <PickerGridPagination
+            page={safePage}
+            pageCount={pageCount}
+            onPrevious={() => setPage(Math.max(0, safePage - 1))}
+            onNext={() => setPage(Math.min(pageCount - 1, safePage + 1))}
+            previousLabel={`Previous ${paginationLabel}`}
+            nextLabel={`Next ${paginationLabel}`}
+            className="mt-2"
+          />
+        ) : null}
+      </>
     )
   }
 
@@ -258,20 +310,28 @@ export function MultiSelectChoices({
             disciplines and talents) into the compendium, then return here.
           </p>
         ) : null}
-        {optionGroups.length === 1 && optionGroups[0]?.label == null ? (
-          <div className={gridClass}>{displayOptions.map(renderOption)}</div>
+        {isFlatList ? (
+          renderPaginatedOptions(displayOptions, flatPage, setFlatPage, title)
         ) : (
           <div className="space-y-4">
-            {optionGroups.map((group) => (
-              <div key={group.label ?? "ungrouped"}>
-                {group.label ? (
-                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-                    {group.label}
-                  </p>
-                ) : null}
-                <div className={gridClass}>{group.options.map(renderOption)}</div>
-              </div>
-            ))}
+            {optionGroups.map((group) => {
+              const groupKey = group.label ?? "ungrouped"
+              return (
+                <div key={groupKey}>
+                  {group.label ? (
+                    <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                      {group.label}
+                    </p>
+                  ) : null}
+                  {renderPaginatedOptions(
+                    group.options,
+                    groupPages[groupKey] ?? 0,
+                    (next) => setGroupPages((prev) => ({ ...prev, [groupKey]: next })),
+                    group.label ?? title,
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
         {allowCustom && (
@@ -329,7 +389,9 @@ export function MultiSelectChoices({
               <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
                 {showSkillInfoButtons && getSkillDescription(infoOption.name) && !infoOption.description?.trim()
                   ? "Skill"
-                  : "Details"}
+                  : getToolDescription(infoOption.name) && !infoOption.description?.trim()
+                    ? "Tool"
+                    : "Details"}
               </p>
               <h4 className="font-serif text-xl font-black text-foreground pr-8">
                 {infoOption.name}

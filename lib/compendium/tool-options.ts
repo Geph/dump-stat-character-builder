@@ -121,6 +121,33 @@ export function resolveToolCheckAbility(
   return "intelligence"
 }
 
+const ABILITY_LABEL: Record<ToolCheckAbility, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+  charisma: "Charisma",
+}
+
+/** Short builder blurb for a tool proficiency (ability check + category). */
+export function getToolDescription(
+  toolName: string,
+  catalog: Array<Pick<Tool, "name" | "check_ability" | "subcategory">> = [],
+): string | null {
+  const normalized = toolName.trim().toLowerCase()
+  if (!normalized) return null
+  const fromCatalog = catalog.find((row) => row.name.toLowerCase() === normalized)
+  const fromSeed = seedByName.get(normalized)
+  if (!fromCatalog && !fromSeed && !isKnownToolName(toolName)) return null
+
+  const ability = resolveToolCheckAbility(toolName, catalog)
+  const subcategory =
+    fromCatalog?.subcategory?.trim() ||
+    fromSeed?.subcategory?.trim() ||
+    (fromSeed?.tool_group ? toolGroupLabel(fromSeed.tool_group as ToolGroup) : "Tool")
+  return `${subcategory}. Ability checks with this tool use ${ABILITY_LABEL[ability]}.`
+}
+
 export function resolveToolExpansions(
   toolName: string,
   catalog: Array<Pick<Tool, "name" | "expands_to">> = [],
