@@ -12,13 +12,9 @@ export type ClassDetailFeatureRow = {
 function isResourceRelatedFeature(feature: Feature, cls: DndClass): boolean {
   if (feature.limitedUses?.type === "class_resource") return true
   if (feature.resourceId) return true
-  const resourceNames = new Set(
-    (cls.class_resources ?? []).map((r) => r.name.toLowerCase()),
-  )
-  if (resourceNames.has(feature.name.toLowerCase())) return true
-  return (cls.class_resources ?? []).some((resource) =>
-    feature.description.toLowerCase().includes(resource.name.toLowerCase()),
-  )
+  // Exact name match only — description mentions (e.g. Primal Knowledge → "Rage") are not resources.
+  const featureName = feature.name.toLowerCase()
+  return (cls.class_resources ?? []).some((resource) => resource.name.toLowerCase() === featureName)
 }
 
 /** Features through level 3 for builder detail overlay — names only, resource features flagged. */

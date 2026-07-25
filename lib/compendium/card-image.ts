@@ -32,9 +32,9 @@ export const COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS =
 /** Builder selection cards — clear top 40%, then ramp to 80% black at the bottom. */
 export const SELECTION_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_bottom,transparent_0%,transparent_40%,rgba(0,0,0,0.45)_54%,rgba(0,0,0,0.8)_100%)]"
-/** Detail overlay hero — dark band in bottom 25% for title/tags. */
+/** Detail overlay hero — dark band for title/tags; taller scrim below `lg` for phone portrait. */
 export const DETAIL_OVERLAY_HERO_GRADIENT_CLASS =
-  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_18%,rgba(0,0,0,0.45)_22%,transparent_25%)]"
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_18%,rgba(0,0,0,0.45)_22%,transparent_25%)] max-lg:bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_30%,rgba(0,0,0,0.5)_40%,transparent_48%)]"
 export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended); ${CLASS_CARD_IMAGE_ASPECT}`
 export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
 export const PORTRAIT_CARD_IMAGE_HINT = `${CLASS_CARD_IMAGE_ASPECT} · 600×800px recommended`

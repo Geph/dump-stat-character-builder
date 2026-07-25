@@ -112,8 +112,8 @@
   --sidebar-ring: oklch(0.48 0.1 65);
 }
 
-/* Arcane — dark purple + neon accents */
-[data-theme="arcane"] {
+/* Astral — dark purple + neon accents */
+[data-theme="astral"] {
   /* Primary — electric purple */
   --primary: oklch(0.62 0.26 290);
   --primary-foreground: oklch(0.98 0 0);
@@ -482,6 +482,57 @@
   50% { transform: translateY(-8px); }
 }
 .animate-float { animation: float 3s ease-in-out infinite; }
+
+@keyframes inspiration-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgb(245 158 11 / 0.45));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 6px rgb(245 158 11 / 0.85));
+    transform: scale(1.08);
+  }
+}
+.animate-inspiration-glow {
+  animation: inspiration-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes inspiration-sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  40% { opacity: 1; transform: scale(1); }
+  70% { opacity: 0.35; transform: scale(0.7); }
+}
+
+.inspiration-sparkles::before,
+.inspiration-sparkles::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgb(251 191 36);
+  box-shadow:
+    0 0 6px rgb(251 191 36 / 0.9),
+    14px -8px 0 -0.5px rgb(253 224 71),
+    -12px 6px 0 -1px rgb(252 211 77),
+    8px 10px 0 -1px rgb(245 158 11);
+  animation: inspiration-sparkle-twinkle 1.8s ease-in-out infinite;
+}
+
+.inspiration-sparkles::before {
+  top: 18%;
+  left: 22%;
+}
+
+.inspiration-sparkles::after {
+  right: 18%;
+  bottom: 20%;
+  animation-delay: 0.7s;
+  box-shadow:
+    0 0 6px rgb(253 224 71 / 0.9),
+    -10px -6px 0 -0.5px rgb(251 191 36),
+    11px 5px 0 -1px rgb(245 158 11);
+}
 
 /* Builder character preview — all text 25% larger */
 #builder-preview .builder-preview-panel {

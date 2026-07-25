@@ -70,6 +70,28 @@ describe("enrichSrdMundaneEquipmentRow", () => {
     })
     expect(row.icon).toBe("mail-shirt")
   })
+
+  it("disables SRD firearms by default while keeping them in the seed", () => {
+    for (const name of ["Pistol", "Musket"] as const) {
+      const row = enrichSrdMundaneEquipmentRow({
+        name,
+        source: "D&D 5.5e SRD",
+        category: "Weapon",
+        subcategory: "Martial Ranged Weapons",
+      })
+      expect(row.enabled).toBe(false)
+    }
+  })
+
+  it("uses the revolver icon for Pistol", () => {
+    const row = enrichSrdMundaneEquipmentRow({
+      name: "Pistol",
+      source: "D&D 5.5e SRD",
+      category: "Weapon",
+      subcategory: "Martial Ranged Weapons",
+    })
+    expect(row.icon).toBe("revolver")
+  })
 })
 
 describe("prepareMagicItemsForSeed", () => {

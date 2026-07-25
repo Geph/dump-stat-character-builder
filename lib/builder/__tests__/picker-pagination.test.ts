@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { getSubclassesForClass } from "@/lib/builder/choices"
-import { getFeatSpellGrantPickerPageSize, getPickerPageSize, getSpellPickerPageSize } from "@/lib/builder/picker-pagination"
+import {
+  getCinematicPickerItemClass,
+  getFeatSpellGrantPickerPageSize,
+  getPickerPageSize,
+  getSpellPickerPageSize,
+} from "@/lib/builder/picker-pagination"
 
 describe("getSpellPickerPageSize", () => {
   it("shows 3 rows on narrow screens (2 columns)", () => {
@@ -21,6 +26,12 @@ describe("getPickerPageSize", () => {
   it("paginates cinematic class/species grids with 2 cols × 3 rows", () => {
     expect(getPickerPageSize("cinematic", false)).toBe(6)
     expect(getPickerPageSize("cinematic", true)).toBe(6)
+  })
+})
+
+describe("getCinematicPickerItemClass", () => {
+  it("sizes phone swipe slides between full-bleed and the tighter 70% pass", () => {
+    expect(getCinematicPickerItemClass()).toContain("max-sm:basis-[82%]")
   })
 })
 

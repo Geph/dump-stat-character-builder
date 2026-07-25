@@ -4,6 +4,7 @@ import {
   COMPENDIUM_LIST_CARD_GRADIENT_CLASS,
   COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS,
   COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
+  DETAIL_OVERLAY_HERO_GRADIENT_CLASS,
   compendiumItemSupportsCardImage,
   compendiumPortraitListGradientClass,
   compendiumTabSupportsCardImage,
@@ -138,6 +139,11 @@ describe("compendium graphic card gradient", () => {
     expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_0%")
     expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_20%")
     expect(COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS).toContain("transparent_40%")
+  })
+
+  it("uses a taller detail-overlay scrim on phones", () => {
+    expect(DETAIL_OVERLAY_HERO_GRADIENT_CLASS).toContain("max-lg:bg-[linear-gradient")
+    expect(DETAIL_OVERLAY_HERO_GRADIENT_CLASS).toContain("transparent_48%")
   })
 })
 

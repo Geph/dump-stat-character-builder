@@ -74,4 +74,30 @@ describe("getClassDetailBaseFeatures", () => {
       "Psionic Archetype Feature",
     ])
   })
+
+  it("does not flag features that only mention a resource in their description", () => {
+    const barbarian = {
+      ...bardFixture(),
+      name: "Barbarian",
+      class_resources: [{ id: "rage", name: "Rage", type: "limited_use" }],
+      features: [
+        {
+          level: 1,
+          name: "Rage",
+          description: "Enter a Rage as a Bonus Action.",
+          limitedUses: { type: "class_resource", classResourceKey: "rage" },
+        },
+        {
+          level: 2,
+          name: "Primal Knowledge",
+          description:
+            "While your Rage is active, you can make certain checks as Strength checks.",
+        },
+      ],
+    } as unknown as DndClass
+
+    const rows = getClassDetailFeatures(barbarian)
+    expect(rows.find((row) => row.name === "Rage")?.resourceRelated).toBe(true)
+    expect(rows.find((row) => row.name === "Primal Knowledge")?.resourceRelated).toBe(false)
+  })
 })

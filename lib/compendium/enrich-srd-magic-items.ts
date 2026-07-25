@@ -251,6 +251,12 @@ export function enrichSrdMundaneEquipmentRow(row: Record<string, unknown>): Reco
     enriched = applySrdItemIcon(enriched, SRD_ARMOR_ICONS_BY_NAME)
   }
 
+  // Firearms are in the 2024 SRD but off by default — campaigns can enable them.
+  const weaponName = String(enriched.name ?? "").trim()
+  if (weaponName === "Pistol" || weaponName === "Musket") {
+    enriched = { ...enriched, enabled: false }
+  }
+
   return enriched
 }
 

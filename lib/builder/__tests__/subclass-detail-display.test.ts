@@ -32,14 +32,14 @@ describe("subclass detail display", () => {
     expect(formatGrantedDisciplineTag("Telepathy Discipline")).toBe("Telepathy")
   })
 
-  it("maps features to title rows without summaries", () => {
+  it("maps features to title rows with full descriptions", () => {
     const features = [
       { level: 3, name: "Opened Mind", description: "Long text." },
       { level: 1, name: "Mental Awareness", description: "More text." },
     ] as Feature[]
     expect(subclassFeatureTitleRows(features)).toEqual([
-      { level: 1, name: "Mental Awareness", resourceRelated: false, summary: "" },
-      { level: 3, name: "Opened Mind", resourceRelated: false, summary: "" },
+      { level: 1, name: "Mental Awareness", resourceRelated: false, summary: "More text." },
+      { level: 3, name: "Opened Mind", resourceRelated: false, summary: "Long text." },
     ])
   })
 })

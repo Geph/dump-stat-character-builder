@@ -103,21 +103,28 @@ function CardContent({
       )}
 
       {blurb && (
-        <p className={cn("mt-2 text-xs text-white/75 leading-relaxed", blurbLineClamp)}>{blurb}</p>
+        <p
+          className={cn(
+            "mt-2 text-xs text-white/75 leading-relaxed max-sm:hidden",
+            blurbLineClamp,
+          )}
+        >
+          {blurb}
+        </p>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex items-center justify-between gap-3 max-sm:justify-end">
         {sourceLabel ? (
           <p
             className={cn(
-              "min-w-0 truncate text-[10px] font-bold uppercase tracking-wider",
+              "min-w-0 truncate text-[10px] font-bold uppercase tracking-wider max-sm:hidden",
               accent.cardFooterText,
             )}
           >
             {sourceLabel}
           </p>
         ) : (
-          <span className="min-w-0 flex-1" />
+          <span className="min-w-0 flex-1 max-sm:hidden" />
         )}
         <div className="flex shrink-0 items-center gap-2">
           {onLearnMore && (

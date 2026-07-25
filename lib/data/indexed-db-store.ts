@@ -251,6 +251,10 @@ async function upsertByName(
       created_at: prev?.created_at ?? now,
       updated_at: now,
     }
+    // Keep the user's enable/disable toggle across SRD reseeds.
+    if (prev && "enabled" in prev) {
+      payload.enabled = prev.enabled
+    }
     byName.set(name, payload)
     saved.push(payload)
   }

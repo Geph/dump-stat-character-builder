@@ -35,6 +35,11 @@ export type FeatSlotContext = {
   armorProficiencies?: string[]
   /** Effective ability scores after ASIs and racial bonuses. */
   abilityScores?: Partial<Record<AbilityScoreKey, number>>
+  /**
+   * When true, skip ability-score prerequisite checks (still enforce armor, level, etc.).
+   * Used so Class-step feat galleries stay browsable before scores are finalized.
+   */
+  skipAbilityScorePrerequisites?: boolean
 }
 
 export function buildOwnedFeatIds(params: {
@@ -183,6 +188,7 @@ export function isFeatEligibleForCategories(
       continue
     }
     if (rule.category === "ability_score") {
+      if (context.skipAbilityScorePrerequisites) continue
       if (!meetsAbilityScorePrerequisite(context.abilityScores, rule)) return false
     }
   }
@@ -199,4 +205,29 @@ export function isFeatValidSelection(
     ...context,
     currentSlotFeatId: feat.id,
   })
+}
+
+/** Feat names among `ownedFeatIds` that fail ability-score prerequisites with the given scores. */
+export function collectFeatAbilityScoreBlockers(
+  ownedFeatIds: string[],
+  feats: Feat[],
+  abilityScores: Partial<Record<AbilityScoreKey, number>> | null | undefined,
+): string[] {
+  const blockers: string[] = []
+  for (const id of ownedFeatIds) {
+    const feat = feats.find((row) => row.id === id)
+    if (!feat) continue
+    for (const rule of collectMechanicalFeatPrerequisiteRules(feat)) {
+      if (rule.category !== "ability_score") continue
+      if (meetsAbilityScorePrerequisite(abilityScores, rule)) continue
+      const abilityLabel = rule.abilities
+        .map((ability) => ability.charAt(0).toUpperCase() + ability.slice(1))
+        .join(" or ")
+      blockers.push(
+        `${feat.name} requires ${abilityLabel} ${rule.minimum}+ (raise an ability score or pick another feat).`,
+      )
+      break
+    }
+  }
+  return blockers
 }

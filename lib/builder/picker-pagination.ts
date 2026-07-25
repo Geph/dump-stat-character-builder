@@ -38,7 +38,8 @@ export function getFeatSpellGrantPickerPageSize(isSmScreen: boolean): number {
 
 /** Width/snap for one swipe carousel slide (apply to each item wrapper). */
 export function getCinematicPickerItemClass(): string {
-  return "max-sm:basis-full max-sm:shrink-0 max-sm:grow-0 max-sm:min-w-0 max-sm:snap-center max-sm:snap-always"
+  // Between full-bleed and the earlier 70% pass — peeks the next card without feeling tiny.
+  return "max-sm:basis-[82%] max-sm:shrink-0 max-sm:grow-0 max-sm:min-w-0 max-sm:snap-center max-sm:snap-always"
 }
 
 /** Visual spell picker: swipe on phones, three portrait columns from `sm` up. */

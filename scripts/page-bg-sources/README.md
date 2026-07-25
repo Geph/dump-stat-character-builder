@@ -9,7 +9,7 @@ pnpm images:optimize
 | File | Theme |
 |------|--------|
 | `parchment.png` (or `.jpg` / `.webp`) | Parchment |
-| `arcane.*` | Arcane |
+| `astral.*` (legacy `arcane.*` also accepted) | Astral |
 | `stone.*` | Stone |
 | `moss.*` | Moss |
 | `sands.*` or `clay.*` | Sands |

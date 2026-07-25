@@ -29,7 +29,7 @@ const WEAPON_ICON_BY_NAME: Record<string, string> = {
   Morningstar: "spiked-mace",
   Musket: "musket",
   Pike: "pikeman",
-  Pistol: "pistol-gun",
+  Pistol: "revolver",
   Quarterstaff: "bo",
   Rapier: "pointy-sword",
   Scimitar: "dervish-swords",

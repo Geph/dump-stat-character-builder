@@ -224,6 +224,10 @@ export function CompendiumDetailOverlay({
                   className={cn(
                     "absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4 sm:p-6",
                     isPortraitCompendiumPanel ? "z-50" : "z-10",
+                    // Keep chrome clear of the slide-up detail sheet on phones.
+                    isPortraitCompendiumPanel &&
+                      portraitDetailSheetOpen &&
+                      "max-lg:pointer-events-none max-lg:opacity-0",
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -250,7 +254,7 @@ export function CompendiumDetailOverlay({
                 <div
                   className={cn(
                     "absolute inset-x-0 bottom-0 z-10 px-4 sm:px-6",
-                    isPortraitCompendiumPanel ? "pb-4 max-lg:pb-20 lg:pb-6" : "pb-4 sm:pb-6",
+                    isPortraitCompendiumPanel ? "pb-2 max-lg:pb-14 lg:pb-3" : "pb-4 sm:pb-6",
                   )}
                 >
                   {subtitle && (
@@ -275,7 +279,7 @@ export function CompendiumDetailOverlay({
                     <div
                       className={cn(
                         "mt-3 flex flex-wrap gap-2",
-                        isPortraitCompendiumPanel && "max-lg:mb-2",
+                        isPortraitCompendiumPanel && "max-lg:mb-4",
                       )}
                     >
                       {tags.map((tag) => {
@@ -322,6 +326,17 @@ export function CompendiumDetailOverlay({
               </button>
             ) : null}
 
+            {isPortraitCompendiumPanel && portraitDetailSheetOpen ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="absolute top-3 right-3 z-40 rounded-full border border-white/20 bg-black/40 p-2 text-white/80 transition-colors hover:bg-black/60 hover:text-white lg:hidden"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            ) : null}
+
             <div
               className={cn(
                 "relative z-10 min-h-0 w-full shrink-0",
@@ -352,7 +367,7 @@ export function CompendiumDetailOverlay({
                 className={cn(
                   "text-white/90 [&_.text-muted-foreground]:text-white/70 [&_.text-foreground]:text-white",
                   isPortraitCompendiumPanel
-                    ? "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:px-3 max-lg:pb-14 max-lg:pt-24 lg:px-3 lg:py-3 lg:pr-14 lg:pt-4"
+                    ? "max-lg:min-h-0 max-lg:flex-1 max-lg:overflow-y-auto max-lg:px-3 max-lg:pb-14 max-lg:pt-28 lg:px-3 lg:py-3 lg:pr-14 lg:pt-4"
                     : cn(isPortraitPanel && "p-2.5 sm:p-3", !isPortraitPanel && "p-3 sm:p-4"),
                   !detailScroll && "h-full overflow-hidden",
                 )}

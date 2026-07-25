@@ -30,5 +30,5 @@ export const pageHeaderSubtitleClass = "text-muted-foreground text-lg max-w-3xl"
 /** Smaller hint/helper copy under page titles. */
 export const pageFloatingHintClass = "text-sm text-muted-foreground leading-relaxed max-w-3xl"
 
-/** Builder step nav container (no background strip). */
-export const pageStepStripClass = "mb-2"
+/** Builder step progress strip container. */
+export const pageStepStripClass = "relative mb-2"

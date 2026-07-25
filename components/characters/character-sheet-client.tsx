@@ -2408,13 +2408,107 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
-          <Link
-            href={`/builder?edit=${character.id}`}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-bold text-sm hover:bg-primary/90 transition-colors"
-          >
-            <Pencil className="w-4 h-4" />
-            Edit
-          </Link>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                ref={sheetMenuButtonRef}
+                type="button"
+                onClick={openSheetMenu}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors ${SHEET_BANNER_BUTTON.icon} text-muted-foreground`}
+                title="Sheet options"
+                aria-expanded={sheetMenuOpen}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              {sheetMenuOpen && sheetMenuPos ? (
+                <>
+                  <div
+                    className="fixed inset-0 z-[99]"
+                    aria-hidden
+                    onClick={() => setSheetMenuOpen(false)}
+                  />
+                  <div
+                    className="fixed z-[100] w-52 rounded-lg border border-border bg-card py-1 shadow-xl"
+                    style={{ top: sheetMenuPos.top, left: sheetMenuPos.left }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!character) return
+                        downloadCharacterExport(
+                          characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
+                        )
+                        setSheetMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      <Download className="w-4 h-4 shrink-0" />
+                      Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!character || !derived) return
+                        void import("@/lib/character/pdf-export").then(({ downloadCharacterPdf }) =>
+                          downloadCharacterPdf({
+                            name: character.name,
+                            level: character.level,
+                            classSummary: classLabel,
+                            derived,
+                            breakdowns: statBreakdowns,
+                            sheetUrl:
+                              typeof window !== "undefined"
+                                ? `${window.location.origin}/characters/${character.id}`
+                                : undefined,
+                          }),
+                        )
+                        setSheetMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
+                    >
+                      <Download className="w-4 h-4 shrink-0" />
+                      Export PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.print()
+                        setSheetMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
+                    >
+                      Print
+                    </button>
+                    <button
+                      type="button"
+                      disabled={playStateSaveStatus === "saving"}
+                      onClick={() => {
+                        void persistPlayStateToDb()
+                        setSheetMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60"
+                    >
+                      <Save className="w-4 h-4 shrink-0" />
+                      {playStateSaveStatus === "saving"
+                        ? "Saving…"
+                        : playStateSaveStatus === "saved"
+                          ? "Saved"
+                          : playStateSaveStatus === "error"
+                            ? "Save failed"
+                            : "Save state"}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <Link
+              href={`/builder?edit=${character.id}`}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-bold text-sm hover:bg-primary/90 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </Link>
+          </div>
         </div>
 
         <motion.div
@@ -2485,19 +2579,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <ManualRollTrigger />
                   <RollHistoryTrigger />
-                  <button
-                    type="button"
-                    onClick={() => setHasInspiration((value) => !value)}
-                    title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
-                    aria-pressed={hasInspiration}
-                    className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${
-                      hasInspiration
-                        ? SHEET_BANNER_BUTTON.inspirationActive
-                        : SHEET_BANNER_BUTTON.inspirationIdle
-                    }`}
-                  >
-                    <Sparkles className="w-5 h-5" />
-                  </button>
                   <div className="relative">
                     <button
                       ref={conditionButtonRef}
@@ -2512,8 +2593,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           : SHEET_BANNER_BUTTON.conditionsDefault
                       }`}
                     >
-                      <span className="hidden sm:inline">Conditions</span>
-                      <span className="sm:hidden">Cond.</span>
+                      Conditions
                       <ChevronDown
                         className={`w-3 h-3 transition-transform ${conditionDropdownOpen ? "rotate-180" : ""}`}
                       />
@@ -2582,98 +2662,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   {innateSorcerySheetToggle && isSorcerer
                     ? renderManualToggleButton(innateSorcerySheetToggle)
                     : null}
-                  <div className="relative">
-                    <button
-                      ref={sheetMenuButtonRef}
-                      type="button"
-                      onClick={openSheetMenu}
-                      className={`flex h-11 w-11 items-center justify-center rounded-lg border-2 transition-colors ${SHEET_BANNER_BUTTON.icon} text-muted-foreground`}
-                      title="Sheet options"
-                      aria-expanded={sheetMenuOpen}
-                    >
-                      <Settings className="w-5 h-5" />
-                    </button>
-                    {sheetMenuOpen && sheetMenuPos ? (
-                      <>
-                        <div
-                          className="fixed inset-0 z-[99]"
-                          aria-hidden
-                          onClick={() => setSheetMenuOpen(false)}
-                        />
-                        <div
-                          className="fixed z-[100] w-52 rounded-lg border border-border bg-card py-1 shadow-xl"
-                          style={{ top: sheetMenuPos.top, left: sheetMenuPos.left }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!character) return
-                              downloadCharacterExport(
-                                characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
-                              )
-                              setSheetMenuOpen(false)
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                          >
-                            <Download className="w-4 h-4 shrink-0" />
-                            Export JSON
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!character || !derived) return
-                              void import("@/lib/character/pdf-export").then(({ downloadCharacterPdf }) =>
-                                downloadCharacterPdf({
-                                  name: character.name,
-                                  level: character.level,
-                                  classSummary: classLabel,
-                                  derived,
-                                  breakdowns: statBreakdowns,
-                                  sheetUrl:
-                                    typeof window !== "undefined"
-                                      ? `${window.location.origin}/characters/${character.id}`
-                                      : undefined,
-                                }),
-                              )
-                              setSheetMenuOpen(false)
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
-                          >
-                            <Download className="w-4 h-4 shrink-0" />
-                            Export PDF
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              window.print()
-                              setSheetMenuOpen(false)
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
-                          >
-                            Print
-                          </button>
-                          <button
-                            type="button"
-                            disabled={playStateSaveStatus === "saving"}
-                            onClick={() => {
-                              void persistPlayStateToDb()
-                              setSheetMenuOpen(false)
-                            }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-60"
-                          >
-                            <Save className="w-4 h-4 shrink-0" />
-                            {playStateSaveStatus === "saving"
-                              ? "Saving…"
-                              : playStateSaveStatus === "saved"
-                                ? "Saved"
-                                : playStateSaveStatus === "error"
-                                  ? "Save failed"
-                                  : "Save state"}
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
                 </div>
 
                 {(derived?.acFormulaOptions.length ?? 0) > 1 ? (
@@ -2706,69 +2694,93 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="flex w-full justify-end">
-              <div className="flex max-w-2/3 flex-wrap items-center justify-end gap-1">
-                {exhaustionLevel > 0 ? (
-                  <span className={SHEET_BANNER_CHIP.exhaustion} title={getExhaustionEffectSummary(exhaustionLevel)}>
-                    Exhaustion {exhaustionLevel}
-                    <ConditionInfoTip
-                      description={
-                        EXHAUSTION_CONDITION?.description ??
-                        getExhaustionEffectSummary(exhaustionLevel)
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setExhaustionLevel(0)}
-                      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded hover:bg-background/60"
-                      aria-label="Clear exhaustion"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </span>
-                ) : null}
-                {bloodiedActive ? (
-                  <span className={SHEET_BANNER_CHIP.bloodied} title={BLOODIED_DESCRIPTION}>
-                    Bloodied
-                    <ConditionInfoTip description={BLOODIED_DESCRIPTION} />
-                  </span>
-                ) : null}
-                {activeConditions
-                  .filter((condName) => condName !== "Exhaustion")
-                  .map((condName) => {
-                    const condDescription =
-                      getConditionDescription(condName) ??
-                      (isConcentrationCondition(condName)
-                        ? "You are concentrating on a spell. Concentration ends if you take damage and fail a Constitution save, cast another concentration spell, or become incapacitated."
-                        : undefined)
-                    return (
-                      <span
-                        key={condName}
-                        className={
-                          isConcentrationCondition(condName)
-                            ? SHEET_BANNER_CHIP.concentration
-                            : SHEET_BANNER_CHIP.condition
+            <div className="flex w-full flex-col gap-2">
+              {(exhaustionLevel > 0 || bloodiedActive || activeConditions.length > 0) ? (
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  {exhaustionLevel > 0 ? (
+                    <span className={SHEET_BANNER_CHIP.exhaustion} title={getExhaustionEffectSummary(exhaustionLevel)}>
+                      Exhaustion {exhaustionLevel}
+                      <ConditionInfoTip
+                        description={
+                          EXHAUSTION_CONDITION?.description ??
+                          getExhaustionEffectSummary(exhaustionLevel)
                         }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setExhaustionLevel(0)}
+                        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded hover:bg-background/60"
+                        aria-label="Clear exhaustion"
                       >
-                        {condName}
-                        {condDescription ? (
-                          <ConditionInfoTip description={condDescription} />
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => toggleCondition(condName)}
-                          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded hover:bg-background/60"
-                          aria-label={`Remove ${condName}`}
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ) : null}
+                  {bloodiedActive ? (
+                    <span className={SHEET_BANNER_CHIP.bloodied} title={BLOODIED_DESCRIPTION}>
+                      Bloodied
+                      <ConditionInfoTip description={BLOODIED_DESCRIPTION} />
+                    </span>
+                  ) : null}
+                  {activeConditions
+                    .filter((condName) => condName !== "Exhaustion")
+                    .map((condName) => {
+                      const condDescription =
+                        getConditionDescription(condName) ??
+                        (isConcentrationCondition(condName)
+                          ? "You are concentrating on a spell. Concentration ends if you take damage and fail a Constitution save, cast another concentration spell, or become incapacitated."
+                          : undefined)
+                      return (
+                        <span
+                          key={condName}
+                          className={
+                            isConcentrationCondition(condName)
+                              ? SHEET_BANNER_CHIP.concentration
+                              : SHEET_BANNER_CHIP.condition
+                          }
                         >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
-                    )
-                  })}
+                          {condName}
+                          {condDescription ? (
+                            <ConditionInfoTip description={condDescription} />
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => toggleCondition(condName)}
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded hover:bg-background/60"
+                            aria-label={`Remove ${condName}`}
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </span>
+                      )
+                    })}
+                </div>
+              ) : null}
+              <div className="flex w-full min-w-0 flex-wrap items-stretch justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setHasInspiration((value) => !value)}
+                  title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
+                  aria-pressed={hasInspiration}
+                  className={`relative inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-lg border-2 px-2.5 py-2 text-xs font-semibold transition-colors sm:flex-none sm:px-3 sm:text-sm ${
+                    hasInspiration
+                      ? SHEET_BANNER_BUTTON.inspirationActive
+                      : SHEET_BANNER_BUTTON.inspirationIdle
+                  }`}
+                >
+                  {hasInspiration ? (
+                    <span className="pointer-events-none absolute inset-0 inspiration-sparkles" aria-hidden />
+                  ) : null}
+                  <Sparkles
+                    className={`relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${
+                      hasInspiration ? "animate-inspiration-glow" : ""
+                    }`}
+                  />
+                  <span className="relative">Inspiration</span>
+                </button>
                 <SheetRestButtons
                   onRest={handleRest}
                   onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
-                  compact
                 />
               </div>
             </div>

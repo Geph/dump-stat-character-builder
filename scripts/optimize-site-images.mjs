@@ -44,7 +44,7 @@ const EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"]
 /** theme id → candidate source basenames (first match wins). */
 const THEME_SOURCES = {
   parchment: ["parchment"],
-  arcane: ["arcane"],
+  astral: ["astral", "arcane"],
   stone: ["stone"],
   moss: ["moss"],
   sands: ["sands", "clay"],

@@ -10,7 +10,7 @@ const themePageBackground = (themeId: AppThemeId) =>
  */
 export const THEME_PAGE_BACKGROUND_ASSETS: Record<AppThemeId, string | null> = {
   parchment: themePageBackground("parchment"),
-  arcane: themePageBackground("arcane"),
+  astral: themePageBackground("astral"),
   stone: themePageBackground("stone"),
   moss: themePageBackground("moss"),
   sands: themePageBackground("sands"),

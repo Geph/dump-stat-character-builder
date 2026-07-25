@@ -56,6 +56,6 @@ export function subclassFeatureTitleRows(
       level: feature.level,
       name: feature.name,
       resourceRelated: false,
-      summary: "",
+      summary: feature.description?.trim() || "",
     }))
 }

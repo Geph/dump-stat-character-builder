@@ -127,6 +127,10 @@ export async function upsertByName(table: CompendiumTable, rows: Record<string, 
     const [existing] = await db.select().from(t).where(eq(t.name, name)).limit(1)
     const payload = { ...row, id: (existing as { id?: string } | undefined)?.id ?? randomUUID() }
     if (existing) {
+      // Keep the user's enable/disable toggle across SRD reseeds.
+      if ("enabled" in (existing as object)) {
+        ;(payload as Record<string, unknown>).enabled = (existing as { enabled: unknown }).enabled
+      }
       const { id: _id, created_at: _c, ...rest } = payload as Record<string, unknown>
       await db.update(t).set(rest as never).where(eq(t.id, (existing as { id: string }).id))
     } else {

@@ -320,6 +320,15 @@ describe("armor training and ability score feat prerequisites", () => {
       }),
     ).toBe(true)
   })
+
+  it("can skip ability-score gates so score-gated feats stay browsable", () => {
+    expect(
+      isFeatEligibleForCategories(athlete, ["General"], 4, {
+        ...baseContext,
+        skipAbilityScorePrerequisites: true,
+      }),
+    ).toBe(true)
+  })
 })
 
 describe("background Planar Pact grant wiring", () => {

@@ -238,6 +238,7 @@ import {
 } from "@/lib/import/parse-alternate-effects-table"
 import {
   buildOwnedFeatIds,
+  collectFeatAbilityScoreBlockers,
   isFeatEligibleForCategories,
   isOriginSelectableCategory,
   normalizeFeatCategory,
@@ -1878,6 +1879,8 @@ export default function BuilderPageClient() {
       backgroundId: character.background_id,
       preferredSources: preferredFeatSources,
       ...featPrerequisiteStats,
+      // Ability scores are finalized on a later step — don't wipe Grappler-style picks early.
+      skipAbilityScorePrerequisites: true,
     }
 
     setFeatureChoicePicks((prev) => {
@@ -2524,6 +2527,13 @@ export default function BuilderPageClient() {
         if (abilityMethod === "standard" && !isStandardArrayComplete(standardArrayAssignments)) {
           blockers.push("Assign every standard array score to an ability.")
         }
+        blockers.push(
+          ...collectFeatAbilityScoreBlockers(
+            ownedFeatIds,
+            feats,
+            featPrerequisiteStats.abilityScores,
+          ),
+        )
         break
       case BUILDER_STEP_IDS.GEAR:
         if (
@@ -2594,6 +2604,8 @@ export default function BuilderPageClient() {
     backgroundAbilityGrant,
     abilityMethod,
     standardArrayAssignments,
+    ownedFeatIds,
+    featPrerequisiteStats,
     spellGrantModifierSlots,
     selectedStartingOption,
     selectedBackgroundStartingOption,
@@ -2721,7 +2733,7 @@ export default function BuilderPageClient() {
                     onClick={() => goToStep(step.id)}
                     disabled={!isReachable}
                     className={`flex flex-col items-center flex-shrink-0 transition-opacity ${
-                      isReachable ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                      isReachable ? "cursor-pointer" : "cursor-not-allowed opacity-70"
                     }`}
                     title={isReachable ? `Go to ${step.label}` : "Complete earlier steps first"}
                   >
@@ -2730,23 +2742,27 @@ export default function BuilderPageClient() {
                         isComplete
                           ? "bg-success text-success-foreground"
                           : isActive
-                          ? "bg-primary text-primary-foreground scale-110"
+                          ? "bg-primary text-primary-foreground scale-110 shadow-md shadow-primary/25"
                           : isReachable
-                          ? "bg-muted text-foreground hover:bg-muted/80"
-                          : "bg-muted/60 text-muted-foreground"
+                          ? "bg-primary/25 text-primary hover:bg-primary/35"
+                          : "bg-primary/15 text-primary/75"
                       }`}
                     >
                       {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                     </div>
                     <span className={`text-[10px] md:text-xs mt-0.5 font-medium ${
-                      isActive ? "text-primary" : isReachable ? "text-foreground" : "text-muted-foreground"
+                      isActive
+                        ? "text-primary"
+                        : isReachable
+                          ? "text-primary/90"
+                          : "text-primary/60"
                     }`}>
                       {step.label}
                     </span>
                   </button>
                   {index < visibleSteps.length - 1 && (
                     <div className={`w-1.5 h-1.5 sm:w-10 sm:h-1 md:w-14 rounded-full sm:rounded mx-0.5 sm:mx-1 md:mx-2 shrink-0 ${
-                      stepOrd < maxOrd ? "bg-success/80" : "bg-border/80"
+                      stepOrd < maxOrd ? "bg-success/80" : "bg-primary/25"
                     }`} />
                   )}
                 </div>
@@ -3001,21 +3017,23 @@ export default function BuilderPageClient() {
                         return (
                           <div
                             key={cl.classId}
-                            className={`flex items-center gap-2 rounded-lg p-2 ${
+                            className={`flex items-center gap-2 rounded-lg p-2 max-sm:min-h-[6rem] max-sm:flex-col max-sm:items-center max-sm:justify-center max-sm:gap-3.5 max-sm:px-4 max-sm:py-4 ${
                               isPrimary
                                 ? "bg-primary/10 border border-primary/40"
                                 : "bg-card border border-border"
                             }`}
                           >
-                            <div className="flex-1 min-w-0">
-                              <span className="font-bold text-sm text-foreground">{cls?.name}</span>
+                            <div className="flex-1 min-w-0 max-sm:flex-none max-sm:text-center">
+                              <span className="font-bold text-sm max-sm:text-lg text-foreground">
+                                {cls?.name}
+                              </span>
                               {isPrimary && (
-                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">
+                                <span className="ml-2 text-[10px] max-sm:text-xs font-bold uppercase tracking-wide text-primary max-sm:ml-0 max-sm:mt-1 max-sm:block">
                                   Primary
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 max-sm:gap-2">
+                            <div className="flex items-center gap-1 max-sm:gap-3">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3035,10 +3053,10 @@ export default function BuilderPageClient() {
                                     removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
                                   }
                                 }}
-                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-destructive/20 rounded"
+                                className="p-1 max-sm:p-3.5 bg-muted hover:bg-destructive/20 rounded max-sm:rounded-xl"
                                 aria-label={`Decrease ${cls?.name ?? "class"} level`}
                               >
-                                <Minus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
+                                <Minus className="w-3 h-3 max-sm:w-6 max-sm:h-6" />
                               </button>
                               <ClassLevelInput
                                 value={cl.level}
@@ -3058,7 +3076,7 @@ export default function BuilderPageClient() {
                                   }
                                   setClassLevels(newLevels)
                                 }}
-                                className="w-8 max-sm:w-11 text-center font-bold text-sm max-sm:text-base bg-background border border-border rounded px-0.5 py-0.5 max-sm:py-1.5 focus:outline-none focus:border-primary"
+                                className="w-8 max-sm:w-14 text-center font-bold text-sm max-sm:text-xl bg-background border border-border rounded max-sm:rounded-xl px-0.5 py-0.5 max-sm:py-2.5 focus:outline-none focus:border-primary"
                               />
                               <button
                                 type="button"
@@ -3070,10 +3088,10 @@ export default function BuilderPageClient() {
                                   }
                                 }}
                                 disabled={totalLevel >= 20}
-                                className="p-1 max-sm:p-2.5 bg-muted hover:bg-primary/20 rounded disabled:opacity-30"
+                                className="p-1 max-sm:p-3.5 bg-muted hover:bg-primary/20 rounded max-sm:rounded-xl disabled:opacity-30"
                                 aria-label={`Increase ${cls?.name ?? "class"} level`}
                               >
-                                <Plus className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
+                                <Plus className="w-3 h-3 max-sm:w-6 max-sm:h-6" />
                               </button>
                             </div>
                             <button
@@ -3081,9 +3099,10 @@ export default function BuilderPageClient() {
                               onClick={() => {
                                 removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
                               }}
-                              className="p-1 text-muted-foreground hover:text-destructive"
+                              className="p-1 text-muted-foreground hover:text-destructive max-sm:p-3"
+                              aria-label={`Remove ${cls?.name ?? "class"}`}
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
                             </button>
                           </div>
                         )
@@ -3531,6 +3550,8 @@ export default function BuilderPageClient() {
                         currentSlotFeatId: pickedId,
                         preferredSources: preferredFeatSources,
                         ...featPrerequisiteStats,
+                        // Class step is before Abilities — keep score-gated feats (e.g. Grappler) visible.
+                        skipAbilityScorePrerequisites: true,
                       }
                       const eligibleFeats = filterPreferredSourceReplacements(
                         feats.filter((feat) =>
@@ -5951,7 +5972,6 @@ export default function BuilderPageClient() {
                 ...(cls.primary_ability?.length
                   ? [{ label: cls.primary_ability.join(" • ").toUpperCase(), emphasis: true }]
                   : []),
-                { label: `D${cls.hit_die} HIT DIE` },
                 ...(complexityBadge ? [complexityBadge] : []),
                 ...getClassDetailHeroBadges(cls),
               ]}
@@ -6054,8 +6074,8 @@ export default function BuilderPageClient() {
                         features={features}
                         accentClassName={accentStyles.cardFooterText}
                         comfortableFromMd
-                        showSummary={false}
                         showLevel
+                        accordion
                       />
                     </div>
                   ) : (

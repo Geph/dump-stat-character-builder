@@ -103,7 +103,7 @@ export const SHEET_MAIN_CLASS =
 /** Tab panel wrapper — keeps grid/flex children from widening the main column. */
 export const SHEET_TAB_CONTENT_CLASS = "w-full min-w-0"
 
-const ARCANE_ABILITY_SCORE_COLORS: Record<AbilityScoreKey, string> = {
+const ASTRAL_ABILITY_SCORE_COLORS: Record<AbilityScoreKey, string> = {
   strength: "bg-red-500",
   dexterity: "bg-green-500",
   constitution: "bg-orange-500",
@@ -114,14 +114,14 @@ const ARCANE_ABILITY_SCORE_COLORS: Record<AbilityScoreKey, string> = {
 
 export function abilityScoreBoxClass(theme: AppThemeId, ability: AbilityScoreKey): string {
   const base = "w-10 h-10 rounded-lg flex items-center justify-center mx-auto"
-  if (theme === "arcane") {
-    return `${base} ${ARCANE_ABILITY_SCORE_COLORS[ability]}`
+  if (theme === "astral") {
+    return `${base} ${ASTRAL_ABILITY_SCORE_COLORS[ability]}`
   }
   return `${base} bg-secondary`
 }
 
 export function abilityScoreValueClass(theme: AppThemeId): string {
-  return theme === "arcane"
+  return theme === "astral"
     ? "text-sm font-black text-white"
     : "text-sm font-black text-secondary-foreground"
 }
