@@ -160,6 +160,13 @@ describe("applySheetRest", () => {
     expect(result.usedResourcesById[fighterResource.id]).toBe(0)
     expect(result.usedResourcesById[channelResource.id]).toBe(2)
     expect(result.currentHp).toBeUndefined()
+    expect(result.summary).toEqual(
+      expect.arrayContaining([
+        "Restored Warlock pact magic (2 slots)",
+        "Restored Second Wind (2 uses)",
+      ]),
+    )
+    expect(result.summary.some((line) => line.includes("Channel Divinity"))).toBe(false)
   })
 
   it("restores HP, spell slots, death saves, and long-rest resources on long rest", () => {
@@ -187,6 +194,30 @@ describe("applySheetRest", () => {
     expect(result.usedSpellSlotsByKey["Wizard-full-3"]).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0])
     expect(result.usedResourcesById[channelResource.id]).toBe(0)
     expect(result.activeConditions).toEqual(["Poisoned"])
+    expect(result.summary[0]).toBe("Hit points restored to 42")
+    expect(result.summary).toEqual(
+      expect.arrayContaining([
+        "Restored Wizard spell slots (6)",
+        "Restored Channel Divinity (2 uses)",
+        "Ended concentration",
+      ]),
+    )
+  })
+
+  it("reports when a short rest restores nothing spendable", () => {
+    const result = applySheetRest({
+      rest: "short_rest",
+      maxHp: 20,
+      activeConditions: [],
+      usedSpellSlotsByKey: {},
+      spellSlotTables: [wizardTable],
+      usedResourcesById: {},
+      resourceEntries: [channelResource],
+      usedActionUsesById: {},
+      sheetActions: [],
+      resolveContext,
+    })
+    expect(result.summary).toEqual(["No short-rest resources needed restoring"])
   })
 })
 

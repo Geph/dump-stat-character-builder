@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   collapseWeaponCategoryPackageOptions,
+  formatPackageOptionTitle,
   resolvePackageEquipmentIds,
 } from "@/lib/builder/equipment-utils"
 import type { Equipment } from "@/lib/types"
@@ -24,6 +25,19 @@ function weapon(id: string, name: string, subcategory: string): Equipment {
     created_at: "",
   }
 }
+
+describe("formatPackageOptionTitle", () => {
+  it("strips gear text from verbose option labels", () => {
+    expect(
+      formatPackageOptionTitle(
+        "(A) Spear, 2 Daggers, Arcane Focus (Crystal), Dungeoneer's Pack, and 28 GP",
+        0,
+      ),
+    ).toBe("Option (A)")
+    expect(formatPackageOptionTitle("B", 1)).toBe("Option (B)")
+    expect(formatPackageOptionTitle("", 2)).toBe("Option (C)")
+  })
+})
 
 describe("collapseWeaponCategoryPackageOptions", () => {
   it("collapses many Option C martial weapons into one Martial Weapon choice", () => {

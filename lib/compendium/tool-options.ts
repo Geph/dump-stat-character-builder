@@ -1,4 +1,5 @@
 import toolsSeed from "@/lib/srd/seed-data/tools.json"
+import { getSrdToolDescription } from "@/lib/compendium/srd-tool-descriptions"
 import type { Tool, ToolCheckAbility, ToolGroup } from "@/lib/types"
 
 export type ToolSeedRow = (typeof toolsSeed)[number]
@@ -129,14 +130,20 @@ const ABILITY_LABEL: Record<ToolCheckAbility, string> = {
   charisma: "Charisma",
 }
 
-/** Short builder blurb for a tool proficiency (ability check + category). */
+/** Builder / overlay description for a tool proficiency (SRD Ability · Utilize · Craft). */
 export function getToolDescription(
   toolName: string,
-  catalog: Array<Pick<Tool, "name" | "check_ability" | "subcategory">> = [],
+  catalog: Array<Pick<Tool, "name" | "check_ability" | "subcategory" | "description">> = [],
 ): string | null {
   const normalized = toolName.trim().toLowerCase()
   if (!normalized) return null
   const fromCatalog = catalog.find((row) => row.name.toLowerCase() === normalized)
+  const catalogDescription = fromCatalog?.description?.trim()
+  if (catalogDescription) return catalogDescription
+
+  const srdDescription = getSrdToolDescription(toolName)
+  if (srdDescription) return srdDescription
+
   const fromSeed = seedByName.get(normalized)
   if (!fromCatalog && !fromSeed && !isKnownToolName(toolName)) return null
 
@@ -162,6 +169,14 @@ export function resolveToolExpansions(
 export function isKnownToolName(name: string, allNames: readonly string[] = getAllSeedToolNames()): boolean {
   const normalized = name.trim().toLowerCase()
   return allNames.some((entry) => entry.toLowerCase() === normalized)
+}
+
+/** Musical instruments (including the "Musical Instrument" category label). */
+export function isMusicalInstrumentToolName(name: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return false
+  if (normalized === "musical instrument") return true
+  return seedByName.get(normalized)?.tool_group === "musical"
 }
 
 export function toolGroupLabel(group: ToolGroup): string {

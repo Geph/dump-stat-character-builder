@@ -23,7 +23,7 @@
   {
     "name": "Calligrapher's Supplies",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
@@ -37,42 +37,42 @@
   {
     "name": "Cartographer's Tools",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
   {
     "name": "Cobbler's Tools",
     "tool_group": "artisans",
-    "check_ability": "strength",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
   {
     "name": "Cook's Utensils",
     "tool_group": "artisans",
-    "check_ability": "strength",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
   {
     "name": "Dice Set",
     "tool_group": "gaming",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Gaming Set"
   },
   {
     "name": "Disguise Kit",
     "tool_group": "other",
-    "check_ability": "intelligence",
+    "check_ability": "charisma",
     "source": "D&D 5.5e SRD",
     "subcategory": "Other Tools"
   },
   {
     "name": "Dragonchess Set",
     "tool_group": "gaming",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Gaming Set"
   },
@@ -100,14 +100,14 @@
   {
     "name": "Forgery Kit",
     "tool_group": "other",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Other Tools"
   },
   {
     "name": "Gaming Set",
     "tool_group": "gaming",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Gaming Set",
     "expands_to": [
@@ -127,7 +127,7 @@
   {
     "name": "Herbalism Kit",
     "tool_group": "other",
-    "check_ability": "wisdom",
+    "check_ability": "intelligence",
     "source": "D&D 5.5e SRD",
     "subcategory": "Other Tools"
   },
@@ -148,7 +148,7 @@
   {
     "name": "Leatherworker's Tools",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
@@ -195,14 +195,14 @@
   {
     "name": "Navigator's Tools",
     "tool_group": "other",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Other Tools"
   },
   {
     "name": "Painter's Supplies",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
@@ -216,14 +216,14 @@
   {
     "name": "Playing Card Set",
     "tool_group": "gaming",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Gaming Set"
   },
   {
     "name": "Poisoner's Kit",
     "tool_group": "other",
-    "check_ability": "wisdom",
+    "check_ability": "intelligence",
     "source": "D&D 5.5e SRD",
     "subcategory": "Other Tools"
   },
@@ -258,14 +258,14 @@
   {
     "name": "Three-Dragon Ante Set",
     "tool_group": "gaming",
-    "check_ability": "intelligence",
+    "check_ability": "wisdom",
     "source": "D&D 5.5e SRD",
     "subcategory": "Gaming Set"
   },
   {
     "name": "Tinker's Tools",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
@@ -293,14 +293,14 @@
   {
     "name": "Weaver's Tools",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   },
   {
     "name": "Woodcarver's Tools",
     "tool_group": "artisans",
-    "check_ability": "intelligence",
+    "check_ability": "dexterity",
     "source": "D&D 5.5e SRD",
     "subcategory": "Artisan's Tools"
   }

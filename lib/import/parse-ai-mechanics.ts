@@ -179,16 +179,10 @@ function parseHealDiceExpression(
 }
 
 /**
- * `temporary_hit_points` mechanics[] wiring, scoped to the common case: the feature is
- * activated and the character gains temp HP. Two axes are intentionally left unwired (return
- * null) because there's no matching character-sheet mechanism yet, not because they're rare:
- *  - thpTrigger "turn_start"/"on_hit" — turn_start_trigger/on_hit_trigger characteristics have
- *    no "grant temp HP" field, only resource restore/spend.
- *  - thpTarget other than "self" — the sheet models one character; there's no "ally" or "chosen
- *    creature" state to grant temp HP to (existing SRD presets that describe granting temp HP to
- *    allies, e.g. Mantle of Inspiration, only encode it in the effect's label text).
- *  - amountScaling "class_resource_die" — the resource's die size isn't carried on the mechanic,
- *    so there's no general way to size the temp HP; hardcoded presets set this by hand instead.
+ * `temporary_hit_points` mechanics[] wiring for on-activation grants.
+ * Ally / chosen-creature targets set healTarget: "choose_ally" so the sheet can pick a
+ * party member or companion. turn_start / on_hit triggers and class_resource_die scaling
+ * remain unwired (no general sheet mechanism yet).
  */
 function buildTemporaryHitPointsEffect(
   mechanic: ImportMechanic,
@@ -206,9 +200,16 @@ function buildTemporaryHitPointsEffect(
   }
   const trigger = mechanic.thpTrigger ?? "on_activation"
   const target = mechanic.thpTarget ?? "self"
-  if ((trigger !== "on_activation" && trigger !== "on_use") || target !== "self") {
+  if (trigger !== "on_activation" && trigger !== "on_use") {
     return null
   }
+  const healTarget =
+    target === "self"
+      ? ("self" as const)
+      : target === "chosen_creature_in_range" || target === "allies_in_range"
+        ? ("choose_ally" as const)
+        : null
+  if (!healTarget) return null
 
   const dice = mechanic.amountDice ? parseHealDiceExpression(mechanic.amountDice) : null
   const healPatch =
@@ -245,6 +246,7 @@ function buildTemporaryHitPointsEffect(
           id: modId(instanceKey(ctx, "temp_hp")),
           kind: "grant_temp_hp",
           tempHpTrigger: "on_action",
+          healTarget,
           ...healPatch,
         },
       ],

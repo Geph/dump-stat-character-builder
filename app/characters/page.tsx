@@ -17,6 +17,11 @@ import {
   prepareCharacterImportRow,
 } from "@/lib/character/character-export-format"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import { CharactersPartiesPanel } from "@/components/characters/characters-parties-panel"
+import {
+  normalizePartyRow,
+  type AdventuringParty,
+} from "@/lib/character/party"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,13 +53,17 @@ export default function CharactersPage() {
   const [characterToDelete, setCharacterToDelete] = useState<CharacterWithRelations | null>(null)
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [parties, setParties] = useState<AdventuringParty[]>([])
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const fetchCharacters = async () => {
     setLoadError(null)
     const db = createClient()
 
-    const { data, error } = await db.from("characters").select("*")
+    const [{ data, error }, partiesResult] = await Promise.all([
+      db.from("characters").select("*"),
+      db.from("parties").select("*").order("name"),
+    ])
 
     if (error) {
       const message = error.message || "Could not load characters from the database."
@@ -65,6 +74,14 @@ export default function CharactersPage() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
       setCharacters(sorted)
+    }
+
+    if (!partiesResult.error && partiesResult.data) {
+      setParties(
+        asCompendiumRows(partiesResult.data)
+          .map((row) => normalizePartyRow(row))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      )
     }
     setLoading(false)
   }
@@ -473,6 +490,14 @@ export default function CharactersPage() {
             ))}
           </div>
         )}
+
+        {!loading ? (
+          <CharactersPartiesPanel
+            characters={characters}
+            parties={parties}
+            onPartiesChange={setParties}
+          />
+        ) : null}
       </main>
 
       <AlertDialog

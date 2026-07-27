@@ -17,6 +17,13 @@ import {
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 
 describe("compendiumBrowseGridClass", () => {
+  it("uses a single column on phones", () => {
+    expect(compendiumBrowseGridClass("classes")).toContain("grid-cols-1")
+    expect(compendiumBrowseGridClass("feats")).toContain("grid-cols-1")
+    expect(compendiumBrowseGridClass("classes")).toContain("sm:grid-cols-2")
+    expect(compendiumBrowseGridClass("feats")).toContain("sm:grid-cols-2")
+  })
+
   it("uses four columns from lg for portrait card tabs", () => {
     expect(compendiumBrowseGridClass("classes")).toContain("lg:grid-cols-4")
     expect(compendiumBrowseGridClass("species")).toContain("lg:grid-cols-4")

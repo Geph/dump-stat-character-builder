@@ -108,8 +108,8 @@ export function SheetEquipmentPanel({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-border">
+        <div className="flex items-center gap-2 shrink-0">
           <Coins className="w-4 h-4 text-primary shrink-0" />
           <span className="text-xs font-semibold text-foreground">Gold</span>
           <input
@@ -124,10 +124,22 @@ export function SheetEquipmentPanel({
           />
           <span className="text-[10px] text-muted-foreground">GP</span>
         </div>
+        {equipment.length > 0 ? (
+          <div className="relative min-w-[10rem] flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
+              placeholder="Search equipment..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={onAddEquipment}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 ml-auto"
         >
           <Plus className="w-3.5 h-3.5" />
           Add equipment
@@ -141,17 +153,7 @@ export function SheetEquipmentPanel({
       <span className="text-[10px] text-muted-foreground">
         Attuned {attunedCount}/{slotCap}
       </span>
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search equipment..."
-          className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
         {filtered.length ? (
           filtered.map((item) => {
             const resolved = resolveCharacterEquipment(item, catalog, equipmentBaseSelections)
@@ -292,7 +294,9 @@ export function SheetEquipmentPanel({
             )
           })
         ) : (
-          <p className="text-xs text-muted-foreground md:col-span-2">No equipment matches your search</p>
+          <p className="text-xs text-muted-foreground md:col-span-2 lg:col-span-3">
+            No equipment matches your search
+          </p>
         )}
       </div>
         </>

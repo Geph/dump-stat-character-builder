@@ -8,12 +8,12 @@ import {
 } from "@/lib/builder/picker-pagination"
 
 describe("getSpellPickerPageSize", () => {
-  it("shows 3 rows on narrow screens (2 columns)", () => {
+  it("shows 6 spells on narrow phone grids", () => {
     expect(getSpellPickerPageSize(false)).toBe(6)
   })
 
-  it("shows 3 rows on md+ screens (3 columns)", () => {
-    expect(getSpellPickerPageSize(true)).toBe(9)
+  it("shows 12 spells on sm+ grids", () => {
+    expect(getSpellPickerPageSize(true)).toBe(12)
   })
 })
 

@@ -27,8 +27,6 @@ import {
   Search,
   Heart,
   Sparkles,
-  Plus,
-  Minus,
   Eye,
   LayoutGrid,
   Coins,
@@ -203,7 +201,7 @@ import {
 import { getSpeciesFeatPickSlots } from "@/lib/builder/species-feat-options"
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
 import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-choice-picker"
-import { ClassLevelInput } from "@/components/builder/class-level-input"
+import { ClassLevelRow } from "@/components/builder/class-level-row"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import {
   clearModifierPicksForSource,
@@ -277,6 +275,7 @@ import {
   isClassAbilityFeatSlot,
 } from "@/lib/builder/class-ability-step"
 import { formatSpellListGroupLabel } from "@/lib/compendium/spell-slots"
+import { spellDetailOverlayTags, spellCastingDetailRows } from "@/lib/compendium/spell-detail-tags"
 import {
   formatMulticlassAbilityIssue,
   getMulticlassAbilityIssues,
@@ -3008,103 +3007,93 @@ export default function BuilderPageClient() {
 
                 {/* Current Class Levels */}
                 {activeClassLevels.length > 0 && (
-                  <div className="mt-4 mb-4 p-3 bg-muted rounded-xl">
-                    <p className="text-xs text-muted-foreground mb-2 uppercase font-bold">Current Classes (Total Level: {totalLevel})</p>
-                    <div className="space-y-2">
+                  <div
+                    className={
+                      cardViewMode === "cinematic"
+                        ? "mt-4 mb-4 space-y-3"
+                        : "mt-4 mb-4 rounded-xl bg-muted p-3"
+                    }
+                  >
+                    <p
+                      className={
+                        cardViewMode === "cinematic"
+                          ? "text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 max-sm:text-xs"
+                          : "mb-2 text-xs font-bold uppercase text-muted-foreground"
+                      }
+                    >
+                      Current Classes
+                      <span
+                        className={
+                          cardViewMode === "cinematic"
+                            ? "ml-2 text-amber-400/90"
+                            : "ml-1 font-normal normal-case tracking-normal text-muted-foreground"
+                        }
+                      >
+                        · Total Level {totalLevel}
+                      </span>
+                    </p>
+                    <div className={cardViewMode === "cinematic" ? "space-y-3" : "space-y-2"}>
                       {activeClassLevels.map((cl, idx) => {
-                        const cls = classes.find(c => c.id === cl.classId)
+                        const cls = classes.find((c) => c.id === cl.classId)
                         const isPrimary = cl.classId === resolvedPrimaryClassId
+                        const maxForClass = 20 - (totalLevel - cl.level)
                         return (
-                          <div
+                          <ClassLevelRow
                             key={cl.classId}
-                            className={`flex items-center gap-2 rounded-lg p-2 max-sm:min-h-[6rem] max-sm:flex-col max-sm:items-center max-sm:justify-center max-sm:gap-3.5 max-sm:px-4 max-sm:py-4 ${
-                              isPrimary
-                                ? "bg-primary/10 border border-primary/40"
-                                : "bg-card border border-border"
-                            }`}
-                          >
-                            <div className="flex-1 min-w-0 max-sm:flex-none max-sm:text-center">
-                              <span className="font-bold text-sm max-sm:text-lg text-foreground">
-                                {cls?.name}
-                              </span>
-                              {isPrimary && (
-                                <span className="ml-2 text-[10px] max-sm:text-xs font-bold uppercase tracking-wide text-primary max-sm:ml-0 max-sm:mt-1 max-sm:block">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 max-sm:gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newLevels = [...activeClassLevels]
-                                  if (newLevels[idx].level > 1) {
-                                    newLevels[idx].level--
-                                    const unlockLevel = resolveSubclassUnlockLevel(cls)
-                                    if (newLevels[idx].level < unlockLevel) {
-                                      setSubclassByClassId((prev) => {
-                                        const next = { ...prev }
-                                        delete next[newLevels[idx].classId]
-                                        return next
-                                      })
-                                    }
-                                    setClassLevels(newLevels)
-                                  } else {
-                                    removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
-                                  }
-                                }}
-                                className="p-1 max-sm:p-3.5 bg-muted hover:bg-destructive/20 rounded max-sm:rounded-xl"
-                                aria-label={`Decrease ${cls?.name ?? "class"} level`}
-                              >
-                                <Minus className="w-3 h-3 max-sm:w-6 max-sm:h-6" />
-                              </button>
-                              <ClassLevelInput
-                                value={cl.level}
-                                min={1}
-                                max={20 - (totalLevel - cl.level)}
-                                aria-label={`${cls?.name ?? "Class"} level`}
-                                onCommit={(level) => {
-                                  const newLevels = [...activeClassLevels]
-                                  newLevels[idx] = { ...newLevels[idx], level }
-                                  const unlockLevel = resolveSubclassUnlockLevel(cls)
-                                  if (level < unlockLevel) {
-                                    setSubclassByClassId((prev) => {
-                                      const next = { ...prev }
-                                      delete next[newLevels[idx].classId]
-                                      return next
-                                    })
-                                  }
-                                  setClassLevels(newLevels)
-                                }}
-                                className="w-8 max-sm:w-14 text-center font-bold text-sm max-sm:text-xl bg-background border border-border rounded max-sm:rounded-xl px-0.5 py-0.5 max-sm:py-2.5 focus:outline-none focus:border-primary"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (totalLevel < 20) {
-                                    const newLevels = [...activeClassLevels]
-                                    newLevels[idx].level++
-                                    setClassLevels(newLevels)
-                                  }
-                                }}
-                                disabled={totalLevel >= 20}
-                                className="p-1 max-sm:p-3.5 bg-muted hover:bg-primary/20 rounded max-sm:rounded-xl disabled:opacity-30"
-                                aria-label={`Increase ${cls?.name ?? "class"} level`}
-                              >
-                                <Plus className="w-3 h-3 max-sm:w-6 max-sm:h-6" />
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                removeClassFromBuild(cl.classId, activeClassLevels.filter((_, i) => i !== idx))
-                              }}
-                              className="p-1 text-muted-foreground hover:text-destructive max-sm:p-3"
-                              aria-label={`Remove ${cls?.name ?? "class"}`}
-                            >
-                              <X className="w-3 h-3 max-sm:w-5 max-sm:h-5" />
-                            </button>
-                          </div>
+                            classNameLabel={cls?.name ?? "Class"}
+                            icon={cls?.icon}
+                            level={cl.level}
+                            max={maxForClass}
+                            isPrimary={isPrimary}
+                            canIncrease={totalLevel < 20}
+                            variant={cardViewMode === "cinematic" ? "visual" : "default"}
+                            onDecrease={() => {
+                              const newLevels = [...activeClassLevels]
+                              if (newLevels[idx].level > 1) {
+                                newLevels[idx].level--
+                                const unlockLevel = resolveSubclassUnlockLevel(cls)
+                                if (newLevels[idx].level < unlockLevel) {
+                                  setSubclassByClassId((prev) => {
+                                    const next = { ...prev }
+                                    delete next[newLevels[idx].classId]
+                                    return next
+                                  })
+                                }
+                                setClassLevels(newLevels)
+                              } else {
+                                removeClassFromBuild(
+                                  cl.classId,
+                                  activeClassLevels.filter((_, i) => i !== idx),
+                                )
+                              }
+                            }}
+                            onIncrease={() => {
+                              if (totalLevel < 20) {
+                                const newLevels = [...activeClassLevels]
+                                newLevels[idx].level++
+                                setClassLevels(newLevels)
+                              }
+                            }}
+                            onCommitLevel={(level) => {
+                              const newLevels = [...activeClassLevels]
+                              newLevels[idx] = { ...newLevels[idx], level }
+                              const unlockLevel = resolveSubclassUnlockLevel(cls)
+                              if (level < unlockLevel) {
+                                setSubclassByClassId((prev) => {
+                                  const next = { ...prev }
+                                  delete next[newLevels[idx].classId]
+                                  return next
+                                })
+                              }
+                              setClassLevels(newLevels)
+                            }}
+                            onRemove={() => {
+                              removeClassFromBuild(
+                                cl.classId,
+                                activeClassLevels.filter((_, i) => i !== idx),
+                              )
+                            }}
+                          />
                         )
                       })}
                     </div>
@@ -5090,20 +5079,6 @@ export default function BuilderPageClient() {
                       </div>
                     ) : null}
 
-                    <div className="relative mb-3">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Search spells..."
-                        value={spellSearch}
-                        onChange={(e) => {
-                          setSpellSearch(e.target.value)
-                          setSpellLevelPages({})
-                        }}
-                        className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    
                     {spellcastingClasses.map((casterClass) => {
                       const casterLevel =
                         activeClassLevels.find((cl) => cl.classId === casterClass.id)?.level ?? 1
@@ -5185,46 +5160,62 @@ export default function BuilderPageClient() {
                             </span>
                           </div>
 
-                          {spellLevels.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-2 mb-3">
-                              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                Level
-                              </label>
-                              <select
-                                value={levelFilter}
-                                onChange={(e) => {
-                                  setSpellFilterLevelByClassId((prev) => ({
-                                    ...prev,
-                                    [casterClass.id]: e.target.value,
-                                  }))
-                                  setSpellLevelPages({})
-                                }}
-                                className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-                              >
-                                <option value="all">All levels</option>
-                                {spellLevels.map((level) => (
-                                  <option key={level} value={String(level)}>
-                                    {formatSpellListGroupLabel(level)}
-                                  </option>
-                                ))}
-                              </select>
-                              {levelFilter !== "all" && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            {spellLevels.length > 0 ? (
+                              <>
+                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Level
+                                </label>
+                                <select
+                                  value={levelFilter}
+                                  onChange={(e) => {
                                     setSpellFilterLevelByClassId((prev) => ({
                                       ...prev,
-                                      [casterClass.id]: "all",
+                                      [casterClass.id]: e.target.value,
                                     }))
                                     setSpellLevelPages({})
                                   }}
-                                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                                  className="rounded-xl border-2 border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
                                 >
-                                  Show all levels
-                                </button>
-                              )}
+                                  <option value="all">All levels</option>
+                                  {spellLevels.map((level) => (
+                                    <option key={level} value={String(level)}>
+                                      {formatSpellListGroupLabel(level)}
+                                    </option>
+                                  ))}
+                                </select>
+                                {levelFilter !== "all" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSpellFilterLevelByClassId((prev) => ({
+                                        ...prev,
+                                        [casterClass.id]: "all",
+                                      }))
+                                      setSpellLevelPages({})
+                                    }}
+                                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                                  >
+                                    Show all levels
+                                  </button>
+                                ) : null}
+                              </>
+                            ) : null}
+                            <div className="relative min-w-[12rem] flex-1">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <input
+                                type="search"
+                                placeholder="Search spells…"
+                                value={spellSearch}
+                                onChange={(e) => {
+                                  setSpellSearch(e.target.value)
+                                  setSpellLevelPages({})
+                                }}
+                                className="w-full rounded-xl border-2 border-border bg-card py-2 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                                aria-label={`Search ${casterClass.name} spells`}
+                              />
                             </div>
-                          )}
+                          </div>
 
                           <div className="space-y-4">
                             {visibleLevels.map((level) => {
@@ -6178,19 +6169,33 @@ export default function BuilderPageClient() {
               subtitle={spell.school}
               imageCrop="top"
               panelWidth={cardViewMode === "cinematic" ? "portrait-spell" : "default"}
-              tags={[
-                { label: spell.level === 0 ? "CANTRIP" : `LEVEL ${spell.level}`, emphasis: true },
-                ...(spell.concentration ? [{ label: "CONCENTRATION" }] : []),
-              ]}
+              tags={spellDetailOverlayTags(spell)}
               accentColor={accent}
             >
-              <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                <div><span className="text-white/50">Casting Time:</span> {spell.casting_time}</div>
-                <div><span className="text-white/50">Range:</span> {spell.range}</div>
-                <div><span className="text-white/50">Duration:</span> {spell.duration}</div>
-                <div><span className="text-white/50">Components:</span> {spell.components?.join(", ")}</div>
-              </div>
+              {spellCastingDetailRows(spell).length > 0 ? (
+                <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+                  {spellCastingDetailRows(spell).map((row) => (
+                    <div key={row.label}>
+                      <span className="text-white/50">{row.label}:</span> {row.value}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {spell.material?.trim() ? (
+                <p className="mb-3 text-sm text-white/70">
+                  <span className="font-semibold text-white/50">Materials: </span>
+                  {spell.material.trim()}
+                </p>
+              ) : null}
               <RichTextContent html={spell.description} />
+              {spell.higher_levels?.trim() ? (
+                <div className="mt-3">
+                  <p className="mb-1 text-xs font-bold uppercase tracking-wide text-white/50">
+                    At Higher Levels
+                  </p>
+                  <RichTextContent html={spell.higher_levels} />
+                </div>
+              ) : null}
             </CompendiumDetailOverlay>
           )
         }

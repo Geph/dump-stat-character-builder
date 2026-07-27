@@ -77,8 +77,8 @@ export function useIsMdPickerScreen(): boolean {
 }
 
 export function useSpellPickerPageSize(): number {
-  const isMd = useIsMdPickerScreen()
-  return getSpellPickerPageSize(isMd)
+  const isSm = useIsSmPickerScreen()
+  return getSpellPickerPageSize(isSm)
 }
 
 export function useIsSmPickerScreen(): boolean {

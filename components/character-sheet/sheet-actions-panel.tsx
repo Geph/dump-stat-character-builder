@@ -25,7 +25,17 @@ import type { ResourceTrackerEntry } from "@/components/character-sheet/resource
 import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
-import type { UsesConfig } from "@/lib/types"
+import {
+  collectTargetableEffects,
+  type PartyEffectTarget,
+} from "@/lib/character/effect-target-policy"
+import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
+import {
+  resolveFeatureEffectHealAmount,
+  type HealResolveContext,
+} from "@/lib/character/resolve-feature-effect-heal"
+import type { PartyAllyCandidate } from "@/lib/character/party-ally-candidates"
+import type { FeatureEffect, UsesConfig } from "@/lib/types"
 import {
   formatPsionicAugmentSelectionSummary,
   totalPsionicAugmentCost,
@@ -52,6 +62,13 @@ type SheetActionsPanelProps = {
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
+  /** Open character id — used when applying self heals / ally picks. */
+  characterId?: string | null
+  /** Apply heal / temp HP to the open sheet's local play state. */
+  onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  /** Party allies + companions available as heal targets. */
+  allyCandidates?: PartyAllyCandidate[]
+  healContext?: HealResolveContext | null
 }
 
 function resolveActionMax(
@@ -312,6 +329,10 @@ function ActionDetailOverlay({
   incapacitated,
   resolveContext,
   onClose,
+  characterId,
+  onApplySelfHeal,
+  allyCandidates = [],
+  healContext = null,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -326,10 +347,16 @@ function ActionDetailOverlay({
   incapacitated: boolean
   resolveContext: ResolveUsesContext
   onClose: () => void
+  characterId?: string | null
+  onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  allyCandidates?: PartyAllyCandidate[]
+  healContext?: HealResolveContext | null
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
-  const [step, setStep] = useState<"detail" | "roll">("detail")
+  const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
+  const [pendingHealEffects, setPendingHealEffects] = useState<FeatureEffect[]>([])
+  const [applyingHeal, setApplyingHeal] = useState(false)
   const menuOptions = (action.menuOptions ?? []).filter(
     (option) => option.unlocksAtLevel == null || option.unlocksAtLevel <= action.classLevel,
   )
@@ -416,12 +443,83 @@ function ActionDetailOverlay({
     if (augmentSummary) parts.push(augmentSummary)
     if (usage && !spendViaAugments) parts.push("Marked one use")
 
+    const targetable = collectTargetableEffects(action.healEffects)
+    const needsAllyPick = targetable.some((entry) => entry.policy === "choose_ally")
+    if (needsAllyPick && healContext) {
+      setPendingHealEffects(targetable.map((entry) => entry.effect))
+      setUseFeedback(parts.join(" · ") || null)
+      setStep("target")
+      return
+    }
+
+    if (targetable.length && healContext && characterId && onApplySelfHeal) {
+      const healParts = [...parts]
+      for (const { effect } of targetable) {
+        const amount = resolveFeatureEffectHealAmount(effect, healContext)
+        if (amount <= 0) continue
+        const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
+        onApplySelfHeal(amount, kind)
+        healParts.push(kind === "temp_hp" ? `+${amount} temp HP` : `Healed ${amount} HP`)
+      }
+      setUseFeedback(healParts.join(" · ") || "Used!")
+      if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
+        setStep("roll")
+        return
+      }
+      return
+    }
+
     if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
       setStep("roll")
       return
     }
 
     setUseFeedback(parts.join(" · ") || "Used!")
+  }
+
+  const handlePickTarget = async (target: PartyEffectTarget) => {
+    if (!healContext || !pendingHealEffects.length) return
+    setApplyingHeal(true)
+    try {
+      const parts: string[] = useFeedback ? [useFeedback] : []
+      for (const effect of pendingHealEffects) {
+        if (
+          target.kind === "character" &&
+          target.characterId === characterId &&
+          onApplySelfHeal
+        ) {
+          const amount = resolveFeatureEffectHealAmount(effect, healContext)
+          if (amount <= 0) continue
+          const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
+          onApplySelfHeal(amount, kind)
+          parts.push(
+            kind === "temp_hp"
+              ? `+${amount} temp HP → ${target.label}`
+              : `Healed ${amount} HP → ${target.label}`,
+          )
+          continue
+        }
+        const result = await applyPartyHealEffect({
+          effect,
+          target,
+          healContext,
+          selfCharacterId: characterId,
+        })
+        if (!result) continue
+        parts.push(
+          result.kind === "temp_hp"
+            ? `+${result.amount} temp HP → ${result.targetLabel}`
+            : `Healed ${result.amount} HP → ${result.targetLabel}`,
+        )
+      }
+      setUseFeedback(parts.join(" · ") || "Used!")
+      setStep("detail")
+      setPendingHealEffects([])
+    } catch (error) {
+      setUseFeedback(error instanceof Error ? error.message : "Could not apply heal.")
+    } finally {
+      setApplyingHeal(false)
+    }
   }
 
   const conMod = resolveContext.abilityModifiers?.CON ?? 0
@@ -474,6 +572,44 @@ function ActionDetailOverlay({
             augmentSummary={augmentSummary}
             onClose={onClose}
           />
+        ) : step === "target" ? (
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">Choose who receives this effect.</p>
+            {allyCandidates.length === 0 ? (
+              <p className="text-sm text-destructive">
+                No party allies found. Create a party on the Characters page that includes this
+                character.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {allyCandidates.map((candidate) => {
+                  const key =
+                    candidate.kind === "companion"
+                      ? `${candidate.characterId}:${candidate.companionKey}`
+                      : candidate.characterId
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      disabled={applyingHeal}
+                      onClick={() => void handlePickTarget(candidate)}
+                      className="rounded-xl border-2 border-border px-3 py-2 text-left text-sm hover:border-primary/50 disabled:opacity-50"
+                    >
+                      <div className="font-semibold">{candidate.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {candidate.currentHp != null
+                          ? `HP ${candidate.currentHp}${candidate.maxHp != null ? `/${candidate.maxHp}` : ""}`
+                          : candidate.kind === "companion"
+                            ? "Companion"
+                            : "Party member"}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {useFeedback ? <p className="text-xs text-muted-foreground">{useFeedback}</p> : null}
+          </div>
         ) : (
           <>
             <div className="p-4 space-y-3">
@@ -659,6 +795,10 @@ export function SheetActionsPanel({
   hitDiceRemaining = 0,
   onSpendHitDice,
   onActivateSheetToggle,
+  characterId = null,
+  onApplySelfHeal,
+  allyCandidates = [],
+  healContext = null,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -881,6 +1021,10 @@ export function SheetActionsPanel({
             incapacitated={incapacitated}
             resolveContext={resolveContext}
             onClose={() => setOpenActionId(null)}
+            characterId={characterId}
+            onApplySelfHeal={onApplySelfHeal}
+            allyCandidates={allyCandidates}
+            healContext={healContext}
           />
         ) : null}
       </AnimatePresence>

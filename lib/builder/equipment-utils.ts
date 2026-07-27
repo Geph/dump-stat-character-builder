@@ -53,11 +53,16 @@ export function equipmentForCategory(
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-function packageOptionLetter(label: string, index: number): string {
+export function packageOptionLetter(label: string, index: number): string {
   const trimmed = label.trim()
-  const match = trimmed.match(/^([A-Za-z])\b/)
+  const match = trimmed.match(/^(?:option\s+)?\(?([A-Za-z])\)?\b/i)
   if (match) return match[1]!.toUpperCase()
   return String.fromCharCode(65 + index)
+}
+
+/** Short picker title — "Option (A)" — without repeating the gear list from the label. */
+export function formatPackageOptionTitle(label: string, index: number): string {
+  return `Option (${packageOptionLetter(label, index)})`
 }
 
 /**

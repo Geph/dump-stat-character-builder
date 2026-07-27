@@ -20,6 +20,7 @@ import {
   Save,
   Download,
   Settings,
+  Share2,
   Shield,
 } from "lucide-react"
 import Link from "next/link"
@@ -29,6 +30,16 @@ import {
   characterRowToExportItem,
   downloadCharacterExport,
 } from "@/lib/character/character-export-format"
+import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
+import {
+  normalizePartyCharacterIds,
+  normalizePartyRow,
+  type AdventuringParty,
+} from "@/lib/character/party"
+import {
+  normalizeShareSnapshotRow,
+  shareSnapshotHref,
+} from "@/lib/character/share-snapshot"
 import type {
   Character,
   DndClass,
@@ -177,6 +188,7 @@ import {
   DefaultActionsOverlay,
 } from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
+import { SheetRestOverlay } from "@/components/character-sheet/sheet-rest-overlay"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
 import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
@@ -193,7 +205,7 @@ import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/g
 import { StatExplainPopover } from "@/components/character-sheet/stat-explain-popover"
 import { CompanionStatPanel } from "@/components/character-sheet/companion-stat-panel"
 import { CompanionAttackRedirect } from "@/components/character-sheet/companion-attack-redirect"
-import { SheetPersistentStatsBar, SheetInitiativeBlock } from "@/components/character-sheet/sheet-persistent-stats-bar"
+import { SheetPersistentStatsBar } from "@/components/character-sheet/sheet-persistent-stats-bar"
 import { HitDiceTracker } from "@/components/character-sheet/hit-dice-tracker"
 import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
 import { SiteFooter } from "@/components/site-footer"
@@ -459,6 +471,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [activeTab, setActiveTab] = useState<SheetTab>("abilities")
   const [currentHp, setCurrentHp] = useState(0)
   const [tempHp, setTempHp] = useState(0)
+  const [partyForAllies, setPartyForAllies] = useState<AdventuringParty | null>(null)
+  const [partyCharacters, setPartyCharacters] = useState<Character[]>([])
+  const [shareStatus, setShareStatus] = useState<string | null>(null)
   const [activeConditions, setActiveConditions] = useState<string[]>([])
   const [exhaustionLevel, setExhaustionLevel] = useState(0)
   const [activeSheetToggleIds, setActiveSheetToggleIds] = useState<string[]>([])
@@ -488,6 +503,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
+  const [restOverlay, setRestOverlay] = useState<{
+    rest: RestType
+    summary: string[]
+  } | null>(null)
   const [realTimeCooldowns, setRealTimeCooldowns] = useState<RealTimeCooldownState>({})
   const [accumulatedResources, setAccumulatedResources] = useState<
     Record<string, AccumulatedResourceState>
@@ -506,6 +525,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     null,
   )
   const [sheetMenuPos, setSheetMenuPos] = useState<{ top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    const loadPartyContext = async () => {
+      const db = createClient()
+      const { data, error } = await db.from("parties").select("*").order("name")
+      if (error || !data) {
+        setPartyForAllies(null)
+        setPartyCharacters([])
+        return
+      }
+      const parties = asCompendiumRows(data).map((row) => normalizePartyRow(row))
+      const matching = parties.find((party) =>
+        normalizePartyCharacterIds(party.character_ids).includes(id),
+      )
+      setPartyForAllies(matching ?? null)
+      if (!matching) {
+        setPartyCharacters([])
+        return
+      }
+      const memberIds = normalizePartyCharacterIds(matching.character_ids)
+      const { data: memberRows } = await db.from("characters").select("*").in("id", memberIds)
+      setPartyCharacters(
+        asCompendiumRows<Character & Record<string, unknown>>(memberRows) as Character[],
+      )
+    }
+    void loadPartyContext()
+  }, [id])
 
   useEffect(() => {
     const fetchCharacter = async () => {
@@ -1857,14 +1904,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (result.tempHp != null) setTempHp(result.tempHp)
       if (result.deathSaves) setDeathSaves(result.deathSaves)
       if (result.activeConditions) setActiveConditions(result.activeConditions)
-      if (rest === "short_rest") {
-        setShortRestHitDiceOpen(true)
-      }
+
+      const summary = [...result.summary]
       if (rest === "long_rest") {
         const pool = buildHitDicePool(classDetails, usedHitDiceByClassId)
-        setUsedHitDiceByClassId(recoverHitDiceOnLongRest(usedHitDiceByClassId, pool))
+        const nextHitDice = recoverHitDiceOnLongRest(usedHitDiceByClassId, pool)
+        let recovered = 0
+        for (const entry of pool) {
+          const beforeSpent = usedHitDiceByClassId[entry.classId] ?? 0
+          const afterSpent = nextHitDice[entry.classId] ?? 0
+          recovered += Math.max(0, beforeSpent - afterSpent)
+        }
+        setUsedHitDiceByClassId(nextHitDice)
         setShortRestHitDiceOpen(false)
+        if (recovered > 0) {
+          summary.push(
+            `Regained ${recovered} Hit Die${recovered === 1 ? "" : "ce"} (half your total, minimum 1)`,
+          )
+        }
       }
+
+      setRestOverlay({ rest, summary })
     },
     [
       derived?.maxHp,
@@ -2165,6 +2225,111 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [derived?.toolProficiencies, character?.tool_proficiencies],
   )
 
+  const allyCandidates = useMemo(() => {
+    if (!partyForAllies) return []
+    const byId = new Map(partyCharacters.map((row) => [row.id, row]))
+    if (character && !byId.has(character.id)) byId.set(character.id, character)
+    return collectPartyAllyCandidates(partyForAllies.character_ids, byId, {
+      includeCompanions: true,
+    })
+  }, [partyForAllies, partyCharacters, character])
+
+  const healContext = useMemo(() => {
+    const mods = derived?.abilityMods ?? {
+      strength: 0,
+      dexterity: 0,
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      charisma: 0,
+    }
+    return {
+      characterLevel: character?.level ?? 1,
+      proficiencyBonus:
+        derived?.proficiencyBonus ?? Math.floor(((character?.level ?? 1) - 1) / 4) + 2,
+      abilityMods: {
+        STR: mods.strength ?? 0,
+        DEX: mods.dexterity ?? 0,
+        CON: mods.constitution ?? 0,
+        INT: mods.intelligence ?? 0,
+        WIS: mods.wisdom ?? 0,
+        CHA: mods.charisma ?? 0,
+      },
+    }
+  }, [character?.level, derived?.proficiencyBonus, derived?.abilityMods])
+
+  const sheetMaxHpForHeal = derived?.maxHp ?? character?.hit_point_max ?? 0
+  const applySelfHeal = useCallback(
+    (amount: number, kind: "heal" | "temp_hp") => {
+      if (kind === "temp_hp") {
+        setTempHp((prev) => Math.max(prev, amount))
+        return
+      }
+      setCurrentHp((hp) => Math.min(sheetMaxHpForHeal, hp + amount))
+    },
+    [sheetMaxHpForHeal],
+  )
+
+  const shareClassLabel = useMemo(() => {
+    if (classDetails.length) {
+      return classDetails
+        .map((entry) => `${entry.class?.name ?? "Class"} Level ${entry.row.level}`)
+        .join(" · ")
+    }
+    if (character?.classes?.name) {
+      return `${character.classes.name} Level ${character.level}`
+    }
+    return "Adventurer"
+  }, [classDetails, character?.classes?.name, character?.level])
+
+  const createShareSnapshot = useCallback(async () => {
+    if (!character) return
+    setShareStatus("Creating link…")
+    const db = createClient()
+    const token =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID().replace(/-/g, "").slice(0, 16)
+        : `${Date.now().toString(36)}`
+    const maxHpSnapshot = derived?.maxHp ?? character.hit_point_max ?? 0
+    const payload = {
+      ...characterRowToExportItem(character as unknown as Record<string, unknown>),
+      snapshot: {
+        currentHp,
+        tempHp,
+        maxHp: maxHpSnapshot,
+        classLabel: shareClassLabel,
+        sharedAt: new Date().toISOString(),
+      },
+    }
+    const { data, error } = await db
+      .from("character_snapshots")
+      .insert([
+        {
+          token,
+          character_name: character.name,
+          payload,
+        },
+      ])
+      .select("*")
+    if (error || !data) {
+      setShareStatus(error?.message ?? "Could not create share link.")
+      return
+    }
+    const row = normalizeShareSnapshotRow(
+      (Array.isArray(data) ? data[0] : data) as Record<string, unknown>,
+    )
+    const href = shareSnapshotHref(row.token || token)
+    const url =
+      typeof window !== "undefined" ? `${window.location.origin}${href}` : href
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareStatus("Share link copied")
+    } catch {
+      setShareStatus(url)
+    }
+    setSheetMenuOpen(false)
+  }, [character, currentHp, tempHp, derived?.maxHp, shareClassLabel])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -2241,13 +2406,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }
   const savingThrowProficiencies = derived?.savingThrowProficiencies ?? character.classes?.saving_throws ?? []
 
-  const classLabel = classDetails.length
-    ? classDetails
-        .map((entry) => `${entry.class?.name ?? "Class"} Level ${entry.row.level}`)
-        .join(" · ")
-    : character.classes?.name
-      ? `${character.classes.name} Level ${character.level}`
-      : "Adventurer"
+  const classLabel = shareClassLabel
 
   const skillsInOrder = getSkillsInAbilityOrder()
   const srdSkillNameSet = new Set(skillsInOrder.map((skill) => skill.name))
@@ -2434,6 +2593,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     <button
                       type="button"
                       onClick={() => {
+                        void createShareSnapshot()
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      <Share2 className="w-4 h-4 shrink-0" />
+                      {shareStatus ?? "Share link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         if (!character) return
                         downloadCharacterExport(
                           characterRowToExportItem(character as unknown as unknown as Record<string, unknown>),
@@ -2559,11 +2728,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   {character.species && (
                     <span className={SHEET_BANNER_BADGE.species}>
                       {character.species.name}
-                    </span>
-                  )}
-                  {(character.size ?? character.species?.size) && (
-                    <span className={SHEET_BANNER_BADGE.size}>
-                      {character.size ?? character.species?.size}
                     </span>
                   )}
                   {character.backgrounds && (
@@ -2980,6 +3144,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         />
                       </span>
                     </div>
+                    {(character.size ?? character.species?.size) ? (
+                      <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium">
+                        <span className="shrink-0">Size</span>
+                        <span className="font-bold">{character.size ?? character.species?.size}</span>
+                      </div>
+                    ) : null}
                     {hitDicePool.length > 0 ? (
                       <HitDiceTracker
                         pool={hitDicePool}
@@ -3153,6 +3323,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     hitDiceRemaining={hitDiceRemainingTotal}
                     onSpendHitDice={spendHitDiceForAction}
                     onActivateSheetToggle={activateSheetToggle}
+                    characterId={character.id}
+                    onApplySelfHeal={applySelfHeal}
+                    allyCandidates={allyCandidates}
+                    healContext={healContext}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
@@ -3406,6 +3580,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     hitDiceRemaining={hitDiceRemainingTotal}
                     onSpendHitDice={spendHitDiceForAction}
                     onActivateSheetToggle={activateSheetToggle}
+                    characterId={character.id}
+                    onApplySelfHeal={applySelfHeal}
+                    allyCandidates={allyCandidates}
+                    healContext={healContext}
                   />
                   {!equippedWeaponCards.length && !combatActions.length ? (
                     <p className="text-xs text-muted-foreground italic">
@@ -3471,14 +3649,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className="space-y-3 min-w-0">
-                  <div className={`${SHEET_COMBAT_PANEL.initiative} rounded-xl p-3 border border-border`}>
-                    <SheetInitiativeBlock
-                      initiative={initiative}
-                      statBreakdowns={statBreakdowns}
-                      onInitiativeRoll={handleInitiativeRoll}
-                      formatMod={formatMod}
-                    />
-                  </div>
                   <div className={`${SHEET_COMBAT_PANEL.spellcastingResources} rounded-xl p-3 border border-border`}>
                     <h2 className="text-sm font-bold text-foreground mb-2 text-left">
                       {hasSpellcasting ? "Spellcasting & Resources" : "Resources"}
@@ -4056,6 +4226,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       </main>
 
       <AnimatePresence>
+        {restOverlay ? (
+          <SheetRestOverlay
+            key="sheet-rest"
+            rest={restOverlay.rest}
+            summary={restOverlay.summary}
+            onClose={() => setRestOverlay(null)}
+            hitDicePool={hitDicePool}
+            conMod={abilityMods.constitution}
+            currentHp={currentHp}
+            maxHp={maxHp}
+            onHeal={(amount) => setCurrentHp((hp) => Math.min(maxHp, hp + amount))}
+            onSpendDice={(classId, count) =>
+              setUsedHitDiceByClassId((prev) => ({
+                ...prev,
+                [classId]: (prev[classId] ?? 0) + count,
+              }))
+            }
+          />
+        ) : null}
         {defaultActionsContext ? (
           <DefaultActionsOverlay
             key="default-actions"

@@ -278,6 +278,8 @@ export interface FeatureEffect {
   remoteViewingDurationMinutes?: number | null
   /** remote_viewing: destroy the linked token when the effect ends. */
   destroysTokenOnEnd?: boolean
+  /** heal_self / grant_temp_hp: who receives the effect when the action is used. */
+  healTarget?: "self" | "choose_ally" | null
   /** Human-readable label for sheet / builder display. */
   label?: string | null
   /** movement_option: teleport instead of normal movement. */

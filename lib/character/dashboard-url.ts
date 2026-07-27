@@ -56,6 +56,15 @@ export function filterDashboardIds(
   return { valid, unknown }
 }
 
+export function parseDashboardPartyParam(raw: string | null | undefined): string | null {
+  const id = raw?.trim()
+  return id || null
+}
+
+export function dashboardPartyHref(partyId: string): string {
+  return `/dashboard?party=${encodeURIComponent(partyId)}`
+}
+
 export function dashboardHref(ids: string[]): string {
   const serialized = serializeDashboardIds(ids)
   return serialized ? `/dashboard?ids=${encodeURIComponent(serialized)}` : "/dashboard"

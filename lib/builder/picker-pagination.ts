@@ -25,10 +25,9 @@ export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean):
   return CINEMATIC_COMPENDIUM_PAGE_SIZE
 }
 
-/** Spell step uses `grid-cols-2 md:grid-cols-3` — always 3 rows in compact view. */
-export function getSpellPickerPageSize(isMdScreen: boolean): number {
-  const columns = isMdScreen ? 3 : 2
-  return columns * PICKER_GRID_ROWS
+/** Spell step: 12 on `sm`+ (3-col cinematic / denser grids), 6 on phones. */
+export function getSpellPickerPageSize(isSmScreen: boolean): number {
+  return isSmScreen ? 12 : PICKER_GRID_ROWS * 2
 }
 
 /** Feat / feature spell grants on narrow phones — paginate long spell lists. */

@@ -7,12 +7,16 @@ import {
   collapseWeaponCategoryPackageOptions,
   equipmentCategoryKind,
   equipmentForCategory,
+  formatPackageOptionTitle,
   isGoldOnlyOption,
 } from "@/lib/builder/equipment-utils"
 import { getCinematicPickerContainerClass } from "@/lib/builder/picker-pagination"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { STARTING_EQUIPMENT_CARD_IMAGES } from "@/lib/site-images"
 import { cn } from "@/lib/utils"
+
+/** Show this many plain item lines before collapsing the rest behind “…”. */
+const VISIBLE_ITEM_LINES = 4
 
 type StartingEquipmentPackagePickerProps = {
   title: string
@@ -77,22 +81,31 @@ export function StartingEquipmentPackagePicker({
           const edgeImage = goldOnly
             ? STARTING_EQUIPMENT_CARD_IMAGES.gold
             : STARTING_EQUIPMENT_CARD_IMAGES.gear
+          // Truncate collapsed cards; selecting expands the full item list.
+          const expandList = selected
+          const visibleItems = expandList
+            ? optionItems
+            : optionItems.slice(0, VISIBLE_ITEM_LINES)
+          const hiddenCount = expandList
+            ? 0
+            : Math.max(0, optionItems.length - VISIBLE_ITEM_LINES)
 
           return (
             <button
               key={index}
               type="button"
               onClick={() => onSelect(index)}
+              aria-expanded={expandList}
               className={cn(
-                "group relative flex min-h-[140px] w-full overflow-hidden rounded-xl border-2 text-left transition-all",
+                "group relative flex min-h-[148px] w-full rounded-xl border-2 text-left transition-all",
                 selected
                   ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                  : "border-border bg-card hover:border-primary/40",
+                  : "overflow-hidden border-border bg-card hover:border-primary/40",
               )}
             >
               <div
                 className={cn(
-                  "relative w-[45%] shrink-0 overflow-hidden bg-muted/20",
+                  "relative w-1/2 shrink-0 self-stretch overflow-hidden bg-muted/20",
                   side === "right" ? "order-2" : "order-1",
                 )}
                 aria-hidden
@@ -102,7 +115,7 @@ export function StartingEquipmentPackagePicker({
                   src={edgeImage}
                   alt=""
                   className={cn(
-                    "h-full w-full object-cover",
+                    "absolute inset-0 h-full w-full object-cover",
                     side === "right" ? "object-right" : "object-left",
                   )}
                 />
@@ -110,12 +123,12 @@ export function StartingEquipmentPackagePicker({
 
               <div
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col justify-center gap-2 p-4",
+                  "flex min-w-0 w-1/2 flex-col justify-center gap-2 p-4",
                   side === "right" ? "order-1" : "order-2",
                 )}
               >
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Option {option.label || String.fromCharCode(65 + index)}
+                  {formatPackageOptionTitle(option.label, index)}
                 </p>
                 {goldOnly ? (
                   <div className="flex items-center gap-2">
@@ -126,7 +139,7 @@ export function StartingEquipmentPackagePicker({
                   </div>
                 ) : (
                   <ul className="space-y-1.5">
-                    {optionItems.map((item, ii) => {
+                    {visibleItems.map((item, ii) => {
                       const isGp = item.name.toLowerCase() === "gold pieces"
                       const category = equipmentCategoryKind(item.name)
                       if (category) {
@@ -135,7 +148,7 @@ export function StartingEquipmentPackagePicker({
                         const selectedId = categoryPicks[pickKey] ?? ""
                         return (
                           <li key={ii} onClick={(event) => event.stopPropagation()}>
-                            <label className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
+                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                               {item.quantity > 1 ? `${item.quantity}× ` : ""}
                               {item.name}
                             </label>
@@ -176,6 +189,11 @@ export function StartingEquipmentPackagePicker({
                         </li>
                       )
                     })}
+                    {hiddenCount > 0 ? (
+                      <li className="text-[11px] font-bold uppercase tracking-wide text-primary/80">
+                        +{hiddenCount} more
+                      </li>
+                    ) : null}
                   </ul>
                 )}
                 {goldOnly && (

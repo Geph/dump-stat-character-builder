@@ -41,7 +41,7 @@ export function EquipmentShoppingPanel({
 }: EquipmentShoppingPanelProps) {
   const pageSize = usePickerPageSize("dense")
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({})
-  const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("all")
+  const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("mundane")
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -87,66 +87,66 @@ export function EquipmentShoppingPanel({
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search equipment to buy..."
-          value={equipmentSearch}
-          onChange={(e) => {
-            onEquipmentSearchChange(e.target.value)
-            setCategoryPages({})
-          }}
-          className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-        />
-      </div>
-
-      {categoryOptions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Type
-          </label>
-          <select
-            value={equipmentFilterCategory}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:min-w-[12rem]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search equipment to buy..."
+            value={equipmentSearch}
             onChange={(e) => {
-              onEquipmentFilterCategoryChange(e.target.value)
+              onEquipmentSearchChange(e.target.value)
               setCategoryPages({})
             }}
-            className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-          >
-            <option value="all">All types</option>
-            {categoryOptions.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          {equipmentFilterCategory !== "all" && (
-            <button
-              type="button"
-              onClick={() => {
-                onEquipmentFilterCategoryChange("all")
+            className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+          />
+        </div>
+        {categoryOptions.length > 0 && (
+          <>
+            <select
+              value={equipmentFilterCategory}
+              onChange={(e) => {
+                onEquipmentFilterCategoryChange(e.target.value)
                 setCategoryPages({})
               }}
-              className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              aria-label="Equipment type"
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary sm:w-auto"
             >
-              Clear type filter
-            </button>
-          )}
-          <select
-            value={magicKindFilter}
-            onChange={(e) => {
-              setMagicKindFilter(e.target.value as "all" | "magic" | "mundane")
-              setCategoryPages({})
-            }}
-            className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
-          >
-            <option value="all">All items</option>
-            <option value="magic">Magic only</option>
-            <option value="mundane">Mundane only</option>
-          </select>
-        </div>
-      )}
+              <option value="all">All types</option>
+              {categoryOptions.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            {equipmentFilterCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEquipmentFilterCategoryChange("all")
+                  setCategoryPages({})
+                }}
+                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Clear type filter
+              </button>
+            )}
+            <select
+              value={magicKindFilter}
+              onChange={(e) => {
+                setMagicKindFilter(e.target.value as "all" | "magic" | "mundane")
+                setCategoryPages({})
+              }}
+              aria-label="Magic or mundane"
+              className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary sm:w-auto"
+            >
+              <option value="all">All items</option>
+              <option value="magic">Magic only</option>
+              <option value="mundane">Mundane only</option>
+            </select>
+          </>
+        )}
+      </div>
 
       <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-1">
         {equipmentGroups.length === 0 ? (

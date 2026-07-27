@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Check, Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { buildWeaponMasteryDescriptionsLookup } from "@/lib/compendium/weapon-mastery"
@@ -42,8 +43,13 @@ export function WeaponMasteryChoices({
   masteryDescriptions,
 }: WeaponMasteryChoicesProps) {
   const [showInfo, setShowInfo] = useState(false)
+  const [portalReady, setPortalReady] = useState(false)
   const unavailable = new Set(unavailableOptions)
   const masteryRules = masteryDescriptions ?? buildWeaponMasteryDescriptionsLookup()
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   const masteryByWeapon = new Map<string, string | null>(
     options.map((option) => [option.name, masteryNameFromDescription(option.description)]),
@@ -199,52 +205,57 @@ export function WeaponMasteryChoices({
         )}
       </div>
 
-      <AnimatePresence>
-        {showInfo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setShowInfo(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => setShowInfo(false)}
-                className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
-                Weapon Mastery
-              </p>
-              <h4 className="font-serif text-xl font-black text-foreground pr-8">
-                Mastery Properties
-              </h4>
-              <dl className="mt-3 space-y-3">
-                {(masteriesPresent.length ? masteriesPresent : Object.keys(masteryRules)).map(
-                  (name) => (
-                    <div key={name}>
-                      <dt className="text-sm font-bold text-foreground">{name}</dt>
-                      <dd className="text-sm text-muted-foreground leading-relaxed">
-                        {masteryRules[name] ?? "No description available."}
-                      </dd>
-                    </div>
-                  ),
-                )}
-              </dl>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {portalReady
+        ? createPortal(
+            <AnimatePresence>
+              {showInfo && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+                  onClick={() => setShowInfo(false)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowInfo(false)}
+                      className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
+                      Weapon Mastery
+                    </p>
+                    <h4 className="font-serif text-xl font-black text-foreground pr-8">
+                      Mastery Properties
+                    </h4>
+                    <dl className="mt-3 space-y-3">
+                      {(masteriesPresent.length ? masteriesPresent : Object.keys(masteryRules)).map(
+                        (name) => (
+                          <div key={name}>
+                            <dt className="text-sm font-bold text-foreground">{name}</dt>
+                            <dd className="text-sm text-muted-foreground leading-relaxed">
+                              {masteryRules[name] ?? "No description available."}
+                            </dd>
+                          </div>
+                        ),
+                      )}
+                    </dl>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
     </>
   )
 }

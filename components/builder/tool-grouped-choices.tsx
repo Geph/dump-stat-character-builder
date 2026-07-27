@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import { ChevronDown, Info, X } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
@@ -63,6 +64,11 @@ export function ToolGroupedChoices({
   const [userExpanded, setUserExpanded] = useState<Record<string, boolean>>({})
   const [groupPages, setGroupPages] = useState<Record<string, number>>({})
   const [infoName, setInfoName] = useState<string | null>(null)
+  const [portalReady, setPortalReady] = useState(false)
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   useEffect(() => {
     setGroupPages({})
@@ -208,39 +214,44 @@ export function ToolGroupedChoices({
         })}
       </div>
 
-      <AnimatePresence>
-        {infoName && infoDescription ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setInfoName(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              className="relative max-h-[80vh] max-w-lg w-full overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => setInfoName(null)}
-                className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary">Tool</p>
-              <h4 className="pr-8 font-serif text-xl font-black text-foreground">{infoName}</h4>
-              <div className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                <RichTextContent html={infoDescription} />
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {portalReady
+        ? createPortal(
+            <AnimatePresence>
+              {infoName && infoDescription ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+                  onClick={() => setInfoName(null)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="relative max-h-[80vh] max-w-lg w-full overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setInfoName(null)}
+                      className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary">Tool</p>
+                    <h4 className="pr-8 font-serif text-xl font-black text-foreground">{infoName}</h4>
+                    <div className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      <RichTextContent html={infoDescription} />
+                    </div>
+                  </motion.div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
     </>
   )
 }

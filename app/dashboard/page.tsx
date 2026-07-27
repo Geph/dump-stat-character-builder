@@ -5,21 +5,26 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
-import {
-  DashboardCharacterPicker,
-} from "@/components/dashboard/dashboard-character-picker"
+import { DashboardCharacterPicker } from "@/components/dashboard/dashboard-character-picker"
 import { DashboardGrid } from "@/components/dashboard/dashboard-character-card"
 import { buildDashboardSummaries } from "@/lib/character/build-dashboard-summary"
 import {
   dashboardHref,
+  dashboardPartyHref,
   filterDashboardIds,
   parseDashboardIdsParam,
+  parseDashboardPartyParam,
   validateDashboardSelection,
 } from "@/lib/character/dashboard-url"
 import { hydrateDashboardCharacters } from "@/lib/character/hydrate-dashboard"
+import {
+  normalizePartyCharacterIds,
+  normalizePartyRow,
+  type AdventuringParty,
+} from "@/lib/character/party"
 import { createClient } from "@/lib/db/client"
 import type { Character, DndClass, Species } from "@/lib/types"
-import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import { asCompendiumRows } from "@/lib/data/types"
 
 type LibraryCharacter = Character & {
   classes?: DndClass | null
@@ -33,9 +38,14 @@ function DashboardPageInner() {
     () => parseDashboardIdsParam(searchParams.get("ids")),
     [searchParams],
   )
+  const urlPartyId = useMemo(
+    () => parseDashboardPartyParam(searchParams.get("party")),
+    [searchParams],
+  )
 
   const [libraryLoading, setLibraryLoading] = useState(true)
   const [libraryCharacters, setLibraryCharacters] = useState<LibraryCharacter[]>([])
+  const [parties, setParties] = useState<AdventuringParty[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>(urlIds)
   const [dashboardLoading, setDashboardLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -43,23 +53,29 @@ function DashboardPageInner() {
   const [unknownIds, setUnknownIds] = useState<string[]>([])
 
   useEffect(() => {
-    setSelectedIds(urlIds)
-  }, [urlIds])
-
-  useEffect(() => {
     const loadLibrary = async () => {
       setLibraryLoading(true)
       setLoadError(null)
       const db = createClient()
-      const { data, error } = await db.from("characters").select("*")
-      if (error) {
-        setLoadError(error.message)
+      const [charactersResult, partiesResult] = await Promise.all([
+        db.from("characters").select("*"),
+        db.from("parties").select("*").order("name"),
+      ])
+      if (charactersResult.error) {
+        setLoadError(charactersResult.error.message)
         setLibraryCharacters([])
       } else {
-        const sorted = [...(asCompendiumRows<LibraryCharacter & Record<string, unknown>>(data) as LibraryCharacter[])].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        )
+        const sorted = [
+          ...(asCompendiumRows<LibraryCharacter & Record<string, unknown>>(
+            charactersResult.data,
+          ) as LibraryCharacter[]),
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         setLibraryCharacters(sorted)
+      }
+      if (!partiesResult.error && partiesResult.data) {
+        setParties(asCompendiumRows(partiesResult.data).map((row) => normalizePartyRow(row)))
+      } else {
+        setParties([])
       }
       setLibraryLoading(false)
     }
@@ -71,10 +87,26 @@ function DashboardPageInner() {
     [libraryCharacters],
   )
 
+  const partyResolvedIds = useMemo(() => {
+    if (!urlPartyId) return [] as string[]
+    const party = parties.find((entry) => entry.id === urlPartyId)
+    if (!party) return []
+    return normalizePartyCharacterIds(party.character_ids)
+  }, [urlPartyId, parties])
+
+  const effectiveUrlIds = useMemo(() => {
+    if (partyResolvedIds.length) return partyResolvedIds
+    return urlIds
+  }, [partyResolvedIds, urlIds])
+
+  useEffect(() => {
+    setSelectedIds(effectiveUrlIds)
+  }, [effectiveUrlIds])
+
   const activeDashboardIds = useMemo(() => {
-    const { valid, unknown } = filterDashboardIds(urlIds, knownIdSet)
+    const { valid, unknown } = filterDashboardIds(effectiveUrlIds, knownIdSet)
     return { valid, unknown }
-  }, [urlIds, knownIdSet])
+  }, [effectiveUrlIds, knownIdSet])
 
   const [summaries, setSummaries] = useState<ReturnType<typeof buildDashboardSummaries>>([])
   const showDashboard =
@@ -82,33 +114,36 @@ function DashboardPageInner() {
     validateDashboardSelection(activeDashboardIds.valid).ok &&
     activeDashboardIds.valid.length > 0
 
-  const loadDashboard = useCallback(
-    async (ids: string[], mode: "initial" | "refresh") => {
-      if (!validateDashboardSelection(ids).ok) return
-      if (mode === "initial") setDashboardLoading(true)
-      else setRefreshing(true)
-      setLoadError(null)
+  const loadDashboard = useCallback(async (ids: string[], mode: "initial" | "refresh") => {
+    if (!validateDashboardSelection(ids).ok) return
+    if (mode === "initial") setDashboardLoading(true)
+    else setRefreshing(true)
+    setLoadError(null)
 
-      try {
-        const db = createClient()
-        const hydrated = await hydrateDashboardCharacters(db, ids)
-        setSummaries(buildDashboardSummaries(hydrated))
-        setUnknownIds([])
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : "Could not load dashboard.")
-      } finally {
-        if (mode === "initial") setDashboardLoading(false)
-        else setRefreshing(false)
-      }
-    },
-    [],
-  )
+    try {
+      const db = createClient()
+      const hydrated = await hydrateDashboardCharacters(db, ids)
+      setSummaries(buildDashboardSummaries(hydrated))
+      setUnknownIds([])
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load dashboard.")
+    } finally {
+      if (mode === "initial") setDashboardLoading(false)
+      else setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!libraryLoading && activeDashboardIds.unknown.length) {
       setUnknownIds(activeDashboardIds.unknown)
     }
   }, [libraryLoading, activeDashboardIds.unknown])
+
+  useEffect(() => {
+    if (urlPartyId && !libraryLoading && parties.length && !partyResolvedIds.length) {
+      setLoadError("That party was not found.")
+    }
+  }, [urlPartyId, libraryLoading, parties.length, partyResolvedIds.length])
 
   useEffect(() => {
     if (!showDashboard) {
@@ -130,6 +165,10 @@ function DashboardPageInner() {
     const validation = validateDashboardSelection(selectedIds)
     if (!validation.ok) return
     router.push(dashboardHref(selectedIds))
+  }
+
+  const loadParty = (partyId: string) => {
+    router.push(dashboardPartyHref(partyId))
   }
 
   const returnToPicker = () => {
@@ -171,13 +210,37 @@ function DashboardPageInner() {
             />
           )
         ) : (
-          <DashboardCharacterPicker
-            characters={libraryCharacters}
-            selectedIds={selectedIds}
-            onToggle={toggleSelection}
-            onProceed={proceedToDashboard}
-            loading={libraryLoading}
-          />
+          <div className="space-y-6">
+            {parties.length > 0 ? (
+              <div className="space-y-2">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                  Load a party
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {parties.map((party) => (
+                    <button
+                      key={party.id}
+                      type="button"
+                      onClick={() => loadParty(party.id)}
+                      className="rounded-full border-2 border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-primary/50"
+                    >
+                      {party.name}
+                      <span className="ml-1 text-muted-foreground">
+                        ({normalizePartyCharacterIds(party.character_ids).length})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <DashboardCharacterPicker
+              characters={libraryCharacters}
+              selectedIds={selectedIds}
+              onToggle={toggleSelection}
+              onProceed={proceedToDashboard}
+              loading={libraryLoading}
+            />
+          </div>
         )}
       </main>
       <SiteFooter />

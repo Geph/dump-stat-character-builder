@@ -19,11 +19,15 @@ import { cn } from "@/lib/utils"
 /** Class/species portrait — full hero with slide-up detail below `lg`; art left + detail right from `lg` up. */
 const PORTRAIT_COMPENDIUM_PANEL_WIDTH =
   "w-[min(90vw,calc(min(92vh,900px)*0.75))] lg:w-[min(90vw,calc(min(92vh,900px)*0.75+min(34vw,360px)))]"
-/** Spell portrait previews — compact detail strip; hero and width expand accordingly. */
+/** Spell portrait — hero is ~80% of prior share; detail strip takes the freed space. */
 const PORTRAIT_SPELL_PANEL_WIDTH =
-  "w-[min(90vw,calc((min(92vh,900px)-min(23.4vh,164px))*0.75))]"
+  "w-[min(90vw,calc((min(92vh,900px)-min(37vh,310px))*0.75))]"
 
-const PORTRAIT_SPELL_DETAIL_STRIP_CLASS = "h-[min(23.4vh,164px)] max-h-[min(23.4vh,164px)]"
+const PORTRAIT_SPELL_DETAIL_STRIP_CLASS = "h-[min(37vh,310px)] max-h-[min(37vh,310px)]"
+
+/** Taller bottom scrim so casting badges stay readable on the shorter spell hero. */
+const PORTRAIT_SPELL_HERO_GRADIENT_CLASS =
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_32%,rgba(0,0,0,0.5)_42%,transparent_50%)] max-lg:bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_38%,rgba(0,0,0,0.55)_48%,transparent_56%)]"
 
 const PORTRAIT_PANEL_WIDTH_BY_VARIANT = {
   portrait: PORTRAIT_COMPENDIUM_PANEL_WIDTH,
@@ -88,6 +92,7 @@ export function CompendiumDetailOverlay({
   const portraitPanelVariant = isPortraitPanel ? (panelWidth as PortraitPanelWidth) : null
   const isPortraitCompendiumPanel =
     portraitPanelVariant === "portrait" || portraitPanelVariant === "portrait-species"
+  const isPortraitSpellPanel = portraitPanelVariant === "portrait-spell"
   const panelWidthClass = isCompactPanel
     ? "w-[min(92vw,28rem)] max-w-[min(92vw,28rem)]"
     : portraitPanelVariant
@@ -218,6 +223,9 @@ export function CompendiumDetailOverlay({
                   crop={imageCrop}
                   variant="overlay"
                   fillHeight
+                  overlayGradientClass={
+                    isPortraitSpellPanel ? PORTRAIT_SPELL_HERO_GRADIENT_CLASS : undefined
+                  }
                 />
 
                 <div

@@ -20,7 +20,7 @@ type SheetPersistentStatsBarProps = {
   incomingAttackNotes?: IncomingAttackNote[]
   /** When true, omits outer margin for embedding in the sheet header row. */
   embedded?: boolean
-  /** Panel layout for combat tab — single compact row (no initiative). */
+  /** Panel layout for combat tab — compact AC / Speed / Init / HP row. */
   panel?: boolean
   initiative: number
   speed: number
@@ -38,13 +38,6 @@ type SheetPersistentStatsBarProps = {
   onSpendHitDice?: (classId: string, count: number) => void
   /** Set spent hit dice for a class (manual remaining edit). */
   onSetHitDiceSpent?: (classId: string, spent: number) => void
-  onInitiativeRoll: () => void
-  formatMod: (mod: number) => string
-}
-
-type InitiativeBlockProps = {
-  initiative: number
-  statBreakdowns?: DerivedStatBreakdowns
   onInitiativeRoll: () => void
   formatMod: (mod: number) => string
 }
@@ -79,50 +72,12 @@ function hpBarTone(currentHp: number, maxHp: number): string {
   return "from-emerald-500 to-emerald-400"
 }
 
-export function SheetInitiativeBlock({
-  initiative,
-  statBreakdowns,
-  onInitiativeRoll,
-  formatMod,
-}: InitiativeBlockProps) {
-  return (
-    <div className="rounded-lg border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-card p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
-          <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Initiative
-            </p>
-            <StatExplainPopover
-              title="Initiative"
-              total={initiative}
-              contributions={
-                statBreakdowns ? breakdownLines(statBreakdowns, "initiative") : undefined
-              }
-            />
-          </div>
-          <p className="text-xl font-black tabular-nums leading-tight">{formatMod(initiative)}</p>
-        </div>
-        <D20RollButton
-          modifier={initiative}
-          title="Roll initiative"
-          size="md"
-          rollContext={{ kind: "initiative", ability: "dexterity" }}
-          onRoll={onInitiativeRoll}
-        />
-      </div>
-    </div>
-  )
-}
-
 function CombatStatsCompactRow({
   armorClass,
   acBreakdown,
   statBreakdowns,
   incomingAttackNotes,
+  initiative,
   speed,
   speeds = [],
   maxHp,
@@ -136,10 +91,9 @@ function CombatStatsCompactRow({
   onShortRestHeal,
   onSpendHitDice,
   onSetHitDiceSpent,
-}: Omit<
-  SheetPersistentStatsBarProps,
-  "embedded" | "panel" | "initiative" | "onInitiativeRoll" | "formatMod"
->) {
+  onInitiativeRoll,
+  formatMod,
+}: Omit<SheetPersistentStatsBarProps, "embedded" | "panel">) {
   const hpPercent =
     maxHp > 0 ? Math.min(100, Math.round((currentHp / maxHp) * 100)) : 0
   const hpTone = hpBarTone(currentHp, maxHp)
@@ -207,7 +161,35 @@ function CombatStatsCompactRow({
         )}
       </div>
 
-      <div className="flex min-w-[12rem] flex-1 flex-col justify-center gap-2.5 rounded-lg border border-destructive/20 bg-gradient-to-br from-destructive/6 to-card px-3 py-3 min-h-[5.625rem]">
+      <div className="flex shrink-0 flex-col justify-center gap-2 rounded-lg border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-card px-3 py-3 min-h-[5.625rem] min-w-[5.75rem]">
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
+            Init
+          </p>
+          <StatExplainPopover
+            title="Initiative"
+            total={initiative}
+            contributions={
+              statBreakdowns ? breakdownLines(statBreakdowns, "initiative") : undefined
+            }
+          />
+        </div>
+        <div className="flex items-center justify-center gap-1.5">
+          <span className="text-xl font-black tabular-nums leading-none">
+            {formatMod(initiative)}
+          </span>
+          <D20RollButton
+            modifier={initiative}
+            title="Roll initiative"
+            size="md"
+            rollContext={{ kind: "initiative", ability: "dexterity" }}
+            onRoll={onInitiativeRoll}
+          />
+        </div>
+      </div>
+
+      <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-2.5 rounded-lg border border-destructive/20 bg-gradient-to-br from-destructive/6 to-card px-3 py-3 min-h-[5.625rem] sm:w-auto sm:max-w-[15.5rem] sm:flex-none">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex items-center gap-2 shrink-0">
             <Heart className="h-4 w-4 text-destructive shrink-0" aria-hidden />
@@ -317,6 +299,7 @@ export function SheetPersistentStatsBar({
         acBreakdown={acBreakdown}
         statBreakdowns={statBreakdowns}
         incomingAttackNotes={incomingAttackNotes}
+        initiative={initiative}
         speed={speed}
         speeds={speeds}
         maxHp={maxHp}
@@ -330,6 +313,8 @@ export function SheetPersistentStatsBar({
         onShortRestHeal={onShortRestHeal}
         onSpendHitDice={onSpendHitDice}
         onSetHitDiceSpent={onSetHitDiceSpent}
+        onInitiativeRoll={onInitiativeRoll}
+        formatMod={formatMod}
       />
     )
   }

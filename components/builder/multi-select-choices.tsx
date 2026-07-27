@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { GameIcon } from "@/components/game-icon-picker"
@@ -10,7 +11,13 @@ import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
 import { skillIconSlug } from "@/lib/compendium/skill-icons"
-import { getToolDescription } from "@/lib/compendium/tool-options"
+import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
+import {
+  getToolDescription,
+  isKnownToolName,
+  isMusicalInstrumentToolName,
+} from "@/lib/compendium/tool-options"
+import { cn } from "@/lib/utils"
 
 /** Phone multi-select grids — 6 options per page. */
 const PHONE_CHOICE_PAGE_SIZE = 6
@@ -21,6 +28,26 @@ type ChoiceOption = {
   prerequisite?: string | null
   /** e.g. discipline name or "General Talent" for pooled psionic talents */
   sourceLabel?: string | null
+}
+
+type KindFilter = "all" | "skill" | "tool" | "instrument"
+
+const SKILL_NAME_SET = new Set(SKILL_NAMES.map((name) => name.toLowerCase()))
+
+const KIND_FILTER_OPTIONS: { id: KindFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "skill", label: "Skills" },
+  { id: "tool", label: "Tools" },
+  { id: "instrument", label: "Instruments" },
+]
+
+function optionKind(name: string): Exclude<KindFilter, "all"> | null {
+  const normalized = name.trim().toLowerCase()
+  if (!normalized) return null
+  if (SKILL_NAME_SET.has(normalized)) return "skill"
+  if (isMusicalInstrumentToolName(name)) return "instrument"
+  if (isKnownToolName(name)) return "tool"
+  return null
 }
 
 type MultiSelectChoicesProps = {
@@ -133,7 +160,13 @@ export function MultiSelectChoices({
   const [customDraft, setCustomDraft] = useState("")
   const [flatPage, setFlatPage] = useState(0)
   const [groupPages, setGroupPages] = useState<Record<string, number>>({})
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all")
+  const [portalReady, setPortalReady] = useState(false)
   const pendingScrollY = useRef<number | null>(null)
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   useLayoutEffect(() => {
     if (pendingScrollY.current == null) return
@@ -159,13 +192,36 @@ export function MultiSelectChoices({
       .map((name) => ({ name })),
   ]
 
-  const optionGroups = groupOptionsBySource(displayOptions)
+  const presentKinds = new Set<Exclude<KindFilter, "all">>()
+  for (const option of displayOptions) {
+    const kind = optionKind(option.name)
+    if (kind) presentKinds.add(kind)
+  }
+  const showKindFilter = presentKinds.size >= 2
+  const presentKindsKey = [...presentKinds].sort().join(",")
+  const visibleKindFilters = KIND_FILTER_OPTIONS.filter(
+    (entry) => entry.id === "all" || presentKinds.has(entry.id),
+  )
+
+  const filteredOptions =
+    !showKindFilter || kindFilter === "all"
+      ? displayOptions
+      : displayOptions.filter((option) => optionKind(option.name) === kindFilter)
+
+  const optionGroups = groupOptionsBySource(filteredOptions)
   const isFlatList = optionGroups.length === 1 && optionGroups[0]?.label == null
 
   useEffect(() => {
     setFlatPage(0)
     setGroupPages({})
-  }, [options, isPhone, title])
+  }, [options, isPhone, title, kindFilter])
+
+  useEffect(() => {
+    if (kindFilter === "all") return
+    if (!showKindFilter || !presentKindsKey.split(",").includes(kindFilter)) {
+      setKindFilter("all")
+    }
+  }, [showKindFilter, kindFilter, presentKindsKey])
 
   const freeSelected = selected.filter((name) => !isLockedName(name))
 
@@ -304,14 +360,46 @@ export function MultiSelectChoices({
           </span>
         </div>
         {hint && <p className="text-xs text-muted-foreground mb-3">{hint}</p>}
+        {showKindFilter ? (
+          <div
+            className="mb-3 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Filter by proficiency type"
+          >
+            {visibleKindFilters.map((entry) => {
+              const active = kindFilter === entry.id
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setKindFilter(entry.id)}
+                  className={cn(
+                    "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors max-sm:min-h-10 max-sm:px-3 max-sm:text-sm",
+                    active
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {entry.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
         {displayOptions.length === 0 ? (
           <p className="text-xs text-muted-foreground italic py-3">
             No choices available yet. Import the related custom abilities (for example Psion
             disciplines and talents) into the compendium, then return here.
           </p>
         ) : null}
+        {displayOptions.length > 0 && filteredOptions.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic py-3">
+            No options in this filter.
+          </p>
+        ) : null}
         {isFlatList ? (
-          renderPaginatedOptions(displayOptions, flatPage, setFlatPage, title)
+          renderPaginatedOptions(filteredOptions, flatPage, setFlatPage, title)
         ) : (
           <div className="space-y-4">
             {optionGroups.map((group) => {
@@ -362,61 +450,70 @@ export function MultiSelectChoices({
         )}
       </div>
 
-      <AnimatePresence>
-        {infoOption && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
-            onClick={() => setInfoOption(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              className="relative max-h-[80vh] max-w-lg w-full overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => setInfoOption(null)}
-                className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
-                {showSkillInfoButtons && getSkillDescription(infoOption.name) && !infoOption.description?.trim()
-                  ? "Skill"
-                  : getToolDescription(infoOption.name) && !infoOption.description?.trim()
-                    ? "Tool"
-                    : "Details"}
-              </p>
-              <h4 className="font-serif text-xl font-black text-foreground pr-8">
-                {infoOption.name}
-              </h4>
-              {infoOption.sourceLabel?.trim() ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {infoOption.sourceLabel.trim()}
-                </p>
-              ) : null}
-              {infoOption.prerequisite?.trim() ? (
-                <p className={`${infoOption.sourceLabel?.trim() ? "mt-1" : "mt-2"} text-xs text-muted-foreground`}>
-                  Prerequisite: {infoOption.prerequisite}
-                </p>
-              ) : null}
-              <div className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                {infoDescription?.trim() ? (
-                  <RichTextContent html={infoDescription} />
-                ) : (
-                  <p>No description available.</p>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {portalReady
+        ? createPortal(
+            <AnimatePresence>
+              {infoOption && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
+                  onClick={() => setInfoOption(null)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="relative max-h-[80vh] max-w-lg w-full overflow-y-auto rounded-xl border-2 border-primary/50 bg-card p-5 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setInfoOption(null)}
+                      className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
+                      {showSkillInfoButtons &&
+                      getSkillDescription(infoOption.name) &&
+                      !infoOption.description?.trim()
+                        ? "Skill"
+                        : getToolDescription(infoOption.name) && !infoOption.description?.trim()
+                          ? "Tool"
+                          : "Details"}
+                    </p>
+                    <h4 className="font-serif text-xl font-black text-foreground pr-8">
+                      {infoOption.name}
+                    </h4>
+                    {infoOption.sourceLabel?.trim() ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {infoOption.sourceLabel.trim()}
+                      </p>
+                    ) : null}
+                    {infoOption.prerequisite?.trim() ? (
+                      <p
+                        className={`${infoOption.sourceLabel?.trim() ? "mt-1" : "mt-2"} text-xs text-muted-foreground`}
+                      >
+                        Prerequisite: {infoOption.prerequisite}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                      {infoDescription?.trim() ? (
+                        <RichTextContent html={infoDescription} />
+                      ) : (
+                        <p>No description available.</p>
+                      )}
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
     </>
   )
 }

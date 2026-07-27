@@ -19,6 +19,7 @@ import { ClassResourcesOverview } from "@/components/compendium/class-resources-
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { filterCompendiumClassResourcesBySubclasses } from "@/lib/compendium/subclass-gated-class-resources"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
+import { spellDetailOverlayTags, spellCastingDetailRows } from "@/lib/compendium/spell-detail-tags"
 import {
   COMPENDIUM_TOGGLE_LABELS,
   contentTypeToTable,
@@ -1872,7 +1873,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     {group.items.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <AnimatePresence>
                     {group.items.map(renderContentCard)}
                   </AnimatePresence>
@@ -1935,7 +1936,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 }
               : (selectedItem as { name: string; source?: string; icon?: string | null; card_image_url?: string | null })
           }
-          subtitle={formatCompendiumSource((selectedItem as { source?: string }).source)}
+          subtitle={
+            activeTab === "spells"
+              ? (selectedItem as Spell).school || formatCompendiumSource((selectedItem as Spell).source)
+              : formatCompendiumSource((selectedItem as { source?: string }).source)
+          }
           tags={
             activeTab === "class_resources"
               ? [
@@ -1994,6 +1999,8 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                             ? [{ label: (selectedItem as Creature).size! }]
                             : []),
                         ]
+                      : activeTab === "spells"
+                        ? spellDetailOverlayTags(selectedItem as Spell)
                 : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as unknown as Record<string, unknown>)}
@@ -2073,9 +2080,32 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               </dl>
             )
           })()}
+          {activeTab === "spells" && spellCastingDetailRows(selectedItem as Spell).length > 0 ? (
+            <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+              {spellCastingDetailRows(selectedItem as Spell).map((row) => (
+                <div key={row.label}>
+                  <span className="text-white/50">{row.label}:</span> {row.value}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {activeTab === "spells" && (selectedItem as Spell).material?.trim() ? (
+            <p className="mb-3 text-sm text-white/70">
+              <span className="font-semibold text-white/50">Materials: </span>
+              {(selectedItem as Spell).material!.trim()}
+            </p>
+          ) : null}
           {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
           )}
+          {activeTab === "spells" && (selectedItem as Spell).higher_levels?.trim() ? (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-white/50">
+                At Higher Levels
+              </p>
+              <RichTextContent html={(selectedItem as Spell).higher_levels} />
+            </div>
+          ) : null}
           {activeTab === "creatures" && (selectedItem as Creature).stat_block ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
               <CreatureStatBlockView template={(selectedItem as Creature).stat_block} variant="dark" />

@@ -1,4 +1,4 @@
-import { COMPENDIUM_TABLES, resolveTable, type CompendiumTable } from "@/lib/db/tables"
+import { COMPENDIUM_TABLES, APP_DATA_TABLES, resolveTable, isCompendiumTable, type CompendiumTable, type AppDataTable } from "@/lib/db/tables"
 import { normalizeBannerUrl, normalizePortraitUrl } from "@/lib/portrait"
 import type { DbResult, Filter, OrderBy, QueryBuilder } from "./types"
 import type { Character, ClassResourceRow, DndClass } from "@/lib/types"
@@ -9,11 +9,11 @@ import {
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 
 const DB_NAME = "dump-stat"
-/** Bump when COMPENDIUM_TABLES gains a new store (v3: tools, v4: repair pass, v5: creatures). */
-const DB_VERSION = 5
+/** Bump when COMPENDIUM_TABLES or app stores gain a new store (v6: parties + character_snapshots). */
+const DB_VERSION = 6
 
-const ALL_STORES = [...COMPENDIUM_TABLES, "characters"] as const
-type StoreName = CompendiumTable | "characters"
+const ALL_STORES = [...COMPENDIUM_TABLES, "characters", ...APP_DATA_TABLES] as const
+type StoreName = CompendiumTable | "characters" | AppDataTable
 
 function newId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -379,6 +379,9 @@ class IndexedDbQueryBuilder implements QueryBuilder {
         const conflict = this.upsertOptions?.onConflict ?? "name"
         if (conflict !== "name") {
           return { data: null, error: { message: `Unsupported upsert conflict: ${conflict}` } }
+        }
+        if (!isCompendiumTable(storeName)) {
+          return { data: null, error: { message: `Upsert by name not supported for ${storeName}` } }
         }
         const saved = await upsertByName(storeName, this.payload as unknown as Record<string, unknown>[])
         return { data: saved, error: null }

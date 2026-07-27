@@ -3,6 +3,7 @@ import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-tale
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type {
   CharacteristicModifier,
   SpecialAttackCharacteristic,
@@ -10,7 +11,7 @@ import type {
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
-import type { CustomAbility, Feature, FeatureActivation, Species, UsesConfig } from "@/lib/types"
+import type { CustomAbility, Feature, FeatureActivation, FeatureEffect, Species, UsesConfig } from "@/lib/types"
 
 export type ActionEconomyKind = "action" | "bonus" | "reaction"
 
@@ -48,6 +49,8 @@ export type SheetActionEntry = {
   spendHitDice?: number | null
   /** Hit die sides for this action's owning class (e.g. Draconic Vengeance damage). */
   hitDieSides?: number | null
+  /** heal_self / grant_temp_hp effects applied when the action is used. */
+  healEffects?: FeatureEffect[]
 }
 
 export type SheetActionMenuOption = {
@@ -288,6 +291,25 @@ function resolveSpendHitDice(item: ActivatableItem): number | null {
   return null
 }
 
+function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
+  const effects: FeatureEffect[] = []
+  const seen = new Set<string>()
+  const push = (list: FeatureEffect[] | undefined) => {
+    for (const effect of list ?? []) {
+      if (effect.kind !== "heal_self" && effect.kind !== "grant_temp_hp") continue
+      const key = effect.id || `${effect.kind}:${effect.label ?? ""}:${effect.healMode ?? ""}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      effects.push(effect)
+    }
+  }
+  push(item.activation?.effects)
+  for (const instance of item.linkedModifiers ?? []) {
+    push(instance.activation?.effects)
+  }
+  return effects
+}
+
 type ActivatableItem = {
   name: string
   description?: string | null
@@ -487,6 +509,7 @@ function pushActivatableItemActions(
         (category !== "utility" || display.abilitiesActions)
       ) {
         const menuOptions = resolveMenuOptions(feature)
+        const healEffects = resolveHealEffects(feature)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: feature.name,
@@ -502,6 +525,7 @@ function pushActivatableItemActions(
           menuOptions: menuOptions.length ? menuOptions : undefined,
           spendHitDice: resolveSpendHitDice(feature),
           hitDieSides: hitDieSides ?? null,
+          healEffects: healEffects.length ? healEffects : undefined,
           psionicAugments: resolvePsionicAugments({
             name: feature.name,
             description: feature.description ?? null,
@@ -545,6 +569,10 @@ function pushPickedChoiceOptionActions(
 ) {
   if (!classId || !featureChoicePicks) return
   if (!feature.isChoice || !feature.choices?.options?.length) return
+  // Weapon Mastery is an on-hit property while wielding — shown on equipped weapon cards,
+  // not as free-floating action cards for every known weapon type (Nick's "Bonus Action"
+  // wording otherwise false-positives via kindsFromText).
+  if (isWeaponMasteryFeature(feature)) return
   const picks = featureChoicePicks[featureChoiceKey(classId, feature.name, feature.level)] ?? []
   for (const pick of picks) {
     const option = feature.choices.options.find((entry) => entry.name === pick)
@@ -671,6 +699,7 @@ function pushCustomAbilityActions(
     if (!kinds.length) continue
 
     seenPowerNames.add(normalizePickName(ability.name))
+    const healEffects = resolveHealEffects(item)
     actions.push({
       id: `ability:${ability.id}`,
       name: ability.name,
@@ -692,6 +721,7 @@ function pushCustomAbilityActions(
       components: ability.components ?? null,
       duration: ability.duration ?? null,
       concentration: ability.concentration,
+      healEffects: healEffects.length ? healEffects : undefined,
     })
   }
 

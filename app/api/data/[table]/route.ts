@@ -13,7 +13,7 @@ import {
   type Filter,
   type OrderBy,
 } from "@/lib/db/repository"
-import { resolveTable } from "@/lib/db/tables"
+import { isCompendiumTable, resolveTable } from "@/lib/db/tables"
 import { coerceQueryFilterValue } from "@/lib/data/coerce-query-filter-value"
 
 function parseFilters(request: NextRequest): Filter[] {
@@ -80,7 +80,11 @@ export async function GET(
 
     const data = await listRows(table, {
       filters,
-      orders: orders.length ? orders : [{ column: "name", ascending: true }],
+      orders: orders.length
+        ? orders
+        : table === "character_snapshots"
+          ? [{ column: "created_at", ascending: false }]
+          : [{ column: "name", ascending: true }],
       limit,
     })
 
@@ -121,6 +125,12 @@ export async function POST(
     const rows = (body.rows ?? []) as unknown as Record<string, unknown>[]
 
     if (body.upsert) {
+      if (!isCompendiumTable(table)) {
+        return NextResponse.json(
+          { error: "Upsert by name is only supported for compendium tables." },
+          { status: 400 },
+        )
+      }
       await upsertByName(table, rows)
       return NextResponse.json({ success: true })
     }

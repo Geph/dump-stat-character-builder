@@ -36,9 +36,12 @@ describe("SRD tools compendium seed", () => {
     expect(groups.flatMap((group) => group.names)).toContain("Lute")
   })
 
-  it("builds short ability-check blurbs for artisan tools", () => {
-    expect(getToolDescription("Carpenter's Tools")).toMatch(/Strength/)
-    expect(getToolDescription("Carpenter's Tools")).toMatch(/Artisan/)
+  it("builds SRD Ability/Utilize/Craft descriptions for artisan tools", () => {
+    const text = getToolDescription("Carpenter's Tools")
+    expect(text).toMatch(/Strength/)
+    expect(text).toMatch(/Utilize/)
+    expect(text).toMatch(/Seal or pry open/)
+    expect(text).toMatch(/Craft/)
     expect(getToolDescription("Not A Real Tool")).toBeNull()
   })
 })

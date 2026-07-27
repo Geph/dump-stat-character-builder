@@ -20,6 +20,8 @@ type CompendiumCardHeroProps = {
   fullBleed?: boolean
   /** Override list-card scrim (portrait vs landscape browse cards). */
   listGradientClass?: string
+  /** Override overlay scrim (e.g. taller band for spell casting badges). */
+  overlayGradientClass?: string
   className?: string
   minHeightClass?: string
   maxHeightClass?: string
@@ -32,6 +34,7 @@ export function CompendiumCardHero({
   fillHeight = false,
   fullBleed = false,
   listGradientClass,
+  overlayGradientClass,
   className,
   minHeightClass,
   maxHeightClass,
@@ -65,7 +68,12 @@ export function CompendiumCardHero({
           )}
         />
       ) : (
-        <div className={cn("absolute inset-0", DETAIL_OVERLAY_HERO_GRADIENT_CLASS)} />
+        <div
+          className={cn(
+            "absolute inset-0",
+            overlayGradientClass ?? DETAIL_OVERLAY_HERO_GRADIENT_CLASS,
+          )}
+        />
       )}
     </div>
   )

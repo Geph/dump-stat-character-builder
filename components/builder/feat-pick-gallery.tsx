@@ -32,7 +32,6 @@ export function FeatPickGallery({
   const cinematic = layout === "cinematic"
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [repeatableFilter, setRepeatableFilter] = useState<"all" | "yes" | "no">("all")
   const [sourceFilter, setSourceFilter] = useState("all")
 
   const categoryOptions = useMemo(() => {
@@ -61,8 +60,6 @@ export function FeatPickGallery({
       ) {
         return false
       }
-      if (repeatableFilter === "yes" && !feat.repeatable) return false
-      if (repeatableFilter === "no" && feat.repeatable) return false
       if (sourceFilter !== "all" && (feat.source?.trim() || "") !== sourceFilter) {
         return false
       }
@@ -70,7 +67,7 @@ export function FeatPickGallery({
       const haystack = `${feat.name} ${feat.prerequisite ?? ""} ${feat.description ?? ""} ${feat.source ?? ""}`.toLowerCase()
       return haystack.includes(query)
     })
-  }, [feats, search, categoryFilter, repeatableFilter, sourceFilter])
+  }, [feats, search, categoryFilter, sourceFilter])
 
   const filterSelectClass =
     "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
@@ -84,8 +81,8 @@ export function FeatPickGallery({
   return (
     <div className="space-y-2">
       {showFilters && selectedId == null && feats.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <div className="relative min-w-0 w-full">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="search"
@@ -96,56 +93,39 @@ export function FeatPickGallery({
               aria-label="Search feats"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {categoryOptions.length > 1 ? (
-              <div className="flex shrink-0 items-center gap-2">
-                <label className={filterLabelClass}>Type</label>
-                <select
-                  value={categoryFilter}
-                  onChange={(event) => setCategoryFilter(event.target.value)}
-                  className={filterSelectClass}
-                  aria-label="Filter feats by type"
-                >
-                  <option value="all">All types</option>
-                  {categoryOptions.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
+          {categoryOptions.length > 1 ? (
             <div className="flex shrink-0 items-center gap-2">
-              <label className={filterLabelClass}>Repeatable</label>
+              <label className={filterLabelClass}>Type</label>
               <select
-                value={repeatableFilter}
-                onChange={(event) =>
-                  setRepeatableFilter(event.target.value as "all" | "yes" | "no")
-                }
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
                 className={filterSelectClass}
-                aria-label="Filter feats by repeatable"
+                aria-label="Filter feats by type"
               >
-                <option value="all">Any</option>
-                <option value="yes">Repeatable</option>
-                <option value="no">Once only</option>
-              </select>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <label className={filterLabelClass}>Source</label>
-              <select
-                value={sourceFilter}
-                onChange={(event) => setSourceFilter(event.target.value)}
-                className={cn(filterSelectClass, "max-w-[12rem]")}
-                aria-label="Filter feats by source"
-              >
-                <option value="all">All sources</option>
-                {sourceOptions.map((source) => (
-                  <option key={source} value={source}>
-                    {source}
+                <option value="all">All types</option>
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
                   </option>
                 ))}
               </select>
             </div>
+          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            <label className={filterLabelClass}>Source</label>
+            <select
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              className={cn(filterSelectClass, "max-w-[12rem]")}
+              aria-label="Filter feats by source"
+            >
+              <option value="all">All sources</option>
+              {sourceOptions.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       ) : null}

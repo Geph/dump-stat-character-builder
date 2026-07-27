@@ -346,6 +346,23 @@ export const characterClasses = mysqlTable("character_classes", {
   created_at: timestamp("created_at").defaultNow().notNull(),
 })
 
+export const parties = mysqlTable("parties", {
+  id: id(),
+  name: varchar("name", { length: 255 }).notNull().default("Unnamed Party"),
+  character_ids: json("character_ids").$type<string[]>().default([]),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export const characterSnapshots = mysqlTable("character_snapshots", {
+  id: id(),
+  token: varchar("token", { length: 64 }).notNull(),
+  character_name: varchar("character_name", { length: 255 }).notNull().default("Character"),
+  payload: json("payload").$type<Record<string, unknown>>().notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+})
+
 export const tableMap = {
   classes,
   subclasses,
@@ -360,6 +377,8 @@ export const tableMap = {
   class_resources: classResources,
   custom_abilities: customAbilities,
   characters,
+  parties,
+  character_snapshots: characterSnapshots,
 } as const
 
 export type TableName = keyof typeof tableMap

@@ -106,6 +106,12 @@ export type SheetRestResult = {
   usedResourcesById: Record<string, number>
   usedActionUsesById: Record<string, number>
   rechargeCapsByResourceId?: Record<string, number>
+  /** Human-readable lines describing what this rest restored. */
+  summary: string[]
+}
+
+function sumSlotUses(slots: number[] | undefined): number {
+  return (slots ?? []).reduce((sum, value) => sum + value, 0)
 }
 
 export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
@@ -123,11 +129,21 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     rechargeCapsByResourceId = {},
   } = params
 
+  const summary: string[] = []
+
   const nextSlots = { ...usedSpellSlotsByKey }
   for (const table of spellSlotTables) {
     if (!shouldResetSpellSlotsOnRest(table, rest)) continue
     const key = spellSlotTableKey(table)
+    const before = sumSlotUses(usedSpellSlotsByKey[key])
     nextSlots[key] = table.slotsByLevel.map(() => 0)
+    if (before > 0) {
+      summary.push(
+        table.type === "pact"
+          ? `Restored ${table.className} pact magic (${before} slot${before === 1 ? "" : "s"})`
+          : `Restored ${table.className} spell slots (${before})`,
+      )
+    }
   }
 
   const nextResources = { ...usedResourcesById }
@@ -146,6 +162,12 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     if (applied.rechargeCapsUsed != null) {
       nextRechargeCaps[entry.id] = applied.rechargeCapsUsed
     }
+    const restored = current - applied.used
+    if (restored > 0) {
+      summary.push(
+        `Restored ${entry.name} (${restored} use${restored === 1 ? "" : "s"})`,
+      )
+    }
   }
 
   const nextActions = { ...usedActionUsesById }
@@ -158,7 +180,14 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     if (seenShareKeys.has(trackingId)) continue
     seenShareKeys.add(trackingId)
     const current = nextActions[trackingId] ?? 0
-    nextActions[trackingId] = applyUsesRest(current, action.limitedUses, rest, max).used
+    const nextUsed = applyUsesRest(current, action.limitedUses, rest, max).used
+    nextActions[trackingId] = nextUsed
+    const restored = current - nextUsed
+    if (restored > 0) {
+      summary.push(
+        `Restored ${action.name} (${restored} use${restored === 1 ? "" : "s"})`,
+      )
+    }
   }
 
   const result: SheetRestResult = {
@@ -166,6 +195,7 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     usedResourcesById: nextResources,
     usedActionUsesById: nextActions,
     rechargeCapsByResourceId: nextRechargeCaps,
+    summary,
   }
 
   if (rest === "long_rest") {
@@ -173,10 +203,24 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     result.tempHp = 0
     result.deathSaves = { successes: 0, failures: 0 }
     result.rechargeCapsByResourceId = {}
+    summary.unshift(`Hit points restored to ${maxHp}`)
+    summary.push("Temporary HP cleared")
+    summary.push("Death saves reset")
     const clearedConcentration = activeConditions.filter((name) => isConcentrationCondition(name))
     if (clearedConcentration.length) {
       result.activeConditions = activeConditions.filter((name) => !isConcentrationCondition(name))
+      summary.push(
+        `Ended concentration${clearedConcentration.length > 1 ? ` (${clearedConcentration.length})` : ""}`,
+      )
     }
+  }
+
+  if (summary.length === 0) {
+    summary.push(
+      rest === "short_rest"
+        ? "No short-rest resources needed restoring"
+        : "No additional resources needed restoring",
+    )
   }
 
   return result

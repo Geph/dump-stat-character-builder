@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { getDb, schema } from "./index"
 import { serializeRow, serializeRows } from "./serialize"
 import type { TableName } from "./schema"
-import type { CompendiumTable } from "./tables"
+import type { CompendiumTable, ResolvableTable } from "./tables"
 import { isCompendiumTable } from "./tables"
 
 export type Filter =
@@ -12,7 +12,7 @@ export type Filter =
 
 export type OrderBy = { column: string; ascending?: boolean }
 
-function getTable(name: CompendiumTable | "characters") {
+function getTable(name: ResolvableTable) {
   return schema.tableMap[name as TableName]
 }
 
@@ -41,7 +41,23 @@ function withIds<T extends Record<string, unknown>>(rows: T[]): (T & { id: strin
   }))
 }
 
-export async function countRows(table: CompendiumTable | "characters", filters: Filter[] = []) {
+function defaultOrders(table: ResolvableTable): OrderBy[] {
+  if (table === "character_snapshots") return [{ column: "created_at", ascending: false }]
+  return [{ column: "name", ascending: true }]
+}
+
+function touchUpdatedAt(table: ResolvableTable, rest: Record<string, unknown>) {
+  if (
+    table === "characters" ||
+    table === "custom_abilities" ||
+    table === "parties" ||
+    table === "character_snapshots"
+  ) {
+    rest.updated_at = new Date()
+  }
+}
+
+export async function countRows(table: ResolvableTable, filters: Filter[] = []) {
   const t = getTable(table)
   const db = getDb()
   const where = buildWhere(t, filters)
@@ -50,7 +66,7 @@ export async function countRows(table: CompendiumTable | "characters", filters: 
 }
 
 export async function listRows(
-  table: CompendiumTable | "characters",
+  table: ResolvableTable,
   options: { filters?: Filter[]; orders?: OrderBy[]; limit?: number } = {},
 ) {
   const t = getTable(table)
@@ -58,21 +74,21 @@ export async function listRows(
   let query = db.select().from(t).$dynamic()
   const where = buildWhere(t, options.filters ?? [])
   if (where) query = query.where(where)
-  const orderBy = buildOrder(t, options.orders ?? [{ column: "name", ascending: true }])
+  const orderBy = buildOrder(t, options.orders?.length ? options.orders : defaultOrders(table))
   if (orderBy.length) query = query.orderBy(...orderBy)
   if (options.limit) query = query.limit(options.limit)
   const rows = await query
   return serializeRows(rows as unknown as Record<string, unknown>[])
 }
 
-export async function getRowById(table: CompendiumTable | "characters", id: string) {
+export async function getRowById(table: ResolvableTable, id: string) {
   const t = getTable(table)
   const db = getDb()
   const [row] = await db.select().from(t).where(eq(t.id, id)).limit(1)
   return row ? serializeRow(row as unknown as Record<string, unknown>) : null
 }
 
-export async function insertRows(table: CompendiumTable | "characters", rows: Record<string, unknown>[]) {
+export async function insertRows(table: ResolvableTable, rows: Record<string, unknown>[]) {
   const t = getTable(table)
   const db = getDb()
   const payload = withIds(rows)
@@ -81,29 +97,24 @@ export async function insertRows(table: CompendiumTable | "characters", rows: Re
 }
 
 export async function updateRowById(
-  table: CompendiumTable | "characters",
+  table: ResolvableTable,
   id: string,
   data: Record<string, unknown>,
 ) {
   const t = getTable(table)
   const db = getDb()
   const { id: _id, created_at: _c, ...rest } = data
-  if (table === "characters") {
-    ;(rest as unknown as Record<string, unknown>).updated_at = new Date()
-  }
-  if (table === "custom_abilities") {
-    ;(rest as unknown as Record<string, unknown>).updated_at = new Date()
-  }
+  touchUpdatedAt(table, rest as Record<string, unknown>)
   await db.update(t).set(rest as never).where(eq(t.id, id))
 }
 
-export async function deleteRowById(table: CompendiumTable | "characters", id: string) {
+export async function deleteRowById(table: ResolvableTable, id: string) {
   const t = getTable(table)
   const db = getDb()
   await db.delete(t).where(eq(t.id, id))
 }
 
-export async function deleteWhere(table: CompendiumTable | "characters", filters: Filter[]) {
+export async function deleteWhere(table: ResolvableTable, filters: Filter[]) {
   const t = getTable(table)
   const db = getDb()
   const where = buildWhere(t, filters)
@@ -111,7 +122,7 @@ export async function deleteWhere(table: CompendiumTable | "characters", filters
   await db.delete(t).where(where)
 }
 
-export async function clearTable(table: CompendiumTable | "characters") {
+export async function clearTable(table: ResolvableTable) {
   const t = getTable(table)
   const db = getDb()
   await db.delete(t).where(sql`1=1`)
@@ -119,7 +130,7 @@ export async function clearTable(table: CompendiumTable | "characters") {
 
 export async function upsertByName(table: CompendiumTable, rows: Record<string, unknown>[]) {
   if (!isCompendiumTable(table)) throw new Error(`Upsert by name not supported for ${table}`)
-  const t = getTable(table)
+  const t = getTable(table) as (typeof schema.tableMap)[CompendiumTable]
   const db = getDb()
   for (const row of rows) {
     const name = row.name as string

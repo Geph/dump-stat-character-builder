@@ -670,4 +670,45 @@ describe("collectSheetActions", () => {
     expect(tactics?.relatedTalentAlerts?.map((a) => a.name)).toEqual(["Death's Gambit"])
     expect(tactics?.relatedTalentAlerts?.[0]?.parentMenuOptionNames).toEqual(["Challenge"])
   })
+
+  it("does not promote Weapon Mastery known-weapon picks into action cards", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 1,
+              name: "Weapon Mastery",
+              description: "You gain mastery with certain weapons.",
+              isChoice: true,
+              choices: {
+                category: "Weapon Mastery",
+                count: 2,
+                options: [
+                  {
+                    name: "Scimitar",
+                    description:
+                      "Nick: When you make the extra attack of the Light property, you can make it as part of the Attack action instead of as a Bonus Action.",
+                  },
+                  {
+                    name: "Longsword",
+                    description:
+                      "Sap: If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll.",
+                  },
+                ],
+              },
+            } as Feature,
+          ],
+          5,
+        ),
+      ],
+      species: null,
+      featureChoicePicks: {
+        "class-1:L1:Weapon Mastery": ["Scimitar", "Longsword"],
+      },
+    })
+
+    expect(actions.map((a) => a.name)).not.toContain("Scimitar")
+    expect(actions.map((a) => a.name)).not.toContain("Longsword")
+  })
 })
