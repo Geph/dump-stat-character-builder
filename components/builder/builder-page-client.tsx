@@ -54,6 +54,7 @@ import {
   legacyBackgroundOriginFeatPickKey,
   magicInitiateListFromFeatGranted,
 } from "@/lib/compendium/background-origin-feat"
+import { magicInitiateAbilityForSpellList, takenMagicInitiateAbilities } from "@/lib/builder/magic-initiate"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import {
   applyBackgroundProficienciesToDraft,
@@ -1310,11 +1311,27 @@ export default function BuilderPageClient() {
     const listSlot = modifierPlayerChoiceSlots.find(
       (slot) => slot.sourceKey === sourceKey && slot.kind === "spell_list_class",
     )
-    if (!listSlot) return
+    const abilitySlot = modifierPlayerChoiceSlots.find(
+      (slot) => slot.sourceKey === sourceKey && slot.kind === "spellcasting_ability",
+    )
+    if (!listSlot && !abilitySlot) return
+
+    const defaultAbility = magicInitiateAbilityForSpellList(spellList)
+    const abilityLabel =
+      defaultAbility.charAt(0).toUpperCase() + defaultAbility.slice(1)
 
     setModifierPlayerPicks((prev) => {
-      if (prev[listSlot.slotKey]?.[0] === spellList) return prev
-      return { ...prev, [listSlot.slotKey]: [spellList] }
+      let next = prev
+      let changed = false
+      if (listSlot && prev[listSlot.slotKey]?.[0] !== spellList) {
+        next = { ...next, [listSlot.slotKey]: [spellList] }
+        changed = true
+      }
+      if (abilitySlot && !prev[abilitySlot.slotKey]?.[0]) {
+        next = { ...next, [abilitySlot.slotKey]: [abilityLabel] }
+        changed = true
+      }
+      return changed ? next : prev
     })
   }, [
     effectiveBackgroundFeatGranted,
@@ -1861,8 +1878,16 @@ export default function BuilderPageClient() {
     () => ({
       armorProficiencies: effectiveArmorProficiencies,
       abilityScores: effectiveAbilityScores,
+      takenMagicInitiateAbilities: [
+        ...takenMagicInitiateAbilities(modifierPlayerChoiceSlots, modifierPlayerPicks),
+      ],
     }),
-    [effectiveArmorProficiencies, effectiveAbilityScores],
+    [
+      effectiveArmorProficiencies,
+      effectiveAbilityScores,
+      modifierPlayerChoiceSlots,
+      modifierPlayerPicks,
+    ],
   )
 
   // Clear feat picks that no longer meet prerequisites (including armor training / ability scores).
@@ -3221,7 +3246,9 @@ export default function BuilderPageClient() {
                                 className={
                                   useSwipeVisualPicker
                                     ? getCinematicPickerContainerClass()
-                                    : pickerGridClass
+                                    : cardViewMode === "dense"
+                                      ? "grid grid-cols-1 xl:grid-cols-2 gap-3 px-1 py-2"
+                                      : pickerGridClass
                                 }
                               >
                                 {classSubclasses.map((subclass) => {
@@ -3778,6 +3805,7 @@ export default function BuilderPageClient() {
                               name={sp.name}
                               subtitle={sp.source || "Custom"}
                               icon={sp.icon}
+                              iconClassName="h-6 w-6"
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectSpecies}

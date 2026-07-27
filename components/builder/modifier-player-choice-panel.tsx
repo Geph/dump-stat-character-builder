@@ -7,6 +7,10 @@ import { PickerGridPagination } from "@/components/builder/picker-grid-paginatio
 import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import {
+  filterMagicInitiateAbilitySlotOptions,
+  isMagicInitiateSourceLabel,
+} from "@/lib/builder/magic-initiate"
+import {
   modifierPlayerChoiceSlotsForSource,
   optionsForExpertiseSlot,
   optionsForProficiencyGrantSlot,
@@ -178,11 +182,13 @@ export function ModifierPlayerChoicePanel({
   proficientTools = [],
   existingExpertiseSkills = [],
 }: ModifierPlayerChoicePanelProps) {
-  const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey).filter((slot) => {
-    if (kinds?.length && !kinds.includes(slot.kind)) return false
-    if (excludeKinds?.includes(slot.kind)) return false
-    return true
-  })
+  const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
+    .filter((slot) => {
+      if (kinds?.length && !kinds.includes(slot.kind)) return false
+      if (excludeKinds?.includes(slot.kind)) return false
+      return true
+    })
+    .map((slot) => filterMagicInitiateAbilitySlotOptions(slot, slots, picks))
   if (relevant.length === 0) return null
 
   return (
@@ -201,6 +207,22 @@ export function ModifierPlayerChoicePanel({
               onChange={onChange}
               accentClass={accentClass}
             />
+          )
+        }
+
+        if (
+          slot.kind === "spellcasting_ability" &&
+          isMagicInitiateSourceLabel(slot.sourceLabel) &&
+          (slot.options?.length ?? 0) === 0
+        ) {
+          return (
+            <p
+              key={slot.slotKey}
+              className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+            >
+              No spellcasting abilities left for another Magic Initiate — each take needs a different
+              ability (Intelligence, Wisdom, or Charisma).
+            </p>
           )
         }
 

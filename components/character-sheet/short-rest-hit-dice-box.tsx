@@ -8,6 +8,7 @@ import {
   rollHitDiceHeal,
   type HitDicePoolEntry,
 } from "@/lib/character/hit-dice"
+import { cn } from "@/lib/utils"
 
 type ShortRestHitDiceBoxProps = {
   pool: HitDicePoolEntry[]
@@ -76,47 +77,78 @@ export function ShortRestHitDiceBox({
 
   if (!pool.length) return null
 
+  const selectClass =
+    "min-h-11 w-full rounded-xl border border-emerald-500/35 bg-background px-3 text-sm font-semibold text-foreground disabled:opacity-50"
+  const selectCount =
+    "min-h-11 w-full rounded-xl border border-emerald-500/35 bg-background px-3 text-center text-sm font-bold tabular-nums text-foreground disabled:opacity-50"
+
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded border border-emerald-500/25 bg-emerald-500/5 px-1.5 py-1">
-      <Dices className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      <span className="text-[9px] font-semibold uppercase text-emerald-700 dark:text-emerald-300">
-        HD
-      </span>
-      {available.length > 1 ? (
-        <select
-          value={selectedEntry?.classId ?? ""}
-          onChange={(event) => {
-            setSelectedClassId(event.target.value)
-            setDiceCount(1)
-          }}
-          disabled={available.length === 0}
-          aria-label="Hit die type"
-          className="max-w-[4.5rem] min-h-6 rounded border border-emerald-500/30 bg-background/80 px-1 text-[10px] font-semibold text-foreground"
-        >
-          {available.map((entry) => (
-            <option key={entry.classId} value={entry.classId}>
-              d{entry.die} ({entry.remaining})
-            </option>
-          ))}
-        </select>
-      ) : selectedEntry ? (
-        <span className="text-[10px] font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
-          d{selectedEntry.die}
+    <div className="space-y-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 sm:p-3.5">
+      <div className="flex items-center gap-2">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+          <Dices className="h-5 w-5" aria-hidden />
         </span>
-      ) : null}
-      <select
-        value={safeCount}
-        onChange={(event) => setDiceCount(parseInt(event.target.value, 10))}
-        disabled={disabled}
-        aria-label="Hit dice to spend"
-        className="w-9 min-h-6 rounded border border-emerald-500/30 bg-background/80 px-0.5 text-center text-[10px] font-bold tabular-nums text-foreground disabled:opacity-50"
-      >
-        {Array.from({ length: Math.max(1, maxSpend) }, (_, index) => index + 1).map((value) => (
-          <option key={value} value={value}>
-            {value}
-          </option>
-        ))}
-      </select>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">Hit Dice</p>
+          <p className="text-xs text-muted-foreground">
+            Roll + CON ({conMod >= 0 ? "+" : ""}
+            {conMod}) per die
+          </p>
+        </div>
+      </div>
+
+      <div className={cn("grid gap-2", available.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+        {available.length > 1 ? (
+          <label className="block space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+              Die type
+            </span>
+            <select
+              value={selectedEntry?.classId ?? ""}
+              onChange={(event) => {
+                setSelectedClassId(event.target.value)
+                setDiceCount(1)
+              }}
+              disabled={available.length === 0}
+              aria-label="Hit die type"
+              className={selectClass}
+            >
+              {available.map((entry) => (
+                <option key={entry.classId} value={entry.classId}>
+                  {entry.className} · d{entry.die} ({entry.remaining} left)
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : selectedEntry ? (
+          <div className="rounded-xl border border-emerald-500/25 bg-background/60 px-3 py-2.5">
+            <p className="text-sm font-bold text-foreground">{selectedEntry.className}</p>
+            <p className="text-xs text-muted-foreground">
+              d{selectedEntry.die} · {selectedEntry.remaining} remaining
+            </p>
+          </div>
+        ) : null}
+
+        <label className="block space-y-1">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+            Dice to spend
+          </span>
+          <select
+            value={safeCount}
+            onChange={(event) => setDiceCount(parseInt(event.target.value, 10))}
+            disabled={disabled}
+            aria-label="Hit dice to spend"
+            className={selectCount}
+          >
+            {Array.from({ length: Math.max(1, maxSpend) }, (_, index) => index + 1).map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <button
         type="button"
         onClick={handleRoll}
@@ -128,9 +160,10 @@ export function ShortRestHitDiceBox({
               ? "No hit dice remaining"
               : "Spend hit dice to heal (Short Rest)"
         }
-        className="min-h-6 rounded border border-emerald-500/35 bg-emerald-500/15 px-1.5 text-[10px] font-bold uppercase text-emerald-800 transition-colors hover:bg-emerald-500/25 disabled:pointer-events-none disabled:opacity-40 dark:text-emerald-200"
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/20 px-4 text-sm font-bold text-emerald-950 transition-colors hover:bg-emerald-500/30 disabled:pointer-events-none disabled:opacity-40 dark:text-emerald-50"
       >
-        Roll
+        <Dices className="h-4 w-4 shrink-0" aria-hidden />
+        Roll {selectedEntry ? `${safeCount}d${selectedEntry.die}` : "Hit Dice"}
       </button>
     </div>
   )

@@ -16,7 +16,7 @@ import {
   type ActionEconomyKind,
   type SheetActionEntry,
 } from "@/lib/character/sheet-actions"
-import { guardianTacticsToggleIdForOption } from "@/lib/compendium/sheet-toggle-registry"
+import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
 import {
   SHEET_ACTION_CARD,
   SHEET_ACTION_USAGE_DOT,
@@ -62,6 +62,8 @@ type SheetActionsPanelProps = {
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
+  /** Mark Action / Bonus Action / Reaction as spent for this turn. */
+  onMarkEconomy?: (kind: ActionEconomyKind) => void
   /** Open character id — used when applying self heals / ally picks. */
   characterId?: string | null
   /** Apply heal / temp HP to the open sheet's local play state. */
@@ -69,6 +71,8 @@ type SheetActionsPanelProps = {
   /** Party allies + companions available as heal targets. */
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
+  /** Force a single card column (e.g. narrow combat right rail). */
+  singleColumn?: boolean
 }
 
 function resolveActionMax(
@@ -326,6 +330,7 @@ function ActionDetailOverlay({
   hitDiceRemaining,
   onSpendHitDice,
   onActivateSheetToggle,
+  onMarkEconomy,
   incapacitated,
   resolveContext,
   onClose,
@@ -344,6 +349,7 @@ function ActionDetailOverlay({
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
+  onMarkEconomy?: (kind: ActionEconomyKind) => void
   incapacitated: boolean
   resolveContext: ResolveUsesContext
   onClose: () => void
@@ -432,10 +438,18 @@ function ActionDetailOverlay({
     const parts: string[] = []
     if (selectedOption) {
       parts.push(selectedOption.name)
-      const toggleId = guardianTacticsToggleIdForOption(selectedOption.name)
-      if (toggleId && onActivateSheetToggle) {
-        onActivateSheetToggle(toggleId)
-        parts.push("Tactics toggle on")
+    }
+
+    const toggleId =
+      (selectedOption ? guardianTacticsToggleIdForOption(selectedOption.name) : null) ??
+      sheetToggleIdActivatedByAction(action)
+    if (toggleId && onActivateSheetToggle) {
+      onActivateSheetToggle(toggleId)
+      parts.push("Toggle on")
+    }
+    if (action.spendsEconomy !== false && onMarkEconomy) {
+      for (const kind of action.kinds) {
+        onMarkEconomy(kind)
       }
     }
     if (hitDiceNeeded > 0) parts.push(`Spent ${hitDiceNeeded} Hit Dice`)
@@ -795,10 +809,12 @@ export function SheetActionsPanel({
   hitDiceRemaining = 0,
   onSpendHitDice,
   onActivateSheetToggle,
+  onMarkEconomy,
   characterId = null,
   onApplySelfHeal,
   allyCandidates = [],
   healContext = null,
+  singleColumn = false,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -922,7 +938,12 @@ export function SheetActionsPanel({
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
               {ACTION_KIND_LABELS[kind]}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div
+              className={cn(
+                "grid gap-2",
+                singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+              )}
+            >
               {entries.map((entry) => {
                 const usage = usageFor(entry)
                 const usesClassResource = Boolean(entry.classResourceKey)
@@ -1018,6 +1039,7 @@ export function SheetActionsPanel({
             hitDiceRemaining={hitDiceRemaining}
             onSpendHitDice={onSpendHitDice}
             onActivateSheetToggle={onActivateSheetToggle}
+            onMarkEconomy={onMarkEconomy}
             incapacitated={incapacitated}
             resolveContext={resolveContext}
             onClose={() => setOpenActionId(null)}

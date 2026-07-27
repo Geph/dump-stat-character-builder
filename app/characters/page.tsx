@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil, Download, Upload } from "lucide-react"
+import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users } from "lucide-react"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
@@ -54,6 +54,7 @@ export default function CharactersPage() {
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [parties, setParties] = useState<AdventuringParty[]>([])
+  const [partiesOpen, setPartiesOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const fetchCharacters = async () => {
@@ -257,6 +258,14 @@ export default function CharactersPage() {
                 Export all
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setPartiesOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
+            >
+              <Users className="w-5 h-5" />
+              Adventuring Parties
+            </button>
             <Link
               href="/builder"
               className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
@@ -493,6 +502,8 @@ export default function CharactersPage() {
 
         {!loading ? (
           <CharactersPartiesPanel
+            open={partiesOpen}
+            onClose={() => setPartiesOpen(false)}
             characters={characters}
             parties={parties}
             onPartiesChange={setParties}

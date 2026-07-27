@@ -61,6 +61,8 @@ export function buildSheetPlayStateFromSheet(params: {
   realTimeCooldowns: CharacterSheetPlayState["realTimeCooldowns"]
   accumulatedResources: CharacterSheetPlayState["accumulatedResources"]
   resourceDieSidesByKey: CharacterSheetPlayState["resourceDieSidesByKey"]
+  skillSortMode?: CharacterSheetPlayState["skillSortMode"]
+  pinnedSkillNames?: CharacterSheetPlayState["pinnedSkillNames"]
   savedAt?: string | null
 }): CharacterSheetPlayState {
   return normalizeSheetPlayState({

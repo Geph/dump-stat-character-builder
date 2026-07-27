@@ -51,6 +51,11 @@ export type SheetActionEntry = {
   hitDieSides?: number | null
   /** heal_self / grant_temp_hp effects applied when the action is used. */
   healEffects?: FeatureEffect[]
+  /**
+   * When false, Use does not mark Action/Bonus/Reaction spent
+   * (Reckless Attack and similar free declarations).
+   */
+  spendsEconomy?: boolean
 }
 
 export type SheetActionMenuOption = {
@@ -341,7 +346,15 @@ export function inferActivatableActionKinds(item: ActivatableItem): ActionEconom
   ) {
     return ["action"]
   }
+  // Reckless Attack and similar free declarations (pre-enrichment DB rows).
+  if (/^reckless attack$/i.test(item.name.trim())) return ["action"]
   return []
+}
+
+function resolveSpendsEconomy(item: ActivatableItem): boolean | undefined {
+  if (item.activation?.noEconomyCost === true) return false
+  if (/^reckless attack$/i.test(item.name.trim())) return false
+  return undefined
 }
 
 /** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
@@ -526,6 +539,7 @@ function pushActivatableItemActions(
           spendHitDice: resolveSpendHitDice(feature),
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
+          spendsEconomy: resolveSpendsEconomy(feature),
           psionicAugments: resolvePsionicAugments({
             name: feature.name,
             description: feature.description ?? null,

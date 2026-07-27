@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { LayoutGrid, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { LayoutGrid, Pencil, Plus, Trash2, Users, X } from "lucide-react"
 import {
   buildPartyStats,
   normalizePartyCharacterIds,
@@ -30,12 +30,16 @@ import {
 } from "@/components/ui/alert-dialog"
 
 type CharactersPartiesPanelProps = {
+  open: boolean
+  onClose: () => void
   characters: Character[]
   parties: AdventuringParty[]
   onPartiesChange: (parties: AdventuringParty[]) => void
 }
 
 export function CharactersPartiesPanel({
+  open,
+  onClose,
   characters,
   parties,
   onPartiesChange,
@@ -129,100 +133,128 @@ export function CharactersPartiesPanel({
     setPartyToDelete(null)
   }
 
+  if (!open) return null
+
   return (
-    <section className="mt-10 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-foreground flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Adventuring Parties
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Group {DASHBOARD_MIN_CHARACTERS}–{DASHBOARD_MAX_CHARACTERS} characters for the GM Dashboard
-            and ally targeting.
-          </p>
+    <>
+      <div
+        className="fixed inset-0 z-[100] flex flex-col bg-background"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="parties-overlay-title"
+      >
+        <header className="shrink-0 border-b border-border bg-card/95 backdrop-blur-lg">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
+            <div className="min-w-0">
+              <h2
+                id="parties-overlay-title"
+                className="flex items-center gap-2 text-xl font-black text-foreground sm:text-2xl"
+              >
+                <Users className="h-5 w-5 shrink-0" />
+                Adventuring Parties
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Group {DASHBOARD_MIN_CHARACTERS}–{DASHBOARD_MAX_CHARACTERS} characters for the GM
+                Dashboard and ally targeting.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-primary bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4" />
+                New party
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close parties"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-7xl px-4 py-6">
+            {parties.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed border-border px-4 py-12 text-center text-sm text-muted-foreground">
+                No parties yet. Create one to open the GM Dashboard with a named group.
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {parties.map((party) => {
+                  const stats = buildPartyStats(party, charactersById)
+                  const memberNames = normalizePartyCharacterIds(party.character_ids)
+                    .map((id) => charactersById.get(id)?.name ?? "Missing character")
+                    .join(", ")
+                  return (
+                    <div
+                      key={party.id}
+                      className="space-y-3 rounded-2xl border-2 border-border bg-card p-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-foreground">{party.name}</h3>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{memberNames}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Link
+                            href={dashboardPartyHref(party.id)}
+                            className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title="Open in GM Dashboard"
+                          >
+                            <LayoutGrid className="h-4 w-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(party)}
+                            className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title="Edit party"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPartyToDelete(party)}
+                            className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-destructive"
+                            title="Delete party"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-full bg-muted px-2 py-0.5">
+                          {stats.memberCount} members
+                        </span>
+                        {stats.averageLevel != null ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5">
+                            Avg level {stats.averageLevel}
+                          </span>
+                        ) : null}
+                        {stats.totalCurrentHp != null && stats.totalMaxHp != null ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5">
+                            HP {stats.totalCurrentHp}/{stats.totalMaxHp}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg border-2 border-primary bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="w-4 h-4" />
-          New party
-        </button>
       </div>
 
-      {parties.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          No parties yet. Create one to open the GM Dashboard with a named group.
-        </div>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {parties.map((party) => {
-            const stats = buildPartyStats(party, charactersById)
-            const memberNames = normalizePartyCharacterIds(party.character_ids)
-              .map((id) => charactersById.get(id)?.name ?? "Missing character")
-              .join(", ")
-            return (
-              <div
-                key={party.id}
-                className="rounded-2xl border-2 border-border bg-card p-4 space-y-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-bold text-foreground">{party.name}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{memberNames}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Link
-                      href={dashboardPartyHref(party.id)}
-                      className="rounded-lg border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-muted"
-                      title="Open in GM Dashboard"
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(party)}
-                      className="rounded-lg border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-muted"
-                      title="Edit party"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPartyToDelete(party)}
-                      className="rounded-lg border border-border p-2 text-muted-foreground hover:text-destructive hover:bg-muted"
-                      title="Delete party"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-full bg-muted px-2 py-0.5">
-                    {stats.memberCount} members
-                  </span>
-                  {stats.averageLevel != null ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5">
-                      Avg level {stats.averageLevel}
-                    </span>
-                  ) : null}
-                  {stats.totalCurrentHp != null && stats.totalMaxHp != null ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5">
-                      HP {stats.totalCurrentHp}/{stats.totalMaxHp}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
       {editorOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border-2 border-border bg-card p-4 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 p-4 sm:items-center">
+          <div className="max-h-[85vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-2xl border-2 border-border bg-card p-4 shadow-2xl">
             <div>
               <h3 className="text-lg font-black">{editing ? "Edit party" : "New party"}</h3>
               <p className="text-xs text-muted-foreground">
@@ -288,11 +320,11 @@ export function CharactersPartiesPanel({
 
       <AlertDialog
         open={partyToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setPartyToDelete(null)
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPartyToDelete(null)
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[120]">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete party?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -315,6 +347,6 @@ export function CharactersPartiesPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </>
   )
 }

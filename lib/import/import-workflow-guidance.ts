@@ -15,15 +15,21 @@ export type ImportWorkflow = {
   notes?: string[]
 }
 
-/** Short rule shown outside collapsed panels. */
-export const ONE_CLASS_AT_A_TIME_WARNING =
-  "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are not likely to work — use a page range or split the extract."
+/** Merged “one class / schema fit / free LLM” guidance for the Import tips dialog. */
+export const SCOPE_AND_SCHEMA_ONE_CLASS =
+  "Import only one class per pass (that class plus its subclasses is fine). Multi-class PDFs or JSON with several classes[] entries are blocked — use a page range or split the extract so each pass has a single class chapter."
 
-export const SCHEMA_FIT_WARNING =
-  "Match each upload to the content type. Whole-book PDFs, spell chapters inside a class extract, or weapons+masteries+feats mashed together will not wire correctly — split them (and tell your LLM to warn you instead of inventing oversized JSON)."
+export const SCOPE_AND_SCHEMA_FIT =
+  "Match each upload to the content type you picked. Whole-book PDFs, full spell write-ups inside a Class extract (beyond list stubs), or weapons + homebrew masteries + feats mashed together will not wire correctly — split them, and tell your LLM to warn you in plain language instead of inventing oversized JSON."
+
+export const SCOPE_AND_SCHEMA_FREE_LLM =
+  "Free or tightly limited LLMs: keep each extract much smaller than Dump Stat’s 100,000-character paste ceiling — typically a few PDF pages or one library section. Split large catalogs by degree/level tier (then alphabetically) and paste each batch as its own JSON. If a full class chapter will not fit, extract the core class first, then add archetypes with Subclasses only. Prefer several small matching passes over one overloaded paste."
 
 export const WEAPON_MASTERY_IMPORT_TIP =
   "Homebrew weapon masteries (Parry, Shift, Explode, …): import as a separate Custom Abilities pass so they extend Weapon Mastery Properties, then import weapons with properties.mastery set to those names. Novel non-SRD properties (Firearm, Reload, …) store as string tags — they display on the item but are not fully simulated."
+
+export const SAME_NAME_CLASS_COLLISION_TIP =
+  "Same-name classes (e.g. Mage Hand Press Warden vs Kibbles Tasty Warden): keep the source header name in JSON; the import review asks you what to rename the class to."
 
 /** Short lead-in for the Import order dialog (class-focused). */
 export const MULTI_FILE_IMPORT_TIP =

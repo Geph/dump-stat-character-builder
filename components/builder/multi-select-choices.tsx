@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 
 /** Phone multi-select grids — 6 options per page. */
-const PHONE_CHOICE_PAGE_SIZE = 6
+const PHONE_CHOICE_PAGE_SIZE = 9
 
 type ChoiceOption = {
   name: string

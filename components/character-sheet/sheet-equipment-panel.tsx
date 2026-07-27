@@ -57,25 +57,22 @@ function EquipRow({
   title?: string
 }) {
   return (
-    <label
-      className={cn(
-        "inline-flex items-center gap-1.5 shrink-0 cursor-pointer",
-        disabled && "opacity-50 cursor-not-allowed",
-      )}
+    <button
+      type="button"
+      disabled={disabled}
       title={title}
+      aria-pressed={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "inline-flex min-h-9 items-center justify-center rounded-lg border-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors",
+        checked
+          ? "border-primary bg-primary/15 text-primary"
+          : "border-border bg-background/80 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+        disabled && "pointer-events-none opacity-50",
+      )}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        title={title}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary"
-      />
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-    </label>
+      {label}
+    </button>
   )
 }
 
@@ -153,7 +150,7 @@ export function SheetEquipmentPanel({
       <span className="text-[10px] text-muted-foreground">
         Attuned {attunedCount}/{slotCap}
       </span>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
         {filtered.length ? (
           filtered.map((item) => {
             const resolved = resolveCharacterEquipment(item, catalog, equipmentBaseSelections)
@@ -208,7 +205,7 @@ export function SheetEquipmentPanel({
                         ))}
                       </select>
                     )}
-                    <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
                       {isArmor && (
                         <EquipRow
                           label="Wear"
@@ -284,10 +281,10 @@ export function SheetEquipmentPanel({
                   <button
                     type="button"
                     onClick={() => onShowDetails(item)}
-                    className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
                     aria-label={`Details for ${item.name}`}
                   >
-                    <Info className="w-3.5 h-3.5" />
+                    <Info className="w-4 h-4" />
                   </button>
                 </div>
               </div>

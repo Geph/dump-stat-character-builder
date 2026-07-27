@@ -12,6 +12,8 @@ type CompendiumDenseSelectionCardProps = {
   name: string
   subtitle?: string
   icon?: string | null
+  /** Override default `h-8 w-8` icon size. */
+  iconClassName?: string
   selected?: boolean
   selectionVariant?: "primary" | "secondary"
   disabled?: boolean
@@ -25,6 +27,7 @@ export function CompendiumDenseSelectionCard({
   name,
   subtitle,
   icon,
+  iconClassName,
   selected = false,
   selectionVariant = "primary",
   disabled = false,
@@ -63,7 +66,10 @@ export function CompendiumDenseSelectionCard({
       {badge && <div className="absolute right-2 top-2">{badge}</div>}
       <div className="flex items-start gap-2">
         {icon && (
-          <GameIcon name={icon} className={cn("h-8 w-8 shrink-0", accent.iconText)} />
+          <GameIcon
+            name={icon}
+            className={cn("h-8 w-8 shrink-0", accent.iconText, iconClassName)}
+          />
         )}
         <div className="min-w-0 flex-1">
           {subtitle && (

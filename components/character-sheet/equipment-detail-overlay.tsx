@@ -66,7 +66,8 @@ export function EquipmentDetailOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>

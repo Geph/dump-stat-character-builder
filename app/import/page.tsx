@@ -109,7 +109,7 @@ type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" |
 type ImportTab = "clipboard" | "pdf" | "pack"
 
 const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
-  { id: "clipboard", label: "Clipboard", icon: ClipboardPaste },
+  { id: "clipboard", label: "BYO LLM", icon: ClipboardPaste },
   { id: "pdf", label: "PDF / JSON", icon: Upload },
 ]
 
@@ -124,7 +124,7 @@ const IMPORT_TABS = canUseServerImport()
 
 export default function ImportPage() {
   const staticMode = isStaticDeploy()
-  const [activeTab, setActiveTab] = useState<ImportTab>(staticMode ? "pack" : "clipboard")
+  const [activeTab, setActiveTab] = useState<ImportTab>("clipboard")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
   const [pdfContentTypeHint, setPdfContentTypeHint] = useState("all")
@@ -518,7 +518,7 @@ export default function ImportPage() {
       message += ` (${data.completedChunks}/${data.totalChunks} sections completed before failure)`
     }
     if (data.code === "quota_exceeded" || data.code === "rate_limit") {
-      message += " Try Clipboard → BYO LLM import, or a different server AI model."
+      message += " Try BYO LLM import, or a different server AI model."
     }
     return message
   }
@@ -1017,13 +1017,13 @@ export default function ImportPage() {
           <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
           <p className={pageHeaderSubtitleClass}>
             {staticMode
-              ? "Import homebrew with BYO LLM (paste LLM output), share JSON packs, or reload the bundled SRD — data stays in your browser."
-              : "Add new content from PDFs or pasted text and JSON"}
+              ? "Import homebrew with BYO LLM (copy a prompt into your own LLM, paste JSON back), share JSON packs, or reload the bundled SRD — data stays in your browser."
+              : "Import homebrew with BYO LLM, upload PDFs or JSON when available, and review before saving to your library."}
           </p>
           {staticMode && (
             <p className={`${pageFloatingHintClass} mt-2`}>
-              Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with MySQL.
-              Use <strong className="font-medium text-foreground">BYO LLM</strong> to copy a prompt into your own LLM and paste the result here.
+              Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with
+              MySQL. The BYO LLM tab uses the same prompt → paste workflow as the hosted app.
             </p>
           )}
         </div>
@@ -1200,7 +1200,7 @@ export default function ImportPage() {
                 <p className="text-sm font-semibold text-foreground">Import source</p>
                 <p className="text-xs text-muted-foreground">
                   {importSourceOpen
-                    ? "Hide Clipboard / PDF tools while reviewing"
+                    ? "Hide BYO LLM / PDF tools while reviewing"
                     : "Collapsed while you review — expand to change source or start over"}
                 </p>
               </div>
@@ -1298,10 +1298,16 @@ export default function ImportPage() {
                 >
                   {staticMode ? (
                     <p className="text-muted-foreground mb-4">
-                      Copy the extraction prompt into your own LLM, then paste the structured JSON below.
-                      No API keys or server required — content is saved to {getStorageLabel()}.
+                      Same workflow as the hosted app: set defaults, copy the extraction prompt into
+                      your own LLM, then paste the structured JSON below. Content saves to{" "}
+                      {getStorageLabel()} — no API keys required.
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="text-muted-foreground mb-4">
+                      Copy an extraction prompt into your own LLM (or use server AI when configured),
+                      then paste structured JSON to review and import.
+                    </p>
+                  )}
                   <ClipboardImportPanel
                     contentType={textContentType}
                     onContentTypeChange={setTextContentType}
@@ -1344,7 +1350,7 @@ export default function ImportPage() {
                     <p className="text-muted-foreground flex-1">
                       Upload a Dump Stat JSON export or a Foundry VTT dnd5e item export directly, or
                       extract text from a PDF when server AI is configured. For PDF homebrew without
-                      server keys, use the Clipboard tab with your own LLM.
+                      server keys, use the BYO LLM tab with your own LLM.
                     </p>
                     {serverAiEnabled ? (
                       <button
@@ -1362,7 +1368,7 @@ export default function ImportPage() {
                     <div className="mb-4 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
                       Server AI is not configured on this host. Upload{" "}
                       <code className="text-xs">.json</code> export files here, or use{" "}
-                      <strong className="font-medium text-foreground">Clipboard</strong> to extract PDF
+                      <strong className="font-medium text-foreground">BYO LLM</strong> to extract PDF
                       text elsewhere and paste structured JSON.
                     </div>
                   ) : null}

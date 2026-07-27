@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { Users, BookOpen, Upload, NotebookText, Home, LayoutDashboard } from "lucide-react"
+import { Users, BookOpen, Download, NotebookText, Home, LayoutDashboard } from "lucide-react"
 import { GlobalSettingsMenu } from "@/components/settings/global-settings-menu"
 import { useGmDashboardNav } from "@/components/settings/use-gm-dashboard-nav"
 
@@ -13,7 +13,7 @@ const navItems = [
   { href: "/characters", label: "Characters", icon: Users },
   { href: "/dashboard", label: "GM Dashboard", icon: LayoutDashboard, beta: true as const },
   { href: "/compendium", label: "Compendium", icon: BookOpen },
-  { href: "/import", label: "Import", icon: Upload },
+  { href: "/import", label: "Import", icon: Download },
 ]
 
 export function MainNav() {

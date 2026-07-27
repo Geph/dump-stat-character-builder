@@ -137,6 +137,36 @@ export function guardianTacticsToggleIdForOption(optionName: string): string | n
   return null
 }
 
+/**
+ * Feature / action use that should turn a banner sheet toggle on (Rage → Raging, etc.).
+ * Resource key is preferred when present so renamed homebrew ports still wire.
+ */
+const ACTION_NAME_ACTIVATES_TOGGLE: Record<string, string> = {
+  rage: "while_raging",
+  "wild shape": "while_wild_shape",
+  "innate sorcery": "while_innate_sorcery_active",
+  "form of dread": "form_of_dread",
+  bladesong: "bladesong_active",
+  "reckless attack": "reckless_attack",
+}
+
+const RESOURCE_KEY_ACTIVATES_TOGGLE: Record<string, string> = {
+  rage: "while_raging",
+  wild_shape: "while_wild_shape",
+}
+
+export function sheetToggleIdActivatedByAction(action: {
+  name: string
+  classResourceKey?: string | null
+}): string | null {
+  const resourceKey = action.classResourceKey?.trim().toLowerCase()
+  if (resourceKey && RESOURCE_KEY_ACTIVATES_TOGGLE[resourceKey]) {
+    return RESOURCE_KEY_ACTIVATES_TOGGLE[resourceKey]
+  }
+  const name = action.name.trim().toLowerCase()
+  return ACTION_NAME_ACTIVATES_TOGGLE[name] ?? null
+}
+
 /** Converts a class/subclass's declared new_toggles into sheet toggle definitions. */
 export function sheetToggleDefinitionsFromNewToggles(
   declarations: readonly { key: string; name: string; grantingFeature?: string | null }[] | null | undefined,

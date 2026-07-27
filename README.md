@@ -240,7 +240,7 @@ OPENAI_API_KEY=sk-your-key-here
 
 Restart the dev server after changing keys. Without any provider key, seed, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or the Clipboard **Import with server AI** action returns a configuration error.
 
-**Import page UI:** The Clipboard tab always shows the BYO LLM workflow (paste text → copy prompt → paste JSON). When server AI is configured, an expandable **server AI extraction** section also appears on Clipboard and PDF tabs (provider/model override stored in browser localStorage). API keys always stay on the server.
+**Import page UI:** The BYO LLM tab always shows the bring-your-own-LLM workflow (paste text → copy prompt → paste JSON). When server AI is configured, an expandable **server AI extraction** section also appears on BYO LLM and PDF tabs (provider/model override stored in browser localStorage). API keys always stay on the server. Static deploys use the same BYO LLM panel layout; PDF/server AI require a hosted build.
 
 **Chunk cache:** Successful AI sections are cached in server memory by hash. If a large import fails mid-way (quota/rate limit), retry the **same** text with the same provider/model — finished sections are reused without extra API cost until the server restarts.
 
@@ -361,7 +361,7 @@ Discipline powers with psi-point augments get `psionic_augments` at import; pick
 | 1 | Exploit / maneuver library (if separate) |
 | 2 | Class chapter: level table (Exploit Dice, Exploits Known) **and** all subclasses in the same pass |
 
-**JSON array example** (Clipboard → Step 2):
+**JSON array example** (BYO LLM → Step 2):
 
 ```json
 [

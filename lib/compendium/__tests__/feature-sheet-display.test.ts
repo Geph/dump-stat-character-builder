@@ -69,6 +69,24 @@ describe("feature sheet display", () => {
     })
   })
 
+  it("surfaces Reckless Attack on combat actions even when sheetDisplay omitted combat", () => {
+    const feature = {
+      level: 2,
+      name: "Reckless Attack",
+      description: "When you make your first attack roll on your turn, you can attack recklessly.",
+      sheetDisplay: {
+        featuresTab: true,
+        abilitiesActions: false,
+        combatActions: false,
+      },
+    }
+    expect(resolveFeatureSheetDisplay(feature)).toEqual({
+      featuresTab: true,
+      abilitiesActions: false,
+      combatActions: true,
+    })
+  })
+
   it("stamps sheetDisplay when enriching SRD features", () => {
     const feature = {
       level: 1,

@@ -2,9 +2,9 @@ import { cn } from "@/lib/utils"
 
 const gradientHeightClass = {
   /** Compendium list/edit — full fade over headers and filters. */
-  full: "h-[min(33rem,67.5vh)]",
+  full: "h-[min(49.5rem,101.25vh)]",
   /** Other app pages — half the compendium fade height. */
-  half: "h-[min(16.5rem,33.75vh)]",
+  half: "h-[min(24.75rem,50.625vh)]",
 } as const
 
 type PageTopGradientProps = {

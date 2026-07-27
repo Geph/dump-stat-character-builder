@@ -82,11 +82,11 @@ export function StatExplainPopover({
           }
           openPopover()
         }}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
         aria-label={`How ${title} is calculated`}
         aria-expanded={open}
       >
-        <Info className="w-3.5 h-3.5" />
+        <Info className="w-4 h-4" />
       </button>
       {open && pos ? (
         <>

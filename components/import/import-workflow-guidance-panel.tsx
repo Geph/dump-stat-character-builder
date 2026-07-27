@@ -6,8 +6,10 @@ import {
   CLASS_IMPORT_STEPS,
   JSON_ARRAY_IMPORT_TIP,
   MULTI_FILE_IMPORT_TIP,
-  ONE_CLASS_AT_A_TIME_WARNING,
-  SCHEMA_FIT_WARNING,
+  SAME_NAME_CLASS_COLLISION_TIP,
+  SCOPE_AND_SCHEMA_FIT,
+  SCOPE_AND_SCHEMA_FREE_LLM,
+  SCOPE_AND_SCHEMA_ONE_CLASS,
   WEAPON_MASTERY_IMPORT_TIP,
 } from "@/lib/import/import-workflow-guidance"
 import { CLEAN_SOURCE_TEXT_UI_GUIDELINES } from "@/lib/import/byo-import-kit"
@@ -28,7 +30,7 @@ import {
   ScrollText,
 } from "lucide-react"
 
-type GuidanceTopic = "one-class" | "import-order" | "clean-source" | "schema-fit"
+type GuidanceTopic = "scope-schema" | "import-order" | "clean-source"
 
 const TOPIC_BUTTONS: {
   id: GuidanceTopic
@@ -38,16 +40,9 @@ const TOPIC_BUTTONS: {
   accent: string
 }[] = [
   {
-    id: "one-class",
-    title: "One class at a time",
-    blurb: "Why multi-class extracts fail",
-    icon: AlertTriangle,
-    accent: "text-amber-700 dark:text-amber-300",
-  },
-  {
-    id: "schema-fit",
-    title: "Schema fit",
-    blurb: "Masteries, whole books, bad shapes",
+    id: "scope-schema",
+    title: "Scope & schema fit",
+    blurb: "One class, bad shapes, free LLM chunks",
     icon: AlertTriangle,
     accent: "text-amber-700 dark:text-amber-300",
   },
@@ -127,28 +122,36 @@ export function ImportWorkflowGuidancePanel() {
       </div>
 
       <GuidanceDialog
-        open={topic === "one-class"}
-        onOpenChange={(open) => setTopic(open ? "one-class" : null)}
-        title="One class at a time"
-        description="Keep each import pass focused on a single class chapter."
-      >
-        <p className="leading-relaxed text-muted-foreground">{ONE_CLASS_AT_A_TIME_WARNING}</p>
-      </GuidanceDialog>
-
-      <GuidanceDialog
-        open={topic === "schema-fit"}
-        onOpenChange={(open) => setTopic(open ? "schema-fit" : null)}
-        title="Schema fit & masteries"
-        description="Upload shapes that match the JSON schema — and how homebrew masteries land."
+        open={topic === "scope-schema"}
+        onOpenChange={(open) => setTopic(open ? "scope-schema" : null)}
+        title="Scope & schema fit"
+        description="Keep each pass one class, match the schema, and chunk small on free LLMs."
         contentClassName="sm:max-w-xl"
       >
-        <div className="space-y-3">
-          <p className="leading-relaxed text-muted-foreground">{SCHEMA_FIT_WARNING}</p>
-          <p className="leading-relaxed text-muted-foreground">{WEAPON_MASTERY_IMPORT_TIP}</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Same-name classes (e.g. Mage Hand Press Warden vs Kibbles Tasty Warden): keep the source
-            header name in JSON; the import review asks you what to rename the class to.
-          </p>
+        <div className="space-y-4">
+          <section className="space-y-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+              One class at a time
+            </h3>
+            <p className="leading-relaxed text-muted-foreground">{SCOPE_AND_SCHEMA_ONE_CLASS}</p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+              Schema fit
+            </h3>
+            <p className="leading-relaxed text-muted-foreground">{SCOPE_AND_SCHEMA_FIT}</p>
+            <p className="leading-relaxed text-muted-foreground">{WEAPON_MASTERY_IMPORT_TIP}</p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+              Free / limited LLMs
+            </h3>
+            <p className="leading-relaxed text-muted-foreground">{SCOPE_AND_SCHEMA_FREE_LLM}</p>
+          </section>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">{SAME_NAME_CLASS_COLLISION_TIP}</p>
         </div>
       </GuidanceDialog>
 

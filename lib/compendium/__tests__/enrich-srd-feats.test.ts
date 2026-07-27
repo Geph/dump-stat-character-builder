@@ -24,15 +24,18 @@ describe("enrichSrdFeatRow SRD presets", () => {
     expect(skills).toBeTruthy()
   })
 
-  it("wires Magic Initiate as repeatable with spell picks", () => {
+  it("wires Magic Initiate as repeatable with spell picks and ability options", () => {
     const row = enrichSrdFeatRow({
       name: "Magic Initiate",
       source: SRD_SOURCE,
       description: "Cantrips and level-1 spell",
     })
     expect(row.repeatable).toBe(true)
-    const linked = (row.linked_modifiers ?? []) as { characteristics?: { type: string }[] }[]
-    expect(linked.flatMap((inst) => inst.characteristics ?? []).some((c) => c.type === "spells_known")).toBe(true)
+    const chars = ((row.linked_modifiers ?? []) as { characteristics?: { type: string; abilityOptions?: string[] }[] }[])
+      .flatMap((inst) => inst.characteristics ?? [])
+    expect(chars.some((c) => c.type === "spells_known")).toBe(true)
+    const ability = chars.find((c) => c.type === "spellcasting_ability")
+    expect(ability?.abilityOptions).toEqual(["intelligence", "wisdom", "charisma"])
   })
 
   it("does not overwrite existing linked modifiers", () => {

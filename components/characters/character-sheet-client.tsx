@@ -22,8 +22,20 @@ import {
   Settings,
   Share2,
   Shield,
+  ShieldCheck,
+  Info,
+  Swords,
+  Scroll,
+  Wand2,
+  Battery,
+  Package,
+  Star,
+  BookOpen,
+  Layers,
+  Pin,
 } from "lucide-react"
 import Link from "next/link"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { findBackgroundGrantedFeat } from "@/lib/compendium/background-display"
 import { getEffectiveBackgroundFeatGranted } from "@/lib/compendium/background-origin-feat"
 import {
@@ -59,7 +71,14 @@ import {
 } from "@/lib/compendium/two-weapon-fighting"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
-import { getSkillsInAbilityOrder, ABILITY_ABBREVIATIONS } from "@/lib/compendium/skills"
+import {
+  getSkillsInAbilityOrder,
+  getSkillsSorted,
+  orderSkillsWithPins,
+  ABILITY_ABBREVIATIONS,
+  type SkillSortMode,
+} from "@/lib/compendium/skills"
+import { SKILL_DESCRIPTIONS, getSkillDescription } from "@/lib/compendium/skill-descriptions"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
 import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-powers-panel"
@@ -106,10 +125,12 @@ import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
 import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-panel"
 import { SheetEquippedWeaponsPanel } from "@/components/character-sheet/sheet-equipped-weapons-panel"
+import { SheetActionEconomyTracker } from "@/components/character-sheet/sheet-action-economy-tracker"
+import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-standard-action-buttons"
+import { SheetSectionHeading } from "@/components/character-sheet/sheet-section-heading"
 import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipment-panel"
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
-import { RollHistoryTrigger } from "@/components/character-sheet/roll-history-trigger"
 import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { collectClassResourceSpendKeys } from "@/lib/compendium/class-resource-display"
@@ -122,6 +143,13 @@ import type { ClassResource } from "@/lib/types"
 import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendium/equipment-attunement"
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import type { ActionEconomyKind } from "@/lib/character/sheet-actions"
+import {
+  actionEconomyKindFromCastingTime,
+  characterCanRollHitDiceOutsideShortRest,
+  emptyActionEconomySpent,
+  type ActionEconomySpent,
+} from "@/lib/character/action-economy"
 import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreBoxClass, abilityScoreValueClass } from "@/lib/character/sheet-status-colors"
 import { useAppTheme } from "@/components/providers/app-theme-provider"
 import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
@@ -130,6 +158,8 @@ import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
+import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
@@ -342,6 +372,14 @@ function dedupeFeaturesByName(
   return order.map((name) => byName.get(name)!)
 }
 
+/** Sheet-only display title — ASI features read as Feat or ASI. */
+function sheetFeatureDisplayName(name: string): string {
+  return /^ability score improvement$/i.test(name.trim()) ? "Feat or ASI" : name
+}
+
+const HEROIC_INSPIRATION_TIP =
+  "If you have Heroic Inspiration, you can expend it when you roll any die to reroll it. You must use the new roll. You typically gain it from the DM or from features that grant it."
+
 /** A feature/trait card whose body can be accordioned away, leaving just the title row. */
 function CollapsibleFeatureCard({
   name,
@@ -359,6 +397,7 @@ function CollapsibleFeatureCard({
   children?: React.ReactNode
 }) {
   const [open, setOpen] = useState(true)
+  const displayName = sheetFeatureDisplayName(name)
   const levelLabel =
     levels && levels.length
       ? levels.map((value) => `Lv ${value}`).join(", ")
@@ -374,7 +413,7 @@ function CollapsibleFeatureCard({
         aria-expanded={open}
       >
         <span className="font-bold min-w-0">
-          {name}
+          {displayName}
           {levelLabel ? (
             <span className="text-muted-foreground font-normal"> ({levelLabel})</span>
           ) : null}
@@ -403,8 +442,8 @@ function CollapsibleFeatureCard({
 
 /**
  * Dropdown control for a feature choice that the rules let you swap when you finish a rest
- * (e.g. Circle of the Land's land type). Changing the selection re-derives the character so the
- * chosen option's effects (spells, resistances, etc.) take effect immediately.
+ * (e.g. Circle of the Land's land type). Weapon Mastery is display-only here — swaps happen
+ * from the Long Rest overlay.
  */
 function RestSwappableChoiceControl({
   feature,
@@ -422,6 +461,33 @@ function RestSwappableChoiceControl({
   const key = featureChoiceKey(classId, feature.name, feature.level)
   const count = Math.max(1, choices.count ?? 1)
   const restLabel = choices.swapRestType === "short" ? "Short Rest" : "Long Rest"
+
+  if (isWeaponMasteryFeature(feature)) {
+    return (
+      <div className="mt-2 rounded-md border border-border bg-background/60 p-2 space-y-1.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Current weapon masteries
+        </p>
+        {picks.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {picks.map((pick) => (
+              <span
+                key={pick}
+                className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-foreground"
+              >
+                {pick}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">None chosen yet.</p>
+        )}
+        <p className="text-[10px] text-muted-foreground">
+          Change these when you finish a {restLabel} (Rest button).
+        </p>
+      </div>
+    )
+  }
 
   const setSlot = (index: number, value: string) => {
     const next = [...picks]
@@ -501,6 +567,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
   const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
+  const [actionEconomySpent, setActionEconomySpent] = useState<ActionEconomySpent>(emptyActionEconomySpent)
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
   const [restOverlay, setRestOverlay] = useState<{
@@ -512,6 +579,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     Record<string, AccumulatedResourceState>
   >({})
   const [resourceDieSidesByKey, setResourceDieSidesByKey] = useState<Record<string, number>>({})
+  const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("ability")
+  const [pinnedSkillNames, setPinnedSkillNames] = useState<string[]>([])
+  const [skillsInfoOpen, setSkillsInfoOpen] = useState(false)
   const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle")
@@ -597,6 +667,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setRealTimeCooldowns(playState.realTimeCooldowns)
         setAccumulatedResources(tickAccumulatedResources(playState.accumulatedResources))
         setResourceDieSidesByKey(playState.resourceDieSidesByKey)
+        setSkillSortMode(playState.skillSortMode)
+        setPinnedSkillNames(playState.pinnedSkillNames)
         setSessionHydrated(true)
 
         if (row.spell_ids?.length) {
@@ -686,6 +758,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
         resourceDieSidesByKey,
+        skillSortMode,
+        pinnedSkillNames,
         savedAt: null,
       }),
     )
@@ -707,6 +781,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     realTimeCooldowns,
     accumulatedResources,
     resourceDieSidesByKey,
+    skillSortMode,
+    pinnedSkillNames,
   ])
 
   const equipmentMagicContext = useMemo(
@@ -1059,6 +1135,40 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character],
   )
 
+  const longRestWeaponMasteryChoices = useMemo(() => {
+    const entries: {
+      key: string
+      className: string
+      feature: Feature
+      classLevel: number
+      picks: string[]
+      count: number
+    }[] = []
+    for (const entry of classDetails) {
+      const className = entry.class?.name ?? "Class"
+      for (const feature of entry.class?.features ?? []) {
+        if ((feature.level ?? 1) > entry.row.level) continue
+        if (!isWeaponMasteryFeature(feature)) continue
+        if (!feature.choices?.swappableOnRest || !feature.choices.options?.length) continue
+        const key = featureChoiceKey(entry.row.class_id, feature.name, feature.level)
+        const count = resolveFeatureChoiceCount(
+          feature.choices,
+          entry.row.level,
+          className,
+        )
+        entries.push({
+          key,
+          className,
+          feature,
+          classLevel: entry.row.level,
+          picks: featureChoicePicks[key] ?? [],
+          count: Math.max(1, count),
+        })
+      }
+    }
+    return entries
+  }, [classDetails, featureChoicePicks])
+
   const sheetClassFeatures = useMemo(() => {
     const features: Feature[] = []
     for (const entry of classDetails) {
@@ -1175,6 +1285,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [sheetToggleDefinitions],
   )
 
+  const markActionEconomy = useCallback((kind: ActionEconomyKind) => {
+    setActionEconomySpent((prev) => (prev[kind] ? prev : { ...prev, [kind]: true }))
+  }, [])
+
+  const toggleActionEconomy = useCallback((kind: ActionEconomyKind) => {
+    setActionEconomySpent((prev) => ({ ...prev, [kind]: !prev[kind] }))
+  }, [])
+
+  const resetActionEconomy = useCallback(() => {
+    setActionEconomySpent(emptyActionEconomySpent())
+  }, [])
+
   const renderManualToggleButton = useCallback(
     (toggle: { id: string; label: string }) => {
       const active = activeSheetToggleIds.includes(toggle.id)
@@ -1233,6 +1355,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
         resourceDieSidesByKey,
+        skillSortMode,
+        pinnedSkillNames,
         savedAt,
       }),
     [
@@ -1251,6 +1375,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       realTimeCooldowns,
       accumulatedResources,
       resourceDieSidesByKey,
+      skillSortMode,
+      pinnedSkillNames,
     ],
   )
 
@@ -1809,6 +1935,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
   }, [characterFeats, originFeat, effectiveBackgroundFeatGranted])
 
+  const canRollHitDiceOutsideShortRest = useMemo(() => {
+    const featNames = [
+      ...characterFeats.map((feat) => feat.name),
+      ...(originFeat?.name ? [originFeat.name] : []),
+      ...(effectiveBackgroundFeatGranted ? [effectiveBackgroundFeatGranted] : []),
+    ]
+    const featureNames = sheetClassFeatures.map((feature) => feature.name)
+    return characterCanRollHitDiceOutsideShortRest({ featNames, featureNames })
+  }, [
+    characterFeats,
+    originFeat,
+    effectiveBackgroundFeatGranted,
+    sheetClassFeatures,
+  ])
+
   const effectiveScores = derived?.abilityScores ?? null
 
   const toggleCondition = (conditionName: string) => {
@@ -1841,6 +1982,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const handleTurnStart = useCallback(() => {
+    setActionEconomySpent(emptyActionEconomySpent())
     if (!turnStartTriggers.length) return
     const abilityMods = derived?.abilityMods ?? {
       strength: 0,
@@ -2330,6 +2472,26 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     setSheetMenuOpen(false)
   }, [character, currentHp, tempHp, derived?.maxHp, shareClassLabel])
 
+  const skillsInOrder = useMemo(() => {
+    const sorted = getSkillsSorted(skillSortMode)
+    return orderSkillsWithPins(sorted, pinnedSkillNames)
+  }, [skillSortMode, pinnedSkillNames])
+  const srdSkillNameSet = useMemo(
+    () => new Set(getSkillsInAbilityOrder().map((skill) => skill.name)),
+    [],
+  )
+  const customSkillRows = useMemo(() => {
+    const rows =
+      derived?.skills.filter((skill) => skill.proficient && !srdSkillNameSet.has(skill.name)) ?? []
+    return orderSkillsWithPins(rows, pinnedSkillNames)
+  }, [derived?.skills, srdSkillNameSet, pinnedSkillNames])
+
+  const togglePinnedSkill = useCallback((skillName: string) => {
+    setPinnedSkillNames((prev) =>
+      prev.includes(skillName) ? prev.filter((name) => name !== skillName) : [...prev, skillName],
+    )
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -2408,10 +2570,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const classLabel = shareClassLabel
 
-  const skillsInOrder = getSkillsInAbilityOrder()
-  const srdSkillNameSet = new Set(skillsInOrder.map((skill) => skill.name))
-  const customSkillRows =
-    derived?.skills.filter((skill) => skill.proficient && !srdSkillNameSet.has(skill.name)) ?? []
   const weaponProficiencies =
     derived?.weaponProficiencies ??
     getEffectiveWeaponProficiencies(
@@ -2740,9 +2898,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               </div>
 
               <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
-                <div className="flex flex-wrap items-center justify-end gap-2">
+                <div className="flex min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:gap-2">
                   <ManualRollTrigger />
-                  <RollHistoryTrigger />
                   <div className="relative">
                     <button
                       ref={conditionButtonRef}
@@ -2822,10 +2979,59 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       </>
                     )}
                   </div>
+                  <SheetRestButtons
+                    onRest={handleRest}
+                    onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
+                  />
+                </div>
+
+                <div className="flex min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:gap-2">
+                  <div className="relative inline-flex">
+                    <button
+                      type="button"
+                      onClick={() => setHasInspiration((value) => !value)}
+                      title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
+                      aria-pressed={hasInspiration}
+                      className={`relative inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg border-2 px-2.5 py-2 pr-8 text-xs font-semibold transition-colors sm:px-3 sm:pr-9 sm:text-sm ${
+                        hasInspiration
+                          ? SHEET_BANNER_BUTTON.inspirationActive
+                          : SHEET_BANNER_BUTTON.inspirationIdle
+                      }`}
+                    >
+                      {hasInspiration ? (
+                        <span className="pointer-events-none absolute inset-0 inspiration-sparkles" aria-hidden />
+                      ) : null}
+                      <Sparkles
+                        className={`relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${
+                          hasInspiration ? "animate-inspiration-glow" : ""
+                        }`}
+                      />
+                      <span className="relative">Inspiration</span>
+                    </button>
+                    <span className="absolute right-0.5 top-1/2 z-10 -translate-y-1/2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-background/40 hover:text-foreground"
+                            aria-label="What Heroic Inspiration does"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={6} className="max-w-[260px] text-left">
+                          {HEROIC_INSPIRATION_TIP}
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                  </div>
                   {ragingSheetToggle ? renderManualToggleButton(ragingSheetToggle) : null}
                   {innateSorcerySheetToggle && isSorcerer
                     ? renderManualToggleButton(innateSorcerySheetToggle)
                     : null}
+                  {secondaryManualSheetToggles.map((toggle) => renderManualToggleButton(toggle))}
                 </div>
 
                 {(derived?.acFormulaOptions.length ?? 0) > 1 ? (
@@ -2848,12 +3054,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       ))}
                     </select>
                   </label>
-                ) : null}
-
-                {secondaryManualSheetToggles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    {secondaryManualSheetToggles.map((toggle) => renderManualToggleButton(toggle))}
-                  </div>
                 ) : null}
               </div>
             </div>
@@ -2920,33 +3120,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     })}
                 </div>
               ) : null}
-              <div className="flex w-full min-w-0 flex-wrap items-stretch justify-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setHasInspiration((value) => !value)}
-                  title={hasInspiration ? "Spend Heroic Inspiration" : "Mark Heroic Inspiration"}
-                  aria-pressed={hasInspiration}
-                  className={`relative inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-lg border-2 px-2.5 py-2 text-xs font-semibold transition-colors sm:flex-none sm:px-3 sm:text-sm ${
-                    hasInspiration
-                      ? SHEET_BANNER_BUTTON.inspirationActive
-                      : SHEET_BANNER_BUTTON.inspirationIdle
-                  }`}
-                >
-                  {hasInspiration ? (
-                    <span className="pointer-events-none absolute inset-0 inspiration-sparkles" aria-hidden />
-                  ) : null}
-                  <Sparkles
-                    className={`relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${
-                      hasInspiration ? "animate-inspiration-glow" : ""
-                    }`}
-                  />
-                  <span className="relative">Inspiration</span>
-                </button>
-                <SheetRestButtons
-                  onRest={handleRest}
-                  onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
-                />
-              </div>
             </div>
           </div>
         </motion.div>
@@ -2964,8 +3137,48 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[11fr_5fr_4fr]">
                 <div className={`${SHEET_ABILITIES_PANEL.skills} rounded-xl p-3 border border-border min-w-0`}>
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Skills</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 md:min-h-[300px]">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <SheetSectionHeading icon={Star} size="xs" as="h3" className="mb-0">
+                        Skills
+                      </SheetSectionHeading>
+                      <button
+                        type="button"
+                        onClick={() => setSkillsInfoOpen(true)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                        aria-label="Skill explanations"
+                        title="What each skill is used for"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {(
+                        [
+                          { mode: "ability" as const, label: "By ability" },
+                          { mode: "alpha" as const, label: "A–Z" },
+                        ] as const
+                      ).map((option) => {
+                        const active = skillSortMode === option.mode
+                        return (
+                          <button
+                            key={option.mode}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setSkillSortMode(option.mode)}
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                              active
+                                ? "border-primary/50 bg-primary/15 text-primary"
+                                : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 md:gap-1 md:min-h-[300px]">
                     {skillsInOrder.map((skill) => {
                       const derivedSkill = derived?.skills.find((entry) => entry.name === skill.name)
                       const isProficient =
@@ -2980,22 +3193,46 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         derivedSkill?.bonus ??
                         abilityMods[skill.ability] +
                           (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
+                      const pinned = pinnedSkillNames.includes(skill.name)
                       return (
                         <div
                           key={skill.name}
-                          className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${
+                          className={`flex justify-between items-center gap-2 px-2 py-1.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${
                             isProficient ? SHEET_STATUS_ROW.skillProficient : SHEET_STATUS_ROW.muted
                           }`}
                         >
-                          <span className="truncate min-w-0">
-                            {skill.name} ({ABILITY_ABBREVIATIONS[skill.ability]})
-                          </span>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => togglePinnedSkill(skill.name)}
+                              title={pinned ? "Unpin skill" : "Pin skill to top"}
+                              aria-label={pinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
+                              aria-pressed={pinned}
+                              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors max-md:h-9 max-md:w-9 ${
+                                pinned
+                                  ? "text-primary bg-primary/10 hover:bg-primary/15"
+                                  : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+                              }`}
+                            >
+                              {pinned ? (
+                                <Pin className="h-3.5 w-3.5 fill-current max-md:h-4 max-md:w-4" aria-hidden />
+                              ) : (
+                                <Pin className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" aria-hidden />
+                              )}
+                            </button>
+                            <span className="truncate min-w-0 max-md:text-sm">
+                              {skill.name} ({ABILITY_ABBREVIATIONS[skill.ability]})
+                            </span>
+                          </div>
                           <span className="flex items-center gap-1 shrink-0">
                             {hasExpertise && <SkillExpertiseIndicator />}
-                            <span className="font-bold tabular-nums w-7 text-right">{formatMod(mod)}</span>
+                            <span className="font-bold tabular-nums w-7 text-right max-md:text-sm">
+                              {formatMod(mod)}
+                            </span>
                             <D20RollButton
                               modifier={mod}
                               title={`Roll ${skill.name}`}
+                              size="md"
                               skillProficient={isProficient}
                               featureBonusesIncluded={Boolean(derivedSkill)}
                               rollContext={{
@@ -3008,23 +3245,48 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </div>
                       )
                     })}
-                    {customSkillRows.map((skill) => (
+                    {customSkillRows.map((skill) => {
+                      const pinned = pinnedSkillNames.includes(skill.name)
+                      return (
                       <div
                         key={skill.name}
-                        className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs ${SHEET_STATUS_ROW.skillCustom}`}
+                        className={`flex justify-between items-center gap-2 px-2 py-1.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${SHEET_STATUS_ROW.skillCustom}`}
                       >
-                        <span className="truncate min-w-0">
-                          {skill.name} (
-                          {ABILITY_ABBREVIATIONS[skill.ability as keyof typeof ABILITY_ABBREVIATIONS] ??
-                            skill.ability.slice(0, 3).toUpperCase()}
-                          )
-                        </span>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => togglePinnedSkill(skill.name)}
+                            title={pinned ? "Unpin skill" : "Pin skill to top"}
+                            aria-label={pinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
+                            aria-pressed={pinned}
+                            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors max-md:h-9 max-md:w-9 ${
+                              pinned
+                                ? "text-primary bg-primary/10 hover:bg-primary/15"
+                                : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+                            }`}
+                          >
+                            {pinned ? (
+                              <Pin className="h-3.5 w-3.5 fill-current max-md:h-4 max-md:w-4" aria-hidden />
+                            ) : (
+                              <Pin className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" aria-hidden />
+                            )}
+                          </button>
+                          <span className="truncate min-w-0 max-md:text-sm">
+                            {skill.name} (
+                            {ABILITY_ABBREVIATIONS[skill.ability as keyof typeof ABILITY_ABBREVIATIONS] ??
+                              skill.ability.slice(0, 3).toUpperCase()}
+                            )
+                          </span>
+                        </div>
                         <span className="flex items-center gap-1 shrink-0">
                           {skill.expertise && <SkillExpertiseIndicator />}
-                          <span className="font-bold tabular-nums w-7 text-right">{formatMod(skill.bonus)}</span>
+                          <span className="font-bold tabular-nums w-7 text-right max-md:text-sm">
+                            {formatMod(skill.bonus)}
+                          </span>
                           <D20RollButton
                             modifier={skill.bonus}
                             title={`Roll ${skill.name}`}
+                            size="md"
                             skillProficient
                             featureBonusesIncluded
                             rollContext={{
@@ -3035,7 +3297,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           />
                         </span>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="mt-4 pt-3 border-t border-border grid grid-cols-2 gap-2">
                     <div className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs bg-secondary/10 font-medium min-w-0">
@@ -3091,7 +3354,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className={`${SHEET_ABILITIES_PANEL.abilityScores} rounded-xl p-3 border border-border min-w-0`}>
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Ability Scores</h3>
+                  <SheetSectionHeading icon={Sparkles} size="xs" as="h3">
+                    Ability Scores
+                  </SheetSectionHeading>
                   <div className="grid grid-cols-3 gap-2">
                     {ABILITY_SCORE_KEYS.map((key) => {
                       const score = effectiveScores[key]
@@ -3156,6 +3421,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         conMod={abilityMods.constitution}
                         currentHp={currentHp}
                         maxHp={maxHp}
+                        allowRollHeal={canRollHitDiceOutsideShortRest}
                         onHeal={(amount) =>
                           setCurrentHp((hp) => Math.min(maxHp, hp + amount))
                         }
@@ -3173,7 +3439,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className={`${SHEET_ABILITIES_PANEL.proficiencies} rounded-xl p-3 border border-border min-w-0`}>
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase mb-2">Proficiencies</h3>
+                  <SheetSectionHeading icon={BookOpen} size="xs" as="h3">
+                    Proficiencies
+                  </SheetSectionHeading>
                   {!weaponProficiencies.length &&
                   !armorProficiencies.length &&
                   !(character.tool_proficiencies ?? []).length &&
@@ -3306,7 +3574,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               <div className={`${SHEET_ABILITIES_PANEL.actions} rounded-xl p-3 border border-border`}>
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <h2 className="text-sm font-bold text-foreground">Actions</h2>
+                  <SheetSectionHeading icon={Swords} className="mb-0">
+                    Actions
+                  </SheetSectionHeading>
                   <DefaultActionsButton onClick={() => setDefaultActionsContext("abilities")} />
                 </div>
                 {utilityActions.length ? (
@@ -3323,6 +3593,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     hitDiceRemaining={hitDiceRemainingTotal}
                     onSpendHitDice={spendHitDiceForAction}
                     onActivateSheetToggle={activateSheetToggle}
+                    onMarkEconomy={markActionEconomy}
                     characterId={character.id}
                     onApplySelfHeal={applySelfHeal}
                     allyCandidates={allyCandidates}
@@ -3417,7 +3688,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
           {activeTab === "details" && (
             <div className={`${SHEET_DETAILS_PANEL} rounded-xl p-4 border border-border`}>
-              <h2 className="text-sm font-bold text-foreground mb-3">Character Details</h2>
+              <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                <Scroll className="h-4 w-4 text-primary" aria-hidden />
+                Character Details
+              </h2>
               <div className="overflow-hidden">
                 {character.portrait_url ? (
                   <button
@@ -3464,10 +3738,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[7fr_3fr] md:items-start">
                 <div className="space-y-3 min-w-0">
                 <div className={`${SHEET_COMBAT_PANEL.combatStats} rounded-xl p-3 border border-border min-w-0 overflow-hidden`}>
-                  <h2 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-primary" aria-hidden />
-                    Combat Stats
-                  </h2>
+                  <SheetSectionHeading icon={Shield}>Combat Stats</SheetSectionHeading>
                   <SheetPersistentStatsBar
                     panel
                     armorClass={armorClass}
@@ -3485,6 +3756,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     hitDicePool={hitDicePool}
                     conMod={abilityMods.constitution}
                     showShortRestHitDice={shortRestHitDiceOpen}
+                    allowRollHealHitDice={canRollHitDiceOutsideShortRest}
                     onShortRestHeal={(amount) => {
                       setCurrentHp((hp) => Math.min(maxHp, hp + amount))
                       setShortRestHitDiceOpen(false)
@@ -3507,94 +3779,62 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     formatMod={formatMod}
                   />
                 </div>
-                <div className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
-                  <div className="flex flex-col lg:flex-row gap-1 lg:gap-1.5 lg:items-stretch">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 lg:gap-1.5 flex-1 min-w-0">
-                      {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
-                        (ability) => {
-                          const abilityKey = ability.toLowerCase() as AbilityScoreKey
-                          const derivedSave = derivedSaves.find((entry) => entry.ability === abilityKey)
-                          const isProficient =
-                            derivedSave?.proficient ?? savingThrowProficiencies.includes(ability)
-                          const mod =
-                            derivedSave?.bonus ??
-                            abilityMods[abilityKey] + (isProficient ? proficiencyBonus : 0)
-                          return (
-                            <div
-                              key={ability}
-                              className={`flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs min-h-[2.75rem] ${
-                                isProficient ? SHEET_STATUS_ROW.saveProficient : SHEET_STATUS_ROW.muted
-                              }`}
-                            >
-                              <span className="min-w-0 font-semibold tabular-nums tracking-wide">
-                                {ABILITY_LABELS[ability.toLowerCase()]}
-                                {derivedSave?.governingAbility
-                                  ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
-                                  : ""}
-                              </span>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="font-bold tabular-nums">{formatMod(mod)}</span>
-                                <D20RollButton
-                                  modifier={mod}
-                                  title={`Roll ${ability} save`}
-                                  rollContext={{
-                                    kind: "save",
-                                    ability: abilityKey,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          )
-                        },
-                      )}
+
+                  <div className={`${SHEET_COMBAT_PANEL.actions} rounded-xl p-3 border border-border flex flex-col min-h-0`}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <SheetSectionHeading icon={Swords} className="mb-0">
+                        Actions
+                      </SheetSectionHeading>
+                      <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
                     </div>
-                    <div className="lg:w-40 xl:w-44 shrink-0 lg:self-stretch min-h-[2.75rem]">
-                      <DeathSaveTracker
-                        variant="inline"
-                        deathSaves={deathSaves}
-                        onDeathSavesChange={setDeathSaves}
+                    <SheetActionEconomyTracker
+                      spent={actionEconomySpent}
+                      onToggle={toggleActionEconomy}
+                      onReset={resetActionEconomy}
+                      disabled={incapacitated}
+                    />
+                    <SheetStandardActionButtons
+                      disabled={incapacitated}
+                      onUse={(kind) => markActionEconomy(kind)}
+                    />
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0">
+                      <SheetEquippedWeaponsPanel
+                        weapons={equippedWeaponCards}
+                        buildInputs={characterBuildInputs}
+                        weaponProficiencies={derived?.weaponProficiencies ?? []}
+                        onAttackRoll={() => markActionEconomy("action")}
+                      />
+                      <SheetActionsPanel
+                        actions={combatActions}
+                        usedByActionId={usedActionUsesById}
+                        onUsedChange={setUsedActionUsesById}
+                        resolveContext={usesResolveContext}
+                        resourceEntries={resourceEntries}
+                        usedResourcesById={usedResourcesById}
+                        onResourceUsedChange={setUsedResourcesById}
+                        incapacitated={incapacitated}
+                        psiLimit={psiLimit}
+                        hitDiceRemaining={hitDiceRemainingTotal}
+                        onSpendHitDice={spendHitDiceForAction}
+                        onActivateSheetToggle={activateSheetToggle}
+                        onMarkEconomy={markActionEconomy}
+                        characterId={character.id}
+                        onApplySelfHeal={applySelfHeal}
+                        allyCandidates={allyCandidates}
+                        healContext={healContext}
+                        singleColumn={false}
                       />
                     </div>
+                    {!equippedWeaponCards.length && !combatActions.length ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        No action-economy abilities listed.
+                      </p>
+                    ) : null}
                   </div>
-                </div>
-                <div className={`${SHEET_COMBAT_PANEL.actions} rounded-xl p-3 border border-border flex flex-col min-h-0`}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h2 className="text-sm font-bold text-foreground">Actions</h2>
-                    <DefaultActionsButton onClick={() => setDefaultActionsContext("combat")} />
-                  </div>
-                  <SheetEquippedWeaponsPanel
-                    weapons={equippedWeaponCards}
-                    buildInputs={characterBuildInputs}
-                    weaponProficiencies={derived?.weaponProficiencies ?? []}
-                  />
-                  <SheetActionsPanel
-                    actions={combatActions}
-                    usedByActionId={usedActionUsesById}
-                    onUsedChange={setUsedActionUsesById}
-                    resolveContext={usesResolveContext}
-                    resourceEntries={resourceEntries}
-                    usedResourcesById={usedResourcesById}
-                    onResourceUsedChange={setUsedResourcesById}
-                    incapacitated={incapacitated}
-                    psiLimit={psiLimit}
-                    hitDiceRemaining={hitDiceRemainingTotal}
-                    onSpendHitDice={spendHitDiceForAction}
-                    onActivateSheetToggle={activateSheetToggle}
-                    characterId={character.id}
-                    onApplySelfHeal={applySelfHeal}
-                    allyCandidates={allyCandidates}
-                    healContext={healContext}
-                  />
-                  {!equippedWeaponCards.length && !combatActions.length ? (
-                    <p className="text-xs text-muted-foreground italic">
-                      No action-economy abilities listed.
-                    </p>
-                  ) : null}
-                </div>
 
                 {showSpellsPanel && (
                   <div className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
-                    <h2 className="text-sm font-bold text-foreground mb-2">Spells</h2>
+                    <SheetSectionHeading icon={Wand2}>Spells</SheetSectionHeading>
                     {spellsGroupedByLevel.length ? (
                       <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
                         {spellsGroupedByLevel.map((group) => (
@@ -3605,7 +3845,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                 ({group.spells.length})
                               </span>
                             </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
                               {group.spells.map((spell) => (
                                 <button
                                   key={spell.id}
@@ -3649,10 +3889,60 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className="space-y-3 min-w-0">
+                <div className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
+                  <SheetSectionHeading icon={ShieldCheck}>Saving Throws</SheetSectionHeading>
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-1.5 min-w-0">
+                      {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
+                        (ability) => {
+                          const abilityKey = ability.toLowerCase() as AbilityScoreKey
+                          const derivedSave = derivedSaves.find((entry) => entry.ability === abilityKey)
+                          const isProficient =
+                            derivedSave?.proficient ?? savingThrowProficiencies.includes(ability)
+                          const mod =
+                            derivedSave?.bonus ??
+                            abilityMods[abilityKey] + (isProficient ? proficiencyBonus : 0)
+                          return (
+                            <div
+                              key={ability}
+                              className={`flex justify-between items-center gap-2 px-2.5 py-2 rounded text-xs min-h-[2.75rem] ${
+                                isProficient ? SHEET_STATUS_ROW.saveProficient : SHEET_STATUS_ROW.muted
+                              }`}
+                            >
+                              <span className="min-w-0 font-semibold tabular-nums tracking-wide">
+                                {ABILITY_LABELS[ability.toLowerCase()]}
+                                {derivedSave?.governingAbility
+                                  ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
+                                  : ""}
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-bold tabular-nums">{formatMod(mod)}</span>
+                                <D20RollButton
+                                  modifier={mod}
+                                  title={`Roll ${ability} save`}
+                                  rollContext={{
+                                    kind: "save",
+                                    ability: abilityKey,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        },
+                      )}
+                    </div>
+                    <DeathSaveTracker
+                      variant="inline"
+                      deathSaves={deathSaves}
+                      onDeathSavesChange={setDeathSaves}
+                    />
+                  </div>
+                </div>
+
                   <div className={`${SHEET_COMBAT_PANEL.spellcastingResources} rounded-xl p-3 border border-border`}>
-                    <h2 className="text-sm font-bold text-foreground mb-2 text-left">
+                    <SheetSectionHeading icon={Battery}>
                       {hasSpellcasting ? "Spellcasting & Resources" : "Resources"}
-                    </h2>
+                    </SheetSectionHeading>
                     <div className="space-y-1">
                       {hasSpellcasting && spellAttackMod != null && Number.isFinite(spellAttackMod) && (
                         <div
@@ -3857,7 +4147,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "equipment" && (
             <div className="space-y-3">
               <div className={`${SHEET_EQUIPMENT_PANEL} rounded-xl p-3 border border-border`}>
-                <h2 className="text-sm font-bold text-foreground mb-2">Equipment</h2>
+                <SheetSectionHeading icon={Package}>Equipment</SheetSectionHeading>
                 <SheetEquipmentPanel
                   equipment={displayedEquipment}
                   catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
@@ -3990,10 +4280,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 const dedupedFeatures = dedupeFeaturesByName(classFeatures)
                 return (
                   <section key={entry.row.class_id} className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                    <h2 className="text-sm font-bold mb-2">
+                    <SheetSectionHeading icon={Layers}>
                       {entry.class?.name} Features
                       {classDetails.length > 1 ? ` (Level ${entry.row.level})` : ""}
-                    </h2>
+                    </SheetSectionHeading>
                     <div className="space-y-2">
                       {dedupedFeatures.map(({ feature, levels }, index) => (
                         <CollapsibleFeatureCard
@@ -4031,7 +4321,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     key={`${entry.row.class_id}-subclass`}
                     className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}
                   >
-                    <h2 className="text-sm font-bold mb-2">{entry.subclass.name} Features</h2>
+                    <SheetSectionHeading icon={Layers}>{entry.subclass.name} Features</SheetSectionHeading>
                     <div className="space-y-2">
                       {subclassFeatures.map((feature, index) => (
                         <CollapsibleFeatureCard
@@ -4059,7 +4349,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               {character.species?.traits && character.species.traits.length > 0 && (
                 <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <h2 className="text-sm font-bold mb-2">{character.species.name} Traits</h2>
+                  <SheetSectionHeading icon={User}>{character.species.name} Traits</SheetSectionHeading>
                   <div className="space-y-2">
                     {character.species.traits.map((trait, index) => (
                       <CollapsibleFeatureCard
@@ -4074,7 +4364,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               {character.backgrounds?.feature && (
                 <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <h2 className="text-sm font-bold mb-2">Background Feature</h2>
+                  <SheetSectionHeading icon={BookOpen}>Background Feature</SheetSectionHeading>
                   <CollapsibleFeatureCard
                     name={character.backgrounds.feature.name}
                     description={character.backgrounds.feature.description}
@@ -4084,7 +4374,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
               {(originFeat || effectiveBackgroundFeatGranted || characterFeatsForDisplay.length > 0) && (
                 <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <h2 className="text-sm font-bold mb-2">Feats &amp; Boons</h2>
+                  <SheetSectionHeading icon={Star}>Feats &amp; Boons</SheetSectionHeading>
                   <div className="space-y-2">
                     {(originFeat || effectiveBackgroundFeatGranted) && (
                       <CollapsibleFeatureCard
@@ -4186,7 +4476,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "custom" && (
             <div className="bg-card rounded-xl p-3 border border-border">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h2 className="text-sm font-bold text-foreground">Custom Abilities</h2>
+                <SheetSectionHeading icon={Sparkles} className="mb-0">
+                  Custom Abilities
+                </SheetSectionHeading>
                 <Link
                   href={compendiumEditHref("abilities", "new")}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
@@ -4226,6 +4518,52 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       </main>
 
       <AnimatePresence>
+        {skillsInfoOpen ? (
+          <motion.div
+            key="skills-info"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+            onClick={() => setSkillsInfoOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-border bg-card p-4 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setSkillsInfoOpen(false)}
+                className="absolute right-3 top-3 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <h2 className="pr-8 text-lg font-black text-foreground">Skills</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Common uses for each skill (SRD). Your DM may call for other checks.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {getSkillsInAbilityOrder().map((skill) => (
+                  <li key={skill.name} className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+                    <p className="text-sm font-bold text-foreground">
+                      {skill.name}{" "}
+                      <span className="font-semibold text-muted-foreground">
+                        ({ABILITY_ABBREVIATIONS[skill.ability]})
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground leading-snug">
+                      {getSkillDescription(skill.name) ?? SKILL_DESCRIPTIONS[skill.name] ?? "—"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </motion.div>
+        ) : null}
         {restOverlay ? (
           <SheetRestOverlay
             key="sheet-rest"
@@ -4243,6 +4581,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 [classId]: (prev[classId] ?? 0) + count,
               }))
             }
+            weaponMasteryChoices={
+              restOverlay.rest === "long_rest" ? longRestWeaponMasteryChoices : []
+            }
+            onWeaponMasteryChange={(key, next) => void persistFeatureChoicePicks(key, next)}
           />
         ) : null}
         {defaultActionsContext ? (
@@ -4284,6 +4626,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             onMetamagicChange={setSelectedMetamagicIds}
             empoweredRerollCap={Math.max(1, abilityMods.charisma ?? 0)}
             onCast={(result) => {
+              markActionEconomy(
+                actionEconomyKindFromCastingTime(selectedSpell.casting_time, {
+                  quickened: selectedMetamagicIds.some((id) => {
+                    const option = metamagicOptions.find((row) => row.id === id)
+                    return option?.effectHint === "quicken"
+                  }),
+                }),
+              )
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
               }

@@ -30,14 +30,17 @@ export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeature
 }
 
 export function resolveFeatureSheetDisplay(
-  feature: Pick<Feature, "sheetDisplay"> & ActivatableItem,
+  feature: Pick<Feature, "sheetDisplay" | "name"> & ActivatableItem,
 ): ResolvedFeatureSheetDisplay {
   const explicit = feature.sheetDisplay
   if (explicit && typeof explicit === "object") {
+    const inferred = inferFeatureSheetDisplay(feature)
+    const forceCombat =
+      inferred.combatActions && /^reckless attack$/i.test((feature.name ?? "").trim())
     return {
       featuresTab: explicit.featuresTab ?? false,
       abilitiesActions: explicit.abilitiesActions ?? false,
-      combatActions: explicit.combatActions ?? false,
+      combatActions: explicit.combatActions || forceCombat,
     }
   }
   return inferFeatureSheetDisplay(feature)

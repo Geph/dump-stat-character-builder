@@ -138,7 +138,11 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         playerPicksSpellList: true,
         label: "Magic Initiate spells",
       }),
-      spellAbility("magic_initiate_ability", "Spellcasting ability: INT, WIS, or CHA (chosen with feat)"),
+      spellAbility("magic_initiate_ability", "Spellcasting ability: INT, WIS, or CHA (chosen with feat)", [
+        "intelligence",
+        "wisdom",
+        "charisma",
+      ]),
       uses(
         "magic_initiate_cast",
         { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },

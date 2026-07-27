@@ -118,6 +118,7 @@ export function CatalogFeatMultiPicker({
                   <CatalogOptionDescriptionHover
                     name={option.name}
                     description={option.description}
+                    compact
                   />
                 </div>
               ) : null}

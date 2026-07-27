@@ -30,6 +30,10 @@ export type CharacterSheetPlayState = {
   accumulatedResources: Record<string, AccumulatedResourceState>
   /** Runtime die-size overrides for mutable resources (e.g. Rampage Die d4→d12). */
   resourceDieSidesByKey: Record<string, number>
+  /** Skills box sort: by ability (STR→CHA) or alphabetical. */
+  skillSortMode: "ability" | "alpha"
+  /** Skill names pinned to the top of the skills list. */
+  pinnedSkillNames: string[]
   /** Set when the player last saved play state to the database. */
   savedAt: string | null
 }
@@ -51,6 +55,8 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     realTimeCooldowns: {},
     accumulatedResources: {},
     resourceDieSidesByKey: {},
+    skillSortMode: "ability",
+    pinnedSkillNames: [],
     savedAt: null,
   }
 }
@@ -119,6 +125,10 @@ export function normalizeSheetPlayState(
         ? { ...raw.accumulatedResources }
         : base.accumulatedResources,
     resourceDieSidesByKey: normalizeResourceDieSides(raw.resourceDieSidesByKey),
+    skillSortMode: raw.skillSortMode === "alpha" ? "alpha" : "ability",
+    pinnedSkillNames: Array.isArray(raw.pinnedSkillNames)
+      ? raw.pinnedSkillNames.filter((entry): entry is string => typeof entry === "string")
+      : base.pinnedSkillNames,
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : base.savedAt,
   }
 }

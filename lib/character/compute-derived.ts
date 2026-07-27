@@ -154,9 +154,6 @@ function buildWeaponAttackDerived(
   if (modifierBonus !== 0) {
     attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
   }
-  if (params.featureDamageBonus > 0) {
-    attackBreakdown.push({ label: "Feature damage", value: params.featureDamageBonus })
-  }
 
   const parsed = parseWeaponDamageDice(getWeaponDamageText(weapon)).oneHanded
   const overrideSides = resolveWeaponDamageDieSidesOverride(
@@ -542,10 +539,32 @@ function buildAcBreakdown(params: {
   }
 
   if (aggregated.acAbilityMods.length > 0) {
-    parts.push({ label: "Base (Unarmored Defense)", value: aggregated.acBase })
+    const formulaLabel =
+      aggregated.acFormulaOptions.find((option) => {
+        if (option.kind !== "ability_modifiers") return false
+        const abilities = (option.abilities ?? []).slice(0, 2)
+        return (
+          abilities.length === aggregated.acAbilityMods.length &&
+          abilities.every((key, index) => key === aggregated.acAbilityMods[index]) &&
+          (option.base ?? 10) === aggregated.acBase
+        )
+      })?.label ??
+      aggregated.acFormulaOptions.find((option) => option.kind === "ability_modifiers")?.label ??
+      "Unarmored Defense"
+
+    parts.push({ label: "Base", value: aggregated.acBase })
+    const hasNonDexterity = aggregated.acAbilityMods.some(
+      (key) => abilityModifierKeyToScoreKey(key) !== "dexterity",
+    )
     for (const key of aggregated.acAbilityMods) {
       const scoreKey = abilityModifierKeyToScoreKey(key)
-      parts.push({ label: ABILITY_MOD_LABELS[scoreKey], value: abilityMods[scoreKey] })
+      const abilityName = ABILITY_MOD_LABELS[scoreKey]
+      const showFormula =
+        Boolean(formulaLabel) && (!hasNonDexterity || scoreKey !== "dexterity")
+      parts.push({
+        label: showFormula ? `${abilityName} (${formulaLabel})` : abilityName,
+        value: abilityMods[scoreKey],
+      })
     }
     if (aggregated.acIncludeProficiency) pushIf("Proficiency Bonus", proficiencyBonus)
     pushIf("Feature bonus", aggregated.acFlatBonus)

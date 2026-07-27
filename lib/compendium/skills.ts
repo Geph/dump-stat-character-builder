@@ -61,3 +61,28 @@ export function getSkillsInAbilityOrder(): typeof SKILLS_DATA {
     ),
   )
 }
+
+/** Flat alphabetical list of all SRD skills. */
+export function getSkillsAlphabetical(): typeof SKILLS_DATA {
+  return [...SKILLS_DATA].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export type SkillSortMode = "ability" | "alpha"
+
+export function getSkillsSorted(mode: SkillSortMode): typeof SKILLS_DATA {
+  return mode === "alpha" ? getSkillsAlphabetical() : getSkillsInAbilityOrder()
+}
+
+/** Pin selected skills to the top while preserving relative order within each group. */
+export function orderSkillsWithPins<T extends { name: string }>(
+  skills: readonly T[],
+  pinnedNames: readonly string[],
+): T[] {
+  if (!pinnedNames.length) return [...skills]
+  const pinnedSet = new Set(pinnedNames)
+  const pinned = pinnedNames
+    .map((name) => skills.find((skill) => skill.name === name))
+    .filter((skill): skill is T => Boolean(skill))
+  const rest = skills.filter((skill) => !pinnedSet.has(skill.name))
+  return [...pinned, ...rest]
+}

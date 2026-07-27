@@ -38,6 +38,8 @@ type SheetPersistentStatsBarProps = {
   onSpendHitDice?: (classId: string, count: number) => void
   /** Set spent hit dice for a class (manual remaining edit). */
   onSetHitDiceSpent?: (classId: string, spent: number) => void
+  /** When false, HitDiceTracker hides roll-to-heal (short-rest-only). */
+  allowRollHealHitDice?: boolean
   onInitiativeRoll: () => void
   formatMod: (mod: number) => string
 }
@@ -91,6 +93,7 @@ function CombatStatsCompactRow({
   onShortRestHeal,
   onSpendHitDice,
   onSetHitDiceSpent,
+  allowRollHealHitDice = true,
   onInitiativeRoll,
   formatMod,
 }: Omit<SheetPersistentStatsBarProps, "embedded" | "panel">) {
@@ -100,8 +103,8 @@ function CombatStatsCompactRow({
   const walkSpeed = speeds.find((entry) => entry.type === "walk")?.feet ?? speed
 
   return (
-    <div className="flex flex-wrap items-stretch gap-2">
-      <div className="flex shrink-0 flex-col justify-center gap-2 rounded-lg border border-primary/25 bg-gradient-to-br from-primary/12 to-card px-3 py-3 min-h-[5.625rem] min-w-[5rem]">
+    <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
+      <div className="flex min-w-[5rem] shrink-0 flex-col justify-center gap-2 rounded-lg border border-primary/25 bg-gradient-to-br from-primary/12 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-0 sm:flex-1 sm:shrink">
         <div className="flex items-center gap-1.5">
           <Shield className="h-4 w-4 text-primary shrink-0" aria-hidden />
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
@@ -132,7 +135,7 @@ function CombatStatsCompactRow({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 flex-col justify-center gap-2 rounded-lg border border-sky-500/25 bg-gradient-to-br from-sky-500/10 to-card px-3 py-3 min-h-[5.625rem] min-w-[5.5rem]">
+      <div className="flex min-w-[5.5rem] shrink-0 flex-col justify-center gap-2 rounded-lg border border-sky-500/25 bg-gradient-to-br from-sky-500/10 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-0 sm:flex-1 sm:shrink">
         <div className="flex items-center gap-1.5">
           <Footprints className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden />
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
@@ -161,11 +164,11 @@ function CombatStatsCompactRow({
         )}
       </div>
 
-      <div className="flex shrink-0 flex-col justify-center gap-2 rounded-lg border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-card px-3 py-3 min-h-[5.625rem] min-w-[5.75rem]">
+      <div className="flex w-48 shrink-0 flex-col justify-center gap-2 rounded-lg border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-card px-3 py-3 min-h-[5.625rem] sm:w-auto sm:min-w-48 sm:flex-1 sm:shrink">
         <div className="flex items-center gap-1.5">
           <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
-            Init
+            Initiative
           </p>
           <StatExplainPopover
             title="Initiative"
@@ -189,7 +192,7 @@ function CombatStatsCompactRow({
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-2.5 rounded-lg border border-destructive/20 bg-gradient-to-br from-destructive/6 to-card px-3 py-3 min-h-[5.625rem] sm:w-auto sm:max-w-[15.5rem] sm:flex-none">
+      <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-2.5 rounded-lg border border-destructive/20 bg-gradient-to-br from-destructive/6 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-[12rem] sm:flex-[1.4]">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex items-center gap-2 shrink-0">
             <Heart className="h-4 w-4 text-destructive shrink-0" aria-hidden />
@@ -237,6 +240,7 @@ function CombatStatsCompactRow({
               maxHp={maxHp}
               onHeal={onShortRestHeal}
               onSetSpent={onSetHitDiceSpent}
+              allowRollHeal={allowRollHealHitDice}
             />
           ) : showShortRestHitDice && onShortRestHeal && onSpendHitDice && hitDicePool.length > 0 ? (
             <ShortRestHitDiceBox
@@ -289,6 +293,7 @@ export function SheetPersistentStatsBar({
   onShortRestHeal,
   onSpendHitDice,
   onSetHitDiceSpent,
+  allowRollHealHitDice = true,
   onInitiativeRoll,
   formatMod,
 }: SheetPersistentStatsBarProps) {
@@ -313,6 +318,7 @@ export function SheetPersistentStatsBar({
         onShortRestHeal={onShortRestHeal}
         onSpendHitDice={onSpendHitDice}
         onSetHitDiceSpent={onSetHitDiceSpent}
+        allowRollHealHitDice={allowRollHealHitDice}
         onInitiativeRoll={onInitiativeRoll}
         formatMod={formatMod}
       />

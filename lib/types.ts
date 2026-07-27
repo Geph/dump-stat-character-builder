@@ -307,6 +307,11 @@ export interface FeatureActivation {
   action?: boolean
   bonusAction?: boolean
   reaction?: boolean
+  /**
+   * When true, the feature still appears under Action/Bonus/Reaction for UX,
+   * but using it does not mark that turn resource spent (e.g. Reckless Attack).
+   */
+  noEconomyCost?: boolean
   /** When you roll initiative (not an action economy cost). */
   onInitiative?: boolean
   /** Passive or reaction-style trigger when the character drops to 0 HP. */

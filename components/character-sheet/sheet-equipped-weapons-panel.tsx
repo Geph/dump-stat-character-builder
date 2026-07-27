@@ -34,6 +34,8 @@ type SheetEquippedWeaponsPanelProps = {
   weapons: EquippedWeaponCard[]
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
+  /** Weapon attack rolls spend the Attack action. */
+  onAttackRoll?: () => void
 }
 
 function WeaponAttackCard({
@@ -44,9 +46,11 @@ function WeaponAttackCard({
   abilityModifier,
   buildInputs,
   weaponProficiencies,
+  onAttackRoll,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
+  onAttackRoll?: () => void
 }) {
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
@@ -162,6 +166,7 @@ function WeaponAttackCard({
               title={`${weapon.name} attack`}
               breakdown={attack.attackBreakdown}
               rollContext={{ kind: "attack" }}
+              onRoll={onAttackRoll}
             />
           </div>
           {damageExpression ? (
@@ -187,6 +192,7 @@ export function SheetEquippedWeaponsPanel({
   weapons,
   buildInputs,
   weaponProficiencies,
+  onAttackRoll,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
@@ -195,13 +201,14 @@ export function SheetEquippedWeaponsPanel({
       <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
         Weapon Attacks
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {weapons.map((entry) => (
           <WeaponAttackCard
             key={`${entry.hand}-${entry.weapon.id}`}
             {...entry}
             buildInputs={buildInputs}
             weaponProficiencies={weaponProficiencies}
+            onAttackRoll={onAttackRoll}
           />
         ))}
       </div>

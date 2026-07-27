@@ -2550,17 +2550,21 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       limitations: [blockedWhenConditionLimitation("Incapacitated")],
     }),
   ],
-  "*::Reckless Attack": [
-    checkAdvantage("reckless_attack", {
-      category: "attack",
-      ability: "Strength",
-      limitations: [requiresActiveToggleLimitation("reckless_attack")],
-    }),
-    incomingAttackMode("reckless_attack_drawback", "advantage", {
-      conditions: ["Melee attacks against you"],
-      limitations: [requiresActiveToggleLimitation("reckless_attack")],
-    }),
-  ],
+  "*::Reckless Attack": {
+    // Surfaces under Actions for play UX; does not spend the Action itself.
+    activation: { action: true, noEconomyCost: true },
+    linkedModifiers: [
+      checkAdvantage("reckless_attack", {
+        category: "attack",
+        ability: "Strength",
+        limitations: [requiresActiveToggleLimitation("reckless_attack")],
+      }),
+      incomingAttackMode("reckless_attack_drawback", "advantage", {
+        conditions: ["Melee attacks against you"],
+        limitations: [requiresActiveToggleLimitation("reckless_attack")],
+      }),
+    ],
+  },
   "*::Primal Knowledge": [
     classSkillListChoice(1, "Primal Knowledge skill"),
     alternateAbilitySkillCheck(

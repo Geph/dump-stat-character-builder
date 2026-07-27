@@ -1,6 +1,9 @@
 import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import {
+  MAGIC_INITIATE_ABILITY_OPTIONS,
+} from "@/lib/builder/magic-initiate"
+import {
   baseCompendiumLookupKey,
   sourcesEqual,
 } from "@/lib/compendium/prefer-same-source"
@@ -40,6 +43,11 @@ export type FeatSlotContext = {
    * Used so Class-step feat galleries stay browsable before scores are finalized.
    */
   skipAbilityScorePrerequisites?: boolean
+  /**
+   * Spellcasting abilities already used by Magic Initiate takes (INT/WIS/CHA).
+   * Blocks selecting another Magic Initiate when all three are claimed.
+   */
+  takenMagicInitiateAbilities?: AbilityScoreKey[]
 }
 
 export function buildOwnedFeatIds(params: {
@@ -152,6 +160,22 @@ export function isFeatEligibleForCategories(
   }
   if (!feat.repeatable && taken.has(feat.id)) return false
   if (hasExclusiveCategoryConflict(feat, context)) return false
+
+  if (/^magic initiate$/i.test(feat.name.trim())) {
+    const takenAbilities = context.takenMagicInitiateAbilities ?? []
+    const currentFeat = context.currentSlotFeatId
+      ? featById(context.feats, context.currentSlotFeatId)
+      : null
+    const currentSlotIsMagicInitiate = Boolean(
+      currentFeat && /^magic initiate$/i.test(currentFeat.name.trim()),
+    )
+    if (
+      !currentSlotIsMagicInitiate &&
+      takenAbilities.length >= MAGIC_INITIATE_ABILITY_OPTIONS.length
+    ) {
+      return false
+    }
+  }
 
   const minLevel =
     feat.level_requirement ??

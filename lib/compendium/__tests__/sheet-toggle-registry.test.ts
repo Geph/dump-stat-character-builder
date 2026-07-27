@@ -5,6 +5,7 @@ import {
   isKnownSheetToggleId,
   mergeSheetToggleDefinitions,
   sheetToggleDefinitionsFromNewToggles,
+  sheetToggleIdActivatedByAction,
 } from "@/lib/compendium/sheet-toggle-registry"
 
 describe("sheet-toggle-registry", () => {
@@ -74,5 +75,20 @@ describe("sheet-toggle-registry", () => {
     expect(sheetToggleDefinitionsFromNewToggles(null)).toEqual([])
     expect(sheetToggleDefinitionsFromNewToggles(undefined)).toEqual([])
     expect(sheetToggleDefinitionsFromNewToggles([])).toEqual([])
+  })
+
+  it("maps Use Rage / Wild Shape actions onto banner sheet toggles", () => {
+    expect(sheetToggleIdActivatedByAction({ name: "Rage", classResourceKey: "rage" })).toBe(
+      "while_raging",
+    )
+    expect(sheetToggleIdActivatedByAction({ name: "Rage" })).toBe("while_raging")
+    expect(sheetToggleIdActivatedByAction({ name: "Wild Shape", classResourceKey: "wild_shape" })).toBe(
+      "while_wild_shape",
+    )
+    expect(sheetToggleIdActivatedByAction({ name: "Innate Sorcery" })).toBe(
+      "while_innate_sorcery_active",
+    )
+    expect(sheetToggleIdActivatedByAction({ name: "Reckless Attack" })).toBe("reckless_attack")
+    expect(sheetToggleIdActivatedByAction({ name: "Bardic Inspiration" })).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ import type { ToolChoicePool } from "@/lib/compendium/tool-options"
 import { cn } from "@/lib/utils"
 
 /** Phone tool grids — 6 options per page. */
-const PHONE_TOOL_PAGE_SIZE = 6
+const PHONE_TOOL_PAGE_SIZE = 9
 
 type ToolGroupedChoicesProps = {
   options: { name: string; description?: string }[]
