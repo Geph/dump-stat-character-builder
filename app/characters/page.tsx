@@ -244,7 +244,7 @@ export default function CharactersPage() {
               disabled={importing}
               className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors disabled:opacity-60"
             >
-              <Upload className="w-5 h-5" />
+              <Download className="w-5 h-5" />
               {importing ? "Importing…" : "Import JSON"}
             </button>
             {characters.length > 0 && (
@@ -253,7 +253,7 @@ export default function CharactersPage() {
                 onClick={handleExportAll}
                 className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
               >
-                <Download className="w-5 h-5" />
+                <Upload className="w-5 h-5" />
                 Export all
               </button>
             )}
@@ -292,8 +292,8 @@ export default function CharactersPage() {
         )}
 
         {!loading && characters.length > 0 && (
-          <div className="mb-6 space-y-3">
-            <div className="relative">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+            <div className="relative min-w-0 w-full sm:max-w-md sm:flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="search"
@@ -303,7 +303,7 @@ export default function CharactersPage() {
                 className="w-full pl-10 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
               />
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
               <select
                 value={filterClass}
                 onChange={(e) => setFilterClass(e.target.value)}

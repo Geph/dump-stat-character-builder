@@ -71,7 +71,7 @@ const VERSION_OPTIONS: VersionOption[] = [
   },
   {
     id: "compact-only",
-    title: "Compact Only",
+    title: "Compact View Only",
     description: "Clean and simple, no art",
     href: "#",
     imageSrc: COMPACT_INTERFACE_SPLASH_IMAGE,
@@ -81,11 +81,10 @@ const VERSION_OPTIONS: VersionOption[] = [
   {
     id: "no-ai",
     title: "No AI Whatsoever",
-    description: "TTRPG and tech tools entirely without AI",
-    href: "https://www.daggerheart.com/",
+    description: "I don't want to use anything with AI in it",
+    href: "https://en.wikipedia.org/wiki/Applications_of_artificial_intelligence",
     imageSrc: NO_AI_SPLASH_IMAGE,
     imageBackgroundClass: "bg-white",
-    sameTab: true,
   },
 ]
 
@@ -177,7 +176,7 @@ function VersionOptionCard({
 
   const titleBlock = (
     <h3
-      className="px-4 pt-3 text-xl font-bold text-foreground sm:text-2xl"
+      className="px-4 pt-3 text-center text-xl font-bold text-foreground sm:text-2xl"
       style={{ fontFamily: "var(--font-display)" }}
     >
       {option.title}
@@ -325,8 +324,7 @@ export function WelcomeSplashOverlay() {
                     href="https://cursor.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-base font-bold tracking-wide text-primary underline decoration-primary/50 underline-offset-[3px] shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary)_15%,transparent)] transition-colors hover:decoration-primary sm:text-lg"
-                    style={{ fontFamily: "var(--font-display)" }}
+                    className="font-bold text-primary underline underline-offset-2 hover:decoration-primary"
                   >
                     Cursor
                   </a>

@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, use, useEffect, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
@@ -13,9 +12,7 @@ import {
 } from "@/lib/character/share-snapshot"
 import { asCompendiumRows } from "@/lib/data/types"
 
-export default function ShareSnapshotPage() {
-  const params = useParams<{ token: string }>()
-  const token = typeof params.token === "string" ? params.token : ""
+function ShareSnapshotContent({ token }: { token: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<CharacterShareSnapshot | null>(null)
@@ -144,5 +141,32 @@ export default function ShareSnapshotPage() {
       </main>
       <SiteFooter />
     </div>
+  )
+}
+
+function ShareSnapshotRoute({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params)
+  return <ShareSnapshotContent token={token} />
+}
+
+export default function ShareSnapshotPage({
+  params,
+}: {
+  params: Promise<{ token: string }>
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex flex-col">
+          <MainNav />
+          <main className="max-w-3xl mx-auto px-4 py-8 w-full">
+            <p className={pageFloatingHintClass}>Loading snapshot…</p>
+          </main>
+          <SiteFooter />
+        </div>
+      }
+    >
+      <ShareSnapshotRoute params={params} />
+    </Suspense>
   )
 }
