@@ -321,21 +321,30 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
-  it("does not wire temporary_hit_points triggers/targets the sheet can't apply yet", () => {
-    // turn_start / on_hit triggers have no "grant temp HP" field on those characteristics.
+  it("does not wire temporary_hit_points triggers the sheet can't apply yet", () => {
+    // turn_start / on_hit triggers have no general "grant temp HP" path yet.
     expect(
       aiMechanicsToDetections(
         [{ kind: "temporary_hit_points", amount: 5, thpTrigger: "turn_start" }],
         { contentKind: "class_feature", featureName: "Turn Start THP" },
       ),
     ).toEqual([])
-    // Granting temp HP to another creature has no target on a single-character sheet.
-    expect(
-      aiMechanicsToDetections(
-        [{ kind: "temporary_hit_points", amount: 5, thpTarget: "allies_in_range" }],
-        { contentKind: "class_feature", featureName: "Ally THP" },
-      ),
-    ).toEqual([])
+  })
+
+  it("wires temporary_hit_points for ally targets with healTarget choose_ally", () => {
+    const detections = aiMechanicsToDetections(
+      [{ kind: "temporary_hit_points", amount: 5, thpTarget: "allies_in_range" }],
+      { contentKind: "class_feature", featureName: "Ally THP" },
+    )
+    expect(detections).toHaveLength(1)
+    expect(detections[0]?.ruleId).toBe("ai.temporary_hit_points")
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect).toMatchObject({
+      kind: "grant_temp_hp",
+      healMode: "fixed",
+      healFixed: 5,
+      healTarget: "choose_ally",
+    })
   })
 
   it("does not wire temporary_hit_points when the LLM mis-keys thpTrigger as generic `trigger` (Improved Warding Flare, Cleric domains audit)", () => {
