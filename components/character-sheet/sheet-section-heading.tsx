@@ -1,19 +1,23 @@
 "use client"
 
 import type { LucideIcon } from "lucide-react"
+import { GameIcon } from "@/components/game-icon-picker"
 import { cn } from "@/lib/utils"
 
 type SheetSectionHeadingProps = {
-  icon: LucideIcon
   children: React.ReactNode
   className?: string
   /** Match ability-tab uppercase labels vs combat panel titles. */
   size?: "sm" | "xs"
   as?: "h2" | "h3" | "p"
-}
+} & (
+  | { icon: LucideIcon; gameIcon?: never }
+  | { icon?: never; gameIcon: string }
+)
 
 export function SheetSectionHeading({
   icon: Icon,
+  gameIcon,
   children,
   className,
   size = "sm",
@@ -28,7 +32,11 @@ export function SheetSectionHeading({
         className,
       )}
     >
-      <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+      {gameIcon ? (
+        <GameIcon name={gameIcon} className="h-4 w-4 shrink-0 text-primary" />
+      ) : Icon ? (
+        <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+      ) : null}
       {children}
     </Tag>
   )

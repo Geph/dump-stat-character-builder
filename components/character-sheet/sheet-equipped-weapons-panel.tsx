@@ -69,7 +69,7 @@ function WeaponAttackCard({
 
   return (
     <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 min-w-0">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-stretch justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
@@ -158,20 +158,21 @@ function WeaponAttackCard({
           ) : null}
         </div>
 
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground uppercase">To Hit</span>
+        <div className="flex w-[6.75rem] shrink-0 flex-col gap-1 self-stretch min-h-[6.5rem]">
+          <div className="min-h-0 flex-1">
             <D20RollButton
               modifier={attack.attackBonus}
               title={`${weapon.name} attack`}
               breakdown={attack.attackBreakdown}
               rollContext={{ kind: "attack" }}
               onRoll={onAttackRoll}
+              layout="panel"
+              tone={hand === "off" ? "bonus" : "action"}
+              caption="To Hit"
             />
           </div>
           {damageExpression ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground uppercase">Dmg</span>
+            <div className="min-h-0 flex-1">
               <WeaponDamageRollButton
                 expression={damageExpression}
                 label={`${weapon.name} damage`}
@@ -179,6 +180,9 @@ function WeaponAttackCard({
                 showNoModToggle={hand === "off"}
                 defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
                 abilityModifier={abilityModifier}
+                layout="panel"
+                tone="damage"
+                caption="Dmg"
               />
             </div>
           ) : null}

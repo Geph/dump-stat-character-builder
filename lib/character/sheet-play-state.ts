@@ -34,6 +34,8 @@ export type CharacterSheetPlayState = {
   skillSortMode: "ability" | "alpha"
   /** Skill names pinned to the top of the skills list. */
   pinnedSkillNames: string[]
+  /** Equipment item ids pinned to the top of the equipment list. */
+  pinnedEquipmentIds: string[]
   /** Set when the player last saved play state to the database. */
   savedAt: string | null
 }
@@ -57,6 +59,7 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     resourceDieSidesByKey: {},
     skillSortMode: "ability",
     pinnedSkillNames: [],
+    pinnedEquipmentIds: [],
     savedAt: null,
   }
 }
@@ -129,6 +132,9 @@ export function normalizeSheetPlayState(
     pinnedSkillNames: Array.isArray(raw.pinnedSkillNames)
       ? raw.pinnedSkillNames.filter((entry): entry is string => typeof entry === "string")
       : base.pinnedSkillNames,
+    pinnedEquipmentIds: Array.isArray(raw.pinnedEquipmentIds)
+      ? raw.pinnedEquipmentIds.filter((entry): entry is string => typeof entry === "string")
+      : base.pinnedEquipmentIds,
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : base.savedAt,
   }
 }

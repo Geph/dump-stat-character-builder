@@ -195,12 +195,9 @@ export function compendiumPortraitListGradientClass(
   return compendiumGraphicCardListGradientClass(tab, cardImage)
 }
 
-/** Browse grid: 1 col on phones; portrait tabs show 4 columns from lg up. */
-export function compendiumBrowseGridClass(tab: CompendiumContentType): string {
-  if (compendiumUsesPortraitCardArt(tab)) {
-    return "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-  }
-  return "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+/** Browse grid: 1 col on phones; more columns only from tablet widths up. */
+export function compendiumBrowseGridClass(_tab: CompendiumContentType): string {
+  return "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
 }
 
 /** Portrait class/species/spell art is top-cropped; widescreen tabs use center framing. */

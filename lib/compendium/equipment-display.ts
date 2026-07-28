@@ -153,3 +153,50 @@ export function filterEquipmentList(items: Equipment[], query: string): Equipmen
 
   return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
 }
+
+export type EquipmentSheetFilter =
+  | "all"
+  | "armor"
+  | "weapons"
+  | "adventuring_gear"
+  | "magic"
+  | "pinned"
+
+export function matchesEquipmentSheetFilter(
+  item: Equipment,
+  filter: EquipmentSheetFilter,
+  pinnedIds: readonly string[] = [],
+): boolean {
+  switch (filter) {
+    case "all":
+      return true
+    case "armor":
+      return isArmorItem(item) || isShieldItem(item)
+    case "weapons":
+      return isWeaponItem(item)
+    case "adventuring_gear": {
+      const category = (item.category ?? "").trim().toLowerCase()
+      return category === "adventuring gear" || category === "tool"
+    }
+    case "magic":
+      return isMagicItem(item)
+    case "pinned":
+      return pinnedIds.includes(item.id)
+    default:
+      return true
+  }
+}
+
+/** Pin selected equipment to the top while preserving relative order within each group. */
+export function orderEquipmentWithPins(
+  items: readonly Equipment[],
+  pinnedIds: readonly string[],
+): Equipment[] {
+  if (!pinnedIds.length) return [...items]
+  const pinnedSet = new Set(pinnedIds)
+  const pinned = pinnedIds
+    .map((id) => items.find((item) => item.id === id))
+    .filter((item): item is Equipment => Boolean(item))
+  const rest = items.filter((item) => !pinnedSet.has(item.id))
+  return [...pinned, ...rest]
+}

@@ -13,7 +13,7 @@ import {
   UserCircle,
   Swords,
   Backpack,
-  Sparkles,
+  Medal,
   PawPrint,
   Wand2,
   FileText,
@@ -51,13 +51,13 @@ const SHEET_TABS: {
   },
   {
     id: "equipment",
-    label: "Equipment",
+    label: "Gear",
     icon: <Backpack className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   },
   {
     id: "features",
     label: "Features",
-    icon: <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden />,
+    icon: <Medal className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   },
   {
     id: "companions",

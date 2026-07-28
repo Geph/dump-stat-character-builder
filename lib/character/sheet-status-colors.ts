@@ -4,12 +4,13 @@ import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 /** Row backgrounds for proficient saves, skills, and similar sheet tiles. */
 export const SHEET_STATUS_ROW = {
-  saveProficient: "bg-sky/15 text-foreground font-medium border border-sky/25",
+  saveProficient:
+    "bg-primary/30 text-foreground font-semibold border border-primary/45",
   skillProficient:
     "bg-lime/12 text-foreground font-medium border border-lime/20",
   skillCustom:
     "bg-violet/12 text-foreground font-medium border border-violet/20",
-  muted: "bg-muted/50 text-muted-foreground",
+  muted: "bg-muted/85 text-muted-foreground border border-border/70",
 } as const
 
 export const SHEET_STATUS_BADGE = {
@@ -21,6 +22,8 @@ export const SHEET_STATUS_BADGE = {
 
 /** Character sheet header chips (species, background, etc.). */
 export const SHEET_BANNER_BADGE = {
+  class:
+    "px-2 py-0.5 rounded-full text-xs font-medium bg-primary/14 text-foreground border border-primary/28",
   species:
     "px-2 py-0.5 rounded-full text-xs font-medium bg-lime/12 text-foreground border border-lime/22",
   size: "px-2 py-0.5 rounded-full text-xs font-medium bg-muted/40 text-foreground border border-border/40",
@@ -124,6 +127,28 @@ export function abilityScoreValueClass(theme: AppThemeId): string {
   return theme === "astral"
     ? "text-sm font-black text-white"
     : "text-sm font-black text-secondary-foreground"
+}
+
+/** Beyond-style ability tile: label → large modifier frame → score pill. */
+export function abilityScoreTileClass(theme: AppThemeId): string {
+  return theme === "astral"
+    ? "relative flex flex-col items-center rounded-xl border border-white/15 bg-gradient-to-b from-white/10 to-card/70 px-1.5 pb-2 pt-2 shadow-sm"
+    : "relative flex flex-col items-center rounded-xl border border-border/80 bg-gradient-to-b from-muted/55 to-card/90 px-1.5 pb-2 pt-2 shadow-sm"
+}
+
+export function abilityScoreModifierFrameClass(theme: AppThemeId): string {
+  return theme === "astral"
+    ? "mt-1.5 flex h-12 w-12 items-center justify-center rounded-md border-2 border-white/40 bg-black/25"
+    : "mt-1.5 flex h-12 w-12 items-center justify-center rounded-md border-2 border-primary/45 bg-background/90"
+}
+
+export function abilityScorePillClass(theme: AppThemeId, ability: AbilityScoreKey): string {
+  const base =
+    "relative z-[1] min-w-[2rem] rounded-full border px-2.5 py-0.5 text-center text-xs font-black tabular-nums"
+  if (theme === "astral") {
+    return `${base} border-white/25 text-white ${ASTRAL_ABILITY_SCORE_COLORS[ability]}`
+  }
+  return `${base} border-border bg-muted text-foreground`
 }
 
 /** Action cards on the combat / abilities tabs. */

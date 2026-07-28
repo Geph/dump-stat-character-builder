@@ -1267,7 +1267,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <h1 className="text-4xl font-black text-foreground mb-2">Compendium</h1>
             <p className={pageHeaderSubtitleClass}>Browse and edit all available D&D content</p>
           </div>
-          <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:gap-2 sm:self-start">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:w-auto sm:flex-nowrap sm:gap-2 sm:self-start">
             <label className="sr-only" htmlFor="compendium-mobile-tab-select">
               Compendium section
             </label>
@@ -1275,7 +1275,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               id="compendium-mobile-tab-select"
               value={activeTab}
               onChange={(event) => setActiveTab(event.target.value as ContentType)}
-              className="min-w-0 flex-1 rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none sm:hidden"
+              className="min-w-0 flex-1 basis-[min(100%,12rem)] rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none sm:hidden"
             >
               {tabs.map((tab) => (
                 <option key={tab.id} value={tab.id}>
@@ -1325,7 +1325,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
             <div
               id="compendium-search"
-              className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+              className="flex min-w-0 flex-1 basis-full items-center gap-1.5 sm:basis-auto sm:flex-none sm:gap-2"
             >
               {!isCompactOnly ? (
                 <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
@@ -1359,7 +1359,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   </button>
                 </div>
               ) : null}
-              <div className="relative w-28 shrink-0 sm:w-36">
+              <div className="relative min-w-0 flex-1 sm:w-36 sm:flex-none">
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3 sm:h-4 sm:w-4" />
                 <input
                   type="text"
@@ -1373,7 +1373,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             </div>
             <Link
               href={compendiumEditHref(activeTab, "new")}
-              className="inline-flex max-w-[42vw] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
+              className="inline-flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
             >
               <Plus className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
               <span className="truncate">{newItemButtonLabels[activeTab]}</span>
@@ -1873,7 +1873,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     {group.items.length}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   <AnimatePresence>
                     {group.items.map(renderContentCard)}
                   </AnimatePresence>

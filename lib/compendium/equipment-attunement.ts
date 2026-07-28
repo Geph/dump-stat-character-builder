@@ -59,7 +59,10 @@ export function isMagicItem(item: Equipment): boolean {
 
 /** Wear/wield is blocked until the item is attuned. */
 export function mustAttuneBeforeEquip(item: Equipment): boolean {
-  return isMagicItem(item) && (isArmorItem(item) || isShieldItem(item) || isWeaponItem(item))
+  return (
+    equipmentRequiresAttunement(item) &&
+    (isArmorItem(item) || isShieldItem(item) || isWeaponItem(item))
+  )
 }
 
 /** Items the sheet can mark equipped or attuned (SRD p. 102). */
@@ -73,5 +76,5 @@ export function isSheetEquippableItem(item: Equipment): boolean {
 }
 
 export function isAttunableItem(item: Equipment): boolean {
-  return isMagicItem(item)
+  return equipmentRequiresAttunement(item)
 }

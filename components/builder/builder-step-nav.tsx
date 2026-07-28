@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChevronLeft, ChevronRight, Check } from "lucide-react"
 import { ProceedBlockerBanner } from "@/components/builder/proceed-blocker-banner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 type BuilderStepNavProps = {
   currentStep: number
@@ -24,31 +25,45 @@ type BuilderStepNavProps = {
    * (e.g. CLASS_ABILITIES is 8, DETAILS is 6).
    */
   lastStep?: number
+  /** Dense builder layout — use tighter controls on the smallest phone screens. */
+  compact?: boolean
 }
 
 function ContinueButton({
   disabled,
   onContinue,
   className = "",
+  compact = false,
 }: {
   disabled: boolean
   onContinue: () => void
   className?: string
+  compact?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onContinue}
       disabled={disabled}
-      className={`flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors ${className}`}
+      className={cn(
+        "flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors",
+        compact && "max-sm:gap-1 max-sm:h-[30px] max-sm:px-2.5 max-sm:py-0 max-sm:text-xs max-sm:rounded-lg",
+        className,
+      )}
     >
       Continue
-      <ChevronRight className="w-4 h-4" />
+      <ChevronRight className={cn("w-4 h-4", compact && "max-sm:w-3.5 max-sm:h-3.5")} />
     </button>
   )
 }
 
-function BlockedContinueButton({ blockers }: { blockers: string[] }) {
+function BlockedContinueButton({
+  blockers,
+  compact = false,
+}: {
+  blockers: string[]
+  compact?: boolean
+}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -64,7 +79,12 @@ function BlockedContinueButton({ blockers }: { blockers: string[] }) {
           onFocus={() => setOpen(true)}
           onBlur={() => setOpen(false)}
         >
-          <ContinueButton disabled onContinue={() => {}} className="pointer-events-none" />
+          <ContinueButton
+            disabled
+            onContinue={() => {}}
+            compact={compact}
+            className="pointer-events-none"
+          />
         </span>
       </PopoverTrigger>
       <PopoverContent
@@ -95,37 +115,44 @@ export function BuilderStepNav({
   saveLabel = "Create Character",
   className = "",
   lastStep = 6,
+  compact = false,
 }: BuilderStepNavProps) {
   const saveEnabled = canSave ?? canProceed
   const showBlockerPopover = !canProceed && proceedBlockers.length > 0
 
   return (
-    <div className={`flex items-center justify-end gap-2 shrink-0 ${className}`}>
+    <div className={cn("flex items-center justify-end gap-2 shrink-0", compact && "max-sm:gap-1.5", className)}>
       <button
         type="button"
         onClick={onBack}
         disabled={currentStep === 1}
-        className="flex items-center gap-2 px-4 py-2 bg-lemon text-lemon-foreground rounded-xl font-bold text-sm disabled:opacity-30 transition-colors hover:brightness-110"
+        className={cn(
+          "flex items-center gap-2 px-4 py-2 bg-lemon text-lemon-foreground rounded-xl font-bold text-sm disabled:opacity-30 transition-colors hover:brightness-110",
+          compact && "max-sm:gap-1 max-sm:h-[30px] max-sm:px-2.5 max-sm:py-0 max-sm:text-xs max-sm:rounded-lg",
+        )}
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft className={cn("w-4 h-4", compact && "max-sm:w-3.5 max-sm:h-3.5")} />
         Back
       </button>
 
       {currentStep !== lastStep ? (
         showBlockerPopover ? (
-          <BlockedContinueButton blockers={proceedBlockers} />
+          <BlockedContinueButton blockers={proceedBlockers} compact={compact} />
         ) : (
-          <ContinueButton disabled={!canProceed} onContinue={onContinue} />
+          <ContinueButton disabled={!canProceed} onContinue={onContinue} compact={compact} />
         )
       ) : (
         <button
           type="button"
           onClick={onSave}
           disabled={saving || !saveEnabled}
-          className="flex items-center gap-2 px-5 py-2 bg-success text-white rounded-xl font-bold text-sm hover:bg-success/90 disabled:opacity-50 transition-colors"
+          className={cn(
+            "flex items-center gap-2 px-5 py-2 bg-success text-white rounded-xl font-bold text-sm hover:bg-success/90 disabled:opacity-50 transition-colors",
+            compact && "max-sm:gap-1 max-sm:h-[30px] max-sm:px-2.5 max-sm:py-0 max-sm:text-xs max-sm:rounded-lg",
+          )}
         >
           {saving ? "Saving..." : saveLabel}
-          <Check className="w-4 h-4" />
+          <Check className={cn("w-4 h-4", compact && "max-sm:w-3.5 max-sm:h-3.5")} />
         </button>
       )}
     </div>

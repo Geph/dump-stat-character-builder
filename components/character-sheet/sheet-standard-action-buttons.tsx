@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { X } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
 import {
   DEFAULT_SHEET_ACTIONS,
   type DefaultSheetAction,
@@ -24,33 +24,61 @@ export function SheetStandardActionButtons({
   disabled = false,
 }: SheetStandardActionButtonsProps) {
   const [detail, setDetail] = useState<DefaultSheetAction | null>(null)
+  const [expanded, setExpanded] = useState(true)
 
   return (
     <>
       <div className="mb-3">
-        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-          Standard
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {COMBAT_STANDARD_ACTIONS.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              disabled={disabled}
-              title={action.description}
-              onClick={() => {
-                onUse("action", action)
-                setDetail(action)
-              }}
-              className={cn(
-                "rounded-md border border-border/80 bg-muted/30 px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
-                disabled && "pointer-events-none opacity-50",
-              )}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+          className="mb-1.5 inline-flex items-center gap-1 rounded-lg px-0.5 py-0.5 text-left transition-colors hover:bg-muted/40"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Standard
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180",
+            )}
+            aria-hidden
+          />
+        </button>
+        <AnimatePresence initial={false}>
+          {expanded ? (
+            <motion.div
+              key="standard-actions"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden"
             >
-              {action.name}
-            </button>
-          ))}
-        </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {COMBAT_STANDARD_ACTIONS.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    disabled={disabled}
+                    title={action.description}
+                    onClick={() => {
+                      onUse("action", action)
+                      setDetail(action)
+                    }}
+                    className={cn(
+                      "rounded-md border border-border/80 bg-muted/30 px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
+                      disabled && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    {action.name}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <AnimatePresence>

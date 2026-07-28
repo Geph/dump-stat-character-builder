@@ -22,7 +22,6 @@ import {
 import { MainNav } from "@/components/main-nav"
 import {
   pageFloatingHintClass,
-  pageHeaderSubtitleClass,
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import {
@@ -1014,12 +1013,7 @@ export default function ImportPage() {
         </div>
 
         <div id="import-header" className="mb-8 sm:pr-56">
-          <h1 className="text-4xl font-black text-foreground mb-2">Import Content</h1>
-          <p className={pageHeaderSubtitleClass}>
-            {staticMode
-              ? "Import homebrew with BYO LLM (copy a prompt into your own LLM, paste JSON back), share JSON packs, or reload the bundled SRD — data stays in your browser."
-              : "Import homebrew with BYO LLM, upload PDFs or JSON when available, and review before saving to your library."}
-          </p>
+          <h1 className="text-4xl font-black text-foreground">Import Content</h1>
           {staticMode && (
             <p className={`${pageFloatingHintClass} mt-2`}>
               Storage: {getStorageLabel()}. PDF and server AI import require a hosted deployment with

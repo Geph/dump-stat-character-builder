@@ -17,8 +17,13 @@ type D20RollButtonProps = {
   modifier: number
   title?: string
   size?: "sm" | "md" | "lg"
-  /** `stack` puts adv/dis above the roll button (centered). Default is side-by-side. */
-  layout?: "inline" | "stack"
+  /** `stack` puts adv/dis above the roll button (centered). `panel` fills parent height. */
+  layout?: "inline" | "stack" | "panel"
+  /** Color fill for weapon / large combat buttons. */
+  tone?: "default" | "action" | "bonus"
+  /** Optional caption shown inside filled panel buttons (e.g. TO HIT). */
+  caption?: string
+  className?: string
   breakdown?: { label: string; value: number }[]
   onRoll?: () => void
   rollContext?: RollContext
@@ -52,8 +57,8 @@ function cycleManualOverride(current: ManualRollOverride): ManualRollOverride {
   return "normal"
 }
 
-function RollDiceIcon({ className = "w-3 h-3" }: { className?: string }) {
-  return <Dices className={`${className} text-muted-foreground shrink-0`} aria-hidden />
+function RollDiceIcon({ className = "w-3 h-3 text-muted-foreground" }: { className?: string }) {
+  return <Dices className={`${className} shrink-0`} aria-hidden />
 }
 
 export function D20RollButton({
@@ -61,6 +66,9 @@ export function D20RollButton({
   title,
   size = "sm",
   layout = "inline",
+  tone = "default",
+  caption,
+  className,
   breakdown,
   onRoll,
   rollContext,
@@ -124,12 +132,22 @@ export function D20RollButton({
   const effectiveModifier = modifier + featureRollBonus
 
   const effectiveMode = resolved.mode
+  const filled = tone !== "default" || layout === "panel"
   const sizeClass =
-    size === "lg"
-      ? "h-11 min-w-11 px-2 text-sm gap-1.5"
-      : size === "md"
-        ? "h-9 min-w-9 px-2 text-sm gap-1.5"
-        : "h-6 min-w-[2.25rem] px-1.5 text-xs gap-1"
+    layout === "panel"
+      ? "min-h-0 flex-1 w-full px-2 text-sm gap-1"
+      : size === "lg"
+        ? "h-11 min-w-11 px-2 text-sm gap-1.5"
+        : size === "md"
+          ? "h-9 min-w-9 px-2 text-sm gap-1.5"
+          : "h-6 min-w-[2.25rem] px-1.5 text-xs gap-1"
+
+  const toneClass =
+    tone === "action"
+      ? "border-2 border-amber-400/80 bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-600"
+      : tone === "bonus"
+        ? "border-2 border-sky-400/80 bg-gradient-to-b from-sky-500 to-sky-700 text-white shadow-md shadow-sky-500/20 hover:from-sky-400 hover:to-sky-600"
+        : "border border-border bg-muted/80 hover:bg-muted"
 
   const modLabel = effectiveModifier >= 0 ? `+${effectiveModifier}` : `${effectiveModifier}`
   const modeBadge = rollModeBadgeLabel(effectiveMode)
@@ -183,9 +201,13 @@ export function D20RollButton({
         setManualOverride((current) => cycleManualOverride(current))
       }}
       className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
-        modeBadge || manualOverride !== "normal"
-          ? "border-primary/40 text-primary"
-          : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+        filled
+          ? modeBadge || manualOverride !== "normal"
+            ? "border-white/55 bg-black/15 text-white"
+            : "border-white/25 bg-black/10 text-white/80 hover:border-white/45"
+          : modeBadge || manualOverride !== "normal"
+            ? "border-primary/40 text-primary"
+            : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
       }`}
       title="Cycle manual advantage / disadvantage override"
       aria-label="Cycle roll mode override"
@@ -199,27 +221,65 @@ export function D20RollButton({
       type="button"
       onClick={handleRoll}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded border border-border bg-muted/80 font-bold tabular-nums hover:bg-muted shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClass}`}
+      className={`inline-flex items-center justify-center rounded font-bold tabular-nums shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClass} ${toneClass} ${className ?? ""}`}
       title={disabledReason ?? tooltip}
       aria-label={title ?? `Roll d20 ${modLabel}`}
     >
-      <RollDiceIcon />
-      {effectiveMode === "auto_fail" ? (
-        <span className="font-medium text-destructive">Fail</span>
-      ) : result != null ? (
-        <span className="font-medium">
-          {result.natural}
-          <span className="text-muted-foreground">=</span>
-          <span className="font-black text-primary">{result.total}</span>
-          {isNat20OrNat1(result.natural) ? (
-            <span className="text-primary" aria-label="Natural 20 or natural 1">
-              !!
+      {caption ? (
+        <span className="flex flex-col items-center gap-0.5 leading-none">
+          <span className={`text-[9px] font-bold uppercase tracking-wide ${filled ? "text-white/85" : "text-muted-foreground"}`}>
+            {caption}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <RollDiceIcon className={filled ? "w-3.5 h-3.5 text-white/90" : "w-3 h-3"} />
+            {effectiveMode === "auto_fail" ? (
+              <span className={`font-medium ${filled ? "text-white" : "text-destructive"}`}>Fail</span>
+            ) : result != null ? (
+              <span className={`font-medium ${filled ? "text-white" : ""}`}>
+                {result.natural}
+                <span className={filled ? "text-white/70" : "text-muted-foreground"}>=</span>
+                <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{result.total}</span>
+                {isNat20OrNat1(result.natural) ? (
+                  <span className={filled ? "text-white" : "text-primary"} aria-label="Natural 20 or natural 1">
+                    !!
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              <span className={filled ? "text-white" : "text-foreground"}>{modLabel}</span>
+            )}
+          </span>
+        </span>
+      ) : (
+        <>
+          <RollDiceIcon className={filled ? "w-3.5 h-3.5 text-white/90" : undefined} />
+          {effectiveMode === "auto_fail" ? (
+            <span className={`font-medium ${filled ? "text-white" : "text-destructive"}`}>Fail</span>
+          ) : result != null ? (
+            <span className={`font-medium ${filled ? "text-white" : ""}`}>
+              {result.natural}
+              <span className={filled ? "text-white/70" : "text-muted-foreground"}>=</span>
+              <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{result.total}</span>
+              {isNat20OrNat1(result.natural) ? (
+                <span className={filled ? "text-white" : "text-primary"} aria-label="Natural 20 or natural 1">
+                  !!
+                </span>
+              ) : null}
             </span>
           ) : null}
-        </span>
-      ) : null}
+        </>
+      )}
     </button>
   )
+
+  if (layout === "panel") {
+    return (
+      <span className="flex h-full min-h-0 w-full flex-col items-stretch gap-0.5">
+        <span className="flex justify-end">{modeToggle}</span>
+        {rollButton}
+      </span>
+    )
+  }
 
   if (layout === "stack") {
     return (

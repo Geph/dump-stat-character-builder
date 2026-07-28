@@ -63,6 +63,7 @@ export function buildSheetPlayStateFromSheet(params: {
   resourceDieSidesByKey: CharacterSheetPlayState["resourceDieSidesByKey"]
   skillSortMode?: CharacterSheetPlayState["skillSortMode"]
   pinnedSkillNames?: CharacterSheetPlayState["pinnedSkillNames"]
+  pinnedEquipmentIds?: CharacterSheetPlayState["pinnedEquipmentIds"]
   savedAt?: string | null
 }): CharacterSheetPlayState {
   return normalizeSheetPlayState({

@@ -1,6 +1,7 @@
 "use client"
 
-import { Coins, Info, Plus, Search } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Coins, Info, Pin, Plus, Search } from "lucide-react"
 import {
   DEFAULT_ATTUNEMENT_SLOTS,
   isAttunableItem,
@@ -12,12 +13,26 @@ import {
   needsBaseSelection,
   resolveCharacterEquipment,
 } from "@/lib/compendium/equipment-base-selection"
-import { filterEquipmentList } from "@/lib/compendium/equipment-display"
+import {
+  filterEquipmentList,
+  matchesEquipmentSheetFilter,
+  orderEquipmentWithPins,
+  type EquipmentSheetFilter,
+} from "@/lib/compendium/equipment-display"
 import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
 import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+const EQUIPMENT_FILTER_OPTIONS: { value: EquipmentSheetFilter; label: string }[] = [
+  { value: "all", label: "All items" },
+  { value: "armor", label: "Armor" },
+  { value: "weapons", label: "Weapons" },
+  { value: "adventuring_gear", label: "Adventuring gear" },
+  { value: "magic", label: "Magic items" },
+  { value: "pinned", label: "Pinned" },
+]
 
 type SheetEquipmentPanelProps = {
   equipment: Equipment[]
@@ -35,6 +50,8 @@ type SheetEquipmentPanelProps = {
   equippedOffHandWeaponId: string | null
   attunedItemIds: string[]
   maxAttunementSlots: number
+  pinnedEquipmentIds: string[]
+  onTogglePinnedEquipment: (id: string) => void
   onEquipArmor: (id: string | null) => void
   onEquipShield: (id: string | null) => void
   onEquipWeapon: (id: string | null) => void
@@ -92,6 +109,8 @@ export function SheetEquipmentPanel({
   equippedOffHandWeaponId,
   attunedItemIds,
   maxAttunementSlots,
+  pinnedEquipmentIds,
+  onTogglePinnedEquipment,
   onEquipArmor,
   onEquipShield,
   onEquipWeapon,
@@ -99,7 +118,14 @@ export function SheetEquipmentPanel({
   onToggleAttune,
   onShowDetails,
 }: SheetEquipmentPanelProps) {
-  const filtered = filterEquipmentList(equipment, searchQuery)
+  const [categoryFilter, setCategoryFilter] = useState<EquipmentSheetFilter>("all")
+  const filtered = useMemo(() => {
+    const bySearch = filterEquipmentList(equipment, searchQuery)
+    const byCategory = bySearch.filter((item) =>
+      matchesEquipmentSheetFilter(item, categoryFilter, pinnedEquipmentIds),
+    )
+    return orderEquipmentWithPins(byCategory, pinnedEquipmentIds)
+  }, [equipment, searchQuery, categoryFilter, pinnedEquipmentIds])
   const attunedCount = attunedItemIds.length
   const slotCap = maxAttunementSlots || DEFAULT_ATTUNEMENT_SLOTS
 
@@ -122,16 +148,30 @@ export function SheetEquipmentPanel({
           <span className="text-[10px] text-muted-foreground">GP</span>
         </div>
         {equipment.length > 0 ? (
-          <div className="relative min-w-[10rem] flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
-              placeholder="Search equipment..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
+          <>
+            <div className="relative min-w-[8rem] flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
+                placeholder="Search equipment..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as EquipmentSheetFilter)}
+              aria-label="Filter equipment"
+              className="h-[30px] shrink-0 rounded-lg border border-border bg-muted px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              {EQUIPMENT_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </>
         ) : null}
         <button
           type="button"
@@ -159,7 +199,12 @@ export function SheetEquipmentPanel({
             const isWeapon = isWeaponItem(resolved)
             const attunable = isAttunableItem(item)
             const isAttuned = attunedItemIds.includes(item.id)
+            const attunementSlot = isAttuned ? attunedItemIds.indexOf(item.id) + 1 : null
             const attuneDisabled = attunable && !isAttuned && attunedCount >= slotCap
+            const attuneDisabledTitle =
+              attuneDisabled
+                ? `Attunement limit reached (${attunedCount}/${slotCap})`
+                : undefined
             const equipBlocked = mustAttuneBeforeEquip(item) && !isAttuned
             const equipBlockedTitle = "Attune this magic item before equipping it"
             const baseOptions = getBaseSelectionOptions(item, catalog)
@@ -168,6 +213,8 @@ export function SheetEquipmentPanel({
             const selectedBaseId =
               equipmentBaseSelections[item.id] ?? item.selected_base_equipment_id ?? ""
             const summary = magicItemSummaryLine(item, resolved)
+            const showSummary = Boolean(summary && !summary.startsWith("Damage "))
+            const pinned = pinnedEquipmentIds.includes(item.id)
 
             return (
               <div
@@ -179,16 +226,35 @@ export function SheetEquipmentPanel({
                     equippedWeaponId === item.id ||
                     equippedOffHandWeaponId === item.id) &&
                     "border-primary/50 bg-primary/5",
+                  pinned && "border-primary/35",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onTogglePinnedEquipment(item.id)}
+                        title={pinned ? "Unpin item" : "Pin item to top"}
+                        aria-label={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
+                        aria-pressed={pinned}
+                        className={cn(
+                          "hidden max-sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors",
+                          pinned
+                            ? "text-primary bg-primary/10 hover:bg-primary/15"
+                            : "text-muted-foreground/70 hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        {pinned ? (
+                          <Pin className="h-4 w-4 fill-current" aria-hidden />
+                        ) : (
+                          <Pin className="h-4 w-4" aria-hidden />
+                        )}
+                      </button>
                       <p className="text-xs font-semibold text-foreground truncate">{item.name}</p>
                       <MagicEquipmentBadges item={item} />
-                      <span className="text-[10px] text-muted-foreground shrink-0">{item.category}</span>
                     </div>
-                    {summary && (
+                    {showSummary && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">{summary}</p>
                     )}
                     {showBasePicker && (
@@ -270,9 +336,10 @@ export function SheetEquipmentPanel({
                       ) : null}
                       {attunable && (
                         <EquipRow
-                          label="Attune"
+                          label={attunementSlot != null ? `Attune ${attunementSlot}` : "Attune"}
                           checked={isAttuned}
                           disabled={attuneDisabled}
+                          title={attuneDisabledTitle}
                           onChange={() => onToggleAttune(item.id)}
                         />
                       )}

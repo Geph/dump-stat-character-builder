@@ -74,6 +74,23 @@ function hpBarTone(currentHp: number, maxHp: number): string {
   return "from-emerald-500 to-emerald-400"
 }
 
+function CompactStatHeader({
+  label,
+  icon,
+}: {
+  label: string
+  icon: ReactNode
+}) {
+  return (
+    <div className="flex w-full flex-col items-center gap-0.5 @[7.5rem]:flex-row @[7.5rem]:justify-center @[7.5rem]:gap-1.5">
+      <span className="shrink-0 text-white/90 @[7.5rem]:order-1">{icon}</span>
+      <p className="text-[9px] font-bold uppercase tracking-wider text-white/85 leading-none @[7.5rem]:order-2">
+        {label}
+      </p>
+    </div>
+  )
+}
+
 function CombatStatsCompactRow({
   armorClass,
   acBreakdown,
@@ -103,29 +120,27 @@ function CombatStatsCompactRow({
   const walkSpeed = speeds.find((entry) => entry.type === "walk")?.feet ?? speed
 
   return (
-    <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
-      <div className="flex min-w-[5rem] shrink-0 flex-col justify-center gap-2 rounded-lg border border-primary/25 bg-gradient-to-br from-primary/12 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-0 sm:flex-1 sm:shrink">
-        <div className="flex items-center gap-1.5">
-          <Shield className="h-4 w-4 text-primary shrink-0" aria-hidden />
-          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
-            AC
-          </p>
-          <StatExplainPopover
-            title="Armor Class"
-            total={armorClass}
-            parts={acBreakdown}
-            contributions={statBreakdowns ? breakdownLines(statBreakdowns, "ac") : undefined}
-          />
-        </div>
-        <span className="block w-full text-center text-2xl font-black tabular-nums leading-none text-primary">
+    <div className="flex flex-wrap items-stretch gap-2">
+      <div className="@container flex min-w-[5rem] flex-1 basis-[5rem] flex-col items-center justify-center gap-2 rounded-xl border-2 border-emerald-400/70 bg-gradient-to-b from-emerald-500 to-emerald-700 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-emerald-500/20">
+        <CompactStatHeader
+          label="AC"
+          icon={<Shield className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
+        />
+        <StatExplainPopover
+          title="Armor Class"
+          total={armorClass}
+          parts={acBreakdown}
+          contributions={statBreakdowns ? breakdownLines(statBreakdowns, "ac") : undefined}
+          className="block w-full text-center text-2xl font-black tabular-nums leading-none text-white hover:text-white/90"
+        >
           {armorClass}
-        </span>
+        </StatExplainPopover>
         {incomingAttackNotes && incomingAttackNotes.length > 0 ? (
           <div className="space-y-0.5 max-w-[10rem]">
             {incomingAttackNotes.map((note) => (
               <p
                 key={`${note.label}:${note.detail}`}
-                className="text-[9px] leading-tight text-amber-800 dark:text-amber-300 line-clamp-2"
+                className="text-[9px] leading-tight text-white/85 line-clamp-2"
                 title={note.detail}
               >
                 {note.detail}
@@ -135,67 +150,67 @@ function CombatStatsCompactRow({
         ) : null}
       </div>
 
-      <div className="flex min-w-[5.5rem] shrink-0 flex-col justify-center gap-2 rounded-lg border border-sky-500/25 bg-gradient-to-br from-sky-500/10 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-0 sm:flex-1 sm:shrink">
-        <div className="flex items-center gap-1.5">
-          <Footprints className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden />
-          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
-            Speed
-          </p>
-          <StatExplainPopover
-            title="Speed"
-            total={speed}
-            summable={false}
-            contributions={statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined}
-          />
-        </div>
-        {speeds.length > 1 ? (
-          <div className="flex w-full flex-col items-center gap-0.5 text-center text-xs font-bold leading-snug tabular-nums">
-            {speeds.map((entry) => (
-              <span key={entry.type}>
-                {entry.feet} ft {entry.label}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <span className="block w-full text-center text-xl font-black tabular-nums leading-none">
-            {walkSpeed}
-            <span className="ml-0.5 text-xs font-bold text-muted-foreground">ft</span>
-          </span>
-        )}
+      <div className="@container flex min-w-[5rem] flex-1 basis-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl border-2 border-sky-400/70 bg-gradient-to-b from-sky-500 to-sky-700 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-sky-500/20">
+        <CompactStatHeader
+          label="Speed"
+          icon={<Footprints className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
+        />
+        <StatExplainPopover
+          title="Speed"
+          total={speed}
+          summable={false}
+          contributions={statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined}
+          className="block w-full text-center text-white hover:text-white/90"
+        >
+          {speeds.length > 1 ? (
+            <div className="flex w-full flex-col items-center gap-0.5 text-center text-xs font-bold leading-snug tabular-nums">
+              {speeds.map((entry) => (
+                <span key={entry.type}>
+                  {entry.feet} ft {entry.label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="block w-full text-center text-xl font-black tabular-nums leading-none">
+              {walkSpeed}
+              <span className="ml-0.5 text-xs font-bold text-white/80">ft</span>
+            </span>
+          )}
+        </StatExplainPopover>
       </div>
 
-      <div className="flex w-48 shrink-0 flex-col justify-center gap-2 rounded-lg border border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-card px-3 py-3 min-h-[5.625rem] sm:w-auto sm:min-w-48 sm:flex-1 sm:shrink">
-        <div className="flex items-center gap-1.5">
-          <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />
-          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
-            Initiative
-          </p>
-          <StatExplainPopover
-            title="Initiative"
-            total={initiative}
-            contributions={
-              statBreakdowns ? breakdownLines(statBreakdowns, "initiative") : undefined
-            }
-          />
-        </div>
-        <div className="flex items-center justify-center gap-1.5">
-          <span className="text-xl font-black tabular-nums leading-none">
-            {formatMod(initiative)}
-          </span>
-          <D20RollButton
-            modifier={initiative}
-            title="Roll initiative"
-            size="md"
-            rollContext={{ kind: "initiative", ability: "dexterity" }}
-            onRoll={onInitiativeRoll}
-          />
-        </div>
+      <div className="@container flex min-w-[4.75rem] flex-1 basis-[5.25rem] flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/70 bg-gradient-to-b from-amber-500 to-amber-700 px-2 py-3 min-h-[5.625rem] text-white shadow-md shadow-amber-500/20 sm:px-3">
+        <CompactStatHeader
+          label="Initiative"
+          icon={<Zap className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
+        />
+        <D20RollButton
+          modifier={initiative}
+          title="Roll initiative"
+          size="md"
+          layout="stack"
+          rollContext={{ kind: "initiative", ability: "dexterity" }}
+          onRoll={onInitiativeRoll}
+        />
+        <StatExplainPopover
+          title="Initiative"
+          total={initiative}
+          contributions={
+            statBreakdowns ? breakdownLines(statBreakdowns, "initiative") : undefined
+          }
+          className="text-lg font-black tabular-nums leading-none text-white hover:text-white/90 sm:text-xl"
+        >
+          {formatMod(initiative)}
+        </StatExplainPopover>
       </div>
 
-      <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-2.5 rounded-lg border border-destructive/20 bg-gradient-to-br from-destructive/6 to-card px-3 py-3 min-h-[5.625rem] sm:min-w-[12rem] sm:flex-[1.4]">
+      <div className="@container flex w-full min-w-[min(100%,17rem)] flex-[1.4] basis-[17rem] flex-col justify-center gap-2.5 rounded-xl border-2 border-rose-400/70 bg-gradient-to-b from-rose-500 to-rose-800 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-rose-500/20">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="flex items-center gap-2 shrink-0">
-            <Heart className="h-4 w-4 text-destructive shrink-0" aria-hidden />
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Heart className="h-4 w-4 text-white/90 shrink-0" aria-hidden />
+            <span className="text-[9px] font-bold uppercase tracking-wider text-white/85">
+              Hit Points
+            </span>
             <div className="flex items-baseline gap-1">
               <input
                 type="number"
@@ -209,15 +224,18 @@ function CombatStatsCompactRow({
                   )
                 }}
                 aria-label="Current hit points"
-                className="w-11 min-h-8 text-center bg-background border border-border rounded px-0.5 text-lg font-black tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-11 min-h-8 text-center bg-black/25 border border-white/25 rounded px-0.5 text-lg font-black tabular-nums text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
-              <span className="text-sm font-bold text-muted-foreground tabular-nums">/ {maxHp}</span>
+              <span className="text-sm font-bold text-white/80 tabular-nums">/ {maxHp}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0 rounded border border-cyan/25 bg-cyan/5 px-1.5 py-1">
-            <ShieldPlus className="h-3 w-3 text-cyan-600 dark:text-cyan-400 shrink-0" aria-hidden />
-            <span className="text-[9px] font-semibold uppercase text-cyan-700 dark:text-cyan-300">
-              Temp
+          <div className="flex items-center gap-1 shrink-0 rounded-lg border border-cyan-300/40 bg-cyan-950/35 px-1.5 py-1">
+            <ShieldPlus className="h-3 w-3 text-cyan-100 shrink-0" aria-hidden />
+            <span className="hidden text-[9px] font-semibold uppercase text-cyan-50 @[18rem]:inline">
+              Temporary HP
+            </span>
+            <span className="text-[9px] font-semibold uppercase text-cyan-50 @[18rem]:hidden">
+              Temp HP
             </span>
             <input
               type="number"
@@ -228,7 +246,7 @@ function CombatStatsCompactRow({
                 onTempHpChange(Number.isNaN(next) ? 0 : Math.max(0, next))
               }}
               aria-label="Temporary hit points"
-              className="w-8 min-h-6 text-center bg-background/80 border border-cyan/30 rounded text-[11px] font-bold text-cyan tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-8 min-h-6 text-center bg-black/25 border border-cyan-200/30 rounded text-[11px] font-bold text-cyan-50 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
           {hitDicePool.length > 0 && onShortRestHeal && onSetHitDiceSpent ? (
@@ -254,7 +272,7 @@ function CombatStatsCompactRow({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/80">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-black/30">
             <div
               className={`h-full rounded-full bg-gradient-to-r transition-all duration-300 ${hpTone}`}
               style={{ width: `${hpPercent}%` }}
@@ -265,7 +283,7 @@ function CombatStatsCompactRow({
               aria-label="Hit point percentage"
             />
           </div>
-          <span className="text-[9px] tabular-nums text-muted-foreground shrink-0">{hpPercent}%</span>
+          <span className="text-[9px] tabular-nums text-white/75 shrink-0">{hpPercent}%</span>
         </div>
       </div>
     </div>

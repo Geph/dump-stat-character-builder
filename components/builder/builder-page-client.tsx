@@ -34,6 +34,7 @@ import {
   UserCircle,
   Shield,
   Dices,
+  RotateCcw,
 } from "lucide-react"
 import {
   aggregateCharacteristics,
@@ -2740,7 +2741,7 @@ export default function BuilderPageClient() {
       
       <div id="builder-steps" className={pageStepStripClass}>
         <div className="max-w-7xl mx-auto px-4 pt-3 pb-1">
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center gap-x-1.5 sm:gap-x-0">
             {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
@@ -2785,7 +2786,7 @@ export default function BuilderPageClient() {
                     </span>
                   </button>
                   {index < visibleSteps.length - 1 && (
-                    <div className={`w-1.5 h-1.5 sm:w-10 sm:h-1 md:w-14 rounded-full sm:rounded mx-0.5 sm:mx-1 md:mx-2 shrink-0 ${
+                    <div className={`hidden sm:block sm:w-10 sm:h-1 md:w-14 rounded mx-1 md:mx-2 shrink-0 ${
                       stepOrd < maxOrd ? "bg-success/80" : "bg-primary/25"
                     }`} />
                   )}
@@ -2838,9 +2839,23 @@ export default function BuilderPageClient() {
                 <button
                   type="button"
                   onClick={resetCharacter}
-                  className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-destructive border border-border hover:border-destructive rounded-lg transition-colors"
+                  title="Reset"
+                  aria-label="Reset"
+                  className={cn(
+                    "inline-flex items-center justify-center gap-1.5 border border-border font-semibold text-muted-foreground transition-colors hover:border-destructive hover:text-destructive",
+                    cardViewMode === "dense"
+                      ? "rounded-lg px-3 py-2 text-xs max-sm:h-[30px] max-sm:w-[30px] max-sm:px-0 max-sm:py-0"
+                      : "rounded-lg px-3 py-2 text-xs",
+                  )}
                 >
-                  Clear All
+                  <RotateCcw
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      cardViewMode === "dense" ? "max-sm:inline sm:hidden" : "hidden",
+                    )}
+                    aria-hidden
+                  />
+                  <span className={cn(cardViewMode === "dense" && "max-sm:hidden")}>Reset</span>
                 </button>
                 {!isCompactOnly ? (
                 <div className="flex rounded-lg border border-border overflow-hidden">
@@ -2888,6 +2903,7 @@ export default function BuilderPageClient() {
                   onSave={saveCharacter}
                   saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
                   lastStep={lastVisibleStepId}
+                  compact={cardViewMode === "dense"}
                 />
               </div>
             </div>
@@ -5399,14 +5415,14 @@ export default function BuilderPageClient() {
 
                 {/* Portrait & banner uploads */}
                 <div className="flex flex-col lg:flex-row gap-6 mb-6">
-                  <div className="flex items-start gap-4">
+                  <div className="flex w-full min-w-0 items-start gap-2 sm:gap-4">
                     <div className="relative shrink-0">
                     {character.portrait_url ? (
                       <div className="relative">
                         <img
                           src={character.portrait_url}
                           alt="Portrait"
-                          className="w-32 h-32 rounded-2xl object-cover border-4 border-border"
+                          className="h-20 w-20 rounded-xl object-cover border-4 border-border sm:h-32 sm:w-32 sm:rounded-2xl"
                         />
                         <button
                             onClick={() => patchCharacter({ portrait_url: null })}
@@ -5416,10 +5432,10 @@ export default function BuilderPageClient() {
                         </button>
                       </div>
                     ) : (
-                        <label className="w-32 h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors px-2 text-center">
-                        <Upload className="w-8 h-8 text-muted-foreground mb-1" />
-                          <span className="text-xs font-medium text-foreground">Portrait</span>
-                          <span className="text-[10px] leading-tight text-muted-foreground mt-1">
+                        <label className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted px-1.5 text-center cursor-pointer transition-colors hover:border-primary sm:h-32 sm:w-32 sm:rounded-2xl sm:px-2">
+                        <Upload className="mb-0.5 h-5 w-5 text-muted-foreground sm:mb-1 sm:h-8 sm:w-8" />
+                          <span className="text-[10px] font-medium text-foreground sm:text-xs">Portrait</span>
+                          <span className="mt-0.5 hidden text-[10px] leading-tight text-muted-foreground sm:mt-1 sm:block">
                             {formatImageUploadHint("portrait")}
                           </span>
                         <input
@@ -5432,13 +5448,13 @@ export default function BuilderPageClient() {
                     )}
                     </div>
 
-                    <div className="relative flex-1 min-w-[200px]">
+                    <div className="relative min-w-0 flex-1 sm:min-w-[200px]">
                       {character.banner_url ? (
                         <div className="relative">
                           <img
                             src={character.banner_url}
                             alt="Banner"
-                            className="w-full h-32 rounded-2xl object-cover border-4 border-border"
+                            className="h-20 w-full rounded-xl object-cover border-4 border-border sm:h-32 sm:rounded-2xl"
                           />
                           <button
                             onClick={() => patchCharacter({ banner_url: null })}
@@ -5448,10 +5464,13 @@ export default function BuilderPageClient() {
                           </button>
                         </div>
                       ) : (
-                        <label className="w-full h-32 bg-muted rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors px-4 text-center">
-                          <Upload className="w-8 h-8 text-muted-foreground mb-1" />
-                          <span className="text-xs font-medium text-foreground">Landscape banner (optional)</span>
-                          <span className="text-[10px] leading-tight text-muted-foreground mt-1">
+                        <label className="flex h-20 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted px-2 text-center cursor-pointer transition-colors hover:border-primary sm:h-32 sm:rounded-2xl sm:px-4">
+                          <Upload className="mb-0.5 h-5 w-5 text-muted-foreground sm:mb-1 sm:h-8 sm:w-8" />
+                          <span className="text-[10px] font-medium text-foreground sm:text-xs">
+                            Landscape banner
+                            <span className="hidden sm:inline"> (optional)</span>
+                          </span>
+                          <span className="mt-0.5 hidden text-[10px] leading-tight text-muted-foreground sm:mt-1 sm:block">
                             {formatImageUploadHint("banner")}
                           </span>
                           <input
@@ -5547,6 +5566,7 @@ export default function BuilderPageClient() {
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
                 lastStep={lastVisibleStepId}
+                compact={cardViewMode === "dense"}
               />
             </div>
           </div>

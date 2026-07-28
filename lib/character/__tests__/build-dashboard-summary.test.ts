@@ -87,6 +87,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
       resourceDieSidesByKey: {},
       skillSortMode: "ability",
       pinnedSkillNames: [],
+      pinnedEquipmentIds: [],
       savedAt: "2026-01-01T00:00:00.000Z",
     },
     created_at: "2026-01-01T00:00:00.000Z",

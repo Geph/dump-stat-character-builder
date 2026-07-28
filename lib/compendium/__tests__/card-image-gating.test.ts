@@ -20,15 +20,19 @@ describe("compendiumBrowseGridClass", () => {
   it("uses a single column on phones", () => {
     expect(compendiumBrowseGridClass("classes")).toContain("grid-cols-1")
     expect(compendiumBrowseGridClass("feats")).toContain("grid-cols-1")
-    expect(compendiumBrowseGridClass("classes")).toContain("sm:grid-cols-2")
-    expect(compendiumBrowseGridClass("feats")).toContain("sm:grid-cols-2")
+    expect(compendiumBrowseGridClass("classes")).toContain("md:grid-cols-2")
+    expect(compendiumBrowseGridClass("feats")).toContain("md:grid-cols-2")
+    expect(compendiumBrowseGridClass("classes")).not.toContain("sm:grid-cols-2")
+    expect(compendiumBrowseGridClass("feats")).not.toContain("sm:grid-cols-2")
   })
 
-  it("uses four columns from lg for portrait card tabs", () => {
-    expect(compendiumBrowseGridClass("classes")).toContain("lg:grid-cols-4")
-    expect(compendiumBrowseGridClass("species")).toContain("lg:grid-cols-4")
-    expect(compendiumBrowseGridClass("subclasses")).toContain("lg:grid-cols-4")
-    expect(compendiumBrowseGridClass("spells")).toContain("lg:grid-cols-4")
+  it("uses four columns from xl", () => {
+    expect(compendiumBrowseGridClass("classes")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("species")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("subclasses")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("spells")).toContain("xl:grid-cols-4")
+    expect(compendiumBrowseGridClass("classes")).toContain("lg:grid-cols-3")
+    expect(compendiumBrowseGridClass("classes")).not.toContain("lg:grid-cols-4")
   })
 
   it("keeps xl breakpoint for other tabs", () => {

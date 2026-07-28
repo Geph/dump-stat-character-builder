@@ -23,7 +23,7 @@ export function DefaultActionsButton({ onClick, variant = "compact" }: DefaultAc
         className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
       >
         <BookOpen className="h-3.5 w-3.5 shrink-0" />
-        Standard Actions
+        Standard Action Rules
       </button>
     )
   }
@@ -36,7 +36,7 @@ export function DefaultActionsButton({ onClick, variant = "compact" }: DefaultAc
       title="2024 standard actions reference"
     >
       <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
-      Standard Actions
+      Standard Action Rules
     </button>
   )
 }
@@ -76,7 +76,7 @@ export function DefaultActionsOverlay({ onClose, context }: DefaultActionsOverla
       >
         <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm">
           <div>
-            <h2 className="text-lg font-black text-foreground">Standard Actions</h2>
+            <h2 className="text-lg font-black text-foreground">Standard Action Rules</h2>
             <p className="text-sm text-muted-foreground">
               2024 rules — one action per turn unless noted
             </p>

@@ -19,7 +19,6 @@ import {
   PawPrint,
   Save,
   Download,
-  Settings,
   Share2,
   Shield,
   ShieldCheck,
@@ -33,6 +32,8 @@ import {
   BookOpen,
   Layers,
   Pin,
+  Moon,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -150,7 +151,7 @@ import {
   emptyActionEconomySpent,
   type ActionEconomySpent,
 } from "@/lib/character/action-economy"
-import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreBoxClass, abilityScoreValueClass } from "@/lib/character/sheet-status-colors"
+import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreTileClass, abilityScoreModifierFrameClass, abilityScorePillClass } from "@/lib/character/sheet-status-colors"
 import { useAppTheme } from "@/components/providers/app-theme-provider"
 import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
@@ -218,6 +219,8 @@ import {
   DefaultActionsOverlay,
 } from "@/components/character-sheet/sheet-default-actions-panel"
 import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-buttons"
+import { SheetRestChooser } from "@/components/character-sheet/sheet-rest-chooser"
+import { BannerStatusMenu } from "@/components/character-sheet/banner-status-menu"
 import { SheetRestOverlay } from "@/components/character-sheet/sheet-rest-overlay"
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
 import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
@@ -277,6 +280,15 @@ const ABILITY_LABELS: Record<string, string> = {
   intelligence: "INT",
   wisdom: "WIS",
   charisma: "CHA",
+}
+
+const ABILITY_FULL_LABELS: Record<string, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+  charisma: "Charisma",
 }
 
 const SHEET_SELECTABLE_CONDITIONS = SRD_CONDITIONS.filter(
@@ -548,6 +560,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
   const [sheetMenuOpen, setSheetMenuOpen] = useState(false)
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
+  const [bannerRestOpen, setBannerRestOpen] = useState(false)
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("")
@@ -581,6 +594,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [resourceDieSidesByKey, setResourceDieSidesByKey] = useState<Record<string, number>>({})
   const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("ability")
   const [pinnedSkillNames, setPinnedSkillNames] = useState<string[]>([])
+  const [pinnedEquipmentIds, setPinnedEquipmentIds] = useState<string[]>([])
   const [skillsInfoOpen, setSkillsInfoOpen] = useState(false)
   const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
@@ -669,6 +683,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setResourceDieSidesByKey(playState.resourceDieSidesByKey)
         setSkillSortMode(playState.skillSortMode)
         setPinnedSkillNames(playState.pinnedSkillNames)
+        setPinnedEquipmentIds(playState.pinnedEquipmentIds)
         setSessionHydrated(true)
 
         if (row.spell_ids?.length) {
@@ -760,6 +775,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         resourceDieSidesByKey,
         skillSortMode,
         pinnedSkillNames,
+        pinnedEquipmentIds,
         savedAt: null,
       }),
     )
@@ -783,6 +799,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     resourceDieSidesByKey,
     skillSortMode,
     pinnedSkillNames,
+    pinnedEquipmentIds,
   ])
 
   const equipmentMagicContext = useMemo(
@@ -1310,7 +1327,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           type="button"
           aria-pressed={active}
           onClick={() => toggleSheetToggle(toggle.id)}
-          className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+          className={`min-h-11 w-full shrink-0 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:w-auto ${
             active
               ? isInnateSorceryToggle
                 ? "border-violet-500/40 bg-violet-500/15 text-violet-800 dark:text-violet-200"
@@ -1357,6 +1374,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         resourceDieSidesByKey,
         skillSortMode,
         pinnedSkillNames,
+        pinnedEquipmentIds,
         savedAt,
       }),
     [
@@ -1377,6 +1395,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       resourceDieSidesByKey,
       skillSortMode,
       pinnedSkillNames,
+      pinnedEquipmentIds,
     ],
   )
 
@@ -2492,6 +2511,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     )
   }, [])
 
+  const togglePinnedEquipment = useCallback((itemId: string) => {
+    setPinnedEquipmentIds((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId],
+    )
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -2735,7 +2760,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 title="Sheet options"
                 aria-expanded={sheetMenuOpen}
               >
-                <Settings className="w-4 h-4" />
+                <Share2 className="w-4 h-4" />
               </button>
               {sheetMenuOpen && sheetMenuPos ? (
                 <>
@@ -2841,72 +2866,89 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl overflow-hidden mb-3 min-h-[140px]"
+          className="relative mb-3 overflow-hidden rounded-2xl max-sm:min-h-0 min-h-[140px]"
         >
-          {character.banner_url && (
-            <div className="absolute inset-0 overflow-hidden rounded-2xl">
+          {character.banner_url ? (
+            <div className="absolute inset-0 overflow-hidden rounded-2xl max-sm:hidden">
               <img
                 src={character.banner_url}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
-          )}
+          ) : null}
           <div
-            className={`relative flex flex-col gap-2 p-4 ${
+            className={`relative flex flex-col gap-2 p-4 max-sm:gap-1.5 max-sm:p-2.5 ${
               character.banner_url
-                ? "bg-gradient-to-r from-background/90 via-background/75 to-background/60"
+                ? "bg-gradient-to-br from-primary/20 to-secondary/20 sm:bg-gradient-to-r sm:from-background/90 sm:via-background/75 sm:to-background/60"
                 : "bg-gradient-to-br from-primary/20 to-secondary/20"
             }`}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+            <div className="absolute right-2.5 top-2.5 z-10 sm:hidden">
+              <ManualRollTrigger />
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-2.5 max-sm:pr-12 sm:gap-4">
               {character.portrait_url ? (
                 <button
                   type="button"
-                  onClick={() => setPortraitZoomOpen(true)}
-                  className="shrink-0 rounded-xl overflow-hidden border-2 border-background shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  onClick={() => setPortraitZoomOpen((open) => !open)}
+                  aria-label={portraitZoomOpen ? "Close portrait" : "Enlarge portrait"}
+                  className="shrink-0 overflow-hidden rounded-lg border-2 border-background shadow-md focus:outline-none focus:ring-2 focus:ring-primary sm:rounded-xl sm:shadow-lg"
                 >
                   <img
                     src={character.portrait_url}
                     alt={character.name}
-                    className="h-16 w-16 object-cover sm:h-24 sm:w-24"
+                    className="h-11 w-11 object-cover sm:h-24 sm:w-24"
                   />
                 </button>
               ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-background bg-card sm:h-24 sm:w-24">
-                  <User className="h-8 w-8 text-muted-foreground sm:h-12 sm:w-12" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 border-background bg-card sm:h-24 sm:w-24 sm:rounded-xl">
+                  <User className="h-5 w-5 text-muted-foreground sm:h-12 sm:w-12" />
                 </div>
               )}
 
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-black leading-tight text-foreground sm:text-2xl">{character.name}</h1>
-                <p className="mt-0.5 text-sm font-bold text-muted-foreground">{classLabel}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {character.species && (
+                <h1 className="text-lg font-black leading-tight text-foreground sm:text-2xl">{character.name}</h1>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  {classDetails.length > 0
+                    ? classDetails.map((entry) => (
+                        <span
+                          key={`${entry.row.class_id}-${entry.row.order}`}
+                          className={SHEET_BANNER_BADGE.class}
+                        >
+                          {entry.class?.name ?? "Class"} {entry.row.level}
+                        </span>
+                      ))
+                    : (
+                        <span className={SHEET_BANNER_BADGE.class}>{classLabel}</span>
+                      )}
+                  {character.species ? (
                     <span className={SHEET_BANNER_BADGE.species}>
                       {character.species.name}
                     </span>
-                  )}
-                  {character.backgrounds && (
+                  ) : null}
+                  {character.backgrounds ? (
                     <span className={SHEET_BANNER_BADGE.background}>
                       {character.backgrounds.name}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
               </div>
 
               <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
                 <div className="flex min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:gap-2">
-                  <ManualRollTrigger />
-                  <div className="relative">
+                  <span className="hidden sm:inline-flex">
+                    <ManualRollTrigger />
+                  </span>
+                  <div className="relative shrink-0">
                     <button
                       ref={conditionButtonRef}
                       type="button"
                       onClick={openConditionMenu}
                       aria-expanded={conditionDropdownOpen}
-                      className={`flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-sm font-semibold transition-colors sm:px-3 ${
+                      className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-2 text-sm font-semibold transition-colors sm:px-3 ${
                         conditionDropdownOpen ||
                         activeConditions.length > 0 ||
                         exhaustionLevel > 0
@@ -2979,14 +3021,106 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       </>
                     )}
                   </div>
+                  <span className="sm:hidden">
+                    <BannerStatusMenu
+                      active={
+                        hasInspiration ||
+                        Boolean(ragingSheetToggle && activeSheetToggleIds.includes(ragingSheetToggle.id)) ||
+                        Boolean(
+                          innateSorcerySheetToggle &&
+                            isSorcerer &&
+                            activeSheetToggleIds.includes(innateSorcerySheetToggle.id),
+                        ) ||
+                        secondaryManualSheetToggles.some((toggle) =>
+                          activeSheetToggleIds.includes(toggle.id),
+                        )
+                      }
+                    >
+                      {(close) => (
+                        <>
+                          {turnStartTriggers.length ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                close()
+                                handleTurnStart()
+                              }}
+                              className={`flex w-full items-center gap-2 rounded-md border-2 px-3 py-2.5 text-left text-sm font-semibold ${SHEET_BANNER_BUTTON.rest}`}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+                              Turn Start
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              close()
+                              setBannerRestOpen(true)
+                            }}
+                            className={`flex w-full items-center gap-2 rounded-md border-2 px-3 py-2.5 text-left text-sm font-semibold ${SHEET_BANNER_BUTTON.rest}`}
+                          >
+                            <Moon className="h-3.5 w-3.5 shrink-0" />
+                            Rest
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => setHasInspiration((value) => !value)}
+                            aria-pressed={hasInspiration}
+                            className={`relative flex w-full items-center gap-2 overflow-hidden rounded-md border-2 px-3 py-2.5 text-left text-sm font-semibold ${
+                              hasInspiration
+                                ? SHEET_BANNER_BUTTON.inspirationActive
+                                : SHEET_BANNER_BUTTON.inspirationIdle
+                            }`}
+                          >
+                            {hasInspiration ? (
+                              <span className="pointer-events-none absolute inset-0 inspiration-sparkles" aria-hidden />
+                            ) : null}
+                            <Sparkles
+                              className={`relative h-3.5 w-3.5 shrink-0 ${
+                                hasInspiration ? "animate-inspiration-glow" : ""
+                              }`}
+                            />
+                            <span className="relative flex-1">Inspiration</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background/40 hover:text-foreground"
+                                  aria-label="What Heroic Inspiration does"
+                                  onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" sideOffset={6} className="max-w-[260px] text-left">
+                                {HEROIC_INSPIRATION_TIP}
+                              </TooltipContent>
+                            </Tooltip>
+                          </button>
+                          {ragingSheetToggle ? renderManualToggleButton(ragingSheetToggle) : null}
+                          {innateSorcerySheetToggle && isSorcerer
+                            ? renderManualToggleButton(innateSorcerySheetToggle)
+                            : null}
+                          {secondaryManualSheetToggles.map((toggle) =>
+                            renderManualToggleButton(toggle),
+                          )}
+                        </>
+                      )}
+                    </BannerStatusMenu>
+                  </span>
+                </div>
+
+                <div className="hidden min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:flex sm:gap-2">
                   <SheetRestButtons
                     onRest={handleRest}
                     onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
                   />
-                </div>
-
-                <div className="flex min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:gap-2">
-                  <div className="relative inline-flex">
+                  <div className="relative inline-flex shrink-0">
                     <button
                       type="button"
                       onClick={() => setHasInspiration((value) => !value)}
@@ -3033,6 +3167,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     : null}
                   {secondaryManualSheetToggles.map((toggle) => renderManualToggleButton(toggle))}
                 </div>
+
+                <SheetRestChooser
+                  open={bannerRestOpen}
+                  onClose={() => setBannerRestOpen(false)}
+                  onRest={handleRest}
+                />
 
                 {(derived?.acFormulaOptions.length ?? 0) > 1 ? (
                   <label className="flex flex-col gap-1 text-xs items-end">
@@ -3139,7 +3279,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <div className={`${SHEET_ABILITIES_PANEL.skills} rounded-xl p-3 border border-border min-w-0`}>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <SheetSectionHeading icon={Star} size="xs" as="h3" className="mb-0">
+                      <SheetSectionHeading gameIcon="diploma" size="xs" as="h3" className="mb-0">
                         Skills
                       </SheetSectionHeading>
                       <button
@@ -3208,16 +3348,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               title={pinned ? "Unpin skill" : "Pin skill to top"}
                               aria-label={pinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
                               aria-pressed={pinned}
-                              className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors max-md:h-9 max-md:w-9 ${
+                              className={`hidden max-sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors ${
                                 pinned
                                   ? "text-primary bg-primary/10 hover:bg-primary/15"
                                   : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
                               }`}
                             >
                               {pinned ? (
-                                <Pin className="h-3.5 w-3.5 fill-current max-md:h-4 max-md:w-4" aria-hidden />
+                                <Pin className="h-4 w-4 fill-current" aria-hidden />
                               ) : (
-                                <Pin className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" aria-hidden />
+                                <Pin className="h-4 w-4" aria-hidden />
                               )}
                             </button>
                             <span className="truncate min-w-0 max-md:text-sm">
@@ -3259,16 +3399,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             title={pinned ? "Unpin skill" : "Pin skill to top"}
                             aria-label={pinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
                             aria-pressed={pinned}
-                            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors max-md:h-9 max-md:w-9 ${
+                            className={`hidden max-sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors ${
                               pinned
                                 ? "text-primary bg-primary/10 hover:bg-primary/15"
                                 : "text-muted-foreground/70 hover:bg-muted hover:text-foreground"
                             }`}
                           >
                             {pinned ? (
-                              <Pin className="h-3.5 w-3.5 fill-current max-md:h-4 max-md:w-4" aria-hidden />
+                              <Pin className="h-4 w-4 fill-current" aria-hidden />
                             ) : (
-                              <Pin className="h-3.5 w-3.5 max-md:h-4 max-md:w-4" aria-hidden />
+                              <Pin className="h-4 w-4" aria-hidden />
                             )}
                           </button>
                           <span className="truncate min-w-0 max-md:text-sm">
@@ -3354,21 +3494,42 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className={`${SHEET_ABILITIES_PANEL.abilityScores} rounded-xl p-3 border border-border min-w-0`}>
-                  <SheetSectionHeading icon={Sparkles} size="xs" as="h3">
+                  <SheetSectionHeading gameIcon="mighty-force" size="xs" as="h3">
                     Ability Scores
                   </SheetSectionHeading>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {ABILITY_SCORE_KEYS.map((key) => {
                       const score = effectiveScores[key]
                       const mod = abilityMods[key]
                       return (
-                        <div key={key} className="text-center">
-                          <div className={abilityScoreBoxClass(theme, key)}>
-                            <span className={abilityScoreValueClass(theme)}>{score}</span>
+                        <div key={key} className={abilityScoreTileClass(theme)}>
+                          <p className="text-[13.5px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:hidden">
+                            {ABILITY_FULL_LABELS[key]}
+                          </p>
+                          <p className="hidden text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:block">
+                            {ABILITY_LABELS[key]}
+                          </p>
+                          <div className={abilityScoreModifierFrameClass(theme)}>
+                            <span className="text-xl font-black tabular-nums leading-none text-foreground">
+                              {getAbilityModifier(score)}
+                            </span>
                           </div>
-                          <p className="text-[10px] font-medium text-foreground mt-0.5">{ABILITY_LABELS[key]}</p>
-                          <p className="text-xs font-bold text-primary">{getAbilityModifier(score)}</p>
-                          <div className="mt-1 flex justify-center">
+                          <div className="relative mt-2 flex w-full items-center justify-center px-1">
+                            <span
+                              className="pointer-events-none absolute inset-x-1 top-1/2 h-px -translate-y-1/2 bg-border/80"
+                              aria-hidden
+                            />
+                            <span
+                              className="pointer-events-none absolute left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border border-border/80 bg-card"
+                              aria-hidden
+                            />
+                            <span
+                              className="pointer-events-none absolute right-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border border-border/80 bg-card"
+                              aria-hidden
+                            />
+                            <span className={abilityScorePillClass(theme, key)}>{score}</span>
+                          </div>
+                          <div className="mt-1.5 flex justify-center">
                             <D20RollButton
                               modifier={mod}
                               title={`${ABILITY_LABELS[key]} ability check`}
@@ -3439,7 +3600,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className={`${SHEET_ABILITIES_PANEL.proficiencies} rounded-xl p-3 border border-border min-w-0`}>
-                  <SheetSectionHeading icon={BookOpen} size="xs" as="h3">
+                  <SheetSectionHeading gameIcon="classical-knowledge" size="xs" as="h3">
                     Proficiencies
                   </SheetSectionHeading>
                   {!weaponProficiencies.length &&
@@ -3601,7 +3762,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
-                    No non-combat actions from your features or traits. Use Standard Actions for
+                    No non-combat actions from your features or traits. Use Standard Action Rules for
                     options like Dash, Hide, and Search.
                   </p>
                 )}
@@ -4147,7 +4308,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           {activeTab === "equipment" && (
             <div className="space-y-3">
               <div className={`${SHEET_EQUIPMENT_PANEL} rounded-xl p-3 border border-border`}>
-                <SheetSectionHeading icon={Package}>Equipment</SheetSectionHeading>
+                <SheetSectionHeading icon={Package}>Gear</SheetSectionHeading>
                 <SheetEquipmentPanel
                   equipment={displayedEquipment}
                   catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
@@ -4166,6 +4327,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   equippedOffHandWeaponId={equippedOffHandWeaponId}
                   attunedItemIds={attunedItemIds}
                   maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
+                  pinnedEquipmentIds={pinnedEquipmentIds}
+                  onTogglePinnedEquipment={togglePinnedEquipment}
                   onEquipArmor={(id) => {
                     if (id) {
                       const item = equipment.find((entry) => entry.id === id)

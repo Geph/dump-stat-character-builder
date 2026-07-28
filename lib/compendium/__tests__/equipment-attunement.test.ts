@@ -92,4 +92,27 @@ describe("mustAttuneBeforeEquip", () => {
       ),
     ).toBe(false)
   })
+
+  it("does not block magic weapons that do not require attunement", () => {
+    expect(
+      mustAttuneBeforeEquip(
+        item({
+          category: "Weapon",
+          rarity: "Common",
+          name: "Moon-Touched Sword",
+          requires_attunement: false,
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isAttunableItem(
+        item({
+          category: "Weapon",
+          rarity: "Common",
+          name: "Moon-Touched Sword",
+          requires_attunement: false,
+        }),
+      ),
+    ).toBe(false)
+  })
 })

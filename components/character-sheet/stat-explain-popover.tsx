@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Info } from "lucide-react"
 import type { StatContribution } from "@/lib/character/stat-contributions"
 import { sumContributions } from "@/lib/character/stat-contributions"
@@ -17,6 +17,9 @@ type StatExplainPopoverProps = {
   contributions?: StatContribution[]
   /** When false, lines are independent final values (e.g. walk vs fly speed), not additive parts. */
   summable?: boolean
+  /** Custom trigger content (e.g. the stat number). Defaults to an info icon. */
+  children?: ReactNode
+  className?: string
 }
 
 export function StatExplainPopover({
@@ -25,6 +28,8 @@ export function StatExplainPopover({
   parts,
   contributions,
   summable = true,
+  children,
+  className,
 }: StatExplainPopoverProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -61,7 +66,12 @@ export function StatExplainPopover({
     }
   }, [open])
 
-  if (!lines.length) return null
+  if (!lines.length) {
+    if (children) {
+      return <span className={className}>{children}</span>
+    }
+    return null
+  }
 
   const computedTotal = summable
     ? contributions?.length
@@ -82,11 +92,14 @@ export function StatExplainPopover({
           }
           openPopover()
         }}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
+        className={
+          className ??
+          "inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors shrink-0"
+        }
         aria-label={`How ${title} is calculated`}
         aria-expanded={open}
       >
-        <Info className="w-4 h-4" />
+        {children ?? <Info className="w-4 h-4" />}
       </button>
       {open && pos ? (
         <>
