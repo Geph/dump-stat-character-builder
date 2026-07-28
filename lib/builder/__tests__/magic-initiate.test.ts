@@ -1,84 +1,79 @@
 import { describe, expect, it } from "vitest"
 import {
   canTakeAnotherMagicInitiate,
-  filterMagicInitiateAbilitySlotOptions,
+  filterMagicInitiateSpellListSlotOptions,
   magicInitiateAbilityForSpellList,
-  takenMagicInitiateAbilities,
+  pruneConflictingMagicInitiateSpellListPicks,
+  takenMagicInitiateSpellLists,
 } from "@/lib/builder/magic-initiate"
 import type { ModifierPlayerChoiceSlot } from "@/lib/builder/modifier-player-choices"
 
-function abilitySlot(
+function listSlot(
   sourceKey: string,
-  sourceLabel: string,
-  slotKey = `${sourceKey}::mod_magic_initiate_ability::spellcasting_ability`,
+  sourceLabel = "Magic Initiate",
+  slotKey = `${sourceKey}::mod_magic_initiate_spells::spell_list_class`,
 ): ModifierPlayerChoiceSlot {
   return {
     slotKey,
     sourceKey,
     sourceLabel,
-    modId: "mod_magic_initiate_ability",
-    kind: "spellcasting_ability",
-    label: "Spellcasting ability",
+    modId: "mod_magic_initiate_spells",
+    kind: "spell_list_class",
+    label: "Magic Initiate: choose spell list",
     maxCount: 1,
-    options: [
-      { name: "Intelligence" },
-      { name: "Wisdom" },
-      { name: "Charisma" },
-    ],
+    options: [{ name: "Cleric" }, { name: "Druid" }, { name: "Wizard" }],
   }
 }
 
-describe("magic-initiate ability exclusivity", () => {
+describe("magic-initiate spell list exclusivity", () => {
   it("maps spell lists to default abilities", () => {
     expect(magicInitiateAbilityForSpellList("Wizard")).toBe("intelligence")
     expect(magicInitiateAbilityForSpellList("Cleric")).toBe("wisdom")
     expect(magicInitiateAbilityForSpellList("Druid")).toBe("wisdom")
   })
 
-  it("blocks reusing an ability already taken by another Magic Initiate", () => {
-    const slots = [
-      abilitySlot("granted:mi", "Magic Initiate"),
-      abilitySlot("feat:mi2", "Magic Initiate"),
-    ]
-    const picks = {
-      [slots[0]!.slotKey]: ["Intelligence"],
-    }
-    const filtered = filterMagicInitiateAbilitySlotOptions(slots[1]!, slots, picks)
-    expect(filtered.options?.map((o) => o.name)).toEqual(["Wisdom", "Charisma"])
-    expect(takenMagicInitiateAbilities(slots, picks).has("intelligence")).toBe(true)
+  it("blocks reusing a spell list already taken by another Magic Initiate", () => {
+    const granted = listSlot("granted:mi")
+    const second = listSlot("feat:mi2")
+    const slots = [granted, second]
+    const picks = { [granted.slotKey]: ["Wizard"] }
+
+    const filtered = filterMagicInitiateSpellListSlotOptions(second, slots, picks)
+    expect(filtered.options?.map((o) => o.name)).toEqual(["Cleric", "Druid"])
+    expect(takenMagicInitiateSpellLists(slots, picks).has("wizard")).toBe(true)
     expect(canTakeAnotherMagicInitiate({ slots, picks })).toBe(true)
   })
 
-  it("reports no remaining Magic Initiate takes when INT/WIS/CHA are all used", () => {
-    const slots = [
-      abilitySlot("a", "Magic Initiate"),
-      abilitySlot("b", "Magic Initiate"),
-      abilitySlot("c", "Magic Initiate"),
-    ]
+  it("allows Cleric and Druid as separate takes even though both default to Wisdom", () => {
+    const first = listSlot("a")
+    const second = listSlot("b")
+    const slots = [first, second]
+    const picks = { [first.slotKey]: ["Cleric"] }
+
+    const filtered = filterMagicInitiateSpellListSlotOptions(second, slots, picks)
+    expect(filtered.options?.map((o) => o.name)).toEqual(["Druid", "Wizard"])
+  })
+
+  it("reports no remaining Magic Initiate takes when all spell lists are used", () => {
+    const slots = [listSlot("a"), listSlot("b"), listSlot("c")]
     const picks = {
-      [slots[0]!.slotKey]: ["Intelligence"],
-      [slots[1]!.slotKey]: ["Wisdom"],
-      [slots[2]!.slotKey]: ["Charisma"],
+      [slots[0]!.slotKey]: ["Wizard"],
+      [slots[1]!.slotKey]: ["Cleric"],
+      [slots[2]!.slotKey]: ["Druid"],
     }
     expect(canTakeAnotherMagicInitiate({ slots, picks })).toBe(false)
   })
 
-  it("infers ability from spell list when ability is not picked yet", () => {
-    const listSlot: ModifierPlayerChoiceSlot = {
-      slotKey: "granted:mi::mod::spell_list_class",
-      sourceKey: "granted:mi",
-      sourceLabel: "Magic Initiate",
-      modId: "mod_list",
-      kind: "spell_list_class",
-      label: "Spell list",
-      maxCount: 1,
-      options: [{ name: "Wizard" }, { name: "Cleric" }, { name: "Druid" }],
+  it("prunes duplicate spell lists in favor of granted takes", () => {
+    const granted = listSlot("feat:granted:mi")
+    const second = listSlot("feat:pick:mi2")
+    const slots = [second, granted]
+    const picks = {
+      [granted.slotKey]: ["Wizard"],
+      [second.slotKey]: ["Wizard"],
     }
-    const ability = abilitySlot("granted:mi", "Magic Initiate")
-    const second = abilitySlot("feat:mi2", "Magic Initiate")
-    const slots = [listSlot, ability, second]
-    const picks = { [listSlot.slotKey]: ["Wizard"] }
-    const filtered = filterMagicInitiateAbilitySlotOptions(second, slots, picks)
-    expect(filtered.options?.map((o) => o.name)).toEqual(["Wisdom", "Charisma"])
+    const pruned = pruneConflictingMagicInitiateSpellListPicks(slots, picks)
+    expect(pruned[granted.slotKey]).toEqual(["Wizard"])
+    expect(pruned[second.slotKey]).toBeUndefined()
   })
 })

@@ -7,6 +7,7 @@ import {
   collapseWeaponCategoryPackageOptions,
   equipmentCategoryKind,
   equipmentForCategory,
+  filterStartingEquipmentOptionsByWeaponProficiency,
   formatPackageOptionTitle,
   isGoldOnlyOption,
 } from "@/lib/builder/equipment-utils"
@@ -28,6 +29,8 @@ type StartingEquipmentPackagePickerProps = {
   equipment?: Equipment[]
   categoryPicks?: Record<string, string>
   onCategoryPick?: (optionIndex: number, itemIndex: number, equipmentId: string) => void
+  /** Weapon proficiencies — hides martial-only options when martial weapons are not granted. */
+  weaponProficiencies?: string[]
   /** Alternate image side per row for visual variety */
   imageSide?: "left" | "right" | "alternate"
   /** Phone swipe carousel (cinematic builder on narrow screens). */
@@ -44,13 +47,19 @@ export function StartingEquipmentPackagePicker({
   equipment = [],
   categoryPicks = {},
   onCategoryPick,
+  weaponProficiencies = [],
   imageSide = "alternate",
   swipeLayout = false,
 }: StartingEquipmentPackagePickerProps) {
-  const displayOptions = useMemo(
-    () => collapseWeaponCategoryPackageOptions(options, equipment),
-    [options, equipment],
-  )
+  const displayOptions = useMemo(() => {
+    const collapsed = collapseWeaponCategoryPackageOptions(options, equipment)
+    return filterStartingEquipmentOptionsByWeaponProficiency(collapsed, weaponProficiencies)
+  }, [options, equipment, weaponProficiencies])
+
+  const originalIndexByDisplay = useMemo(() => {
+    const collapsed = collapseWeaponCategoryPackageOptions(options, equipment)
+    return displayOptions.map((option) => collapsed.indexOf(option))
+  }, [options, equipment, displayOptions])
 
   if (!displayOptions.length) return null
 
@@ -72,11 +81,12 @@ export function StartingEquipmentPackagePicker({
             : "grid grid-cols-1 lg:grid-cols-2 gap-4",
         )}
       >
-        {displayOptions.map((option, index) => {
+        {displayOptions.map((option, displayIndex) => {
+          const index = originalIndexByDisplay[displayIndex] ?? displayIndex
           const selected = selectedIndex === index
           const goldOnly = isGoldOnlyOption(option, startingGold)
           const side =
-            imageSide === "alternate" ? (index % 2 === 0 ? "left" : "right") : imageSide
+            imageSide === "alternate" ? (displayIndex % 2 === 0 ? "left" : "right") : imageSide
           const optionItems = option.items ?? []
           const edgeImage = goldOnly
             ? STARTING_EQUIPMENT_CARD_IMAGES.gold

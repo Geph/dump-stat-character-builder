@@ -55,7 +55,7 @@ import {
   legacyBackgroundOriginFeatPickKey,
   magicInitiateListFromFeatGranted,
 } from "@/lib/compendium/background-origin-feat"
-import { magicInitiateAbilityForSpellList, takenMagicInitiateAbilities } from "@/lib/builder/magic-initiate"
+import { magicInitiateAbilityForSpellList, pruneConflictingMagicInitiateSpellListPicks, takenMagicInitiateSpellLists } from "@/lib/builder/magic-initiate"
 import { OriginFeatGrantedSelect } from "@/components/compendium/origin-feat-granted-select"
 import {
   applyBackgroundProficienciesToDraft,
@@ -168,7 +168,9 @@ import {
   equipmentForCategory,
   getEquipmentCostGp,
   getStartingEquipmentGroups,
+  hasMartialWeaponProficiency,
   isGoldOnlyOption,
+  packageOptionRequiresMartialProficiency,
   resolvePackageEquipmentIds,
   sumEquipmentGoldCost,
 } from "@/lib/builder/equipment-utils"
@@ -1340,6 +1342,12 @@ export default function BuilderPageClient() {
     modifierPlayerChoiceSlots,
   ])
 
+  useEffect(() => {
+    setModifierPlayerPicks((prev) =>
+      pruneConflictingMagicInitiateSpellListPicks(modifierPlayerChoiceSlots, prev),
+    )
+  }, [modifierPlayerChoiceSlots])
+
   const featPickSlotKeys = featPickSlots.map((slot) => slot.key).join("|")
 
   useEffect(() => {
@@ -1867,6 +1875,25 @@ export default function BuilderPageClient() {
     [effectiveToolProficiencies],
   )
   const effectiveWeaponProficiencies = characterDerived.weaponProficiencies
+  const canPickMartialStartingWeapon = hasMartialWeaponProficiency(effectiveWeaponProficiencies)
+
+  useEffect(() => {
+    if (startingEquipmentOptionIndex == null) return
+    const selected = classPackageOptions[startingEquipmentOptionIndex]
+    if (!selected) return
+    if (
+      packageOptionRequiresMartialProficiency(selected) &&
+      !canPickMartialStartingWeapon
+    ) {
+      setStartingEquipmentOptionIndex(null)
+      setStartingEquipmentCategoryPicks({})
+    }
+  }, [
+    startingEquipmentOptionIndex,
+    classPackageOptions,
+    canPickMartialStartingWeapon,
+  ])
+
   const effectiveArmorProficiencies = characterDerived.armorProficiencies
   const savingThrowProficiencies = characterDerived.savingThrowProficiencies
   const maxHp = characterDerived.maxHp
@@ -1879,8 +1906,8 @@ export default function BuilderPageClient() {
     () => ({
       armorProficiencies: effectiveArmorProficiencies,
       abilityScores: effectiveAbilityScores,
-      takenMagicInitiateAbilities: [
-        ...takenMagicInitiateAbilities(modifierPlayerChoiceSlots, modifierPlayerPicks),
+      takenMagicInitiateSpellLists: [
+        ...takenMagicInitiateSpellLists(modifierPlayerChoiceSlots, modifierPlayerPicks),
       ],
     }),
     [
@@ -4865,6 +4892,7 @@ export default function BuilderPageClient() {
                             equipment={equipment}
                             categoryPicks={startingEquipmentCategoryPicks}
                             onCategoryPick={setClassPackageCategoryPick}
+                            weaponProficiencies={effectiveWeaponProficiencies}
                             swipeLayout={useSwipeVisualPicker}
                           />
                         ))
@@ -4875,7 +4903,15 @@ export default function BuilderPageClient() {
                               <p className="text-sm font-medium text-foreground mb-2">{group.description}</p>
                               <div className="space-y-2">
                                 {(gi === 0 ? classPackageOptions : group.options ?? []).map(
-                                  (option, oi) => (
+                                  (option, oi) => {
+                                  if (
+                                    gi === 0 &&
+                                    packageOptionRequiresMartialProficiency(option) &&
+                                    !canPickMartialStartingWeapon
+                                  ) {
+                                    return null
+                                  }
+                                  return (
                                   <label
                                     key={oi}
                                     className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
@@ -4946,7 +4982,8 @@ export default function BuilderPageClient() {
                                       )}
                   </div>
                                   </label>
-                                ),
+                                  )
+                                  },
                                 )}
                               </div>
                             </div>

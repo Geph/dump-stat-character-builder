@@ -68,6 +68,7 @@ export function formatPackageOptionTitle(label: string, index: number): string {
 /**
  * Collapse a run of single martial/simple weapon package options into one
  * category choice (e.g. many "Option C" swords → one "Martial Weapon" pick).
+ * Single named weapons (Quarterstaff, Dagger) are left as-is.
  */
 export function collapseWeaponCategoryPackageOptions(
   options: { label: string; items: { name: string; quantity: number }[] }[],
@@ -116,9 +117,10 @@ export function collapseWeaponCategoryPackageOptions(
       end += 1
     }
 
-    if (end - index === 1 && equipmentCategoryKind(single)) {
+    if (end - index === 1) {
+      // Keep a lone named weapon or an already-canonical category line.
       result.push(option)
-    } else if (end - index >= 1) {
+    } else {
       result.push({
         label: letter,
         items: [
@@ -132,6 +134,33 @@ export function collapseWeaponCategoryPackageOptions(
     index = end
   }
   return result
+}
+
+/** True when proficiency list includes martial weapons (any qualifier). */
+export function hasMartialWeaponProficiency(
+  proficiencies: string[] | null | undefined,
+): boolean {
+  return (proficiencies ?? []).some((entry) => /martial/i.test(entry))
+}
+
+/** Package option that is only a martial-weapon category pick. */
+export function packageOptionRequiresMartialProficiency(option: {
+  items?: { name: string; quantity: number }[]
+}): boolean {
+  const items = option.items ?? []
+  if (!items.length) return false
+  return items.every((item) => {
+    if (item.name.toLowerCase() === "gold pieces") return true
+    return equipmentCategoryKind(item.name) === "martial"
+  }) && items.some((item) => equipmentCategoryKind(item.name) === "martial")
+}
+
+/** Hide martial-only starting options unless the character has martial proficiency. */
+export function filterStartingEquipmentOptionsByWeaponProficiency<
+  T extends { items?: { name: string; quantity: number }[] },
+>(options: T[], weaponProficiencies: string[] | null | undefined): T[] {
+  if (hasMartialWeaponProficiency(weaponProficiencies)) return options
+  return options.filter((option) => !packageOptionRequiresMartialProficiency(option))
 }
 
 export function findEquipmentByName(name: string, equipment: Equipment[]): Equipment | undefined {

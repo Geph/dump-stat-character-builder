@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   collapseWeaponCategoryPackageOptions,
+  filterStartingEquipmentOptionsByWeaponProficiency,
   formatPackageOptionTitle,
   resolvePackageEquipmentIds,
 } from "@/lib/builder/equipment-utils"
@@ -59,6 +60,35 @@ describe("collapseWeaponCategoryPackageOptions", () => {
       { label: "B", items: [{ name: "Gold Pieces", quantity: 10 }] },
       { label: "C", items: [{ name: "Martial Weapon", quantity: 1 }] },
     ])
+  })
+
+  it("keeps single named simple weapons instead of collapsing to Simple Weapon", () => {
+    const equipment = [
+      weapon("staff", "Quarterstaff", "Simple Melee"),
+      weapon("dagger", "Dagger", "Simple Melee"),
+      weapon("longsword", "Longsword", "Martial Melee"),
+    ]
+    const options = [
+      { label: "A", items: [{ name: "Quarterstaff", quantity: 1 }] },
+      { label: "B", items: [{ name: "Dagger", quantity: 1 }] },
+      { label: "C", items: [{ name: "Martial Weapon", quantity: 1 }] },
+    ]
+    expect(collapseWeaponCategoryPackageOptions(options, equipment)).toEqual(options)
+  })
+
+  it("hides martial-only options without martial proficiency", () => {
+    const options = [
+      { label: "A", items: [{ name: "Quarterstaff", quantity: 1 }] },
+      { label: "B", items: [{ name: "Dagger", quantity: 1 }] },
+      { label: "C", items: [{ name: "Martial Weapon", quantity: 1 }] },
+    ]
+    expect(filterStartingEquipmentOptionsByWeaponProficiency(options, ["Simple weapons"])).toEqual([
+      options[0],
+      options[1],
+    ])
+    expect(
+      filterStartingEquipmentOptionsByWeaponProficiency(options, ["Simple weapons", "Martial weapons"]),
+    ).toEqual(options)
   })
 
   it("resolves category picks into equipment ids", () => {

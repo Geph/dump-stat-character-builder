@@ -8,6 +8,7 @@ import {
   resolveCatalogFeatPickCharacteristics,
   resolveCatalogFeatPickLabel,
 } from "@/lib/builder/catalog-feat-options"
+import { pruneConflictingMagicInitiateSpellListPicks } from "@/lib/builder/magic-initiate"
 import {
   SKILL_NAMES,
   normalizeCharacteristics,
@@ -887,7 +888,7 @@ export function setModifierPlayerPickValue(
     }
   }
 
-  return next
+  return pruneConflictingMagicInitiateSpellListPicks(allSlots, next)
 }
 
 export function modifierPlayerChoiceSlotsForSource(

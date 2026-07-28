@@ -7,7 +7,7 @@ import { PickerGridPagination } from "@/components/builder/picker-grid-paginatio
 import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import {
-  filterMagicInitiateAbilitySlotOptions,
+  filterMagicInitiateSpellListSlotOptions,
   isMagicInitiateSourceLabel,
 } from "@/lib/builder/magic-initiate"
 import {
@@ -188,7 +188,20 @@ export function ModifierPlayerChoicePanel({
       if (excludeKinds?.includes(slot.kind)) return false
       return true
     })
-    .map((slot) => filterMagicInitiateAbilitySlotOptions(slot, slots, picks))
+    .map((slot) => filterMagicInitiateSpellListSlotOptions(slot, slots, picks))
+
+  useEffect(() => {
+    for (const slot of relevant) {
+      if (slot.kind !== "spell_list_class") continue
+      if (!isMagicInitiateSourceLabel(slot.sourceLabel)) continue
+      const selected = picks[slot.slotKey] ?? []
+      if (!selected.length) continue
+      const allowed = new Set((slot.options ?? []).map((option) => option.name))
+      const next = selected.filter((name) => allowed.has(name))
+      if (next.length !== selected.length) onChange(slot.slotKey, next)
+    }
+  }, [relevant, picks, onChange])
+
   if (relevant.length === 0) return null
 
   return (
@@ -211,7 +224,7 @@ export function ModifierPlayerChoicePanel({
         }
 
         if (
-          slot.kind === "spellcasting_ability" &&
+          slot.kind === "spell_list_class" &&
           isMagicInitiateSourceLabel(slot.sourceLabel) &&
           (slot.options?.length ?? 0) === 0
         ) {
@@ -220,8 +233,8 @@ export function ModifierPlayerChoicePanel({
               key={slot.slotKey}
               className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
             >
-              No spellcasting abilities left for another Magic Initiate — each take needs a different
-              ability (Intelligence, Wisdom, or Charisma).
+              No spell lists left for another Magic Initiate — each take needs a different class
+              list (Cleric, Druid, or Wizard).
             </p>
           )
         }

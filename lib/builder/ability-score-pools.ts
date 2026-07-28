@@ -8,6 +8,7 @@ import {
   ABILITY_SCORE_KEYS,
   type AbilityScoreKey,
 } from "@/lib/compendium/characteristic-modifiers"
+import { featureGrantsFeats } from "@/lib/compendium/grant-feat-catalog"
 import {
   effectiveLinkedModifiers,
   readLinkedModifiers,
@@ -36,6 +37,7 @@ function grantsFromLinkedModifiers(
   catalog: ModifierCatalogEntry[],
   allocationKeyPrefix: string,
   sourceLabel: string,
+  options?: { excludeAsiPools?: boolean },
 ): AbilityScorePoolGrant[] {
   const instances = effectiveLinkedModifiers(linked, legacyRefs, catalog)
   if (!instances.length) return []
@@ -45,6 +47,9 @@ function grantsFromLinkedModifiers(
     const { characteristics } = resolveLinkedModifierInstance(instance, catalog)
     for (const mod of characteristics) {
       if (mod.type !== "ability_scores" || mod.mode !== "asi_pool") continue
+      // Class ASI features that also grant a feat pick are double-wired when both the
+      // feature pool and the chosen ASI feat pool are shown.
+      if (options?.excludeAsiPools) continue
       grants.push({
         allocationKey: `${allocationKeyPrefix}::ref::${instance.catalogRefId}::${mod.id}`,
         label: mod.label?.trim() || entry?.name || sourceLabel,
@@ -65,6 +70,7 @@ function collectFromFeature(
   grants: AbilityScorePoolGrant[],
 ): void {
   const featureKey = featureChoiceKey(classId, feature.name, feature.level)
+  const excludeAsiPools = featureGrantsFeats(feature, catalog)
   grants.push(
     ...grantsFromLinkedModifiers(
       feature.linkedModifiers,
@@ -72,6 +78,7 @@ function collectFromFeature(
       catalog,
       `class_feature:${featureKey}`,
       `Feature · ${feature.name}`,
+      { excludeAsiPools },
     ),
   )
 
@@ -246,8 +253,14 @@ export function shouldUseLegacyMilestoneAsiUi(params: {
   const { milestoneAsiFeatCount, grants, featSelectionEntries, feats } = params
   if (milestoneAsiFeatCount <= 0) return false
   const required = milestoneAsiPointTotal(milestoneAsiFeatCount)
-  const covered = asiPoolPointsFromFeatSelections(grants, featSelectionEntries, feats)
-  return covered < required
+  const coveredFromEntries = asiPoolPointsFromFeatSelections(grants, featSelectionEntries, feats)
+  if (coveredFromEntries >= required) return false
+
+  // Fallback when entry keys and grant prefixes drift: any Feat · ASI pool still counts.
+  const coveredFromLabels = grants
+    .filter((grant) => /feat\s*·\s*ability score improvement/i.test(grant.sourceLabel ?? ""))
+    .reduce((sum, grant) => sum + grant.points, 0)
+  return coveredFromLabels < required
 }
 
 export function allAbilityScorePoolAllocationsValid(
