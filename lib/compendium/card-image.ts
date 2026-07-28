@@ -114,27 +114,44 @@ export function resolveCompendiumCardImageUrl(
   return getCompendiumCardImageUrl(item)
 }
 
-/** Keep custom card art; otherwise apply bundled SRD defaults by item name. */
+/** True when the URL is app-bundled card art under /images/compendium/ (safe to upgrade). */
+export function isBundledCompendiumCardImagePath(url: string): boolean {
+  return /(?:^|\/)images\/compendium\//.test(url)
+}
+
+/**
+ * Keep true custom card art; otherwise apply defaults by item name for SRD-sourced rows.
+ * Bundled `/images/compendium/…` paths are treated as upgradeable defaults, not custom art.
+ */
 export function applySrdCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  if (existing) return { ...row, card_image_url: existing }
-  if (!isSrdSource(row.source as string | null | undefined)) return row
   const card_image_url = defaults[String(row.name ?? "")] ?? null
+  if (existing && !isBundledCompendiumCardImagePath(existing)) {
+    return { ...row, card_image_url: existing }
+  }
+  if (!isSrdSource(row.source as string | null | undefined)) {
+    return existing ? { ...row, card_image_url: existing } : row
+  }
   return card_image_url ? { ...row, card_image_url } : row
 }
 
-/** Keep custom card art; otherwise apply bundled defaults by item name (any source). */
+/**
+ * Keep true custom card art; otherwise apply bundled defaults by item name (any source).
+ * Bundled `/images/compendium/…` paths are treated as upgradeable defaults, not custom art.
+ */
 export function applyBundledCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  if (existing) return { ...row, card_image_url: existing }
   const card_image_url = defaults[String(row.name ?? "")] ?? null
-  return card_image_url ? { ...row, card_image_url } : row
+  if (existing && !isBundledCompendiumCardImagePath(existing)) {
+    return { ...row, card_image_url: existing }
+  }
+  return card_image_url ? { ...row, card_image_url } : existing ? { ...row, card_image_url: existing } : row
 }
 
 /** Compendium tabs that use portrait (3:4) card art in browse grids. */
