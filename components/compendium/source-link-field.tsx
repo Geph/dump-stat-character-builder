@@ -1,5 +1,5 @@
 /** Short author/publisher label shown on compact pickers (DB allows 64). */
-export const SOURCE_AUTHOR_MAX_LENGTH = 24
+export const SOURCE_AUTHOR_MAX_LENGTH = 15
 
 interface SourceDetailsFieldProps {
   value: string
