@@ -4,7 +4,10 @@ import type { ReactNode } from "react"
 import { GameIconPicker } from "@/components/game-icon-picker"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { CompendiumThemeColorPicker } from "@/components/compendium/theme-color-picker"
-import { SourceLinkField } from "@/components/compendium/source-link-field"
+import {
+  SOURCE_AUTHOR_MAX_LENGTH,
+  SourceLinkField,
+} from "@/components/compendium/source-link-field"
 import { CardImageField } from "@/components/compendium/card-image-field"
 import type { CompendiumCardImageCrop } from "@/lib/compendium/card-image"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
@@ -59,8 +62,8 @@ export function CompendiumEditorHeaderRow({
 }: CompendiumEditorHeaderRowProps) {
   const { isCompactOnly } = useAppPresentationMode()
   const gridCols = afterName
-    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
-    : "grid-cols-1 md:grid-cols-3"
+    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+    : "grid-cols-1 md:grid-cols-2"
 
   return (
     <div className="space-y-4">
@@ -76,34 +79,36 @@ export function CompendiumEditorHeaderRow({
           ) : null}
         </div>
       </div>
-      <div className={`flex-1 w-full min-w-0 grid ${gridCols} gap-4`}>
-        <div>
-          <label className="block text-sm font-semibold text-foreground mb-2">{nameLabel}</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            required={nameRequired}
-            className={fieldClass}
-            placeholder={namePlaceholder}
-          />
+      <div className="flex-1 w-full min-w-0 space-y-4">
+        <div className={`grid ${gridCols} gap-4`}>
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">{nameLabel}</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              required={nameRequired}
+              className={fieldClass}
+              placeholder={namePlaceholder}
+            />
+          </div>
+          {afterName}
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">Source Author</label>
+            <input
+              type="text"
+              value={source}
+              onChange={(e) => onSourceChange(e.target.value.slice(0, SOURCE_AUTHOR_MAX_LENGTH))}
+              maxLength={SOURCE_AUTHOR_MAX_LENGTH}
+              className={fieldClass}
+              placeholder="WotC"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Short label for pickers ({source.length}/{SOURCE_AUTHOR_MAX_LENGTH}).
+            </p>
+          </div>
         </div>
-        {afterName}
-        <div>
-          <label className="block text-sm font-semibold text-foreground mb-2">Source</label>
-          <input
-            type="text"
-            value={source}
-            onChange={(e) => onSourceChange(e.target.value)}
-            className={fieldClass}
-            placeholder="Player's Handbook"
-          />
-        </div>
-        <SourceLinkField
-          value={creatorUrl}
-          onChange={onCreatorUrlChange}
-          compact
-        />
+        <SourceLinkField value={creatorUrl} onChange={onCreatorUrlChange} />
       </div>
     </div>
     {onCardImageUrlChange && cardImagePlacement === "below" && !isCompactOnly ? (

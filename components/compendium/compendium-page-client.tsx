@@ -2153,19 +2153,27 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               })()}
             </div>
           ) : null}
-          {(selectedItem as { creator_url?: string | null }).creator_url && (
-            <p className="mt-4 text-sm">
-              <span className="text-white/50">Source link: </span>
-              <a
-                href={(selectedItem as { creator_url: string }).creator_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline break-all"
-              >
-                {(selectedItem as { creator_url: string }).creator_url}
-              </a>
-            </p>
-          )}
+          {(selectedItem as { creator_url?: string | null }).creator_url && (() => {
+            const details = (selectedItem as { creator_url: string }).creator_url.trim()
+            const isBareUrl = /^https?:\/\/\S+$/i.test(details)
+            return (
+              <p className="mt-4 text-sm">
+                <span className="text-white/50">Source details: </span>
+                {isBareUrl ? (
+                  <a
+                    href={details}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {details}
+                  </a>
+                ) : (
+                  <span className="text-white/80 break-words whitespace-pre-wrap">{details}</span>
+                )}
+              </p>
+            )
+          })()}
         </CompendiumDetailOverlay>
       )}
       <SiteFooter />
