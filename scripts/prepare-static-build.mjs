@@ -6,22 +6,10 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from "fs"
 import { dirname, join } from "path"
 import { fileURLToPath } from "url"
+import { DYNAMIC_ROUTES } from "./static-build-routes.mjs"
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const stashRoot = join(root, ".static-build-stash")
-
-const DYNAMIC_ROUTES = [
-  "app/compendium/classes/[id]",
-  "app/compendium/subclasses/[id]",
-  "app/compendium/species/[id]",
-  "app/compendium/backgrounds/[id]",
-  "app/compendium/spells/[id]",
-  "app/compendium/feats/[id]",
-  "app/compendium/equipment/[id]",
-  "app/compendium/abilities/[id]",
-  "app/characters/[id]",
-  "app/api",
-]
 
 function stashPath(rel) {
   return join(stashRoot, rel)
