@@ -73,6 +73,7 @@ describe("Dark Gift category + Origin-slot eligibility", () => {
     const withoutPrereq = inferFeatImportFields({
       name: "Scion of the Outer Planes",
       description: "Your connection to an Outer Plane infuses you with the energy there.",
+      prerequisite: null,
       category: "General",
     })
     expect(withoutPrereq.category).toBe("Origin")
