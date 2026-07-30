@@ -677,7 +677,7 @@ export function applyModifierPlayerPicks(
     })
   }
 
-  return result.map((mod) => {
+  const picked = result.map((mod) => {
     if (mod.sharedChoiceGroup) return mod
 
     if (mod.type === "skills") {
@@ -771,6 +771,30 @@ export function applyModifierPlayerPicks(
     }
 
     return mod
+  })
+
+  return applyChosenCastingAbilityToSpells(picked)
+}
+
+/**
+ * A source that lets the player choose a casting ability (Elven Lineage cantrips, Scion of
+ * the Outer Planes) casts its granted spells with that ability, so spell grants from the
+ * same source inherit it unless they name one explicitly.
+ */
+function applyChosenCastingAbilityToSpells(
+  mods: CharacteristicModifier[],
+): CharacteristicModifier[] {
+  const chosen = mods.find(
+    (mod): mod is SpellcastingAbilityCharacteristic =>
+      mod.type === "spellcasting_ability" && (mod.abilityOptions?.length ?? 0) > 1,
+  )
+  if (!chosen) return mods
+
+  return mods.map((mod) => {
+    if (mod.type !== "spells_known") return mod
+    const spellMod = mod as SpellsKnownCharacteristic
+    if (spellMod.castingAbility) return mod
+    return { ...spellMod, castingAbility: chosen.ability }
   })
 }
 

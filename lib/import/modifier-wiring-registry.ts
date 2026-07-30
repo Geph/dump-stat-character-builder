@@ -1429,6 +1429,9 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Distinguish Discipline Talents (nested on the discipline) from Class Talents (ability_role class_talent) — distinct choices.category and resourceKey.",
       "Use import_proposals.custom_abilities for discipline systems needing builder UI.",
       "Ephemeral turn-start free points that expire unused and have spend restrictions: mechanics kind turn_start_bonus_grant (not turn_start_resource_restore).",
+      "Play-state engines the sheet already runs — keep the source wording verbatim and do NOT invent class_resources rows, dieSidesByLevel ladders, or new_toggles for them: Rampage Die (Rampaging Power), Flesh Warp's Mutation Die, Mesmerism illusion tokens (Projected Self, Imaginary Ally), Biokinesis Weapon Morph natural weapons, Balance of Power's banked pool, and Perfected Enhancement's temp-HP bonus. Dump Stat owns the die size, token counts, morph toggles, banked amounts, and their reset-on-rest behavior.",
+      "Rampage Die dependants: Uncontrollable Mind → condition_immunity Charmed/Frightened with requiresSheetToggle \"rampage_die_d8_plus\" (never unconditional). Tantrum (class_talent) and Unstoppable Rampage need no mechanics[] — the sheet steps the die on initiative / on damage taken and runs the 0-HP roll from the feature names.",
+      "Empowered Psionics (+INT to psionic power damage) is description-driven (on_cast_spell_trigger reminder); do not model it as damage_roll_modifiers on the subclass.",
     ],
   },
   {
@@ -1653,6 +1656,7 @@ function formatMechanicsCheatsheet(): string {
     "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
     "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters. For subclass spell tables that unlock more spells at higher levels (e.g. \"at level 5 you also always have Conjure Animals prepared\"), emit ONE spells_known mechanic PER level tier with unlocksAtClassLevel set to that tier's level — do not lump every tier's spells into one mechanic without it, or they'll all become available at the feature's own (lowest) level.",
+    "- spellcasting_ability: spellcastingAbility intelligence|wisdom|charisma. When the source lets the PLAYER choose (\"your spellcasting ability for it is Intelligence, Wisdom, or Charisma (choose when you select this feat)\"), emit ONE spellcasting_ability mechanic on the PARENT feat/feature and keep that sentence in its description — do not pick one ability yourself and do not repeat the mechanic on each choices option. Dump Stat turns the three-way wording into a build-time pick, and spell grants from the same feat/feature inherit whichever ability the player picks.",
     "- tool_proficiencies: tools [\"Smith's Tools\"]; grantExpertise true for doubled tool checks",
     "- attunement_slots: attunementTotal 4 (sets cap) OR attunementBonus 1 (adds to default 3)",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
@@ -1700,6 +1704,7 @@ function formatMechanicsCheatsheet(): string {
     "- armor_proficiencies / weapon_proficiencies: list gains in armor[] / weaponMode. Conditional upgrades (\"gain X, or Y instead if you already have X\") stay in description prose only — do not invent a conditionalUpgrade field until the schema supports it.",
     "- spells_known / spellChoiceGrants: spellChoiceGrants[].level is SPELL level (0 = cantrip, 1–9); use unlocksAtClassLevel when the feature unlocks that pick at a specific character/class level (both fields when the source states both).",
     "- Sheet toggles: requiresSheetToggle must reference either a standard key (while_raging, while_wild_shape, while_dancing, below_half_hp / Bloodied, etc.) OR a key listed once under new_toggles on the parent class/subclass ({ key, name, grantingFeature }). Declare transformation states (Rage of the Gods form, etc.) in new_toggles before other features reference them. new_toggles goes on the class/subclass object itself (sibling of features[]) — never inside an individual feature. Alchemist optional keys: self_medication_active, counter_discharge_active.",
+    "- Play-state derived toggles: some keys are computed by the sheet from live play-state, so reference them with requiresSheetToggle but NEVER declare them in new_toggles — rampage_die_d8_plus (auto-active while an Unleashed Mind Rampage Die is d8 or larger) and the exclusive weapon_morph_* group (weapon_morph_bone_spike, weapon_morph_flesh_club, weapon_morph_sinew_whip, weapon_morph_viscera_cannon, weapon_morph_chitinous_plating — set when the player Uses that morph option).",
     "- Renamed / lightly-modified SRD features: set basedOnSrdFeature to the exact INDEX — SRD-standard feature name (e.g. \"Evasion\") while keeping the homebrew display name. Auto-wire applies the base; description/mechanics[] carry deltas (party share, extra gates).",
     "- targetCount (shared): { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } for \"a number of creatures equal to your Charisma modifier (minimum of one)\" — use on temporary_hit_points, movement_grant, and similar targeted effects (not uses.ability_modifier, which is for use counts).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
@@ -1757,6 +1762,7 @@ When the homebrew name differs (e.g. "Leading Evasion"), keep that name and set 
     "- When a feature invents a new transformation / conditional state (\"while in this form\", Rage of the Gods, etc.), add ONE entry under new_toggles on the class or subclass: { key: \"rage_of_the_gods_form\", name: \"Rage of the Gods\", grantingFeature: \"Rage of the Gods\" }.",
     "- Derive key as snake_case from the feature name. Sub-benefits (flight, resistance, reaction) then set requiresSheetToggle to that same key.",
     "- Do not invent mismatched keys silently inside individual mechanics[] rows — declare once, then reference.",
+    "- Derived play-state keys are owned by the sheet and must NOT appear in new_toggles: rampage_die_d8_plus (Rampage Die d8+) and weapon_morph_* (active Weapon Morph option). Reference them from mechanics[] when a benefit only holds in that state — e.g. Uncontrollable Mind's Charmed/Frightened immunity is condition_immunity + requiresSheetToggle \"rampage_die_d8_plus\", never an unconditional immunity.",
 
     "Leave narrative-only (no mechanics[] unless a clear bonus phrase exists):",
     ...NARRATIVE_ONLY_GUIDANCE.map((line) => `- ${line}`),

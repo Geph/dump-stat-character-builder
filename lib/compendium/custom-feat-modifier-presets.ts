@@ -59,6 +59,15 @@ const LORE_SKILLS = ["Arcana", "History", "Investigation", "Nature", "Religion"]
 const OBSERVER_SKILLS = ["Insight", "Investigation", "Perception"] as const
 const ELEMENTAL_DAMAGE_TYPES = ["Acid", "Cold", "Fire", "Lightning", "Thunder"] as const
 
+/** Planar Infusion table (Scion of the Outer Planes): plane → resistance + cantrip. */
+const PLANAR_INFUSION_ROWS = [
+  { key: "chaotic", plane: "Chaotic Outer Plane", damageType: "Poison", cantrip: "Minor Illusion" },
+  { key: "evil", plane: "Evil Outer Plane", damageType: "Necrotic", cantrip: "Chill Touch" },
+  { key: "good", plane: "Good Outer Plane", damageType: "Radiant", cantrip: "Sacred Flame" },
+  { key: "lawful", plane: "Lawful Outer Plane", damageType: "Force", cantrip: "Guidance" },
+  { key: "outlands", plane: "The Outlands", damageType: "Psychic", cantrip: "Mage Hand" },
+] as const
+
 /** Artisan tools listed on the Crafter (Origin) Fast Crafting table. */
 const CRAFTER_ARTISAN_TOOLS = [
   "Carpenter's Tools",
@@ -880,73 +889,32 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   // —— Planescape ——
   "Scion of the Outer Planes": {
     linkedModifiers: [
-      spellAbility("scion_spell_ability", "Spellcasting ability for Planar Infusion cantrip", [
-        "intelligence",
-        "wisdom",
-        "charisma",
-      ]),
+      spellAbility(
+        "scion_spell_ability",
+        "Planar Infusion cantrip: spellcasting ability (Intelligence, Wisdom, or Charisma)",
+        ["intelligence", "wisdom", "charisma"],
+      ),
     ],
     isChoice: true,
     choices: {
       category: "Planar Infusion",
       count: 1,
-      options: [
-        {
-          name: "Chaotic Outer Plane",
-          description: "You gain resistance to Poison damage and learn the Minor Illusion cantrip.",
-          linkedModifiers: [
-            damageResistanceFixed("scion_chaotic_res", ["Poison"], "Poison resistance"),
-            spellsKnown("scion_chaotic_cantrip", {
-              spells: [{ spellId: "Minor Illusion", alwaysPrepared: true }],
-              label: "Minor Illusion cantrip",
-            }),
-          ],
-        },
-        {
-          name: "Evil Outer Plane",
-          description: "You gain resistance to Necrotic damage and learn the Chill Touch cantrip.",
-          linkedModifiers: [
-            damageResistanceFixed("scion_evil_res", ["Necrotic"], "Necrotic resistance"),
-            spellsKnown("scion_evil_cantrip", {
-              spells: [{ spellId: "Chill Touch", alwaysPrepared: true }],
-              label: "Chill Touch cantrip",
-            }),
-          ],
-        },
-        {
-          name: "Good Outer Plane",
-          description: "You gain resistance to Radiant damage and learn the Sacred Flame cantrip.",
-          linkedModifiers: [
-            damageResistanceFixed("scion_good_res", ["Radiant"], "Radiant resistance"),
-            spellsKnown("scion_good_cantrip", {
-              spells: [{ spellId: "Sacred Flame", alwaysPrepared: true }],
-              label: "Sacred Flame cantrip",
-            }),
-          ],
-        },
-        {
-          name: "Lawful Outer Plane",
-          description: "You gain resistance to Force damage and learn the Guidance cantrip.",
-          linkedModifiers: [
-            damageResistanceFixed("scion_lawful_res", ["Force"], "Force resistance"),
-            spellsKnown("scion_lawful_cantrip", {
-              spells: [{ spellId: "Guidance", alwaysPrepared: true }],
-              label: "Guidance cantrip",
-            }),
-          ],
-        },
-        {
-          name: "The Outlands",
-          description: "You gain resistance to Psychic damage and learn the Mage Hand cantrip.",
-          linkedModifiers: [
-            damageResistanceFixed("scion_outlands_res", ["Psychic"], "Psychic resistance"),
-            spellsKnown("scion_outlands_cantrip", {
-              spells: [{ spellId: "Mage Hand", alwaysPrepared: true }],
-              label: "Mage Hand cantrip",
-            }),
-          ],
-        },
-      ],
+      options: PLANAR_INFUSION_ROWS.map((row) => ({
+        name: row.plane,
+        description: `You gain Resistance to ${row.damageType} damage and always have the ${row.cantrip} cantrip prepared, cast with your chosen spellcasting ability and without material components.`,
+        linkedModifiers: [
+          damageResistanceFixed(
+            `scion_${row.key}_res`,
+            [row.damageType],
+            `${row.damageType} Resistance (${row.plane})`,
+          ),
+          spellsKnown(`scion_${row.key}_cantrip`, {
+            spells: [{ spellId: row.cantrip, alwaysPrepared: true, prepared: true }],
+            alwaysPrepared: true,
+            label: `${row.cantrip} cantrip (no material components)`,
+          }),
+        ],
+      })),
     },
   },
   "Agent of Order": {

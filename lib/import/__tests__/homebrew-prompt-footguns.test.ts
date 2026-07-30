@@ -91,6 +91,16 @@ describe("homebrew prompt footguns", () => {
     expect(blob).toMatch(/NEVER eligible_classes Alternate Fighter/i)
   })
 
+  it("keeps Psion play-state engines out of class_resources and toggles declarations", () => {
+    const blob = HOMEBREW_WIRING_PATTERNS.flatMap((p) => [p.source, ...p.guidance]).join("\n")
+    expect(blob).toMatch(/Play-state engines the sheet already runs/i)
+    expect(blob).toMatch(/Mutation Die/)
+    expect(blob).toMatch(/Weapon Morph/)
+    expect(blob).toMatch(/rampage_die_d8_plus/)
+    expect(blob).toMatch(/never unconditional/i)
+    expect(blob).toMatch(/Empowered Psionics/)
+  })
+
   it("third-party charnel_touch definition still warns about uses.shape", () => {
     const src = readFileSync(join(process.cwd(), "lib/import/third-party-resources.ts"), "utf8")
     expect(src).toMatch(/never uses\.type multiply_level/)

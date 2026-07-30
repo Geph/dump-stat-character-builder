@@ -978,6 +978,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     exhaustionLevel,
     currentHp,
     acFormulaPick,
+    resourceDieSidesByKey.rampage_die,
   ])
 
   const derived = useMemo(() => {
@@ -2377,6 +2378,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (result.activeConditions) setActiveConditions(result.activeConditions)
 
       const summary = [...result.summary]
+      // Resting ends the fight — the Rampage Die falls back to its d4 baseline.
+      if (resourceDieSidesByKey.rampage_die != null) {
+        setResourceDieSidesByKey((prev) => ({ ...prev, rampage_die: 4 }))
+        setRampageTurn(defaultRampageTurnState())
+      }
       if (rest === "long_rest") {
         const pool = buildHitDicePool(classDetails, usedHitDiceByClassId)
         const nextHitDice = recoverHitDiceOnLongRest(usedHitDiceByClassId, pool)
@@ -2414,6 +2420,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       rechargeCapsByResourceId,
       classDetails,
       usedHitDiceByClassId,
+      resourceDieSidesByKey.rampage_die,
     ],
   )
 

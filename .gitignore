@@ -37,3 +37,6 @@ scripts/subclass-card-sources/*
 lib/import/__tests__/fixtures/*eberron*
 lib/import/__tests__/fixtures/*homebrew*
 **/import-json/
+tmp-*.json
+# Scratch diagnostics that read those extracts (would fail in CI without them)
+lib/import/__tests__/tmp-*.test.ts

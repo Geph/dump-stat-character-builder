@@ -5,6 +5,7 @@ import {
   CHOICE_EXTRACTION_HINT,
   CUSTOM_CLASS_IMPORT_HINT,
   DUPLICATE_ABILITY_MERGE_HINT,
+  FEAT_CATEGORY_IMPORT_HINT,
   GENERAL_SOURCE_CLEANUP_HINT,
   MARKER_LEGEND_SCAN_HINT,
   NAME_SOURCE_MATCHING_HINT,
@@ -174,6 +175,42 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("primordial_aspect_lightning")
     expect(prompt).toContain("Rampage Die")
     expect(prompt).toContain("not by class level")
+  })
+
+  it("keeps table-row option benefits separate from benefits shared by every option", () => {
+    expect(CHOICE_EXTRACTION_HINT).toContain("only what DIFFERS between rows")
+    expect(CHOICE_EXTRACTION_HINT).toContain("stays on the parent")
+    expect(CHOICE_EXTRACTION_HINT).toContain("Plane | Damage Resistance | Cantrip")
+    expect(CHOICE_EXTRACTION_HINT).toContain("parent spellcasting_ability mechanic")
+
+    const feats = buildByoExtractionPrompt("feats")
+    expect(feats).toContain("one option per row named exactly as the first column")
+    expect(feats).toContain("one feat-level spellcasting_ability mechanic")
+    expect(FEAT_CATEGORY_IMPORT_HINT).toContain("Planar Infusion")
+    expect(FEAT_CATEGORY_IMPORT_HINT).toContain("The Outlands")
+    expect(FEAT_CATEGORY_IMPORT_HINT).toContain("never repeat the casting-ability choice on every option")
+  })
+
+  it("documents the player-chosen spellcasting ability mechanic and its inheritance", () => {
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- spellcasting_ability:")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("emit ONE spellcasting_ability mechanic on the PARENT")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("inherit whichever ability the player picks")
+  })
+
+  it("gates Psion play-state features instead of granting them outright", () => {
+    const prompt = buildByoExtractionPrompt("subclasses")
+    expect(prompt).toContain("rampage_die_d8_plus")
+    expect(prompt).toContain("do not declare it under new_toggles")
+    expect(prompt).toContain("weapon_morph_")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Play-state derived toggles")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Mutation Die")
+
+    const abilities = buildByoExtractionPrompt("abilities", {
+      customSystems: { abilityCategory: "Psionic Disciplines", classResourceLabels: "Psi Points" },
+    })
+    expect(abilities).toContain("Flesh Warp")
+    expect(abilities).toContain("Imaginary Ally")
+    expect(abilities).toContain("weapon_morph_")
   })
 
   it("forbids inventing ability_bonuses keys like desktop on backgrounds", () => {

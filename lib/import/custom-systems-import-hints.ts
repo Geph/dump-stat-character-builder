@@ -73,6 +73,7 @@ Split layers. Do NOT mash an entire package/section into one ability description
    d) Default Alternate Effects tables stay on the discipline description (HTML table is fine).
    e) Class-level and feat-gated talents as ability_role "class_talent" rows (patterns 3b–3c) — do not nest those under a discipline.
    f) Innate Psionics / Innate Psionic Ability stay as class features (spells_known / uses modifiers) — not custom abilities.
+   g) Powers and talents whose bookkeeping the sheet already runs — Biokinesis Flesh Warp (Mutation Die), Biokinesis Weapon Morph (temporary natural weapons), Mesmerism Projected Self and Imaginary Ally (illusion tokens), Unleashed Mind Tantrum (Rampage Die steps) — stay ordinary rows for their layer (psionic_power / class_talent). Keep the die sizes, token counts, durations, HP costs, and morph option names verbatim in description, and do not invent class_resources rows, dieSidesByLevel ladders, uses pools, or new_toggles for them: Dump Stat tracks the die, tokens, and the exclusive weapon_morph_* toggles as play-state and resets them on a rest.
 
    Exploits — one proposal per exploit; keep "expend one Exploit Die" phrasing when present.
    Inventor — one proposal per upgrade option.

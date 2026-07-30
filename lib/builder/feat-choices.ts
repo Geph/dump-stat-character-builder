@@ -47,26 +47,35 @@ export function buildFeatSelectionEntries(params: {
   return entries
 }
 
+/**
+ * Feat-level modifiers apply on top of the picked options' modifiers — a choice feat can
+ * carry benefits shared by every option (e.g. Scion of the Outer Planes' casting ability).
+ */
 export function linkedModifiersForFeat(
   feat: Feat,
   choicePickKey: string,
   featChoicePicks: Record<string, string[]>,
   catalog: ModifierCatalogEntry[],
 ): LinkedModifierInstance[] {
-  if (feat.isChoice && feat.choices?.options?.length) {
-    const instances: LinkedModifierInstance[] = []
-    const picked = featChoicePicks[choicePickKey] ?? []
-    for (const optionName of picked) {
-      const option = feat.choices.options.find((entry) => entry.name === optionName)
-      if (!option) continue
-      instances.push(
-        ...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
-      )
-    }
-    return instances
-  }
+  const instances = effectiveLinkedModifiers(feat.linkedModifiers, feat.modifierRefs, catalog)
+  if (!feat.isChoice || !feat.choices?.options?.length) return instances
 
-  return effectiveLinkedModifiers(feat.linkedModifiers, feat.modifierRefs, catalog)
+  const seenInstanceIds = new Set(instances.map((instance) => instance.instanceId))
+  const picked = featChoicePicks[choicePickKey] ?? []
+  for (const optionName of picked) {
+    const option = feat.choices.options.find((entry) => entry.name === optionName)
+    if (!option) continue
+    for (const instance of effectiveLinkedModifiers(
+      option.linkedModifiers,
+      option.modifierRefs,
+      catalog,
+    )) {
+      if (instance.instanceId && seenInstanceIds.has(instance.instanceId)) continue
+      if (instance.instanceId) seenInstanceIds.add(instance.instanceId)
+      instances.push(instance)
+    }
+  }
+  return instances
 }
 
 export function collectFeatModifierChoiceBlockers(
