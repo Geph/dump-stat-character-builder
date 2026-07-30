@@ -5,13 +5,17 @@ import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifie
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import type { ImportContent } from "@/lib/import/content-schema"
 import { KIBBLES_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/kibbles-feat-modifier-presets"
+import {
+  hasHomebrewFixture,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
 const KIBBLES_FEAT_NAMES = Object.keys(KIBBLES_FEAT_MODIFIER_PRESETS).filter(
   (name) => name !== "Innovators Upgrade" && name !== "Aquatic Adaption", // aliases
 )
 
-const KIBBLES_CRAFTING_FEATS_PATH =
-  "/Users/geph/Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files/import-json/kibbles tasty/kibbles-crafting-feats"
+/** Drive-only source extract: the last case skips wherever it isn't present. */
+const CRAFTING_FEATS_FIXTURE = "kibbles-crafting-feats"
 
 describe("Kibbles feat name presets", () => {
   it("wires Expert Alchemist as fixed ASI + tool proficiency", () => {
@@ -55,8 +59,10 @@ describe("Kibbles feat name presets", () => {
     expect(unwired).toEqual([])
   })
 
-  it("wires Alien Weapon Retraining and Aquatic Adaption from Drive crafting JSON", () => {
-    const raw = JSON.parse(readFileSync(KIBBLES_CRAFTING_FEATS_PATH, "utf8")) as {
+  it.runIf(hasHomebrewFixture(CRAFTING_FEATS_FIXTURE))("wires Alien Weapon Retraining and Aquatic Adaption from Drive crafting JSON", () => {
+    const raw = JSON.parse(
+      readFileSync(homebrewFixturePath(CRAFTING_FEATS_FIXTURE) as string, "utf8"),
+    ) as {
       feats: { name: string }[]
     }
     const enriched = enrichImportContentModifiers({ feats: raw.feats as never })

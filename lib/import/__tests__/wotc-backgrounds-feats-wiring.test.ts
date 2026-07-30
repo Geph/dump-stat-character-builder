@@ -9,20 +9,27 @@ import { collectBackgroundFeatGrantGaps } from "@/lib/import/collect-missing-bac
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
 import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import type { Background } from "@/lib/types"
+import {
+  hasHomebrewFixture,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
-const BG_PATH =
-  "/Users/geph/Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files/import-json/wotc-backgrounds"
-const FEATS_PATH =
-  "/Users/geph/Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files/import-json/wotc-feats"
+const BG_FIXTURE = "wotc-backgrounds"
+const FEATS_FIXTURE = "wotc-feats"
 
-function loadDriveJson(path: string): unknown {
+/** Drive-only source extracts: these tests skip wherever they aren't present. */
+const hasFixtures = hasHomebrewFixture(BG_FIXTURE, FEATS_FIXTURE)
+
+function loadDriveJson(name: string): unknown {
+  const path = homebrewFixturePath(name)
+  if (!path) throw new Error(`Missing Drive import fixture: ${name}`)
   return JSON.parse(readFileSync(path, "utf8"))
 }
 
 describe("wotc-backgrounds + wotc-feats Drive wiring", () => {
-  it("wires Planar Infusion / Conviction via feat_granted (Scion loaded with batch)", () => {
-    const backgrounds = (loadDriveJson(BG_PATH) as { backgrounds: unknown[] }).backgrounds
-    const feats = (loadDriveJson(FEATS_PATH) as { feats: unknown[] }).feats
+  it.runIf(hasFixtures)("wires Planar Infusion / Conviction via feat_granted (Scion loaded with batch)", () => {
+    const backgrounds = (loadDriveJson(BG_FIXTURE) as { backgrounds: unknown[] }).backgrounds
+    const feats = (loadDriveJson(FEATS_FIXTURE) as { feats: unknown[] }).feats
     const content = enrichImportContentModifiers({
       backgrounds: backgrounds as never,
       feats: feats as never,
@@ -54,8 +61,8 @@ describe("wotc-backgrounds + wotc-feats Drive wiring", () => {
     expect(unmatchedBg.map((e) => `${e.sourceLabel}::${e.featureName}`)).toEqual([])
   })
 
-  it("wires all Drive feats after enrichment; Planescape follow-ups keep real benefits", () => {
-    const feats = (loadDriveJson(FEATS_PATH) as { feats: unknown[] }).feats
+  it.runIf(hasFixtures)("wires all Drive feats after enrichment; Planescape follow-ups keep real benefits", () => {
+    const feats = (loadDriveJson(FEATS_FIXTURE) as { feats: unknown[] }).feats
     const content = enrichImportContentModifiers({ feats: feats as never })
     const review = collectImportModifierReview(content).filter((r) =>
       r.sourceLabel.startsWith("Feat:"),
@@ -75,8 +82,8 @@ describe("wotc-backgrounds + wotc-feats Drive wiring", () => {
     expect((wanderer?.linkedModifiers ?? []).some((m) => m.activation?.action)).toBe(true)
   })
 
-  it("wires Ravenloft Dark Gift choice backgrounds into feat pick slots", () => {
-    const backgrounds = (loadDriveJson(BG_PATH) as { backgrounds: unknown[] }).backgrounds
+  it.runIf(hasFixtures)("wires Ravenloft Dark Gift choice backgrounds into feat pick slots", () => {
+    const backgrounds = (loadDriveJson(BG_FIXTURE) as { backgrounds: unknown[] }).backgrounds
     const content = enrichImportContentModifiers({ backgrounds: backgrounds as never })
     const catalog = buildDefaultModifierCatalog()
     const haunted = content.backgrounds?.find((b) => b.name === "Haunted One")
