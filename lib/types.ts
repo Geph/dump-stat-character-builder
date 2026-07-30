@@ -845,6 +845,8 @@ export interface Feat {
   prerequisite_class_ids: string[] | null
   prerequisite_species_ids: string[] | null
   prerequisite_background_ids: string[] | null
+  /** Soft recommendations — class names (not eligibility gates). */
+  recommended_classes?: string[] | null
   benefits: import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] | null
   /** References into the Common Modifier Effects catalog (merged with benefits in builder). */
   modifierRefs?: string[] | null

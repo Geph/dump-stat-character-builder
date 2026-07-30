@@ -914,6 +914,20 @@ function enrichCanonicalFeatureChoices(feature: Feature): Feature {
   const name = feature.name?.trim().replace(/[\u2018\u2019\u201B]/g, "'")
   if (!name) return feature
 
+  if (name === "Fast Hands") {
+    // Not a build-time pick — both options are always available as a Bonus Action menu.
+    return {
+      ...feature,
+      isChoice: false,
+      choices: undefined,
+      description:
+        "As a Bonus Action, you can do one of the following.\n" +
+        "<strong>Sleight of Hand.</strong> Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket.\n" +
+        "<strong>Use an Object.</strong> Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+      activation: { ...(feature.activation ?? {}), bonusAction: true },
+    }
+  }
+
   if (name === "Circle of the Land Spells") {
     return buildCircleOfTheLandChoice(feature)
   }
@@ -2176,18 +2190,29 @@ function naturesVeil(): LinkedModifierInstance[] {
   ]
 }
 
-function fastHandsPicker(): LinkedModifierInstance {
-  return charInstance("modinst_fast_hands", FEATURE_OPTION_PICKER_CATALOG_ID, [
-    legacyFeatureOptionPickerCharacteristic({
+/** Thief Fast Hands — free Bonus Action menu (not a build-time pick). */
+function fastHandsMenu(): LinkedModifierInstance {
+  return charInstance("modinst_fast_hands", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+    {
       id: modId("fast_hands"),
-      category: "Fast Hands",
-      choiceCount: 1,
+      type: "resource_ability_menu",
+      resourceKey: "",
+      waiveResourceCost: true,
       options: [
-        { name: "Sleight of Hand", description: "" },
-        { name: "Use Object", description: "" },
-        { name: "Thieves' Tools", description: "" },
+        {
+          name: "Sleight of Hand",
+          resourceCost: 0,
+          description:
+            "Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools, or to pick a pocket.",
+        },
+        {
+          name: "Use an Object",
+          resourceCost: 0,
+          description:
+            "Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+        },
       ],
-    }),
+    },
   ])
 }
 
@@ -3008,7 +3033,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Fast Hands": {
-    linkedModifiers: [fastHandsPicker()],
+    activation: { bonusAction: true },
+    linkedModifiers: [fastHandsMenu()],
   },
   "*::Supreme Sneak": {
     linkedModifiers: [

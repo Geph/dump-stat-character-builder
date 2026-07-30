@@ -107,6 +107,7 @@ export const BUILDER_FEAT_COLUMNS = [
   "prerequisite_class_ids",
   "prerequisite_species_ids",
   "prerequisite_background_ids",
+  "recommended_classes",
   "benefits",
   "modifier_refs",
   "linked_modifiers",

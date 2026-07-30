@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS feats (
   prerequisite_class_ids JSON,
   prerequisite_species_ids JSON,
   prerequisite_background_ids JSON,
+  recommended_classes JSON,
   benefits JSON,
   modifier_refs JSON,
   linked_modifiers JSON,

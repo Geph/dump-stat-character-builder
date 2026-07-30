@@ -188,6 +188,7 @@ export const feats = mysqlTable("feats", {
   prerequisite_class_ids: json("prerequisite_class_ids").$type<string[]>(),
   prerequisite_species_ids: json("prerequisite_species_ids").$type<string[]>(),
   prerequisite_background_ids: json("prerequisite_background_ids").$type<string[]>(),
+  recommended_classes: json("recommended_classes").$type<string[]>(),
   benefits: json("benefits"),
   modifier_refs: json("modifier_refs").$type<string[]>().default([]),
   linked_modifiers: json("linked_modifiers").$type<unknown[]>().default([]),

@@ -488,6 +488,7 @@ const FeatAiSchema = z.object({
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
   category: z.string().nullable(),
   level_requirement: z.number().nullable().optional(),
+  recommended_classes: z.array(z.string()).nullable().optional(),
   isChoice: z.boolean().nullable(),
   choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
@@ -985,6 +986,9 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         prerequisite_rules: feat.prerequisite_rules,
         category: feat.category,
         level_requirement: feat.level_requirement,
+        recommended_classes: feat.recommended_classes?.length
+          ? feat.recommended_classes
+          : undefined,
         isChoice: feat.isChoice === true ? true : undefined,
         choices: feat.choices ?? undefined,
         mechanics: normalizeMechanics(feat.mechanics),

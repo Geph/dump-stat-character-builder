@@ -299,7 +299,7 @@
       {
         "level": 3,
         "name": "Fast Hands",
-        "description": "As a Bonus Action, you can do one of the following.\n_Sleight of Hand._ Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket.\n_Use an Object._ Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+        "description": "As a Bonus Action, you can do one of the following.\n<strong>Sleight of Hand.</strong> Make a Dexterity (Sleight of Hand) check to pick a lock or disarm a trap with Thieves' Tools or to pick a pocket.\n<strong>Use an Object.</strong> Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
         "srdFeatureId": "srd.subclass.rogue.thief.fast-hands.l3"
       },
       {

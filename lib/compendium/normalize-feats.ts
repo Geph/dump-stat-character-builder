@@ -1,5 +1,6 @@
 import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
 import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
+import { applyFeatRecommendedClasses } from "@/lib/compendium/phb-feat-recommended-classes"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
@@ -13,16 +14,26 @@ function parseFeatChoices(raw: unknown): FeatureChoice | undefined {
   return choices
 }
 
+function parseRecommendedClasses(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null
+  const names = raw.map((v) => String(v ?? "").trim()).filter(Boolean)
+  return names.length ? names : null
+}
+
 /** Map a stored feat row to runtime Feat shape. */
 export function normalizeFeatRow(
   row: Record<string, unknown>,
   catalog: ModifierCatalogEntry[] = [],
 ): Feat {
-  const enriched = isSrdSource(row.source as string | null | undefined)
+  const base = isSrdSource(row.source as string | null | undefined)
     ? enrichSrdFeatRow(row)
     : enrichCustomFeatRow(row)
+  const enriched = applyFeatRecommendedClasses(base)
   return {
     ...(enriched as unknown as Feat),
+    recommended_classes: parseRecommendedClasses(
+      enriched.recommended_classes ?? enriched.recommendedClasses,
+    ),
     isChoice: Boolean(enriched.is_choice ?? enriched.isChoice),
     choices: parseFeatChoices(enriched.choices),
     linkedModifiers: readLinkedModifiers(enriched, catalog),

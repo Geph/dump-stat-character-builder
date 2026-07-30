@@ -464,6 +464,8 @@ export const FeatImportSchema = z.object({
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   category: z.string().nullable().optional(),
   level_requirement: z.number().nullable().optional(),
+  /** Soft recommendations — class names (not hard eligibility). */
+  recommended_classes: z.array(z.string()).nullable().optional(),
   /** Ability-catalog picks (discipline / class talent / exploit). Not for ASI / Fighting Style / Epic Boon milestones. */
   isChoice: z.boolean().optional(),
   choices: ChoiceOptionsSchema.optional(),

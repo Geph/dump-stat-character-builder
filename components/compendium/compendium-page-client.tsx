@@ -1095,6 +1095,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
               {castCompendiumRow<Feat>(data).source || "Custom"}
             </span>
+            {(castCompendiumRow<Feat>(data).recommended_classes?.length ?? 0) > 0 && (
+              <span className="text-xs px-2 py-1 bg-secondary/10 text-secondary rounded-full">
+                Rec: {castCompendiumRow<Feat>(data).recommended_classes!.join(" · ")}
+              </span>
+            )}
           </div>
         )}
         {activeTab === "equipment" && (
@@ -2001,7 +2006,28 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                         ]
                       : activeTab === "spells"
                         ? spellDetailOverlayTags(selectedItem as Spell)
-                : undefined
+                        : activeTab === "feats"
+                          ? [
+                              ...((selectedItem as Feat).category
+                                ? [{ label: (selectedItem as Feat).category! }]
+                                : []),
+                              ...(((selectedItem as Feat).level_requirement ?? 1) > 1
+                                ? [
+                                    {
+                                      label: `Lvl ${(selectedItem as Feat).level_requirement}+`,
+                                      emphasis: true as const,
+                                    },
+                                  ]
+                                : []),
+                              ...((selectedItem as Feat).recommended_classes?.length
+                                ? [
+                                    {
+                                      label: `Recommended: ${(selectedItem as Feat).recommended_classes!.join(", ")}`,
+                                    },
+                                  ]
+                                : []),
+                            ]
+                          : undefined
           }
           accentColor={getCompendiumItemAccentColor(selectedItem as unknown as Record<string, unknown>)}
           headerActions={

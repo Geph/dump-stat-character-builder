@@ -41,6 +41,7 @@ import {
   syncModifierRefs,
   type LinkedModifierInstance,
 } from "@/lib/compendium/linked-modifiers"
+import { PHB_FEAT_RECOMMENDED_CLASS_NAMES } from "@/lib/compendium/phb-feat-recommended-classes"
 
 const FEAT_CATEGORIES = ["Origin", "Dark Gift", "General", "Fighting Style", "Epic Boon", "Planar Pact"] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -55,6 +56,7 @@ interface FeatFormData {
   prerequisite_class_ids: string[]
   prerequisite_species_ids: string[]
   prerequisite_background_ids: string[]
+  recommended_classes: string[]
   characteristics: CharacteristicModifier[]
   modifier_refs: string[]
   linked_modifiers: LinkedModifierInstance[]
@@ -79,6 +81,7 @@ const defaultFeat: FeatFormData = {
   prerequisite_class_ids: [],
   prerequisite_species_ids: [],
   prerequisite_background_ids: [],
+  recommended_classes: [],
   characteristics: [],
   modifier_refs: [],
   linked_modifiers: [],
@@ -161,6 +164,7 @@ export default function FeatEditorPage({ id }: { id: string }) {
               prerequisite_class_ids: enriched.prerequisite_class_ids || [],
               prerequisite_species_ids: enriched.prerequisite_species_ids || [],
               prerequisite_background_ids: enriched.prerequisite_background_ids || [],
+              recommended_classes: enriched.recommended_classes || [],
               characteristics: normalizeCharacteristics(enriched.benefits, null),
               modifier_refs: readModifierRefs(enriched as unknown as Record<string, unknown>),
               linked_modifiers: readLinkedModifiers(enriched as unknown as Record<string, unknown>, modifierCatalog),
@@ -459,6 +463,125 @@ export default function FeatEditorPage({ id }: { id: string }) {
                 />
               </label>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Recommended for
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Soft guidance for players — does not restrict who can take the feat.
+            </p>
+            <div className="flex flex-wrap gap-3 items-center">
+              {PHB_FEAT_RECOMMENDED_CLASS_NAMES.map((cls) => {
+                const checked = form.recommended_classes.some(
+                  (c) => c.toLowerCase() === cls.toLowerCase(),
+                )
+                return (
+                  <label key={cls} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setForm((prev) => {
+                          const next = checked
+                            ? prev.recommended_classes.filter(
+                                (c) => c.toLowerCase() !== cls.toLowerCase(),
+                              )
+                            : [...prev.recommended_classes, cls]
+                          return { ...prev, recommended_classes: next }
+                        })
+                      }}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-sm text-foreground">{cls}</span>
+                  </label>
+                )
+              })}
+            </div>
+            {allClasses.some(
+              (c) =>
+                !PHB_FEAT_RECOMMENDED_CLASS_NAMES.some(
+                  (std) => std.toLowerCase() === c.name.toLowerCase(),
+                ),
+            ) ? (
+              <div className="mt-3">
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Other classes from your compendium
+                </label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const name = e.target.value
+                    if (!name) return
+                    setForm((prev) =>
+                      prev.recommended_classes.some(
+                        (c) => c.toLowerCase() === name.toLowerCase(),
+                      )
+                        ? prev
+                        : { ...prev, recommended_classes: [...prev.recommended_classes, name] },
+                    )
+                  }}
+                  className="w-full max-w-md px-3 py-2 bg-background border-2 border-border rounded-xl text-sm text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Add class…</option>
+                  {allClasses
+                    .filter(
+                      (c) =>
+                        !PHB_FEAT_RECOMMENDED_CLASS_NAMES.some(
+                          (std) => std.toLowerCase() === c.name.toLowerCase(),
+                        ) &&
+                        !form.recommended_classes.some(
+                          (sel) => sel.toLowerCase() === c.name.toLowerCase(),
+                        ),
+                    )
+                    .map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+                {form.recommended_classes.filter(
+                  (name) =>
+                    !PHB_FEAT_RECOMMENDED_CLASS_NAMES.some(
+                      (std) => std.toLowerCase() === name.toLowerCase(),
+                    ),
+                ).length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {form.recommended_classes
+                      .filter(
+                        (name) =>
+                          !PHB_FEAT_RECOMMENDED_CLASS_NAMES.some(
+                            (std) => std.toLowerCase() === name.toLowerCase(),
+                          ),
+                      )
+                      .map((name) => (
+                        <span
+                          key={name}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground"
+                        >
+                          {name}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                recommended_classes: prev.recommended_classes.filter(
+                                  (c) => c !== name,
+                                ),
+                              }))
+                            }
+                            className="hover:text-foreground"
+                            aria-label={`Remove ${name}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           </CompendiumEditorPanel>
 

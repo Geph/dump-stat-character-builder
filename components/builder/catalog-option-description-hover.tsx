@@ -72,16 +72,16 @@ export function CatalogOptionDescriptionHover({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[200] flex items-end justify-center bg-black/70 p-4 sm:items-center"
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
                   onClick={() => setOpen(false)}
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="catalog-option-info-title"
                 >
                   <motion.div
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 16 }}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
                     className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-primary/40 bg-card p-4 shadow-2xl sm:p-5"
                     onClick={(event) => event.stopPropagation()}
                   >

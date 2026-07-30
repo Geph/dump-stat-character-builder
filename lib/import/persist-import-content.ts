@@ -1,6 +1,7 @@
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
+import { applyFeatRecommendedClasses } from "@/lib/compendium/phb-feat-recommended-classes"
 import { deleteWhere, insertRows, listRows, upsertByName } from "@/lib/db/repository"
 import type { FoundryImportMeta } from "@/lib/import/foundry-types"
 import { stripFoundryMeta, type ImportContentWithFoundryMeta } from "@/lib/import/foundry-manifest"
@@ -401,6 +402,10 @@ export async function persistImportedContent(
         preferredSource,
       )
       const modifierRefs = (row.modifierRefs ?? row.modifier_refs) as string[] | undefined
+      const withRecommended = applyFeatRecommendedClasses({
+        name: f.name,
+        recommended_classes: (f as { recommended_classes?: string[] | null }).recommended_classes,
+      })
       return {
         name: f.name,
         description: f.description ? formatFeatDescription(f.description) : null,
@@ -411,6 +416,7 @@ export async function persistImportedContent(
           typeof (f as { level_requirement?: unknown }).level_requirement === "number"
             ? (f as { level_requirement: number }).level_requirement
             : null,
+        recommended_classes: (withRecommended.recommended_classes as string[] | undefined) ?? null,
         linked_modifiers: linkedModifiers ?? [],
         modifier_refs: modifierRefs ?? [],
         source: sanitizeImportRowSource((f as { source?: string | null }).source, source),
