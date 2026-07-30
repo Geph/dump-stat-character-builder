@@ -5,14 +5,15 @@ import {
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import { effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import type { FeatureChoice } from "@/lib/types"
 
 const DEFERRED_MECHANICS_NOTE =
   "Mechanic not fully modeled on sheet — see feature description (Dark Lurker check reduction)."
 
-const RAMPAGE_DIE_DEFERRED_NOTE =
-  "Rampage Die state is tracked manually: begin at d4, increase one die step after consecutive turns dealing damage (maximum d12), and reset to d4 after a turn without damage or when Incapacitated. Automatic die stepping and Tantrum's initiative/on-damage increases are not yet modeled."
+const RAMPAGE_DIE_SHEET_NOTE =
+  "Rampage Die runs on the sheet: Turn Start steps it up after a turn you dealt damage and resets it to d4 after a turn without damage or while Incapacitated. Weapon damage rolls and damaging power uses mark the turn automatically, the die can only be added to one damage roll per turn, and holding d12 for 10 rounds adds a level of Exhaustion."
 
 function curiousMindSkillOptions(): FeatureChoice["options"] {
   return DND_SKILLS.map((skill) => ({
@@ -236,6 +237,95 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
           recharges: [{ kind: "real_time", mode: "decay", minutes: 1 }],
         },
       },
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Bank healing/THP from psionic powers and spells into your Balance of Power pool (max = Psion level, 1 min decay). Expend the pool on a damage roll to add that much damage to one target.",
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.perfected_enhancement",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^perfected enhancement$/i },
+    skipIfCharacteristicTypes: ["power_rider"],
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "perfected_enhancement_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_perfected_enhancement_rider",
+              type: "power_rider",
+              parentPowerNames: ["Enhancing Surge"],
+              alertSummary:
+                "When a psionic power grants temporary HP, add your proficiency bonus to the temp HP one creature gains (sheet applies +PB on psionic-power temp HP grants).",
+              label: "Perfected Enhancement",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Sheet: when you Use a psionic power that grants temporary hit points, Dump Stat adds your proficiency bonus to one creature's temp HP from that grant.",
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.boundless_imagination",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^boundless imagination$/i },
+    operations: [
+      {
+        op: "setChoices",
+        isChoice: true,
+        choices: {
+          category: "Boundless Imagination",
+          count: 1,
+          options: [
+            {
+              name: "Devastating Weapons",
+              description: "Its damage becomes 1d12.",
+            },
+            {
+              name: "Psionic Conduit",
+              description:
+                "You can use psionic powers, spells, and talents through your Astral Construct as if you were in its space.",
+            },
+            {
+              name: "Vivid Existence",
+              description:
+                "Your Astral Construct fully materializes and automatically uses Solidify at the start of your turn without requiring a command.",
+            },
+          ],
+          swappableOnRest: false,
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "boundless_imagination_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_boundless_imagination_rider",
+              type: "power_rider",
+              parentPowerNames: ["Astral Construct"],
+              alertSummary:
+                "When you conjure Astral Construct, apply your Boundless Imagination pick (change the benefit as a bonus action for the duration).",
+              label: "Boundless Imagination",
+            },
+          ],
+        },
+      },
     ],
   },
   {
@@ -256,7 +346,7 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /psion/i, name: /^(?:rampage die|rampaging power)$/i },
     operations: [
-      { op: "appendDescription", text: RAMPAGE_DIE_DEFERRED_NOTE },
+      { op: "appendDescription", text: RAMPAGE_DIE_SHEET_NOTE },
       {
         op: "attachNamedPreset",
         preset: {
@@ -279,6 +369,38 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
             },
           ],
         },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.uncontrollable_mind",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^uncontrollable mind$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        // The description parses as an unconditional immunity; the real grant only
+        // holds while the Rampage Die is d8 or larger.
+        replaceCharacteristicTypes: ["condition_immunity"],
+        preset: {
+          kind: "char_instance",
+          idKey: "uncontrollable_mind_immunities",
+          catalogRefId: "cat_char_condition_immunity",
+          characteristics: [
+            {
+              id: "mod_uncontrollable_mind_immunities",
+              type: "condition_immunity",
+              conditions: ["Charmed", "Frightened"],
+              label: "Immunity to Charmed and Frightened (Rampage Die d8+)",
+              limitations: [requiresActiveToggleLimitation("rampage_die_d8_plus")],
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "The sheet grants Charmed and Frightened immunity only while your Rampage Die is d8 or larger. Resistance to being magically controlled stays a table ruling.",
       },
     ],
   },
@@ -316,6 +438,529 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
       },
     ],
   },
+  {
+    id: "psion.subclass.full_awakening",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^full awakening$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: { action: true, noEconomyCost: true },
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "psi_points",
+          classResourceAmount: 2,
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "full_awakening_attacks",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("full_awakening_attacks"),
+              kind: "check_roll_modifier",
+              checkRollMode: "advantage",
+              checkCategory: "attack",
+              label: "Full Awakening: advantage on attacks",
+              limitations: [requiresActiveToggleLimitation("full_awakening_active")],
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["check_roll_modifier"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "full_awakening_saves",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("full_awakening_saves"),
+              kind: "check_roll_modifier",
+              checkRollMode: "advantage",
+              checkCategory: "save",
+              label: "Full Awakening: advantage on saves",
+              limitations: [requiresActiveToggleLimitation("full_awakening_active")],
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Use at the start of your turn (2 psi). Enable Full Awakening on the sheet so attack/save advantage applies until the start of your next turn.",
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.mind_over_matter",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^mind over matter$/i },
+    skipIfCharacteristicTypes: ["resource_ability_menu"],
+    operations: [
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "mind_over_matter_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_mind_over_matter_menu",
+              type: "resource_ability_menu",
+              resourceKey: "psi_points",
+              options: [
+                {
+                  name: "INT save instead (STR/DEX/CON)",
+                  description:
+                    "When you would make a Strength, Dexterity, or Constitution saving throw, spend 2 psi to make an Intelligence saving throw instead.",
+                  resourceCost: 2,
+                },
+                {
+                  name: "Death save = 20",
+                  description:
+                    "When you make a death saving throw, spend 4 psi before rolling to treat the roll as a 20.",
+                  resourceCost: 4,
+                },
+              ],
+              label: "Mind Over Matter — spend psi",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.unstoppable_rampage",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^unstoppable rampage$/i },
+    skipIfCharacteristicTypes: ["resource_ability_menu"],
+    operations: [
+      { op: "setActivation", activation: { onDropToZeroHp: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "unstoppable_rampage_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_unstoppable_rampage_menu",
+              type: "resource_ability_menu",
+              resourceKey: "psi_points",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Roll Rampage Die",
+                  description:
+                    "Roll your Rampage Die + CON vs excess damage. If you exceed it, drop to 1 HP instead of 0.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Second Rampage Die (+2 psi)",
+                  description: "Spend 2 psi to roll an additional Rampage Die and add it.",
+                  resourceCost: 2,
+                },
+              ],
+              label: "Unstoppable Rampage",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.astral_guardian",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^astral guardian$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "psi_points",
+          classResourceAmount: 1,
+        },
+      },
+    ],
+  },
+  // —— Class talents / discipline powers (proposal abilities) ——
+  {
+    id: "psion.ability.mind_rider",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^mind rider$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "appendDescription",
+        text: "Using this action turns on Mind Rider on the sheet while you see through the target (you are deaf and blind to your own senses). Ally Int/Wis/Cha save advantage stays play-time — turn the toggle off when the link ends.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.empowered_strike_rider",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^empowered strike$/i },
+    skipIfCharacteristicTypes: ["power_rider"],
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "empowered_strike_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_empowered_strike_rider",
+              type: "power_rider",
+              parentPowerNames: ["Attack", "Elemental Blast", "Telekinetic Force"],
+              alertSummary:
+                "Once/turn on a weapon hit (Attack action): apply augments from a known Elemental Blast or Telekinetic Force without that power's base damage. Open Elemental Blast / Telekinetic Force for the augment list; Psionic Mastery still applies.",
+              label: "Empowered Strike",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.ability.projected_nightmares",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^projected nightmares$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["feature_choice_option_grant"],
+        preset: {
+          kind: "char_instance",
+          idKey: "projected_nightmares_option",
+          catalogRefId: "cat_char_feature_choice_option_grant",
+          characteristics: [
+            {
+              id: "mod_projected_nightmares_option",
+              type: "feature_choice_option_grant",
+              targetFeatureName: "Boundless Imagination",
+              choiceCategory: "Boundless Imagination",
+              options: [
+                {
+                  name: "Horrifying Nightmare",
+                  description:
+                    "Chosen creatures that start their turns within 5 feet of your Astral Construct must make a Wisdom saving throw against your Psionics DC or become frightened of it until the start of their next turn. On a successful save, a creature is immune to this effect for 24 hours or until you summon a new Astral Construct.",
+                },
+              ],
+              label: "Projected Nightmares — Horrifying Nightmare",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "projected_nightmares_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_projected_nightmares_rider",
+              type: "power_rider",
+              parentPowerNames: ["Astral Construct"],
+              parentMenuOptionNames: ["Horrifying Nightmare"],
+              alertSummary:
+                "Boundless Imagination option — Horrifying Nightmare: chosen creatures starting within 5 ft. of your Astral Construct WIS save or frightened until their next turn.",
+              label: "Projected Nightmares",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.ability.bile_blast",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^bile blast$/i },
+    skipIfCharacteristicTypes: ["special_attack"],
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "bile_blast",
+          catalogRefId: "cat_char_special_attack",
+          activation: { action: true },
+          characteristics: [
+            {
+              id: "mod_bile_blast",
+              type: "special_attack",
+              attackName: "Bile Blast",
+              attackProfile: "force_save",
+              targetMode: "area",
+              areaShape: "cone",
+              areaLengthFeet: 15,
+              saveAbility: "Dexterity",
+              saveDCBase: 8,
+              saveHalfDamage: true,
+              damageTypes: ["Acid"],
+              damageDiceCount: 2,
+              damageDieType: "d6",
+              damageByLevel: [
+                { level: 1, mode: "dice", dieCount: 2, dieType: "d6" },
+                { level: 5, mode: "dice", dieCount: 3, dieType: "d6" },
+                { level: 11, mode: "dice", dieCount: 4, dieType: "d6" },
+                { level: 17, mode: "dice", dieCount: 6, dieType: "d6" },
+              ],
+              label: "Bile Blast — acid cone",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.ability.weapon_morph",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^weapon morph$/i },
+    skipIfCharacteristicTypes: ["resource_ability_menu"],
+    operations: [
+      { op: "setCastingTime", castingTime: "1 bonus action" },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "weapon_morph_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          activation: { bonusAction: true },
+          characteristics: [
+            {
+              id: "mod_weapon_morph_menu",
+              type: "resource_ability_menu",
+              resourceKey: "",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Bone Spike",
+                  description: "Martial melee natural weapon: 1d8 piercing, Finesse.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Chitinous Plating",
+                  description: "Shield-like plating: +2 AC while morph is active.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Flesh Club",
+                  description: "Martial melee natural weapon: 1d8 bludgeoning.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Sinew Whip",
+                  description: "Martial melee natural weapon: 1d6 slashing, Finesse, Reach.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Viscera Cannon",
+                  description:
+                    "Martial ranged natural weapon: 1d8 acid, 60/180 ft. Each shot costs 1 HP (ammo).",
+                  resourceCost: 0,
+                },
+                {
+                  name: "End morph",
+                  description: "End Weapon Morph as a bonus action.",
+                  resourceCost: 0,
+                },
+              ],
+              label: "Weapon Morph",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.ability.slime_excretion",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^slime excretion$/i },
+    operations: [{ op: "setCastingTime", castingTime: "1 action" }],
+  },
+  {
+    id: "psion.ability.advantageous_assault",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^advantageous assault$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 bonus action" },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "advantageous_assault",
+          catalogRefId: "cat_fx_bonus_action_attack",
+          activation: { bonusAction: true },
+          effects: [{ id: modId("advantageous_assault"), kind: "bonus_action_attack" }],
+        },
+        skipIfCharacteristicTypes: ["bonus_action_attack"],
+      },
+    ],
+  },
+  {
+    id: "psion.ability.projected_self",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^projected self$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "appendDescription",
+        text: "Sheet: Using this ability spawns a Projected Self illusion token (1 HP). Track concentration, move/cast-from-illusion, and swap reaction on the Combat resources panel.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.imaginary_ally",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^imaginary ally$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "appendDescription",
+        text: "Sheet: Using this ability spawns an Imaginary Ally illusion token (1 HP) with a Bonus Action spell-attack proxy (1d8+INT psychic).",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.flesh_warp",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^flesh warp$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "appendDescription",
+        text: "Sheet: Using this ability grants a Mutation Die (d4) on the Combat resources panel until the start of your next turn. Perfected steps the die up; Muscular auto-applies to Strength without spending. Track ally benefit counts toward CON-mod Exhaustion there.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.swollen_muscles",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^swollen muscles$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "appendDescription",
+        text: "Sheet: Using this ability turns on the Swollen Muscles toggle (treat target Strength as equal to your Intelligence until your next turn).",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.mental_projection",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^mental projection$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Sheet reminder: harmless illustrative images — no spend. Track duration play-time.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.psionic_regrowth",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^psionic regrowth$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 action" },
+      {
+        op: "setUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "psi_points",
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "psionic_regrowth",
+          catalogRefId: "cat_fx_heal_self",
+          activation: { action: true },
+          effects: [
+            {
+              id: modId("psionic_regrowth"),
+              kind: "heal_self",
+              healTarget: "choose_ally",
+              label: "Psionic Regrowth — spend psi to heal (amount play-time)",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Spend psi points to heal; scale healed HP to psi spent play-time if the source scales.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.rapid_regeneration",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^rapid regeneration$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 bonus action" },
+      {
+        op: "setUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "psi_points",
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "rapid_regeneration",
+          catalogRefId: "cat_fx_heal_self",
+          activation: { bonusAction: true },
+          effects: [
+            {
+              id: modId("rapid_regeneration"),
+              kind: "heal_self",
+              healTarget: "self",
+              label: "Rapid Regeneration — spend psi to heal (amount play-time)",
+            },
+          ],
+        },
+      },
+    ],
+  },
 ]
 
 /** Psion presets also apply when subclass.class_name is empty — match via optional empty. */
@@ -327,6 +972,31 @@ export const PSION_PRESETS_OPEN_CLASS: EnrichmentPreset[] = PSION_PRESETS.map((p
     // Applied in apply.ts with a fallback when subclassClassName is empty
   },
 }))
+
+export const PSION_SEEDS: ContentSeed[] = [
+  {
+    id: "psion.seed.balance_of_power",
+    pack: "psion",
+    seedClassResource: {
+      className: /psion/i,
+      requiresFeatureName: /^balance of power$/i,
+      resourceKey: "balance_of_power",
+      build: (className) => ({
+        class_name: className,
+        resource_key: "balance_of_power",
+        name: "Balance of Power",
+        description:
+          "Bank HP restored or temporary HP granted by psionic abilities into this pool (max = Psion level). Expend the pool on a damage roll within 1 minute.",
+        uses: {
+          type: "at_level",
+          atLevelMode: "multiply_level",
+          atLevelTable: [{ level: 1, count: 1 }],
+          recharges: [{ kind: "real_time", mode: "decay", minutes: 1 }],
+        },
+      }),
+    },
+  },
+]
 
 export const MONK_PRESETS: EnrichmentPreset[] = [
   {

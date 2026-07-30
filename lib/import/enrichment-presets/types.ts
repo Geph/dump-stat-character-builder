@@ -49,12 +49,14 @@ export type NamedModifierPreset =
       idKey: string
       catalogRefId: string
       characteristics: unknown[]
+      activation?: NonNullable<Feature["activation"]>
     }
   | {
       kind: "fx_instance"
       idKey: string
       catalogRefId: string
       effects: unknown[]
+      activation?: NonNullable<Feature["activation"]>
     }
 
 export type EnrichmentOperation =
@@ -73,6 +75,10 @@ export type EnrichmentOperation =
   | {
       op: "setActivation"
       activation: NonNullable<Feature["activation"]>
+    }
+  | {
+      op: "setCastingTime"
+      castingTime: string
     }
   | {
       op: "setSheetDisplay"
@@ -165,4 +171,7 @@ export type FeatureLike = Feature & {
   source_name?: string
   companion_stat_block?: unknown
   uses?: UsesConfig
+  /** Custom-ability casting header (proposal abilities). */
+  casting_time?: string | null
+  execution?: string | null
 }

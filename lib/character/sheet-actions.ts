@@ -33,6 +33,8 @@ export type SheetActionEntry = {
   classResourceKey?: string | null
   /** Custom ability backing this action, when surfaced from the compendium. */
   customAbilityId?: string | null
+  /** Ability role for custom abilities (e.g. psionic_power). */
+  abilityRole?: string | null
   psionicAugments?: PsionicAugmentsConfig | null
   /** Structured attack/damage profile when this action is a special attack power. */
   specialAttack?: SpecialAttackCharacteristic | null
@@ -728,6 +730,7 @@ function pushCustomAbilityActions(
       classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
       classResourceKey: resolveActionResourceKey(item),
       customAbilityId: ability.id,
+      abilityRole: ability.ability_role ?? null,
       psionicAugments: resolvePsionicAugments(ability),
       specialAttack: resolveSpecialAttack(item),
       castingTime: ability.casting_time ?? ability.execution ?? null,
@@ -941,9 +944,29 @@ function collectTalentAlertsFromCustomAbilities(
           const key = `${ability.name}::${char.parentPowerNames.join("|")}`
           if (seen.has(key)) continue
           seen.add(key)
+          let summary = char.alertSummary?.trim() || char.label?.trim() || ability.name
+          if (/^empowered strike$/i.test(ability.name)) {
+            const knownPowers = abilities.filter(
+              (row) =>
+                row.ability_role === "psionic_power" &&
+                /^(?:elemental blast|telekinetic force)$/i.test(row.name),
+            )
+            if (knownPowers.length) {
+              const lines = knownPowers.map((power) => {
+                const augments = resolvePsionicAugments(power)?.augments ?? []
+                const names = augments.map((entry) => entry.name).filter(Boolean)
+                return names.length
+                  ? `${power.name}: ${names.join(", ")}`
+                  : `${power.name} (see power card for augments)`
+              })
+              summary = `${summary}\nKnown: ${lines.join(" · ")}`
+            } else {
+              summary = `${summary}\nNo Elemental Blast / Telekinetic Force known yet.`
+            }
+          }
           alerts.push({
             name: ability.name,
-            summary: char.alertSummary?.trim() || char.label?.trim() || ability.name,
+            summary,
             description: ability.description ?? null,
             sourceLabel,
             parentPowerNames: char.parentPowerNames,

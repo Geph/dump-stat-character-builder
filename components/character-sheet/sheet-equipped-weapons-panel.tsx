@@ -28,6 +28,11 @@ type EquippedWeaponCard = {
   hand: "main" | "off"
   defaultIncludeAbilityModifier: boolean
   abilityModifier: number
+  /** Optional play-state note (e.g. Weapon Morph ammo). */
+  note?: string
+  /** When set, spend this much HP when the attack roll button is used. */
+  ammoHpCost?: number
+  onSpendAmmoHp?: () => void
 }
 
 type SheetEquippedWeaponsPanelProps = {
@@ -36,6 +41,8 @@ type SheetEquippedWeaponsPanelProps = {
   weaponProficiencies: string[]
   /** Weapon attack rolls spend the Attack action. */
   onAttackRoll?: () => void
+  /** Weapon damage rolls signal that damage was dealt this turn (Rampage Die). */
+  onDamageRoll?: () => void
 }
 
 function WeaponAttackCard({
@@ -44,13 +51,18 @@ function WeaponAttackCard({
   hand,
   defaultIncludeAbilityModifier,
   abilityModifier,
+  note,
+  ammoHpCost,
+  onSpendAmmoHp,
   buildInputs,
   weaponProficiencies,
   onAttackRoll,
+  onDamageRoll,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
   onAttackRoll?: () => void
+  onDamageRoll?: () => void
 }) {
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
@@ -66,6 +78,10 @@ function WeaponAttackCard({
     (mastery ? describeWeaponMastery(mastery) : null) ??
     (mastery ? "Homebrew mastery — see item details." : null)
   const masteryActive = sheetContext?.masteryActive ?? false
+  const handleAttackRoll = () => {
+    if (ammoHpCost && ammoHpCost > 0 && onSpendAmmoHp) onSpendAmmoHp()
+    onAttackRoll?.()
+  }
 
   return (
     <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 min-w-0">
@@ -156,6 +172,10 @@ function WeaponAttackCard({
               ))}
             </div>
           ) : null}
+
+          {note ? (
+            <p className="text-[10px] leading-snug text-amber-800 dark:text-amber-200">{note}</p>
+          ) : null}
         </div>
 
         <div className="flex w-[6.75rem] shrink-0 flex-col gap-1 self-stretch min-h-[6.5rem]">
@@ -165,7 +185,7 @@ function WeaponAttackCard({
               title={`${weapon.name} attack`}
               breakdown={attack.attackBreakdown}
               rollContext={{ kind: "attack" }}
-              onRoll={onAttackRoll}
+              onRoll={handleAttackRoll}
               layout="panel"
               tone={hand === "off" ? "bonus" : "action"}
               caption="To Hit"
@@ -183,6 +203,7 @@ function WeaponAttackCard({
                 layout="panel"
                 tone="damage"
                 caption="Dmg"
+                onRoll={onDamageRoll}
               />
             </div>
           ) : null}
@@ -197,6 +218,7 @@ export function SheetEquippedWeaponsPanel({
   buildInputs,
   weaponProficiencies,
   onAttackRoll,
+  onDamageRoll,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
@@ -213,6 +235,7 @@ export function SheetEquippedWeaponsPanel({
             buildInputs={buildInputs}
             weaponProficiencies={weaponProficiencies}
             onAttackRoll={onAttackRoll}
+            onDamageRoll={onDamageRoll}
           />
         ))}
       </div>

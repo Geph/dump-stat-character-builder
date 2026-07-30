@@ -237,11 +237,13 @@ export default function CompendiumPageClient() {
   const [spellSchools, setSpellSchoolsState] = useState<string[]>(() => getSpellSchools())
   const [spellSchoolsEditorOpen, setSpellSchoolsEditorOpen] = useState(false)
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
+  const [featFilterSource, setFeatFilterSource] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
   const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
   const [toolFilterGroup, setToolFilterGroup] = useState<string>("all")
   const [backgroundFilterAbilities, setBackgroundFilterAbilities] = useState<AbilityModifierKey[]>([])
+  const [backgroundFilterSource, setBackgroundFilterSource] = useState<string>("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -473,6 +475,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         const feat = item as Feat
         const category = feat.category || "General"
         if (featFilterCategory !== "all" && category !== featFilterCategory) return false
+        if (
+          featFilterSource !== "all" &&
+          (feat.source?.trim() || "Custom") !== featFilterSource
+        ) {
+          return false
+        }
       }
       if (activeTab === "equipment") {
         const eq = item as Equipment
@@ -495,8 +503,20 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         const tool = item as Tool
         if (toolFilterGroup !== "all" && tool.tool_group !== toolFilterGroup) return false
       }
-      if (activeTab === "backgrounds" && backgroundFilterAbilities.length > 0) {
-        if (!backgroundMatchesAbilityFilter(item as Background, backgroundFilterAbilities)) return false
+      if (activeTab === "backgrounds") {
+        const background = item as Background
+        if (
+          backgroundFilterSource !== "all" &&
+          (background.source?.trim() || "Custom") !== backgroundFilterSource
+        ) {
+          return false
+        }
+        if (
+          backgroundFilterAbilities.length > 0 &&
+          !backgroundMatchesAbilityFilter(background, backgroundFilterAbilities)
+        ) {
+          return false
+        }
       }
       return true
     })
@@ -505,11 +525,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   }, [
     activeTab,
     backgroundFilterAbilities,
+    backgroundFilterSource,
     classNamesById,
     classResourceFilterClassId,
     content,
     equipmentFilterCategory,
     featFilterCategory,
+    featFilterSource,
     languageFilterPool,
     magicItemFilterCategory,
     searchQuery,
@@ -527,6 +549,18 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
     [equipmentData],
   )
+  const backgroundSourceOptions = useMemo(() => {
+    const rows = (content.backgrounds ?? []) as Background[]
+    return [
+      ...new Set(rows.map((bg) => bg.source?.trim() || "Custom").filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b))
+  }, [content.backgrounds])
+  const featSourceOptions = useMemo(() => {
+    const rows = (content.feats ?? []) as Feat[]
+    return [
+      ...new Set(rows.map((feat) => feat.source?.trim() || "Custom").filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b))
+  }, [content.feats])
   const magicItemCategoryOptions = useMemo(
     () => getMagicItemCategoryOptions(magicItemData),
     [magicItemData],
@@ -1570,7 +1604,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex flex-1 min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             {activeTab === "feats" && (
-              <div id="feat-filters" className="flex flex-wrap items-center gap-2">
+              <div id="feat-filters" className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                     Type
@@ -1589,12 +1623,35 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     <option value="Planar Pact">Planar Pact</option>
                   </select>
                 </div>
-                {featFilterCategory !== "all" && (
+                {featSourceOptions.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                      Source
+                    </label>
+                    <select
+                      value={featFilterSource}
+                      onChange={(e) => setFeatFilterSource(e.target.value)}
+                      className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                      aria-label="Filter feats by source"
+                    >
+                      <option value="all">All sources</option>
+                      {featSourceOptions.map((source) => (
+                        <option key={source} value={source}>
+                          {source}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+                {(featFilterCategory !== "all" || featFilterSource !== "all") && (
                   <button
-                    onClick={() => setFeatFilterCategory("all")}
+                    onClick={() => {
+                      setFeatFilterCategory("all")
+                      setFeatFilterSource("all")
+                    }}
                     className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                   >
-                    Clear filter
+                    Clear filters
                   </button>
                 )}
               </div>
@@ -1712,39 +1769,64 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             )}
 
             {activeTab === "backgrounds" && (
-              <div id="background-filters" className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                  Abilities
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {BACKGROUND_ABILITY_FILTER_OPTIONS.map((ability) => {
-                    const selected = backgroundFilterAbilities.includes(ability)
-                    return (
-                      <button
-                        key={ability}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() =>
-                          setBackgroundFilterAbilities((prev) =>
-                            selected ? prev.filter((key) => key !== ability) : [...prev, ability],
-                          )
-                        }
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-                          selected
-                            ? "border-primary bg-primary/15 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                        )}
-                      >
-                        {ability}
-                      </button>
-                    )
-                  })}
+              <div id="background-filters" className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {backgroundSourceOptions.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                      Source
+                    </label>
+                    <select
+                      value={backgroundFilterSource}
+                      onChange={(e) => setBackgroundFilterSource(e.target.value)}
+                      className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                      aria-label="Filter backgrounds by source"
+                    >
+                      <option value="all">All sources</option>
+                      {backgroundSourceOptions.map((source) => (
+                        <option key={source} value={source}>
+                          {source}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Abilities
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {BACKGROUND_ABILITY_FILTER_OPTIONS.map((ability) => {
+                      const selected = backgroundFilterAbilities.includes(ability)
+                      return (
+                        <button
+                          key={ability}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() =>
+                            setBackgroundFilterAbilities((prev) =>
+                              selected ? prev.filter((key) => key !== ability) : [...prev, ability],
+                            )
+                          }
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+                            selected
+                              ? "border-primary bg-primary/15 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                          )}
+                        >
+                          {ability}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-                {backgroundFilterAbilities.length > 0 && (
+                {(backgroundFilterAbilities.length > 0 || backgroundFilterSource !== "all") && (
                   <button
                     type="button"
-                    onClick={() => setBackgroundFilterAbilities([])}
+                    onClick={() => {
+                      setBackgroundFilterAbilities([])
+                      setBackgroundFilterSource("all")
+                    }}
                     className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                   >
                     Clear filters

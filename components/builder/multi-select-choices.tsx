@@ -8,19 +8,20 @@ import { GameIcon } from "@/components/game-icon-picker"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
-import { paginateList } from "@/lib/builder/picker-pagination"
+import {
+  MULTI_SELECT_CHOICE_PAGE_SIZE,
+  paginateList,
+} from "@/lib/builder/picker-pagination"
 import { getSkillDescription } from "@/lib/compendium/skill-descriptions"
 import { skillIconSlug } from "@/lib/compendium/skill-icons"
 import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
+import { getAllSeedLanguageNames } from "@/lib/compendium/language-options"
 import {
   getToolDescription,
   isKnownToolName,
   isMusicalInstrumentToolName,
 } from "@/lib/compendium/tool-options"
 import { cn } from "@/lib/utils"
-
-/** Phone multi-select grids — 6 options per page. */
-const PHONE_CHOICE_PAGE_SIZE = 9
 
 type ChoiceOption = {
   name: string
@@ -30,21 +31,24 @@ type ChoiceOption = {
   sourceLabel?: string | null
 }
 
-type KindFilter = "all" | "skill" | "tool" | "instrument"
+type KindFilter = "all" | "skill" | "tool" | "instrument" | "language"
 
 const SKILL_NAME_SET = new Set(SKILL_NAMES.map((name) => name.toLowerCase()))
+const LANGUAGE_NAME_SET = new Set(getAllSeedLanguageNames().map((name) => name.toLowerCase()))
 
 const KIND_FILTER_OPTIONS: { id: KindFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "skill", label: "Skills" },
   { id: "tool", label: "Tools" },
   { id: "instrument", label: "Instruments" },
+  { id: "language", label: "Languages" },
 ]
 
 function optionKind(name: string): Exclude<KindFilter, "all"> | null {
   const normalized = name.trim().toLowerCase()
   if (!normalized) return null
   if (SKILL_NAME_SET.has(normalized)) return "skill"
+  if (LANGUAGE_NAME_SET.has(normalized)) return "language"
   if (isMusicalInstrumentToolName(name)) return "instrument"
   if (isKnownToolName(name)) return "tool"
   return null
@@ -214,7 +218,7 @@ export function MultiSelectChoices({
   useEffect(() => {
     setFlatPage(0)
     setGroupPages({})
-  }, [options, isPhone, title, kindFilter])
+  }, [options, isPhone, compact, title, kindFilter])
 
   useEffect(() => {
     if (kindFilter === "all") return
@@ -329,13 +333,15 @@ export function MultiSelectChoices({
     setPage: (next: number) => void,
     paginationLabel: string,
   ) => {
-    const pageSize = isPhone ? PHONE_CHOICE_PAGE_SIZE : Math.max(list.length, 1)
+    // Phone and compact builder: paginate at 10. Default/desktop visual lists stay unpaginated.
+    const shouldPaginate = isPhone || compact
+    const pageSize = shouldPaginate ? MULTI_SELECT_CHOICE_PAGE_SIZE : Math.max(list.length, 1)
     const { pageItems, pageCount, safePage } = paginateList(list, page, pageSize)
-    const visible = isPhone ? pageItems : list
+    const visible = shouldPaginate ? pageItems : list
     return (
       <>
         <div className={gridClass}>{visible.map(renderOption)}</div>
-        {isPhone ? (
+        {shouldPaginate ? (
           <PickerGridPagination
             page={safePage}
             pageCount={pageCount}

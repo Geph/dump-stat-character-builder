@@ -259,15 +259,25 @@ export function resolveNamedPreset(
       ]
     case "char_instance":
       return [
-        charInstance(
-          createModifierInstanceId(),
-          preset.catalogRefId,
-          preset.characteristics as CharacteristicModifier[],
-        ),
+        {
+          ...charInstance(
+            createModifierInstanceId(),
+            preset.catalogRefId,
+            preset.characteristics as CharacteristicModifier[],
+          ),
+          ...(preset.activation
+            ? {
+                activation: {
+                  ...(preset.activation ?? {}),
+                },
+              }
+            : {}),
+        },
       ]
     case "fx_instance":
       return [
         fxInstance(createModifierInstanceId(), preset.catalogRefId, {
+          ...(preset.activation ?? {}),
           effects: preset.effects as never[],
         }),
       ]

@@ -987,6 +987,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
     grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
     featureChoiceCountBonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
+    featureChoiceOptionGrants: aggregatedCharacteristics.featureChoiceOptionGrants,
     powerRiders: aggregatedCharacteristics.powerRiders,
     equippedWeaponAttack,
     equippedOffHandWeaponAttack,

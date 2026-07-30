@@ -34,6 +34,8 @@ type WeaponDamageRollButtonProps = {
   tone?: "default" | "damage"
   caption?: string
   className?: string
+  /** Fired after a damage roll resolves (e.g. to mark Rampage Die damage dealt). */
+  onRoll?: () => void
 }
 
 function abilityModInExpression(
@@ -90,6 +92,7 @@ export function WeaponDamageRollButton({
   tone = "default",
   caption,
   className,
+  onRoll,
 }: WeaponDamageRollButtonProps) {
   const history = useSheetRollHistory()
   const [total, setTotal] = useState<number | null>(null)
@@ -158,6 +161,7 @@ export function WeaponDamageRollButton({
       label: label ?? `Damage (${activeExpression})`,
       summary: `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${modeSuffix}${noModSuffix}`,
     })
+    onRoll?.()
   }
 
   const filled = tone === "damage" || layout === "panel"

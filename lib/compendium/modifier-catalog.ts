@@ -148,6 +148,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   healing_received_modifier: "Damage mitigation",
   grant_custom_ability: "Feats & choices",
   feature_choice_count_bonus: "Feats & choices",
+  feature_choice_option_grant: "Feats & choices",
   equipment_and_magic_items: "Equipment & items",
   catalog_option: "Feats & choices",
   craftable_items: "Equipment & items",

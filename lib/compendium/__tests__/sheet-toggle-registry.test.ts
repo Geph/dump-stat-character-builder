@@ -43,6 +43,14 @@ describe("sheet-toggle-registry", () => {
     expect(getSheetToggleDefinition("form_of_dread")?.sourceType).toBe("builtin")
   })
 
+  it("resolves KibblesTasty Psion play toggles and action activation", () => {
+    expect(getSheetToggleDefinition("full_awakening_active")?.label).toBe("Full Awakening")
+    expect(getSheetToggleDefinition("mind_rider_active")?.label).toBe("Mind Rider")
+    expect(isKnownSheetToggleId("full_awakening_active")).toBe(true)
+    expect(sheetToggleIdActivatedByAction({ name: "Full Awakening" })).toBe("full_awakening_active")
+    expect(sheetToggleIdActivatedByAction({ name: "Mind Rider" })).toBe("mind_rider_active")
+  })
+
   it("recognizes magic item toggle ids", () => {
     expect(isKnownSheetToggleId("magic_item:abc:power")).toBe(true)
     expect(getSheetToggleDefinition("magic_item:abc:power")?.sourceType).toBe("magic_item")

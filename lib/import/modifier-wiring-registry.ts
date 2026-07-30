@@ -1288,7 +1288,7 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     examples: ["Tantrum"],
     mechanicsKind: "uses",
     notes:
-      "Reminder for Unleashed Mind Rampage Die sheet controls. Auto initiative/damage stepping is tracked in #16.",
+      "Surfaces the Unleashed Mind talent; the sheet steps the Rampage Die on initiative and on damage taken while it is d6 or lower.",
   },
 ]
 

@@ -77,7 +77,7 @@ export function CompendiumDenseSelectionCard({
               {subtitle}
             </p>
           )}
-          <h3 className="font-bold text-sm text-foreground leading-tight">{name}</h3>
+          <h3 className="font-bold text-xs text-foreground leading-tight">{name}</h3>
         </div>
       </div>
     </div>

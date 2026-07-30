@@ -18,8 +18,8 @@ describe("getSpellPickerPageSize", () => {
 })
 
 describe("getPickerPageSize", () => {
-  it("keeps dense mode at 3 rows for phone and large grids", () => {
-    expect(getPickerPageSize("dense", false)).toBe(6)
+  it("uses 8 items (2×4) for dense phone/medium and 12 for large grids", () => {
+    expect(getPickerPageSize("dense", false)).toBe(8)
     expect(getPickerPageSize("dense", true)).toBe(12)
   })
 

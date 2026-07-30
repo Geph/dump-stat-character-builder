@@ -26,6 +26,7 @@ import { featChoicePickKey } from "@/lib/builder/feat-choices"
 import type {
   AbilityScoreKey,
   FeatureChoiceCountBonusCharacteristic,
+  FeatureChoiceOptionGrantCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { CustomAbility, Equipment, Feat, Spell } from "@/lib/types"
 import {
@@ -46,6 +47,7 @@ type ClassAbilitiesStepProps = {
   grantedCustomAbilityNames?: string[]
   featChoicePicks?: Record<string, string[]>
   featureChoiceCountBonuses?: FeatureChoiceCountBonusCharacteristic[]
+  featureChoiceOptionGrants?: FeatureChoiceOptionGrantCharacteristic[]
   compactPickerLayout: "default" | "compact"
   skillPickerLayout: "default" | "compact" | "visual"
   cardViewMode: "dense" | "cinematic"
@@ -96,6 +98,7 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
     grantedCustomAbilityNames,
     featChoicePicks,
     featureChoiceCountBonuses,
+    featureChoiceOptionGrants,
     compactPickerLayout,
     skillPickerLayout,
     cardViewMode,
@@ -176,6 +179,7 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
               weaponMasteryDescriptions={weaponMasteryDescriptions}
               cardViewMode={cardViewMode}
               featureChoiceCountBonuses={featureChoiceCountBonuses}
+              featureChoiceOptionGrants={featureChoiceOptionGrants}
               onFeatureChoiceChange={(key, selected) =>
                 setFeatureChoicePicks((prev) => ({ ...prev, [key]: selected }))
               }

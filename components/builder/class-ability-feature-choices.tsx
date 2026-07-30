@@ -7,7 +7,7 @@ import type { ClassAbilityFeatureEntry } from "@/lib/builder/class-ability-step"
 import { featureChoiceKey, getTakenSkills, type SkillPickSource } from "@/lib/builder/choices"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
-import type { FeatureChoiceCountBonusCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import type { FeatureChoiceCountBonusCharacteristic, FeatureChoiceOptionGrantCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { CustomAbility, Equipment, Feature } from "@/lib/types"
@@ -28,6 +28,7 @@ type Props = {
   weaponMasteryDescriptions?: Record<string, string>
   cardViewMode?: "dense" | "cinematic"
   featureChoiceCountBonuses?: FeatureChoiceCountBonusCharacteristic[]
+  featureChoiceOptionGrants?: FeatureChoiceOptionGrantCharacteristic[]
   onFeatureChoiceChange: (key: string, selected: string[]) => void
   onClearModifierPicks: (sourceKey: string) => void
 }
@@ -98,6 +99,7 @@ export function ClassAbilityFeatureChoices({
   weaponMasteryDescriptions,
   cardViewMode = "cinematic",
   featureChoiceCountBonuses,
+  featureChoiceOptionGrants,
   onFeatureChoiceChange,
   onClearModifierPicks,
 }: Props) {
@@ -117,6 +119,7 @@ export function ClassAbilityFeatureChoices({
           knownSpellNames,
           subclassName: subclassName ?? null,
           grantedCustomAbilityNames,
+          optionGrants: featureChoiceOptionGrants,
         })
         const choiceCount = resolveFeatureChoiceCount(
           feature.choices!,

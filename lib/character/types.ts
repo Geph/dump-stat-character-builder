@@ -175,6 +175,7 @@ export type DerivedCharacter = {
   healingReceivedModifiers: import("@/lib/compendium/characteristic-modifiers").HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
   featureChoiceCountBonuses: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceCountBonusCharacteristic[]
+  featureChoiceOptionGrants: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceOptionGrantCharacteristic[]
   powerRiders: import("@/lib/compendium/characteristic-modifiers").PowerRiderCharacteristic[]
   equippedWeaponAttack: WeaponAttackDerived | null
   equippedOffHandWeaponAttack: WeaponAttackDerived | null

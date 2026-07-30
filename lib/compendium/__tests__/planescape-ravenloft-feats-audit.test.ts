@@ -6,6 +6,7 @@ import {
   type FeatSlotContext,
 } from "@/lib/builder/feat-selection"
 import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
+import { normalizeFeatRow } from "@/lib/compendium/normalize-feats"
 import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import type { Feat } from "@/lib/types"
 
@@ -59,14 +60,23 @@ describe("Dark Gift category + Origin-slot eligibility", () => {
     expect(inferred.category).toBe("Dark Gift")
   })
 
-  it("reclassifies Planescape Scion feats mis-tagged as Planar Pact to General", () => {
+  it("reclassifies Scion of the Outer Planes as Origin with Planescape Campaign", () => {
     const inferred = inferFeatImportFields({
       name: "Scion of the Outer Planes",
       description: "Your connection to an Outer Plane infuses you with the energy there.",
       prerequisite: "Planescape Campaign",
       category: "Planar Pact",
     })
-    expect(inferred.category).toBe("General")
+    expect(inferred.category).toBe("Origin")
+    expect(inferred.prerequisite).toBe("Planescape Campaign")
+
+    const withoutPrereq = inferFeatImportFields({
+      name: "Scion of the Outer Planes",
+      description: "Your connection to an Outer Plane infuses you with the energy there.",
+      category: "General",
+    })
+    expect(withoutPrereq.category).toBe("Origin")
+    expect(withoutPrereq.prerequisite).toBe("Planescape Campaign")
 
     const followUp = inferFeatImportFields({
       name: "Agent of Order",
@@ -75,6 +85,30 @@ describe("Dark Gift category + Origin-slot eligibility", () => {
       category: "Planar Pact",
     })
     expect(followUp.category).toBe("General")
+  })
+
+  it("normalizes stored Scion rows to Origin with Planescape Campaign gate", () => {
+    const feat = normalizeFeatRow({
+      id: "scion",
+      name: "Scion of the Outer Planes",
+      description: "Planar Infusion",
+      category: "General",
+      source: "Planescape",
+      prerequisite: null,
+      level_requirement: null,
+      prerequisite_feat_ids: null,
+      prerequisite_rules: null,
+      benefits: null,
+      icon: null,
+      creator_url: null,
+      created_at: new Date().toISOString(),
+    })
+    expect(feat.category).toBe("Origin")
+    expect(feat.prerequisite).toBe("Planescape Campaign")
+    expect(feat.prerequisite_rules).toEqual([
+      { category: "other", value: "Planescape Campaign" },
+    ])
+    expect(isOriginSelectableCategory(feat.category)).toBe(true)
   })
 
   it("keeps true Planar Pact feats as Planar Pact", () => {

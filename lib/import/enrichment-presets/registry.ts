@@ -21,6 +21,7 @@ import {
   MONK_PRESETS,
   NECROMANCER_PRESETS,
   PSION_PRESETS,
+  PSION_SEEDS,
   VAGABOND_PRESETS,
 } from "@/lib/import/enrichment-presets/packs/homebrew"
 import type {
@@ -57,6 +58,7 @@ const SEEDS: ContentSeed[] = [
   ...INVESTIGATOR_SEEDS,
   ...ALTERNATE_RANGER_SEEDS,
   ...MHP_WARDEN_SEEDS,
+  ...PSION_SEEDS,
 ]
 
 const HOOKS = new Map<string, EnrichmentHook>()

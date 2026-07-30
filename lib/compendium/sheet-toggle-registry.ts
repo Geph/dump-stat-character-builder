@@ -79,6 +79,25 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "wrath_of_the_wild_form", label: "Wrath of the Wild", sourceType: "class_feature" },
   { id: "ghost_walk_form", label: "Ghost Walk", sourceType: "class_feature" },
   { id: "umbral_form", label: "Umbral Form", sourceType: "class_feature" },
+  // KibblesTasty Psion
+  {
+    // Derived from Rampage Die play-state, not clicked by the player.
+    id: "rampage_die_d8_plus",
+    label: "Rampage Die d8+",
+    sourceType: "class_feature",
+  },
+  { id: "full_awakening_active", label: "Full Awakening", sourceType: "class_feature" },
+  { id: "mind_rider_active", label: "Mind Rider", sourceType: "class_feature" },
+  {
+    id: "swollen_muscles_active",
+    label: "Swollen Muscles (STR = INT)",
+    sourceType: "class_feature",
+  },
+  {
+    id: "projected_self_active",
+    label: "Projected Self (concentrating)",
+    sourceType: "class_feature",
+  },
 ]
 
 export const EDITOR_SHEET_TOGGLE_OPTIONS: SheetToggleDefinition[] = [
@@ -137,6 +156,52 @@ export function guardianTacticsToggleIdForOption(optionName: string): string | n
   return null
 }
 
+/** Active Weapon Morph option — exclusive; set when you Use a morph menu option. */
+export const WEAPON_MORPH_TOGGLES: SheetToggleDefinition[] = [
+  {
+    id: "weapon_morph_bone_spike",
+    label: "Weapon Morph: Bone Spike",
+    sourceType: "class_feature",
+    exclusiveGroup: "weapon_morph",
+  },
+  {
+    id: "weapon_morph_flesh_club",
+    label: "Weapon Morph: Flesh Club",
+    sourceType: "class_feature",
+    exclusiveGroup: "weapon_morph",
+  },
+  {
+    id: "weapon_morph_sinew_whip",
+    label: "Weapon Morph: Sinew Whip",
+    sourceType: "class_feature",
+    exclusiveGroup: "weapon_morph",
+  },
+  {
+    id: "weapon_morph_viscera_cannon",
+    label: "Weapon Morph: Viscera Cannon",
+    sourceType: "class_feature",
+    exclusiveGroup: "weapon_morph",
+  },
+  {
+    id: "weapon_morph_chitinous_plating",
+    label: "Weapon Morph: Chitinous Plating",
+    sourceType: "class_feature",
+    exclusiveGroup: "weapon_morph",
+  },
+]
+
+/** Sentinel returned by weaponMorphToggleIdForOption for End morph. */
+export const END_WEAPON_MORPH_TOGGLE_ID = "__end_weapon_morph__"
+
+export function clearExclusiveSheetToggleGroup(
+  activeIds: readonly string[],
+  exclusiveGroup: string,
+  definitions: SheetToggleDefinition[],
+): string[] {
+  const byId = new Map(definitions.map((entry) => [entry.id, entry]))
+  return activeIds.filter((id) => byId.get(id)?.exclusiveGroup !== exclusiveGroup)
+}
+
 /**
  * Feature / action use that should turn a banner sheet toggle on (Rage → Raging, etc.).
  * Resource key is preferred when present so renamed homebrew ports still wire.
@@ -148,6 +213,8 @@ const ACTION_NAME_ACTIVATES_TOGGLE: Record<string, string> = {
   "form of dread": "form_of_dread",
   bladesong: "bladesong_active",
   "reckless attack": "reckless_attack",
+  "full awakening": "full_awakening_active",
+  "mind rider": "mind_rider_active",
 }
 
 const RESOURCE_KEY_ACTIVATES_TOGGLE: Record<string, string> = {

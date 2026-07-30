@@ -5,6 +5,9 @@ type FeatImportLike = {
   category?: string | null
 }
 
+const SCION_OF_THE_OUTER_PLANES = /^scion of the outer planes$/i
+const PLANESCAPE_CAMPAIGN = "Planescape Campaign"
+
 /** Infer feat category and prerequisite from description when the LLM omits structured fields. */
 export function inferFeatImportFields<T extends FeatImportLike>(feat: T): T {
   const description = feat.description?.trim() ?? ""
@@ -22,13 +25,20 @@ export function inferFeatImportFields<T extends FeatImportLike>(feat: T): T {
   const explicitPlanarPact =
     /planar\s+pact\s+feat/i.test(header) || /can'?t have another planar pact feat/i.test(nameAndPrereq)
   const explicitDarkGift = /dark\s+gift\s+feat/i.test(nameAndPrereq) || /\bdark\s+gift\b/i.test(feat.name)
+  const isScionOfTheOuterPlanes = SCION_OF_THE_OUTER_PLANES.test(feat.name.trim())
 
   if (explicitDarkGift) {
     category = "Dark Gift"
+  } else if (isScionOfTheOuterPlanes) {
+    // Planescape Origin feat (not Planar Pact / General). Gate is the campaign setting.
+    category = "Origin"
+    if (!prerequisite || !/\bplanescape\b/i.test(prerequisite)) {
+      prerequisite = PLANESCAPE_CAMPAIGN
+    }
   } else if (explicitPlanarPact) {
     category = "Planar Pact"
   } else if (category === "Planar Pact") {
-    // LLM often mis-tags Ravenloft Dark Gifts or Planescape Scion feats as Planar Pact.
+    // LLM often mis-tags Ravenloft Dark Gifts or Planescape follow-ups as Planar Pact.
     // Planar Pact is opt-in only via explicit pact language above.
     if (/ravenloft/i.test(prerequisite ?? "")) {
       category = "Dark Gift"

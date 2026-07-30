@@ -942,8 +942,9 @@ export const FEAT_CATEGORY_IMPORT_HINT = `For feats, set category when the sourc
 - "Dark Gift" for Ravenloft Dark Gift feats — NOT Planar Pact. Dark Gifts may be chosen whenever an Origin feat slot is offered (with DM permission). Headers like "Dark Gift Feat (Prerequisite: Ravenloft Campaign)" → category "Dark Gift".
 - "Epic Boon" for Epic Boons (19th+ level boons)
 - "Fighting Style" for fighting style options
-- "Planar Pact" for Planar Pact feats only (mutually exclusive pact feats like Fey Pact, Infernal Pact — "Can't Have Another Planar Pact Feat"). Do NOT use Planar Pact for Planescape Scion / follow-up feats (those are General) or Ravenloft Dark Gifts.
-- "General" for other feats (default when unclear), including Planescape campaign feats (Scion of the Outer Planes and its follow-ups)
+- "Planar Pact" for Planar Pact feats only (mutually exclusive pact feats like Fey Pact, Infernal Pact — "Can't Have Another Planar Pact Feat"). Do NOT use Planar Pact for Planescape Scion / follow-up feats or Ravenloft Dark Gifts.
+- "General" for other feats (default when unclear), including Planescape Scion follow-ups (Agent of Order, etc.). Scion of the Outer Planes itself is Origin (below).
+- Scion of the Outer Planes: category "Origin" with prerequisite_rules: [{ "category": "other", "value": "Planescape Campaign" }] (and prerequisite "Planescape Campaign").
 Do not embed the category name only in description — use the category field.
 When the header says "Planar Pact Feat", set category to "Planar Pact" and put prerequisite text in prerequisite (not only in description).
 When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Planar Pact").

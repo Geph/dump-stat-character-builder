@@ -94,7 +94,7 @@ export function CompendiumEditorHeaderRow({
           </div>
           {afterName}
           <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Source Author</label>
+            <label className="block text-sm font-semibold text-foreground mb-2">Source short name</label>
             <input
               type="text"
               value={source}

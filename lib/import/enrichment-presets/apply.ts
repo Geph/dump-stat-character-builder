@@ -96,7 +96,17 @@ function presetsForPacks(packs: Set<string>, target?: EnrichmentPreset["target"]
 import { parseCraftableItemsTable } from "@/lib/import/parse-craftable-items-table"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { Feature, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureActivation, UsesConfig } from "@/lib/types"
+
+function castingTimeFromActivation(
+  activation: FeatureActivation | null | undefined,
+): string | null {
+  if (!activation) return null
+  if (activation.bonusAction) return "1 bonus action"
+  if (activation.reaction || activation.onDropToZeroHp) return "1 reaction"
+  if (activation.action) return "1 action"
+  return null
+}
 
 function hasCharacteristicType(
   modifiers: LinkedModifierInstance[] | undefined,
@@ -163,6 +173,9 @@ function applyOperations(
             ...operation.activation,
           },
         }
+        break
+      case "setCastingTime":
+        next = { ...next, casting_time: operation.castingTime }
         break
       case "setSheetDisplay":
         next = {
@@ -486,6 +499,24 @@ export function applyImportEnrichmentPresets(
         return { ...subclass, features }
       }),
     }
+
+    // Subclass-gated class resources (e.g. Balance of Power on Transcended Mind).
+    let resources = [...(next.class_resources ?? [])] as ClassResourceImportRow[]
+    for (const subclass of next.subclasses ?? []) {
+      const parentClass = subclass.class_name || ""
+      if (!parentClass) continue
+      resources = mergeClassResourcesWithPresets(
+        parentClass,
+        (subclass.features ?? []) as Feature[],
+        resources,
+      )
+    }
+    if (resources.length) {
+      next = {
+        ...next,
+        class_resources: resources as NonNullable<ImportContent["class_resources"]>,
+      }
+    }
   }
 
   if (next.import_proposals?.custom_abilities?.length) {
@@ -512,6 +543,13 @@ export function applyImportEnrichmentPresets(
               sourceName: ability.source_name ?? undefined,
             })
           }
+          const castingTime =
+            row.casting_time?.trim() ||
+            castingTimeFromActivation(row.activation) ||
+            (typeof record.casting_time === "string" ? record.casting_time : null)
+          const descriptionChanged =
+            typeof row.description === "string" &&
+            row.description !== (ability.description ?? "")
           const synced = row.linkedModifiers?.length
             ? (syncModifierRefs({
                 ...ability,
@@ -519,6 +557,8 @@ export function applyImportEnrichmentPresets(
                 uses: row.uses,
                 companion_stat_block: row.companion_stat_block,
                 linkedModifiers: row.linkedModifiers,
+                ...(castingTime ? { casting_time: castingTime } : {}),
+                ...(descriptionChanged ? { description: row.description } : {}),
               }) as Record<string, unknown>)
             : null
           if (!synced) {
@@ -528,6 +568,8 @@ export function applyImportEnrichmentPresets(
             if (row.companion_stat_block != null) {
               out.companion_stat_block = row.companion_stat_block
             }
+            if (castingTime) out.casting_time = castingTime
+            if (descriptionChanged) out.description = row.description
             return out as unknown as typeof ability
           }
           return synced as unknown as typeof ability

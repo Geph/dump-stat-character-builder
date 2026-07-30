@@ -1,4 +1,5 @@
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
+import { defaultRampageTurnState } from "@/lib/character/rampage-die"
 import {
   defaultSheetPlayState,
   normalizeSheetPlayState,
@@ -61,6 +62,10 @@ export function buildSheetPlayStateFromSheet(params: {
   realTimeCooldowns: CharacterSheetPlayState["realTimeCooldowns"]
   accumulatedResources: CharacterSheetPlayState["accumulatedResources"]
   resourceDieSidesByKey: CharacterSheetPlayState["resourceDieSidesByKey"]
+  rampageTurn?: CharacterSheetPlayState["rampageTurn"]
+  mutationDie?: CharacterSheetPlayState["mutationDie"]
+  fleshWarpAllyBenefitCounts?: CharacterSheetPlayState["fleshWarpAllyBenefitCounts"]
+  illusionTokens?: CharacterSheetPlayState["illusionTokens"]
   skillSortMode?: CharacterSheetPlayState["skillSortMode"]
   pinnedSkillNames?: CharacterSheetPlayState["pinnedSkillNames"]
   pinnedEquipmentIds?: CharacterSheetPlayState["pinnedEquipmentIds"]
@@ -68,6 +73,10 @@ export function buildSheetPlayStateFromSheet(params: {
 }): CharacterSheetPlayState {
   return normalizeSheetPlayState({
     ...params,
+    rampageTurn: params.rampageTurn ?? defaultRampageTurnState(),
+    mutationDie: params.mutationDie ?? null,
+    fleshWarpAllyBenefitCounts: params.fleshWarpAllyBenefitCounts ?? {},
+    illusionTokens: params.illusionTokens ?? [],
     savedAt: params.savedAt ?? null,
   })
 }

@@ -214,6 +214,50 @@ export type ResolveFeatureChoiceOptionsParams = {
   subclassName?: string | null
   /** Abilities granted by class/subclass modifiers (e.g. archetype disciplines). */
   grantedCustomAbilityNames?: string[]
+  /** Extra options granted by talents (Projected Nightmares → Boundless Imagination). */
+  optionGrants?: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceOptionGrantCharacteristic[]
+}
+
+function optionGrantMatchesFeature(
+  grant: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceOptionGrantCharacteristic,
+  feature: Feature,
+): boolean {
+  const target = normalizeName(grant.targetFeatureName ?? "")
+  const category = normalizeName(grant.choiceCategory ?? "")
+  const featureName = normalizeName(feature.name)
+  const choiceCat = normalizeName(feature.choices?.category ?? "")
+  if (target && (featureName === target || featureName.includes(target) || target.includes(featureName))) {
+    return true
+  }
+  if (category && (choiceCat === category || choiceCat.includes(category) || category.includes(choiceCat))) {
+    return true
+  }
+  if (category && (featureName === category || featureName.includes(category) || category.includes(featureName))) {
+    return true
+  }
+  return false
+}
+
+function mergeFeatureChoiceOptionGrants(
+  options: FeatureChoice["options"],
+  feature: Feature,
+  grants: ResolveFeatureChoiceOptionsParams["optionGrants"],
+): FeatureChoice["options"] {
+  if (!grants?.length) return options
+  const next = [...options]
+  for (const grant of grants) {
+    if (!optionGrantMatchesFeature(grant, feature)) continue
+    for (const option of grant.options ?? []) {
+      const name = option.name?.trim()
+      if (!name) continue
+      if (next.some((entry) => namesMatch(entry.name, name))) continue
+      next.push({
+        name,
+        description: option.description ?? "",
+      })
+    }
+  }
+  return next
 }
 
 export function resolveFeatureChoiceOptions(
@@ -347,16 +391,21 @@ export function resolveFeatureChoiceOptions(
       key.toLowerCase().includes(feature.name.toLowerCase())
     )
   })
-  return filterChoiceOptionsByEligibility(choices.options ?? [], {
-    ...prerequisiteContext,
-    selectedAbilityNames: staticSelectedKey
-      ? [
-          ...(params.featureChoicePicks[staticSelectedKey] ?? []),
-          ...(params.grantedCustomAbilityNames ?? []),
-          ...knownDisciplines,
-        ]
-      : prerequisiteContext.selectedAbilityNames,
-  }, { customAbilities: params.customAbilities })
+  const base = filterChoiceOptionsByEligibility(
+    choices.options ?? [],
+    {
+      ...prerequisiteContext,
+      selectedAbilityNames: staticSelectedKey
+        ? [
+            ...(params.featureChoicePicks[staticSelectedKey] ?? []),
+            ...(params.grantedCustomAbilityNames ?? []),
+            ...knownDisciplines,
+          ]
+        : prerequisiteContext.selectedAbilityNames,
+    },
+    { customAbilities: params.customAbilities },
+  )
+  return mergeFeatureChoiceOptionGrants(base, feature, params.optionGrants)
 }
 
 

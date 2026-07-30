@@ -4,6 +4,9 @@ import { applyFeatRecommendedClasses } from "@/lib/compendium/phb-feat-recommend
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
+import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
+import { inferFeatPrerequisiteRules } from "@/lib/import/resolve-feat-prerequisites"
+import type { PrerequisiteRule } from "@/lib/import/content-schema"
 import { isSrdSource } from "@/lib/srd/source"
 import type { Feat, FeatureChoice } from "@/lib/types"
 
@@ -25,9 +28,25 @@ export function normalizeFeatRow(
   row: Record<string, unknown>,
   catalog: ModifierCatalogEntry[] = [],
 ): Feat {
-  const base = isSrdSource(row.source as string | null | undefined)
-    ? enrichSrdFeatRow(row)
-    : enrichCustomFeatRow(row)
+  const inferred = inferFeatImportFields({
+    name: String(row.name ?? ""),
+    description: typeof row.description === "string" ? row.description : null,
+    prerequisite: (row.prerequisite as string | null | undefined) ?? null,
+    category: (row.category as string | null | undefined) ?? null,
+  })
+  const prerequisiteRules = inferFeatPrerequisiteRules(
+    inferred.prerequisite,
+    (row.prerequisite_rules as PrerequisiteRule[] | null | undefined) ?? null,
+  )
+  const withInferredFields: Record<string, unknown> = {
+    ...row,
+    category: inferred.category,
+    prerequisite: inferred.prerequisite,
+    ...(prerequisiteRules.length ? { prerequisite_rules: prerequisiteRules } : {}),
+  }
+  const base = isSrdSource(withInferredFields.source as string | null | undefined)
+    ? enrichSrdFeatRow(withInferredFields)
+    : enrichCustomFeatRow(withInferredFields)
   const enriched = applyFeatRecommendedClasses(base)
   return {
     ...(enriched as unknown as Feat),

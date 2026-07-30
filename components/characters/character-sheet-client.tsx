@@ -105,9 +105,22 @@ import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/cha
 import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
 import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-resource-die"
 import {
+  advanceRampageDieTurn,
+  defaultRampageTurnState,
   normalizeRampageDieSides,
-  stepRampageDieSides,
+  rampageDieGrantsUncontrollableMind,
+  tantrumStepOnDamageTaken,
+  tantrumStepOnInitiative,
+  type RampageDieState,
+  type RampageTurnState,
 } from "@/lib/character/rampage-die"
+import {
+  characterHasUnstoppableRampage,
+  characterKnowsTantrum,
+  characterKnowsUncontrollableMind,
+  empoweredPsionicsDamageBonus,
+} from "@/lib/character/unleashed-mind"
+import { RampageDieTracker } from "@/components/character-sheet/rampage-die-tracker"
 import {
   applyTurnStartTriggers,
   collectTurnStartTriggers,
@@ -191,11 +204,31 @@ import {
 } from "@/lib/character/sheet-session-state"
 import {
   applySheetToggleChange,
+  clearExclusiveSheetToggleGroup,
+  END_WEAPON_MORPH_TOGGLE_ID,
   GUARDIAN_TACTICS_TOGGLES,
   PRIMORDIAL_ASPECT_TOGGLES,
   sheetToggleDefinitionsFromNewToggles,
+  WEAPON_MORPH_TOGGLES,
   type SheetToggleDefinition,
 } from "@/lib/compendium/sheet-toggle-registry"
+import {
+  createMutationDieGrant,
+  stepMutationDie,
+  type MutationDieGrant,
+} from "@/lib/character/mutation-die"
+import {
+  createIllusionToken,
+  type IllusionTokenKind,
+  type IllusionTokenState,
+} from "@/lib/character/illusion-tokens"
+import {
+  activeWeaponMorphOption,
+  buildWeaponMorphAttack,
+  WEAPON_MORPH_EXCLUSIVE_GROUP,
+} from "@/lib/character/weapon-morph"
+import { MutationDieTracker } from "@/components/character-sheet/mutation-die-tracker"
+import { IllusionTokensPanel } from "@/components/character-sheet/illusion-tokens-panel"
 import {
   buildCharacterSheetToggleDefinitions,
   collectReferencedSheetToggleIds,
@@ -206,6 +239,14 @@ import {
   influenceCap,
   spendInfluencePoints,
 } from "@/lib/character/influence-points"
+import {
+  bankBalanceOfPower,
+  characterHasBalanceOfPowerMechanic,
+  currentBalanceOfPower,
+  psionLevelForBalanceOfPower,
+  spendBalanceOfPower,
+} from "@/lib/character/balance-of-power"
+import { perfectedEnhancementBonus as resolvePerfectedEnhancementBonus } from "@/lib/character/perfected-enhancement"
 import { resolveSpecializedElement } from "@/lib/character/resolve-specialized-element"
 import { tickAccumulatedResources, type RealTimeCooldownState } from "@/lib/character/real-time-recharge"
 import type { AccumulatedResourceState } from "@/lib/character/sheet-play-state"
@@ -592,6 +633,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     Record<string, AccumulatedResourceState>
   >({})
   const [resourceDieSidesByKey, setResourceDieSidesByKey] = useState<Record<string, number>>({})
+  const [rampageTurn, setRampageTurn] = useState<RampageTurnState>(defaultRampageTurnState())
+  const [mutationDie, setMutationDie] = useState<MutationDieGrant | null>(null)
+  const [fleshWarpAllyBenefitCounts, setFleshWarpAllyBenefitCounts] = useState<
+    Record<string, number>
+  >({})
+  const [illusionTokens, setIllusionTokens] = useState<IllusionTokenState[]>([])
   const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("ability")
   const [pinnedSkillNames, setPinnedSkillNames] = useState<string[]>([])
   const [pinnedEquipmentIds, setPinnedEquipmentIds] = useState<string[]>([])
@@ -681,6 +728,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setRealTimeCooldowns(playState.realTimeCooldowns)
         setAccumulatedResources(tickAccumulatedResources(playState.accumulatedResources))
         setResourceDieSidesByKey(playState.resourceDieSidesByKey)
+        setRampageTurn(playState.rampageTurn)
+        setMutationDie(playState.mutationDie)
+        setFleshWarpAllyBenefitCounts(playState.fleshWarpAllyBenefitCounts)
+        setIllusionTokens(playState.illusionTokens)
         setSkillSortMode(playState.skillSortMode)
         setPinnedSkillNames(playState.pinnedSkillNames)
         setPinnedEquipmentIds(playState.pinnedEquipmentIds)
@@ -773,6 +824,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
         resourceDieSidesByKey,
+        rampageTurn,
+        mutationDie,
+        fleshWarpAllyBenefitCounts,
+        illusionTokens,
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
@@ -797,6 +852,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     realTimeCooldowns,
     accumulatedResources,
     resourceDieSidesByKey,
+    rampageTurn,
+    mutationDie,
+    fleshWarpAllyBenefitCounts,
+    illusionTokens,
     skillSortMode,
     pinnedSkillNames,
     pinnedEquipmentIds,
@@ -861,6 +920,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const effectiveSheetToggles = new Set(activeSheetToggleIds)
     if (maxHpForHalf > 0 && currentHp <= Math.floor(maxHpForHalf / 2)) {
       effectiveSheetToggles.add("below_half_hp")
+    }
+    // Uncontrollable Mind reads the Rampage Die rather than a clicked toggle.
+    if (
+      resourceDieSidesByKey.rampage_die != null &&
+      rampageDieGrantsUncontrollableMind(resourceDieSidesByKey.rampage_die)
+    ) {
+      effectiveSheetToggles.add("rampage_die_d8_plus")
     }
     const resolvedFeatures: Feature[] = []
     for (const entry of classList) {
@@ -1238,6 +1304,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       ),
     )
     if (hasGuardianTactics) dynamic.push(...GUARDIAN_TACTICS_TOGGLES)
+    // Always available for exclusive-group activation from Weapon Morph Use menu.
+    dynamic.push(...WEAPON_MORPH_TOGGLES)
     dynamic.push(...magicItemToggleDefinitions(magicItemPowers, equipmentById))
     for (const entry of classDetails) {
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.class?.new_toggles))
@@ -1249,7 +1317,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const manualSheetToggles = useMemo(
     () =>
       sheetToggleDefinitions.filter(
-        (toggle) => toggle.id !== "below_half_hp" && toggle.id !== "quarry_marked",
+        (toggle) =>
+          toggle.id !== "below_half_hp" &&
+          toggle.id !== "quarry_marked" &&
+          !toggle.id.startsWith("weapon_morph_"),
       ),
     [sheetToggleDefinitions],
   )
@@ -1294,12 +1365,46 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   /** Force a toggle on (does not turn it off if already active). Exclusive groups still clear peers. */
   const activateSheetToggle = useCallback(
     (toggleId: string) => {
+      if (toggleId === END_WEAPON_MORPH_TOGGLE_ID) {
+        setActiveSheetToggleIds((prev) =>
+          clearExclusiveSheetToggleGroup(prev, WEAPON_MORPH_EXCLUSIVE_GROUP, sheetToggleDefinitions),
+        )
+        return
+      }
       setActiveSheetToggleIds((prev) => {
         if (prev.includes(toggleId)) return prev
         return applySheetToggleChange(prev, toggleId, sheetToggleDefinitions)
       })
     },
     [sheetToggleDefinitions],
+  )
+
+  const spawnIllusionToken = useCallback((kind: IllusionTokenKind) => {
+    const next = createIllusionToken({ kind })
+    setIllusionTokens((prev) =>
+      kind === "projected_self"
+        ? [...prev.filter((token) => token.kind !== "projected_self"), next]
+        : [...prev, next],
+    )
+  }, [])
+
+  const grantMutationDieFromAction = useCallback(
+    (opts: { autoApplyStrength: boolean; perfected: boolean; targetLabel: string }) => {
+      let grant = createMutationDieGrant({
+        autoApplyStrength: opts.autoApplyStrength,
+        targetLabel: opts.targetLabel,
+      })
+      if (opts.perfected) grant = stepMutationDie(grant, 1)
+      setMutationDie(grant)
+      const label = opts.targetLabel.trim()
+      if (label && !/^self$/i.test(label)) {
+        setFleshWarpAllyBenefitCounts((prev) => ({
+          ...prev,
+          [label]: (prev[label] ?? 0) + 1,
+        }))
+      }
+    },
+    [],
   )
 
   const markActionEconomy = useCallback((kind: ActionEconomyKind) => {
@@ -1372,6 +1477,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         realTimeCooldowns,
         accumulatedResources: tickAccumulatedResources(accumulatedResources),
         resourceDieSidesByKey,
+        rampageTurn,
+        mutationDie,
+        fleshWarpAllyBenefitCounts,
+        illusionTokens,
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
@@ -1393,6 +1502,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       realTimeCooldowns,
       accumulatedResources,
       resourceDieSidesByKey,
+      rampageTurn,
+      mutationDie,
+      fleshWarpAllyBenefitCounts,
+      illusionTokens,
       skillSortMode,
       pinnedSkillNames,
       pinnedEquipmentIds,
@@ -1873,6 +1986,32 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       ...(originFeat ? [originFeat] : []),
     ])
     const cards = []
+    const morph = activeWeaponMorphOption(activeSheetToggleIds)
+    if (morph?.kind === "weapon" && derived) {
+      const morphAttack = buildWeaponMorphAttack({
+        equipment: morph.equipment,
+        abilityMods: derived.abilityMods,
+        proficiencyBonus: derived.proficiencyBonus,
+      })
+      if (morphAttack) {
+        cards.push({
+          weapon: morph.equipment,
+          attack: morphAttack,
+          hand: "main" as const,
+          defaultIncludeAbilityModifier: true,
+          abilityModifier: morphAttack.damageAbilityMod,
+          note:
+            morph.id === "viscera_cannon"
+              ? "Weapon Morph · each attack spends 1 HP (ammo)"
+              : "Weapon Morph natural weapon",
+          ammoHpCost: morph.id === "viscera_cannon" ? 1 : undefined,
+          onSpendAmmoHp:
+            morph.id === "viscera_cannon"
+              ? () => setCurrentHp((hp) => Math.max(0, hp - 1))
+              : undefined,
+        })
+      }
+    }
     if (equippedWeapon && derived?.equippedWeaponAttack) {
       cards.push({
         weapon: equippedWeapon,
@@ -1902,8 +2041,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     derived?.equippedWeaponAttack,
     derived?.equippedOffHandWeaponAttack,
     derived?.abilityMods,
+    derived?.proficiencyBonus,
+    derived,
     characterFeats,
     originFeat,
+    activeSheetToggleIds,
   ])
 
   // Tools the character is proficient with are surfaced automatically in the
@@ -2000,8 +2142,173 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [turnStartTriggers],
   )
 
+  const hasBalanceOfPowerMechanic = useMemo(
+    () =>
+      characterHasBalanceOfPowerMechanic({
+        classDetails,
+        classResources: classDetails.flatMap((entry) => entry.class?.class_resources ?? []),
+      }),
+    [classDetails],
+  )
+
+  const perfectedEnhancementBonusValue = useMemo(
+    () =>
+      resolvePerfectedEnhancementBonus({
+        classDetails,
+        proficiencyBonus: derived?.proficiencyBonus ?? 2,
+      }),
+    [classDetails, derived?.proficiencyBonus],
+  )
+
+  const empoweredPsionicsBonusValue = useMemo(
+    () =>
+      empoweredPsionicsDamageBonus({
+        classDetails,
+        intModifier: derived?.abilityMods.intelligence ?? 0,
+      }),
+    [classDetails, derived?.abilityMods.intelligence],
+  )
+
+  /** Feature + talent names used to detect Unleashed Mind riders (Tantrum, Uncontrollable Mind). */
+  const unleashedMindKnownNames = useMemo(() => {
+    const names: (string | null | undefined)[] = []
+    for (const entry of classDetails) {
+      for (const feature of [
+        ...(entry.class?.features ?? []),
+        ...(entry.subclass?.features ?? []),
+      ]) {
+        names.push(feature.name)
+      }
+    }
+    for (const ability of sheetCustomAbilities) names.push(ability.name)
+    return names
+  }, [classDetails, sheetCustomAbilities])
+
+  const hasRampageDie = rampageDieSides != null
+  const knowsTantrum = useMemo(
+    () => characterKnowsTantrum(unleashedMindKnownNames),
+    [unleashedMindKnownNames],
+  )
+  const knowsUncontrollableMind = useMemo(
+    () => characterKnowsUncontrollableMind(unleashedMindKnownNames),
+    [unleashedMindKnownNames],
+  )
+  const knowsUnstoppableRampage = useMemo(
+    () => characterHasUnstoppableRampage(unleashedMindKnownNames),
+    [unleashedMindKnownNames],
+  )
+
+  const rampageDieState = useMemo<RampageDieState>(
+    () => ({ sides: normalizeRampageDieSides(rampageDieSides), ...rampageTurn }),
+    [rampageDieSides, rampageTurn],
+  )
+
+  const applyRampageDieState = useCallback((next: RampageDieState) => {
+    setResourceDieSidesByKey((prev) => ({ ...prev, rampage_die: next.sides }))
+    setRampageTurn({
+      dealtDamageThisTurn: next.dealtDamageThisTurn,
+      usedDieThisTurn: next.usedDieThisTurn,
+      d12RoundsHeld: next.d12RoundsHeld,
+    })
+  }, [])
+
+  /** Weapon damage rolls and damaging power Uses count as dealing damage this turn. */
+  const markRampageDamageDealtThisTurn = useCallback(() => {
+    if (!hasRampageDie) return
+    setRampageTurn((prev) =>
+      prev.dealtDamageThisTurn ? prev : { ...prev, dealtDamageThisTurn: true },
+    )
+  }, [hasRampageDie])
+
+  const psiResourceEntry = useMemo(
+    () => spendableResourceEntries.find((entry) => entry.id.endsWith("_psi_points")) ?? null,
+    [spendableResourceEntries],
+  )
+
+  const psiPointsAvailable = useMemo(() => {
+    if (!psiResourceEntry) return 0
+    const max =
+      resolveUsesAtLevel(psiResourceEntry.uses, psiResourceEntry.classLevel, usesResolveContext) ?? 0
+    return Math.max(0, max - (usedResourcesById[psiResourceEntry.id] ?? 0))
+  }, [psiResourceEntry, usedResourcesById, usesResolveContext])
+
+  const spendPsiPoints = useCallback(
+    (amount: number) => {
+      if (!psiResourceEntry || amount <= 0 || psiPointsAvailable < amount) return false
+      setUsedResourcesById((prev) => ({
+        ...prev,
+        [psiResourceEntry.id]: (prev[psiResourceEntry.id] ?? 0) + amount,
+      }))
+      return true
+    },
+    [psiResourceEntry, psiPointsAvailable],
+  )
+
+  const handleInitiativeRollWithTantrum = useCallback(() => {
+    handleInitiativeRoll()
+    if (hasRampageDie && knowsTantrum) {
+      applyRampageDieState(tantrumStepOnInitiative(rampageDieState))
+    }
+  }, [handleInitiativeRoll, hasRampageDie, knowsTantrum, rampageDieState, applyRampageDieState])
+
+  /** Tantrum steps the Rampage Die up when HP drops while the die is d6 or lower. */
+  const handleCurrentHpChange = useCallback(
+    (nextHp: number) => {
+      if (hasRampageDie && knowsTantrum && nextHp < currentHp) {
+        applyRampageDieState(tantrumStepOnDamageTaken(rampageDieState))
+      }
+      setCurrentHp(nextHp)
+    },
+    [hasRampageDie, knowsTantrum, currentHp, rampageDieState, applyRampageDieState],
+  )
+
+  const unstoppableRampageContext = useMemo(() => {
+    if (!hasRampageDie || !knowsUnstoppableRampage) return null
+    return {
+      conModifier: derived?.abilityMods.constitution ?? 0,
+      psiAvailable: psiPointsAvailable,
+      onSpendPsi: spendPsiPoints,
+      onSurvive: () => setCurrentHp(1),
+    }
+  }, [
+    hasRampageDie,
+    knowsUnstoppableRampage,
+    derived?.abilityMods.constitution,
+    psiPointsAvailable,
+    spendPsiPoints,
+  ])
+
+  const balanceOfPowerCapValue = useMemo(
+    () => psionLevelForBalanceOfPower(classDetails),
+    [classDetails],
+  )
+
+  const bankIntoBalanceOfPower = useCallback(
+    (amount: number) => {
+      if (!hasBalanceOfPowerMechanic || amount <= 0) return
+      setAccumulatedResources((prev) =>
+        bankBalanceOfPower({
+          accumulated: prev,
+          amount,
+          max: balanceOfPowerCapValue,
+        }),
+      )
+    },
+    [hasBalanceOfPowerMechanic, balanceOfPowerCapValue],
+  )
+
   const handleTurnStart = useCallback(() => {
     setActionEconomySpent(emptyActionEconomySpent())
+    if (hasRampageDie) {
+      const advanced = advanceRampageDieTurn({
+        state: rampageDieState,
+        incapacitated: isIncapacitatedByConditions(activeConditions),
+      })
+      applyRampageDieState(advanced.state)
+      if (advanced.exhaustionGained > 0) {
+        setExhaustionLevel((level) => clampExhaustionLevel(level + advanced.exhaustionGained))
+      }
+    }
     if (!turnStartTriggers.length) return
     const abilityMods = derived?.abilityMods ?? {
       strength: 0,
@@ -2027,6 +2334,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     setAccumulatedResources(result.accumulatedResources)
     if (result.currentHp !== currentHp) setCurrentHp(result.currentHp)
   }, [
+    hasRampageDie,
+    rampageDieState,
+    applyRampageDieState,
     turnStartTriggers,
     usedResourcesById,
     spendableResourceEntries,
@@ -2078,11 +2388,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         }
         setUsedHitDiceByClassId(nextHitDice)
         setShortRestHitDiceOpen(false)
+        setFleshWarpAllyBenefitCounts({})
+        setMutationDie(null)
         if (recovered > 0) {
           summary.push(
             `Regained ${recovered} Hit Die${recovered === 1 ? "" : "ce"} (half your total, minimum 1)`,
           )
         }
+        summary.push("Cleared Mutation Die and Flesh Warp ally benefit counts")
       }
 
       setRestOverlay({ rest, summary })
@@ -2318,8 +2631,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const activeSheetToggleSet = useMemo(() => {
     const toggles = new Set<SheetToggleKey>(activeSheetToggleIds as SheetToggleKey[])
     if (bloodiedActive) toggles.add("below_half_hp")
+    if (
+      resourceDieSidesByKey.rampage_die != null &&
+      rampageDieGrantsUncontrollableMind(resourceDieSidesByKey.rampage_die)
+    ) {
+      toggles.add("rampage_die_d8_plus")
+    }
     return toggles
-  }, [activeSheetToggleIds, bloodiedActive])
+  }, [activeSheetToggleIds, bloodiedActive, resourceDieSidesByKey.rampage_die])
 
   const limitationEquipment = useMemo(
     () =>
@@ -2566,8 +2885,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const match = label?.match(/(\d+)/)
     return match ? parseInt(match[1], 10) : null
   }
+  const morphAcBonus = (() => {
+    const morph = activeWeaponMorphOption(activeSheetToggleIds)
+    if (morph?.kind !== "shield") return 0
+    return typeof morph.equipment.armor_class === "number" ? morph.equipment.armor_class : 2
+  })()
   const armorClass =
-    activePolymorph?.ac ?? derived?.armorClass ?? character.armor_class ?? 10
+    (activePolymorph?.ac ?? derived?.armorClass ?? character.armor_class ?? 10) + morphAcBonus
   const speed =
     (activePolymorph ? parseSpeedFt(activePolymorph.template.speed) : null) ??
     derived?.speed ??
@@ -2711,6 +3035,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     : 0
   const influencePointCap = hasInfluencePointsMechanic
     ? influenceCap(abilityMods.intelligence)
+    : 0
+  const balanceOfPowerCount = hasBalanceOfPowerMechanic
+    ? currentBalanceOfPower(tickAccumulatedResources(accumulatedResources))
     : 0
 
   return (
@@ -3038,7 +3365,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     >
                       {(close) => (
                         <>
-                          {turnStartTriggers.length ? (
+                          {turnStartTriggers.length || hasRampageDie ? (
                             <button
                               type="button"
                               role="menuitem"
@@ -3118,7 +3445,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <div className="hidden min-w-0 flex-wrap items-stretch justify-end gap-1.5 sm:flex sm:gap-2">
                   <SheetRestButtons
                     onRest={handleRest}
-                    onTurnStart={turnStartTriggers.length ? handleTurnStart : undefined}
+                    onTurnStart={
+                      turnStartTriggers.length || hasRampageDie ? handleTurnStart : undefined
+                    }
                   />
                   <div className="relative inline-flex shrink-0">
                     <button
@@ -3754,9 +4083,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     hitDiceRemaining={hitDiceRemainingTotal}
                     onSpendHitDice={spendHitDiceForAction}
                     onActivateSheetToggle={activateSheetToggle}
+                    onSpawnIllusionToken={spawnIllusionToken}
+                    onGrantMutationDie={grantMutationDieFromAction}
                     onMarkEconomy={markActionEconomy}
                     characterId={character.id}
                     onApplySelfHeal={applySelfHeal}
+                    perfectedEnhancementBonus={perfectedEnhancementBonusValue}
+                    empoweredPsionicsBonus={empoweredPsionicsBonusValue}
+                    onMarkDamageDealt={markRampageDamageDealtThisTurn}
+                    onBankBalanceOfPower={
+                      hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
+                    }
                     allyCandidates={allyCandidates}
                     healContext={healContext}
                   />
@@ -3912,7 +4249,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     maxHp={maxHp}
                     currentHp={currentHp}
                     tempHp={tempHp}
-                    onCurrentHpChange={setCurrentHp}
+                    onCurrentHpChange={handleCurrentHpChange}
                     onTempHpChange={setTempHp}
                     hitDicePool={hitDicePool}
                     conMod={abilityMods.constitution}
@@ -3936,7 +4273,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         return next
                       })
                     }
-                    onInitiativeRoll={handleInitiativeRoll}
+                    onInitiativeRoll={handleInitiativeRollWithTantrum}
                     formatMod={formatMod}
                   />
                 </div>
@@ -3964,6 +4301,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         buildInputs={characterBuildInputs}
                         weaponProficiencies={derived?.weaponProficiencies ?? []}
                         onAttackRoll={() => markActionEconomy("action")}
+                        onDamageRoll={markRampageDamageDealtThisTurn}
                       />
                       <SheetActionsPanel
                         actions={combatActions}
@@ -3978,9 +4316,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         hitDiceRemaining={hitDiceRemainingTotal}
                         onSpendHitDice={spendHitDiceForAction}
                         onActivateSheetToggle={activateSheetToggle}
+                        onSpawnIllusionToken={spawnIllusionToken}
+                        onGrantMutationDie={grantMutationDieFromAction}
                         onMarkEconomy={markActionEconomy}
                         characterId={character.id}
                         onApplySelfHeal={applySelfHeal}
+                        perfectedEnhancementBonus={perfectedEnhancementBonusValue}
+                        empoweredPsionicsBonus={empoweredPsionicsBonusValue}
+                        onMarkDamageDealt={markRampageDamageDealtThisTurn}
+                        onBankBalanceOfPower={
+                          hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
+                        }
                         allyCandidates={allyCandidates}
                         healContext={healContext}
                         singleColumn={false}
@@ -4186,72 +4532,36 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             resolveContext={usesResolveContext}
                           />
                         )}
-                        {rampageDieSides != null && (
-                          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-xs font-bold text-rose-800 dark:text-rose-200">
-                                  Rampage Die
-                                </p>
-                                <p className="text-2xl font-black tabular-nums text-foreground">
-                                  d{rampageDieSides}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setResourceDieSidesByKey((prev) => ({
-                                      ...prev,
-                                      rampage_die: stepRampageDieSides(
-                                        prev.rampage_die ?? rampageDieSides,
-                                        -1,
-                                      ),
-                                    }))
-                                  }
-                                  className="rounded-md border border-border px-2 py-1 text-xs font-semibold"
-                                >
-                                  Step down
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setResourceDieSidesByKey((prev) => ({
-                                      ...prev,
-                                      rampage_die: 4,
-                                    }))
-                                  }
-                                  className="rounded-md border border-border px-2 py-1 text-xs font-semibold"
-                                >
-                                  Reset d4
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setResourceDieSidesByKey((prev) => ({
-                                      ...prev,
-                                      rampage_die: stepRampageDieSides(
-                                        prev.rampage_die ?? rampageDieSides,
-                                        1,
-                                      ),
-                                    }))
-                                  }
-                                  className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-xs font-semibold text-rose-800 dark:text-rose-200"
-                                >
-                                  Step up
-                                </button>
-                              </div>
-                            </div>
-                            <p className="mt-2 text-[10px] text-muted-foreground">
-                              Once per turn, add this die to one damage roll. Step up after
-                              consecutive turns dealing damage; reset after a turn without damage
-                              or when Incapacitated.
-                            </p>
-                            <p className="mt-1 text-[10px] font-medium text-rose-800 dark:text-rose-200">
-                              Tantrum (if known): step up when initiative is rolled, and when you
-                              take damage while this die is d6 or lower.
-                            </p>
-                          </div>
+                        {hasRampageDie && (
+                          <RampageDieTracker
+                            state={rampageDieState}
+                            onStateChange={applyRampageDieState}
+                            knowsTantrum={knowsTantrum}
+                            knowsUncontrollableMind={knowsUncontrollableMind}
+                            unstoppable={unstoppableRampageContext}
+                          />
+                        )}
+                        {(mutationDie != null ||
+                          Object.keys(fleshWarpAllyBenefitCounts).length > 0 ||
+                          sheetActions.some((action) => /^flesh warp$/i.test(action.name))) && (
+                          <MutationDieTracker
+                            grant={mutationDie}
+                            allyBenefitCounts={fleshWarpAllyBenefitCounts}
+                            onGrantChange={setMutationDie}
+                            onAllyBenefitCountsChange={setFleshWarpAllyBenefitCounts}
+                            constitutionMod={abilityMods.constitution}
+                          />
+                        )}
+                        {(illusionTokens.length > 0 ||
+                          sheetActions.some((action) =>
+                            /^(?:projected self|imaginary ally)$/i.test(action.name),
+                          )) && (
+                          <IllusionTokensPanel
+                            tokens={illusionTokens}
+                            onChange={setIllusionTokens}
+                            spellAttackModifier={spellAttackMod}
+                            intelligenceMod={abilityMods.intelligence}
+                          />
                         )}
                         {hasInfluencePointsMechanic && (influencePointCount > 0 || influencePointCap > 0) && (
                           <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/5 p-2.5">
@@ -4281,6 +4591,46 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             >
                               Spend 1 Influence
                             </button>
+                          </div>
+                        )}
+                        {hasBalanceOfPowerMechanic && (
+                          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                Balance of Power
+                              </p>
+                              <span className="text-[10px] tabular-nums text-muted-foreground">
+                                {balanceOfPowerCount} / {balanceOfPowerCapValue}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mb-2">
+                              Banks automatically when a psionic power restores HP or grants temp HP.
+                              Decay after 1 minute. Expend on a damage roll to add that much damage to
+                              one target.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                disabled={balanceOfPowerCount <= 0}
+                                onClick={() => {
+                                  const result = spendBalanceOfPower({
+                                    accumulated: accumulatedResources,
+                                  })
+                                  setAccumulatedResources(result.accumulated)
+                                }}
+                                className="text-xs font-semibold rounded-md border border-amber-500/40 px-2 py-1 disabled:opacity-40"
+                              >
+                                Expend pool on damage
+                              </button>
+                              <button
+                                type="button"
+                                disabled={balanceOfPowerCount >= balanceOfPowerCapValue}
+                                onClick={() => bankIntoBalanceOfPower(1)}
+                                className="text-xs font-semibold rounded-md border border-amber-500/40 px-2 py-1 disabled:opacity-40"
+                              >
+                                Bank +1 (manual)
+                              </button>
+                            </div>
                           </div>
                         )}
                         {specializedElement ? (

@@ -259,6 +259,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Extra picks for a named feature or choice category (Unlimited Imagination, Skill Thief)",
   },
   {
+    value: "feature_choice_option_grant",
+    label: "Feature Choice Option Grant",
+    hint: "Add named options to a feature choice pool (Projected Nightmares → Boundless Imagination)",
+  },
+  {
     value: "equipment_and_magic_items",
     label: "Equipment & Magic Items",
     hint: "Create mundane gear or replicate magic item plans (Artificer)",
@@ -1241,6 +1246,14 @@ export interface FeatureChoiceCountBonusCharacteristic extends CharacteristicMod
   bonusFrom?: "half_proficiency" | "proficiency" | null
 }
 
+/** Extra named options for a feature choice pool (Projected Nightmares → Boundless Imagination). */
+export interface FeatureChoiceOptionGrantCharacteristic extends CharacteristicModifierBase {
+  type: "feature_choice_option_grant"
+  targetFeatureName?: string | null
+  choiceCategory?: string | null
+  options: { name: string; description: string }[]
+}
+
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
@@ -1301,6 +1314,7 @@ export type CharacteristicModifier =
   | HealingReceivedModifierCharacteristic
   | GrantCustomAbilityCharacteristic
   | FeatureChoiceCountBonusCharacteristic
+  | FeatureChoiceOptionGrantCharacteristic
 
 export function createModifierId(): string {
   return `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -1495,6 +1509,8 @@ export function createCharacteristicModifier(
       return { id, type, abilityNames: [] }
     case "feature_choice_count_bonus":
       return { id, type, targetFeatureName: null, choiceCategory: null, bonus: 1, bonusFrom: null }
+    case "feature_choice_option_grant":
+      return { id, type, targetFeatureName: null, choiceCategory: null, options: [] }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
     case "craftable_items":
@@ -2143,6 +2159,7 @@ export type AggregatedCharacteristics = {
   healingReceivedModifiers: HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
   featureChoiceCountBonuses: FeatureChoiceCountBonusCharacteristic[]
+  featureChoiceOptionGrants: FeatureChoiceOptionGrantCharacteristic[]
 }
 
 const UNARMED_DIE_RANK: Record<UnarmedStrikeDie, number> = {
@@ -2240,6 +2257,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   healingReceivedModifiers: [],
   grantedCustomAbilityNames: [],
   featureChoiceCountBonuses: [],
+  featureChoiceOptionGrants: [],
 })
 
 function pushUnique(list: string[], values: string[] | null | undefined) {
@@ -2754,6 +2772,9 @@ export function aggregateCharacteristics(
         break
       case "feature_choice_count_bonus":
         result.featureChoiceCountBonuses.push(mod)
+        break
+      case "feature_choice_option_grant":
+        result.featureChoiceOptionGrants.push(mod)
         break
     }
   }

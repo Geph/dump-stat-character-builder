@@ -419,6 +419,7 @@ export default function BuilderPageClient() {
   const [speciesSearch, setSpeciesSearch] = useState("")
   const [speciesPickerPage, setSpeciesPickerPage] = useState(0)
   const [backgroundSearch, setBackgroundSearch] = useState("")
+  const [backgroundSourceFilter, setBackgroundSourceFilter] = useState("all")
   const [backgroundPickerPage, setBackgroundPickerPage] = useState(0)
   const [spellSearch, setSpellSearch] = useState("")
   const [equipmentSearch, setEquipmentSearch] = useState("")
@@ -675,7 +676,7 @@ export default function BuilderPageClient() {
 
   useEffect(() => {
     setBackgroundPickerPage(0)
-  }, [backgroundSearch])
+  }, [backgroundSearch, backgroundSourceFilter])
 
   useEffect(() => {
     setClassPickerPage(0)
@@ -3375,6 +3376,7 @@ export default function BuilderPageClient() {
                               subclassName: subclassForClass?.name ?? null,
                               grantedCustomAbilityNames:
                                 aggregatedCharacteristics.grantedCustomAbilityNames,
+                              optionGrants: aggregatedCharacteristics.featureChoiceOptionGrants,
                             })
                             const choiceCount = resolveFeatureChoiceCount(
                               feature.choices!,
@@ -3759,6 +3761,7 @@ export default function BuilderPageClient() {
                 grantedCustomAbilityNames={aggregatedCharacteristics.grantedCustomAbilityNames}
                 featChoicePicks={featChoicePicks}
                 featureChoiceCountBonuses={aggregatedCharacteristics.featureChoiceCountBonuses}
+                featureChoiceOptionGrants={aggregatedCharacteristics.featureChoiceOptionGrants}
                 compactPickerLayout={compactPickerLayout}
                 skillPickerLayout={skillPickerLayout}
                 cardViewMode={cardViewMode}
@@ -3848,7 +3851,6 @@ export default function BuilderPageClient() {
                               name={sp.name}
                               subtitle={sp.source || "Custom"}
                               icon={sp.icon}
-                              iconClassName="h-6 w-6"
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectSpecies}
@@ -4137,22 +4139,58 @@ export default function BuilderPageClient() {
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Background</h2>
                   <p className={`${pageFloatingHintClass} mb-3`}>Your background provides ability bonuses and a 1st-level feat.</p>
                   
-                  {/* Search */}
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search backgrounds..."
-                      value={backgroundSearch}
-                      onChange={(e) => setBackgroundSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                    />
+                  {/* Search + source filter */}
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search backgrounds..."
+                        value={backgroundSearch}
+                        onChange={(e) => setBackgroundSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    {(() => {
+                      const sourceOptions = [
+                        ...new Set(
+                          backgrounds.map((bg) => bg.source?.trim() || "Custom").filter(Boolean),
+                        ),
+                      ].sort((a, b) => a.localeCompare(b))
+                      if (sourceOptions.length <= 1) return null
+                      return (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                            Source
+                          </label>
+                          <select
+                            value={backgroundSourceFilter}
+                            onChange={(e) => setBackgroundSourceFilter(e.target.value)}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none max-w-[14rem]"
+                            aria-label="Filter backgrounds by source"
+                          >
+                            <option value="all">All sources</option>
+                            {sourceOptions.map((source) => (
+                              <option key={source} value={source}>
+                                {source}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })()}
                   </div>
                   
                   {(() => {
-                    const filteredBackgrounds = backgrounds.filter((bg) =>
-                      bg.name.toLowerCase().includes(backgroundSearch.toLowerCase()),
-                    )
+                    const filteredBackgrounds = backgrounds.filter((bg) => {
+                      if (
+                        backgroundSourceFilter !== "all" &&
+                        (bg.source?.trim() || "Custom") !== backgroundSourceFilter
+                      ) {
+                        return false
+                      }
+                      return bg.name.toLowerCase().includes(backgroundSearch.toLowerCase())
+                    })
                     const {
                       items: visibleBackgrounds,
                       pageCount: backgroundPageCount,

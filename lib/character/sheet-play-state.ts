@@ -1,5 +1,19 @@
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import type { RealTimeCooldownState } from "@/lib/character/real-time-recharge"
+import {
+  normalizeAllyBenefitCounts,
+  normalizeMutationDieGrant,
+  type MutationDieGrant,
+} from "@/lib/character/mutation-die"
+import {
+  normalizeIllusionTokens,
+  type IllusionTokenState,
+} from "@/lib/character/illusion-tokens"
+import {
+  defaultRampageTurnState,
+  normalizeRampageTurnState,
+  type RampageTurnState,
+} from "@/lib/character/rampage-die"
 
 /** Per-resource banked value with optional real-time decay (Influence, Balance of Power). */
 export type AccumulatedResourceState = {
@@ -30,6 +44,14 @@ export type CharacterSheetPlayState = {
   accumulatedResources: Record<string, AccumulatedResourceState>
   /** Runtime die-size overrides for mutable resources (e.g. Rampage Die d4→d12). */
   resourceDieSidesByKey: Record<string, number>
+  /** Rampage Die per-turn flags + d12 Exhaustion clock (Unleashed Mind). */
+  rampageTurn: RampageTurnState
+  /** Flesh Warp Mutation Die grant (target ephemeral die until caster's next turn). */
+  mutationDie: MutationDieGrant | null
+  /** Ally benefit counts for Flesh Warp exhaustion tracking (label → uses this long rest). */
+  fleshWarpAllyBenefitCounts: Record<string, number>
+  /** Active Projected Self / Imaginary Ally illusion tokens. */
+  illusionTokens: IllusionTokenState[]
   /** Skills box sort: by ability (STR→CHA) or alphabetical. */
   skillSortMode: "ability" | "alpha"
   /** Skill names pinned to the top of the skills list. */
@@ -57,6 +79,10 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     realTimeCooldowns: {},
     accumulatedResources: {},
     resourceDieSidesByKey: {},
+    rampageTurn: defaultRampageTurnState(),
+    mutationDie: null,
+    fleshWarpAllyBenefitCounts: {},
+    illusionTokens: [],
     skillSortMode: "ability",
     pinnedSkillNames: [],
     pinnedEquipmentIds: [],
@@ -128,6 +154,10 @@ export function normalizeSheetPlayState(
         ? { ...raw.accumulatedResources }
         : base.accumulatedResources,
     resourceDieSidesByKey: normalizeResourceDieSides(raw.resourceDieSidesByKey),
+    rampageTurn: normalizeRampageTurnState(raw.rampageTurn),
+    mutationDie: normalizeMutationDieGrant(raw.mutationDie),
+    fleshWarpAllyBenefitCounts: normalizeAllyBenefitCounts(raw.fleshWarpAllyBenefitCounts),
+    illusionTokens: normalizeIllusionTokens(raw.illusionTokens),
     skillSortMode: raw.skillSortMode === "alpha" ? "alpha" : "ability",
     pinnedSkillNames: Array.isArray(raw.pinnedSkillNames)
       ? raw.pinnedSkillNames.filter((entry): entry is string => typeof entry === "string")

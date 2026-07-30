@@ -18,12 +18,16 @@ export const CINEMATIC_COMPENDIUM_PAGE_SIZE = PICKER_GRID_ROWS * 2
 /** Items per page before showing pagination controls. */
 export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean): number {
   if (mode === "dense") {
-    // Phone: 2 cols × 3 rows. Large: up to 4 cols × 3 rows.
-    return isLargeScreen ? PICKER_GRID_ROWS * 4 : PICKER_GRID_ROWS * 2
+    // Phone/medium: 2 cols × 4 rows = 8. Large: up to 4 cols × 3 rows = 12.
+    return isLargeScreen ? PICKER_GRID_ROWS * 4 : 8
   }
   // Cinematic compendium cards: 2 cols × 3 rows whenever paginated (`sm`+).
   return CINEMATIC_COMPENDIUM_PAGE_SIZE
 }
+
+/** Skill / language / tool multi-selects — fixed page length on phone and compact layouts. */
+export const MULTI_SELECT_CHOICE_PAGE_SIZE = 10
+
 
 /** Spell step: 12 on `sm`+ (3-col cinematic / denser grids), 6 on phones. */
 export function getSpellPickerPageSize(isSmScreen: boolean): number {

@@ -2907,6 +2907,67 @@ function ModifierFields({
           </div>
         </div>
       )
+
+    case "feature_choice_option_grant":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Target feature name
+            </label>
+            <input
+              type="text"
+              value={mod.targetFeatureName ?? ""}
+              onChange={(e) =>
+                onChange({ ...mod, targetFeatureName: e.target.value || null })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              placeholder="Boundless Imagination"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Choice category (optional)
+            </label>
+            <input
+              type="text"
+              value={mod.choiceCategory ?? ""}
+              onChange={(e) => onChange({ ...mod, choiceCategory: e.target.value || null })}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Granted options (name, then description; separate options with ---)
+            </label>
+            <textarea
+              value={(mod.options ?? [])
+                .map((option) => `${option.name}\n${option.description ?? ""}`.trim())
+                .join("\n---\n")}
+              onChange={(e) => {
+                const blocks = e.target.value.split(/\n---\n/)
+                onChange({
+                  ...mod,
+                  options: blocks
+                    .map((block) => {
+                      const [nameLine, ...rest] = block.trim().split("\n")
+                      const name = (nameLine ?? "").trim()
+                      if (!name) return null
+                      return {
+                        name,
+                        description: rest.join("\n").trim(),
+                      }
+                    })
+                    .filter((entry): entry is { name: string; description: string } => Boolean(entry)),
+                })
+              }}
+              rows={6}
+              placeholder={"Horrifying Nightmare\nChosen creatures…"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )
   }
 }
 

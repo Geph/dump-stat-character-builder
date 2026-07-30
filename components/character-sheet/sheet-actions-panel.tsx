@@ -17,6 +17,8 @@ import {
   type SheetActionEntry,
 } from "@/lib/character/sheet-actions"
 import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
+import { weaponMorphToggleIdForOption } from "@/lib/character/weapon-morph"
+import type { IllusionTokenKind } from "@/lib/character/illusion-tokens"
 import {
   SHEET_ACTION_CARD,
   SHEET_ACTION_USAGE_DOT,
@@ -62,12 +64,28 @@ type SheetActionsPanelProps = {
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
+  /** Spawn a Projected Self / Imaginary Ally play-state token. */
+  onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
+  /** Grant a Flesh Warp Mutation Die (Perfected / Muscular from selected augments). */
+  onGrantMutationDie?: (opts: {
+    autoApplyStrength: boolean
+    perfected: boolean
+    targetLabel: string
+  }) => void
   /** Mark Action / Bonus Action / Reaction as spent for this turn. */
   onMarkEconomy?: (kind: ActionEconomyKind) => void
   /** Open character id — used when applying self heals / ally picks. */
   characterId?: string | null
   /** Apply heal / temp HP to the open sheet's local play state. */
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  /** Extra temp HP from Perfected Enhancement when granting via a psionic power. */
+  perfectedEnhancementBonus?: number
+  /** +INT added to psionic discipline power damage (Empowered Psionics). */
+  empoweredPsionicsBonus?: number
+  /** Using a damaging power marks damage dealt this turn (Rampage Die). */
+  onMarkDamageDealt?: () => void
+  /** Bank heal/THP amounts into Balance of Power after a psionic ability. */
+  onBankBalanceOfPower?: (amount: number) => void
   /** Party allies + companions available as heal targets. */
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
@@ -149,6 +167,7 @@ function ActionRollStep({
   attackMod,
   proficiencyBonus,
   damageModifier,
+  damageModifierNote = null,
   psiSpent,
   hitDiceSpent,
   augmentSummary,
@@ -159,6 +178,7 @@ function ActionRollStep({
   attackMod: number
   proficiencyBonus: number
   damageModifier: number
+  damageModifierNote?: string | null
   psiSpent: number
   hitDiceSpent: number
   augmentSummary: string | null
@@ -295,6 +315,9 @@ function ActionRollStep({
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Damage ({damageExpression})
           </p>
+          {damageModifierNote ? (
+            <p className="text-[11px] font-medium text-primary">{damageModifierNote}</p>
+          ) : null}
           <p className="text-lg font-black tabular-nums text-foreground">
             {damageSummary ?? "—"}
           </p>
@@ -330,12 +353,18 @@ function ActionDetailOverlay({
   hitDiceRemaining,
   onSpendHitDice,
   onActivateSheetToggle,
+  onSpawnIllusionToken,
+  onGrantMutationDie,
   onMarkEconomy,
   incapacitated,
   resolveContext,
   onClose,
   characterId,
   onApplySelfHeal,
+  perfectedEnhancementBonus = 0,
+  empoweredPsionicsBonus = 0,
+  onMarkDamageDealt,
+  onBankBalanceOfPower,
   allyCandidates = [],
   healContext = null,
 }: {
@@ -349,12 +378,22 @@ function ActionDetailOverlay({
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
+  onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
+  onGrantMutationDie?: (opts: {
+    autoApplyStrength: boolean
+    perfected: boolean
+    targetLabel: string
+  }) => void
   onMarkEconomy?: (kind: ActionEconomyKind) => void
   incapacitated: boolean
   resolveContext: ResolveUsesContext
   onClose: () => void
   characterId?: string | null
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  perfectedEnhancementBonus?: number
+  empoweredPsionicsBonus?: number
+  onMarkDamageDealt?: () => void
+  onBankBalanceOfPower?: (amount: number) => void
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
 }) {
@@ -440,17 +479,55 @@ function ActionDetailOverlay({
       parts.push(selectedOption.name)
     }
 
+    const morphToggleId = selectedOption
+      ? weaponMorphToggleIdForOption(selectedOption.name)
+      : null
     const toggleId =
+      morphToggleId ??
       (selectedOption ? guardianTacticsToggleIdForOption(selectedOption.name) : null) ??
       sheetToggleIdActivatedByAction(action)
     if (toggleId && onActivateSheetToggle) {
       onActivateSheetToggle(toggleId)
+      parts.push(toggleId === "__end_weapon_morph__" ? "Morph ended" : "Toggle on")
+    }
+
+    const actionName = action.name.trim().toLowerCase()
+    if (actionName === "projected self" && onSpawnIllusionToken) {
+      onSpawnIllusionToken("projected_self")
+      if (onActivateSheetToggle) onActivateSheetToggle("projected_self_active")
+      parts.push("Illusion token")
+    }
+    if (actionName === "imaginary ally" && onSpawnIllusionToken) {
+      onSpawnIllusionToken("imaginary_ally")
+      parts.push("Illusion token")
+    }
+    if (actionName === "swollen muscles" && onActivateSheetToggle) {
+      onActivateSheetToggle("swollen_muscles_active")
       parts.push("Toggle on")
     }
+    if (actionName === "flesh warp" && onGrantMutationDie) {
+      const selectedAugmentNames = (psionicAugments?.augments ?? [])
+        .filter((augment) =>
+          augmentSelections.some((selection) => selection.augmentId === augment.id),
+        )
+        .map((augment) => augment.name)
+      const autoApplyStrength = selectedAugmentNames.some((name) => /muscular/i.test(name))
+      const perfected = selectedAugmentNames.some((name) => /perfected/i.test(name))
+      onGrantMutationDie({
+        autoApplyStrength,
+        perfected,
+        targetLabel: "Self",
+      })
+      parts.push(perfected ? "Mutation Die (Perfected)" : "Mutation Die")
+    }
+
     if (action.spendsEconomy !== false && onMarkEconomy) {
       for (const kind of action.kinds) {
         onMarkEconomy(kind)
       }
+    }
+    if ((specialAttack?.damageDiceCount ?? 0) > 0 && onMarkDamageDealt) {
+      onMarkDamageDealt()
     }
     if (hitDiceNeeded > 0) parts.push(`Spent ${hitDiceNeeded} Hit Dice`)
     if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
@@ -468,13 +545,25 @@ function ActionDetailOverlay({
 
     if (targetable.length && healContext && characterId && onApplySelfHeal) {
       const healParts = [...parts]
+      const isPsionicPower = action.abilityRole === "psionic_power"
+      let banked = 0
       for (const { effect } of targetable) {
-        const amount = resolveFeatureEffectHealAmount(effect, healContext)
+        let amount = resolveFeatureEffectHealAmount(effect, healContext)
         if (amount <= 0) continue
         const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
+        if (
+          kind === "temp_hp" &&
+          isPsionicPower &&
+          perfectedEnhancementBonus > 0
+        ) {
+          amount += perfectedEnhancementBonus
+          healParts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
+        }
         onApplySelfHeal(amount, kind)
+        if (isPsionicPower) banked += amount
         healParts.push(kind === "temp_hp" ? `+${amount} temp HP` : `Healed ${amount} HP`)
       }
+      if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
       setUseFeedback(healParts.join(" · ") || "Used!")
       if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
         setStep("roll")
@@ -496,16 +585,29 @@ function ActionDetailOverlay({
     setApplyingHeal(true)
     try {
       const parts: string[] = useFeedback ? [useFeedback] : []
+      let banked = 0
+      let perfectedApplied = false
       for (const effect of pendingHealEffects) {
         if (
           target.kind === "character" &&
           target.characterId === characterId &&
           onApplySelfHeal
         ) {
-          const amount = resolveFeatureEffectHealAmount(effect, healContext)
+          let amount = resolveFeatureEffectHealAmount(effect, healContext)
           if (amount <= 0) continue
           const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
+          if (
+            kind === "temp_hp" &&
+            action.abilityRole === "psionic_power" &&
+            perfectedEnhancementBonus > 0 &&
+            !perfectedApplied
+          ) {
+            amount += perfectedEnhancementBonus
+            perfectedApplied = true
+            parts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
+          }
           onApplySelfHeal(amount, kind)
+          if (action.abilityRole === "psionic_power") banked += amount
           parts.push(
             kind === "temp_hp"
               ? `+${amount} temp HP → ${target.label}`
@@ -513,19 +615,35 @@ function ActionDetailOverlay({
           )
           continue
         }
+        let effectForParty = effect
+        if (
+          effect.kind === "grant_temp_hp" &&
+          action.abilityRole === "psionic_power" &&
+          perfectedEnhancementBonus > 0 &&
+          !perfectedApplied
+        ) {
+          effectForParty = {
+            ...effect,
+            healFlatBonus: (effect.healFlatBonus ?? 0) + perfectedEnhancementBonus,
+          }
+          perfectedApplied = true
+          parts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
+        }
         const result = await applyPartyHealEffect({
-          effect,
+          effect: effectForParty,
           target,
           healContext,
           selfCharacterId: characterId,
         })
         if (!result) continue
+        if (action.abilityRole === "psionic_power") banked += result.amount
         parts.push(
           result.kind === "temp_hp"
             ? `+${result.amount} temp HP → ${result.targetLabel}`
             : `Healed ${result.amount} HP → ${result.targetLabel}`,
         )
       }
+      if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
       setUseFeedback(parts.join(" · ") || "Used!")
       setStep("detail")
       setPendingHealEffects([])
@@ -539,6 +657,10 @@ function ActionDetailOverlay({
   const conMod = resolveContext.abilityModifiers?.CON ?? 0
   const vengeanceDamageMod =
     hitDiceNeeded > 0 && specialAttack && /vengeance/i.test(action.name) ? conMod : 0
+  const empoweredPsionicsDamageMod =
+    action.abilityRole === "psionic_power" && (specialAttack?.damageDiceCount ?? 0) > 0
+      ? empoweredPsionicsBonus
+      : 0
 
   return (
     <motion.div
@@ -580,7 +702,12 @@ function ActionDetailOverlay({
             specialAttack={specialAttack}
             attackMod={attackModifierFromContext(resolveContext)}
             proficiencyBonus={resolveContext.proficiencyBonus ?? 0}
-            damageModifier={vengeanceDamageMod}
+            damageModifier={vengeanceDamageMod + empoweredPsionicsDamageMod}
+            damageModifierNote={
+              empoweredPsionicsDamageMod > 0
+                ? `Empowered Psionics (+${empoweredPsionicsDamageMod} INT)`
+                : null
+            }
             psiSpent={psiCost}
             hitDiceSpent={hitDiceNeeded}
             augmentSummary={augmentSummary}
@@ -809,9 +936,15 @@ export function SheetActionsPanel({
   hitDiceRemaining = 0,
   onSpendHitDice,
   onActivateSheetToggle,
+  onSpawnIllusionToken,
+  onGrantMutationDie,
   onMarkEconomy,
   characterId = null,
   onApplySelfHeal,
+  perfectedEnhancementBonus = 0,
+  empoweredPsionicsBonus = 0,
+  onMarkDamageDealt,
+  onBankBalanceOfPower,
   allyCandidates = [],
   healContext = null,
   singleColumn = false,
@@ -1039,12 +1172,18 @@ export function SheetActionsPanel({
             hitDiceRemaining={hitDiceRemaining}
             onSpendHitDice={onSpendHitDice}
             onActivateSheetToggle={onActivateSheetToggle}
+            onSpawnIllusionToken={onSpawnIllusionToken}
+            onGrantMutationDie={onGrantMutationDie}
             onMarkEconomy={onMarkEconomy}
             incapacitated={incapacitated}
             resolveContext={resolveContext}
             onClose={() => setOpenActionId(null)}
             characterId={characterId}
             onApplySelfHeal={onApplySelfHeal}
+            perfectedEnhancementBonus={perfectedEnhancementBonus}
+            empoweredPsionicsBonus={empoweredPsionicsBonus}
+            onMarkDamageDealt={onMarkDamageDealt}
+            onBankBalanceOfPower={onBankBalanceOfPower}
             allyCandidates={allyCandidates}
             healContext={healContext}
           />
