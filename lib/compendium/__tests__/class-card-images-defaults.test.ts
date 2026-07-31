@@ -56,10 +56,16 @@ describe("class card images", () => {
   })
 
   it("applies bundled card art to non-SRD named imports (Psion / Artificer)", () => {
-    const [psion] = enrichClassesList([
+    type ClassRow = {
+      name: string
+      source: string
+      features: unknown[]
+      card_image_url?: string | null
+    }
+    const [psion] = enrichClassesList<ClassRow>([
       { name: "Psion", source: "KibblesTasty Psion", features: [] },
     ])
-    const [artificer] = enrichClassesList([
+    const [artificer] = enrichClassesList<ClassRow>([
       { name: "Artificer", source: "Eberron: Forge of the Artificer", features: [] },
     ])
     expect(psion.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Psion)
