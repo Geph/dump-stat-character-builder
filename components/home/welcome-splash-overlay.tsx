@@ -81,7 +81,7 @@ const VERSION_OPTIONS: VersionOption[] = [
   {
     id: "no-ai",
     title: "No AI Whatsoever",
-    description: "I don't want to use anything with AI in it",
+    description: "I don't want to use anything related to AI whatsoever",
     href: "https://en.wikipedia.org/wiki/Applications_of_artificial_intelligence",
     imageSrc: NO_AI_SPLASH_IMAGE,
     imageBackgroundClass: "bg-white",

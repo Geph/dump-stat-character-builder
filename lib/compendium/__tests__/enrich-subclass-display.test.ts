@@ -26,12 +26,22 @@ describe("enrichSubclassDisplayDefaults", () => {
     expect(row.card_image_url).toBe("https://example.com/custom.png")
   })
 
-  it("leaves homebrew subclasses without bundled art as placeholders", () => {
+  it("fills Psion / Artificer named card art regardless of source", () => {
     const row = enrichSubclassDisplayDefaults({
       name: "Consuming Mind",
       icon: null,
       card_image_url: null,
       source: "KibblesTasty",
+    })
+    expect(row.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Consuming Mind"])
+  })
+
+  it("leaves unmapped homebrew subclasses without bundled art as placeholders", () => {
+    const row = enrichSubclassDisplayDefaults({
+      name: "Path of the Homebrew",
+      icon: null,
+      card_image_url: null,
+      source: "Custom",
     })
     expect(row.card_image_url).toBeNull()
   })

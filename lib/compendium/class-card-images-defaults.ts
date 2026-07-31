@@ -2,8 +2,12 @@ import { withBasePath } from "@/lib/config/deploy-mode"
 
 const classCardImage = (slug: string) => withBasePath(`/images/compendium/classes/${slug}.png`)
 
-/** Default card art for SRD classes — files live under public/images/compendium/classes/. */
+/**
+ * Default card art for classes — files live under public/images/compendium/classes/.
+ * Includes SRD / 2024 PHB plus Artificer (Forge of the Artificer) and KibblesTasty Psion.
+ */
 export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
+  Artificer: classCardImage("artificer"),
   Barbarian: classCardImage("barbarian"),
   Bard: classCardImage("bard"),
   Cleric: classCardImage("cleric"),
@@ -11,6 +15,7 @@ export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Fighter: classCardImage("fighter"),
   Monk: classCardImage("monk"),
   Paladin: classCardImage("paladin"),
+  Psion: classCardImage("psion"),
   Ranger: classCardImage("ranger"),
   Rogue: classCardImage("rogue"),
   Sorcerer: classCardImage("sorcerer"),

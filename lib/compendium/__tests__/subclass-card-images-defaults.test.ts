@@ -5,13 +5,22 @@ import bundledSubclasses from "@/lib/srd/seed-data/subclasses.json"
 import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
 import { SRD_SUBCLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/subclass-card-images-defaults"
 
-describe("SRD subclass card images", () => {
-  it("maps all twelve SRD subclasses to bundled card art paths", () => {
-    expect(Object.keys(SRD_SUBCLASS_CARD_IMAGES_BY_NAME).sort()).toEqual(
-      bundledSubclasses.map((row) => row.name).sort(),
-    )
+describe("subclass card images", () => {
+  it("covers every bundled SRD subclass plus PHB / Psion / Artificer extras", () => {
+    for (const row of bundledSubclasses) {
+      expect(
+        SRD_SUBCLASS_CARD_IMAGES_BY_NAME[row.name],
+        `missing default art for SRD subclass ${row.name}`,
+      ).toMatch(/\/images\/compendium\/subclasses\//)
+    }
     expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Champion).toMatch(
       /\/images\/compendium\/subclasses\/champion\.png$/,
+    )
+    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Alchemist).toMatch(
+      /\/images\/compendium\/subclasses\/alchemist\.png$/,
+    )
+    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Knowing Mind"]).toMatch(
+      /\/images\/compendium\/subclasses\/knowing-mind\.png$/,
     )
   })
 
@@ -25,7 +34,7 @@ describe("SRD subclass card images", () => {
     }
   })
 
-  it("enriches SRD subclass rows with default card art when unset", () => {
+  it("enriches subclass rows with default card art when unset", () => {
     const row = enrichSrdSubclassRow(
       {
         name: "Path of the Berserker",
@@ -35,6 +44,19 @@ describe("SRD subclass card images", () => {
       "Barbarian",
     )
     expect(row.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Path of the Berserker"])
+  })
+
+  it("applies named card art on non-SRD imports (Artificer / Psion)", () => {
+    const alchemist = enrichSrdSubclassRow(
+      { name: "Alchemist", source: "Eberron: Forge of the Artificer", features: [] },
+      "Artificer",
+    )
+    const knowing = enrichSrdSubclassRow(
+      { name: "Knowing Mind", source: "KibblesTasty Psion", features: [] },
+      "Psion",
+    )
+    expect(alchemist.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Alchemist)
+    expect(knowing.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Knowing Mind"])
   })
 
   it("preserves custom card art when already set", () => {
@@ -51,10 +73,10 @@ describe("SRD subclass card images", () => {
     expect(row.card_image_url).toBe(custom)
   })
 
-  it("does not apply defaults to custom homebrew subclasses", () => {
+  it("does not invent art for unmapped homebrew subclass names", () => {
     const row = enrichSrdSubclassRow(
       {
-        name: "Path of the Berserker",
+        name: "Path of the Homebrew",
         source: "Custom",
         features: [],
       },

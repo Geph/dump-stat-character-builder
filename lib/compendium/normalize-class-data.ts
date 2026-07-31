@@ -1,5 +1,7 @@
 import type { StartingEquipmentGroup } from "@/lib/types"
 import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
+import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
+import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
@@ -105,11 +107,20 @@ export function enrichClassesList<
       return enrichSrdClassRow(enriched as unknown as Record<string, unknown>) as T
     }
 
-    const existingIcon = (enriched as { icon?: unknown }).icon
-    if (typeof existingIcon === "string" && existingIcon.trim()) {
-      return { ...enriched, icon: existingIcon.trim() }
-    }
-    const defaultIcon = defaultClassIconForName(enriched.name)
-    return defaultIcon ? { ...enriched, icon: defaultIcon } : enriched
+    const withIcon = (() => {
+      const existingIcon = (enriched as { icon?: unknown }).icon
+      if (typeof existingIcon === "string" && existingIcon.trim()) {
+        return { ...enriched, icon: existingIcon.trim() }
+      }
+      const defaultIcon = defaultClassIconForName(enriched.name)
+      return defaultIcon ? { ...enriched, icon: defaultIcon } : enriched
+    })()
+
+    // Artificer / Psion / other named imports get bundled card art the same way
+    // subclasses do — source does not need to be SRD.
+    return applyBundledCardImage(
+      withIcon as unknown as Record<string, unknown>,
+      SRD_CLASS_CARD_IMAGES_BY_NAME,
+    ) as T
   })
 }

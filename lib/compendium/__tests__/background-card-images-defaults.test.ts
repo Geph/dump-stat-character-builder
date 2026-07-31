@@ -1,16 +1,38 @@
+import fs from "node:fs"
+import path from "node:path"
 import { describe, expect, it } from "vitest"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { SRD_BACKGROUND_CARD_IMAGES_BY_NAME } from "@/lib/compendium/background-card-images-defaults"
 
 describe("background card images", () => {
-  it("maps core WOTC backgrounds to dumpstat hosted art", () => {
+  it("maps core WOTC backgrounds to bundled local art when available", () => {
     for (const name of ["Acolyte", "Criminal", "Sage", "Soldier", "Haunted One", "Mist Wanderer"]) {
       expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME[name]).toMatch(
-        /^https:\/\/jeffginger\.com\/dumpstat\/wotc\/backgrounds\//,
+        /\/images\/compendium\/backgrounds\//,
       )
     }
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Acolyte).toContain("Acolyte.jpeg")
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"]).toContain("Haunted%20One.jpeg")
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Acolyte).toMatch(/acolyte\.png$/)
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"]).toMatch(/haunted-one\.png$/)
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Cannith Heir"]).toMatch(
+      /house-cannith-heir\.png$/,
+    )
+  })
+
+  it("keeps hosted dumpstat URLs for backgrounds without bundled sources", () => {
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Harper).toMatch(
+      /^https:\/\/jeffginger\.com\/dumpstat\/wotc\/backgrounds\//,
+    )
+  })
+
+  it("ships an optimized image file for every bundled background path", () => {
+    const imagesDir = path.join(process.cwd(), "public/images/compendium/backgrounds")
+    for (const [name, url] of Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME)) {
+      if (!url.includes("/images/compendium/backgrounds/")) continue
+      const file = path.basename(url)
+      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
+        true,
+      )
+    }
   })
 
   it("enriches non-SRD background rows with default card art when unset", () => {
@@ -20,7 +42,7 @@ describe("background card images", () => {
     expect(row.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"])
   })
 
-  it("upgrades bundled /images/compendium background paths to hosted defaults", () => {
+  it("applies bundled defaults when an older bundled path is already set", () => {
     const [row] = enrichBackgroundList([
       {
         name: "Sage",

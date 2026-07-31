@@ -1,5 +1,5 @@
 import { enrichSubclassFeaturesWithResources } from "@/lib/compendium/class-resource-features"
-import { applySrdCardImage } from "@/lib/compendium/card-image"
+import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { enrichSubclassFeaturesWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import { enrichSubclassSpellTableFeatures } from "@/lib/compendium/enrich-subclass-spell-features"
 import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
@@ -28,7 +28,8 @@ export function enrichSrdSubclassRow(
   const withSpells = spellCatalog.length
     ? enrichSubclassSpellTableFeatures(withPresets, spellCatalog, preferredSource)
     : withPresets
-  return applySrdCardImage(
+  // Card art is keyed by subclass name (PHB / Psion / Artificer), not SRD-only.
+  return applyBundledCardImage(
     applySrdItemIcon(withSpells, SRD_SUBCLASS_ICONS_BY_NAME),
     SRD_SUBCLASS_CARD_IMAGES_BY_NAME,
   )

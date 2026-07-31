@@ -4,13 +4,19 @@ import sharp from "sharp"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const ASSETS = process.env.PAGE_BG_SOURCES ?? path.join(ROOT, "scripts", "page-bg-sources")
+const CLASS_CARD_SOURCES =
+  process.env.CLASS_CARD_SOURCES ?? path.join(ROOT, "scripts", "class-card-sources")
 const SUBCLASS_CARD_SOURCES =
   process.env.SUBCLASS_CARD_SOURCES ?? path.join(ROOT, "scripts", "subclass-card-sources")
+const BACKGROUND_CARD_SOURCES =
+  process.env.BACKGROUND_CARD_SOURCES ?? path.join(ROOT, "scripts", "background-card-sources")
 const PAGE_BG_OUT = path.join(ROOT, "public", "images", "page-backgrounds")
 const HERO_OUT = path.join(ROOT, "public", "images", "hero")
 const FEATURE_OUT = path.join(ROOT, "public", "images", "features")
 const SPLASH_OUT = path.join(ROOT, "public", "images", "welcome-splash")
+const CLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "classes")
 const SUBCLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "subclasses")
+const BACKGROUND_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "backgrounds")
 
 const WEBP_QUALITY = Number(process.env.SITE_IMAGE_QUALITY ?? 85)
 const CARD_JPEG_QUALITY = Number(process.env.CARD_JPEG_QUALITY ?? 82)
@@ -35,7 +41,7 @@ const SPLASH_HEIGHT = Number(process.env.SPLASH_HEIGHT ?? 900)
 const README_HERO_MAX_WIDTH = Number(process.env.README_HERO_MAX_WIDTH ?? 1400)
 const README_HERO_MAX_HEIGHT = Number(process.env.README_HERO_MAX_HEIGHT ?? 1200)
 
-/** Compendium portrait card art — matches class/species bundled defaults. */
+/** Compendium portrait card art — matches class/species card art. */
 const CARD_WIDTH = Number(process.env.CARD_WIDTH ?? 771)
 const CARD_HEIGHT = Number(process.env.CARD_HEIGHT ?? 1024)
 
@@ -75,22 +81,6 @@ const SPLASH_SOURCES = {
   "no-ai": ["no-ai", "No-AI"],
 }
 
-/** SRD subclass card art slugs (output basename = source basename). */
-const SUBCLASS_CARD_SLUGS = [
-  "path-of-the-berserker",
-  "college-of-lore",
-  "life-domain",
-  "circle-of-the-land",
-  "champion",
-  "warrior-of-the-open-hand",
-  "oath-of-devotion",
-  "hunter",
-  "thief",
-  "draconic-sorcery",
-  "fiend-patron",
-  "evoker",
-]
-
 function resolveSourcePath(basenames, assetsDir = ASSETS) {
   for (const base of basenames) {
     for (const ext of EXTENSIONS) {
@@ -99,6 +89,21 @@ function resolveSourcePath(basenames, assetsDir = ASSETS) {
     }
   }
   return null
+}
+
+/** Discover card sources by slug basename (first extension wins). */
+function discoverCardSlugs(sourcesDir) {
+  if (!fs.existsSync(sourcesDir)) return []
+  const bySlug = new Map()
+  for (const entry of fs.readdirSync(sourcesDir)) {
+    const ext = path.extname(entry).toLowerCase()
+    if (!EXTENSIONS.includes(ext)) continue
+    const slug = path.basename(entry, ext)
+    if (!slug || slug.startsWith(".")) continue
+    if (bySlug.has(slug)) continue
+    bySlug.set(slug, path.join(sourcesDir, entry))
+  }
+  return [...bySlug.entries()].sort(([a], [b]) => a.localeCompare(b))
 }
 
 async function encodeWebp(input, output, width, height) {
@@ -170,11 +175,39 @@ async function encodeCardJpeg(input, output, width, height) {
   return { inputMeta, outMeta, inputKb, outKb, action }
 }
 
+async function encodeCardBatch(label, sourcesDir, outDir) {
+  console.log(`\n${label} → ${path.relative(ROOT, outDir)}/`)
+  fs.mkdirSync(outDir, { recursive: true })
+  const entries = discoverCardSlugs(sourcesDir)
+  if (entries.length === 0) {
+    console.log("  − no sources (keeping existing outputs if any)")
+    return 0
+  }
+  let missing = 0
+  for (const [slug, input] of entries) {
+    const output = path.join(outDir, `${slug}.png`)
+    try {
+      const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
+        input,
+        output,
+        CARD_WIDTH,
+        CARD_HEIGHT,
+      )
+      console.log(
+        `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+      )
+    } catch (error) {
+      console.error(`  ✗ ${slug}: ${error instanceof Error ? error.message : error}`)
+      missing += 1
+    }
+  }
+  return missing
+}
+
 fs.mkdirSync(PAGE_BG_OUT, { recursive: true })
 fs.mkdirSync(HERO_OUT, { recursive: true })
 fs.mkdirSync(FEATURE_OUT, { recursive: true })
 fs.mkdirSync(SPLASH_OUT, { recursive: true })
-fs.mkdirSync(SUBCLASS_CARD_OUT, { recursive: true })
 
 let missing = 0
 
@@ -183,8 +216,7 @@ for (const [theme, basenames] of Object.entries(THEME_SOURCES)) {
   const input = resolveSourcePath(basenames)
   const output = path.join(PAGE_BG_OUT, `${theme}.webp`)
   if (!input) {
-    console.error(`  ✗ ${theme}: missing ${basenames.join(" or ")}`)
-    missing += 1
+    console.log(`  − ${theme}: no source (keeping existing output if any)`)
     continue
   }
 
@@ -204,8 +236,7 @@ for (const [basename, candidates] of Object.entries(HERO_SOURCES)) {
   const input = resolveSourcePath(candidates)
   const output = path.join(HERO_OUT, `${basename}.webp`)
   if (!input) {
-    console.error(`  ✗ ${basename}: missing ${candidates.join(" or ")}`)
-    missing += 1
+    console.log(`  − ${basename}: no source (keeping existing output if any)`)
     continue
   }
 
@@ -225,8 +256,7 @@ for (const [basename, candidates] of Object.entries(FEATURE_SOURCES)) {
   const input = resolveSourcePath(candidates)
   const output = path.join(FEATURE_OUT, `${basename}.webp`)
   if (!input) {
-    console.error(`  ✗ ${basename}: missing ${candidates.join(" or ")}`)
-    missing += 1
+    console.log(`  − ${basename}: no source (keeping existing output if any)`)
     continue
   }
 
@@ -278,32 +308,13 @@ if (readmeHeroInput) {
   console.log("  − hero: no source (keeping existing output if any)")
 }
 
-console.log("\nSubclass card art → public/images/compendium/subclasses/")
-let subclassMissing = 0
-for (const slug of SUBCLASS_CARD_SLUGS) {
-  const input = resolveSourcePath([slug], SUBCLASS_CARD_SOURCES)
-  const output = path.join(SUBCLASS_CARD_OUT, `${slug}.png`)
-  if (!input) {
-    if (fs.existsSync(output)) {
-      console.log(`  − ${slug}: no source (keeping existing output)`)
-    } else {
-      console.error(`  ✗ ${slug}: missing source`)
-      subclassMissing += 1
-    }
-    continue
-  }
-
-  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
-    input,
-    output,
-    CARD_WIDTH,
-    CARD_HEIGHT,
-  )
-  console.log(
-    `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
-  )
-}
-if (subclassMissing > 0) missing += subclassMissing
+missing += await encodeCardBatch("Class card art", CLASS_CARD_SOURCES, CLASS_CARD_OUT)
+missing += await encodeCardBatch("Subclass card art", SUBCLASS_CARD_SOURCES, SUBCLASS_CARD_OUT)
+missing += await encodeCardBatch(
+  "Background card art",
+  BACKGROUND_CARD_SOURCES,
+  BACKGROUND_CARD_OUT,
+)
 
 if (missing > 0) {
   process.exitCode = 1
