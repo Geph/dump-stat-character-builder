@@ -8,8 +8,8 @@ import {
 } from "@/lib/builder/picker-pagination"
 
 describe("getSpellPickerPageSize", () => {
-  it("shows 6 spells on narrow phone grids", () => {
-    expect(getSpellPickerPageSize(false)).toBe(6)
+  it("shows 8 spells on narrow phone grids", () => {
+    expect(getSpellPickerPageSize(false)).toBe(8)
   })
 
   it("shows 12 spells on sm+ grids", () => {

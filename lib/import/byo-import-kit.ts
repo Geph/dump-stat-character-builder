@@ -67,6 +67,7 @@ const JSON_OUTPUT_RULES = `Output format (required)
 
 If the source does not fit this content type / schema (whole book, multi-class PDF, spell chapter inside a class pass, etc.), do NOT invent JSON — reply in plain language telling the user how to split or re-scope the upload.
 Otherwise return ONLY valid JSON — no markdown fences, no commentary before or after.
+Escape newlines inside strings as \\n (never put a raw line break between quotes — that makes JSON.parse fail).
 Use null for optional fields you do not have data for.
 Omit top-level arrays for content types not present (or set them to null); use [] only when the source contains that type but yields zero valid entries.
 Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import from description phrasing (and optional mechanics[]) on features, traits, feats, equipment, and abilities.

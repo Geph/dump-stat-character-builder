@@ -5,7 +5,7 @@ import {
   type AiImportContent,
 } from "@/lib/import/import-content-ai-schema"
 import { combineImportContents } from "@/lib/import/merge-import-content"
-import { stripLlmJsonText } from "@/lib/import/strip-llm-json"
+import { repairLlmJsonText, stripLlmJsonText } from "@/lib/import/strip-llm-json"
 
 const IMPORT_CONTENT_KEYS = [
   "species",
@@ -84,21 +84,73 @@ function parseImportContentArray(parsed: unknown[]): ImportContent | null {
   return parts.length === 1 ? parts[0] : combineImportContents(parts)
 }
 
-/** Parse BYO / LLM structured JSON into ImportContent for the import pipeline. */
-export function parseImportContentJson(raw: string): ImportContent | null {
-  const trimmedText = stripLlmJsonText(raw)
-  let parsed: unknown
+function tryJsonParse(text: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
-    parsed = JSON.parse(trimmedText)
-  } catch {
-    return null
+    return { ok: true, value: JSON.parse(text) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, error: message }
   }
+}
 
+function contentFromParsed(parsed: unknown): ImportContent | null {
   const candidate = unwrapImportJsonCandidate(parsed)
   if (Array.isArray(parsed)) {
     return parseImportContentArray(parsed)
   }
   return parseSingleImportContent(candidate)
+}
+
+export type ParseImportContentJsonResult =
+  | { ok: true; content: ImportContent }
+  | { ok: false; error: string }
+
+/**
+ * Parse BYO / LLM structured JSON with a human-readable failure reason.
+ * Repairs common Gemini paste issues (raw newlines in strings, trailing commas).
+ */
+export function parseImportContentJsonDetailed(raw: string): ParseImportContentJsonResult {
+  const stripped = stripLlmJsonText(raw)
+  if (!stripped) {
+    return { ok: false, error: "Paste is empty after removing markdown fences / prose." }
+  }
+
+  const candidates = [stripped, repairLlmJsonText(stripped)]
+  // Dedupe if repair is a no-op
+  const unique = candidates[0] === candidates[1] ? [candidates[0]!] : candidates
+
+  let lastParseError: string | null = null
+  for (const text of unique) {
+    const parsed = tryJsonParse(text)
+    if (!parsed.ok) {
+      lastParseError = parsed.error
+      continue
+    }
+    const content = contentFromParsed(parsed.value)
+    if (content) return { ok: true, content }
+    return {
+      ok: false,
+      error:
+        "JSON parsed, but it is not Dump Stat import-content (expected classes, spells, feats, etc.).",
+    }
+  }
+
+  const hint = lastParseError?.includes("Bad control character")
+    ? " Tip: LLMs often insert raw line breaks inside quoted text — re-copy, or ask the model to escape newlines as \\n."
+    : lastParseError?.includes("Unexpected end") || lastParseError?.includes("Unterminated")
+      ? " Tip: the paste may be truncated — ask the model for a complete JSON object, or split class vs spells into separate imports."
+      : ""
+
+  return {
+    ok: false,
+    error: `Could not parse import JSON${lastParseError ? ` (${lastParseError})` : ""}.${hint}`,
+  }
+}
+
+/** Parse BYO / LLM structured JSON into ImportContent for the import pipeline. */
+export function parseImportContentJson(raw: string): ImportContent | null {
+  const result = parseImportContentJsonDetailed(raw)
+  return result.ok ? result.content : null
 }
 
 export function looksLikeImportContentJson(raw: string): boolean {

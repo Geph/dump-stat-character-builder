@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { GameIcon } from "@/components/game-icon-picker"
 import { compendiumCardHeroImageClass } from "@/lib/compendium/card-image"
 import { resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
+import { getDenseSpellPickerSchoolClass } from "@/lib/builder/picker-pagination"
 import {
   compendiumAccentColorStyles,
   type CompendiumThemeColorId,
@@ -168,7 +169,7 @@ export function BuilderSpellCompactPick({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{spell.name}</p>
-        <p className="text-xs text-muted-foreground">{spell.school}</p>
+        <p className={getDenseSpellPickerSchoolClass()}>{spell.school}</p>
       </div>
       <button
         type="button"

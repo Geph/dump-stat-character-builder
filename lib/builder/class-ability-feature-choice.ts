@@ -10,20 +10,39 @@ export const CLASS_ABILITY_FEAT_CATEGORIES = new Set([
   "Planar Pact",
 ])
 
-/** Proficiency-style choice categories that stay on Class & Level. */
+/** Proficiency-style class/subclass feature choices shown on Class Abilities. */
 export function isProficiencyStyleChoice(feature: Feature): boolean {
   const category = `${feature.choices?.category ?? ""} ${feature.name}`.toLowerCase()
   return /\b(skill|tool|language|instrument|artisan|musical|proficienc)/i.test(category)
 }
 
 /**
- * Feature choices that are custom class ability pools (talents, knacks, disciplines,
- * weapon mastery, exploits, etc.) — not skill/tool picks.
+ * These presets model proficiencies chosen when entering the class, even though
+ * their source key is an ordinary class feature. Keep them beside base class
+ * skill and multiclass proficiency choices.
  */
-export function isClassAbilityFeatureChoice(feature: Feature): boolean {
+export function proficiencyFeatureStaysOnClassStep(
+  className: string | undefined,
+  feature: Feature,
+): boolean {
+  const owner = className?.trim().toLowerCase()
+  const name = feature.name.trim().toLowerCase()
+  return (
+    (owner === "bard" && name === "bardic inspiration") ||
+    (owner === "monk" && name === "martial arts") ||
+    (owner === "artificer" && name === "tool proficiencies")
+  )
+}
+
+/**
+ * Feature choices shown on Class Abilities: custom ability pools, weapon mastery,
+ * and feature-granted skill/tool/language choices. Starting-class proficiency
+ * exceptions remain on Class & Level.
+ */
+export function isClassAbilityFeatureChoice(feature: Feature, className?: string): boolean {
+  if (proficiencyFeatureStaysOnClassStep(className, feature)) return false
   if (!feature.isChoice || !feature.choices) return false
   if (feature.choices.optionsSource) return true
   if (isWeaponMasteryFeature(feature)) return true
-  if (isProficiencyStyleChoice(feature)) return false
   return (feature.choices.options?.length ?? 0) > 0
 }

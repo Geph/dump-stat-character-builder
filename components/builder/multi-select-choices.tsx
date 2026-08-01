@@ -151,7 +151,8 @@ export function MultiSelectChoices({
   customPlaceholder = "Add a custom entry...",
   skillIconByName = {},
 }: MultiSelectChoicesProps) {
-  const unavailable = new Set(unavailableOptions)
+  const unavailableKeys = new Set(unavailableOptions.map(normalizeKey).filter(Boolean))
+  const isUnavailableName = (name: string) => unavailableKeys.has(normalizeKey(name))
   const lockedKeys = new Set(lockedOptions.map(normalizeKey).filter(Boolean))
   const isLockedName = (name: string) => lockedKeys.has(normalizeKey(name))
   const compact = layout === "compact"
@@ -235,13 +236,20 @@ export function MultiSelectChoices({
       emitChange(freeSelected.filter((entry) => entry !== name))
       return
     }
-    if (unavailable.has(name) || freeSelected.length >= maxCount) return
+    if (isUnavailableName(name) || freeSelected.length >= maxCount) return
     emitChange([...freeSelected, name])
   }
 
   const addCustom = () => {
     const trimmed = customDraft.trim()
-    if (!trimmed || freeSelected.includes(trimmed) || freeSelected.length >= maxCount) return
+    if (
+      !trimmed ||
+      freeSelected.some((entry) => normalizeKey(entry) === normalizeKey(trimmed)) ||
+      isUnavailableName(trimmed) ||
+      freeSelected.length >= maxCount
+    ) {
+      return
+    }
     emitChange([...freeSelected, trimmed])
     setCustomDraft("")
   }
@@ -256,7 +264,7 @@ export function MultiSelectChoices({
   const renderOption = (option: ChoiceOption) => {
     const locked = isLockedName(option.name)
     const isSelected = locked || freeSelected.includes(option.name)
-    const isTakenElsewhere = !isSelected && unavailable.has(option.name)
+    const isTakenElsewhere = !isSelected && isUnavailableName(option.name)
     const isDisabled =
       locked || isTakenElsewhere || (!isSelected && freeSelected.length >= maxCount)
     const description = optionInfoText(option, showSkillInfoButtons)

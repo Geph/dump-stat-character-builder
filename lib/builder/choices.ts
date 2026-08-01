@@ -159,7 +159,7 @@ export function collectClassStepBlockers(
     for (const feature of cls.features ?? []) {
       if (feature.level > entry.level || !feature.isChoice || !feature.choices) continue
       // Custom ability pools (talents, knacks, metamagic-style lists) validate on Class Abilities.
-      if (isClassAbilityFeatureChoice(feature)) continue
+      if (isClassAbilityFeatureChoice(feature, cls.name)) continue
       const hasStaticOptions = (feature.choices.options?.length ?? 0) > 0
       const hasOptionsSource = Boolean(feature.choices.optionsSource)
       if (!hasStaticOptions && !hasOptionsSource) continue

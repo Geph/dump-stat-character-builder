@@ -63,6 +63,7 @@ type ClassAbilitiesStepProps = {
     skillIconByName?: Record<string, string>
     proficientSkills?: string[]
     proficientTools?: string[]
+    knownLanguages?: string[]
     existingExpertiseSkills?: string[]
   }
   classCatalogFeatGroups: CatalogFeatPickGroup[]
@@ -155,17 +156,21 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
         <h2 className="text-2xl font-black text-foreground mb-2">Class Abilities</h2>
         <p className={`${pageFloatingHintClass} mb-3`}>
           Pick class-specific ability pools — Metamagic, Eldritch Invocations, Fighting Styles,
-          disciplines, talents, knacks, exploits, and similar options.
+          disciplines, talents, knacks, exploits, and feature-granted skill, language, or tool
+          choices.
         </p>
       </div>
 
       {[...groupedByClass.entries()].map(([classId, entries]) => {
         const className = entries[0]?.className ?? "Class"
+        const choiceEntries = entries.filter(
+          (entry) => entry.feature.isChoice && entry.feature.choices,
+        )
         return (
           <div key={classId} className="space-y-3 border-t border-border pt-4">
             <h3 className="text-lg font-bold text-foreground">{className}</h3>
             <ClassAbilityFeatureChoices
-              entries={entries}
+              entries={choiceEntries}
               customAbilities={customAbilities}
               featureChoicePicks={featureChoicePicks}
               equipment={equipment}
@@ -173,6 +178,8 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
               grantedCustomAbilityNames={grantedCustomAbilityNames}
               additionalChoicePicks={featChoicePicks}
               skillPickSources={skillPickSources}
+              knownLanguages={modifierExpertisePickerProps.knownLanguages}
+              proficientTools={modifierExpertisePickerProps.proficientTools}
               skillPickerLayout={skillPickerLayout}
               compactPickerLayout={compactPickerLayout}
               customSkillIconByName={customSkillIconByName}

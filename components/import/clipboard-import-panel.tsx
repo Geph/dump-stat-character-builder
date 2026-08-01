@@ -240,15 +240,17 @@ export function ClipboardImportPanel({
               />
             ) : null}
             {contentType === "classes" ? (
-              <div className="inline-flex items-center gap-1 max-w-md text-sm text-muted-foreground">
-                <label className="inline-flex items-center gap-2">
+              <div className="inline-flex min-w-0 max-w-md items-start gap-1 text-sm text-muted-foreground">
+                <label className="inline-flex min-w-0 items-start gap-2">
                   <input
                     type="checkbox"
                     checked={preferSameSourceReplacements}
                     onChange={(event) => onPreferSameSourceReplacementsChange(event.target.checked)}
-                    className="rounded border-border text-lime focus:ring-lime"
+                    className="mt-0.5 rounded border-border text-lime focus:ring-lime"
                   />
-                  <span>Has replacements for other SRD content, such as spells or feats</span>
+                  <span className="min-w-0 text-pretty">
+                    Has replacements for other SRD content, such as spells or feats
+                  </span>
                 </label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -267,7 +269,7 @@ export function ClipboardImportPanel({
                 </Tooltip>
               </div>
             ) : null}
-            <div className="flex items-center gap-2 flex-1 min-w-[min(100%,18rem)]">
+            <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:min-w-[min(100%,18rem)]">
               <label
                 htmlFor="import-material-source"
                 className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground shrink-0"

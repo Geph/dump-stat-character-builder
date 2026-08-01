@@ -26,8 +26,8 @@ export const BUILDER_STEP_IDS = {
  */
 export const BUILDER_STEPS = [
   { id: BUILDER_STEP_IDS.CLASS, order: 1, label: "Class & Level", icon: Shield },
-  { id: BUILDER_STEP_IDS.CLASS_ABILITIES, order: 2, label: "Class Abilities", icon: Layers },
-  { id: BUILDER_STEP_IDS.ORIGIN, order: 3, label: "Origin", icon: Users },
+  { id: BUILDER_STEP_IDS.ORIGIN, order: 2, label: "Origin", icon: Users },
+  { id: BUILDER_STEP_IDS.CLASS_ABILITIES, order: 3, label: "Class Abilities", icon: Layers },
   { id: BUILDER_STEP_IDS.ABILITIES, order: 4, label: "Abilities", icon: Dices },
   { id: BUILDER_STEP_IDS.GEAR, order: 5, label: "Gear", icon: Package },
   { id: BUILDER_STEP_IDS.SPELLS, order: 6, label: "Spells", icon: Sparkles },

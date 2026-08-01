@@ -115,7 +115,8 @@ export function StartingEquipmentPackagePicker({
             >
               <div
                 className={cn(
-                  "relative w-1/2 shrink-0 self-stretch overflow-hidden bg-muted/20",
+                  // Phone swipe: half; medium single-col: one-third; lg 2-col cards: half again.
+                  "relative w-1/2 shrink-0 self-stretch overflow-hidden bg-muted/20 sm:w-1/3 lg:w-1/2",
                   side === "right" ? "order-2" : "order-1",
                 )}
                 aria-hidden
@@ -133,7 +134,7 @@ export function StartingEquipmentPackagePicker({
 
               <div
                 className={cn(
-                  "flex min-w-0 w-1/2 flex-col justify-center gap-2 p-4",
+                  "flex min-w-0 w-1/2 flex-col justify-center gap-2 p-4 sm:w-2/3 lg:w-1/2",
                   side === "right" ? "order-1" : "order-2",
                 )}
               >

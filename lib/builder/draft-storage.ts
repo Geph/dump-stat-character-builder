@@ -21,8 +21,30 @@ export function normalizeBuilderStepId(step: number): number {
   return step >= 1 ? step : 1
 }
 
+/**
+ * Draft v1 used Class Abilities as display step 2 and Origin as display step 3.
+ * v2 swaps those steps, so migrate by workflow position rather than silently
+ * making a previously reached step inaccessible.
+ */
+export function migrateBuilderCurrentStepForVersion(step: number, version: number): number {
+  const normalized = normalizeBuilderStepId(step)
+  if (version !== 1) return normalized
+  // A v1 draft parked on old step 2 should now complete Origin first.
+  if (normalized === 8) return 2
+  return normalized
+}
+
+export function migrateBuilderMaxStepForVersion(step: number, version: number): number {
+  const normalized = normalizeBuilderStepId(step)
+  if (version !== 1) return normalized
+  // Preserve the furthest display position reached under the old ordering.
+  if (normalized === 8) return 2
+  if (normalized === 2) return 8
+  return normalized
+}
+
 export type BuilderDraftSnapshot = {
-  version: 1
+  version: 1 | 2
   savedAt: string
   currentStep: number
   maxStepReached: number
@@ -93,13 +115,13 @@ export function loadBuilderDraft(): BuilderDraftSnapshot | null {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as BuilderDraftSnapshot
-    if (parsed.version !== 1 || !parsed.character) return null
+    if ((parsed.version !== 1 && parsed.version !== 2) || !parsed.character) return null
     const classLevels = normalizeDraftClassLevels(parsed)
     return {
       ...parsed,
       classLevels,
-      currentStep: normalizeBuilderStepId(parsed.currentStep),
-      maxStepReached: normalizeBuilderStepId(parsed.maxStepReached),
+      currentStep: migrateBuilderCurrentStepForVersion(parsed.currentStep, parsed.version),
+      maxStepReached: migrateBuilderMaxStepForVersion(parsed.maxStepReached, parsed.version),
       classAddOrder:
         Array.isArray(parsed.classAddOrder) && parsed.classAddOrder.length > 0
           ? parsed.classAddOrder
@@ -117,7 +139,7 @@ export function saveBuilderDraft(snapshot: Omit<BuilderDraftSnapshot, "version" 
   if (!isBrowser()) return
   try {
     const payload: BuilderDraftSnapshot = {
-      version: 1,
+      version: 2,
       savedAt: new Date().toISOString(),
       ...snapshot,
     }

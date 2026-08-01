@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
+  migrateBuilderCurrentStepForVersion,
+  migrateBuilderMaxStepForVersion,
   normalizeDraftClassLevels,
   normalizeBuilderStepId,
   type BuilderDraftSnapshot,
@@ -36,5 +38,22 @@ describe("normalizeBuilderStepId", () => {
 
   it("preserves Class Abilities step id 8", () => {
     expect(normalizeBuilderStepId(8)).toBe(8)
+  })
+})
+
+describe("builder step-order draft migration", () => {
+  it("moves a v1 draft parked on old Class Abilities to Origin first", () => {
+    expect(migrateBuilderCurrentStepForVersion(8, 1)).toBe(2)
+    expect(migrateBuilderCurrentStepForVersion(2, 1)).toBe(2)
+  })
+
+  it("preserves the furthest v1 workflow position reached", () => {
+    expect(migrateBuilderMaxStepForVersion(8, 1)).toBe(2)
+    expect(migrateBuilderMaxStepForVersion(2, 1)).toBe(8)
+  })
+
+  it("preserves semantic step ids for v2 drafts", () => {
+    expect(migrateBuilderCurrentStepForVersion(8, 2)).toBe(8)
+    expect(migrateBuilderMaxStepForVersion(2, 2)).toBe(2)
   })
 })

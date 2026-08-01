@@ -260,6 +260,7 @@ import { generateRandomCharacterDetails } from "@/lib/builder/random-character-d
 import {
   getCinematicPickerContainerClass,
   getCinematicSpellPickerContainerClass,
+  getDenseSpellPickerGridClass,
   paginateList,
 } from "@/lib/builder/picker-pagination"
 import { resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
@@ -1700,6 +1701,12 @@ export default function BuilderPageClient() {
         ).tools,
       ]),
     ],
+    knownLanguages: [
+      ...new Set([
+        ...(character.languages ?? []),
+        ...aggregatedCharacteristics.languages,
+      ]),
+    ],
     existingExpertiseSkills: aggregatedCharacteristics.skillExpertise,
     choiceLayout: compactPickerLayout,
     skillPickerLayout,
@@ -2189,7 +2196,8 @@ export default function BuilderPageClient() {
       }
 
       clearBuilderDraft()
-      router.push(characterSheetHref(savedRow.id))
+      // Hard navigate so we always leave the builder after a successful save.
+      window.location.assign(`${characterSheetHref(savedRow.id)}&saved=1`)
     } catch (err) {
       console.error("Error saving character:", err)
       alert(err instanceof Error ? err.message : "Failed to save character. Please try again.")
@@ -2227,8 +2235,9 @@ export default function BuilderPageClient() {
         classes,
         subclasses,
         subclassByClassId,
+        modifierPlayerChoiceSlots,
       }),
-    [activeClassLevels, classes, subclasses, subclassByClassId],
+    [activeClassLevels, classes, subclasses, subclassByClassId, modifierPlayerChoiceSlots],
   )
   const classAbilityFeatureKeys = useMemo(
     () =>
@@ -2411,6 +2420,7 @@ export default function BuilderPageClient() {
             subclassByClassId,
             featureChoicePicks,
             featPickSlots,
+            modifierPlayerChoiceSlots,
           }).length === 0 &&
           validateFeatModifierChoices(
             feats,
@@ -2518,6 +2528,7 @@ export default function BuilderPageClient() {
             subclassByClassId,
             featureChoicePicks,
             featPickSlots,
+            modifierPlayerChoiceSlots,
           }),
         )
         blockers.push(
@@ -2625,6 +2636,7 @@ export default function BuilderPageClient() {
     subclasses,
     classSkillPicks,
     subclassByClassId,
+    modifierPlayerChoiceSlots,
     featureChoicePicks,
     resolvedPrimaryClassId,
     activeClassAddOrder,
@@ -2673,6 +2685,20 @@ export default function BuilderPageClient() {
     activeClassLevels.length > 0 &&
     meetsMulticlassRequirements
 
+  const saveBlockers = useMemo(() => {
+    const blockers: string[] = []
+    if (character.name.trim().length === 0) {
+      blockers.push("Enter a character name on the Details step.")
+    }
+    if (activeClassLevels.length === 0) {
+      blockers.push("Choose at least one class.")
+    }
+    for (const issue of multiclassAbilityIssues) {
+      blockers.push(formatMulticlassAbilityIssue(issue))
+    }
+    return blockers
+  }, [character.name, activeClassLevels.length, multiclassAbilityIssues])
+
   const hasSpellStep = spellcastingClasses.length > 0
   const hasClassAbilityStep = characterHasClassAbilityStep({
     classLevels: activeClassLevels,
@@ -2681,6 +2707,7 @@ export default function BuilderPageClient() {
     subclassByClassId,
     featPickSlots,
     customAbilities,
+    modifierPlayerChoiceSlots,
   })
   const visibleSteps = BUILDER_STEPS.filter((step) => {
     if (step.id === BUILDER_STEP_IDS.SPELLS) return hasSpellStep
@@ -2739,7 +2766,7 @@ export default function BuilderPageClient() {
 
   useEffect(() => {
     if (currentStep === BUILDER_STEP_IDS.CLASS_ABILITIES && !hasClassAbilityStep) {
-      setCurrentStep(BUILDER_STEP_IDS.CLASS)
+      setCurrentStep(BUILDER_STEP_IDS.ORIGIN)
     }
   }, [currentStep, hasClassAbilityStep])
 
@@ -2925,11 +2952,15 @@ export default function BuilderPageClient() {
                   canProceed={canProceed()}
                   proceedBlockers={proceedBlockers}
                   canSave={canSaveCharacter()}
+                  saveBlockers={saveBlockers}
                   saving={saving}
                   onBack={goBackStep}
                   onContinue={advanceStep}
                   onSave={saveCharacter}
                   saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
+                  viewSheetHref={
+                    editingCharacterId ? characterSheetHref(editingCharacterId) : null
+                  }
                   lastStep={lastVisibleStepId}
                   compact={cardViewMode === "dense"}
                 />
@@ -2938,7 +2969,7 @@ export default function BuilderPageClient() {
 
             {editingCharacterId && (
               <p className={`${pageFloatingHintClass} mb-4 -mt-2`}>
-                Editing an existing character. Changes are saved when you click Save Character on the Details step.
+                Editing an existing character. Save to update, or open View Sheet anytime.
               </p>
             )}
 
@@ -3202,7 +3233,7 @@ export default function BuilderPageClient() {
                           feature.level <= entry.level &&
                           feature.isChoice &&
                           feature.choices &&
-                          !isClassAbilityFeatureChoice(feature) &&
+                          !isClassAbilityFeatureChoice(feature, cls.name) &&
                           !classAbilityFeatureKeys.has(
                             featureChoiceKey(entry.classId, feature.name, feature.level),
                           ) &&
@@ -3523,7 +3554,10 @@ export default function BuilderPageClient() {
                               .filter(
                                 (feature) =>
                                   feature.level <= entry.level &&
-                                  !isClassAbilityFeatureChoice(feature) &&
+                                  !isClassAbilityFeatureChoice(feature, cls.name) &&
+                                  !classAbilityFeatureKeys.has(
+                                    featureChoiceKey(entry.classId, feature.name, feature.level),
+                                  ) &&
                                   !eligibleKeys.has(
                                     featureChoiceKey(entry.classId, feature.name, feature.level),
                                   ),
@@ -5364,7 +5398,7 @@ export default function BuilderPageClient() {
                                 className={
                                   cardViewMode === "cinematic"
                                     ? getCinematicSpellPickerContainerClass()
-                                    : "grid grid-cols-2 md:grid-cols-3 gap-2"
+                                    : getDenseSpellPickerGridClass()
                                 }
                               >
                                     {spellsToShow.map((spell) => {
@@ -5635,11 +5669,15 @@ export default function BuilderPageClient() {
                 canProceed={canProceed()}
                 proceedBlockers={proceedBlockers}
                 canSave={canSaveCharacter()}
+                saveBlockers={saveBlockers}
                 saving={saving}
                 onBack={goBackStep}
                 onContinue={advanceStep}
                 onSave={saveCharacter}
                 saveLabel={editingCharacterId ? "Save Character" : "Create Character"}
+                viewSheetHref={
+                  editingCharacterId ? characterSheetHref(editingCharacterId) : null
+                }
                 lastStep={lastVisibleStepId}
                 compact={cardViewMode === "dense"}
               />

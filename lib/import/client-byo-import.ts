@@ -9,7 +9,7 @@ import type {
   ImportRenameMap,
 } from "@/lib/import/import-collisions"
 import { normalizeImportMaterialSource } from "@/lib/import/import-material-source"
-import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
+import { parseImportContentJsonDetailed } from "@/lib/import/parse-import-content-json"
 import {
   finalizeImportWithPersist,
   prepareImportedContent,
@@ -18,9 +18,6 @@ import type { ImportProposalSelections, ImportProposalSet } from "@/lib/import/i
 import type { ImportStage } from "@/lib/import/import-staging"
 import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
 import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
-
-const BYO_JSON_PARSE_ERROR =
-  "Could not parse import JSON. Paste valid Dump Stat import-content JSON from the BYO workflow (see the prompt template)."
 
 export type ClientByoImportReviewResult = {
   needsConfirmation: true
@@ -49,10 +46,11 @@ export async function runClientByoJsonImport(
   persistOptions?: import("@/lib/import/persist-import-options").PersistImportOptions,
 ): Promise<ClientByoImportResult> {
   const trimmed = text.trim()
-  const content = parseImportContentJson(trimmed)
-  if (!content) {
-    throw new Error(BYO_JSON_PARSE_ERROR)
+  const parsed = parseImportContentJsonDetailed(trimmed)
+  if (!parsed.ok) {
+    throw new Error(parsed.error)
   }
+  const content = parsed.content
 
   const multiClassBlock = getMultipleClassImportBlock(content, "text")
   if (multiClassBlock) {

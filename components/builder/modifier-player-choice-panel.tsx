@@ -44,6 +44,8 @@ type ModifierPlayerChoicePanelProps = {
   proficientSkills?: string[]
   /** Tools the character is already proficient in (for Expertise skill-or-tool pickers). */
   proficientTools?: string[]
+  /** Languages the character already knows (hidden from language pickers). */
+  knownLanguages?: string[]
   /** Skills that already have Expertise from earlier features. */
   existingExpertiseSkills?: string[]
 }
@@ -180,6 +182,7 @@ export function ModifierPlayerChoicePanel({
   skillIconByName = {},
   proficientSkills = [],
   proficientTools = [],
+  knownLanguages = [],
   existingExpertiseSkills = [],
 }: ModifierPlayerChoicePanelProps) {
   const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
@@ -247,6 +250,7 @@ export function ModifierPlayerChoicePanel({
             slot.toolChoicePool === "musical" ||
             slot.toolChoicePool === "gaming")
         const currentSelection = picks[slot.slotKey] ?? []
+        const isLanguageKind = slot.kind === "language"
         const displayOptions = slot.grantsExpertise
           ? optionsForExpertiseSlot(slot, {
               proficientSkills,
@@ -254,10 +258,11 @@ export function ModifierPlayerChoicePanel({
               existingExpertiseSkills,
               currentSelection,
             })
-          : isSkillKind
+          : isSkillKind || isLanguageKind
             ? optionsForProficiencyGrantSlot(slot, {
                 proficientSkills,
                 proficientTools,
+                knownLanguages,
                 currentSelection,
               })
             : (slot.options ?? [])
@@ -317,9 +322,17 @@ export function ModifierPlayerChoicePanel({
                   : choiceLayout
             }
             skillIconByName={isSkillKind ? skillIconByName : undefined}
-            unavailableOptions={isSkillKind && !slot.grantsExpertise ? unavailableOptions : []}
+            unavailableOptions={
+              slot.grantsExpertise
+                ? []
+                : isSkillKind
+                  ? unavailableOptions
+                  : isLanguageKind
+                    ? knownLanguages
+                    : []
+            }
             allowCustom={slot.allowCustom ?? false}
-            customPlaceholder={slot.kind === "language" ? "Add a custom language..." : undefined}
+            customPlaceholder={isLanguageKind ? "Add a custom language..." : undefined}
           />
         )
       })}

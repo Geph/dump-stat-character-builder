@@ -964,6 +964,8 @@ export function optionsForProficiencyGrantSlot(
   params: {
     proficientSkills: string[]
     proficientTools?: string[]
+    /** Languages already known from any source (species, background, features, etc.). */
+    knownLanguages?: string[]
     currentSelection?: string[]
   },
 ): { name: string; description?: string }[] {
@@ -972,8 +974,21 @@ export function optionsForProficiencyGrantSlot(
   const {
     proficientSkills,
     proficientTools = [],
+    knownLanguages = [],
     currentSelection = [],
   } = params
+
+  if (slot.kind === "language") {
+    const knownSet = new Set(knownLanguages.map((name) => name.trim().toLowerCase()).filter(Boolean))
+    const keepSelected = new Set(
+      currentSelection.map((name) => name.trim().toLowerCase()).filter(Boolean),
+    )
+    return (slot.options ?? []).filter((option) => {
+      const key = option.name.trim().toLowerCase()
+      if (keepSelected.has(key)) return true
+      return !knownSet.has(key)
+    })
+  }
 
   const proficientSkillSet = new Set(proficientSkills)
   const proficientToolSet = new Set(proficientTools)

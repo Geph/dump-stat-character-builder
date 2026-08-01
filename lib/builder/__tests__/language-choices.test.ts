@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   applyModifierPlayerPicks,
   modifierPlayerChoiceSlotKey,
+  optionsForProficiencyGrantSlot,
+  type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
@@ -71,5 +73,40 @@ describe("applyModifierPlayerPicks — languages", () => {
     }) as unknown as unknown as CharacteristicModifier[]
     const resolved = result[0] as CharacteristicModifier & { values: string[]; choiceCount?: number | null }
     expect(resolved.values).toEqual(["Common", "Elvish"])
+  })
+})
+
+describe("optionsForProficiencyGrantSlot — languages", () => {
+  const deftExplorerSlot: ModifierPlayerChoiceSlot = {
+    slotKey: "class:ranger:lang:language",
+    sourceKey: "class:ranger",
+    sourceLabel: "Ranger",
+    modId: "lang",
+    kind: "language",
+    label: "Deft Explorer language",
+    maxCount: 1,
+    options: languageOptionsForPool("standard").map((name) => ({ name })),
+    allowCustom: true,
+  }
+
+  it("hides languages the character already knows (e.g. from species)", () => {
+    const options = optionsForProficiencyGrantSlot(deftExplorerSlot, {
+      proficientSkills: [],
+      knownLanguages: ["Common", "Elvish", "Dwarvish"],
+    })
+    const names = options.map((option) => option.name)
+    expect(names).not.toContain("Common")
+    expect(names).not.toContain("Elvish")
+    expect(names).not.toContain("Dwarvish")
+    expect(names).toContain("Giant")
+  })
+
+  it("keeps the current selection visible even when already known", () => {
+    const options = optionsForProficiencyGrantSlot(deftExplorerSlot, {
+      proficientSkills: [],
+      knownLanguages: ["Common", "Elvish"],
+      currentSelection: ["elvish"],
+    })
+    expect(options.map((option) => option.name)).toContain("Elvish")
   })
 })

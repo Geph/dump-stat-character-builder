@@ -28,3 +28,85 @@ export function stripLlmJsonText(raw: string): string {
 
   return text
 }
+
+/**
+ * Repair common LLM JSON paste issues that break JSON.parse:
+ * - Raw newlines / tabs / control chars inside string literals
+ * - Curly “smart” double quotes used as delimiters
+ * - Trailing commas before `}` / `]`
+ *
+ * Safe on already-valid JSON (no-op for well-formed strings).
+ */
+export function repairLlmJsonText(text: string): string {
+  let out = ""
+  let inString = false
+  let escaped = false
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!
+
+    if (!inString) {
+      // Curly double quotes outside strings → straight delimiters
+      if (ch === "\u201c" || ch === "\u201d") {
+        out += '"'
+        inString = true
+        escaped = false
+        continue
+      }
+      if (ch === '"') {
+        out += ch
+        inString = true
+        escaped = false
+        continue
+      }
+      // Trailing commas: `,]` / `,}` / `,` + whitespace + closer
+      if (ch === ",") {
+        let j = i + 1
+        while (j < text.length && /\s/.test(text[j]!)) j++
+        const next = text[j]
+        if (next === "}" || next === "]") {
+          continue
+        }
+      }
+      out += ch
+      continue
+    }
+
+    // Inside a string
+    if (escaped) {
+      out += ch
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      out += ch
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      out += ch
+      inString = false
+      continue
+    }
+    if (ch === "\n") {
+      out += "\\n"
+      continue
+    }
+    if (ch === "\r") {
+      out += "\\r"
+      continue
+    }
+    if (ch === "\t") {
+      out += "\\t"
+      continue
+    }
+    const code = ch.charCodeAt(0)
+    if (code < 0x20) {
+      out += `\\u${code.toString(16).padStart(4, "0")}`
+      continue
+    }
+    out += ch
+  }
+
+  return out
+}

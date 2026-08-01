@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users } from "lucide-react"
+import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
@@ -32,6 +32,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -217,8 +223,8 @@ export default function CharactersPage() {
       <MainNav />
       
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
+        <div className="mb-8 flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-4xl font-black text-foreground mb-2">My Characters</h1>
             <p className={pageHeaderStatBadgeClass}>
               {loading
@@ -228,7 +234,7 @@ export default function CharactersPage() {
                   : `${characters.length} ${characters.length === 1 ? "character" : "characters"}`}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <input
               ref={importInputRef}
               type="file"
@@ -239,40 +245,87 @@ export default function CharactersPage() {
                 if (file) void handleImportFile(file)
               }}
             />
-            <button
-              type="button"
-              onClick={() => importInputRef.current?.click()}
-              disabled={importing}
-              className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors disabled:opacity-60"
-            >
-              <Download className="w-5 h-5" />
-              {importing ? "Importing…" : "Import JSON"}
-            </button>
-            {characters.length > 0 && (
+
+            {/* Compact actions — this width and below */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors 2xl:hidden"
+                  aria-label="Manage Characters"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                  Manage Characters
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  disabled={importing}
+                  onClick={() => importInputRef.current?.click()}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  {importing ? "Importing…" : "Import JSON"}
+                </DropdownMenuItem>
+                {characters.length > 0 ? (
+                  <DropdownMenuItem onClick={handleExportAll} className="gap-2 cursor-pointer">
+                    <Download className="w-4 h-4" />
+                    Download all
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem
+                  onClick={() => setPartiesOpen(true)}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Users className="w-4 h-4" />
+                  Adventuring Parties
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2 cursor-pointer">
+                  <Link href="/builder">
+                    <Plus className="w-4 h-4" />
+                    New Character
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Full action row — wide screens only */}
+            <div className="hidden items-center gap-2 2xl:flex">
               <button
                 type="button"
-                onClick={handleExportAll}
-                className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
+                onClick={() => importInputRef.current?.click()}
+                disabled={importing}
+                className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors disabled:opacity-60"
               >
                 <Upload className="w-5 h-5" />
-                Export all
+                {importing ? "Importing…" : "Import JSON"}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setPartiesOpen(true)}
-              className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
-            >
-              <Users className="w-5 h-5" />
-              Adventuring Parties
-            </button>
-            <Link
-              href="/builder"
-              className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              New Character
-            </Link>
+              {characters.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleExportAll}
+                  className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  Download all
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPartiesOpen(true)}
+                className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors"
+              >
+                <Users className="w-5 h-5" />
+                Adventuring Parties
+              </button>
+              <Link
+                href="/builder"
+                className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                New Character
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -465,7 +518,7 @@ export default function CharactersPage() {
                         type="button"
                         onClick={() => handleExportCharacter(character)}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Export character JSON"
+                        title="Download JSON"
                       >
                         <Download className="w-4 h-4" />
                       </button>

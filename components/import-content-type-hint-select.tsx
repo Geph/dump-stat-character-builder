@@ -15,12 +15,14 @@ export function ImportContentTypeHintSelect({
   label = "Type:",
 }: ImportContentTypeHintSelectProps) {
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">{label}</label>
+    <div className="flex min-w-0 max-w-full items-center gap-2">
+      <label className="shrink-0 whitespace-nowrap text-sm font-medium text-muted-foreground">
+        {label}
+      </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 ${focusRingClassName}`}
+        className={`min-w-0 w-full max-w-[min(100%,20rem)] truncate px-3 py-1.5 bg-muted rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 ${focusRingClassName}`}
       >
         {IMPORT_CONTENT_TYPE_HINTS.map((hint) => (
           <option key={hint.value} value={hint.value}>

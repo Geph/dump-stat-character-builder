@@ -22,6 +22,8 @@ type Props = {
   /** Extra picks (e.g. feat discipline picks) merged into known-discipline resolution. */
   additionalChoicePicks?: Record<string, string[]>
   skillPickSources: SkillPickSource[]
+  knownLanguages?: string[]
+  proficientTools?: string[]
   skillPickerLayout: "visual" | "compact" | "default"
   compactPickerLayout: "compact" | "default"
   customSkillIconByName?: Record<string, string>
@@ -93,6 +95,8 @@ export function ClassAbilityFeatureChoices({
   grantedCustomAbilityNames,
   additionalChoicePicks,
   skillPickSources,
+  knownLanguages = [],
+  proficientTools = [],
   skillPickerLayout,
   compactPickerLayout,
   customSkillIconByName,
@@ -160,6 +164,16 @@ export function ClassAbilityFeatureChoices({
           entry.source === "subclass" && subclassName
             ? `${className} (${subclassName})`
             : className
+        const proficiencyCategory = `${feature.choices?.category ?? ""} ${feature.name}`
+        const unavailableOptions = [
+          ...(/\bskill/i.test(proficiencyCategory)
+            ? getTakenSkills(skillPickSources, `feature:${key}`)
+            : []),
+          ...(/\b(language|tongue)\b/i.test(proficiencyCategory) ? knownLanguages : []),
+          ...(/\b(tool|instrument|artisan|musical)\b/i.test(proficiencyCategory)
+            ? proficientTools
+            : []),
+        ]
 
         const handleChange = (selected: string[]) => {
           if (isKnackPool) {
@@ -204,7 +218,7 @@ export function ClassAbilityFeatureChoices({
                 options={choiceOptions}
                 maxCount={choiceCount}
                 selected={featureChoicePicks[key] ?? []}
-                unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
+                unavailableOptions={unavailableOptions}
                 onChange={handleChange}
                 layout={cardViewMode === "cinematic" ? "visual" : "compact"}
                 masteryDescriptions={weaponMasteryDescriptions}
@@ -218,7 +232,7 @@ export function ClassAbilityFeatureChoices({
                 selected={featureChoicePicks[key] ?? []}
                 lockedOptions={lockedOptions}
                 lockedLabel="Granted by subclass"
-                unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
+                unavailableOptions={unavailableOptions}
                 showSkillInfo={feature.choices!.category.toLowerCase().includes("skill")}
                 showOptionInfo={!feature.choices!.category.toLowerCase().includes("skill")}
                 layout={

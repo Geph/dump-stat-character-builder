@@ -1,10 +1,19 @@
-import { featureChoiceKey, choiceCountMet } from "@/lib/builder/choices"
+import {
+  featureChoiceKey,
+  choiceCountMet,
+  resolveSubclassUnlockLevel,
+} from "@/lib/builder/choices"
 import {
   CLASS_ABILITY_FEAT_CATEGORIES,
   isClassAbilityFeatureChoice,
+  proficiencyFeatureStaysOnClassStep,
 } from "@/lib/builder/class-ability-feature-choice"
 import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
 import type { FeatPickSlot } from "@/lib/builder/class-feat-features"
+import type {
+  ModifierPlayerChoiceKind,
+  ModifierPlayerChoiceSlot,
+} from "@/lib/builder/modifier-player-choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import type { CustomAbility, DndClass, Feature, Subclass } from "@/lib/types"
@@ -29,12 +38,35 @@ export type ClassAbilityFeatureEntry = {
   subclassName?: string | null
 }
 
+const CLASS_ABILITY_PROFICIENCY_SLOT_KINDS = new Set<ModifierPlayerChoiceKind>([
+  "skill",
+  "tool",
+  "language",
+  "skill_or_tool",
+])
+
+/** Passive class/subclass features with player proficiency picks belong on Class Abilities. */
+export function featureHasClassAbilityModifierChoice(
+  classId: string,
+  feature: Feature,
+  slots: ModifierPlayerChoiceSlot[] = [],
+  className?: string,
+): boolean {
+  if (proficiencyFeatureStaysOnClassStep(className, feature)) return false
+  const sourceKey = featureChoiceKey(classId, feature.name, feature.level)
+  return slots.some(
+    (slot) =>
+      slot.sourceKey === sourceKey && CLASS_ABILITY_PROFICIENCY_SLOT_KINDS.has(slot.kind),
+  )
+}
+
 /** Collect class + subclass feature pools for the Class Abilities builder step. */
 export function collectClassAbilityFeatures(params: {
   classLevels: { classId: string; level: number }[]
   classes: DndClass[]
   subclasses?: Subclass[]
   subclassByClassId?: Record<string, string>
+  modifierPlayerChoiceSlots?: ModifierPlayerChoiceSlot[]
 }): ClassAbilityFeatureEntry[] {
   const entries: ClassAbilityFeatureEntry[] = []
   const subclasses = params.subclasses ?? []
@@ -46,7 +78,17 @@ export function collectClassAbilityFeatures(params: {
 
     for (const feature of cls.features ?? []) {
       if (feature.level > levelEntry.level) continue
-      if (!isClassAbilityFeatureChoice(feature)) continue
+      if (
+        !isClassAbilityFeatureChoice(feature, cls.name) &&
+        !featureHasClassAbilityModifierChoice(
+          levelEntry.classId,
+          feature,
+          params.modifierPlayerChoiceSlots,
+          cls.name,
+        )
+      ) {
+        continue
+      }
       entries.push({
         classId: levelEntry.classId,
         className: cls.name,
@@ -57,12 +99,21 @@ export function collectClassAbilityFeatures(params: {
     }
 
     const subclassId = subclassByClassId[levelEntry.classId]
-    if (!subclassId) continue
+    if (!subclassId || levelEntry.level < resolveSubclassUnlockLevel(cls)) continue
     const subclass = subclasses.find((row) => row.id === subclassId)
     if (!subclass) continue
     for (const feature of (subclass.features ?? []) as Feature[]) {
       if (feature.level > levelEntry.level) continue
-      if (!isClassAbilityFeatureChoice(feature)) continue
+      if (
+        !isClassAbilityFeatureChoice(feature) &&
+        !featureHasClassAbilityModifierChoice(
+          levelEntry.classId,
+          feature,
+          params.modifierPlayerChoiceSlots,
+        )
+      ) {
+        continue
+      }
       entries.push({
         classId: levelEntry.classId,
         className: cls.name,
@@ -84,6 +135,7 @@ export function hasClassAbilityStep(params: {
   subclassByClassId?: Record<string, string>
   featPickSlots?: FeatPickSlot[]
   customAbilities?: CustomAbility[]
+  modifierPlayerChoiceSlots?: ModifierPlayerChoiceSlot[]
 }): boolean {
   if (
     collectClassAbilityFeatures(params).length > 0 ||
@@ -111,6 +163,7 @@ export function collectClassAbilityStepBlockers(params: {
   subclassByClassId?: Record<string, string>
   featureChoicePicks: Record<string, string[]>
   featPickSlots?: FeatPickSlot[]
+  modifierPlayerChoiceSlots?: ModifierPlayerChoiceSlot[]
 }): string[] {
   const blockers: string[] = []
   for (const entry of collectClassAbilityFeatures(params)) {

@@ -14,7 +14,7 @@ import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-prev
 import { runWithBundledCardArtAssignment } from "@/lib/site-settings/app-presentation-mode"
 import { normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
-import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
+import { parseImportContentJsonDetailed } from "@/lib/import/parse-import-content-json"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
 import { validatePastedSourceTextLength } from "@/lib/import/import-source-limits"
@@ -126,17 +126,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (importMode === "byo-json" || importMode === "structured-json") {
-      const content = parseImportContentJson(trimmedText)
-      if (!content) {
-        return NextResponse.json(
-          {
-            error:
-              "Invalid import JSON. Paste the LLM output matching the template (classes, spells, feats, etc.).",
-          },
-          { status: 400 },
-        )
+      const parsed = parseImportContentJsonDetailed(trimmedText)
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 })
       }
-      return await runTextImportPipeline(content, {
+      return await runTextImportPipeline(parsed.content, {
         charLength: trimmedText.length,
         materialSource,
         preferSameSourceReplacements: Boolean(preferSameSourceReplacements),

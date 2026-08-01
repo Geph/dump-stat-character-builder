@@ -1,7 +1,10 @@
+import fs from "fs"
+import path from "path"
 import { describe, expect, it } from "vitest"
 import { enrichSrdSpellRow, resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
 import {
   BUNDLED_SPELL_CARD_IMAGE_NAMES,
+  BUNDLED_SPELL_CARD_IMAGES_BY_NAME,
   defaultSpellCardImageUrl,
   spellNameToCardImageSlug,
 } from "@/lib/compendium/spell-card-images-defaults"
@@ -16,6 +19,16 @@ describe("spell card image defaults", () => {
   it("exposes bundled art for every listed spell name", () => {
     for (const name of BUNDLED_SPELL_CARD_IMAGE_NAMES) {
       expect(defaultSpellCardImageUrl(name)).toMatch(/\/images\/compendium\/spells\//)
+    }
+  })
+
+  it("ships an image file for every mapped spell", () => {
+    const imagesDir = path.join(process.cwd(), "public/images/compendium/spells")
+    for (const [name, url] of Object.entries(BUNDLED_SPELL_CARD_IMAGES_BY_NAME)) {
+      const file = path.basename(url)
+      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
+        true,
+      )
     }
   })
 

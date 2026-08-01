@@ -9,6 +9,23 @@ export const SPELL_PICKER_MD_MIN_WIDTH = 768
 /** Matches Tailwind `sm` — phone-only layout tweaks stay below this width. */
 export const PICKER_SM_MIN_WIDTH = 640
 
+/**
+ * Dense spell grid: single column (name only) below this; two columns from here until `md`.
+ * Lower than `sm` so large phones / narrow panels keep 2-col before true pocket widths.
+ * Keep in sync with `getDenseSpellPickerGridClass` / compact school visibility classes.
+ */
+export const SPELL_PICKER_TWO_COL_MIN_WIDTH = 480
+
+/** Dense (non-cinematic) spell picks: 1 col on pocket phones, 2 from 480px, 3 from `md`. */
+export function getDenseSpellPickerGridClass(): string {
+  return "grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 gap-2"
+}
+
+/** Show spell school under the name once the dense grid is 2+ columns. */
+export function getDenseSpellPickerSchoolClass(): string {
+  return "hidden text-xs text-muted-foreground min-[480px]:block"
+}
+
 /** Default visible rows for paginated picker grids. */
 export const PICKER_GRID_ROWS = 3
 
@@ -29,9 +46,9 @@ export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean):
 export const MULTI_SELECT_CHOICE_PAGE_SIZE = 10
 
 
-/** Spell step: 12 on `sm`+ (3-col cinematic / denser grids), 6 on phones. */
+/** Spell step: 12 on `sm`+ (3-col cinematic / denser grids), 8 on phones. */
 export function getSpellPickerPageSize(isSmScreen: boolean): number {
-  return isSmScreen ? 12 : PICKER_GRID_ROWS * 2
+  return isSmScreen ? 12 : 8
 }
 
 /** Feat / feature spell grants on narrow phones — paginate long spell lists. */

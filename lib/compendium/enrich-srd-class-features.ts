@@ -3815,8 +3815,8 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   // —— Ranger ——
   "*::Deft Explorer": {
     linkedModifiers: [
-      skillChoice(2, "Deft Explorer Expertise", true),
-      languages([], 1, "Deft Explorer language"),
+      skillChoice(1, "Deft Explorer Expertise", true),
+      languages([], 2, "Deft Explorer languages"),
     ],
   },
   "*::Superior Hunter's Prey": {
