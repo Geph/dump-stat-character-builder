@@ -22,6 +22,9 @@ describe("subclass card images", () => {
     expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Knowing Mind"]).toMatch(
       /\/images\/compendium\/subclasses\/knowing-mind\.png$/,
     )
+    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Gadgetsmith).toMatch(
+      /\/images\/compendium\/subclasses\/gadgetsmith\.png$/,
+    )
   })
 
   it("ships an optimized image file for every mapped subclass", () => {

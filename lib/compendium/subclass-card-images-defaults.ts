@@ -4,8 +4,8 @@ const subclassCardImage = (slug: string) => withBasePath(`/images/compendium/sub
 
 /**
  * Default card art for subclasses — files live under public/images/compendium/subclasses/.
- * Covers 2024 PHB (+ some FRUA / Ravenloft extras), KibblesTasty Psion minds, and
- * Eberron: Forge of the Artificer.
+ * Covers 2024 PHB (+ some FRUA / Ravenloft extras), KibblesTasty Inventor / Psion,
+ * and Eberron: Forge of the Artificer.
  */
 export const SRD_SUBCLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   // Artificer (Forge of the Artificer)
@@ -15,6 +15,16 @@ export const SRD_SUBCLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Battle Smith": subclassCardImage("battle-smith"),
   Cartographer: subclassCardImage("cartographer"),
   Reanimator: subclassCardImage("reanimator"),
+
+  // Inventor (KibblesTasty)
+  Fleshsmith: subclassCardImage("fleshsmith"),
+  Gadgetsmith: subclassCardImage("gadgetsmith"),
+  Golemsmith: subclassCardImage("golemsmith"),
+  Infusionsmith: subclassCardImage("infusionsmith"),
+  Potionsmith: subclassCardImage("potionsmith"),
+  Runesmith: subclassCardImage("runesmith"),
+  Thundersmith: subclassCardImage("thundersmith"),
+  Warsmith: subclassCardImage("warsmith"),
 
   // Barbarian
   "Path of the Berserker": subclassCardImage("path-of-the-berserker"),
@@ -75,6 +85,7 @@ export const SRD_SUBCLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   // Rogue
   "Arcane Trickster": subclassCardImage("arcane-trickster"),
   Assassin: subclassCardImage("assassin"),
+  Gadgeteer: subclassCardImage("gadgeteer"),
   Phantom: subclassCardImage("phantom"),
   "Scion of the Three": subclassCardImage("scion-of-the-three"),
   Soulknife: subclassCardImage("soulknife"),

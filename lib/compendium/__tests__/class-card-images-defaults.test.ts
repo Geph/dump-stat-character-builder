@@ -12,6 +12,7 @@ const EXPECTED_CLASS_NAMES = [
   "Cleric",
   "Druid",
   "Fighter",
+  "Inventor",
   "Monk",
   "Paladin",
   "Psion",
@@ -55,7 +56,7 @@ describe("class card images", () => {
     expect(row.card_image_url).toMatch(/\/images\/compendium\/classes\/warlock\.png$/)
   })
 
-  it("applies bundled card art to non-SRD named imports (Psion / Artificer)", () => {
+  it("applies bundled card art to non-SRD named imports (Psion / Artificer / Inventor)", () => {
     type ClassRow = {
       name: string
       source: string
@@ -68,8 +69,12 @@ describe("class card images", () => {
     const [artificer] = enrichClassesList<ClassRow>([
       { name: "Artificer", source: "Eberron: Forge of the Artificer", features: [] },
     ])
+    const [inventor] = enrichClassesList<ClassRow>([
+      { name: "Inventor", source: "KibblesTasty Inventor", features: [] },
+    ])
     expect(psion.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Psion)
     expect(artificer.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Artificer)
+    expect(inventor.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Inventor)
   })
 
   it("preserves custom card art when already set", () => {

@@ -17,6 +17,10 @@ out/
 .DS_Store
 tsconfig.tsbuildinfo
 
+# Local package-manager caches / binaries (never commit)
+.pnpm-store/
+.tools/
+
 # SRD build cache (committed output is lib/srd/seed-data/)
 data/srd-source/
 data/*.pdf
@@ -39,6 +43,12 @@ scripts/subclass-card-sources/*
 scripts/background-card-sources/*
 !scripts/background-card-sources/README.md
 !scripts/background-card-sources/.gitkeep
+scripts/species-card-sources/*
+!scripts/species-card-sources/README.md
+!scripts/species-card-sources/.gitkeep
+scripts/spell-card-sources/*
+!scripts/spell-card-sources/README.md
+!scripts/spell-card-sources/.gitkeep
 # Local third-party / copyrighted import extracts (dev-only; never commit)
 lib/import/__tests__/fixtures/*eberron*
 lib/import/__tests__/fixtures/*homebrew*

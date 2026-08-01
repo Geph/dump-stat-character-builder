@@ -4,7 +4,7 @@ const classCardImage = (slug: string) => withBasePath(`/images/compendium/classe
 
 /**
  * Default card art for classes — files live under public/images/compendium/classes/.
- * Includes SRD / 2024 PHB plus Artificer (Forge of the Artificer) and KibblesTasty Psion.
+ * Includes SRD / 2024 PHB plus Artificer, KibblesTasty Inventor / Psion.
  */
 export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Artificer: classCardImage("artificer"),
@@ -13,6 +13,7 @@ export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Cleric: classCardImage("cleric"),
   Druid: classCardImage("druid"),
   Fighter: classCardImage("fighter"),
+  Inventor: classCardImage("inventor"),
   Monk: classCardImage("monk"),
   Paladin: classCardImage("paladin"),
   Psion: classCardImage("psion"),

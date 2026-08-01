@@ -10,6 +10,7 @@ Covered materials:
 
 - **2024 PHB** subclasses (plus a few FRUA / Ravenloft extras present in the source pack)
 - **KibblesTasty Psion** minds (`awakened-mind`, `unleashed-mind`, …)
+- **KibblesTasty Inventor** specializations (`gadgetsmith`, `warsmith`, `runesmith`, …)
 - **Eberron: Forge of the Artificer** (`alchemist`, `armorer`, `artillerist`, `battle-smith`, `cartographer`, `reanimator`)
 
 Output: `public/images/compendium/subclasses/*.png` at **771×1024** (same as class/species card art).

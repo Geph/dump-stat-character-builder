@@ -24,6 +24,14 @@ describe("background card images", () => {
     )
   })
 
+  it("prefers bundled art for newly staged Ravenloft / FRUA backgrounds", () => {
+    for (const name of ["Carouser", "Inquisitive", "Spirit Medium", "Vampire Devotee"]) {
+      expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME[name]).toMatch(
+        /\/images\/compendium\/backgrounds\//,
+      )
+    }
+  })
+
   it("ships an optimized image file for every bundled background path", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/backgrounds")
     for (const [name, url] of Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME)) {

@@ -52,10 +52,14 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Scribe: bundledBackgroundCardImage("scribe"),
   "Shadowmoor Expert": bundledBackgroundCardImage("shadowmoor-expert"),
   Soldier: bundledBackgroundCardImage("soldier"),
+  "Spirit Medium": bundledBackgroundCardImage("spirit-medium"),
+  "Vampire Devotee": bundledBackgroundCardImage("vampire-devotee"),
+  "Vampire Survivor": bundledBackgroundCardImage("vampire-survivor"),
   Wayfarer: bundledBackgroundCardImage("wayfarer"),
+  Carouser: bundledBackgroundCardImage("carouser"),
+  Inquisitive: bundledBackgroundCardImage("inquisitive"),
 
   // Hosted-only fallbacks (no bundled source yet)
-  Carouser: hostedBackgroundCardImage("Carouser.jpeg"),
   "Chondathan Freebooter": hostedBackgroundCardImage("Chondathan Freebooter.jpeg"),
   "Dead Magic Dweller": hostedBackgroundCardImage("Dead Magic Dweller.jpeg"),
   "Dragon Cultist": hostedBackgroundCardImage("Dragon Cultist.jpeg"),
@@ -64,7 +68,6 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Genie Touched": hostedBackgroundCardImage("Genie Touched.jpeg"),
   Harper: hostedBackgroundCardImage("Harper.jpeg"),
   "Ice Fisher": hostedBackgroundCardImage("Ice Fisher.jpeg"),
-  Inquisitive: hostedBackgroundCardImage("Inquisitive.jpeg"),
   "Knight of the Gauntlet": hostedBackgroundCardImage("Knight of the Gauntlet.jpeg"),
   "Lords' Alliance Vassal": hostedBackgroundCardImage("Lords' Alliance Vassal.jpeg"),
   "Lorwyn Expert": hostedBackgroundCardImage("Lorwyn Expert.jpeg"),
@@ -76,9 +79,6 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Rashemi Wanderer": hostedBackgroundCardImage("Rashemi Wanderer.jpeg"),
   "Shadowmasters Exile": hostedBackgroundCardImage("Shadowmasters Exile.jpeg"),
   "Spellfire Initiate": hostedBackgroundCardImage("Spellfire Initiate.jpeg"),
-  "Spirit Medium": hostedBackgroundCardImage("Spirit Medium.jpeg"),
-  "Vampire Devotee": hostedBackgroundCardImage("Vampire Devotee.jpeg"),
-  "Vampire Survivor": hostedBackgroundCardImage("Vampire Survivor.jpeg"),
   "Zhentarim Mercenary": hostedBackgroundCardImage("Zhentarim Mercenary.jpeg"),
 }
 

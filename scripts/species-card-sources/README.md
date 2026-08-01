@@ -1,0 +1,15 @@
+Drop **full-resolution** species card art here, then run:
+
+```bash
+pnpm images:optimize
+```
+
+Sources are matched by slug basename (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`).
+
+Examples: `elf`, `warforged`, `kalashtar`, `khoravar`.
+
+Output: `public/images/compendium/species/*.png` at **771×1024**.
+
+Wire display names → slugs in `lib/compendium/species-card-images-defaults.ts`.
+
+Source files here are gitignored — only the optimized outputs in `public/images/` are committed.

@@ -10,6 +10,7 @@ Sources are matched by slug basename (first extension wins among `.png` / `.jpg`
 |-------------|-------|
 | `barbarian` … `wizard` | 2024 PHB / SRD classes |
 | `artificer` | Eberron: Forge of the Artificer |
+| `inventor` | KibblesTasty Inventor |
 | `psion` | KibblesTasty Psion |
 
 Output: `public/images/compendium/classes/*.png` at **771×1024** (JPEG bytes under a `.png` extension).

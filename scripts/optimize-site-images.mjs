@@ -10,6 +10,10 @@ const SUBCLASS_CARD_SOURCES =
   process.env.SUBCLASS_CARD_SOURCES ?? path.join(ROOT, "scripts", "subclass-card-sources")
 const BACKGROUND_CARD_SOURCES =
   process.env.BACKGROUND_CARD_SOURCES ?? path.join(ROOT, "scripts", "background-card-sources")
+const SPECIES_CARD_SOURCES =
+  process.env.SPECIES_CARD_SOURCES ?? path.join(ROOT, "scripts", "species-card-sources")
+const SPELL_CARD_SOURCES =
+  process.env.SPELL_CARD_SOURCES ?? path.join(ROOT, "scripts", "spell-card-sources")
 const PAGE_BG_OUT = path.join(ROOT, "public", "images", "page-backgrounds")
 const HERO_OUT = path.join(ROOT, "public", "images", "hero")
 const FEATURE_OUT = path.join(ROOT, "public", "images", "features")
@@ -17,6 +21,8 @@ const SPLASH_OUT = path.join(ROOT, "public", "images", "welcome-splash")
 const CLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "classes")
 const SUBCLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "subclasses")
 const BACKGROUND_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "backgrounds")
+const SPECIES_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "species")
+const SPELL_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "spells")
 
 const WEBP_QUALITY = Number(process.env.SITE_IMAGE_QUALITY ?? 85)
 const CARD_JPEG_QUALITY = Number(process.env.CARD_JPEG_QUALITY ?? 82)
@@ -315,6 +321,8 @@ missing += await encodeCardBatch(
   BACKGROUND_CARD_SOURCES,
   BACKGROUND_CARD_OUT,
 )
+missing += await encodeCardBatch("Species card art", SPECIES_CARD_SOURCES, SPECIES_CARD_OUT)
+missing += await encodeCardBatch("Spell card art", SPELL_CARD_SOURCES, SPELL_CARD_OUT)
 
 if (missing > 0) {
   process.exitCode = 1
