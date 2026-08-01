@@ -9,6 +9,7 @@ import { defaultSpeciesCardImageUrl } from "@/lib/compendium/species-card-images
 import { defaultSpellCardImageUrl } from "@/lib/compendium/spell-card-images-defaults"
 import { defaultSubclassCardImageUrl } from "@/lib/compendium/subclass-card-images-defaults"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
+import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation-mode"
 import type { Equipment } from "@/lib/types"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 
@@ -64,6 +65,7 @@ export function defaultImportCardArtUrl(
   section: ImportCardArtSection,
   name: string,
 ): string | null {
+  if (!shouldAssignBundledCardArt()) return null
   const trimmed = name.trim()
   if (!trimmed) return null
   switch (section) {
@@ -121,6 +123,8 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
 
 /** Collect compendium rows eligible for optional card art during import review. */
 export function collectImportCardArtTargets(content: ImportContent): ImportCardArtTarget[] {
+  if (!shouldAssignBundledCardArt()) return []
+
   const targets: ImportCardArtTarget[] = []
 
   pushTargets(targets, "classes", content.classes)
@@ -177,6 +181,9 @@ export function applyImportCardArtUrls(
   content: ImportContent,
   urlMap: ImportCardArtUrlMap,
 ): ImportContent {
+  if (!shouldAssignBundledCardArt()) {
+    return stripImportContentCardArt(content)
+  }
   if (!Object.keys(urlMap).length) return content
 
   const withAbilities = content as ImportContentWithAbilities
@@ -198,6 +205,33 @@ export function applyImportCardArtUrls(
       "abilities",
       urlMap,
     )
+  }
+
+  return next
+}
+
+/** Drop all card art from import rows (Compact Only). */
+export function stripImportContentCardArt(content: ImportContent): ImportContent {
+  const clear = <T extends { card_image_url?: string | null }>(
+    rows: T[] | undefined,
+  ): T[] | undefined => {
+    if (!rows?.length) return rows
+    return rows.map((row) => ({ ...row, card_image_url: null }))
+  }
+
+  const withAbilities = content as ImportContentWithAbilities
+  const next: ImportContent = {
+    ...content,
+    classes: clear(content.classes),
+    subclasses: clear(content.subclasses),
+    species: clear(content.species),
+    backgrounds: clear(content.backgrounds),
+    spells: clear(content.spells),
+    equipment: clear(content.equipment),
+  }
+
+  if (withAbilities.abilities?.length) {
+    ;(next as ImportContentWithAbilities).abilities = clear(withAbilities.abilities)
   }
 
   return next

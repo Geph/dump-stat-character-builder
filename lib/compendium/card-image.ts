@@ -4,7 +4,7 @@ import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import { isCommonModifiersCatalogAbility } from "@/lib/compendium/modifier-catalog"
-import { areCompendiumImagesEnabled } from "@/lib/site-settings/app-presentation-mode"
+import { areCompendiumImagesEnabled, shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation-mode"
 import { getBuilderLayout } from "@/lib/site-settings/builder-layout"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -132,12 +132,19 @@ function isUpgradeableDefaultCardImage(url: string): boolean {
 /**
  * Keep true custom card art; otherwise apply defaults by item name for SRD-sourced rows.
  * Bundled `/images/compendium/…` paths and dumpstat hosts are treated as upgradeable defaults.
+ * Compact Only skips assigning bundled defaults (and clears upgradeable URLs).
  */
 export function applySrdCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
+  if (!shouldAssignBundledCardArt()) {
+    if (existing && isUpgradeableDefaultCardImage(existing)) {
+      return { ...row, card_image_url: null }
+    }
+    return existing ? { ...row, card_image_url: existing } : row
+  }
   const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
   if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }
@@ -159,12 +166,19 @@ export function applySrdCardImage(
  * Keep true custom card art; otherwise apply bundled defaults by item **name** (any source).
  * Source labels are ignored so Ravenloft/Planescape rows mis-tagged as PHB still match.
  * Dumpstat jeffginger.com URLs are never kept — replaced by a local default or cleared.
+ * Compact Only skips assigning bundled defaults (and clears upgradeable URLs).
  */
 export function applyBundledCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
+  if (!shouldAssignBundledCardArt()) {
+    if (existing && isUpgradeableDefaultCardImage(existing)) {
+      return { ...row, card_image_url: null }
+    }
+    return existing ? { ...row, card_image_url: existing } : row
+  }
   const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
   if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }

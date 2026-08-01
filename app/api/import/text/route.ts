@@ -11,6 +11,7 @@ import { parseFoundryInput } from "@/lib/import/parse-foundry-dnd5e"
 import { respondToFoundryParseResult } from "@/lib/import/foundry-import-route"
 import { finalizeImportedContent } from "@/lib/import/finalize-import"
 import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
+import { runWithBundledCardArtAssignment } from "@/lib/site-settings/app-presentation-mode"
 import { normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       materialSource,
       cardArtUrlMap,
       skippedPreviewKeys,
+      includeCardArt,
       customAbilityCategory,
       classResourceLabels,
       subclassMatchClassName,
@@ -67,23 +69,28 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      const assignCardArt = includeCardArt !== false
       const { totalImported, breakdown, warnings, report, discoveredSpellSchools } =
-        await finalizeImportedContent(
-        pendingContent,
-        {
-          classResourceIds: proposalSelections?.classResourceIds ?? [],
-          customAbilityIds: proposalSelections?.customAbilityIds ?? [],
-        },
-        normalizeImportMaterialSource(materialSource, "Custom"),
-        renameMap ?? {},
-        (collisions ?? []) as import("@/lib/import/import-collisions").ImportCollision[],
-        collisionResolutionMap ?? {},
-        (cardArtUrlMap ?? {}) as import("@/lib/import/import-card-art").ImportCardArtUrlMap,
-        {
-          preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
-        },
-        previewSkipKeys,
-      )
+        await runWithBundledCardArtAssignment(assignCardArt, () =>
+          finalizeImportedContent(
+            pendingContent,
+            {
+              classResourceIds: proposalSelections?.classResourceIds ?? [],
+              customAbilityIds: proposalSelections?.customAbilityIds ?? [],
+            },
+            normalizeImportMaterialSource(materialSource, "Custom"),
+            renameMap ?? {},
+            (collisions ?? []) as import("@/lib/import/import-collisions").ImportCollision[],
+            collisionResolutionMap ?? {},
+            assignCardArt
+              ? ((cardArtUrlMap ?? {}) as import("@/lib/import/import-card-art").ImportCardArtUrlMap)
+              : {},
+            {
+              preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
+            },
+            previewSkipKeys,
+          ),
+        )
 
       return NextResponse.json({
         success: true,

@@ -20,6 +20,7 @@ import {
   putRows,
   upsertByName,
 } from "./indexed-db-store"
+import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation-mode"
 
 export type LocalSeedResult = {
   total: number
@@ -54,6 +55,7 @@ function writeStoredSpellCardArtVersion(version: string): void {
 }
 
 async function ensureBundledSpellCardArt(): Promise<void> {
+  if (!shouldAssignBundledCardArt()) return
   if (readStoredSpellCardArtVersion() === BUNDLED_SPELL_CARD_ART_VERSION) return
   const { spells } = getSrdSeedData()
   await upsertByName(

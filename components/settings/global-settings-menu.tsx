@@ -93,76 +93,12 @@ export function GlobalSettingsMenu() {
 
           <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4">
             <TabsContent value="appearance" className="mt-0 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Choose a color theme for the app interface.
-              </p>
-              <ul className="space-y-2">
-                {APP_THEMES.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      onClick={() => setTheme(t.id)}
-                      className={cn(
-                        "flex w-full items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors",
-                        theme === t.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-muted/60",
-                      )}
-                    >
-                      <span className="mt-0.5 flex shrink-0 gap-1" aria-hidden>
-                        {t.swatches.map((color, i) => (
-                          <span
-                            key={i}
-                            className="h-4 w-4 rounded-full border border-border/80"
-                            style={{ background: color }}
-                          />
-                        ))}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block font-semibold text-foreground">{t.label}</span>
-                        <span className="block text-xs text-muted-foreground leading-snug">
-                          {t.description}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="border-t border-border pt-4 space-y-4">
-                {!isCompactOnly ? (
-                  <>
-                    <HeroBackgroundSettings onStatus={setStatus} />
-                    <PageBackgroundSettings onStatus={setStatus} />
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Background graphics are hidden in Compact Only mode. Choose Visual + Compact on
-                    the home page splash to re-enable them.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="general" className="mt-0 space-y-6">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
-                <p className="text-xs font-semibold text-foreground">Deployment</p>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] leading-tight">
-                  <dt className="text-muted-foreground">Version</dt>
-                  <dd className="font-medium text-foreground tabular-nums">{getAppVersion()}</dd>
-                  <dt className="text-muted-foreground">Mode</dt>
-                  <dd className="font-medium text-foreground">{getDeployMode()}</dd>
-                  <dt className="text-muted-foreground">Storage</dt>
-                  <dd className="font-medium text-foreground">{getStorageLabel()}</dd>
-                </dl>
-              </div>
-
               <div>
                 <p className="text-sm font-semibold text-foreground">Card layout</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {isCompactOnly
-                    ? "Compact Only mode keeps the builder and compendium in dense list view."
-                    : "Default Visual or Compact presentation for the character builder and compendium. You can still toggle it on those pages."}
+                    ? "Compact Only mode keeps the builder and compendium in dense list view. Visual art may not import while this home-page choice is active."
+                    : "Default Visual or Compact presentation for the character builder and compendium. You can still toggle it on those pages, however if you selected compact mode from the initial choice on the home page visual art may not import."}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {BUILDER_LAYOUT_OPTIONS.filter((option) => !isCompactOnly || option.id === "compact").map((option) => {
@@ -192,6 +128,72 @@ export function GlobalSettingsMenu() {
                     )
                   })}
                 </div>
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Choose a color theme for the app interface.
+                </p>
+                <ul className="space-y-2">
+                  {APP_THEMES.map((t) => (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => setTheme(t.id)}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors",
+                          theme === t.id
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted/60",
+                        )}
+                      >
+                        <span className="mt-0.5 flex shrink-0 gap-1" aria-hidden>
+                          {t.swatches.map((color, i) => (
+                            <span
+                              key={i}
+                              className="h-4 w-4 rounded-full border border-border/80"
+                              style={{ background: color }}
+                            />
+                          ))}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-foreground">{t.label}</span>
+                          <span className="block text-xs text-muted-foreground leading-snug">
+                            {t.description}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-4">
+                {!isCompactOnly ? (
+                  <>
+                    <HeroBackgroundSettings onStatus={setStatus} />
+                    <PageBackgroundSettings onStatus={setStatus} />
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Background graphics are hidden in Compact Only mode. Choose Visual + Compact on
+                    the home page splash to re-enable them.
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="general" className="mt-0 space-y-6">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
+                <p className="text-xs font-semibold text-foreground">Deployment</p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] leading-tight">
+                  <dt className="text-muted-foreground">Version</dt>
+                  <dd className="font-medium text-foreground tabular-nums">{getAppVersion()}</dd>
+                  <dt className="text-muted-foreground">Mode</dt>
+                  <dd className="font-medium text-foreground">{getDeployMode()}</dd>
+                  <dt className="text-muted-foreground">Storage</dt>
+                  <dd className="font-medium text-foreground">{getStorageLabel()}</dd>
+                </dl>
               </div>
 
               <div>

@@ -10,6 +10,9 @@ export const SRD_SUBCLASS_ICONS_BY_NAME: Record<string, string> = {
   "Life Domain": "heart-plus",
   "Oath of Devotion": "tarot-11-justice",
   "Path of the Berserker": "enrage",
+  "Path of the Wild Heart": "heart-inside",
+  "Path of the World Tree": "tree-door",
+  "Path of the Zealot": "church",
   Thief: "robin-hood-hat",
   "Warrior of the Open Hand": "black-hand-shield",
 }

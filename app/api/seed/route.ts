@@ -24,6 +24,7 @@ import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
 import { LEGACY_SRD_SOURCES, withSrdCreatorUrlList } from "@/lib/srd/source"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import { runWithBundledCardArtAssignment } from "@/lib/site-settings/app-presentation-mode"
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,8 +36,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: configError }, { status: 503 })
     }
 
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const includeCardArt = body?.includeCardArt !== false
+
     const appliedMigrations = await ensureMigrationsApplied(getPool())
 
+    return await runWithBundledCardArtAssignment(Boolean(includeCardArt), async () => {
     const { classes, subclasses, species, backgrounds, spells, feats, languages, tools } = getSrdSeedData()
 
     await upsertByName("classes", enrichSrdClassList(withSrdCreatorUrlList(classes)))
@@ -112,6 +117,7 @@ export async function POST(request: NextRequest) {
       equipmentSeed,
       srdVersion: getSrdSeedData().manifest.version,
       migrationsApplied: appliedMigrations,
+    })
     })
   } catch (error) {
     console.error("Seed error:", error)

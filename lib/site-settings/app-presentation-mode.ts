@@ -35,6 +35,31 @@ export function areCompendiumImagesEnabled(): boolean {
   return !isCompactOnlyPresentation()
 }
 
+/**
+ * Whether seed/import enrichment should write bundled default `card_image_url` values.
+ * Compact Only (splash) opts out. Server routes can force this via `runWithBundledCardArtAssignment`.
+ */
+let bundledCardArtAssignmentOverride: boolean | null = null
+
+export function shouldAssignBundledCardArt(): boolean {
+  if (bundledCardArtAssignmentOverride != null) return bundledCardArtAssignmentOverride
+  return areCompendiumImagesEnabled()
+}
+
+/** Run seed/import work with an explicit card-art assignment policy (for server routes). */
+export function runWithBundledCardArtAssignment<T>(
+  assignArt: boolean,
+  fn: () => T,
+): T {
+  const previous = bundledCardArtAssignmentOverride
+  bundledCardArtAssignmentOverride = assignArt
+  try {
+    return fn()
+  } finally {
+    bundledCardArtAssignmentOverride = previous
+  }
+}
+
 /** Hero, page, and marketing surfaces use solid theme fills instead of photos. */
 export function areDecorativeBackgroundImagesEnabled(): boolean {
   if (typeof window === "undefined") return true

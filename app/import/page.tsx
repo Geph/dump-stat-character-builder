@@ -92,6 +92,7 @@ import {
   buildInitialImportCardArtUrlMap,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
   renameImportClassAtIndex,
   renameImportSubclassAtIndex,
@@ -123,6 +124,8 @@ const IMPORT_TABS = canUseServerImport()
 
 export default function ImportPage() {
   const staticMode = isStaticDeploy()
+  const { isCompactOnly } = useAppPresentationMode()
+  const includeCardArt = !isCompactOnly
   const [activeTab, setActiveTab] = useState<ImportTab>("clipboard")
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfContentType, setPdfContentType] = useState<"all" | "specific">("all")
@@ -380,11 +383,14 @@ export default function ImportPage() {
       setReviewStageIndex(0)
       setReviewPhase("content")
       setPreviewSkipKeys(new Set())
-      setCardArtUrlMap(buildInitialImportCardArtUrlMap(pendingImport.content))
+      setCardArtUrlMap(
+        includeCardArt ? buildInitialImportCardArtUrlMap(pendingImport.content) : {},
+      )
       return
     }
 
     setCardArtUrlMap((current) => {
+      if (!includeCardArt) return {}
       const initial = buildInitialImportCardArtUrlMap(pendingImport.content)
       const next = { ...initial }
       for (const [key, value] of Object.entries(current)) {
@@ -392,7 +398,7 @@ export default function ImportPage() {
       }
       return next
     })
-  }, [pendingImport])
+  }, [pendingImport, includeCardArt])
 
   useEffect(() => {
     if (!pendingImport) return
@@ -578,7 +584,7 @@ export default function ImportPage() {
           renameMap,
           collisions: pendingImport.collisions,
           collisionResolutionMap,
-          cardArtUrlMap,
+          cardArtUrlMap: includeCardArt ? cardArtUrlMap : {},
           preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
           skippedPreviewKeys: previewSkipKeys,
         })
@@ -598,7 +604,8 @@ export default function ImportPage() {
           collisionResolutionMap,
           collisions: pendingImport.collisions,
           materialSource: pendingImport.materialSource,
-          cardArtUrlMap,
+          cardArtUrlMap: includeCardArt ? cardArtUrlMap : {},
+          includeCardArt,
           skippedPreviewKeys: [...previewSkipKeys],
           preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
         }),
@@ -880,6 +887,8 @@ export default function ImportPage() {
 
       const response = await fetch("/api/seed", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ includeCardArt }),
       })
 
       const data = await response.json()
@@ -1093,20 +1102,22 @@ export default function ImportPage() {
                       hideSummary
                       embedded
                       showModifierReviewHint={stageHasModifiers}
-                      cardArtUrls={cardArtUrlMap}
-                      onCardArtChange={setCardArtUrlMap}
+                      cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
+                      onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
                       onRenameItem={handleRenameImportPreview}
                       skippedKeys={previewSkipKeys}
                       onSkippedKeysChange={setPreviewSkipKeys}
                     />
-                    <ImportCardArtPanel
-                      key={`card-art-${activeReviewStage?.id ?? "all"}`}
-                      content={pendingImport.content}
-                      value={cardArtUrlMap}
-                      onChange={setCardArtUrlMap}
-                      sections={stageCardArtSections}
-                      excludeSections={["classes", "subclasses"]}
-                    />
+                    {includeCardArt ? (
+                      <ImportCardArtPanel
+                        key={`card-art-${activeReviewStage?.id ?? "all"}`}
+                        content={pendingImport.content}
+                        value={cardArtUrlMap}
+                        onChange={setCardArtUrlMap}
+                        sections={stageCardArtSections}
+                        excludeSections={["classes", "subclasses"]}
+                      />
+                    ) : null}
                   </>
                 }
                 modifiersChildren={
@@ -1134,8 +1145,8 @@ export default function ImportPage() {
                   content={pendingImport.content}
                   previewSummary={pendingImport.previewSummary}
                   showModifierReviewHint={modifierReviewRows.length > 0}
-                  cardArtUrls={cardArtUrlMap}
-                  onCardArtChange={setCardArtUrlMap}
+                  cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
+                  onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
                   onRenameItem={handleRenameImportPreview}
                   skippedKeys={previewSkipKeys}
                   onSkippedKeysChange={setPreviewSkipKeys}
@@ -1147,12 +1158,14 @@ export default function ImportPage() {
                     variant="review"
                   />
                 ) : null}
-                <ImportCardArtPanel
-                  content={pendingImport.content}
-                  value={cardArtUrlMap}
-                  onChange={setCardArtUrlMap}
-                  excludeSections={["classes", "subclasses"]}
-                />
+                {includeCardArt ? (
+                  <ImportCardArtPanel
+                    content={pendingImport.content}
+                    value={cardArtUrlMap}
+                    onChange={setCardArtUrlMap}
+                    excludeSections={["classes", "subclasses"]}
+                  />
+                ) : null}
               </>
             )}
             {backgroundFeatGaps.length > 0 ? (

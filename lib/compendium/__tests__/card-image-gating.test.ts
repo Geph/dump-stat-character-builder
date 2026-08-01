@@ -192,3 +192,53 @@ describe("resolveCompendiumCardImageUrl", () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe("bundled card art assignment under Compact Only", () => {
+  function stubPresentation(mode: "visual-compact" | "compact-only") {
+    const store = new Map<string, string>([["dumpstat:app-presentation-mode", mode]])
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+    }
+    vi.stubGlobal("window", { localStorage: storage })
+    vi.stubGlobal("localStorage", storage)
+  }
+
+  it("does not assign SRD defaults when Compact Only is selected", async () => {
+    const { applySrdCardImage } = await import("@/lib/compendium/card-image")
+    stubPresentation("compact-only")
+    const row = applySrdCardImage(
+      { name: "Elf", source: "SRD" },
+      { Elf: "/images/compendium/species/elf.png" },
+    )
+    expect(row.card_image_url).toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+
+  it("clears upgradeable bundled urls when Compact Only is selected", async () => {
+    const { applyBundledCardImage } = await import("@/lib/compendium/card-image")
+    stubPresentation("compact-only")
+    const row = applyBundledCardImage(
+      { name: "Elf", card_image_url: "/images/compendium/species/elf.png" },
+      { Elf: "/images/compendium/species/elf.png" },
+    )
+    expect(row.card_image_url).toBeNull()
+    vi.unstubAllGlobals()
+  })
+
+  it("still assigns defaults in Visual + Compact presentation", async () => {
+    const { applySrdCardImage } = await import("@/lib/compendium/card-image")
+    stubPresentation("visual-compact")
+    const row = applySrdCardImage(
+      { name: "Elf", source: "SRD" },
+      { Elf: "/images/compendium/species/elf.png" },
+    )
+    expect(row.card_image_url).toBe("/images/compendium/species/elf.png")
+    vi.unstubAllGlobals()
+  })
+})

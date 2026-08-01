@@ -19,6 +19,15 @@ describe("SRD subclass icon defaults", () => {
     }
   })
 
+  it("maps Barbarian PHB path icons from the curated defaults", () => {
+    expect(SRD_SUBCLASS_ICONS_BY_NAME["Path of the Wild Heart"]).toBe("heart-inside")
+    expect(SRD_SUBCLASS_ICONS_BY_NAME["Path of the World Tree"]).toBe("tree-door")
+    expect(SRD_SUBCLASS_ICONS_BY_NAME["Path of the Zealot"]).toBe("church")
+    for (const slug of ["heart-inside", "tree-door", "church"] as const) {
+      expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${slug}.svg`))).toBe(true)
+    }
+  })
+
   it("applies bundled subclass icons on seed enrich", () => {
     const row = enrichSrdSubclassRow(
       {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   applyImportCardArtUrls,
@@ -76,6 +76,29 @@ describe("import-card-art", () => {
           ability_bonuses: null,
         },
       ],
+      species: [
+        {
+          name: "Aasimar (2024)",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+        },
+        {
+          name: "Aasimar (2014)",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+        },
+        {
+          name: "Changeling",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+        },
+      ],
     }
     const map = buildInitialImportCardArtUrlMap(withKnownNames)
     expect(map[importCardArtTargetKey("classes", 0)]).toMatch(/\/images\/compendium\/classes\/barbarian\.png$/)
@@ -85,6 +108,49 @@ describe("import-card-art", () => {
     expect(map[importCardArtTargetKey("backgrounds", 0)]).toMatch(
       /\/images\/compendium\/backgrounds\/acolyte\.png$/,
     )
+    expect(map[importCardArtTargetKey("species", 0)]).toMatch(
+      /\/images\/compendium\/species\/aasimar\.png$/,
+    )
+    expect(map[importCardArtTargetKey("species", 1)]).toMatch(
+      /\/images\/compendium\/species\/aasimar-2014\.png$/,
+    )
+    expect(map[importCardArtTargetKey("species", 2)]).toMatch(
+      /\/images\/compendium\/species\/changeling\.png$/,
+    )
+  })
+
+  it("skips import card-art targets entirely under Compact Only", () => {
+    const store = new Map<string, string>([["dumpstat:app-presentation-mode", "compact-only"]])
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+    }
+    vi.stubGlobal("window", { localStorage: storage })
+    vi.stubGlobal("localStorage", storage)
+
+    const withSpecies: ImportContent = {
+      species: [
+        {
+          name: "Aasimar (2024)",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+        },
+      ],
+    }
+    expect(collectImportCardArtTargets(withSpecies)).toEqual([])
+    expect(buildInitialImportCardArtUrlMap(withSpecies)).toEqual({})
+    const stripped = applyImportCardArtUrls(withSpecies, {
+      [importCardArtTargetKey("species", 0)]: "/images/compendium/species/aasimar.png",
+    })
+    expect(stripped.species?.[0]?.card_image_url).toBeNull()
+    vi.unstubAllGlobals()
   })
 
   it("prefers an explicit import URL over a bundled default", () => {
