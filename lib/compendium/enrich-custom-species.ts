@@ -7,7 +7,10 @@ import {
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import { SPECIES_CARD_IMAGES_BY_NAME } from "@/lib/compendium/species-card-images-defaults"
+import {
+  defaultSpeciesCardImageUrl,
+  SPECIES_CARD_IMAGES_BY_NAME,
+} from "@/lib/compendium/species-card-images-defaults"
 import { isSrdSource } from "@/lib/srd/source"
 import type { FeatureActivation, Trait, UsesConfig } from "@/lib/types"
 import type { Feature } from "@/lib/types"
@@ -1425,7 +1428,13 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
 }
 
 function withSpeciesCardImage(row: Record<string, unknown>): Record<string, unknown> {
-  return applyBundledCardImage(row, SPECIES_CARD_IMAGES_BY_NAME)
+  const name = String(row.name ?? "").trim()
+  const resolved = defaultSpeciesCardImageUrl(name)
+  // Pass a name-keyed map so applyBundledCardImage still clears dumpstat URLs when unset.
+  return applyBundledCardImage(
+    row,
+    resolved ? { ...SPECIES_CARD_IMAGES_BY_NAME, [name]: resolved } : SPECIES_CARD_IMAGES_BY_NAME,
+  )
 }
 
 /** Apply non-SRD species modifier presets when the species name matches the registry. */

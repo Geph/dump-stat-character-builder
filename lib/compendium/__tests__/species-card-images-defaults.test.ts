@@ -5,6 +5,7 @@ import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
 import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import {
+  defaultSpeciesCardImageUrl,
   SPECIES_CARD_IMAGES_BY_NAME,
   SRD_SPECIES_CARD_IMAGE_NAMES,
 } from "@/lib/compendium/species-card-images-defaults"
@@ -25,20 +26,31 @@ describe("species card images", () => {
         "Changeling (2014)",
         "Changeling (2024)",
         "Deep Gnome",
+        "Dhakaani Ghaal'Dar",
+        "Dhakaani Golin'dar",
+        "Dhakanni Golin'dar",
+        "Dhakaani Guul'dar",
+        "Dhakaani Guul'dar (Bugbear)",
         "Dhampir",
         "Dragonborn",
+        "Duergar",
         "Dwarf",
         "Eladrin",
         "Elf",
+        "Fairy",
         "Giff",
         "Githzerai",
+        "Gnoll",
         "Gnome",
         "Goliath",
         "Hadozee",
         "Halfling",
         "Hexblood",
         "Human",
+        "Jhorgun'taal",
         "Kalashtar",
+        "Kalamer Landwalker Merfolk",
+        "Kalamer Landwalker (Merfolk)",
         "Khoravar",
         "Lupin",
         "Orc",
@@ -71,6 +83,20 @@ describe("species card images", () => {
     expect(SPECIES_CARD_IMAGES_BY_NAME["Changeling (2024)"]).toBe(
       SPECIES_CARD_IMAGES_BY_NAME.Changeling,
     )
+    expect(SPECIES_CARD_IMAGES_BY_NAME.Fairy).toMatch(/\/images\/compendium\/species\/fairy\.png$/)
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Dhakaani Ghaal'Dar"]).toMatch(
+      /\/images\/compendium\/species\/dhakaani-ghaaldar\.png$/,
+    )
+  })
+
+  it("resolves parenthetical lineage tags to base art", () => {
+    expect(defaultSpeciesCardImageUrl("Dhakaani Guul'dar (Bugbear)")).toBe(
+      SPECIES_CARD_IMAGES_BY_NAME["Dhakaani Guul'dar"],
+    )
+    expect(defaultSpeciesCardImageUrl("Kalamer Landwalker (Merfolk)")).toBe(
+      SPECIES_CARD_IMAGES_BY_NAME["Kalamer Landwalker Merfolk"],
+    )
+    expect(defaultSpeciesCardImageUrl("Fairy")).toBe(SPECIES_CARD_IMAGES_BY_NAME.Fairy)
   })
 
   it("ships an optimized image file for every mapped species", () => {
@@ -113,6 +139,17 @@ describe("species card images", () => {
   it("applies bundled art to custom species when name matches", () => {
     const row = enrichCustomSpeciesRow({ name: "Tabaxi", source: "Custom", traits: [] })
     expect(row.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Tabaxi)
+  })
+
+  it("applies Fairy and Dhakaani art on custom enrich", () => {
+    const fairy = enrichCustomSpeciesRow({ name: "Fairy", source: "Custom", traits: [] })
+    const guuldar = enrichCustomSpeciesRow({
+      name: "Dhakaani Guul'dar (Bugbear)",
+      source: "Eberron",
+      traits: [],
+    })
+    expect(fairy.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Fairy)
+    expect(guuldar.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME["Dhakaani Guul'dar"])
   })
 
   it("uses distinct 2014 vs 2024 Aasimar and Changeling portraits", () => {
