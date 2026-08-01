@@ -6,7 +6,9 @@ pnpm images:optimize
 
 Sources are matched by slug basename (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`).
 
-Examples: `elf`, `warforged`, `kalashtar`, `khoravar`.
+Examples: `elf`, `warforged`, `kalashtar`, `astral-elf`, `autognome`, `plasmoid`.
+
+Prefer `aasimar-2024` / `changeling-2024` source basenames for the canonical `aasimar` / `changeling` outputs.
 
 Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portrait).
 

@@ -1,3 +1,5 @@
+import fs from "node:fs"
+import path from "node:path"
 import { describe, expect, it } from "vitest"
 import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
 import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
@@ -13,14 +15,22 @@ describe("species card images", () => {
       [
         "Aarakocra",
         "Aasimar",
+        "Astral Elf",
+        "Autognome",
+        "Bugbear",
         "Centaur",
         "Changeling",
+        "Deep Gnome",
         "Dhampir",
         "Dragonborn",
         "Dwarf",
+        "Eladrin",
         "Elf",
+        "Giff",
+        "Githzerai",
         "Gnome",
         "Goliath",
+        "Hadozee",
         "Halfling",
         "Hexblood",
         "Human",
@@ -28,6 +38,7 @@ describe("species card images", () => {
         "Khoravar",
         "Lupin",
         "Orc",
+        "Plasmoid",
         "Reborn",
         "Shifter",
         "Tabaxi",
@@ -36,6 +47,22 @@ describe("species card images", () => {
       ].sort(),
     )
     expect(SPECIES_CARD_IMAGES_BY_NAME.Elf).toMatch(/\/images\/compendium\/species\/elf\.png$/)
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Astral Elf"]).toMatch(
+      /\/images\/compendium\/species\/astral-elf\.png$/,
+    )
+    expect(SPECIES_CARD_IMAGES_BY_NAME.Autognome).toMatch(
+      /\/images\/compendium\/species\/autognome\.png$/,
+    )
+  })
+
+  it("ships an optimized image file for every mapped species", () => {
+    const imagesDir = path.join(process.cwd(), "public/images/compendium/species")
+    for (const [name, url] of Object.entries(SPECIES_CARD_IMAGES_BY_NAME)) {
+      const file = path.basename(url)
+      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
+        true,
+      )
+    }
   })
 
   it("maps every SRD species to bundled card art", () => {
