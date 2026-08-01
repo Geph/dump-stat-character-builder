@@ -39,7 +39,8 @@ export const CARD_IMAGE_ASPECT_LABEL = `${WIDE_CARD_IMAGE_ASPECT} (recommended);
 export const CARD_IMAGE_RECOMMENDED = "840×360px landscape, or 600×800px portrait for classes (top crop in banner)"
 export const PORTRAIT_CARD_IMAGE_HINT = `${CLASS_CARD_IMAGE_ASPECT} · 600×800px recommended`
 
-export type CompendiumCardImageCrop = "top" | "center"
+export type CompendiumCardImageCrop = "top" | "center" | "height"
+
 
 /** Max characters for the two-line card blurb (`line-clamp-2 text-xs`). */
 export const COMPENDIUM_CARD_BLURB_MAX_LENGTH = 120
@@ -119,39 +120,60 @@ export function isBundledCompendiumCardImagePath(url: string): boolean {
   return /(?:^|\/)images\/compendium\//.test(url)
 }
 
+/** Hosted dumpstat card art — never auto-kept; replace with bundled art or clear. */
+export function isHostedDumpstatCardImageUrl(url: string): boolean {
+  return /jeffginger\.com\/dumpstat\//i.test(url)
+}
+
+function isUpgradeableDefaultCardImage(url: string): boolean {
+  return isBundledCompendiumCardImagePath(url) || isHostedDumpstatCardImageUrl(url)
+}
+
 /**
  * Keep true custom card art; otherwise apply defaults by item name for SRD-sourced rows.
- * Bundled `/images/compendium/…` paths are treated as upgradeable defaults, not custom art.
+ * Bundled `/images/compendium/…` paths and dumpstat hosts are treated as upgradeable defaults.
  */
 export function applySrdCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  const card_image_url = defaults[String(row.name ?? "")] ?? null
-  if (existing && !isBundledCompendiumCardImagePath(existing)) {
+  const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
+  if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }
   }
   if (!isSrdSource(row.source as string | null | undefined)) {
+    if (existing && isHostedDumpstatCardImageUrl(existing)) {
+      return { ...row, card_image_url: null }
+    }
     return existing ? { ...row, card_image_url: existing } : row
   }
-  return card_image_url ? { ...row, card_image_url } : row
+  if (card_image_url) return { ...row, card_image_url }
+  if (existing && isHostedDumpstatCardImageUrl(existing)) {
+    return { ...row, card_image_url: null }
+  }
+  return existing ? { ...row, card_image_url: existing } : row
 }
 
 /**
- * Keep true custom card art; otherwise apply bundled defaults by item name (any source).
- * Bundled `/images/compendium/…` paths are treated as upgradeable defaults, not custom art.
+ * Keep true custom card art; otherwise apply bundled defaults by item **name** (any source).
+ * Source labels are ignored so Ravenloft/Planescape rows mis-tagged as PHB still match.
+ * Dumpstat jeffginger.com URLs are never kept — replaced by a local default or cleared.
  */
 export function applyBundledCardImage(
   row: Record<string, unknown>,
   defaults: Record<string, string>,
 ): Record<string, unknown> {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  const card_image_url = defaults[String(row.name ?? "")] ?? null
-  if (existing && !isBundledCompendiumCardImagePath(existing)) {
+  const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
+  if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }
   }
-  return card_image_url ? { ...row, card_image_url } : existing ? { ...row, card_image_url: existing } : row
+  if (card_image_url) return { ...row, card_image_url }
+  if (existing && isHostedDumpstatCardImageUrl(existing)) {
+    return { ...row, card_image_url: null }
+  }
+  return existing ? { ...row, card_image_url: existing } : row
 }
 
 /** Compendium tabs that use portrait (3:4) card art in browse grids. */
@@ -229,9 +251,14 @@ export function compendiumCardImageCropForType(
 }
 
 export function compendiumCardHeroImageClass(crop: CompendiumCardImageCrop = "center"): string {
-  return crop === "top"
-    ? "absolute inset-0 h-full w-full object-cover object-top"
-    : "absolute inset-0 h-full w-full object-cover object-center"
+  if (crop === "top") {
+    return "absolute inset-0 h-full w-full object-cover object-top"
+  }
+  if (crop === "height") {
+    // Scale to the frame height so the full graphic is visible; overflow clips the sides.
+    return "absolute inset-y-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2"
+  }
+  return "absolute inset-0 h-full w-full object-cover object-center"
 }
 
 export function compendiumCardAccent(item: CompendiumCardVisual): CompendiumThemeColorId | null {

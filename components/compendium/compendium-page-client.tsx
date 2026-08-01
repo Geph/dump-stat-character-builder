@@ -64,11 +64,13 @@ import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { canClearCompendiumViaApi } from "@/lib/config/deploy-mode"
 import { clearIndexedDbStore } from "@/lib/data/indexed-db-store"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { BackgroundDetailStrip } from "@/components/compendium/background-detail-strip"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
 import { classComplexityDetailRow } from "@/components/compendium/class-complexity-display"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
   CLASS_CARD_ASPECT_CLASS,
+  WIDE_CARD_ASPECT_CLASS,
   COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS,
   COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS,
   areBrowseCardImagesEnabled,
@@ -339,6 +341,9 @@ export default function CompendiumPageClient() {
 
   // Subclasses indexed by class (for class tab cards)
   const [subclassesForClasses, setSubclassesForClasses] = useState<Subclass[]>([])
+  /** Feats/spells for background detail overlays (origin feat text, granted spells). */
+  const [backgroundDetailFeats, setBackgroundDetailFeats] = useState<Feat[]>([])
+  const [backgroundDetailSpells, setBackgroundDetailSpells] = useState<Spell[]>([])
 
   // Fetch content only for active tab
   useEffect(() => {
@@ -411,6 +416,25 @@ export default function CompendiumPageClient() {
     }
     
     fetchActiveTabContent()
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== "backgrounds") return
+    let cancelled = false
+    const loadBackgroundDetailLookups = async () => {
+      const db = createClient()
+      const [{ data: feats }, { data: spells }] = await Promise.all([
+        db.from("feats").select("id, name, description, source").order("name").limit(2000),
+        db.from("spells").select("id, name, level, school, source").order("name").limit(5000),
+      ])
+      if (cancelled) return
+      setBackgroundDetailFeats(asCompendiumRows(feats) as unknown as Feat[])
+      setBackgroundDetailSpells(asCompendiumRows(spells) as unknown as Spell[])
+    }
+    void loadBackgroundDetailLookups()
+    return () => {
+      cancelled = true
+    }
   }, [activeTab])
 
   // Derive unique spell filter options from loaded spell data
@@ -893,12 +917,15 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     )
     const portraitGraphicCard = isCompendiumPortraitGraphicCard(activeTab, cardImage)
     const hideCardIcon = hidesCompendiumBrowseCardIcon(activeTab, cardImage)
+    const widescreenBackgroundCard = activeTab === "backgrounds" && Boolean(cardImage)
     const cardMinHeightClass =
-      cardImage && !portraitGraphicCard
-        ? activeTab === "classes"
-          ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
-          : COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
-        : null
+      widescreenBackgroundCard
+        ? null
+        : cardImage && !portraitGraphicCard
+          ? activeTab === "classes"
+            ? COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS
+            : COMPENDIUM_LIST_CARD_MIN_HEIGHT_CLASS
+          : null
     const listGradientClass = cardImage
       ? compendiumPortraitListGradientClass(activeTab, cardImage)
       : undefined
@@ -993,6 +1020,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         className={cn(
           "relative overflow-hidden rounded-2xl border-2 transition-colors",
           portraitGraphicCard && CLASS_CARD_ASPECT_CLASS,
+          widescreenBackgroundCard && WIDE_CARD_ASPECT_CLASS,
           cardMinHeightClass ?? (!cardImage ? "bg-card/55 backdrop-blur-sm" : null),
           enabled
             ? `border-primary/40 ${accentStyles.hoverBorder}`
@@ -1014,7 +1042,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           className={cn(
             "relative z-10",
             portraitGraphicCard ? "flex min-h-full flex-col justify-end p-3 pb-10" : "p-5 pb-11",
-            cardImage && !portraitGraphicCard && "flex min-h-full flex-col justify-end pt-3",
+            cardImage &&
+              !portraitGraphicCard &&
+              "flex min-h-full flex-col justify-end pt-3 sm:pb-3 sm:pr-5 sm:pl-4",
             cardImage &&
               "[&_.text-foreground]:text-white [&_.text-muted-foreground]:text-white/75 [&_.text-primary]:text-primary [&_.text-secondary]:text-secondary [&_.text-warning]:text-warning [&_.text-orange]:text-orange [&_.text-lime]:text-lime [&_.text-magenta]:text-magenta [&_.text-accent]:text-accent [&_.bg-muted]:bg-black/40 [&_.bg-muted]:text-white/90",
           )}
@@ -1037,7 +1067,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             </div>
           </>
         ) : (
-          <div className="mb-2 flex items-start justify-between gap-2">
+          <div
+            className={cn(
+              "mb-2 flex items-start justify-between gap-2",
+              !portraitGraphicCard && "sm:mb-1",
+            )}
+          >
             <div className="flex min-w-0 items-center gap-3">
               {cardIcon}
               {cardTitle}
@@ -1993,6 +2028,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           open
           onClose={() => setSelectedItem(null)}
           imageCrop={compendiumCardImageCropForType(activeTab)}
+          heroLayout={activeTab === "backgrounds" ? "widescreen" : "default"}
           panelWidth={
             isCompendiumPortraitGraphicCard(
               activeTab,
@@ -2088,6 +2124,17 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                         ]
                       : activeTab === "spells"
                         ? spellDetailOverlayTags(selectedItem as Spell)
+                        : activeTab === "backgrounds"
+                          ? [
+                              ...((selectedItem as Background).feat_granted
+                                ? [
+                                    {
+                                      label: `FEAT: ${(selectedItem as Background).feat_granted}`,
+                                      emphasis: true as const,
+                                    },
+                                  ]
+                                : []),
+                            ]
                         : activeTab === "feats"
                           ? [
                               ...((selectedItem as Feat).category
@@ -2203,9 +2250,24 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               {(selectedItem as Spell).material!.trim()}
             </p>
           ) : null}
-          {!isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) && (
+          {activeTab === "backgrounds" ? (
+            <BackgroundDetailStrip
+              background={selectedItem as Background}
+              feats={
+                backgroundDetailFeats.length
+                  ? backgroundDetailFeats
+                  : (content.feats as unknown as Feat[])
+              }
+              spells={
+                backgroundDetailSpells.length
+                  ? backgroundDetailSpells
+                  : (content.spells as unknown as Spell[])
+              }
+              layout="stacked"
+            />
+          ) : !isCommonModifiersCatalogAbility(selectedItem as { id?: string; is_system?: boolean }) ? (
             <RichTextContent html={(selectedItem as { description?: string }).description} />
-          )}
+          ) : null}
           {activeTab === "spells" && (selectedItem as Spell).higher_levels?.trim() ? (
             <div className="mt-3">
               <p className="mb-1 text-xs font-bold uppercase tracking-wide text-white/50">

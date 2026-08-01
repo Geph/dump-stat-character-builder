@@ -34,6 +34,7 @@ export async function finalizeImportedContent(
   collisionResolutionMap: ImportCollisionResolutionMap = {},
   cardArtUrlMap: ImportCardArtUrlMap = {},
   persistOptions?: PersistImportOptions,
+  skippedPreviewKeys: ReadonlySet<string> | readonly string[] = [],
 ) {
   return finalizeImportWithPersist(
     pendingContent,
@@ -45,6 +46,7 @@ export async function finalizeImportedContent(
     collisionResolutionMap,
     cardArtUrlMap,
     persistOptions,
+    skippedPreviewKeys,
   )
 }
 

@@ -13,6 +13,8 @@ Sources are matched by slug basename (first extension wins among `.png` / `.jpg`
 | `inventor` | KibblesTasty Inventor |
 | `psion` | KibblesTasty Psion |
 
-Output: `public/images/compendium/classes/*.png` at **771×1024** (JPEG bytes under a `.png` extension).
+Output: `public/images/compendium/classes/*.png` at **771×1024** (**3:4** portrait; JPEG bytes under a `.png` extension).
+
+Backgrounds use **21:9** (`1680×720`) — see `scripts/background-card-sources/README.md`.
 
 Source files here are gitignored — only the optimized outputs in `public/images/` are committed.

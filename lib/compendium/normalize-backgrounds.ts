@@ -152,8 +152,7 @@ export function enrichBackgroundList<
       enriched.starting_gold = seed.starting_gold
     }
 
-    // Use applyBundledCardImage (any source) — WOTC/campaign backgrounds are not SRD-sourced,
-    // so applySrdCardImage would leave card_image_url unset even when defaults exist.
+    // Match bundled card art by background name (any source) — never jeffginger hosts.
     return applyBundledCardImage(
       applySrdItemIcon(
         applySrdFlavorDescription(enriched as unknown as Record<string, unknown>, "background"),

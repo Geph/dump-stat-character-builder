@@ -5,6 +5,7 @@ import type { ImportContent } from "@/lib/import/content-schema"
 import {
   collectImportContentPreview,
   importContentPreviewLimit,
+  importPreviewItemSkipKey,
   type ImportContentPreviewItem,
   type ImportContentPreviewNameKind,
   type ImportContentPreviewSection,
@@ -34,6 +35,9 @@ type ImportContentPreviewPanelProps = {
   onCardArtChange?: (map: ImportCardArtUrlMap) => void
   /** Commit a class/subclass name edit (applied on blur). */
   onRenameItem?: (kind: ImportContentPreviewNameKind, sourceIndex: number, nextName: string) => void
+  /** Soft-skip keys (`section:index`) — independent of collision skip. */
+  skippedKeys?: ReadonlySet<string>
+  onSkippedKeysChange?: (next: Set<string>) => void
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
@@ -52,15 +56,19 @@ function PreviewItem({
   cardArtUrl,
   onCardArtUrlChange,
   onRename,
+  skipped,
+  onToggleSkip,
 }: {
   item: ImportContentPreviewItem
   bare?: boolean
   cardArtUrl?: string
   onCardArtUrlChange?: (next: string) => void
   onRename?: (nextName: string) => void
+  skipped?: boolean
+  onToggleSkip?: () => void
 }) {
-  const showCardArt = Boolean(item.cardArtKey && onCardArtUrlChange)
-  const canRename = Boolean(item.nameKind != null && item.sourceIndex != null && onRename)
+  const showCardArt = Boolean(item.cardArtKey && onCardArtUrlChange) && !skipped
+  const canRename = Boolean(item.nameKind != null && onRename) && !skipped
   const [draftName, setDraftName] = useState(item.name)
 
   useEffect(() => {
@@ -101,7 +109,15 @@ function PreviewItem({
             className="min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 py-1 text-sm font-medium text-foreground"
           />
         ) : (
-          <span className="font-medium text-foreground">{item.name}</span>
+          <span
+            className={
+              skipped
+                ? "min-w-0 flex-1 font-medium text-muted-foreground line-through"
+                : "min-w-0 flex-1 font-medium text-foreground"
+            }
+          >
+            {item.name}
+          </span>
         )}
         {item.badges.map((badge) => (
           <span
@@ -111,31 +127,50 @@ function PreviewItem({
             {badge}
           </span>
         ))}
+        {onToggleSkip ? (
+          <button
+            type="button"
+            onClick={onToggleSkip}
+            className={
+              skipped
+                ? "ml-auto shrink-0 rounded-md border border-border/70 bg-background px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted/40"
+                : "ml-auto shrink-0 rounded-md border border-border/70 px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            }
+          >
+            {skipped ? "Undo skip" : "Skip import"}
+          </button>
+        ) : null}
       </div>
-      {item.details.length > 0 ? (
-        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-          {item.details.map((detail) => (
-            <div key={`${item.id}-${detail.label}`} className="contents">
-              <dt className="text-muted-foreground">{detail.label}</dt>
-              <dd className="text-foreground">{detail.value}</dd>
+      {skipped ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">Won&apos;t be imported.</p>
+      ) : (
+        <>
+          {item.details.length > 0 ? (
+            <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+              {item.details.map((detail) => (
+                <div key={`${item.id}-${detail.label}`} className="contents">
+                  <dt className="text-muted-foreground">{detail.label}</dt>
+                  <dd className="text-foreground">{detail.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          {item.descriptionSnippet ? (
+            <p className="mt-1.5 text-xs text-muted-foreground line-clamp-3">{item.descriptionSnippet}</p>
+          ) : null}
+          {showCardArt && item.cardArtKey ? (
+            <div className="mt-3 border-t border-border/50 pt-3">
+              <ImportCardArtControls
+                rowKey={item.cardArtKey}
+                name={item.name}
+                portrait={importCardArtUsesPortraitArt(item.cardArtTab ?? "subclasses")}
+                url={cardArtUrl ?? ""}
+                onUrlChange={onCardArtUrlChange!}
+              />
             </div>
-          ))}
-        </dl>
-      ) : null}
-      {item.descriptionSnippet ? (
-        <p className="mt-1.5 text-xs text-muted-foreground line-clamp-3">{item.descriptionSnippet}</p>
-      ) : null}
-      {showCardArt && item.cardArtKey ? (
-        <div className="mt-3 border-t border-border/50 pt-3">
-          <ImportCardArtControls
-            rowKey={item.cardArtKey}
-            name={item.name}
-            portrait={importCardArtUsesPortraitArt(item.cardArtTab ?? "subclasses")}
-            url={cardArtUrl ?? ""}
-            onUrlChange={onCardArtUrlChange!}
-          />
-        </div>
-      ) : null}
+          ) : null}
+        </>
+      )}
     </li>
   )
 }
@@ -146,12 +181,16 @@ function PreviewSection({
   cardArtUrls,
   onCardArtChange,
   onRenameItem,
+  skippedKeys,
+  onToggleSkip,
 }: {
   section: ImportContentPreviewSection
   bare?: boolean
   cardArtUrls?: ImportCardArtUrlMap
   onCardArtChange?: (map: ImportCardArtUrlMap) => void
   onRenameItem?: (kind: ImportContentPreviewNameKind, sourceIndex: number, nextName: string) => void
+  skippedKeys?: ReadonlySet<string>
+  onToggleSkip?: (item: ImportContentPreviewItem) => void
 }) {
   const limit = importContentPreviewLimit()
   const [expanded, setExpanded] = useState(false)
@@ -162,24 +201,30 @@ function PreviewSection({
   const list = (
     <>
       <ul className="space-y-2">
-        {visibleItems.map((item) => (
-          <PreviewItem
-            key={item.id}
-            item={item}
-            bare={bare}
-            cardArtUrl={item.cardArtKey ? cardArtUrls?.[item.cardArtKey] : undefined}
-            onCardArtUrlChange={
-              item.cardArtKey && onCardArtChange
-                ? (next) => onCardArtChange({ ...cardArtUrls, [item.cardArtKey!]: next })
-                : undefined
-            }
-            onRename={
-              item.nameKind != null && item.sourceIndex != null && onRenameItem
-                ? (nextName) => onRenameItem(item.nameKind!, item.sourceIndex!, nextName)
-                : undefined
-            }
-          />
-        ))}
+        {visibleItems.map((item) => {
+          const skipKey = importPreviewItemSkipKey(item)
+          const skipped = skippedKeys?.has(skipKey) ?? false
+          return (
+            <PreviewItem
+              key={item.id}
+              item={item}
+              bare={bare}
+              skipped={skipped}
+              onToggleSkip={onToggleSkip ? () => onToggleSkip(item) : undefined}
+              cardArtUrl={item.cardArtKey ? cardArtUrls?.[item.cardArtKey] : undefined}
+              onCardArtUrlChange={
+                item.cardArtKey && onCardArtChange
+                  ? (next) => onCardArtChange({ ...cardArtUrls, [item.cardArtKey!]: next })
+                  : undefined
+              }
+              onRename={
+                item.nameKind != null && onRenameItem
+                  ? (nextName) => onRenameItem(item.nameKind!, item.sourceIndex, nextName)
+                  : undefined
+              }
+            />
+          )
+        })}
       </ul>
       {hiddenCount > 0 ? (
         <button
@@ -217,11 +262,22 @@ export function ImportContentPreviewPanel({
   cardArtUrls,
   onCardArtChange,
   onRenameItem,
+  skippedKeys,
+  onSkippedKeysChange,
 }: ImportContentPreviewPanelProps) {
   const sections = useMemo(
     () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
     [content, sectionKeys],
   )
+
+  const handleToggleSkip = (item: ImportContentPreviewItem) => {
+    if (!onSkippedKeysChange) return
+    const key = importPreviewItemSkipKey(item)
+    const next = new Set(skippedKeys ?? [])
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    onSkippedKeysChange(next)
+  }
 
   const visibleSummary = hideSummary ? undefined : previewSummary
   if (!sections.length && !visibleSummary && !showModifierReviewHint) return null
@@ -267,6 +323,8 @@ export function ImportContentPreviewPanel({
               cardArtUrls={cardArtUrls}
               onCardArtChange={onCardArtChange}
               onRenameItem={onRenameItem}
+              skippedKeys={skippedKeys}
+              onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
             />
           ))}
         </div>

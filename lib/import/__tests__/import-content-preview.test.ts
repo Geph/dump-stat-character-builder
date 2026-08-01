@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { collectImportContentPreview } from "@/lib/import/import-content-preview"
+import {
+  collectImportContentPreview,
+  stripSkippedImportPreviewItems,
+} from "@/lib/import/import-content-preview"
 import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("collectImportContentPreview", () => {
@@ -40,6 +43,8 @@ describe("collectImportContentPreview", () => {
     const equipment = sections.find((section) => section.key === "equipment")
 
     expect(spells?.items[0]?.name).toBe("Fire Bolt")
+    expect(spells?.items[0]?.sectionKey).toBe("spells")
+    expect(spells?.items[0]?.sourceIndex).toBe(0)
     expect(spells?.items[0]?.details.some((row) => row.label === "School")).toBe(true)
     expect(spells?.items[0]?.details).toContainEqual({
       label: "Other prerequisite",
@@ -48,5 +53,35 @@ describe("collectImportContentPreview", () => {
     expect(equipment?.items[0]?.badges).toContain("Magic item")
     expect(equipment?.items[0]?.details.some((row) => row.value === "Rare")).toBe(true)
     expect(equipment?.items[0]?.descriptionSnippet).toMatch(/3 charges/)
+  })
+
+  it("keeps original sourceIndex after sort for subclasses", () => {
+    const content = {
+      subclasses: [
+        { name: "Zebra Path", class_name: "Wizard", features: [] },
+        { name: "Alpha Path", class_name: "Wizard", features: [] },
+      ],
+    } as unknown as ImportContent
+
+    const sections = collectImportContentPreview(content)
+    const items = sections.find((section) => section.key === "subclasses")?.items ?? []
+    expect(items.map((item) => item.name)).toEqual(["Alpha Path", "Zebra Path"])
+    expect(items.map((item) => item.sourceIndex)).toEqual([1, 0])
+  })
+})
+
+describe("stripSkippedImportPreviewItems", () => {
+  it("drops preview soft-skips without touching other sections", () => {
+    const content = {
+      species: [
+        { name: "Aasimar (2014)", size: "Medium", speed: 30, traits: [] },
+        { name: "Elf", size: "Medium", speed: 30, traits: [] },
+      ],
+      feats: [{ name: "Alert", description: "Always ready." }],
+    } as unknown as ImportContent
+
+    const next = stripSkippedImportPreviewItems(content, ["species:0"])
+    expect(next.species?.map((row) => row.name)).toEqual(["Elf"])
+    expect(next.feats).toHaveLength(1)
   })
 })

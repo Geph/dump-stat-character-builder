@@ -17,6 +17,7 @@ import {
 import type { ImportProposalSelections, ImportProposalSet } from "@/lib/import/import-proposals"
 import type { ImportStage } from "@/lib/import/import-staging"
 import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
+import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
 
 const BYO_JSON_PARSE_ERROR =
   "Could not parse import JSON. Paste valid Dump Stat import-content JSON from the BYO workflow (see the prompt template)."
@@ -94,8 +95,13 @@ export async function confirmClientByoJsonImport(params: {
   collisionResolutionMap: ImportCollisionResolutionMap
   cardArtUrlMap?: ImportCardArtUrlMap
   preferSameSourceReplacements?: boolean
+  skippedPreviewKeys?: ReadonlySet<string> | readonly string[]
 }): Promise<ClientByoImportSuccessResult> {
-  const multiClassBlock = getMultipleClassImportBlock(params.pendingContent, "text")
+  const contentForGate = stripSkippedImportPreviewItems(
+    params.pendingContent,
+    params.skippedPreviewKeys ?? [],
+  )
+  const multiClassBlock = getMultipleClassImportBlock(contentForGate, "text")
   if (multiClassBlock) {
     throw new Error(multiClassBlock.message)
   }
@@ -112,6 +118,7 @@ export async function confirmClientByoJsonImport(params: {
     {
       preferSameSourceReplacements: Boolean(params.preferSameSourceReplacements),
     },
+    params.skippedPreviewKeys ?? [],
   )
 
   return {

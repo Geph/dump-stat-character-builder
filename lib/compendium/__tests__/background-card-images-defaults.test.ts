@@ -5,26 +5,52 @@ import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { SRD_BACKGROUND_CARD_IMAGES_BY_NAME } from "@/lib/compendium/background-card-images-defaults"
 
 describe("background card images", () => {
-  it("maps core WOTC backgrounds to bundled local art when available", () => {
-    for (const name of ["Acolyte", "Criminal", "Sage", "Soldier", "Haunted One", "Mist Wanderer"]) {
+  it("maps PHB / SRD backgrounds to bundled local art", () => {
+    for (const name of [
+      "Acolyte",
+      "Artisan",
+      "Charlatan",
+      "Criminal",
+      "Entertainer",
+      "Farmer",
+      "Guard",
+      "Guide",
+      "Hermit",
+      "Merchant",
+      "Noble",
+      "Sage",
+      "Sailor",
+      "Scribe",
+      "Soldier",
+      "Wayfarer",
+    ]) {
       expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME[name]).toMatch(
         /\/images\/compendium\/backgrounds\//,
       )
+      expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME[name]).not.toMatch(/jeffginger\.com/i)
     }
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Acolyte).toMatch(/acolyte\.png$/)
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"]).toMatch(/haunted-one\.png$/)
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Cannith Heir"]).toMatch(
-      /house-cannith-heir\.png$/,
-    )
   })
 
-  it("keeps hosted dumpstat URLs for backgrounds without bundled sources", () => {
-    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Harper).toMatch(
-      /^https:\/\/jeffginger\.com\/dumpstat\/wotc\/backgrounds\//,
-    )
+  it("replaces dumpstat hosts with bundled PHB art on enrich", () => {
+    const [row] = enrichBackgroundList([
+      {
+        name: "Noble",
+        source: "Player's Handbook",
+        card_image_url: "https://jeffginger.com/dumpstat/wotc/backgrounds/Noble.jpeg",
+      },
+    ] as unknown as import("@/lib/types").Background[])
+    expect(row.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Noble)
+    expect(row.card_image_url).toMatch(/\/images\/compendium\/backgrounds\/noble\.png$/)
   })
 
-  it("prefers bundled art for newly staged Ravenloft / FRUA backgrounds", () => {
+  it("does not auto-assign jeffginger dumpstat URLs", () => {
+    for (const url of Object.values(SRD_BACKGROUND_CARD_IMAGES_BY_NAME)) {
+      expect(url).not.toMatch(/jeffginger\.com/i)
+    }
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Harper).toBeUndefined()
+  })
+
+  it("prefers bundled art for Ravenloft / FRUA backgrounds by name", () => {
     for (const name of ["Carouser", "Inquisitive", "Spirit Medium", "Vampire Devotee"]) {
       expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME[name]).toMatch(
         /\/images\/compendium\/backgrounds\//,
@@ -32,22 +58,29 @@ describe("background card images", () => {
     }
   })
 
-  it("ships an optimized image file for every bundled background path", () => {
+  it("ships landscape 21:9 optimized files for every bundled background", async () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/backgrounds")
+    const { default: sharp } = await import("sharp")
     for (const [name, url] of Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME)) {
-      if (!url.includes("/images/compendium/backgrounds/")) continue
       const file = path.basename(url)
-      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
-        true,
-      )
+      const full = path.join(imagesDir, file)
+      expect(fs.existsSync(full), `missing art for ${name}: ${file}`).toBe(true)
+      const meta = await sharp(full).metadata()
+      expect(meta.width, `${name} width`).toBe(1680)
+      expect(meta.height, `${name} height`).toBe(720)
     }
   })
 
-  it("enriches non-SRD background rows with default card art when unset", () => {
-    const [row] = enrichBackgroundList([
+  it("enriches rows by name regardless of source label", () => {
+    const [ravenloft] = enrichBackgroundList([
       { name: "Haunted One", source: "Van Richten's Guide to Ravenloft" },
     ] as unknown as import("@/lib/types").Background[])
-    expect(row.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"])
+    expect(ravenloft.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"])
+
+    const [mislabeled] = enrichBackgroundList([
+      { name: "Haunted One", source: "Player's Handbook" },
+    ] as unknown as import("@/lib/types").Background[])
+    expect(mislabeled.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Haunted One"])
   })
 
   it("applies bundled defaults when an older bundled path is already set", () => {
@@ -60,6 +93,17 @@ describe("background card images", () => {
       },
     ])
     expect(row.card_image_url).toBe(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Sage)
+  })
+
+  it("clears dumpstat hosts when no bundled art exists", () => {
+    const [row] = enrichBackgroundList([
+      {
+        name: "Harper",
+        source: "Forgotten Realms",
+        card_image_url: "https://jeffginger.com/dumpstat/wotc/backgrounds/Harper.jpeg",
+      },
+    ] as unknown as import("@/lib/types").Background[])
+    expect(row.card_image_url).toBeNull()
   })
 
   it("preserves custom remote card art when already set", () => {

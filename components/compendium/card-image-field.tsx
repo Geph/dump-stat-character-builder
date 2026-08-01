@@ -57,7 +57,11 @@ export function CardImageField({
   const preview = normalizeCardImageUrl(value)
   const aspectClass = imageAspect === "21/9" ? WIDE_CARD_ASPECT_CLASS : CLASS_CARD_ASPECT_CLASS
   const previewImageClass =
-    imageCrop === "top" ? "h-full w-full object-cover object-top" : "h-full w-full object-cover object-center"
+    imageCrop === "top"
+      ? "h-full w-full object-cover object-top"
+      : imageCrop === "height"
+        ? "h-full w-auto max-w-none"
+        : "h-full w-full object-cover object-center"
   const previewWidthClass =
     layout === "sidebar" || layout === "paired" ? "w-full" : "w-full max-w-md"
   const previewSizeClass =

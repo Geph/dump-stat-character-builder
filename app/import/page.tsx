@@ -134,7 +134,7 @@ export default function ImportPage() {
   const [textContent, setTextContent] = useState("")
   const [jsonImportText, setJsonImportText] = useState("")
   const [textContentType, setTextContentType] = useState<string>("all")
-  const [importMaterialSource, setImportMaterialSource] = useState("Custom")
+  const [importMaterialSource, setImportMaterialSource] = useState("")
   const [customAbilityCategory, setCustomAbilityCategory] = useState("")
   const [classResourceLabels, setClassResourceLabels] = useState("")
   const [subclassMatch, setSubclassMatch] = useState<{
@@ -165,6 +165,7 @@ export default function ImportPage() {
   const [collisionResolutionMap, setCollisionResolutionMap] =
     useState<ImportCollisionResolutionMap>({})
   const [cardArtUrlMap, setCardArtUrlMap] = useState<ImportCardArtUrlMap>({})
+  const [previewSkipKeys, setPreviewSkipKeys] = useState<ReadonlySet<string>>(() => new Set())
   const [reviewStageIndex, setReviewStageIndex] = useState(0)
   const [reviewPhase, setReviewPhase] = useState<ImportReviewPhase>("content")
   const [importSourceOpen, setImportSourceOpen] = useState(true)
@@ -368,6 +369,7 @@ export default function ImportPage() {
     if (!pendingImport) {
       hadPendingImportRef.current = false
       setCardArtUrlMap({})
+      setPreviewSkipKeys(new Set())
       setReviewStageIndex(0)
       setReviewPhase("content")
       return
@@ -377,6 +379,7 @@ export default function ImportPage() {
       hadPendingImportRef.current = true
       setReviewStageIndex(0)
       setReviewPhase("content")
+      setPreviewSkipKeys(new Set())
       setCardArtUrlMap(buildInitialImportCardArtUrlMap(pendingImport.content))
       return
     }
@@ -473,6 +476,7 @@ export default function ImportPage() {
     setRenameMap({})
     setCollisionResolutionMap({})
     setCardArtUrlMap({})
+    setPreviewSkipKeys(new Set())
     setPdfFile(null)
     setPackFile(null)
     setPdfContentType("all")
@@ -576,6 +580,7 @@ export default function ImportPage() {
           collisionResolutionMap,
           cardArtUrlMap,
           preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
+          skippedPreviewKeys: previewSkipKeys,
         })
         applyImportSuccess(data)
         setTextStatus("success")
@@ -594,6 +599,7 @@ export default function ImportPage() {
           collisions: pendingImport.collisions,
           materialSource: pendingImport.materialSource,
           cardArtUrlMap,
+          skippedPreviewKeys: [...previewSkipKeys],
           preferSameSourceReplacements: Boolean(pendingImport.preferSameSourceReplacements),
         }),
       })
@@ -1090,6 +1096,8 @@ export default function ImportPage() {
                       cardArtUrls={cardArtUrlMap}
                       onCardArtChange={setCardArtUrlMap}
                       onRenameItem={handleRenameImportPreview}
+                      skippedKeys={previewSkipKeys}
+                      onSkippedKeysChange={setPreviewSkipKeys}
                     />
                     <ImportCardArtPanel
                       key={`card-art-${activeReviewStage?.id ?? "all"}`}
@@ -1129,6 +1137,8 @@ export default function ImportPage() {
                   cardArtUrls={cardArtUrlMap}
                   onCardArtChange={setCardArtUrlMap}
                   onRenameItem={handleRenameImportPreview}
+                  skippedKeys={previewSkipKeys}
+                  onSkippedKeysChange={setPreviewSkipKeys}
                 />
                 {modifierReviewRows.length > 0 ? (
                   <ImportModifierReviewPanel

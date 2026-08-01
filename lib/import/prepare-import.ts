@@ -33,6 +33,7 @@ import {
   applyImportCardArtUrls,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
 
 export function summarizeImportPreview(content: ImportContent): string {
   const parts = Object.entries({
@@ -142,6 +143,8 @@ export async function finalizeImportWithPersist(
   collisionResolutionMap: ImportCollisionResolutionMap = {},
   cardArtUrlMap: ImportCardArtUrlMap = {},
   persistOptions?: import("@/lib/import/persist-import-options").PersistImportOptions,
+  /** Soft-skips from the content preview (independent of collision skip). */
+  skippedPreviewKeys: ReadonlySet<string> | readonly string[] = [],
 ): Promise<PersistImportResult> {
   const materialSource = normalizeImportMaterialSource(source)
   const renamed = collisions.length
@@ -157,5 +160,7 @@ export async function finalizeImportWithPersist(
     applyProposalSelections(renamed, proposals, selections),
   )
   const withCardArt = applyImportCardArtUrls(withModifiers, cardArtUrlMap)
-  return persist(withCardArt, materialSource, persistOptions)
+  // Strip after renames/card art so preview indices stay valid for those maps.
+  const toPersist = stripSkippedImportPreviewItems(withCardArt, skippedPreviewKeys)
+  return persist(toPersist, materialSource, persistOptions)
 }

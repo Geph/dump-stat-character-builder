@@ -13,7 +13,9 @@ Covered materials:
 - **KibblesTasty Inventor** specializations (`gadgetsmith`, `warsmith`, `runesmith`, …)
 - **Eberron: Forge of the Artificer** (`alchemist`, `armorer`, `artillerist`, `battle-smith`, `cartographer`, `reanimator`)
 
-Output: `public/images/compendium/subclasses/*.png` at **771×1024** (same as class/species card art).
+Output: `public/images/compendium/subclasses/*.png` at **771×1024** (**3:4** portrait, same as class/species card art).
+
+Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
 
 Wire display names → slugs in `lib/compendium/subclass-card-images-defaults.ts`.
 

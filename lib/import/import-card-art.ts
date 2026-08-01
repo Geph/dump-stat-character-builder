@@ -3,6 +3,11 @@ import {
   compendiumUsesPortraitCardArt,
   normalizeCardImageUrl,
 } from "@/lib/compendium/card-image"
+import { defaultBackgroundCardImageUrl } from "@/lib/compendium/background-card-images-defaults"
+import { defaultClassCardImageUrl } from "@/lib/compendium/class-card-images-defaults"
+import { defaultSpeciesCardImageUrl } from "@/lib/compendium/species-card-images-defaults"
+import { defaultSpellCardImageUrl } from "@/lib/compendium/spell-card-images-defaults"
+import { defaultSubclassCardImageUrl } from "@/lib/compendium/subclass-card-images-defaults"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import type { Equipment } from "@/lib/types"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
@@ -54,8 +59,35 @@ export function importCardArtTargetKey(section: ImportCardArtSection, index: num
   return `${section}:${index}`
 }
 
-function rowInitialUrl(row: { card_image_url?: string | null }): string | null {
-  return normalizeCardImageUrl(row.card_image_url)
+/** Bundled / hosted card defaults keyed by item name (when the import row has no URL). */
+export function defaultImportCardArtUrl(
+  section: ImportCardArtSection,
+  name: string,
+): string | null {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  switch (section) {
+    case "classes":
+      return defaultClassCardImageUrl(trimmed)
+    case "subclasses":
+      return defaultSubclassCardImageUrl(trimmed)
+    case "species":
+      return defaultSpeciesCardImageUrl(trimmed)
+    case "backgrounds":
+      return defaultBackgroundCardImageUrl(trimmed)
+    case "spells":
+      return defaultSpellCardImageUrl(trimmed)
+    case "equipment":
+    case "abilities":
+      return null
+  }
+}
+
+function rowInitialUrl(
+  section: ImportCardArtSection,
+  row: { name: string; card_image_url?: string | null },
+): string | null {
+  return normalizeCardImageUrl(row.card_image_url) ?? defaultImportCardArtUrl(section, row.name)
 }
 
 function pushTargets<T extends { name: string; card_image_url?: string | null }>(
@@ -82,7 +114,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
       name,
       detail: options?.detail?.(row),
       compendiumTab,
-      initialUrl: rowInitialUrl(row),
+      initialUrl: rowInitialUrl(section, row),
     })
   })
 }

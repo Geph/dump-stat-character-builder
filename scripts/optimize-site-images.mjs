@@ -47,9 +47,13 @@ const SPLASH_HEIGHT = Number(process.env.SPLASH_HEIGHT ?? 900)
 const README_HERO_MAX_WIDTH = Number(process.env.README_HERO_MAX_WIDTH ?? 1400)
 const README_HERO_MAX_HEIGHT = Number(process.env.README_HERO_MAX_HEIGHT ?? 1200)
 
-/** Compendium portrait card art — matches class/species card art. */
+/** Compendium portrait card art (classes / subclasses / species / spells) — 3:4. */
 const CARD_WIDTH = Number(process.env.CARD_WIDTH ?? 771)
 const CARD_HEIGHT = Number(process.env.CARD_HEIGHT ?? 1024)
+
+/** Background card art — 21:9 landscape (matches browse/detail heroes). */
+const BACKGROUND_CARD_WIDTH = Number(process.env.BACKGROUND_CARD_WIDTH ?? 1680)
+const BACKGROUND_CARD_HEIGHT = Number(process.env.BACKGROUND_CARD_HEIGHT ?? 720)
 
 const EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"]
 
@@ -97,17 +101,26 @@ function resolveSourcePath(basenames, assetsDir = ASSETS) {
   return null
 }
 
-/** Discover card sources by slug basename (first extension wins). */
+/** Discover card sources by slug basename. Prefer .png > .webp > .jpg/.jpeg when duplicates exist. */
 function discoverCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
+  const rank = (ext) => {
+    if (ext === ".png") return 0
+    if (ext === ".webp") return 1
+    if (ext === ".jpg" || ext === ".jpeg") return 2
+    return 9
+  }
   const bySlug = new Map()
   for (const entry of fs.readdirSync(sourcesDir)) {
     const ext = path.extname(entry).toLowerCase()
     if (!EXTENSIONS.includes(ext)) continue
     const slug = path.basename(entry, ext)
     if (!slug || slug.startsWith(".")) continue
-    if (bySlug.has(slug)) continue
-    bySlug.set(slug, path.join(sourcesDir, entry))
+    const full = path.join(sourcesDir, entry)
+    const prev = bySlug.get(slug)
+    if (!prev || rank(ext) < rank(path.extname(prev).toLowerCase())) {
+      bySlug.set(slug, full)
+    }
   }
   return [...bySlug.entries()].sort(([a], [b]) => a.localeCompare(b))
 }
@@ -181,8 +194,8 @@ async function encodeCardJpeg(input, output, width, height) {
   return { inputMeta, outMeta, inputKb, outKb, action }
 }
 
-async function encodeCardBatch(label, sourcesDir, outDir) {
-  console.log(`\n${label} → ${path.relative(ROOT, outDir)}/`)
+async function encodeCardBatch(label, sourcesDir, outDir, width = CARD_WIDTH, height = CARD_HEIGHT) {
+  console.log(`\n${label} → ${path.relative(ROOT, outDir)}/ (${width}×${height})`)
   fs.mkdirSync(outDir, { recursive: true })
   const entries = discoverCardSlugs(sourcesDir)
   if (entries.length === 0) {
@@ -196,8 +209,8 @@ async function encodeCardBatch(label, sourcesDir, outDir) {
       const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
         input,
         output,
-        CARD_WIDTH,
-        CARD_HEIGHT,
+        width,
+        height,
       )
       console.log(
         `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
@@ -320,6 +333,8 @@ missing += await encodeCardBatch(
   "Background card art",
   BACKGROUND_CARD_SOURCES,
   BACKGROUND_CARD_OUT,
+  BACKGROUND_CARD_WIDTH,
+  BACKGROUND_CARD_HEIGHT,
 )
 missing += await encodeCardBatch("Species card art", SPECIES_CARD_SOURCES, SPECIES_CARD_OUT)
 missing += await encodeCardBatch("Spell card art", SPELL_CARD_SOURCES, SPELL_CARD_OUT)

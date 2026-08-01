@@ -1,24 +1,19 @@
 import { withBasePath } from "@/lib/config/deploy-mode"
 
-const DUMPSTAT_WOTC_BACKGROUNDS =
-  "https://jeffginger.com/dumpstat/wotc/backgrounds"
-
 const bundledBackgroundCardImage = (slug: string) =>
   withBasePath(`/images/compendium/backgrounds/${slug}.png`)
 
-const hostedBackgroundCardImage = (filename: string) =>
-  `${DUMPSTAT_WOTC_BACKGROUNDS}/${encodeURIComponent(filename)}`
-
 /**
- * Prefer optimized local card art when present under public/images/compendium/backgrounds/.
- * Hosted dumpstat URLs remain as fallbacks for names without a bundled file.
+ * Bundled background card art under public/images/compendium/backgrounds/.
+ * Matched by background **name** (any source label) — never remote dumpstat hosts.
+ * Names without a local file stay blank until art is uploaded.
  */
 export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
-  // Bundled (PHB / Eberron / Planescape / Ravenloft — optimized via scripts/background-card-sources)
   "Aberrant Heir": bundledBackgroundCardImage("aberrant-heir"),
   Acolyte: bundledBackgroundCardImage("acolyte"),
   Archaeologist: bundledBackgroundCardImage("archaeologist"),
   Artisan: bundledBackgroundCardImage("artisan"),
+  Carouser: bundledBackgroundCardImage("carouser"),
   Charlatan: bundledBackgroundCardImage("charlatan"),
   Criminal: bundledBackgroundCardImage("criminal"),
   Entertainer: bundledBackgroundCardImage("entertainer"),
@@ -42,6 +37,7 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "House Tharashk Heir": bundledBackgroundCardImage("house-tharashk-heir"),
   "House Thuranni Heir": bundledBackgroundCardImage("house-thuranni-heir"),
   "House Vadalis Heir": bundledBackgroundCardImage("house-vadalis-heir"),
+  Inquisitive: bundledBackgroundCardImage("inquisitive"),
   Investigator: bundledBackgroundCardImage("investigator"),
   Merchant: bundledBackgroundCardImage("merchant"),
   "Mist Wanderer": bundledBackgroundCardImage("mist-wanderer"),
@@ -56,32 +52,8 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Vampire Devotee": bundledBackgroundCardImage("vampire-devotee"),
   "Vampire Survivor": bundledBackgroundCardImage("vampire-survivor"),
   Wayfarer: bundledBackgroundCardImage("wayfarer"),
-  Carouser: bundledBackgroundCardImage("carouser"),
-  Inquisitive: bundledBackgroundCardImage("inquisitive"),
-
-  // Hosted-only fallbacks (no bundled source yet)
-  "Chondathan Freebooter": hostedBackgroundCardImage("Chondathan Freebooter.jpeg"),
-  "Dead Magic Dweller": hostedBackgroundCardImage("Dead Magic Dweller.jpeg"),
-  "Dragon Cultist": hostedBackgroundCardImage("Dragon Cultist.jpeg"),
-  "Emerald Enclave Caretaker": hostedBackgroundCardImage("Emerald Enclave Caretaker.jpeg"),
-  "Flaming Fist Mercenary": hostedBackgroundCardImage("Flaming Fist Mercenary.jpeg"),
-  "Genie Touched": hostedBackgroundCardImage("Genie Touched.jpeg"),
-  Harper: hostedBackgroundCardImage("Harper.jpeg"),
-  "Ice Fisher": hostedBackgroundCardImage("Ice Fisher.jpeg"),
-  "Knight of the Gauntlet": hostedBackgroundCardImage("Knight of the Gauntlet.jpeg"),
-  "Lords' Alliance Vassal": hostedBackgroundCardImage("Lords' Alliance Vassal.jpeg"),
-  "Lorwyn Expert": hostedBackgroundCardImage("Lorwyn Expert.jpeg"),
-  "Moonwell Pilgrim": hostedBackgroundCardImage("Moonwell Pilgrim.jpeg"),
-  "Mulhorandi Tomb Raider": hostedBackgroundCardImage("Mulhorandi Tomb Raider.jpeg"),
-  Mythalkeeper: hostedBackgroundCardImage("Mythalkeeper.jpeg"),
-  "Pact Seeker": hostedBackgroundCardImage("Pact Seeker.jpeg"),
-  "Purple Dragon Squire": hostedBackgroundCardImage("Purple Dragon Squire.jpeg"),
-  "Rashemi Wanderer": hostedBackgroundCardImage("Rashemi Wanderer.jpeg"),
-  "Shadowmasters Exile": hostedBackgroundCardImage("Shadowmasters Exile.jpeg"),
-  "Spellfire Initiate": hostedBackgroundCardImage("Spellfire Initiate.jpeg"),
-  "Zhentarim Mercenary": hostedBackgroundCardImage("Zhentarim Mercenary.jpeg"),
 }
 
 export function defaultBackgroundCardImageUrl(backgroundName: string): string | null {
-  return SRD_BACKGROUND_CARD_IMAGES_BY_NAME[backgroundName] ?? null
+  return SRD_BACKGROUND_CARD_IMAGES_BY_NAME[backgroundName.trim()] ?? null
 }

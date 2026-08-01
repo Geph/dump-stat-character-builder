@@ -284,9 +284,10 @@ export function ClipboardImportPanel({
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={6} className="max-w-[280px] text-left text-balance">
-                    Source label is stored on imported entries so you can filter by book or homebrew
-                    name. Use Match existing to reuse a label already on your homebrew content (SRD
-                    and System excluded).
+                    Default is Auto-detect: keep each entry&apos;s own source from the import JSON when
+                    present, otherwise store Custom. Type a label to force one source on every row, or
+                    use Match existing to reuse a label already on your homebrew content (SRD and
+                    System excluded).
                     {contentType === "subclasses" ? (
                       <>
                         {" "}
@@ -304,7 +305,7 @@ export function ClipboardImportPanel({
                 type="text"
                 value={materialSource}
                 onChange={(event) => onMaterialSourceChange(event.target.value)}
-                placeholder="e.g. MCDM, Homebrew"
+                placeholder="Auto-detect"
                 className="flex-1 min-w-0 px-3 py-1.5 bg-muted rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-lime text-sm"
               />
               <DropdownMenu
@@ -325,6 +326,16 @@ export function ClipboardImportPanel({
                 <DropdownMenuContent align="end" className="max-h-64 w-64 overflow-y-auto">
                   <DropdownMenuLabel>Imported sources (excludes SRD / System)</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={() => onMaterialSourceChange("")}
+                  >
+                    Auto-detect
+                    {!materialSource.trim() ? (
+                      <Check className="ml-auto h-3.5 w-3.5 text-primary" aria-hidden />
+                    ) : null}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   {loadingExistingSources ? (
                     <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -334,7 +345,8 @@ export function ClipboardImportPanel({
                     <p className="px-2 py-2 text-xs text-destructive">{existingSourcesError}</p>
                   ) : existingSources.length === 0 ? (
                     <p className="px-2 py-2 text-xs text-muted-foreground leading-relaxed">
-                      No non-SRD sources in the compendium yet. Type a new label above.
+                      No non-SRD sources in the compendium yet. Leave Auto-detect or type a new
+                      label above.
                     </p>
                   ) : (
                     existingSources.map((source) => (

@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import {
   getCompendiumCardImageUrl,
+  WIDE_CARD_ASPECT_CLASS,
   type CompendiumCardImageCrop,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
@@ -65,8 +66,8 @@ type CompendiumDetailOverlayProps = {
   imageCrop?: CompendiumCardImageCrop
   /** Default 80vw; narrow 64vw; slim 48vw; compact = text-only dialog; portrait variants tune detail strip height. */
   panelWidth?: "default" | "narrow" | "slim" | "compact" | PortraitPanelWidth
-  /** `balanced` splits hero and detail strip evenly (background wide cards). */
-  heroLayout?: "default" | "balanced"
+  /** `balanced` splits hero and detail strip evenly; `widescreen` locks the hero to 21:9. */
+  heroLayout?: "default" | "balanced" | "widescreen"
 }
 
 export function CompendiumDetailOverlay({
@@ -103,6 +104,7 @@ export function CompendiumDetailOverlay({
           ? "w-[64vw] max-w-[64vw]"
           : "w-[80vw] max-w-[80vw]"
   const isBalancedHero = heroLayout === "balanced"
+  const isWidescreenHero = heroLayout === "widescreen"
   const [portraitDetailSheetOpen, setPortraitDetailSheetOpen] = useState(false)
 
   useEffect(() => {
@@ -207,7 +209,11 @@ export function CompendiumDetailOverlay({
                 "relative min-h-0 overflow-hidden",
                 isPortraitCompendiumPanel && "h-full w-full lg:h-full lg:w-auto lg:shrink-0 lg:flex-none",
                 !isPortraitCompendiumPanel &&
-                  (isPortraitPanel || isBalancedHero ? "w-full flex-1" : "w-full flex-[3]"),
+                  (isWidescreenHero
+                    ? "w-full shrink-0"
+                    : isPortraitPanel || isBalancedHero
+                      ? "w-full flex-1"
+                      : "w-full flex-[3]"),
               )}
             >
               <div
@@ -215,7 +221,9 @@ export function CompendiumDetailOverlay({
                   "relative overflow-hidden",
                   isPortraitCompendiumPanel
                     ? "h-full w-full lg:aspect-[3/4] lg:h-full lg:max-h-full"
-                    : "h-full w-full",
+                    : isWidescreenHero
+                      ? cn(WIDE_CARD_ASPECT_CLASS, "w-full")
+                      : "h-full w-full",
                 )}
               >
                 <CompendiumCardHero

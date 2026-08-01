@@ -16,7 +16,7 @@ function BackgroundDetailField({ label, children }: { label: string; children: R
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</p>
-      <div className="mt-0.5 text-[11px] leading-snug text-white/90">{children}</div>
+      <div className="mt-0.5 text-sm leading-snug text-white/90">{children}</div>
     </div>
   )
 }
@@ -44,14 +44,14 @@ export function BackgroundDetailStrip({
 
   if (layout === "stacked") {
     return (
-      <div className="space-y-2 overflow-y-auto pr-0.5">
+      <div className="space-y-3 overflow-y-auto pr-0.5 text-sm">
         {background.description?.trim() ? (
           <RichTextContent
             html={background.description}
-            className="text-[11px] leading-snug [&_p]:text-white/85"
+            className="text-sm leading-relaxed [&_p]:text-white/85"
           />
         ) : (
-          <p className="text-[11px] text-white/70">No description listed.</p>
+          <p className="text-sm text-white/70">No description listed.</p>
         )}
         {abilityBonusSummary ? (
           <BackgroundDetailField label="Ability Bonuses">{abilityBonusSummary}</BackgroundDetailField>
@@ -67,7 +67,7 @@ export function BackgroundDetailStrip({
             {grantedFeat?.description ? (
               <RichTextContent
                 html={grantedFeat.description}
-                className="mt-1 [&_p]:text-white/75"
+                className="mt-1 text-sm [&_p]:text-white/75"
               />
             ) : null}
           </BackgroundDetailField>

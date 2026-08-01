@@ -56,6 +56,55 @@ describe("import-card-art", () => {
     expect(map[importCardArtTargetKey("classes", 0)]).toBe("")
   })
 
+  it("seeds bundled card defaults when the import row has no URL", () => {
+    const withKnownNames: ImportContent = {
+      classes: [{ name: "Barbarian", description: null, hit_die: 12, primary_ability: ["STR"], features: [] }],
+      subclasses: [
+        {
+          name: "Path of the Berserker",
+          class_name: "Barbarian",
+          description: null,
+          features: [],
+        },
+      ],
+      backgrounds: [
+        {
+          name: "Acolyte",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: null,
+          ability_bonuses: null,
+        },
+      ],
+    }
+    const map = buildInitialImportCardArtUrlMap(withKnownNames)
+    expect(map[importCardArtTargetKey("classes", 0)]).toMatch(/\/images\/compendium\/classes\/barbarian\.png$/)
+    expect(map[importCardArtTargetKey("subclasses", 0)]).toMatch(
+      /\/images\/compendium\/subclasses\/path-of-the-berserker\.png$/,
+    )
+    expect(map[importCardArtTargetKey("backgrounds", 0)]).toMatch(
+      /\/images\/compendium\/backgrounds\/acolyte\.png$/,
+    )
+  })
+
+  it("prefers an explicit import URL over a bundled default", () => {
+    const withOverride: ImportContent = {
+      subclasses: [
+        {
+          name: "Path of the Berserker",
+          class_name: "Barbarian",
+          description: null,
+          features: [],
+          card_image_url: "https://example.com/custom-berserker.png",
+        },
+      ],
+    }
+    const map = buildInitialImportCardArtUrlMap(withOverride)
+    expect(map[importCardArtTargetKey("subclasses", 0)]).toBe(
+      "https://example.com/custom-berserker.png",
+    )
+  })
+
   it("applies review URLs onto matching rows by stable index keys", () => {
     const urlMap = {
       [importCardArtTargetKey("classes", 0)]: "https://example.com/witch.png",

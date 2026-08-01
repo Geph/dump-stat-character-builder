@@ -10,6 +10,7 @@ import { importDumpStatExportItems, parseDumpStatExportJson } from "@/lib/import
 import { parseFoundryInput } from "@/lib/import/parse-foundry-dnd5e"
 import { respondToFoundryParseResult } from "@/lib/import/foundry-import-route"
 import { finalizeImportedContent } from "@/lib/import/finalize-import"
+import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
 import { normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
       collisions,
       materialSource,
       cardArtUrlMap,
+      skippedPreviewKeys,
       customAbilityCategory,
       classResourceLabels,
       subclassMatchClassName,
@@ -52,7 +54,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: configError }, { status: 503 })
       }
 
-      const multiClassBlock = getMultipleClassImportBlock(pendingContent, "text")
+      const previewSkipKeys = Array.isArray(skippedPreviewKeys) ? skippedPreviewKeys : []
+      const contentForGate = stripSkippedImportPreviewItems(pendingContent, previewSkipKeys)
+      const multiClassBlock = getMultipleClassImportBlock(contentForGate, "text")
       if (multiClassBlock) {
         return NextResponse.json(
           {
@@ -78,6 +82,7 @@ export async function POST(request: NextRequest) {
         {
           preferSameSourceReplacements: Boolean(preferSameSourceReplacements),
         },
+        previewSkipKeys,
       )
 
       return NextResponse.json({

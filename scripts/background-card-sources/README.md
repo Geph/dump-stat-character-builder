@@ -4,10 +4,12 @@ Drop **full-resolution** background card art here, then run:
 pnpm images:optimize
 ```
 
-Sources are matched by slug basename (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`).
+Sources are matched by slug basename (`.png` preferred over `.jpg` / `.webp`).
 
 Examples: `acolyte`, `gate-warden`, `house-cannith-heir`, `planar-philosopher`.
 
-Output: `public/images/compendium/backgrounds/*.png` at **771×1024**.
+Output: `public/images/compendium/backgrounds/*.png` at **1680×720** (**21:9** landscape).
 
-Source files here are gitignored — only the optimized outputs in `public/images/` are committed. Hosted remote fallbacks remain in `lib/compendium/background-card-images-defaults.ts` for names without a bundled file.
+Other card types (classes, subclasses, species, spells) stay **771×1024** (**3:4** portrait).
+
+Source files here are gitignored — only the optimized outputs in `public/images/` are committed.

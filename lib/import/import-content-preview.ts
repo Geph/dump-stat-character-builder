@@ -12,6 +12,17 @@ export type ImportContentPreviewDetail = {
 
 export type ImportContentPreviewNameKind = "class" | "subclass"
 
+/** Content arrays that appear in the import review preview list. */
+export type ImportContentPreviewSectionKey =
+  | "classes"
+  | "species"
+  | "backgrounds"
+  | "subclasses"
+  | "feats"
+  | "creatures"
+  | "spells"
+  | "equipment"
+
 export type ImportContentPreviewItem = {
   id: string
   name: string
@@ -24,17 +35,57 @@ export type ImportContentPreviewItem = {
   cardArtTab?: CompendiumContentType
   /** When set with sourceIndex, the review UI allows editing this row's name. */
   nameKind?: ImportContentPreviewNameKind
-  /** Index into the import content array for renames / card art. */
-  sourceIndex?: number
+  /** Preview section this row belongs to (for skip-import). */
+  sectionKey: ImportContentPreviewSectionKey
+  /** Index into the import content array for renames / card art / skip. */
+  sourceIndex: number
 }
 
 export type ImportContentPreviewSection = {
-  key: string
+  key: ImportContentPreviewSectionKey
   label: string
   items: ImportContentPreviewItem[]
 }
 
 const PREVIEW_LIMIT = 16
+
+export function importPreviewSkipKey(
+  sectionKey: ImportContentPreviewSectionKey,
+  sourceIndex: number,
+): string {
+  return `${sectionKey}:${sourceIndex}`
+}
+
+export function importPreviewItemSkipKey(item: Pick<ImportContentPreviewItem, "sectionKey" | "sourceIndex">): string {
+  return importPreviewSkipKey(item.sectionKey, item.sourceIndex)
+}
+
+/** Drop rows the user skipped in the content preview (independent of collision skip). */
+export function stripSkippedImportPreviewItems(
+  content: ImportContent,
+  skippedKeys: ReadonlySet<string> | readonly string[],
+): ImportContent {
+  const skipped = skippedKeys instanceof Set ? skippedKeys : new Set(skippedKeys)
+  if (!skipped.size) return content
+
+  const keep = <T,>(section: ImportContentPreviewSectionKey, rows: T[] | undefined): T[] | undefined => {
+    if (!rows?.length) return rows
+    const next = rows.filter((_, index) => !skipped.has(importPreviewSkipKey(section, index)))
+    return next.length ? next : undefined
+  }
+
+  return {
+    ...content,
+    classes: keep("classes", content.classes),
+    species: keep("species", content.species),
+    backgrounds: keep("backgrounds", content.backgrounds),
+    subclasses: keep("subclasses", content.subclasses),
+    feats: keep("feats", content.feats),
+    creatures: keep("creatures", content.creatures),
+    spells: keep("spells", content.spells),
+    equipment: keep("equipment", content.equipment),
+  }
+}
 
 function snippet(text: string | null | undefined, max = 200): string | undefined {
   if (!text?.trim()) return undefined
@@ -79,9 +130,8 @@ function previewSpells(content: ImportContent): ImportContentPreviewSection | nu
   const spells = content.spells
   if (!spells?.length) return null
 
-  const items = [...spells]
-    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
-    .map((spell) => {
+  const items = spells
+    .map((spell, index) => {
       const details: ImportContentPreviewDetail[] = [
         { label: "Level", value: spellLevelLabel(spell.level) },
         { label: "School", value: spell.school },
@@ -105,12 +155,19 @@ function previewSpells(content: ImportContent): ImportContentPreviewSection | nu
       }
 
       return {
-        id: `spell:${spell.name}`,
+        id: `spell:${index}:${spell.name}`,
         name: spell.name,
         details,
         badges,
         descriptionSnippet: snippet(spell.description),
+        sectionKey: "spells" as const,
+        sourceIndex: index,
       }
+    })
+    .sort((a, b) => {
+      const spellA = spells[a.sourceIndex]!
+      const spellB = spells[b.sourceIndex]!
+      return spellA.level - spellB.level || a.name.localeCompare(b.name)
     })
 
   return { key: "spells", label: "Spells", items }
@@ -120,9 +177,8 @@ function previewEquipment(content: ImportContent): ImportContentPreviewSection |
   const equipment = content.equipment
   if (!equipment?.length) return null
 
-  const items = [...equipment]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((row) => {
+  const items = equipment
+    .map((row, index) => {
       const item = row as Equipment & {
         magic_effects?: unknown[]
         linkedModifiers?: unknown[]
@@ -160,13 +216,16 @@ function previewEquipment(content: ImportContent): ImportContentPreviewSection |
       if (isMagicItem(item)) badges.push("Magic item")
 
       return {
-        id: `equipment:${item.name}`,
+        id: `equipment:${index}:${item.name}`,
         name: item.name,
         details,
         badges,
         descriptionSnippet: snippet(item.description),
+        sectionKey: "equipment" as const,
+        sourceIndex: index,
       }
     })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   return { key: "equipment", label: "Equipment & magic items", items }
 }
@@ -206,6 +265,7 @@ function previewClasses(content: ImportContent): ImportContentPreviewSection | n
       cardArtKey: importCardArtTargetKey("classes", index),
       cardArtTab: "classes" as const,
       nameKind: "class" as const,
+      sectionKey: "classes" as const,
       sourceIndex: index,
     }
   })
@@ -242,6 +302,7 @@ function previewSubclasses(content: ImportContent): ImportContentPreviewSection 
         cardArtKey: importCardArtTargetKey("subclasses", index),
         cardArtTab: "subclasses" as const,
         nameKind: "subclass" as const,
+        sectionKey: "subclasses" as const,
         sourceIndex: index,
       }
     })
@@ -253,9 +314,8 @@ function previewFeats(content: ImportContent): ImportContentPreviewSection | nul
   const feats = content.feats
   if (!feats?.length) return null
 
-  const items = [...feats]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((feat) => {
+  const items = feats
+    .map((feat, index) => {
       const details: ImportContentPreviewDetail[] = []
       if (feat.category) details.push({ label: "Category", value: feat.category })
       if (feat.prerequisite) details.push({ label: "Prerequisite", value: feat.prerequisite })
@@ -273,13 +333,16 @@ function previewFeats(content: ImportContent): ImportContentPreviewSection | nul
       }
 
       return {
-        id: `feat:${feat.name}`,
+        id: `feat:${index}:${feat.name}`,
         name: feat.name,
         details,
         badges: [],
         descriptionSnippet: snippet(feat.description),
+        sectionKey: "feats" as const,
+        sourceIndex: index,
       }
     })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   return { key: "feats", label: "Feats", items }
 }
@@ -288,9 +351,8 @@ function previewCreatures(content: ImportContent): ImportContentPreviewSection |
   const creatures = content.creatures
   if (!creatures?.length) return null
 
-  const items = [...creatures]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((creature) => {
+  const items = creatures
+    .map((creature, index) => {
       const details: ImportContentPreviewDetail[] = []
       if (creature.creature_type) details.push({ label: "Type", value: creature.creature_type })
       if (creature.size) details.push({ label: "Size", value: creature.size })
@@ -305,7 +367,7 @@ function previewCreatures(content: ImportContent): ImportContentPreviewSection |
       appendPrerequisiteRules(details, creature)
 
       return {
-        id: `creature:${creature.name}`,
+        id: `creature:${index}:${creature.name}`,
         name: creature.name,
         details,
         badges: [
@@ -313,8 +375,11 @@ function previewCreatures(content: ImportContent): ImportContentPreviewSection |
           ...(creature.cr ? [`CR ${creature.cr}`] : []),
         ],
         descriptionSnippet: snippet(creature.description),
+        sectionKey: "creatures" as const,
+        sourceIndex: index,
       }
     })
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   return { key: "creatures", label: "Creatures & Companions", items }
 }
@@ -323,27 +388,29 @@ function previewSpecies(content: ImportContent): ImportContentPreviewSection | n
   const species = content.species
   if (!species?.length) return null
 
-  const items = species.map((row) => ({
-    id: `species:${row.name}`,
+  const items = species.map((row, index) => ({
+    id: `species:${index}:${row.name}`,
     name: row.name,
     details: [
-      { label: "Size", value: row.size },
+      { label: "Size", value: row.size ?? "—" },
       { label: "Speed", value: `${row.speed} ft.` },
       { label: "Traits", value: String(row.traits?.length ?? 0) },
       ...(row.prerequisite_rules ?? []).map((rule) => formatPrerequisiteRule(rule)),
     ],
-    badges: [],
+    badges: [] as string[],
     descriptionSnippet: snippet(row.description),
+    sectionKey: "species" as const,
+    sourceIndex: index,
   }))
 
-  return { key: "species", label: "Species", items: items as ImportContentPreviewItem[] }
+  return { key: "species", label: "Species", items }
 }
 
 function previewBackgrounds(content: ImportContent): ImportContentPreviewSection | null {
   const backgrounds = content.backgrounds
   if (!backgrounds?.length) return null
 
-  const items = backgrounds.map((row) => {
+  const items = backgrounds.map((row, index) => {
     const details: ImportContentPreviewDetail[] = []
     if (row.skill_proficiencies?.length) {
       details.push({ label: "Skills", value: row.skill_proficiencies.join(", ") })
@@ -351,11 +418,13 @@ function previewBackgrounds(content: ImportContent): ImportContentPreviewSection
     if (row.feat_granted) details.push({ label: "Feat", value: row.feat_granted })
     appendPrerequisiteRules(details, row)
     return {
-      id: `background:${row.name}`,
+      id: `background:${index}:${row.name}`,
       name: row.name,
       details,
-      badges: [],
+      badges: [] as string[],
       descriptionSnippet: snippet(row.description),
+      sectionKey: "backgrounds" as const,
+      sourceIndex: index,
     }
   })
 

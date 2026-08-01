@@ -8,7 +8,9 @@ Sources are matched by slug basename (first extension wins among `.png` / `.jpg`
 
 Examples: `elf`, `warforged`, `kalashtar`, `khoravar`.
 
-Output: `public/images/compendium/species/*.png` at **771×1024**.
+Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portrait).
+
+Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
 
 Wire display names → slugs in `lib/compendium/species-card-images-defaults.ts`.
 

@@ -39,7 +39,10 @@ export function CompendiumCardHero({
   minHeightClass,
   maxHeightClass,
 }: CompendiumCardHeroProps) {
-  const imageClass = compendiumCardHeroImageClass(crop)
+  // Detail overlays: prefer full graphic height (clip sides) over top/bottom crop.
+  const effectiveCrop =
+    variant === "overlay" && fillHeight && crop !== "top" ? "height" : crop
+  const imageClass = compendiumCardHeroImageClass(effectiveCrop)
 
   return (
     <div
