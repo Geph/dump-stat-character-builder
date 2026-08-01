@@ -85,7 +85,7 @@ describe("import-card-art", () => {
           traits: [],
         },
         {
-          name: "Aasimar (2014)",
+          name: "Aasimar (2022)",
           description: null,
           speed: 30,
           size: "Medium",
@@ -97,6 +97,14 @@ describe("import-card-art", () => {
           speed: 30,
           size: "Medium",
           traits: [],
+        },
+        {
+          name: "Dhakaani Ghaal'dar (Hobgoblin)",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+          card_image_url: "https://jeffginger.com/dumpstat/wotc/species/Ghaaldar.jpeg",
         },
       ],
     }
@@ -112,10 +120,13 @@ describe("import-card-art", () => {
       /\/images\/compendium\/species\/aasimar\.png$/,
     )
     expect(map[importCardArtTargetKey("species", 1)]).toMatch(
-      /\/images\/compendium\/species\/aasimar-2014\.png$/,
+      /\/images\/compendium\/species\/aasimar-2022\.png$/,
     )
     expect(map[importCardArtTargetKey("species", 2)]).toMatch(
       /\/images\/compendium\/species\/changeling\.png$/,
+    )
+    expect(map[importCardArtTargetKey("species", 3)]).toMatch(
+      /\/images\/compendium\/species\/dhakaani-ghaaldar\.png$/,
     )
   })
 

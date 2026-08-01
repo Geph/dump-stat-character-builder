@@ -9,6 +9,7 @@ Sources are matched by slug basename (first extension wins among `.png` / `.jpg`
 Examples: `elf`, `warforged`, `kalashtar`, `astral-elf`, `autognome`, `plasmoid`.
 
 Prefer `aasimar-2024` / `changeling-2024` source basenames for the canonical `aasimar` / `changeling` outputs.
+Use `aasimar-2022` / `changeling-2022` for MotM portraits (import names `Aasimar (2022)` / `Changeling (2022)`). True 2014 Volo’s-era art can be added later as `*-2014` if needed.
 
 Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portrait).
 

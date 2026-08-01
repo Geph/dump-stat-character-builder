@@ -104,6 +104,7 @@ function resolveSourcePath(basenames, assetsDir = ASSETS) {
 /**
  * Source basenames → output basenames (without extension).
  * Keeps Drive’s `aasimar-2024` / `changeling-2024` masters while shipping canonical URLs.
+ * MotM portraits stay year-suffixed (`aasimar-2022`, `changeling-2022`).
  */
 const CARD_OUTPUT_SLUG_ALIASES = {
   "aasimar-2024": "aasimar",

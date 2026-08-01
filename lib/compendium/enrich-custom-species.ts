@@ -1064,8 +1064,8 @@ const SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
     ],
   },
 
-  // —— Elf (Lorwyn / Shadowmoor lineages) ——
-  "Elf::Elven Lineage::Lorwyn Elf": {
+  // —— Lorwyn Elf (separate Lorwyn-Shadowmoor species; Elf base + lineages) ——
+  "Lorwyn Elf::Elven Lineage::Lorwyn Elf": {
     linkedModifiers: [
       spellcastingAbilityChoice("lorwyn_elf_lineage_ability"),
       spellsKnownFixed(
@@ -1079,7 +1079,7 @@ const SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
       ),
     ],
   },
-  "Elf::Elven Lineage::Shadowmoor Elf": {
+  "Lorwyn Elf::Elven Lineage::Shadowmoor Elf": {
     linkedModifiers: [
       vision(120, "darkvision", "Shadowmoor Elf darkvision 120 ft."),
       spellcastingAbilityChoice("shadowmoor_elf_lineage_ability"),

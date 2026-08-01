@@ -5,7 +5,7 @@ import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
 import { SRD_SUBCLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/subclass-card-images-defaults"
 
 describe("subclass card images", () => {
-  it("maps Drive-approved subclasses including Psion and Inventor", () => {
+  it("maps Drive-approved subclasses including Psion, Inventor, and Artificer", () => {
     expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Champion).toMatch(
       /\/images\/compendium\/subclasses\/champion\.png$/,
     )
@@ -15,7 +15,12 @@ describe("subclass card images", () => {
     expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Gadgetsmith).toMatch(
       /\/images\/compendium\/subclasses\/gadgetsmith\.png$/,
     )
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Alchemist).toBeUndefined()
+    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Alchemist).toMatch(
+      /\/images\/compendium\/subclasses\/alchemist\.png$/,
+    )
+    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Shadow Sorcery"]).toMatch(
+      /\/images\/compendium\/subclasses\/shadow-magic\.png$/,
+    )
   })
 
   it("ships an optimized image file for every mapped subclass", () => {
@@ -26,6 +31,24 @@ describe("subclass card images", () => {
         true,
       )
     }
+  })
+
+  it("wires every scripts/subclass-card-sources slug into defaults", () => {
+    const sourcesDir = path.join(process.cwd(), "scripts/subclass-card-sources")
+    if (!fs.existsSync(sourcesDir)) return
+    const sourceSlugs = fs
+      .readdirSync(sourcesDir)
+      .filter((entry) => /\.(png|jpe?g|webp)$/i.test(entry))
+      .map((entry) => path.basename(entry, path.extname(entry)))
+      .sort()
+    const mappedSlugs = [
+      ...new Set(
+        Object.values(SRD_SUBCLASS_CARD_IMAGES_BY_NAME).map((url) =>
+          path.basename(url).replace(/\.png$/, ""),
+        ),
+      ),
+    ].sort()
+    expect(mappedSlugs).toEqual(sourceSlugs)
   })
 
   it("enriches subclass rows with default card art when unset", () => {

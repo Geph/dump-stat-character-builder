@@ -107,11 +107,36 @@ describe("WOTC species wiring", () => {
 
     const elf = enriched.species?.find((s) => s.name === "Elf")
     const lineage = (elf?.traits as TraitRow[] | undefined)?.find((t) => t.name === "Elven Lineage")
-    expect((lineage?.choices?.options ?? []).map((o) => o.name)).toEqual(
-      expect.arrayContaining(["Drow", "High Elf", "Wood Elf", "Lorwyn Elf", "Shadowmoor Elf"]),
-    )
+    expect((lineage?.choices?.options ?? []).map((o) => o.name)).toEqual([
+      "Drow",
+      "High Elf",
+      "Wood Elf",
+    ])
     expect(
       (lineage?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0),
+    ).toBe(true)
+
+    const lorwynElf = enriched.species?.find((s) => s.name === "Lorwyn Elf")
+    const lorwynLineage = (lorwynElf?.traits as TraitRow[] | undefined)?.find(
+      (t) => t.name === "Elven Lineage",
+    )
+    expect((lorwynLineage?.choices?.options ?? []).map((o) => o.name)).toEqual([
+      "Lorwyn Elf",
+      "Shadowmoor Elf",
+    ])
+    expect(
+      (lorwynLineage?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0),
+    ).toBe(true)
+
+    const flamekin = enriched.species?.find((s) => s.name === "Flamekin")
+    expect((flamekin?.traits as TraitRow[] | undefined)?.map((t) => t.name)).toEqual([
+      "Size",
+      "Darkvision",
+      "Fire Resistance",
+      "Reach to the Blaze",
+    ])
+    expect(
+      ((flamekin?.traits as TraitRow[] | undefined) ?? []).every((t) => traitHasWiring(t)),
     ).toBe(true)
 
     const goliath = enriched.species?.find((s) => s.name === "Goliath")

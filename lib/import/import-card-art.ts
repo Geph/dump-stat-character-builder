@@ -1,6 +1,7 @@
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import {
   compendiumUsesPortraitCardArt,
+  isHostedDumpstatCardImageUrl,
   normalizeCardImageUrl,
 } from "@/lib/compendium/card-image"
 import { defaultBackgroundCardImageUrl } from "@/lib/compendium/background-card-images-defaults"
@@ -89,7 +90,13 @@ function rowInitialUrl(
   section: ImportCardArtSection,
   row: { name: string; card_image_url?: string | null },
 ): string | null {
-  return normalizeCardImageUrl(row.card_image_url) ?? defaultImportCardArtUrl(section, row.name)
+  const existing = normalizeCardImageUrl(row.card_image_url)
+  const bundled = defaultImportCardArtUrl(section, row.name)
+  // Prefer bundled defaults over dumpstat hosts (same rule as applyBundledCardImage).
+  if (existing && isHostedDumpstatCardImageUrl(existing)) {
+    return bundled
+  }
+  return existing ?? bundled
 }
 
 function pushTargets<T extends { name: string; card_image_url?: string | null }>(

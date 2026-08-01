@@ -74,7 +74,7 @@ describe("stripSkippedImportPreviewItems", () => {
   it("drops preview soft-skips without touching other sections", () => {
     const content = {
       species: [
-        { name: "Aasimar (2014)", size: "Medium", speed: 30, traits: [] },
+        { name: "Aasimar (2022)", size: "Medium", speed: 30, traits: [] },
         { name: "Elf", size: "Medium", speed: 30, traits: [] },
       ],
       feats: [{ name: "Alert", description: "Always ready." }],
