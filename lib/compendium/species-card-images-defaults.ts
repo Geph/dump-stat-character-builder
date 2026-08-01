@@ -4,16 +4,21 @@ const speciesCardImage = (slug: string) => withBasePath(`/images/compendium/spec
 
 /**
  * Default card art for species — files live under public/images/compendium/species/.
- * Matched by species **name** on import (any source). Prefer 2024 art for Aasimar / Changeling.
+ * Matched by species **name** on import (any source).
+ * Aasimar / Changeling: plain name (and "(2024)") use 2024 art; "(2014)" uses the legacy portrait.
  */
 export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Aarakocra: speciesCardImage("aarakocra"),
   Aasimar: speciesCardImage("aasimar"),
+  "Aasimar (2014)": speciesCardImage("aasimar-2014"),
+  "Aasimar (2024)": speciesCardImage("aasimar"),
   "Astral Elf": speciesCardImage("astral-elf"),
   Autognome: speciesCardImage("autognome"),
   Bugbear: speciesCardImage("bugbear"),
   Centaur: speciesCardImage("centaur"),
   Changeling: speciesCardImage("changeling"),
+  "Changeling (2014)": speciesCardImage("changeling-2014"),
+  "Changeling (2024)": speciesCardImage("changeling"),
   "Deep Gnome": speciesCardImage("deep-gnome"),
   Dhampir: speciesCardImage("dhampir"),
   Dragonborn: speciesCardImage("dragonborn"),

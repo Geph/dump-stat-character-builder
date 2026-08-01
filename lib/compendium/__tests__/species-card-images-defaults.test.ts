@@ -15,11 +15,15 @@ describe("species card images", () => {
       [
         "Aarakocra",
         "Aasimar",
+        "Aasimar (2014)",
+        "Aasimar (2024)",
         "Astral Elf",
         "Autognome",
         "Bugbear",
         "Centaur",
         "Changeling",
+        "Changeling (2014)",
+        "Changeling (2024)",
         "Deep Gnome",
         "Dhampir",
         "Dragonborn",
@@ -52,6 +56,20 @@ describe("species card images", () => {
     )
     expect(SPECIES_CARD_IMAGES_BY_NAME.Autognome).toMatch(
       /\/images\/compendium\/species\/autognome\.png$/,
+    )
+    expect(SPECIES_CARD_IMAGES_BY_NAME.Aasimar).toMatch(/\/images\/compendium\/species\/aasimar\.png$/)
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Aasimar (2014)"]).toMatch(
+      /\/images\/compendium\/species\/aasimar-2014\.png$/,
+    )
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Aasimar (2024)"]).toBe(SPECIES_CARD_IMAGES_BY_NAME.Aasimar)
+    expect(SPECIES_CARD_IMAGES_BY_NAME.Changeling).toMatch(
+      /\/images\/compendium\/species\/changeling\.png$/,
+    )
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Changeling (2014)"]).toMatch(
+      /\/images\/compendium\/species\/changeling-2014\.png$/,
+    )
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Changeling (2024)"]).toBe(
+      SPECIES_CARD_IMAGES_BY_NAME.Changeling,
     )
   })
 
@@ -95,6 +113,27 @@ describe("species card images", () => {
   it("applies bundled art to custom species when name matches", () => {
     const row = enrichCustomSpeciesRow({ name: "Tabaxi", source: "Custom", traits: [] })
     expect(row.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Tabaxi)
+  })
+
+  it("uses distinct 2014 vs 2024 Aasimar and Changeling portraits", () => {
+    const aasimar2014 = enrichCustomSpeciesRow({
+      name: "Aasimar (2014)",
+      source: "Custom",
+      traits: [],
+    })
+    const aasimar = enrichCustomSpeciesRow({ name: "Aasimar", source: "Custom", traits: [] })
+    const changeling2014 = enrichCustomSpeciesRow({
+      name: "Changeling (2014)",
+      source: "Custom",
+      traits: [],
+    })
+    const changeling = enrichCustomSpeciesRow({ name: "Changeling", source: "Custom", traits: [] })
+    expect(aasimar2014.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME["Aasimar (2014)"])
+    expect(aasimar.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Aasimar)
+    expect(aasimar2014.card_image_url).not.toBe(aasimar.card_image_url)
+    expect(changeling2014.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME["Changeling (2014)"])
+    expect(changeling.card_image_url).toBe(SPECIES_CARD_IMAGES_BY_NAME.Changeling)
+    expect(changeling2014.card_image_url).not.toBe(changeling.card_image_url)
   })
 
   it("enriches species list with card art for SRD and custom rows", () => {

@@ -101,6 +101,15 @@ function resolveSourcePath(basenames, assetsDir = ASSETS) {
   return null
 }
 
+/**
+ * Source basenames → output basenames (without extension).
+ * Keeps Drive’s `aasimar-2024` / `changeling-2024` masters while shipping canonical URLs.
+ */
+const CARD_OUTPUT_SLUG_ALIASES = {
+  "aasimar-2024": "aasimar",
+  "changeling-2024": "changeling",
+}
+
 /** Discover card sources by slug basename. Prefer .png > .webp > .jpg/.jpeg when duplicates exist. */
 function discoverCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
@@ -110,19 +119,29 @@ function discoverCardSlugs(sourcesDir) {
     if (ext === ".jpg" || ext === ".jpeg") return 2
     return 9
   }
-  const bySlug = new Map()
+  /** Prefer *-2024 aliased sources over a plain canonical file when both exist. */
+  const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
+  const byOutputSlug = new Map()
   for (const entry of fs.readdirSync(sourcesDir)) {
     const ext = path.extname(entry).toLowerCase()
     if (!EXTENSIONS.includes(ext)) continue
-    const slug = path.basename(entry, ext)
-    if (!slug || slug.startsWith(".")) continue
+    const sourceSlug = path.basename(entry, ext)
+    if (!sourceSlug || sourceSlug.startsWith(".")) continue
+    const outputSlug = CARD_OUTPUT_SLUG_ALIASES[sourceSlug] ?? sourceSlug
     const full = path.join(sourcesDir, entry)
-    const prev = bySlug.get(slug)
-    if (!prev || rank(ext) < rank(path.extname(prev).toLowerCase())) {
-      bySlug.set(slug, full)
+    const prev = byOutputSlug.get(outputSlug)
+    if (
+      !prev ||
+      sourceRank(sourceSlug) < sourceRank(prev.sourceSlug) ||
+      (sourceRank(sourceSlug) === sourceRank(prev.sourceSlug) &&
+        rank(ext) < rank(path.extname(prev.path).toLowerCase()))
+    ) {
+      byOutputSlug.set(outputSlug, { path: full, sourceSlug })
     }
   }
-  return [...bySlug.entries()].sort(([a], [b]) => a.localeCompare(b))
+  return [...byOutputSlug.entries()]
+    .map(([slug, { path: full }]) => [slug, full])
+    .sort(([a], [b]) => a.localeCompare(b))
 }
 
 async function encodeWebp(input, output, width, height) {
