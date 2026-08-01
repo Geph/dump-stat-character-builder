@@ -19,8 +19,11 @@ describe("species card images", () => {
         "Aasimar (2014)",
         "Aasimar (2022)",
         "Aasimar (2024)",
+        "Air Genasi",
         "Astral Elf",
         "Autognome",
+        "Boggart",
+        "Boggarts",
         "Bugbear",
         "Centaur",
         "Changeling",
@@ -40,15 +43,25 @@ describe("species card images", () => {
         "Dragonborn",
         "Duergar",
         "Dwarf",
+        "Earth Genasi",
         "Eladrin",
         "Elf",
-        "Lorwyn Elf",
         "Fairy",
-        "Lorwyn Fairy",
+        "Firbolg",
+        "Fire Genasi",
+        "Flamekin",
+        "Genasi: Air",
+        "Genasi: Earth",
+        "Genasi: Fire",
+        "Genasi: Water",
         "Giff",
+        "Githyanki",
         "Githzerai",
         "Gnoll",
         "Gnome",
+        "Goblin",
+        "Goblin (2014)",
+        "Goblin (2022)",
         "Goliath",
         "Hadozee",
         "Halfling",
@@ -60,14 +73,23 @@ describe("species card images", () => {
         "Kalamer Landwalker Merfolk",
         "Kalamer Landwalker (Merfolk)",
         "Khoravar",
+        "Kithkin",
+        "Lorwyn Changeling",
+        "Lorwyn Elf",
+        "Lorwyn Fairy",
         "Lupin",
         "Orc",
         "Plasmoid",
         "Reborn",
+        "Rimekin",
+        "Ruinbound",
+        "Sahuagin",
         "Shifter",
         "Tabaxi",
+        "Thri-kreen",
         "Tiefling",
         "Warforged",
+        "Water Genasi",
       ].sort(),
     )
     expect(SPECIES_CARD_IMAGES_BY_NAME.Elf).toMatch(/\/images\/compendium\/species\/elf\.png$/)
@@ -114,7 +136,18 @@ describe("species card images", () => {
       SPECIES_CARD_IMAGES_BY_NAME["Kalamer Landwalker Merfolk"],
     )
     expect(defaultSpeciesCardImageUrl("Fairy")).toBe(SPECIES_CARD_IMAGES_BY_NAME.Fairy)
-    expect(defaultSpeciesCardImageUrl("lorwyn fairy")).toBe(SPECIES_CARD_IMAGES_BY_NAME.Fairy)
+    expect(defaultSpeciesCardImageUrl("lorwyn fairy")).toMatch(/lorwyn-fairy\.png$/)
+    expect(defaultSpeciesCardImageUrl("Lorwyn Fairy")).not.toBe(SPECIES_CARD_IMAGES_BY_NAME.Fairy)
+    expect(defaultSpeciesCardImageUrl("Lorwyn Changeling")).toMatch(/lorwyn-changeling\.png$/)
+    expect(defaultSpeciesCardImageUrl("Lorwyn Changeling")).not.toBe(
+      SPECIES_CARD_IMAGES_BY_NAME.Changeling,
+    )
+    expect(defaultSpeciesCardImageUrl("Firbolg")).toBe(SPECIES_CARD_IMAGES_BY_NAME.Firbolg)
+    expect(defaultSpeciesCardImageUrl("Genasi: Air")).toBe(
+      SPECIES_CARD_IMAGES_BY_NAME["Air Genasi"],
+    )
+    expect(defaultSpeciesCardImageUrl("Goblin (2022)")).toMatch(/goblin-2022\.png$/)
+    expect(defaultSpeciesCardImageUrl("Lorwyn Elf")).toMatch(/lorwyn-elf\.png$/)
   })
 
   it("keeps MotM 2022 portraits distinct from 2024", () => {

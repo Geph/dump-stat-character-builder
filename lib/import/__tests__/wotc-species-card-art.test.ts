@@ -24,6 +24,20 @@ describe("wotc-species import card art", () => {
       "Lorwyn Fairy",
       "Fairy",
       "Elf",
+      "Firbolg",
+      "Goblin (2022)",
+      "Genasi: Air",
+      "Genasi: Earth",
+      "Genasi: Fire",
+      "Genasi: Water",
+      "Githyanki",
+      "Thri-kreen",
+      "Sahuagin",
+      "Flamekin",
+      "Kithkin",
+      "Boggarts",
+      "Rimekin",
+      "Ruinbound",
     ]
     for (const name of expected) {
       const idx = content.species!.findIndex((s) => s.name === name)
@@ -37,6 +51,22 @@ describe("wotc-species import card art", () => {
     const i22 = content.species!.findIndex((s) => s.name === "Aasimar (2022)")
     expect(map[importCardArtTargetKey("species", i24)]).not.toBe(
       map[importCardArtTargetKey("species", i22)],
+    )
+
+    const lorwynFairy = content.species!.findIndex((s) => s.name === "Lorwyn Fairy")
+    const fairy = content.species!.findIndex((s) => s.name === "Fairy")
+    expect(map[importCardArtTargetKey("species", lorwynFairy)]).toMatch(/lorwyn-fairy\.png$/)
+    expect(map[importCardArtTargetKey("species", lorwynFairy)]).not.toBe(
+      map[importCardArtTargetKey("species", fairy)],
+    )
+
+    const lorwynChangeling = content.species!.findIndex((s) => s.name === "Lorwyn Changeling")
+    const changeling2024 = content.species!.findIndex((s) => s.name === "Changeling (2024)")
+    expect(map[importCardArtTargetKey("species", lorwynChangeling)]).toMatch(
+      /lorwyn-changeling\.png$/,
+    )
+    expect(map[importCardArtTargetKey("species", lorwynChangeling)]).not.toBe(
+      map[importCardArtTargetKey("species", changeling2024)],
     )
   })
 })

@@ -20,8 +20,11 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Aasimar (2014)": speciesCardImage("aasimar-2022"),
   "Aasimar (2022)": speciesCardImage("aasimar-2022"),
   "Aasimar (2024)": speciesCardImage("aasimar"),
+  "Air Genasi": speciesCardImage("air-genasi"),
   "Astral Elf": speciesCardImage("astral-elf"),
   Autognome: speciesCardImage("autognome"),
+  Boggart: speciesCardImage("boggarts"),
+  Boggarts: speciesCardImage("boggarts"),
   Bugbear: speciesCardImage("bugbear"),
   Centaur: speciesCardImage("centaur"),
   Changeling: speciesCardImage("changeling"),
@@ -42,15 +45,25 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Dragonborn: speciesCardImage("dragonborn"),
   Duergar: speciesCardImage("duergar"),
   Dwarf: speciesCardImage("dwarf"),
+  "Earth Genasi": speciesCardImage("earth-genasi"),
   Eladrin: speciesCardImage("eladrin"),
   Elf: speciesCardImage("elf"),
-  "Lorwyn Elf": speciesCardImage("elf"),
   Fairy: speciesCardImage("fairy"),
-  "Lorwyn Fairy": speciesCardImage("fairy"),
+  Firbolg: speciesCardImage("firbolg"),
+  "Fire Genasi": speciesCardImage("fire-genasi"),
+  Flamekin: speciesCardImage("flamekin"),
+  "Genasi: Air": speciesCardImage("air-genasi"),
+  "Genasi: Earth": speciesCardImage("earth-genasi"),
+  "Genasi: Fire": speciesCardImage("fire-genasi"),
+  "Genasi: Water": speciesCardImage("water-genasi"),
   Giff: speciesCardImage("giff"),
+  Githyanki: speciesCardImage("githyanki"),
   Githzerai: speciesCardImage("githzerai"),
   Gnoll: speciesCardImage("gnoll"),
   Gnome: speciesCardImage("gnome"),
+  Goblin: speciesCardImage("goblin-2022"),
+  "Goblin (2014)": speciesCardImage("goblin-2022"),
+  "Goblin (2022)": speciesCardImage("goblin-2022"),
   Goliath: speciesCardImage("goliath"),
   Hadozee: speciesCardImage("hadozee"),
   Halfling: speciesCardImage("halfling"),
@@ -62,14 +75,23 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Kalamer Landwalker Merfolk": speciesCardImage("kalamer-landwalker-merfolk"),
   "Kalamer Landwalker (Merfolk)": speciesCardImage("kalamer-landwalker-merfolk"),
   Khoravar: speciesCardImage("khoravar"),
+  Kithkin: speciesCardImage("kithkin"),
+  "Lorwyn Changeling": speciesCardImage("lorwyn-changeling"),
+  "Lorwyn Elf": speciesCardImage("lorwyn-elf"),
+  "Lorwyn Fairy": speciesCardImage("lorwyn-fairy"),
   Lupin: speciesCardImage("lupin"),
   Orc: speciesCardImage("orc"),
   Plasmoid: speciesCardImage("plasmoid"),
   Reborn: speciesCardImage("reborn"),
+  Rimekin: speciesCardImage("rimekin"),
+  Ruinbound: speciesCardImage("ruinbound"),
+  Sahuagin: speciesCardImage("sahuagin"),
   Shifter: speciesCardImage("shifter"),
   Tabaxi: speciesCardImage("tabaxi"),
+  "Thri-kreen": speciesCardImage("thri-kreen"),
   Tiefling: speciesCardImage("tiefling"),
   Warforged: speciesCardImage("warforged"),
+  "Water Genasi": speciesCardImage("water-genasi"),
 }
 
 /** SRD 2024 species that ship with bundled card art. */
@@ -105,12 +127,25 @@ function lookupSpeciesCardImage(name: string): string | null {
   )
 }
 
+/** Import labels like `Genasi: Air` → also try `Air Genasi`. */
+const SPECIES_COLON_LABEL_RE = /^(.+?):\s*(.+)$/u
+
 export function defaultSpeciesCardImageUrl(speciesName: string): string | null {
   const trimmed = speciesName.trim()
   if (!trimmed) return null
 
   const exact = lookupSpeciesCardImage(trimmed)
   if (exact) return exact
+
+  const colonMatch = trimmed.match(SPECIES_COLON_LABEL_RE)
+  if (colonMatch) {
+    const left = colonMatch[1]!.trim()
+    const right = colonMatch[2]!.trim()
+    if (left && right) {
+      const flipped = lookupSpeciesCardImage(`${right} ${left}`)
+      if (flipped) return flipped
+    }
+  }
 
   const yearMatch = trimmed.match(SPECIES_YEAR_SUFFIX_RE)
   if (yearMatch) {
