@@ -3343,7 +3343,10 @@ export default function BuilderPageClient() {
                               >
                                 {classSubclasses.map((subclass) => {
                                   const isSelected = subclassByClassId[entry.classId] === subclass.id
-                                  const displaySubclass = enrichSubclassDisplayDefaults(subclass)
+                                  const displaySubclass = enrichSubclassDisplayDefaults(
+                                    subclass,
+                                    cls.name,
+                                  )
                                   const accent = getCompendiumItemAccentColor(
                                     displaySubclass as unknown as Record<string, unknown>,
                                   )
