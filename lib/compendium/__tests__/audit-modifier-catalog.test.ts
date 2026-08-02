@@ -25,7 +25,6 @@ describe("audit-modifier-catalog", () => {
         "catalog_option",
         "craftable_items",
         "custom_skill",
-        "equipment_and_magic_items",
         "held_items_cap",
       ]
     `)

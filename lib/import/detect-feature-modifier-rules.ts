@@ -429,6 +429,7 @@ function parseCritRangeMinimum(fragment: string): number | null {
 }
 
 function parseAttackTargetFromText(text: string): string {
+  if (/spell\s+attacks?/i.test(text)) return "spell"
   if (/ranged\s+weapons?/i.test(text)) return "ranged"
   if (/melee\s+weapons?/i.test(text)) return "melee"
   if (/weapon\s+attacks?/i.test(text)) return "all"
@@ -979,7 +980,9 @@ function buildCriticalHitScalingModifier(
       label:
         target === "all"
           ? `Critical hit ${baseMinimum ?? sortedByLevel[0]?.fixed}–20${sortedByLevel.length ? " (by level)" : ""}`
-          : `${titleCaseWords(target)} weapon critical hit range`,
+          : target === "spell"
+            ? "Spell attack critical hit range"
+            : `${titleCaseWords(target)} weapon critical hit range`,
     },
   ])
 }
@@ -1649,6 +1652,13 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       // "ignores Immunity to the Charmed condition" / "have Immunity to X … automatically succeed"
       // describes enemy/target immunities, not a self grant.
       if (/\bignores?\s+immunity\b/i.test(text)) return null
+      if (
+        /\b(?:your|one of your)\s+(?:thralls?|companions?|summons?|creatures?)\b[\s\S]{0,160}\b(?:have|has)\s+immunity\s+to\b/i.test(
+          text,
+        )
+      ) {
+        return null
+      }
       if (/\b(?:have|has|with)\s+immunity\s+to\b[\s\S]{0,80}\bautomatically\s+succeed/i.test(text)) {
         return null
       }

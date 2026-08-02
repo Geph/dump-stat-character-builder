@@ -332,7 +332,13 @@ export function ModifierPlayerChoicePanel({
                     : []
             }
             allowCustom={slot.allowCustom ?? false}
-            customPlaceholder={isLanguageKind ? "Add a custom language..." : undefined}
+            customPlaceholder={
+              isLanguageKind
+                ? "Add a custom language..."
+                : slot.kind === "equipment"
+                  ? "Name another linked item..."
+                  : undefined
+            }
           />
         )
       })}

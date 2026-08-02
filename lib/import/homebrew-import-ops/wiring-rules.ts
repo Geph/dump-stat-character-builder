@@ -117,12 +117,27 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
     const cls = asRecord(Array.isArray(root.classes) ? root.classes[0] : null)
     const spellcasting = asRecord(cls?.spellcasting)
-    if (!spellcasting?.ability || !spellcasting?.caster_progression) {
+    if (
+      !spellcasting?.ability ||
+      !spellcasting?.caster_progression ||
+      spellcasting.prepared !== true
+    ) {
       findings.push({
         id: "necromancer.spellcasting_field",
         severity: "warn",
-        message: 'Set classes[].spellcasting { ability: "Intelligence", caster_progression: "full" }',
+        message:
+          'Set classes[].spellcasting { ability: "Intelligence", caster_progression: "full", prepared: true } (include progression[] Cantrips/Prepared when the class table has those columns)',
         path: "classes[0].spellcasting",
+      })
+    }
+    const progression = Array.isArray(spellcasting?.progression) ? spellcasting!.progression : []
+    if (spellcasting && progression.length === 0) {
+      findings.push({
+        id: "necromancer.spellcasting_progression",
+        severity: "warn",
+        message:
+          "Necromancer Features table has Cantrips + Prepared Spells columns — emit spellcasting.progression[{ level, cantrips, prepared, max_spell_level }] (3/4 at 1st → 5/22 at 20th)",
+        path: "classes[0].spellcasting.progression",
       })
     }
     const lichdom = featureNamed(features, /^lichdom$/i)

@@ -1458,6 +1458,19 @@ export default function BuilderPageClient() {
     isGoldOnlyOption(selectedBackgroundStartingOption, backgroundStartingGold)
   const inGoldShoppingMode = useGoldEquipment || useBackgroundGoldEquipment
 
+  const modifierGrantedEquipmentIds = useMemo(() => {
+    const byName = new Map(equipment.map((item) => [item.name.trim().toLowerCase(), item.id]))
+    const ids: string[] = []
+    for (const slot of modifierPlayerChoiceSlots) {
+      if (slot.kind !== "equipment") continue
+      for (const pickedName of modifierPlayerPicks[slot.slotKey] ?? []) {
+        const id = byName.get(pickedName.trim().toLowerCase())
+        if (id && !ids.includes(id)) ids.push(id)
+      }
+    }
+    return ids
+  }, [equipment, modifierPlayerChoiceSlots, modifierPlayerPicks])
+
   const packageCategoryPicksComplete = (
     option: { items?: { name: string; quantity: number }[] } | null,
     optionIndex: number | null,
@@ -1532,6 +1545,7 @@ export default function BuilderPageClient() {
     const merged = [
       ...new Set([
         ...packageEquipmentIds,
+        ...modifierGrantedEquipmentIds,
         ...(inGoldShoppingMode ? goldPurchasedEquipmentIds : []),
       ]),
     ]
@@ -1550,6 +1564,7 @@ export default function BuilderPageClient() {
     startingEquipmentOptionIndex,
     backgroundStartingEquipmentOptionIndex,
     packageEquipmentIds,
+    modifierGrantedEquipmentIds,
     goldPurchasedEquipmentIds,
     inGoldShoppingMode,
   ])

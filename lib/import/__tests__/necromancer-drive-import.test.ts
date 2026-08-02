@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
+import { collectSheetActions } from "@/lib/character/sheet-actions"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
@@ -68,6 +69,27 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     )
   })
 
+  it("wires INT prepared spellcasting with Cantrips/Prepared progression", () => {
+    const content = enrich()
+    const spellcasting = content.classes?.[0]?.spellcasting
+    expect(spellcasting).toMatchObject({
+      ability: "Intelligence",
+      caster_progression: "full",
+      prepared: true,
+    })
+    expect(spellcasting?.progression).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ level: 1, cantrips: 3, prepared: 4 }),
+        expect.objectContaining({ level: 10, cantrips: 5, prepared: 15 }),
+        expect.objectContaining({ level: 20, cantrips: 5, prepared: 22 }),
+      ]),
+    )
+    const spellcastingFeature = content.classes?.[0]?.features?.find((f) => f.name === "Spellcasting")
+    expect(String(spellcastingFeature?.description ?? "").toLowerCase()).not.toContain(
+      "pasted class table",
+    )
+  })
+
   it("wires Charnel Touch, Dark Arcana, Undying Servitude, and Lichdom immunities", () => {
     const content = enrich()
     const charnel = content.classes?.[0]?.features?.find((f) => f.name === "Charnel Touch") as Feature | undefined
@@ -80,9 +102,88 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     expect(undying?.activation?.reaction).toBe(true)
 
     const lichdom = content.classes?.[0]?.features?.find((f) => f.name === "Lichdom") as Feature | undefined
-    const types = lichdom?.linkedModifiers?.flatMap((m) => (m.characteristics ?? []).map((c) => c.type)) ?? []
-    expect(types).toContain("damage_immunity")
-    expect(types).toContain("vision")
+    const characteristics =
+      lichdom?.linkedModifiers?.flatMap((m) => m.characteristics ?? []) ?? []
+    expect(characteristics.find((row) => row.type === "damage_immunity")).toMatchObject({
+      damageTypes: expect.arrayContaining(["Necrotic", "Poison"]),
+    })
+    expect(characteristics.find((row) => row.type === "condition_immunity")).toMatchObject({
+      conditions: expect.arrayContaining(["Exhaustion", "Poisoned"]),
+    })
+    expect(characteristics.find((row) => row.type === "vision")).toMatchObject({
+      visionType: "truesight",
+      rangeFeet: 120,
+    })
+  })
+
+  it("wires Dead Space capacity, linked-item choice, notes, and utility action", () => {
+    const content = enrich()
+    const cls = content.classes?.[0]
+    const deadSpace = cls?.features?.find((feature) => feature.name === "Dead Space") as
+      | Feature
+      | undefined
+    const characteristics =
+      deadSpace?.linkedModifiers?.flatMap((modifier) => modifier.characteristics ?? []) ?? []
+
+    expect(characteristics.find((row) => row.type === "equipment_and_magic_items")).toMatchObject({
+      itemOptions: ["Bag", "Cloak", "Backpack"],
+      choiceCount: 1,
+      allowCustom: true,
+    })
+    expect(characteristics.find((row) => row.type === "uses")).toMatchObject({
+      uses: { type: "fixed", fixedAmount: 12 },
+    })
+    expect(characteristics.find((row) => row.type === "player_note")).toMatchObject({
+      prompt: "Dead Space notes",
+      target: "feature",
+    })
+    expect(content.equipment?.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Bag", "Cloak"]),
+    )
+
+    const actions = collectSheetActions({
+      classDetails: [
+        {
+          row: { class_id: "necromancer", level: 2, subclass_id: null, order: 0 },
+          class: { ...cls, id: "necromancer" } as never,
+          subclass: null,
+        },
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Dead Space")).toMatchObject({
+      kinds: ["action"],
+      category: "utility",
+      limitedUses: { type: "fixed", fixedAmount: 12 },
+      playerNotes: [{ prompt: "Dead Space notes" }],
+      equipmentChoices: [
+        {
+          options: ["Bag", "Cloak", "Backpack"],
+          allowCustom: true,
+        },
+      ],
+    })
+  })
+
+  it("keeps Critical Spellcasting scoped to spells and thrall immunities off the Necromancer", () => {
+    const content = enrich()
+    const features = content.classes?.[0]?.features ?? []
+    for (const name of ["Critical Spellcasting", "Improved Critical Spellcasting"]) {
+      const feature = features.find((row) => row.name === name) as Feature | undefined
+      const crit = feature?.linkedModifiers
+        ?.flatMap((modifier) => modifier.characteristics ?? [])
+        .find((row) => row.type === "attack_roll_modifiers")
+      expect(crit).toMatchObject({ entries: [expect.objectContaining({ target: "spell" })] })
+    }
+
+    const improvedThralls = features.find((row) => row.name === "Improved Thralls") as
+      | Feature
+      | undefined
+    const thrallTypes =
+      improvedThralls?.linkedModifiers?.flatMap((modifier) =>
+        (modifier.characteristics ?? []).map((row) => row.type),
+      ) ?? []
+    expect(thrallTypes).not.toContain("condition_immunity")
   })
 
   it("keeps Deadnaught as companion among thrall creatures", () => {

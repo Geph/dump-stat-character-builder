@@ -1146,6 +1146,26 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character, characterGold, equipmentBaseSelections],
   )
 
+  const persistLinkedEquipmentChoice = useCallback(
+    async (key: string, value: string) => {
+      await persistFeatureChoicePicks(key, value ? [value] : [])
+      if (!value) return
+      const item = (equipmentCatalog.length ? equipmentCatalog : equipment).find(
+        (entry) => entry.name.trim().toLowerCase() === value.toLowerCase(),
+      )
+      if (item && !character?.equipment_ids?.includes(item.id)) {
+        await handleAddEquipmentFromCatalog(item, { deductCost: false })
+      }
+    },
+    [
+      character?.equipment_ids,
+      equipment,
+      equipmentCatalog,
+      handleAddEquipmentFromCatalog,
+      persistFeatureChoicePicks,
+    ],
+  )
+
   useEffect(() => {
     if (!character || !equipment.length) return
     if (equippedArmorId || equippedShieldId || equippedWeaponId || equippedOffHandWeaponId) return
@@ -4081,6 +4101,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     actions={utilityActions}
                     usedByActionId={usedActionUsesById}
                     onUsedChange={setUsedActionUsesById}
+                    playerNoteValues={featureChoicePicks}
+                    onPlayerNoteChange={(key, value) =>
+                      void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
+                    }
+                    onEquipmentChoiceChange={(key, value) =>
+                      void persistLinkedEquipmentChoice(key, value)
+                    }
                     resolveContext={usesResolveContext}
                     resourceEntries={resourceEntries}
                     usedResourcesById={usedResourcesById}
@@ -4314,6 +4341,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         actions={combatActions}
                         usedByActionId={usedActionUsesById}
                         onUsedChange={setUsedActionUsesById}
+                        playerNoteValues={featureChoicePicks}
+                        onPlayerNoteChange={(key, value) =>
+                          void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
+                        }
+                        onEquipmentChoiceChange={(key, value) =>
+                          void persistLinkedEquipmentChoice(key, value)
+                        }
                         resolveContext={usesResolveContext}
                         resourceEntries={resourceEntries}
                         usedResourcesById={usedResourcesById}
@@ -5120,6 +5154,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             item={selectedEquipment}
             catalog={equipmentCatalog.length ? equipmentCatalog : equipment}
             baseSelections={equipmentBaseSelections}
+            playerNoteValues={featureChoicePicks}
+            onPlayerNoteChange={(key, value) =>
+              void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
+            }
             onClose={() => setSelectedEquipment(null)}
           />
         ) : null}

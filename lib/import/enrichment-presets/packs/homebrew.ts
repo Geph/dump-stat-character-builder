@@ -1258,8 +1258,43 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
         replaceCharacteristicTypes: ["damage_resistance", "damage_immunity"],
       },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "lichdom_condition_immunity",
+          catalogRefId: "cat_char_condition_immunity",
+          characteristics: [
+            {
+              id: "mod_lichdom_condition_immunity",
+              type: "condition_immunity",
+              conditions: ["Exhaustion", "Poisoned"],
+              label: "Lichdom condition immunities",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["condition_immunity"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "lichdom_truesight",
+          catalogRefId: "cat_char_vision",
+          characteristics: [
+            {
+              id: "mod_lichdom_truesight",
+              type: "vision",
+              visionType: "truesight",
+              rangeFeet: 120,
+              label: "Lichdom Truesight",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["vision"],
+      },
+      {
         op: "appendDescription",
-        text: "Creature type Undead + Spirit Jar rejuvenation stay narrative/play-time. Truesight and condition immunities are sheet-wired when present in mechanics.",
+        text: "Creature type Undead, Turn Undead immunity, and Spirit Jar rejuvenation stay narrative/play-time.",
       },
     ],
   },

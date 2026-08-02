@@ -2662,6 +2662,91 @@ function ModifierFields({
         </div>
       )
 
+    case "equipment_and_magic_items":
+      return (
+        <div className="space-y-3">
+          <label className="block text-xs font-semibold text-foreground">
+            Item options
+            <textarea
+              value={(mod.itemOptions ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  itemOptions: e.target.value
+                    .split("\n")
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={4}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder={"Bag\nCloak\nBackpack"}
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="text-xs font-semibold text-foreground">
+              Choice count
+              <input
+                type="number"
+                min={1}
+                value={mod.choiceCount ?? 1}
+                onChange={(e) =>
+                  onChange({ ...mod, choiceCount: Math.max(1, Number(e.target.value) || 1) })
+                }
+                className="ml-2 w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <input
+                type="checkbox"
+                checked={mod.allowCustom === true}
+                onChange={(e) => onChange({ ...mod, allowCustom: e.target.checked })}
+              />
+              Allow another item name
+            </label>
+          </div>
+        </div>
+      )
+
+    case "player_note":
+      return (
+        <div className="space-y-3">
+          <label className="block text-xs font-semibold text-foreground">
+            Prompt
+            <input
+              type="text"
+              value={mod.prompt}
+              onChange={(e) => onChange({ ...mod, prompt: e.target.value })}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder="Linked item"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Placeholder
+            <input
+              type="text"
+              value={mod.placeholder ?? ""}
+              onChange={(e) => onChange({ ...mod, placeholder: e.target.value })}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder="Describe the item and its contents…"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Show on
+            <select
+              value={mod.target}
+              onChange={(e) =>
+                onChange({ ...mod, target: e.target.value as "feature" | "equipment" })
+              }
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="feature">Feature / action</option>
+              <option value="equipment">Equipment item</option>
+            </select>
+          </label>
+        </div>
+      )
+
     case "power_rider":
       return (
         <div className="space-y-3">

@@ -40,7 +40,11 @@ export const ImportMechanicSchema = z.object({
   hpMode: z.enum(["per_level", "flat"]).optional(),
   hpValue: z.number().optional(),
   attackBonus: z.number().optional(),
-  attackTarget: z.enum(["all", "melee", "ranged"]).optional(),
+  attackTarget: z.enum(["all", "spell", "melee", "ranged"]).optional(),
+  criticalHitMinimum: z.number().min(2).max(20).optional(),
+  criticalHitMinimumByLevel: z
+    .array(z.object({ level: z.number(), fixed: z.number().min(2).max(20) }))
+    .optional(),
   /** Flat damage bonus (Dueling +2). Prefer over inventing bonusDice for non-dice bonuses. */
   damageBonus: z.number().optional(),
   damageTarget: z.enum(["all", "melee", "ranged"]).optional(),
@@ -143,6 +147,14 @@ export const ImportMechanicSchema = z.object({
   creatureChoiceOptions: z.array(z.string()).optional(),
   /** grant_creature: Wild Shape / polymorph form. */
   creaturePolymorph: z.boolean().optional(),
+  /** equipment_and_magic_items: named mundane items the player may select. */
+  itemOptions: z.array(z.string()).optional(),
+  /** equipment_and_magic_items: permit a free-text item name. */
+  allowCustom: z.boolean().optional(),
+  /** player_note: label, placeholder, and display target for a persistent sheet note. */
+  notePrompt: z.string().optional(),
+  notePlaceholder: z.string().optional(),
+  noteTarget: z.enum(["feature", "equipment"]).optional(),
   languages: z.array(z.string()).optional(),
   languageChoiceCount: z.number().optional(),
   choicePool: z.enum(["standard", "standard_and_rare"]).optional(),
@@ -983,7 +995,12 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Mage Hand Press Warden").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\".
+- **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Cantrip spellChoiceGrants stay incremental (3, +1@4, +1@10). Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
 - **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with creatureChoiceOptions. Deadnaught is a companion (level-scaled HP).
+- **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (the dots track occupied corpse/Undead capacity); and player_note with notePrompt \"Dead Space notes\", a useful contents/linked-item placeholder, and noteTarget \"feature\". Preserve both Magic-action and Short-Rest relinking sentences so it appears in Actions and explains when the linked item can change.
+- **Necromancer critical spellcasting:** attack_roll_modifiers must use attackTarget \"spell\" (never \"all\") and criticalHitMinimum 19, improving to 18 at level 14, so weapon attacks do not inherit the spell-only critical range.
+- **Necromancer Improved Thralls:** immunities belong to the thralls, not the player character. Preserve them as companion rules text; do not emit player condition_immunity or damage_immunity mechanics.
+- **Necromancer Lichdom:** emit damage_immunity for Necrotic and Poison plus condition_immunity for Exhaustion and Poisoned, and vision Truesight 120. Preserve Undead creature type, turn immunity, and Spirit Jar revival as narrative rules unless a dedicated mechanic exists.
 - **Dancer:** Dances = spendable uses (often short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool
 - **Craftsman:** Masterwork Bonus = special Class Cap (not spendable). Thunderlords Charge Points = spendable multiply_level pool (long rest) with subclass_name \"Thunderlords' Guild\" (subclass-gated). Do not model "uses equal to Masterwork Bonus" as spending masterwork_bonus — enrichment creates a separate at_level tracker. Masterwork weapon/armor live math uses sheet toggles masterwork_weapon_active / masterwork_armor_active.
 - **Dancer Momentum:** subclass-gated class_resources.momentum (fixed cap 3) with subclass_name matching the Momentum archetype; spend phrases on the Momentum feature.

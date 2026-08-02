@@ -51,7 +51,11 @@ const ImportMechanicAiSchema = z.object({
   hpMode: z.enum(["per_level", "flat"]).nullable(),
   hpValue: z.number().nullable(),
   attackBonus: z.number().nullable(),
-  attackTarget: z.enum(["all", "melee", "ranged"]).nullable(),
+  attackTarget: z.enum(["all", "spell", "melee", "ranged"]).nullable(),
+  criticalHitMinimum: z.number().nullable(),
+  criticalHitMinimumByLevel: z
+    .array(z.object({ level: z.number(), fixed: z.number() }))
+    .nullable(),
   damageBonus: z.number().nullable(),
   damageTarget: z.enum(["all", "melee", "ranged"]).nullable(),
   bonusDice: z.string().nullable(),
@@ -139,6 +143,11 @@ const ImportMechanicAiSchema = z.object({
   creatureNames: z.array(z.string()).nullable(),
   creatureChoiceOptions: z.array(z.string()).nullable(),
   creaturePolymorph: z.boolean().nullable(),
+  itemOptions: z.array(z.string()).nullable(),
+  allowCustom: z.boolean().nullable(),
+  notePrompt: z.string().nullable(),
+  notePlaceholder: z.string().nullable(),
+  noteTarget: z.enum(["feature", "equipment"]).nullable(),
   spellcastingAbility: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),

@@ -1049,7 +1049,13 @@ function buildFromMechanic(
       }
     }
     case "attack_roll_modifiers": {
-      if (mechanic.attackBonus == null) return null
+      if (
+        mechanic.attackBonus == null &&
+        mechanic.criticalHitMinimum == null &&
+        !mechanic.criticalHitMinimumByLevel?.length
+      ) {
+        return null
+      }
       return {
         ruleId: "ai.attack",
         confidence: aiConfidence(mechanic),
@@ -1058,7 +1064,16 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "attack")),
             type: "attack_roll_modifiers",
-            entries: [{ bonus: mechanic.attackBonus, target: mechanic.attackTarget ?? "all" }],
+            entries: [
+              {
+                bonus: mechanic.attackBonus ?? 0,
+                target: mechanic.attackTarget ?? "all",
+                criticalHitMinimum: mechanic.criticalHitMinimum ?? null,
+                criticalHitMinimumByLevel: (mechanic.criticalHitMinimumByLevel ?? []).map(
+                  (entry) => ({ level: entry.level, mode: "fixed" as const, fixed: entry.fixed }),
+                ),
+              },
+            ],
           },
         ]),
       }
@@ -1251,6 +1266,45 @@ function buildFromMechanic(
         confidence: aiConfidence(mechanic),
         matchedPhrase,
         instance: usesInstance(instanceId, uses, ctx.featureName ?? "Limited uses"),
+      }
+    }
+    case "equipment_and_magic_items": {
+      const itemOptions = (mechanic.itemOptions ?? []).map((item) => item.trim()).filter(Boolean)
+      if (!itemOptions.length && mechanic.allowCustom !== true) return null
+      return {
+        ruleId: "ai.equipment_and_magic_items",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(
+          instanceId,
+          characteristicCatalogRefId("equipment_and_magic_items"),
+          [
+            {
+              id: modId(instanceKey(ctx, "equipment_and_magic_items")),
+              type: "equipment_and_magic_items",
+              mode: "create_mundane",
+              itemOptions,
+              choiceCount: mechanic.choiceCount ?? 1,
+              allowCustom: mechanic.allowCustom === true,
+            },
+          ],
+        ),
+      }
+    }
+    case "player_note": {
+      return {
+        ruleId: "ai.player_note",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("player_note"), [
+          {
+            id: modId(instanceKey(ctx, "player_note")),
+            type: "player_note",
+            prompt: mechanic.notePrompt?.trim() || "Player notes",
+            placeholder: mechanic.notePlaceholder?.trim() || "",
+            target: mechanic.noteTarget ?? "feature",
+          },
+        ]),
       }
     }
     case "grant_feat": {

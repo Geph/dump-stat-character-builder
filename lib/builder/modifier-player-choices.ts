@@ -41,6 +41,7 @@ export type ModifierPlayerChoiceKind =
   | "spell"
   | "spellcasting_ability"
   | "damage_type"
+  | "equipment"
 
 export type ModifierPlayerChoiceSlot = {
   slotKey: string
@@ -216,6 +217,25 @@ function slotsFromCharacteristic(
       maxCount: count,
       options: options.map((name) => ({ name })),
       allowCustom: true,
+    })
+    return slots
+  }
+
+  if (mod.type === "equipment_and_magic_items" && mod.mode === "create_mundane") {
+    const count = mod.choiceCount ?? 0
+    const options = (mod.itemOptions ?? []).map((name) => name.trim()).filter(Boolean)
+    if (count <= 0 || (options.length === 0 && mod.allowCustom !== true)) return slots
+
+    slots.push({
+      slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "equipment"),
+      sourceKey,
+      sourceLabel,
+      modId: mod.id,
+      kind: "equipment",
+      label: mod.label ?? `Choose ${count} linked item${count === 1 ? "" : "s"}`,
+      maxCount: count,
+      options: options.map((name) => ({ name })),
+      allowCustom: mod.allowCustom === true,
     })
     return slots
   }

@@ -91,6 +91,17 @@ type SheetActionsPanelProps = {
   healContext?: HealResolveContext | null
   /** Force a single card column (e.g. narrow combat right rail). */
   singleColumn?: boolean
+  playerNoteValues?: Record<string, string[]>
+  onPlayerNoteChange?: (key: string, value: string) => void
+  onEquipmentChoiceChange?: (key: string, value: string) => void
+}
+
+function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
+  return `player-note:${action.id}:${noteId}`
+}
+
+function actionEquipmentChoiceKey(action: SheetActionEntry, choiceId: string): string {
+  return `player-equipment:${action.id}:${choiceId}`
 }
 
 function resolveActionMax(
@@ -367,6 +378,9 @@ function ActionDetailOverlay({
   onBankBalanceOfPower,
   allyCandidates = [],
   healContext = null,
+  playerNoteValues = {},
+  onPlayerNoteChange,
+  onEquipmentChoiceChange,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -396,6 +410,9 @@ function ActionDetailOverlay({
   onBankBalanceOfPower?: (amount: number) => void
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
+  playerNoteValues?: Record<string, string[]>
+  onPlayerNoteChange?: (key: string, value: string) => void
+  onEquipmentChoiceChange?: (key: string, value: string) => void
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
@@ -883,6 +900,56 @@ function ActionDetailOverlay({
                 html={action.description}
                 className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
               />
+              {action.equipmentChoices?.map((choice) => {
+                const key = actionEquipmentChoiceKey(action, choice.id)
+                const listId = `${key}:options`
+                return (
+                  <label key={key} className="block space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      {choice.label}
+                    </span>
+                    <input
+                      key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
+                      type="text"
+                      list={choice.options.length ? listId : undefined}
+                      defaultValue={playerNoteValues[key]?.[0] ?? ""}
+                      onBlur={(event) => onEquipmentChoiceChange?.(key, event.target.value.trim())}
+                      placeholder={
+                        choice.allowCustom ? "Choose an item or enter another name…" : "Choose an item…"
+                      }
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                    {choice.options.length ? (
+                      <datalist id={listId}>
+                        {choice.options.map((option) => (
+                          <option key={option} value={option} />
+                        ))}
+                      </datalist>
+                    ) : null}
+                    <span className="block text-[11px] text-muted-foreground">
+                      Change this after completing the relinking rest or ritual described above.
+                    </span>
+                  </label>
+                )
+              })}
+              {action.playerNotes?.map((note) => {
+                const key = actionPlayerNoteKey(action, note.id)
+                return (
+                  <label key={key} className="block space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      {note.prompt}
+                    </span>
+                    <textarea
+                      key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
+                      defaultValue={playerNoteValues[key]?.[0] ?? ""}
+                      onBlur={(event) => onPlayerNoteChange?.(key, event.target.value)}
+                      rows={3}
+                      placeholder={note.placeholder}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                  </label>
+                )
+              })}
             </div>
 
             <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
@@ -948,6 +1015,9 @@ export function SheetActionsPanel({
   allyCandidates = [],
   healContext = null,
   singleColumn = false,
+  playerNoteValues = {},
+  onPlayerNoteChange,
+  onEquipmentChoiceChange,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -1186,6 +1256,9 @@ export function SheetActionsPanel({
             onBankBalanceOfPower={onBankBalanceOfPower}
             allyCandidates={allyCandidates}
             healContext={healContext}
+            playerNoteValues={playerNoteValues}
+            onPlayerNoteChange={onPlayerNoteChange}
+            onEquipmentChoiceChange={onEquipmentChoiceChange}
           />
         ) : null}
       </AnimatePresence>

@@ -92,6 +92,7 @@ export const SPEED_TYPES = [
 
 export const ATTACK_ROLL_TARGETS = [
   { value: "all", label: "All attack rolls" },
+  { value: "spell", label: "Spell attacks" },
   { value: "melee", label: "Melee weapon attacks" },
   { value: "ranged", label: "Ranged weapon attacks" },
   { value: "unarmed", label: "Unarmed strikes" },
@@ -267,6 +268,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     value: "equipment_and_magic_items",
     label: "Equipment & Magic Items",
     hint: "Create mundane gear or replicate magic item plans (Artificer)",
+  },
+  {
+    value: "player_note",
+    label: "Player Note",
+    hint: "Editable character-sheet note tied to this feature or equipment item",
   },
   {
     value: "catalog_option",
@@ -1189,9 +1195,20 @@ export interface EquipmentAndMagicItemsCharacteristic extends CharacteristicModi
   /** Named mundane items or magic item plan labels. */
   itemOptions?: string[]
   choiceCount?: number
+  /** Let the player enter an item name that is not in itemOptions. */
+  allowCustom?: boolean
   usesPerLongRest?: number | "ability_modifier"
   usesAbility?: AbilityScoreKey
   planTables?: { minArtificerLevel: number; label: string; items?: string[] }[]
+}
+
+export interface PlayerNoteCharacteristic extends CharacteristicModifierBase {
+  type: "player_note"
+  /** Label shown above the editable note. */
+  prompt: string
+  placeholder?: string
+  /** Where the note editor is expected to appear. */
+  target: "feature" | "equipment"
 }
 
 export interface CatalogOptionCharacteristic extends CharacteristicModifierBase {
@@ -1308,6 +1325,7 @@ export type CharacteristicModifier =
   | GrantFeatCharacteristic
   | GrantCreatureCharacteristic
   | EquipmentAndMagicItemsCharacteristic
+  | PlayerNoteCharacteristic
   | CatalogOptionCharacteristic
   | PowerRiderCharacteristic
   | AbilityScoreOverrideCharacteristic
@@ -1513,6 +1531,8 @@ export function createCharacteristicModifier(
       return { id, type, targetFeatureName: null, choiceCategory: null, options: [] }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
+    case "player_note":
+      return { id, type, prompt: "Player notes", placeholder: "", target: "feature" }
     case "craftable_items":
       return { id, type, items: [], category: null }
     case "held_items_cap":
@@ -2757,6 +2777,8 @@ export function aggregateCharacteristics(
         break
       case "equipment_and_magic_items":
         result.equipmentMagicItems.push(mod)
+        break
+      case "player_note":
         break
       case "power_rider":
         result.powerRiders.push(mod)

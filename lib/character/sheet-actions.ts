@@ -4,9 +4,10 @@ import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
-import type {
-  CharacteristicModifier,
-  SpecialAttackCharacteristic,
+import {
+  resolveUsesConfig,
+  type CharacteristicModifier,
+  type SpecialAttackCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
@@ -58,6 +59,23 @@ export type SheetActionEntry = {
    * (Reckless Attack and similar free declarations).
    */
   spendsEconomy?: boolean
+  /** Persistent editable notes requested by player_note characteristics. */
+  playerNotes?: SheetPlayerNote[]
+  /** Mundane item linkers that can be changed by the player (Dead Space, etc.). */
+  equipmentChoices?: SheetEquipmentChoice[]
+}
+
+export type SheetPlayerNote = {
+  id: string
+  prompt: string
+  placeholder?: string
+}
+
+export type SheetEquipmentChoice = {
+  id: string
+  label: string
+  options: string[]
+  allowCustom: boolean
 }
 
 export type SheetActionMenuOption = {
@@ -190,6 +208,50 @@ function kindsFromLinkedModifiers(
     }
   }
   return [...kinds]
+}
+
+function resolvePlayerNotes(item: ActivatableItem): SheetPlayerNote[] {
+  const notes: SheetPlayerNote[] = []
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type !== "player_note" || characteristic.target !== "feature") continue
+      notes.push({
+        id: characteristic.id,
+        prompt: characteristic.prompt || "Player notes",
+        placeholder: characteristic.placeholder,
+      })
+    }
+  }
+  return notes
+}
+
+function resolveEquipmentChoices(item: ActivatableItem): SheetEquipmentChoice[] {
+  const choices: SheetEquipmentChoice[] = []
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (
+        characteristic.type !== "equipment_and_magic_items" ||
+        characteristic.mode !== "create_mundane" ||
+        (characteristic.choiceCount ?? 0) < 1
+      ) {
+        continue
+      }
+      choices.push({
+        id: characteristic.id,
+        label: characteristic.label || "Linked item",
+        options: characteristic.itemOptions ?? [],
+        allowCustom: characteristic.allowCustom === true,
+      })
+    }
+  }
+  return choices
+}
+
+function resolveItemLimitedUses(item: ActivatableItem): UsesConfig | null | undefined {
+  const characteristics = (item.linkedModifiers ?? []).flatMap(
+    (instance) => instance.characteristics ?? [],
+  )
+  return resolveUsesConfig(characteristics, item.limitedUses)
 }
 
 /** Last-resort detection of an action-economy cost from the feature/trait prose. */
@@ -508,6 +570,7 @@ function pushActivatableItemActions(
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
   const movementExpansions = collectMovementOptionExpansions(feature)
   const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
+  const limitedUses = resolveItemLimitedUses(feature)
 
   if (!suppressParent) {
     const kinds = inferActivatableActionKinds(feature)
@@ -525,13 +588,15 @@ function pushActivatableItemActions(
       ) {
         const menuOptions = resolveMenuOptions(feature)
         const healEffects = resolveHealEffects(feature)
+        const playerNotes = resolvePlayerNotes(feature)
+        const equipmentChoices = resolveEquipmentChoices(feature)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: feature.name,
           sourceLabel,
           kinds,
           category,
-          limitedUses: feature.limitedUses,
+          limitedUses,
           classLevel: levelCap,
           description: feature.description ?? null,
           classId,
@@ -542,6 +607,8 @@ function pushActivatableItemActions(
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
           spendsEconomy: resolveSpendsEconomy(feature),
+          playerNotes: playerNotes.length ? playerNotes : undefined,
+          equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           psionicAugments: resolvePsionicAugments({
             name: feature.name,
             description: feature.description ?? null,
@@ -561,7 +628,7 @@ function pushActivatableItemActions(
       sourceLabel: feature.name,
       kinds: expansion.kinds,
       category: expansion.category,
-      limitedUses: feature.limitedUses,
+      limitedUses,
       classLevel: levelCap,
       description: expansion.description,
       classId,

@@ -11,6 +11,7 @@ import { getEquipmentDetailRows } from "@/lib/compendium/equipment-display"
 import { readMagicEffects } from "@/lib/compendium/equipment-magic"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import type { Equipment } from "@/lib/types"
 
 type EquipmentDetailOverlayProps = {
@@ -18,6 +19,8 @@ type EquipmentDetailOverlayProps = {
   catalog?: Equipment[]
   baseSelections?: Record<string, string>
   onClose: () => void
+  playerNoteValues?: Record<string, string[]>
+  onPlayerNoteChange?: (key: string, value: string) => void
 }
 
 export function EquipmentDetailOverlay({
@@ -25,12 +28,22 @@ export function EquipmentDetailOverlay({
   catalog = [],
   baseSelections = {},
   onClose,
+  playerNoteValues = {},
+  onPlayerNoteChange,
 }: EquipmentDetailOverlayProps) {
   const resolved = catalog.length
     ? resolveCharacterEquipment(item, catalog, baseSelections)
     : item
   const detailRows = getEquipmentDetailRows(resolved)
   const magicEffects = readMagicEffects(item)
+  const playerNotes = magicEffects.flatMap((instance) =>
+    (instance.characteristics ?? []).filter(
+      (
+        characteristic,
+      ): characteristic is Extract<CharacteristicModifier, { type: "player_note" }> =>
+        characteristic.type === "player_note" && characteristic.target === "equipment",
+    ),
+  )
   const baseOptions = catalog.length ? getBaseSelectionOptions(item, catalog) : []
   const selectedBaseId = baseSelections[item.id] ?? item.selected_base_equipment_id ?? null
   const selectedBase = selectedBaseId
@@ -113,6 +126,24 @@ export function EquipmentDetailOverlay({
               <p className="text-sm text-muted-foreground">No additional details recorded for this item.</p>
             )
           )}
+          {playerNotes.map((note) => {
+            const key = `player-note:equipment:${item.id}:${note.id}`
+            return (
+              <label key={key} className="block space-y-1">
+                <span className="text-xs font-bold uppercase text-muted-foreground">
+                  {note.prompt}
+                </span>
+                <textarea
+                  key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
+                  defaultValue={playerNoteValues[key]?.[0] ?? ""}
+                  onBlur={(event) => onPlayerNoteChange?.(key, event.target.value)}
+                  rows={3}
+                  placeholder={note.placeholder}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                />
+              </label>
+            )
+          })}
         </div>
       </motion.div>
     </motion.div>

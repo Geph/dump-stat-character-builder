@@ -6,6 +6,17 @@
       "hit_die": 6,
       "primary_ability": ["Intelligence"],
       "saving_throws": ["Constitution", "Intelligence"],
+      "spellcasting": {
+        "ability": "Intelligence",
+        "caster_progression": "full",
+        "prepared": true,
+        "progression": [
+          { "level": 1, "cantrips": 3, "prepared": 4, "max_spell_level": 1 },
+          { "level": 4, "cantrips": 4, "prepared": 7, "max_spell_level": 2 },
+          { "level": 10, "cantrips": 5, "prepared": 15, "max_spell_level": 5 },
+          { "level": 20, "cantrips": 5, "prepared": 22, "max_spell_level": 9 }
+        ]
+      },
       "weapon_proficiencies": ["Simple weapons"],
       "armor_proficiencies": [],
       "skill_choices": {
