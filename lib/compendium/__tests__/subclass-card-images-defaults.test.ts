@@ -2,50 +2,76 @@ import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
 import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
-import { SRD_SUBCLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/subclass-card-images-defaults"
+import {
+  defaultSubclassCardImageUrl,
+  listSubclassCardImageRelativePaths,
+  SRD_SUBCLASS_CARD_IMAGES_BY_NAME,
+  SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME,
+} from "@/lib/compendium/subclass-card-images-defaults"
 
 describe("subclass card images", () => {
-  it("maps Drive-approved subclasses including Psion, Inventor, and Artificer", () => {
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Champion).toMatch(
-      /\/images\/compendium\/subclasses\/champion\.png$/,
+  it("stores art under parent-class subdirectories", () => {
+    expect(defaultSubclassCardImageUrl("Champion", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/champion\.png$/,
     )
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Knowing Mind"]).toMatch(
-      /\/images\/compendium\/subclasses\/knowing-mind\.png$/,
+    expect(defaultSubclassCardImageUrl("Knowing Mind", "Psion")).toMatch(
+      /\/images\/compendium\/subclasses\/psion\/knowing-mind\.png$/,
     )
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Gadgetsmith).toMatch(
-      /\/images\/compendium\/subclasses\/gadgetsmith\.png$/,
+    expect(defaultSubclassCardImageUrl("Gadgetsmith", "Inventor")).toMatch(
+      /\/images\/compendium\/subclasses\/inventor\/gadgetsmith\.png$/,
     )
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Alchemist).toMatch(
-      /\/images\/compendium\/subclasses\/alchemist\.png$/,
+    expect(defaultSubclassCardImageUrl("Alchemist", "Artificer")).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/alchemist\.png$/,
     )
-    expect(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Shadow Sorcery"]).toMatch(
-      /\/images\/compendium\/subclasses\/shadow-magic\.png$/,
+    expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toMatch(
+      /\/images\/compendium\/subclasses\/sorcerer\/shadow-magic\.png$/,
     )
+  })
+
+  it("disambiguates Reanimator by parent class", () => {
+    expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
+    )
+    // Necromancer Reanimator is a different subclass — do not reuse Artificer art.
+    expect(defaultSubclassCardImageUrl("Reanimator", "Necromancer")).toBeNull()
   })
 
   it("ships an optimized image file for every mapped subclass", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/subclasses")
-    for (const [name, url] of Object.entries(SRD_SUBCLASS_CARD_IMAGES_BY_NAME)) {
-      const file = path.basename(url)
-      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
-        true,
-      )
+    for (const rel of listSubclassCardImageRelativePaths()) {
+      expect(fs.existsSync(path.join(imagesDir, rel)), `missing art: ${rel}`).toBe(true)
     }
   })
 
-  it("wires every scripts/subclass-card-sources slug into defaults", () => {
+  it("wires every scripts/subclass-card-sources nested slug into defaults", () => {
     const sourcesDir = path.join(process.cwd(), "scripts/subclass-card-sources")
     if (!fs.existsSync(sourcesDir)) return
-    const sourceSlugs = fs
-      .readdirSync(sourcesDir)
-      .filter((entry) => /\.(png|jpe?g|webp)$/i.test(entry))
-      .map((entry) => path.basename(entry, path.extname(entry)))
-      .sort()
+
+    const sourceSlugs: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.startsWith(".")) continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+          continue
+        }
+        if (!/\.(png|jpe?g|webp)$/i.test(entry.name)) continue
+        const rel = path.relative(sourcesDir, full)
+        const slug = rel.replace(/\.[^.]+$/, "").split(path.sep).join("/")
+        sourceSlugs.push(slug)
+      }
+    }
+    walk(sourcesDir)
+    sourceSlugs.sort()
+
     const mappedSlugs = [
       ...new Set(
-        Object.values(SRD_SUBCLASS_CARD_IMAGES_BY_NAME).map((url) =>
-          path.basename(url).replace(/\.png$/, ""),
-        ),
+        Object.values(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME).map((url) => {
+          const marker = "/images/compendium/subclasses/"
+          const idx = url.indexOf(marker)
+          return url.slice(idx + marker.length).replace(/\.png$/, "")
+        }),
       ),
     ].sort()
     expect(mappedSlugs).toEqual(sourceSlugs)
@@ -60,7 +86,9 @@ describe("subclass card images", () => {
       },
       "Barbarian",
     )
-    expect(row.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Path of the Berserker"])
+    expect(row.card_image_url).toBe(
+      defaultSubclassCardImageUrl("Path of the Berserker", "Barbarian"),
+    )
   })
 
   it("applies named card art on non-SRD imports (Inventor / Psion)", () => {
@@ -72,8 +100,16 @@ describe("subclass card images", () => {
       { name: "Knowing Mind", source: "KibblesTasty Psion", features: [] },
       "Psion",
     )
-    expect(gadgetsmith.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME.Gadgetsmith)
-    expect(knowing.card_image_url).toBe(SRD_SUBCLASS_CARD_IMAGES_BY_NAME["Knowing Mind"])
+    expect(gadgetsmith.card_image_url).toBe(defaultSubclassCardImageUrl("Gadgetsmith", "Inventor"))
+    expect(knowing.card_image_url).toBe(defaultSubclassCardImageUrl("Knowing Mind", "Psion"))
+  })
+
+  it("does not assign Artificer Reanimator art to Necromancer Reanimator", () => {
+    const row = enrichSrdSubclassRow(
+      { name: "Reanimator", source: "Mage Hand Press", features: [] },
+      "Necromancer",
+    )
+    expect(row.card_image_url).toBeUndefined()
   })
 
   it("preserves custom card art when already set", () => {

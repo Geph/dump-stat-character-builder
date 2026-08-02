@@ -1,10 +1,20 @@
 Drop **full-resolution** subclass card art here, then run:
 
 ```bash
-pnpm images:optimize
+npm run images:optimize
 ```
 
-Sources are matched by slug basename (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`). The optimizer discovers every slug in this folder — keep filenames as the output slug (e.g. `awakened-mind.png`, `alchemist.png`).
+Organize by **parent class** so same-named subclasses do not collide:
+
+```
+scripts/subclass-card-sources/
+  artificer/reanimator.png
+  necromancer/reanimator.png   # different art when available
+  barbarian/path-of-the-berserker.png
+  psion/knowing-mind.png
+```
+
+Sources are matched by relative slug (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`). The optimizer discovers every nested slug — keep filenames as the output slug.
 
 Covered materials:
 
@@ -13,10 +23,10 @@ Covered materials:
 - **KibblesTasty Inventor** specializations (`gadgetsmith`, `warsmith`, `runesmith`, …)
 - **Eberron: Forge of the Artificer** (`alchemist`, `armorer`, `artillerist`, `battle-smith`, `cartographer`, `reanimator`)
 
-Output: `public/images/compendium/subclasses/*.png` at **771×1024** (**3:4** portrait, same as class/species card art).
+Output: `public/images/compendium/subclasses/{class-slug}/{subclass-slug}.png` at **771×1024** (**3:4** portrait, same as class/species card art).
 
 Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
 
-Wire display names → slugs in `lib/compendium/subclass-card-images-defaults.ts`.
+Wire display names → class + slug in `lib/compendium/subclass-card-images-defaults.ts`.
 
 Source files here are gitignored — only the optimized outputs in `public/images/` are committed.

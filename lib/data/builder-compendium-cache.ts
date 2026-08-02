@@ -240,8 +240,10 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     }) as (DndClass & { enabled?: boolean | number | null })[],
   ) as unknown as DndClass[]
 
+  const classNameById = new Map(classes.map((cls) => [cls.id, cls.name]))
   const subclasses = enrichSubclassDisplayList(
     filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[],
+    classNameById,
   )
   const species = filterEnabled(
     enrichSpeciesList(

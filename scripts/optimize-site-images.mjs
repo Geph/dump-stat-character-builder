@@ -111,7 +111,7 @@ const CARD_OUTPUT_SLUG_ALIASES = {
   "changeling-2024": "changeling",
 }
 
-/** Discover card sources by slug basename. Prefer .png > .webp > .jpg/.jpeg when duplicates exist. */
+/** Discover card sources by slug basename (supports nested dirs, e.g. artificer/reanimator). Prefer .png > .webp > .jpg/.jpeg when duplicates exist. */
 function discoverCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
   const rank = (ext) => {
@@ -123,23 +123,38 @@ function discoverCardSlugs(sourcesDir) {
   /** Prefer *-2024 aliased sources over a plain canonical file when both exist. */
   const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
   const byOutputSlug = new Map()
-  for (const entry of fs.readdirSync(sourcesDir)) {
-    const ext = path.extname(entry).toLowerCase()
-    if (!EXTENSIONS.includes(ext)) continue
-    const sourceSlug = path.basename(entry, ext)
-    if (!sourceSlug || sourceSlug.startsWith(".")) continue
-    const outputSlug = CARD_OUTPUT_SLUG_ALIASES[sourceSlug] ?? sourceSlug
-    const full = path.join(sourcesDir, entry)
-    const prev = byOutputSlug.get(outputSlug)
-    if (
-      !prev ||
-      sourceRank(sourceSlug) < sourceRank(prev.sourceSlug) ||
-      (sourceRank(sourceSlug) === sourceRank(prev.sourceSlug) &&
-        rank(ext) < rank(path.extname(prev.path).toLowerCase()))
-    ) {
-      byOutputSlug.set(outputSlug, { path: full, sourceSlug })
+
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith(".")) continue
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(full)
+        continue
+      }
+      const ext = path.extname(entry.name).toLowerCase()
+      if (!EXTENSIONS.includes(ext)) continue
+      const rel = path.relative(sourcesDir, full)
+      const sourceSlug = rel.slice(0, -ext.length).split(path.sep).join("/")
+      if (!sourceSlug) continue
+      const parts = sourceSlug.split("/")
+      const base = parts[parts.length - 1]
+      const aliasedBase = CARD_OUTPUT_SLUG_ALIASES[base] ?? base
+      parts[parts.length - 1] = aliasedBase
+      const outputSlug = parts.join("/")
+      const prev = byOutputSlug.get(outputSlug)
+      if (
+        !prev ||
+        sourceRank(base) < sourceRank(prev.sourceSlug) ||
+        (sourceRank(base) === sourceRank(prev.sourceSlug) &&
+          rank(ext) < rank(path.extname(prev.path).toLowerCase()))
+      ) {
+        byOutputSlug.set(outputSlug, { path: full, sourceSlug: base })
+      }
     }
   }
+  walk(sourcesDir)
+
   return [...byOutputSlug.entries()]
     .map(([slug, { path: full }]) => [slug, full])
     .sort(([a], [b]) => a.localeCompare(b))
@@ -225,6 +240,7 @@ async function encodeCardBatch(label, sourcesDir, outDir, width = CARD_WIDTH, he
   let missing = 0
   for (const [slug, input] of entries) {
     const output = path.join(outDir, `${slug}.png`)
+    fs.mkdirSync(path.dirname(output), { recursive: true })
     try {
       const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
         input,

@@ -65,6 +65,7 @@ export function importCardArtTargetKey(section: ImportCardArtSection, index: num
 export function defaultImportCardArtUrl(
   section: ImportCardArtSection,
   name: string,
+  options?: { className?: string | null },
 ): string | null {
   if (!shouldAssignBundledCardArt()) return null
   const trimmed = name.trim()
@@ -73,7 +74,7 @@ export function defaultImportCardArtUrl(
     case "classes":
       return defaultClassCardImageUrl(trimmed)
     case "subclasses":
-      return defaultSubclassCardImageUrl(trimmed)
+      return defaultSubclassCardImageUrl(trimmed, options?.className)
     case "species":
       return defaultSpeciesCardImageUrl(trimmed)
     case "backgrounds":
@@ -88,10 +89,12 @@ export function defaultImportCardArtUrl(
 
 function rowInitialUrl(
   section: ImportCardArtSection,
-  row: { name: string; card_image_url?: string | null },
+  row: { name: string; card_image_url?: string | null; class_name?: string | null },
 ): string | null {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  const bundled = defaultImportCardArtUrl(section, row.name)
+  const bundled = defaultImportCardArtUrl(section, row.name, {
+    className: row.class_name,
+  })
   // Prefer bundled defaults over dumpstat hosts (same rule as applyBundledCardImage).
   if (existing && isHostedDumpstatCardImageUrl(existing)) {
     return bundled

@@ -111,7 +111,7 @@ describe("import-card-art", () => {
     const map = buildInitialImportCardArtUrlMap(withKnownNames)
     expect(map[importCardArtTargetKey("classes", 0)]).toMatch(/\/images\/compendium\/classes\/barbarian\.png$/)
     expect(map[importCardArtTargetKey("subclasses", 0)]).toMatch(
-      /\/images\/compendium\/subclasses\/path-of-the-berserker\.png$/,
+      /\/images\/compendium\/subclasses\/barbarian\/path-of-the-berserker\.png$/,
     )
     expect(map[importCardArtTargetKey("backgrounds", 0)]).toMatch(
       /\/images\/compendium\/backgrounds\/acolyte\.png$/,
@@ -162,6 +162,30 @@ describe("import-card-art", () => {
     })
     expect(stripped.species?.[0]?.card_image_url).toBeNull()
     vi.unstubAllGlobals()
+  })
+
+  it("scopes Reanimator card art to Artificer, not Necromancer", () => {
+    const content: ImportContent = {
+      subclasses: [
+        {
+          name: "Reanimator",
+          class_name: "Artificer",
+          description: null,
+          features: [],
+        },
+        {
+          name: "Reanimator",
+          class_name: "Necromancer",
+          description: null,
+          features: [],
+        },
+      ],
+    }
+    const map = buildInitialImportCardArtUrlMap(content)
+    expect(map[importCardArtTargetKey("subclasses", 0)]).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
+    )
+    expect(map[importCardArtTargetKey("subclasses", 1)]).toBe("")
   })
 
   it("prefers an explicit import URL over a bundled default", () => {
