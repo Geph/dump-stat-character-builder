@@ -57,7 +57,7 @@ export type ImportProposalCustomAbility = {
   talentCount?: number
   choices?: import("@/lib/types").FeatureChoice | null
   specializationChoices?: import("@/lib/types").FeatureChoice | null
-  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "class_talent" | "knack" | "upgrade" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
+  abilityRole?: "discipline" | "psionic_power" | "talent_pool" | "class_talent" | "knack" | "upgrade" | "weapon_mastery" | "bomb_formula" | "discovery" | "alchemist_bomb" | null
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
   casting_time?: string | null
   execution?: string | null

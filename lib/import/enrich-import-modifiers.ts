@@ -451,12 +451,14 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
     next.abilities = content.abilities.map((ability) => {
       const isPsionicPower =
         (ability as { ability_role?: string }).ability_role === "psionic_power"
+      const isWeaponMastery =
+        (ability as { ability_role?: string }).ability_role === "weapon_mastery"
       const ctx = {
         contentKind: "ability" as const,
         sourceName: ability.source_name ?? ability.name,
         // Power bodies describe the power's own active effect; phrase rules would
         // wire spurious passive modifiers (damage riders, "you know it" languages).
-        suppressPhraseDetection: isPsionicPower,
+        suppressPhraseDetection: isPsionicPower || isWeaponMastery,
       }
       const enriched = enrichFeatureLike(ability as ImportMechanicsCarrier, {
         ...ctx,
@@ -478,10 +480,12 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
         ctx,
       )
       let linkedModifiers = withOptionMods.linkedModifiers ?? []
-      const altEffects = alternateEffectsSpellsKnownModifier(
-        parseAlternateEffectsCostRows(ability.description),
-        `import_ability_${ability.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
-      )
+      const altEffects = isWeaponMastery
+        ? null
+        : alternateEffectsSpellsKnownModifier(
+            parseAlternateEffectsCostRows(ability.description),
+            `import_ability_${ability.name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
+          )
       if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
         linkedModifiers = [...linkedModifiers, altEffects]
       }

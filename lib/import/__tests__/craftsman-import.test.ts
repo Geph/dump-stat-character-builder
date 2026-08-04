@@ -138,6 +138,48 @@ describe("Craftsman enrichment", () => {
     expect(options.some((opt) => opt.name === "Ballista Trap")).toBe(true)
   })
 
+  it("routes standalone mastery libraries to Craftsman and Dancer pickers", () => {
+    const enriched = applyImportEnrichmentPresets({
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "parry",
+            name: "Parry",
+            definition: "Mastery property",
+            description: "When you hit, gain +2 AC until your next turn.",
+            prerequisite: "Melee Weapon, Finesse Property",
+            source_type: "compendium",
+            source_name: null,
+            level_requirement: 1,
+            eligible_classes: ["Dancer", "Craftsman"],
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+
+    const parry = enriched.import_proposals?.custom_abilities?.[0]
+    expect(parry?.ability_role).toBe("weapon_mastery")
+    expect(parry?.mechanics).toEqual([])
+
+    const row = {
+      id: "parry",
+      name: "Parry",
+      description: parry?.description ?? "",
+      ability_role: parry?.ability_role,
+      eligible_classes: parry?.eligible_classes,
+      level_requirement: 1,
+      prerequisites: parry?.prerequisite ?? null,
+    } as unknown as CustomAbility
+    expect(
+      aggregateUpgradeOptions({
+        customAbilities: [row],
+        classNames: ["Dancer"],
+        classLevel: 1,
+        selectedUpgradeNames: [],
+      }).map((option) => option.name),
+    ).toContain("Parry")
+  })
+
   it("phrase-detects ignore Half and Three-Quarters Cover", () => {
     const mods = detectFeatureModifiers(
       "Your ranged attacks with Masterwork weapons ignore Half Cover and Three-Quarters Cover.",

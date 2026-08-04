@@ -71,6 +71,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
   })
 
   const isPsionicPower = row.ability_role === "psionic_power"
+  const isWeaponMastery = row.ability_role === "weapon_mastery"
   const headers = parseCastingHeaders(descriptionHtml)
   const detected = enrichFeatureWithMechanicalDetection(
     {
@@ -83,15 +84,17 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
       contentKind: "feat",
       sourceName: String(row.source_name ?? name),
       featureName: name,
-      suppressPhraseDetection: isPsionicPower,
+      suppressPhraseDetection: isPsionicPower || isWeaponMastery,
     },
   )
 
   let linkedModifiers = detected.linkedModifiers ?? []
-  const altEffects = alternateEffectsSpellsKnownModifier(
-    parseAlternateEffectsCostRows(descriptionHtml),
-    `import_ability_${name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
-  )
+  const altEffects = isWeaponMastery
+    ? null
+    : alternateEffectsSpellsKnownModifier(
+        parseAlternateEffectsCostRows(descriptionHtml),
+        `import_ability_${name.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}`,
+      )
   if (altEffects && !isModifierRedundantAgainst(altEffects, linkedModifiers)) {
     linkedModifiers = [...linkedModifiers, altEffects]
   }

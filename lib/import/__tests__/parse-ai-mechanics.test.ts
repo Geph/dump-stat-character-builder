@@ -886,6 +886,37 @@ describe("aiMechanicsToDetections", () => {
       extraAttackCount: 2,
     })
   })
+
+  it("preserves computed check bonuses and their minimum value", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "check_roll_modifier",
+          checkRollMode: "bonus",
+          checkCategory: "skill",
+          checkSkills: ["Medicine"],
+          bonusConfig: {
+            mode: "ability_modifier",
+            ability: "intelligence",
+            minimum: 1,
+          },
+        },
+      ],
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Reanimator",
+        featureName: "Skilled Surgeon",
+      },
+    )
+    expect(detections[0]?.instance.activation?.effects?.[0]).toMatchObject({
+      kind: "check_roll_modifier",
+      bonusConfig: {
+        mode: "ability_modifier",
+        ability: "INT",
+        resultFloor: { mode: "fixed", fixed: 1 },
+      },
+    })
+  })
 })
 
 describe("import modifier review helpers", () => {

@@ -98,6 +98,16 @@ export const ImportMechanicSchema = z.object({
    * Frightened). Prefer this over conditionNote when the gate is a named condition.
    */
   checkConditionTypes: z.array(z.string()).optional(),
+  bonusConfig: z
+    .object({
+      mode: z.enum(["fixed", "proficiency", "ability_modifier"]),
+      fixed: z.number().optional(),
+      ability: z.enum(ABILITY_SCORE_KEYS).optional(),
+      multiplier: z.number().optional(),
+      /** Minimum value of the bonus itself ("minimum bonus of +1"). */
+      minimum: z.number().optional(),
+    })
+    .optional(),
   /** Shared multi-target / beneficiary scope for die bonuses, THP, movement, etc. */
   targets: z
     .enum(["self", "self_and_allies_in_range", "self_and_chosen_ally", "chosen_creatures", "chosen_creatures_in_range"])
@@ -807,6 +817,7 @@ export const AbilityImportSchema = z.object({
       "class_talent",
       "knack",
       "upgrade",
+      "weapon_mastery",
       "bomb_formula",
       "discovery",
       "alchemist_bomb",
@@ -1077,7 +1088,7 @@ export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation be
 - Maneuver / technique libraries (Battle Master-style: a die pool fuels player-chosen combat options) use the SAME "class_knacks" pipeline as Knacks — set ability_role: "knack" on each maneuver's custom_abilities row and wire the granting feature's choices with optionsSource: "class_knacks" (there is no "class_maneuvers" option — it will resolve to zero picks). Do NOT set choices.resourceKey to the die pool's resource_key: maneuvers-known and the die pool almost always scale on different tables (e.g. 3/5/7/9 maneuvers known vs. 4/5/6 dice). Use choices.choiceCountByLevel with the maneuvers-known tier table instead — resourceKey is only for choice counts that equal a resource pool's own count (e.g. knacks_known)
 - For Inventor-style upgrades, put one custom_abilities proposal per upgrade option (ability_role: "upgrade", repeatable per option). Section headers like "Gadgetsmith Upgrades" / "Unrestricted Upgrades" are NOT ability rows. Wire the class feature with choices { category: "Upgrade", resourceKey: "upgrades", optionsSource: "class_upgrades" }. Subclass-attached upgrade lists (Craftsman Trappers' traps, Dancer Dance Styles) ARE included when the character has that subclass — set source_type "subclass" / source_name to the guild/style subclass and ability_role "upgrade".
 - Investigator subclass Trinkets are the exception: emit one upgrade row per trinket, but do NOT wire the class Trinkets feature as optionsSource "class_upgrades" / resourceKey "trinkets" (that pool is spendable uses, not a pick count). Enrichment auto-grants subclass trinkets via grant_custom_ability.
-- Craftsman mastery-property catalog entries and Trappers' Guild traps: one custom_abilities row each with ability_role "upgrade". Traps feature: choices { category: "Trap", resourceKey: "traps_known", optionsSource: "class_upgrades", options: [] }.
+- Craftsman mastery-property catalog entries: one custom_abilities row each with ability_role "weapon_mastery"; these feed both class_upgrades-compatible pickers and Weapon Mastery Properties tooltips. Trappers' Guild traps use ability_role "upgrade". Traps feature: choices { category: "Trap", resourceKey: "traps_known", optionsSource: "class_upgrades", options: [] }.
 - Talent pools (three patterns — do not conflate):
   1) Discipline-gated talents: nested in choices on the discipline package (category e.g. "Discipline Talents", not a colliding bare "Talents" when a class-level pool also exists).
   2) Class-level talents: separate list at end of class chapter / "Talents Known" column — one custom_abilities row per talent with ability_role: "class_talent"; the importer also builds a "General Psionic Talents" talent_pool package. Wire the class feature with choices.category "Class Talents" or "General Psionic Talents", resourceKey class_talents_known, and optionsSource: "class_talents". Capture level/subclass gates in options[].prerequisite or the row's prerequisite.

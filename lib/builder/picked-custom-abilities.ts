@@ -21,6 +21,7 @@ export function isPickGatedAbilityRole(role: string | null | undefined): boolean
     role === "discipline" ||
     role === "knack" ||
     role === "upgrade" ||
+    role === "weapon_mastery" ||
     role === "class_talent" ||
     role === "bomb_formula" ||
     role === "discovery"

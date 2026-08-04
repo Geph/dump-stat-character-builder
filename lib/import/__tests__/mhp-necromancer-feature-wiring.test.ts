@@ -163,6 +163,22 @@ describe("Mage Hand Press Necromancer feature wiring", () => {
     ).toBe(false)
   })
 
+  it("does not turn resistance/immunity bypass text into self defenses", () => {
+    const detections = detectFeatureModifiers(
+      "When you deal Poison damage or give the Poisoned condition, it ignores Resistance to Poison damage and Immunity to the Poisoned condition.",
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Plague Lord",
+        featureName: "Necrotoxin",
+      },
+    )
+    const types = detections.flatMap((row) =>
+      (row.instance.characteristics ?? []).map((characteristic) => characteristic.type),
+    )
+    expect(types).not.toContain("damage_resistance")
+    expect(types).not.toContain("condition_immunity")
+  })
+
   it("wires Lichdom immunities and Truesight from the enrichment preset alone", () => {
     const cls = enrichImportContentModifiers(
       applyImportEnrichmentPresets({

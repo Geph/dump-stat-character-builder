@@ -747,7 +747,7 @@ export interface CustomAbility {
    */
   specialization_choices?: FeatureChoice | null
   level_requirement?: number | null
-  /** discipline | psionic_power | talent_pool | class_talent | knack | bomb_formula | discovery | alchemist_bomb — guides builder aggregation. */
+  /** Semantic role used by builder/catalog aggregation. */
   ability_role?:
     | "discipline"
     | "psionic_power"
@@ -755,6 +755,7 @@ export interface CustomAbility {
     | "class_talent"
     | "knack"
     | "upgrade"
+    | "weapon_mastery"
     | "bomb_formula"
     | "discovery"
     | "alchemist_bomb"

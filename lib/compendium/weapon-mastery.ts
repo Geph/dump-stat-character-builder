@@ -52,10 +52,29 @@ export function weaponMasteryCatalogEntriesFromAbilities(
 ): ModifierCatalogEntry[] {
   if (!customAbilities?.length) return []
   const ability = customAbilities.find((row) => row.id === WEAPON_MASTERY_PROPERTIES_CATALOG_LOOKUP_ID)
-  if (!ability) return []
-  return normalizeModifierCatalog(
-    (ability as unknown as unknown as Record<string, unknown>).modifier_catalog,
+  const systemEntries = normalizeModifierCatalog(
+    (ability as unknown as Record<string, unknown> | undefined)?.modifier_catalog,
   )
+  const importedEntries = customAbilities
+    .filter((row) => row.ability_role === "weapon_mastery")
+    .map((row) => {
+      const description = row.description?.trim() || row.name
+      return {
+        id: `cat_weapon_mastery_${row.id}`,
+        name: row.name,
+        group: "Mastery Properties",
+        summary: firstClauseOfWeaponMasteryRule(stripHtml(description)),
+        description,
+        characteristics: [],
+        activation: null,
+      } satisfies ModifierCatalogEntry
+    })
+
+  const byName = new Map<string, ModifierCatalogEntry>()
+  for (const entry of [...systemEntries, ...importedEntries]) {
+    byName.set(entry.name.trim().toLowerCase(), entry)
+  }
+  return [...byName.values()]
 }
 
 export function weaponMasteryPropertyNames(

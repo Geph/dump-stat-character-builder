@@ -15,7 +15,17 @@ export function upgradeAbilitiesForClass(
     ? normalizeName(options.subclassName)
     : null
   return customAbilities.filter((ability) => {
-    if (ability.ability_role !== "upgrade") return false
+    if (ability.ability_role !== "upgrade" && ability.ability_role !== "weapon_mastery") return false
+    if (
+      ability.eligible_classes?.some((eligible) => {
+        const eligibleKey = normalizeName(eligible)
+        return [...classKeys].some(
+          (classKey) => eligibleKey.includes(classKey) || classKey.includes(eligibleKey),
+        )
+      })
+    ) {
+      return true
+    }
     if (ability.attached_to_type === "class" && ability.attached_to_id) {
       const attachKey = normalizeName(ability.attached_to_id)
       return [...classKeys].some(
@@ -39,6 +49,9 @@ export function upgradeAbilitiesForClass(
 }
 
 export function isUpgradeEligible(upgrade: CustomAbility, classLevel: number): boolean {
+  if (upgrade.ability_role === "weapon_mastery") {
+    return upgrade.level_requirement == null || classLevel >= upgrade.level_requirement
+  }
   return isChoiceOptionEligible(
     {
       name: upgrade.name,
@@ -90,7 +103,7 @@ export function validateUpgradeSelectionChange(params: {
 }): { ok: true } | { ok: false; message: string } {
   const upgradeByName = new Map(
     params.customAbilities
-      .filter((row) => row.ability_role === "upgrade")
+      .filter((row) => row.ability_role === "upgrade" || row.ability_role === "weapon_mastery")
       .map((row) => [normalizeName(row.name), row]),
   )
 

@@ -1448,6 +1448,35 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    id: "necromancer.subclass.archlich",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^archlich(?:\s+\[lichdom\])?$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "archlich_paralyzing_touch",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_archlich_paralyzing_touch",
+              type: "power_rider",
+              parentPowerNames: ["Charnel Touch"],
+              alertSummary:
+                "Charnel Touch dealing 30+ damage Paralyzes the target until the start of your next turn.",
+            },
+          ],
+        },
+        // The prose detector sees Devour Soul's once-per-rest sentence, but that limit must not
+        // cap Magic Resistance or Paralyzing Touch on this multi-benefit feature.
+        replaceCharacteristicTypes: ["uses"],
+      },
+      { op: "clearLimitedUses" },
+    ],
+  },
+  {
     id: "necromancer.subclass.thrall_rush",
     pack: "necromancer",
     target: "subclass_feature",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildWeaponMasteryDescriptionsLookup,
   describeWeaponMastery,
+  weaponMasteryCatalogEntriesFromAbilities,
   weaponMasteryPropertyNames,
 } from "@/lib/compendium/weapon-mastery"
 import { getWeaponMastery } from "@/lib/compendium/combat-stats"
@@ -9,7 +10,7 @@ import {
   buildDefaultWeaponMasteryOptions,
   WEAPON_MASTERY_PROPERTIES_CATALOG_ID,
 } from "@/lib/compendium/system-option-catalogs"
-import type { Equipment } from "@/lib/types"
+import type { CustomAbility, Equipment } from "@/lib/types"
 
 describe("weapon mastery", () => {
   it("describes standard mastery properties case-insensitively", () => {
@@ -57,6 +58,19 @@ describe("weapon mastery", () => {
       expect.arrayContaining(["Cleave", "Explode", "Vex"]),
     )
     expect(weaponMasteryPropertyNames(catalogEntries)).toHaveLength(9)
+  })
+
+  it("exposes imported weapon-mastery abilities as catalog entries", () => {
+    const entries = weaponMasteryCatalogEntriesFromAbilities([
+      {
+        id: "explode",
+        name: "Explode",
+        description: "<p>Replace one attack with a projectile explosion.</p>",
+        ability_role: "weapon_mastery",
+      } as unknown as CustomAbility,
+    ])
+    expect(describeWeaponMastery("Explode", entries)).toMatch(/projectile explosion/)
+    expect(weaponMasteryPropertyNames(entries)).toContain("Explode")
   })
 
   it("builds a lookup map from catalog entries with fallback defaults", () => {

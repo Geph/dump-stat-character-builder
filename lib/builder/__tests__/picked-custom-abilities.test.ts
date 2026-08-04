@@ -40,6 +40,9 @@ describe("picked custom abilities", () => {
     expect(
       isPickGatedCustomAbility(ability({ id: "3", name: "Mind Blast", ability_role: "psionic_power" })),
     ).toBe(false)
+    expect(
+      isPickGatedCustomAbility(ability({ id: "4", name: "Parry", ability_role: "weapon_mastery" })),
+    ).toBe(true)
   })
 
   it("unlocks only selected / granted pick-gated abilities", () => {

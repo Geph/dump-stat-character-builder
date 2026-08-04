@@ -94,6 +94,32 @@ describe("Ravenloft subclass wiring", () => {
     expect(wired).toBeGreaterThanOrEqual(35)
   })
 
+  it.skipIf(skip)("wires Grave Touched as conditional riders, not self resistance", () => {
+    const path = homebrewFixturePath(FIXTURE)!
+    const data = JSON.parse(readFileSync(path, "utf8")) as {
+      subclasses?: { name?: string; class_name?: string; features?: FeatureRow[] }[]
+    }
+    const undead = data.subclasses?.find((row) => /^undead patron$/i.test(row.name ?? ""))
+    const enriched = enrichSrdSubclassRow(undead as unknown as Record<string, unknown>, "Warlock") as {
+      features?: FeatureRow[]
+    }
+    const graveTouched = enriched.features?.find((feature) => feature.name === "Grave Touched")
+    const characteristics = (graveTouched?.linkedModifiers ?? []).flatMap(
+      (modifier) =>
+        ((modifier as { characteristics?: { type?: string; alertSummary?: string }[] })
+          .characteristics ?? []),
+    )
+
+    expect(characteristics.filter((row) => row.type === "power_rider")).toHaveLength(2)
+    expect(characteristics.some((row) => row.type === "damage_resistance")).toBe(false)
+    expect(characteristics.map((row) => row.alertSummary).join(" ")).toMatch(
+      /ignores Necrotic Resistance/,
+    )
+    expect(characteristics.map((row) => row.alertSummary).join(" ")).toMatch(
+      /don't need sleep/,
+    )
+  })
+
   it.skipIf(skip)("stages Strange Modifications via choiceCountByLevel (not a second Macabre picker)", () => {
     const path = homebrewFixturePath(FIXTURE)!
     const data = JSON.parse(readFileSync(path, "utf8")) as {

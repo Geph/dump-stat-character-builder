@@ -290,6 +290,35 @@ function buildFromMechanic(
       ...(conditionTypesFromNote ?? []),
     ].filter((value, index, all) => all.indexOf(value) === index)
     if (mechanic.conditionNote?.trim() && !checkConditionTypes.length) return null
+    const importedBonus = mechanic.bonusConfig
+    const bonusAbility = importedBonus?.ability
+      ? ({
+          strength: "STR",
+          dexterity: "DEX",
+          constitution: "CON",
+          intelligence: "INT",
+          wisdom: "WIS",
+          charisma: "CHA",
+        } as const)[importedBonus.ability]
+      : undefined
+    const bonusConfig = importedBonus
+      ? {
+          mode: importedBonus.mode,
+          ...(importedBonus.fixed != null ? { fixed: importedBonus.fixed } : {}),
+          ...(bonusAbility ? { ability: bonusAbility } : {}),
+          ...(importedBonus.multiplier != null
+            ? { multiplier: importedBonus.multiplier }
+            : {}),
+          ...(importedBonus.minimum != null
+            ? {
+                resultFloor: {
+                  mode: "fixed" as const,
+                  fixed: importedBonus.minimum,
+                },
+              }
+            : {}),
+        }
+      : undefined
     return {
       ruleId: "ai.check_roll_modifier",
       confidence: aiConfidence(mechanic),
@@ -303,6 +332,7 @@ function buildFromMechanic(
             checkCategory: mechanic.checkCategory ?? (mechanic.checkSkills?.length ? "skill" : "save"),
             checkAbility: mechanic.checkAbility ?? undefined,
             checkSkills: mechanic.checkSkills,
+            ...(bonusConfig ? { bonusConfig } : {}),
             ...(checkConditionTypes.length ? { checkConditionTypes } : {}),
             ...(mechanic.requiresSheetToggle
               ? {

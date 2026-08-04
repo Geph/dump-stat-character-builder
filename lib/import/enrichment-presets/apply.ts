@@ -45,6 +45,7 @@ import {
 import { sanitizeAlternateRogueImportContent } from "@/lib/import/enrichment-presets/packs/alternate-rogue"
 import { sanitizeAlternateFighterImportContent } from "@/lib/import/enrichment-presets/packs/alternate-fighter"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
+import { sanitizeCraftsmanMasteriesImportContent } from "@/lib/import/enrichment-presets/packs/craftsman"
 import type {
   EnrichmentOperation,
   EnrichmentPreset,
@@ -607,6 +608,7 @@ export function applyImportEnrichmentPresets(
 
   next = patchInitiativeRechargeFromFeatures(next)
   next = sanitizeGunslingerImportContent(next)
+  next = sanitizeCraftsmanMasteriesImportContent(next)
   next = sanitizeInvestigatorImportContent(next)
   next = sanitizeNecromancerImportContent(next)
   next = sanitizeVagabondImportContent(next)

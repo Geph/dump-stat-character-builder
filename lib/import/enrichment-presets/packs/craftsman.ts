@@ -3,7 +3,43 @@ import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { blockedWhenConditionLimitation, requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
+import type { ImportContent } from "@/lib/import/content-schema"
 import type { FeatureChoice } from "@/lib/types"
+
+const CRAFTSMAN_MASTERY_NAMES =
+  /^(bludgeon|mounted|parry|scatter|shift|sighted|tension|twinshot|explode|flurry|follow-through|jolt|numb|crush|daze|finisher|puncture|rake|automatic)$/i
+
+/**
+ * Standalone mastery-library extracts are compendium-sourced and have no source_name,
+ * so the ordinary Craftsman proposal preset cannot identify them. Give these rows a
+ * dedicated role consumed by both class upgrade pickers and weapon-mastery tooltips.
+ */
+export function sanitizeCraftsmanMasteriesImportContent(content: ImportContent): ImportContent {
+  const proposals = content.import_proposals?.custom_abilities
+  if (!proposals?.length) return content
+
+  const customAbilities = proposals.map((ability) => {
+    const eligible = ability.eligible_classes ?? []
+    const isCraftsmanMastery =
+      CRAFTSMAN_MASTERY_NAMES.test(ability.name ?? "") &&
+      (eligible.some((className) => /^craftsman$/i.test(className)) ||
+        /\bweapon mastery property\b/i.test(ability.definition ?? ""))
+    if (!isCraftsmanMastery) return ability
+    return {
+      ...ability,
+      ability_role: "weapon_mastery" as const,
+      mechanics: [],
+    }
+  })
+
+  return {
+    ...content,
+    import_proposals: {
+      ...content.import_proposals,
+      custom_abilities: customAbilities,
+    },
+  }
+}
 
 function baneWeaponOptions(): FeatureChoice["options"] {
   return [

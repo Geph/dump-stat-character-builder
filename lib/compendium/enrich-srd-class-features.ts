@@ -4392,6 +4392,30 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       }),
     ],
   },
+  "*::Grave Touched": {
+    linkedModifiers: [
+      charInstance("modinst_grave_touched_necrosis", "cat_char_power_rider", [
+        {
+          id: modId("grave_touched_necrosis"),
+          type: "power_rider",
+          parentPowerNames: ["Attack", "Spell"],
+          alertSummary:
+            "Necrotic damage from your attacks, Warlock spells, and Warlock features ignores Necrotic Resistance. Once per turn, a damaging spell can deal Necrotic damage instead. While Form of Dread is active, a Necrotic attack-roll hit deals one additional damage die once per turn.",
+          label: "Grave Touched — Arcane and Dreaded Necrosis",
+        },
+      ]),
+      charInstance("modinst_grave_touched_endurance", "cat_char_power_rider", [
+        {
+          id: modId("grave_touched_endurance"),
+          type: "power_rider",
+          parentPowerNames: ["Grave Touched"],
+          alertSummary:
+            "You gain no Exhaustion from dehydration, malnutrition, or suffocation; you don't need sleep, and magic can't put you to sleep.",
+          label: "Grave Touched — Undead Endurance",
+        },
+      ]),
+    ],
+  },
   "*::Necrotic Husk": {
     linkedModifiers: [
       damageResistance(["Necrotic"], "Necrotic Resilience"),

@@ -96,6 +96,17 @@ const ImportMechanicAiSchema = z.object({
   checkSkills: z.array(z.string()).nullable(),
   conditionNote: z.string().nullable(),
   checkConditionTypes: z.array(z.string()).nullable(),
+  bonusConfig: z
+    .object({
+      mode: z.enum(["fixed", "proficiency", "ability_modifier"]),
+      fixed: z.number().nullable(),
+      ability: z
+        .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+        .nullable(),
+      multiplier: z.number().nullable(),
+      minimum: z.number().nullable(),
+    })
+    .nullable(),
   targets: z
     .enum([
       "self",
@@ -418,6 +429,7 @@ const AbilityAiSchema = z.object({
       "class_talent",
       "knack",
       "upgrade",
+      "weapon_mastery",
       "bomb_formula",
       "discovery",
       "alchemist_bomb",
@@ -842,6 +854,11 @@ function normalizeMechanics(
     if (Array.isArray(shallow.menuOptions)) {
       shallow.menuOptions = shallow.menuOptions.map((option) =>
         omitNull(option as unknown as Record<string, unknown>),
+      )
+    }
+    if (shallow.bonusConfig && typeof shallow.bonusConfig === "object") {
+      shallow.bonusConfig = omitNull(
+        shallow.bonusConfig as unknown as Record<string, unknown>,
       )
     }
     const parsed = ImportMechanicSchema.safeParse(shallow)

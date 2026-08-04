@@ -299,6 +299,23 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
       rangeFeet: 5,
       useReaction: false,
     })
+
+    for (const [subclassName, featureName] of [
+      ["Overlord", "Despotic Discourse"],
+      ["Pale Master", "Chilling Disposition"],
+      ["Reanimator", "Skilled Surgeon"],
+    ]) {
+      const checkBonus = feature(subclassName, featureName)
+        ?.linkedModifiers?.flatMap((modifier) => modifier.activation?.effects ?? [])
+        .find((effect) => effect.kind === "check_roll_modifier")
+      expect(checkBonus).toMatchObject({
+        bonusConfig: {
+          mode: "ability_modifier",
+          ability: "INT",
+          resultFloor: { mode: "fixed", fixed: 1 },
+        },
+      })
+    }
   })
 
   it("shares Pharaoh Channel Divinity uses and suppresses conditional false positives", () => {
@@ -341,6 +358,7 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
         (row) => row.type === "weapon_reach_modifier",
       ),
     ).toBe(false)
+    expect(feature("Pale Master", "Archlich [Lichdom]")?.limitedUses).toBeUndefined()
     expect(feature("Reaper", "Umbral Form")?.limitedUses).toBeUndefined()
   })
 })

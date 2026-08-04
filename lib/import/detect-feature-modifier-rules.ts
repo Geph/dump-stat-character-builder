@@ -1611,7 +1611,8 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       if (
         /\b(?:target|creature|it)\s+has\s+resistance\b/i.test(text) ||
         /\bloses?\s+that\s+resistance\b/i.test(text) ||
-        /\binstead\s+has\s+resistance\b/i.test(text)
+        /\binstead\s+has\s+resistance\b/i.test(text) ||
+        /\bignores?\b[\s\S]{0,100}\bresistance\b/i.test(text)
       ) {
         return null
       }
@@ -1651,7 +1652,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       }
       // "ignores Immunity to the Charmed condition" / "have Immunity to X … automatically succeed"
       // describes enemy/target immunities, not a self grant.
-      if (/\bignores?\s+immunity\b/i.test(text)) return null
+      if (/\bignores?\b[\s\S]{0,100}\bimmunity\b/i.test(text)) return null
       if (
         /\b(?:your|one of your)\s+(?:thralls?|companions?|summons?|creatures?)\b[\s\S]{0,160}\b(?:have|has)\s+immunity\s+to\b/i.test(
           text,
