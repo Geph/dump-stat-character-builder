@@ -245,3 +245,36 @@ export function listSubclassCardImageRelativePaths(): string[] {
     ),
   ].sort()
 }
+
+/** Pre-nesting bundled URL: `/images/compendium/subclasses/{slug}.png` (no class folder). */
+export function isLegacyFlatSubclassCardImagePath(url: string): boolean {
+  return /\/images\/compendium\/subclasses\/[^/]+\.png$/i.test(url.trim())
+}
+
+/**
+ * Rewrite stale flat subclass card URLs to `{class}/{slug}` paths after the nesting migration.
+ * Returns null when the flat file no longer exists and no nested mapping is known.
+ */
+export function rewriteLegacyFlatSubclassCardImageUrl(
+  url: string | null | undefined,
+  subclassName?: string | null,
+  className?: string | null,
+): string | null {
+  const existing = normalizeCardImageUrl(url)
+  if (!existing) return null
+  if (!isLegacyFlatSubclassCardImagePath(existing)) return existing
+
+  const fromClass = defaultSubclassCardImageUrl(String(subclassName ?? ""), className)
+  if (fromClass) return fromClass
+
+  const fromNameOnly = defaultSubclassCardImageUrl(String(subclassName ?? ""))
+  if (fromNameOnly) return fromNameOnly
+
+  const match = existing.match(/\/images\/compendium\/subclasses\/([^/]+)\.png$/i)
+  const slug = match?.[1]?.toLowerCase()
+  if (!slug) return null
+  for (const entry of SUBCLASS_CARD_IMAGE_ENTRIES) {
+    if (entry.slug === slug) return subclassCardImage(entry.className, entry.slug)
+  }
+  return null
+}

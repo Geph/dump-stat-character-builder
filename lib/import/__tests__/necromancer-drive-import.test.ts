@@ -6,6 +6,7 @@ import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/ap
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { resolveHomebrewImportJsonPath } from "@/lib/import/homebrew-import-ops"
+import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { Feature } from "@/lib/types"
 
@@ -199,6 +200,7 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
         "Gorger",
         "Deadnaught",
         "Bloodlurk",
+        "Specter",
       ]),
     )
   })
@@ -212,5 +214,132 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
       fixedAmount: 1,
       restoreByResource: { resourceKey: "charnel_touch", resourceAmount: 20, restores: 1 },
     })
+  })
+
+  it("wires every automatable subclass feature and isolates narrative-only gaps", () => {
+    const review = collectImportModifierReview(enrich()).filter((row) =>
+      row.sourceLabel.startsWith("Subclass:"),
+    )
+    expect(
+      review.filter((row) => row.status === "unwired").map((row) => row.featureName),
+    ).toEqual([
+      "Overcharged Thralls",
+      "Holy Symbol",
+      "Mock Divinity",
+      "Bloated Thralls",
+      "Wraith Flight",
+    ])
+  })
+
+  it("wires subclass Charnel menus, riders, companion grants, and multiattack counts", () => {
+    const content = enrich()
+    const feature = (subclassName: string, featureName: string) =>
+      content.subclasses
+        ?.find((subclass) => subclass.name === subclassName)
+        ?.features?.find((row) => row.name === featureName) as Feature | undefined
+    const characteristics = (subclassName: string, featureName: string) =>
+      feature(subclassName, featureName)?.linkedModifiers?.flatMap(
+        (modifier) => modifier.characteristics ?? [],
+      ) ?? []
+
+    const transformation = feature("Blood Ascendant", "Vampiric Transformation")
+    expect(transformation?.isChoice).toBeFalsy()
+    expect(transformation?.choices).toBeUndefined()
+    expect(
+      characteristics("Blood Ascendant", "Vampiric Transformation").find(
+        (row) => row.type === "resource_ability_menu",
+      ),
+    ).toMatchObject({
+      resourceKey: "charnel_touch",
+      options: [
+        expect.objectContaining({ name: "Bat", resourceCost: 15 }),
+        expect.objectContaining({ name: "Mist", resourceCost: 15 }),
+      ],
+    })
+    expect(
+      characteristics("Blood Ascendant", "Vampiric Transformation").find(
+        (row) => row.type === "speed",
+      ),
+    ).toMatchObject({ requiresSheetToggle: "vampiric_mist_form" })
+
+    expect(
+      characteristics("Blood Ascendant", "Children of the Night").find(
+        (row) => row.type === "grant_creature",
+      ),
+    ).toMatchObject({
+      creatureNames: expect.arrayContaining(["Wolf", "Swarm of Bats", "Swarm of Rats"]),
+      choiceOptions: expect.arrayContaining(["Wolf", "Swarm of Bats", "Swarm of Rats"]),
+    })
+
+    const imperatorExtraAttack = feature("Death Knight", "Imperator [Lichdom]")
+      ?.linkedModifiers?.flatMap((modifier) => modifier.activation?.effects ?? [])
+      .find((effect) => effect.kind === "extra_attack")
+    expect(imperatorExtraAttack).toMatchObject({ extraAttackCount: 2 })
+
+    expect(
+      characteristics("Overlord", "Charnel Aura").find(
+        (row) => row.type === "resource_ability_menu",
+      ),
+    ).toMatchObject({
+      options: [
+        expect.objectContaining({ name: "Aura +1", resourceCost: 5 }),
+        expect.objectContaining({ name: "Aura +2", resourceCost: 10 }),
+        expect.objectContaining({ name: "Aura +3", resourceCost: 15 }),
+      ],
+    })
+
+    expect(
+      characteristics("Plague Lord", "Vile Congregation").find(
+        (row) => row.type === "d20_test_reaction",
+      ),
+    ).toMatchObject({
+      modifierMode: "subtract",
+      fixedDie: "1d4",
+      rangeFeet: 5,
+      useReaction: false,
+    })
+  })
+
+  it("shares Pharaoh Channel Divinity uses and suppresses conditional false positives", () => {
+    const content = enrich()
+    const feature = (subclassName: string, featureName: string) =>
+      content.subclasses
+        ?.find((subclass) => subclass.name === subclassName)
+        ?.features?.find((row) => row.name === featureName) as Feature | undefined
+    const characteristics = (subclassName: string, featureName: string) =>
+      feature(subclassName, featureName)?.linkedModifiers?.flatMap(
+        (modifier) => modifier.characteristics ?? [],
+      ) ?? []
+
+    for (const name of ["Channel Divinity", "Scarab of Judgement"]) {
+      expect(feature("Pharaoh", name)?.limitedUses).toMatchObject({
+        type: "fixed",
+        fixedAmount: 2,
+        useShareKey: "pharaoh_channel_divinity",
+        recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+        restoreByResource: {
+          resourceKey: "charnel_touch",
+          resourceAmount: 15,
+          restores: 1,
+        },
+      })
+    }
+
+    expect(
+      characteristics("Pharaoh", "Mummy Lord [Lichdom]").some(
+        (row) => row.type === "condition_immunity",
+      ),
+    ).toBe(false)
+    expect(
+      characteristics("Plague Lord", "Necrotoxin").some(
+        (row) => row.type === "damage_resistance" || row.type === "condition_immunity",
+      ),
+    ).toBe(false)
+    expect(
+      characteristics("Plague Lord", "Projectile Spew").some(
+        (row) => row.type === "weapon_reach_modifier",
+      ),
+    ).toBe(false)
+    expect(feature("Reaper", "Umbral Form")?.limitedUses).toBeUndefined()
   })
 })

@@ -1317,6 +1317,343 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
     ],
   },
+  {
+    id: "necromancer.subclass.vampiric_transformation",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^vampiric transformation$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "vampiric_transformation_mist_speed",
+          catalogRefId: "cat_char_speed",
+          characteristics: [
+            {
+              id: "mod_vampiric_transformation_mist_speed",
+              type: "speed",
+              speedType: "fly",
+              mode: "set",
+              value: 20,
+              customType: "hover",
+              requiresSheetToggle: "vampiric_mist_form",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["speed"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "vampiric_transformation_mist_resistance",
+          catalogRefId: "cat_char_damage_resistance",
+          characteristics: [
+            {
+              id: "mod_vampiric_transformation_mist_resistance",
+              type: "damage_resistance",
+              damageTypes: ["Bludgeoning", "Piercing", "Slashing"],
+              requiresSheetToggle: "vampiric_mist_form",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_resistance"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "vampiric_transformation_mist_immunity",
+          catalogRefId: "cat_char_condition_immunity",
+          characteristics: [
+            {
+              id: "mod_vampiric_transformation_mist_immunity",
+              type: "condition_immunity",
+              conditions: ["Prone"],
+              requiresSheetToggle: "vampiric_mist_form",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["condition_immunity"],
+      },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.charnel_aura",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^charnel aura$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.sacrificial_thralls",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^sacrificial thralls$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.tyrant",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^tyrant(?:\s+\[lichdom\])?$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true, onDropToZeroHp: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.charnel_empower",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^charnel empower$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "charnel_empower_necromancy",
+          catalogRefId: "cat_char_on_cast_spell_trigger",
+          characteristics: [
+            {
+              id: "mod_charnel_empower_necromancy",
+              type: "on_cast_spell_trigger",
+              spellTags: [],
+              spellSchool: "Necromancy",
+              effect: null,
+              label: "Spend Charnel Touch points for equal extra Necrotic damage",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "necromancer.subclass.frightening_gaze",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^chilling disposition$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.thrall_rush",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^thrall rush$/i },
+    operations: [
+      { op: "setActivation", activation: { onInitiative: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.pharaoh_channel_divinity",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^channel divinity$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 2,
+          recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+          useShareKey: "pharaoh_channel_divinity",
+          restoreByResource: {
+            resourceKey: "charnel_touch",
+            resourceAmount: 15,
+            restores: 1,
+          },
+        },
+      },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.scarab_of_judgement",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^scarab of judgement$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 2,
+          recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+          useShareKey: "pharaoh_channel_divinity",
+          restoreByResource: {
+            resourceKey: "charnel_touch",
+            resourceAmount: 15,
+            restores: 1,
+          },
+        },
+      },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.mummy_lord_whirlwind",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^mummy lord(?:\s+\[lichdom\])?$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "mummy_lord_whirlwind_reminder",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_mummy_lord_whirlwind_reminder",
+              type: "power_rider",
+              parentPowerNames: ["Mummy Lord [Lichdom]", "Mummy Lord"],
+              alertSummary:
+                "Whirlwind of Sand: move 60 feet while immune to damage and listed conditions.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["condition_immunity"],
+      },
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.necrotoxin",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^necrotoxin$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "necrotoxin_reminder",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_necrotoxin_reminder",
+              type: "power_rider",
+              parentPowerNames: ["Charnel Touch"],
+              alertSummary:
+                "Your Poison damage and Poisoned effects ignore Poison Resistance and Poisoned Immunity.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_resistance", "condition_immunity"],
+      },
+    ],
+  },
+  {
+    id: "necromancer.subclass.projectile_spew",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^projectile spew$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "projectile_spew_reminder",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_projectile_spew_reminder",
+              type: "power_rider",
+              parentPowerNames: ["Charnel Touch"],
+              alertSummary:
+                "Charnel Touch and Necromancer spells with Touch range gain 10 feet of reach.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["weapon_reach_modifier"],
+      },
+    ],
+  },
+  {
+    id: "necromancer.subclass.corpulent_lich",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^corpulent lich(?:\s+\[lichdom\])?$/i },
+    operations: [
+      { op: "setActivation", activation: { onDropToZeroHp: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.quick_stitch",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^quick stitch$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.spell_stitching",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^spell-stitching$/i },
+    operations: [
+      { op: "setCastingTime", castingTime: "1 hour (during a Short or Long Rest)" },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.patchwork_golem",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^patchwork golem(?:\s+\[lichdom\])?$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.umbral_form",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^umbral form$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "umbral_form_reminder",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_umbral_form_reminder",
+              type: "power_rider",
+              parentPowerNames: ["Umbral Form"],
+              alertSummary:
+                "While active: attacks against you have Disadvantage; Darkness can conceal you from Darkvision.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_resistance", "uses"],
+      },
+      { op: "clearLimitedUses" },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
 ]
 
 export const ALCHEMIST_PHILOSOPHER_PRESETS: EnrichmentPreset[] = []

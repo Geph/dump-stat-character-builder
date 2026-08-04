@@ -5,6 +5,7 @@ import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
 import {
   defaultSubclassCardImageUrl,
   listSubclassCardImageRelativePaths,
+  rewriteLegacyFlatSubclassCardImageUrl,
   SRD_SUBCLASS_CARD_IMAGES_BY_NAME,
   SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME,
 } from "@/lib/compendium/subclass-card-images-defaults"
@@ -126,15 +127,26 @@ describe("subclass card images", () => {
     expect(row.card_image_url).toBe(custom)
   })
 
-  it("does not invent art for unmapped homebrew subclass names", () => {
-    const row = enrichSrdSubclassRow(
-      {
-        name: "Path of the Homebrew",
-        source: "Custom",
-        features: [],
-      },
-      "Barbarian",
-    )
-    expect(row.card_image_url).toBeUndefined()
+  it("rewrites legacy flat subclass card paths to class folders", () => {
+    expect(
+      rewriteLegacyFlatSubclassCardImageUrl(
+        "/images/compendium/subclasses/college-of-lore.png",
+        "College of Lore",
+        "Bard",
+      ),
+    ).toMatch(/\/images\/compendium\/subclasses\/bard\/college-of-lore\.png$/)
+    expect(
+      rewriteLegacyFlatSubclassCardImageUrl(
+        "/images/compendium/subclasses/college-of-lore.png",
+        "College of Lore",
+      ),
+    ).toMatch(/\/bard\/college-of-lore\.png$/)
+    expect(
+      rewriteLegacyFlatSubclassCardImageUrl(
+        "/images/compendium/subclasses/bard/college-of-lore.png",
+        "College of Lore",
+        "Bard",
+      ),
+    ).toMatch(/\/bard\/college-of-lore\.png$/)
   })
 })

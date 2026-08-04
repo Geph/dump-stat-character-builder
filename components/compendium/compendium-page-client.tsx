@@ -110,6 +110,8 @@ import {
   SPELL_SCHOOLS_CHANGE_EVENT,
 } from "@/lib/compendium/schools-of-magic"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import { rewriteLegacyFlatSubclassCardImageUrl } from "@/lib/compendium/subclass-card-images-defaults"
+import { enrichSubclassDisplayList } from "@/lib/compendium/enrich-subclass-display"
 
 type ContentType = CompendiumContentType
 
@@ -123,9 +125,27 @@ function systemCatalogSortIndex(id: string): number {
   return index === -1 ? 999 : index
 }
 
-function enrichCompendiumTabRows(tab: ContentType, rows: unknown[]) {
+function enrichCompendiumTabRows(
+  tab: ContentType,
+  rows: unknown[],
+  classNameById?: Record<string, string>,
+) {
   if (tab === "classes") return enrichClassesList(rows as unknown as DndClass[])
   if (tab === "species") return enrichSpeciesList(rows as { name: string; source?: string | null }[])
+  if (tab === "subclasses") {
+    const subclassRows = asCompendiumRows(rows) as unknown as Subclass[]
+    // Upgrade legacy flat `/subclasses/{slug}.png` URLs, then apply class-aware defaults.
+    const rewritten = subclassRows.map((row) => {
+      const nextUrl = rewriteLegacyFlatSubclassCardImageUrl(
+        row.card_image_url,
+        row.name,
+        classNameById?.[row.class_id],
+      )
+      if (nextUrl === (row.card_image_url ?? null)) return row
+      return { ...row, card_image_url: nextUrl }
+    })
+    return enrichSubclassDisplayList(rewritten, classNameById)
+  }
   return rows
 }
 
@@ -384,9 +404,17 @@ export default function CompendiumPageClient() {
           magic_items: split.magic,
         }))
       } else {
+        let classNamesForEnrich = classNamesById
+        if (activeTab === "subclasses") {
+          const { data: classes } = await db.from("classes").select("id, name").order("name")
+          classNamesForEnrich = Object.fromEntries(
+            asCompendiumRows<{ id: string; name: string }>(classes).map((cls) => [cls.id, cls.name]),
+          )
+          setClassNamesById(classNamesForEnrich)
+        }
         setContent((prev) => ({
           ...prev,
-          [activeTab]: enrichCompendiumTabRows(activeTab, rows),
+          [activeTab]: enrichCompendiumTabRows(activeTab, rows, classNamesForEnrich),
         }))
       }
 
@@ -676,9 +704,17 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         magic_items: split.magic,
       }))
     } else {
+      let classNamesForEnrich = classNamesById
+      if (activeTab === "subclasses") {
+        const { data: classes } = await db.from("classes").select("id, name").order("name")
+        classNamesForEnrich = Object.fromEntries(
+          asCompendiumRows<{ id: string; name: string }>(classes).map((cls) => [cls.id, cls.name]),
+        )
+        setClassNamesById(classNamesForEnrich)
+      }
       setContent((prev) => ({
         ...prev,
-        [activeTab]: enrichCompendiumTabRows(activeTab, rows),
+        [activeTab]: enrichCompendiumTabRows(activeTab, rows, classNamesForEnrich),
       }))
     }
     setLoading(false)

@@ -200,6 +200,13 @@ const ImportMechanicAiSchema = z.object({
   spendResourceAmount: z.number().nullable(),
   failedTriggerOn: z.enum(["fail", "success"]).nullable(),
   rollKind: z.enum(["ability", "skill", "attack", "save"]).nullable(),
+  modifierMode: z.enum(["add", "subtract"]).nullable(),
+  rollKinds: z.array(z.enum(["ability", "skill", "attack", "save"])).nullable(),
+  dieSource: z.enum(["resource_die", "fixed", "ability_modifier"]).nullable(),
+  fixedDie: z.string().nullable(),
+  dieAbility: z
+    .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+    .nullable(),
   targetScope: z
     .enum([
       "self",
@@ -226,6 +233,18 @@ const ImportMechanicAiSchema = z.object({
   dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).nullable(),
   waiveResourceCost: z.boolean().nullable(),
   menuAbilityNames: z.array(z.string()).nullable(),
+  menuOptions: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().nullable(),
+        resourceCost: z.number().nullable(),
+        hitDiceCost: z.number().nullable(),
+        unlocksAtLevel: z.number().nullable(),
+      }),
+    )
+    .nullable(),
+  extraAttackCount: z.number().nullable(),
   parentPowerNames: z.array(z.string()).nullable(),
   parentMenuOptionNames: z.array(z.string()).nullable(),
   alertSummary: z.string().nullable(),
@@ -819,7 +838,13 @@ function normalizeMechanics(
   if (!mechanics?.length) return undefined
   const cleaned: ImportMechanic[] = []
   for (const entry of mechanics) {
-    const parsed = ImportMechanicSchema.safeParse(omitNull(entry as unknown as Record<string, unknown>))
+    const shallow = omitNull(entry as unknown as Record<string, unknown>)
+    if (Array.isArray(shallow.menuOptions)) {
+      shallow.menuOptions = shallow.menuOptions.map((option) =>
+        omitNull(option as unknown as Record<string, unknown>),
+      )
+    }
+    const parsed = ImportMechanicSchema.safeParse(shallow)
     if (parsed.success) cleaned.push(parsed.data)
   }
   return cleaned.length ? cleaned : undefined

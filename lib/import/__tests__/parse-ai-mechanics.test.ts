@@ -808,6 +808,84 @@ describe("aiMechanicsToDetections", () => {
       expect(replacingChar.mode).toBe("ability_modifier")
     }
   })
+
+  it("preserves structured resource-menu costs and descriptions", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "resource_ability_menu",
+          classResourceKey: "charnel_touch",
+          menuOptions: [
+            {
+              name: "Bat",
+              description: "Transform into a bat.",
+              resourceCost: 15,
+            },
+            {
+              name: "Mist",
+              description: "Transform into mist.",
+              resourceCost: 15,
+            },
+          ],
+        },
+      ],
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Blood Ascendant",
+        featureName: "Vampiric Transformation",
+      },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "resource_ability_menu",
+      resourceKey: "charnel_touch",
+      options: [
+        { name: "Bat", description: "Transform into a bat.", resourceCost: 15 },
+        { name: "Mist", description: "Transform into mist.", resourceCost: 15 },
+      ],
+    })
+  })
+
+  it("wires action-free d20 penalties and configurable Extra Attack counts", () => {
+    const d20 = aiMechanicsToDetections(
+      [
+        {
+          kind: "d20_test_reaction",
+          modifierMode: "subtract",
+          rollKinds: ["ability", "skill", "attack", "save"],
+          targetScope: "target_creature",
+          rangeFeet: 5,
+          useReaction: false,
+          dieSource: "fixed",
+          fixedDie: "1d4",
+        },
+      ],
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Plague Lord",
+        featureName: "Vile Congregation",
+      },
+    )
+    expect(d20[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "d20_test_reaction",
+      modifierMode: "subtract",
+      rangeFeet: 5,
+      useReaction: false,
+      fixedDie: "1d4",
+    })
+
+    const attacks = aiMechanicsToDetections(
+      [{ kind: "extra_attack", extraAttackCount: 2 }],
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Death Knight",
+        featureName: "Imperator",
+      },
+    )
+    expect(attacks[0]?.instance.activation?.effects?.[0]).toMatchObject({
+      kind: "extra_attack",
+      extraAttackCount: 2,
+    })
+  })
 })
 
 describe("import modifier review helpers", () => {

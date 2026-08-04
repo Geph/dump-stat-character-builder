@@ -90,6 +90,13 @@ describe("enrichCustomFeatRow PHB presets", () => {
       description: "Lucky",
     })
     expect(lucky.icon).toBe("clover")
+
+    expect(
+      enrichCustomFeatRow({ name: "Baleful Scion", source: "Planescape", description: "x" }).icon,
+    ).toBe("evil-love")
+    expect(
+      enrichCustomFeatRow({ name: "Outlands Envoy", source: "Planescape", description: "x" }).icon,
+    ).toBe("trail")
   })
 
   it("wires Fey Touched with spell picks and Misty Step", () => {

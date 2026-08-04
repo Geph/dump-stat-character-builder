@@ -44,6 +44,22 @@ function featureNamed(features: JsonRecord[], name: RegExp): JsonRecord | undefi
   return features.find((f) => typeof f.name === "string" && name.test(f.name))
 }
 
+function subclassFeature(
+  content: JsonRecord,
+  subclassName: RegExp,
+  featureName: RegExp,
+): JsonRecord | undefined {
+  const subclasses = Array.isArray(content.subclasses) ? content.subclasses : []
+  const subclass = subclasses
+    .map(asRecord)
+    .filter(Boolean)
+    .find((row) => typeof row!.name === "string" && subclassName.test(String(row!.name)))
+  const features = Array.isArray(subclass?.features)
+    ? subclass.features.map(asRecord).filter(Boolean) as JsonRecord[]
+    : []
+  return featureNamed(features, featureName)
+}
+
 export function auditImportWiring(content: unknown): WiringFinding[] {
   const root = asRecord(content)
   if (!root) return [{ id: "invalid_json", severity: "error", message: "Root must be a JSON object" }]
@@ -156,6 +172,65 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
           })
         }
       }
+    }
+
+    const transformation = subclassFeature(root, /^blood ascendant$/i, /^vampiric transformation$/i)
+    if (transformation?.isChoice || asRecord(transformation?.choices)) {
+      findings.push({
+        id: "necromancer.vampiric_transformation_choice",
+        severity: "error",
+        message:
+          "Vampiric Transformation forms are chosen per use, not at build time — use a Charnel Touch resource_ability_menu with 15-point Bat/Mist options",
+        path: "subclasses[Blood Ascendant].features[Vampiric Transformation]",
+      })
+    }
+    const children = subclassFeature(root, /^blood ascendant$/i, /^children of the night$/i)
+    const childrenGrant = (Array.isArray(children?.mechanics) ? children.mechanics : [])
+      .map(asRecord)
+      .filter(Boolean)
+      .find((mechanic) => mechanic!.kind === "grant_creature")
+    if (
+      childrenGrant &&
+      (!Array.isArray(childrenGrant.creatureNames) || childrenGrant.creatureNames.length === 0)
+    ) {
+      findings.push({
+        id: "necromancer.children_creature_names",
+        severity: "error",
+        message:
+          "Children of the Night grant_creature needs creatureNames as well as creatureChoiceOptions",
+        path: "subclasses[Blood Ascendant].features[Children of the Night].mechanics",
+      })
+    }
+    const projectile = subclassFeature(root, /^plague lord$/i, /^projectile spew$/i)
+    if (
+      (Array.isArray(projectile?.mechanics) ? projectile.mechanics : []).some(
+        (mechanic) => asRecord(mechanic)?.kind === "weapon_reach_modifier",
+      )
+    ) {
+      findings.push({
+        id: "necromancer.projectile_spew_weapon_reach",
+        severity: "error",
+        message:
+          "Projectile Spew extends Charnel Touch and Touch spells, not weapon reach — use a Charnel Touch power_rider reminder",
+        path: "subclasses[Plague Lord].features[Projectile Spew].mechanics",
+      })
+    }
+    const reaper = (Array.isArray(root.subclasses) ? root.subclasses : [])
+      .map(asRecord)
+      .filter(Boolean)
+      .find((row) => /^reaper$/i.test(String(row!.name ?? "")))
+    const reaperToggles = Array.isArray(reaper?.new_toggles) ? reaper.new_toggles : []
+    if (
+      subclassFeature(root, /^reaper$/i, /^umbral form$/i) &&
+      !reaperToggles.some((toggle) => asRecord(toggle)?.key === "umbral_form_active")
+    ) {
+      findings.push({
+        id: "necromancer.umbral_form_toggle",
+        severity: "error",
+        message:
+          "Reaper Umbral Form needs new_toggles key umbral_form_active and gated form-only mechanics",
+        path: "subclasses[Reaper].new_toggles",
+      })
     }
   }
 

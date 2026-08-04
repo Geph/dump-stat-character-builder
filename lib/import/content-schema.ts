@@ -214,6 +214,12 @@ export const ImportMechanicSchema = z.object({
   /** failed_roll_trigger — fail (Guided Strike / Peerless Skill) or success (Cutting Words). */
   failedTriggerOn: z.enum(["fail", "success"]).optional(),
   rollKind: z.enum(["ability", "skill", "attack", "save"]).optional(),
+  /** d20_test_reaction — may be action-free when useReaction is false. */
+  modifierMode: z.enum(["add", "subtract"]).optional(),
+  rollKinds: z.array(z.enum(["ability", "skill", "attack", "save"])).optional(),
+  dieSource: z.enum(["resource_die", "fixed", "ability_modifier"]).optional(),
+  fixedDie: z.string().optional(),
+  dieAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
   targetScope: z
     .enum([
       "self",
@@ -258,6 +264,19 @@ export const ImportMechanicSchema = z.object({
   /** resource_ability_menu */
   waiveResourceCost: z.boolean().optional(),
   menuAbilityNames: z.array(z.string()).optional(),
+  menuOptions: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        resourceCost: z.number().optional(),
+        hitDiceCost: z.number().optional(),
+        unlocksAtLevel: z.number().optional(),
+      }),
+    )
+    .optional(),
+  /** extra_attack: additional attacks beyond the first (1 = attack twice, 2 = attack three times). */
+  extraAttackCount: z.number().int().min(1).optional(),
   /** power_rider — attach sheet alert to named actions / menu options */
   parentPowerNames: z.array(z.string()).optional(),
   parentMenuOptionNames: z.array(z.string()).optional(),
@@ -996,11 +1015,15 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\".
 - **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Cantrip spellChoiceGrants stay incremental (3, +1@4, +1@10). Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
-- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with creatureChoiceOptions. Deadnaught is a companion (level-scaled HP).
+- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with BOTH creatureNames and creatureChoiceOptions (the latter is only the player-pick subset). Deadnaught is a companion (level-scaled HP).
 - **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (the dots track occupied corpse/Undead capacity); and player_note with notePrompt \"Dead Space notes\", a useful contents/linked-item placeholder, and noteTarget \"feature\". Preserve both Magic-action and Short-Rest relinking sentences so it appears in Actions and explains when the linked item can change.
 - **Necromancer critical spellcasting:** attack_roll_modifiers must use attackTarget \"spell\" (never \"all\") and criticalHitMinimum 19, improving to 18 at level 14, so weapon attacks do not inherit the spell-only critical range.
 - **Necromancer Improved Thralls:** immunities belong to the thralls, not the player character. Preserve them as companion rules text; do not emit player condition_immunity or damage_immunity mechanics.
 - **Necromancer Lichdom:** emit damage_immunity for Necrotic and Poison plus condition_immunity for Exhaustion and Poisoned, and vision Truesight 120. Preserve Undead creature type, turn immunity, and Spirit Jar revival as narrative rules unless a dedicated mechanic exists.
+- **Necromancer subclass Charnel riders:** use power_rider parentPowerNames ["Charnel Touch"] for Charnel Drain/Resilience/Toxin/Voltage/Veil and Lichdom riders that alter Charnel Touch. These are reminders on the Charnel Touch action; do not invent unconditional HP, immunity, or weapon-reach modifiers.
+- **Necromancer subclass resource menus:** Vampiric Transformation, Charnel Aura, Domination Spells, Spell-Stitching, Quick Stitch, and Self-Stitches use resource_ability_menu with classResourceKey "charnel_touch" and structured menuOptions [{ name, description, resourceCost }]. Per-use forms/stitches are NOT build-time isChoice/choices selections.
+- **Necromancer Pharaoh Channel Divinity:** two shared uses; Short Rest restores one and Long Rest restores all; 15 Charnel Touch restores one. Ankh of Radiance and Scarab of Judgement spend the same useShareKey, not independent pools.
+- **Necromancer conditional forms:** Umbral Form must declare new_toggles key "umbral_form_active"; gate its Grappled/Prone immunities and equal-to-walk Climb Speed with requiresSheetToggle. Never borrow another class's same-named Umbral Form resistance preset. Whirlwind of Sand immunities only exist during its movement and must not aggregate as permanent character immunities.
 - **Dancer:** Dances = spendable uses (often short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool
 - **Craftsman:** Masterwork Bonus = special Class Cap (not spendable). Thunderlords Charge Points = spendable multiply_level pool (long rest) with subclass_name \"Thunderlords' Guild\" (subclass-gated). Do not model "uses equal to Masterwork Bonus" as spending masterwork_bonus — enrichment creates a separate at_level tracker. Masterwork weapon/armor live math uses sheet toggles masterwork_weapon_active / masterwork_armor_active.
 - **Dancer Momentum:** subclass-gated class_resources.momentum (fixed cap 3) with subclass_name matching the Momentum archetype; spend phrases on the Momentum feature.

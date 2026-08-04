@@ -273,7 +273,7 @@ function buildFromMechanic(
             {
               id: modId(instanceKey(ctx, "extra_attack")),
               kind: "extra_attack",
-              extraAttackCount: 1,
+              extraAttackCount: mechanic.extraAttackCount ?? 1,
             },
           ],
         }),
@@ -527,6 +527,31 @@ function buildFromMechanic(
     }
   }
 
+  if (mechanic.kind === "d20_test_reaction") {
+    return {
+      ruleId: "ai.d20_test_reaction",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("d20_test_reaction"), [
+        {
+          id: modId(instanceKey(ctx, "d20_test")),
+          type: "d20_test_reaction",
+          modifierMode: mechanic.modifierMode ?? "subtract",
+          rollKinds: mechanic.rollKinds ?? ["ability", "skill", "attack", "save"],
+          targetScope: mechanic.targetScope ?? "target_creature",
+          rangeFeet: mechanic.rangeFeet ?? null,
+          useReaction: mechanic.useReaction ?? false,
+          dieSource: mechanic.dieSource ?? "fixed",
+          fixedDie: mechanic.fixedDie ?? "1d4",
+          dieAbility: mechanic.dieAbility ?? null,
+          spendResourceKey: mechanic.spendResourceKey ?? null,
+          spendResourceAmount: mechanic.spendResourceAmount ?? null,
+          effect: null,
+        },
+      ]),
+    }
+  }
+
   if (mechanic.kind === "special_attack") {
     const diceMatch = (mechanic.damageDice ?? mechanic.bonusDice)?.trim().match(
       /^(\d+)\s*d\s*(4|6|8|10|12)\b/i,
@@ -688,7 +713,15 @@ function buildFromMechanic(
           type: "resource_ability_menu",
           resourceKey,
           waiveResourceCost: mechanic.waiveResourceCost ?? false,
-          options: (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
+          options: mechanic.menuOptions?.length
+            ? mechanic.menuOptions.map((option) => ({
+                name: option.name,
+                ...(option.description ? { description: option.description } : {}),
+                ...(option.resourceCost != null ? { resourceCost: option.resourceCost } : {}),
+                ...(option.hitDiceCost != null ? { hitDiceCost: option.hitDiceCost } : {}),
+                ...(option.unlocksAtLevel != null ? { unlocksAtLevel: option.unlocksAtLevel } : {}),
+              }))
+            : (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
         },
       ]),
     }
