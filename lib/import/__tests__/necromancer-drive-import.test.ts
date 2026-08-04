@@ -216,12 +216,13 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     })
   })
 
-  it("wires every automatable subclass feature and isolates narrative-only gaps", () => {
+  it("wires every automatable subclass feature and classifies narrative-only gaps", () => {
     const review = collectImportModifierReview(enrich()).filter((row) =>
       row.sourceLabel.startsWith("Subclass:"),
     )
+    expect(review.filter((row) => row.status === "unwired")).toEqual([])
     expect(
-      review.filter((row) => row.status === "unwired").map((row) => row.featureName),
+      review.filter((row) => row.status === "structural").map((row) => row.featureName),
     ).toEqual([
       "Overcharged Thralls",
       "Holy Symbol",
