@@ -16,10 +16,16 @@ export type ModifierReviewCarrier = Feature & {
 export function isStructuralOrNarrativeFeature(
   feature: Pick<Feature, "name" | "description" | "isChoice" | "choices"> & {
     level?: number
+    ability_role?: string | null
   },
 ): boolean {
   const name = (feature.name ?? "").trim()
   if (!name) return false
+
+  // Weapon Mastery Properties catalog rows (Parry, Shift, Explode, ...) are reference
+  // text for equipment tooltips / upgrade pickers, not standalone modifier-bearing
+  // features — never expected to carry linked modifiers of their own.
+  if (feature.ability_role === "weapon_mastery") return true
 
   const asFeature = feature as Feature
   if (isSubclassFeatureGrant(asFeature)) return true

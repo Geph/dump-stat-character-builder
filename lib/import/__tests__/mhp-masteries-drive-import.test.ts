@@ -10,6 +10,7 @@ import {
   applyProposalSelections,
   collectImportProposals,
 } from "@/lib/import/import-proposals"
+import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import type { CustomAbility } from "@/lib/types"
 
@@ -63,6 +64,12 @@ describe.skipIf(!hasDriveFixture)("Mage Hand Press mastery library import", () =
         selectedUpgradeNames: [],
       }).map((option) => option.name),
     ).toEqual(expect.arrayContaining(["Parry", "Shift"]))
+
+    // Catalog/reference rows never carry their own linked modifiers — the import
+    // review must classify them as "structural", not falsely flag them "unwired".
+    const reviewRows = collectImportModifierReview(wired)
+    expect(reviewRows).toHaveLength(19)
+    expect(reviewRows.every((row) => row.status === "structural")).toBe(true)
   })
 
   it.skipIf(!CRAFTSMAN_PATH)("stays correctly typed when merged before the Craftsman class", () => {
