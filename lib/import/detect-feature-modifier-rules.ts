@@ -187,6 +187,10 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
     confidence: "high",
     test: (featureName) => /^evasion$/i.test(featureName.trim()),
     build: () => buildEvasionModifier(`modinst_evasion_${newInstanceId()}`),
+    // Renamed Evasion ports that are explicitly Constitution-based (e.g. Mage Hand Press
+    // Vagabond's Mettle) already carry an explicit damage_reduction mechanic with
+    // checkAbility set — don't let this Dex-default name rule collide with / override it.
+    suppressWhenDescriptionMatches: [/constitution\s+saving\s+throw/i],
   },
   {
     id: "weapon.mastery_by_name",
@@ -1272,9 +1276,18 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "ac.flat_bonus",
     confidence: "high",
     test: /\b(?:\+\s*(\d+)\s+(?:bonus\s+)?to\s+(?:your\s+)?AC|(\d+)\s+bonus\s+to\s+(?:your\s+)?(?:AC|Armor\s+Class))\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
       const bonus = parseInt(match[1] ?? match[2], 10)
       if (!Number.isFinite(bonus)) return null
+      // "The creature has a +2 bonus to AC" — describes a third-party benefit (e.g. a
+      // creature-type table entry), not a grant to the player.
+      if (
+        /\b(?:the\s+creature|the\s+target)\b[\s\S]{0,60}\bbonus\s+to\s+(?:your\s+)?(?:AC|Armor\s+Class)\b/i.test(
+          text,
+        )
+      ) {
+        return null
+      }
       return charInstance(newInstanceId(), characteristicCatalogRefId("ac"), [
         {
           id: modId(instanceKey(ctx, "ac_bonus")),
@@ -1434,6 +1447,18 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       // Ally/enemy pack-tactics style auras are not self check modifiers.
       if (/\b(?:your\s+)?allies\s+have\s+advantage\b/i.test(text)) return null
       if (/\benemies\b[\s\S]{0,80}\bdisadvantage\s+on\s+attack\s+rolls?\b/i.test(text)) return null
+      // Negated grants ("enemies can't have Advantage on attack rolls against you", an
+      // Elusive-style effect) are not a self buff — don't false-positive on the negation.
+      if (/\bcan'?t\s+have\s+advantage\s+on\s+attack\s+rolls?\b/i.test(text)) return null
+      // Companion/pet-owned buffs (Desperate Companion: "your hound has Advantage on attack
+      // rolls") belong on the granted creature, not the player's own check modifiers.
+      if (
+        /\b(?:your|the)\s+(?:hound|companion|familiar|beast|mount|pet|steed|summon)\b[\s\S]{0,80}\bhas\s+advantage\s+on\s+attack\s+rolls?\b/i.test(
+          text,
+        )
+      ) {
+        return null
+      }
       return buildCheckRollModifier(
         ctx,
         "atk_adv",
@@ -1660,6 +1685,11 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       ) {
         return null
       }
+      // "The creature has Immunity to X" — a third-party table benefit (e.g. a
+      // creature-type entry), not a grant to the player.
+      if (/\b(?:the\s+creature|the\s+target)\b[\s\S]{0,60}\bhas\s+immunity\s+to\b/i.test(text)) {
+        return null
+      }
       if (/\b(?:have|has|with)\s+immunity\s+to\b[\s\S]{0,80}\bautomatically\s+succeed/i.test(text)) {
         return null
       }
@@ -1685,6 +1715,13 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: (match, ctx, text) => {
       const feet = parseInt(match[1], 10)
       if (!Number.isFinite(feet)) return null
+      // "The creature's Speed increases by 10 feet" — a third-party table benefit
+      // (e.g. a creature-type entry), not a grant to the player.
+      if (
+        /\b(?:the\s+creature|the\s+target)\b(?:'s)?[\s\S]{0,60}\bspeed\s+increases?\s+by\b/i.test(text)
+      ) {
+        return null
+      }
       const primordialLightning =
         /^Primordial Aspect$/i.test(ctx.featureName ?? "") &&
         /\bLightning\b[\s\S]{0,120}\bwalking speed increases?\b/i.test(text)
@@ -2332,6 +2369,19 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       ]),
   },
   {
+    // "You learn the Mage Hand and Ray of Frost cantrips…" — two-or-more named cantrips
+    // (Arcane Initiation-style background options). Distinct from spell.know_cantrip's
+    // single-name "the X cantrip" (singular) match.
+    id: "spell.know_cantrips_named_list",
+    confidence: "high",
+    test: /\bthe\s+([A-Za-z][A-Za-z',\/ -]+?)\s+cantrips\b/i,
+    build: (match, ctx) => {
+      const names = parseSpellNameList(match[1] ?? "")
+      if (!names.length) return null
+      return spellsKnownInstance(ctx, "cantrips_named_list", names, names.join(", "))
+    },
+  },
+  {
     id: "spell.know_cantrip",
     confidence: "high",
     test: /\b(?:you\s+know|learn|you\s+learn)\s+the\s+([A-Za-z' ]+?)\s+cantrip\b/i,
@@ -2512,7 +2562,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     confidence: "high",
     scope: "full",
     test:
-      /\byou\s+(?:gain|learn)\s+the\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+spells?\b|\byou\s+learn\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)(?=\s*[.,]|\s+and\s+can\s+cast\b)/i,
+      /\byou\s+(?:gain|learn)\s+the\s+([A-Za-z][A-Za-z'\/ -]{2,60}?)\s+spells?\b|\byou\s+learn\s+(?!to\b)([A-Za-z][A-Za-z'\/ -]{2,60}?)(?=\s*[.,]|\s+and\s+can\s+cast\b)/i,
     build: (match, ctx, text) => {
       const fromGain = match[1]
       const fromLearn = match[2]

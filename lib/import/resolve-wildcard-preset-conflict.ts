@@ -23,6 +23,14 @@ export function wildcardPresetConflict(
     }
   }
 
+  if (presetKey === "*::Tactical Master") {
+    if (/\bmastery\s+property\b|\bweapon\s+mastery\b/i.test(text)) return null
+    return {
+      presetKey,
+      reason: `Description is an ally saving-throw aura, not SRD Fighter's weapon mastery swap (${featureName}).`,
+    }
+  }
+
   return null
 }
 

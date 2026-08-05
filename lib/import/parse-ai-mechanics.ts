@@ -887,7 +887,7 @@ function buildFromMechanic(
       ruleId: "ai.damage_reduction.evasion",
       confidence: aiConfidence(mechanic),
       matchedPhrase,
-      instance: buildEvasionModifier(instanceId),
+      instance: buildEvasionModifier(instanceId, mechanic.checkAbility ?? "Dexterity"),
     }
   }
 

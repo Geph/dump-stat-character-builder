@@ -18,8 +18,15 @@ export function buildGrantFeatModifier(
   return charInstance(instanceId, GRANT_FEAT_CATALOG_ID, [characteristic])
 }
 
-/** Dex-save Evasion: no damage on successful save, half on failed (SRD Rogue/Monk). */
-export function buildEvasionModifier(instanceId = "modinst_evasion"): LinkedModifierInstance {
+/**
+ * Evasion-style damage mitigation: no damage on successful save, half on failed.
+ * Defaults to the SRD Rogue/Monk Dexterity-save shape; pass `checkAbility` to
+ * reuse this for other-ability variants (e.g. Vagabond Mettle's Constitution save).
+ */
+export function buildEvasionModifier(
+  instanceId = "modinst_evasion",
+  checkAbility: string = "Dexterity",
+): LinkedModifierInstance {
   return fxInstance(instanceId, DAMAGE_REDUCTION_CATALOG_ID, {
     effects: [
       {
@@ -28,7 +35,7 @@ export function buildEvasionModifier(instanceId = "modinst_evasion"): LinkedModi
         mitigation: "reduction",
         defensiveSaveScope: true,
         checkCategory: "save",
-        checkAbility: "Dexterity",
+        checkAbility,
         defensiveSaveSuccess: "none",
         limitations: [blockedWhenConditionLimitation("Incapacitated")],
       },

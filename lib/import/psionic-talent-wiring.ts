@@ -180,8 +180,12 @@ export const PSIONIC_TALENT_WIRING_RULES: FeatureModifierRule[] = [
     confidence: "high",
     scope: "full",
     test: /\btemporary\s+hit\s+points\s+equal\s+to\s+your\s+Intelligence\s+modifier\b/i,
-    build: (_match, ctx) =>
-      fxInstance(newInstanceId(), effectCatalogRefId("grant_temp_hp"), {
+    build: (_match, ctx) => {
+      // Scope to the Psion talent this phrase is written for — other homebrew (e.g. Mage
+      // Hand Press Warmage's Deck of Fate card table) coincidentally uses the same sentence
+      // for one of several possible card-draw outcomes, not an unconditional THP grant.
+      if (!/precognitive\s+dreams/i.test(ctx.featureName ?? "")) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("grant_temp_hp"), {
         effects: [
           {
             id: modId(instanceKey(ctx, "precog_thp")),
@@ -192,7 +196,8 @@ export const PSIONIC_TALENT_WIRING_RULES: FeatureModifierRule[] = [
             label: "Temporary hit points equal to Intelligence modifier (companions after long rest)",
           },
         ],
-      }),
+      })
+    },
   },
   {
     id: "precognitive.dreams.surprise_immunity",

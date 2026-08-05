@@ -85,8 +85,10 @@ function buildHexesResourcePicker(feature: Feature): LinkedModifierInstance {
 
 function enrichKnacksFeature(feature: Feature): Feature {
   const name = feature.name.trim()
-  const isKnackPool =
-    /^knacks?$/i.test(name) || /(?:warmage\s+)?tricks?$/i.test(name)
+  // Match the literal whole class-feature name only ("Knacks", "Tricks", "Warmage Tricks") —
+  // never names that merely end in "Tricks"/"Knacks" (e.g. Houndmaster's "Old Dog, New Tricks"),
+  // which are unrelated class features, not a Warmage-style knack/trick pick pool.
+  const isKnackPool = /^(?:knacks?|(?:warmage\s+)?tricks?)$/i.test(name)
   if (!isKnackPool) return feature
   const category = /trick/i.test(name) ? (name || "Trick") : "Knack"
   const resourceKey = /trick/i.test(name) ? "tricks_known" : "knacks_known"

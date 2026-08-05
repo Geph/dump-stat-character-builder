@@ -3,7 +3,11 @@ import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-re
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
+import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import type { Feature } from "@/lib/types"
+
+/** Rooks Covert Magic — each spell independently usable once per Long Rest. */
+const COVERT_MAGIC_SPELLS = ["Feather Fall", "Invisibility", "Knock", "Silence", "Spider Climb"] as const
 
 /** Cantrips column → incremental Warmage cantrip picks (not cumulative totals). */
 export const WARMAGE_CANTRIP_GRANTS = [
@@ -130,6 +134,19 @@ function grantKingsManeuvers() {
   ])
 }
 
+function adaptiveMagicRider() {
+  return charInstance(createModifierInstanceId(), characteristicCatalogRefId("power_rider"), [
+    {
+      id: modId("adaptive_magic"),
+      type: "power_rider",
+      parentPowerNames: ["Adaptive Magic"],
+      alertSummary:
+        "While chosen: learn one additional Warmage trick (doesn't count against tricks known) and one additional Warmage cantrip.",
+      label: "Adaptive Magic — extra trick + cantrip while active",
+    },
+  ])
+}
+
 /**
  * Sanitize Mage Hand Press Warmage imports:
  * - INT cantrip-only spellcasting (no base caster_progression — Bishops adds third caster)
@@ -247,6 +264,36 @@ export function sanitizeWarmageImportContent(content: ImportContent): ImportCont
               prepared: existing.prepared ?? true,
             },
           } as typeof sc
+        }
+
+        if (/^house of pawns$/i.test(sc.name ?? "")) {
+          const features = (sc.features ?? []).map((feat) => {
+            if (!/^promotion$/i.test(feat.name ?? "") || !feat.choices?.options?.length) return feat
+            const options = feat.choices.options.map((option) => {
+              if (!/^adaptive magic$/i.test(option.name ?? "")) return option
+              const optWithMods = option as typeof option & {
+                linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[]
+                modifierRefs?: string[]
+              }
+              const existing = Array.isArray(optWithMods.linkedModifiers) ? optWithMods.linkedModifiers : []
+              const already = existing.some((mod) =>
+                mod.characteristics?.some((c) => c.type === "power_rider"),
+              )
+              if (already) return option
+              const synced = syncModifierRefs({
+                name: option.name,
+                description: option.description ?? "",
+                linkedModifiers: [...existing, adaptiveMagicRider()],
+              } as Feature)
+              return {
+                ...option,
+                linkedModifiers: synced.linkedModifiers,
+                modifierRefs: synced.modifierRefs,
+              }
+            })
+            return { ...feat, choices: { ...feat.choices, options } }
+          })
+          return { ...sc, features } as typeof sc
         }
 
         if (!/^house of kings$/i.test(sc.name ?? "")) return sc
@@ -429,6 +476,298 @@ export const WARMAGE_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "Subclass maneuver — keep \"expend one Battle Die\" phrasing. Not a Tricks pick.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.cards_deck_of_fate",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^deck of fate$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["ac", "speed"],
+        preset: {
+          kind: "char_instance",
+          idKey: "deck_of_fate_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_deck_of_fate",
+              type: "power_rider",
+              parentPowerNames: ["Deck of Fate"],
+              alertSummary:
+                "Bonus Action: play cards to match a Hands-table result (extra damage, THP, +10 ft. Speed, +1 AC, or +1 saves) — GM-adjudicated card draw.",
+              label: "Deck of Fate — card-table reminder",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "The Hands table is a GM-adjudicated card-match engine with multiple possible outcomes — no single unconditional AC/Speed/damage/THP grant applies; resolve narratively at the table per the played hand.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.darts_bullseye",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^bullseye$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["damage_roll_modifiers"],
+        preset: {
+          kind: "char_instance",
+          idKey: "bullseye_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_bullseye",
+              type: "power_rider",
+              parentPowerNames: ["Bullseye"],
+              alertSummary:
+                "On repeating a recorded d20 roll: choose one — extra 1d10 Force damage, regain a Trick Shot use, or reroll (GM/player-chosen tracker option).",
+              label: "Bullseye — recorded-roll tracker reminder",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Extra damage is conditional on repeating a recorded d20 roll, and is one of three player-chosen options (not an unconditional damage bonus) — resolve narratively when the trigger condition is met.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.bishops_siege_casting",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^siege casting$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "siege_casting",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_siege_casting",
+              type: "power_rider",
+              parentPowerNames: ["Siege Casting"],
+              alertSummary:
+                "Advantage on spell attack rolls against targets 100+ feet away; double damage to objects/structures.",
+              label: "Siege Casting — range advantage reminder",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Range-gated advantage (100+ feet) has no distance-based limitation primitive in this builder — apply it manually when the target is far enough away; the double-damage-to-objects rider is likewise play-time only.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.bishops_arcane_dominance",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^arcane dominance$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "arcane_dominance",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_arcane_dominance",
+              type: "power_rider",
+              parentPowerNames: ["Arcane Dominance"],
+              alertSummary:
+                "Bonus Action: expend spell slots with a combined level of 6+ to regain one expended Arcane Surge use.",
+              label: "Arcane Dominance — spend slots to restore Arcane Surge",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Spending a combined spell-slot level (6+) to restore an Arcane Surge use has no alternateRefresh primitive for variable multi-slot costs in this builder — track manually.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.kings_tactical_master",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^tactical master$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "tactical_master_aura",
+          catalogRefId: "cat_char_aura",
+          characteristics: [
+            {
+              id: "mod_tactical_master_aura",
+              type: "aura",
+              radiusFeet: 10,
+              affectsSelf: false,
+              affectsAllies: true,
+              saveBonusConfig: { mode: "ability_modifier", ability: "Intelligence" },
+              label: "Tactical Master — allies add Intelligence modifier to saves vs. spells/magic",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Bonus is limited to saving throws against spells and magical effects (not all saves) and has a minimum-of-1 floor — apply that scope/floor manually; this builder's aura save bonus doesn't model per-save-type gating.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.pawns_multidiscipline",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^multidiscipline$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "multidiscipline",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_multidiscipline",
+              type: "power_rider",
+              parentPowerNames: ["Multidiscipline"],
+              alertSummary:
+                "Add half your Proficiency Bonus (round down) to any saving throw that doesn't otherwise use it.",
+              label: "Multidiscipline — half-proficiency on non-proficient saves",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "No per-save proficiency-aware check_roll_modifier bonus exists in this builder — apply the half-proficiency bonus to non-proficient saves manually.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.dice_dice_of_fate",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^dice of fate$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "dice_of_fate",
+          classResourceAmount: 1,
+        },
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Dice of Fate pool is tracked on class_resources.dice_of_fate (4 from L3, 6 from L7; long-rest recharge).",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.dice_chaos_roll",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^chaos roll$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Chaos Roll's 2d6 result table is a GM-adjudicated random effect — resolve narratively at the table; only the Magic Action cost (2 Dice of Fate) is tracked here.",
+      },
+    ],
+  },
+  {
+    id: "warmage.subclass.dice_roll_the_bones",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^roll the bones$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "warmage.subclass.darts_intercepting_shot",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^intercepting shot$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "warmage.subclass.rooks_fleeting_decoy",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^fleeting decoy$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "warmage.subclass.knights_field_of_blades",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^field of blades$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "warmage.subclass.rooks_covert_magic",
+    pack: "warmage",
+    target: "subclass_feature",
+    match: { subclassClassName: /warmage/i, name: /^covert magic$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["spells_known", "uses"],
+        preset: {
+          kind: "char_instance",
+          idKey: "covert_magic_spells",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_covert_magic_spells",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: COVERT_MAGIC_SPELLS.map((name) => ({
+                spellId: spellNamePlaceholder(name),
+                alwaysPrepared: true,
+              })),
+              freeCastPerLongRest: COVERT_MAGIC_SPELLS.map((name) => ({ spellName: name, count: 1 })),
+              label: "Covert Magic (1 free cast each / Long Rest)",
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Each spell is an independent free cast per Long Rest (not a single shared use). Expending Arcane Surge to regain all uses at once is a narrative refresh — no action required, tracked manually.",
       },
     ],
   },

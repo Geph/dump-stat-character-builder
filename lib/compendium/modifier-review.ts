@@ -69,6 +69,52 @@ export function isStructuralOrNarrativeFeature(
     return true
   }
 
+  // Mage Hand Press Warmage — narrative / play-time-only features with no reasonable
+  // mechanical primitive (random card/dice tables, GM-adjudicated trackers, freeform
+  // teleport/positioning riders). Rules text stays in the description; nothing to wire.
+  const WARMAGE_NARRATIVE_FEATURE_NAMES = [
+    // These two are pure pointers into class_resources.arcane_surge (uses count/recharge
+    // already live on the base Arcane Surge feature's setLimitedUses) — no modifiers of
+    // their own to carry.
+    "arcane surge improvement",
+    "master warmage",
+    "reliable cantrip",
+    "spell sculpting",
+    "high stakes",
+    "card reading",
+    "ace in the hole",
+    "loaded dice",
+    "twisted fate",
+    "steal luck",
+    "grandmaster",
+    "tactical maneuver",
+    "vanishing toss",
+    "elusive step",
+    "pawn wall",
+    "fundamental mastery",
+    "lead from the front",
+  ]
+  if (WARMAGE_NARRATIVE_FEATURE_NAMES.some((entry) => new RegExp(`^${entry}$`, "i").test(name))) {
+    return true
+  }
+
+  // Mage Hand Press Vagabond — base-class background state overrides with no discrete
+  // "power" of their own to attach a reminder to (always-on Bloodied-state prose / a
+  // freeform extra Bonus Action for maneuvers). Rules text stays in the description;
+  // nothing to wire. (Subclass features with a concrete, specific rule instead get a
+  // power_rider alert on their own named action — see packs/vagabond.ts.)
+  const VAGABOND_NARRATIVE_FEATURE_NAMES = [
+    // Critical Hits against you miss while Bloodied — no crit-immunity primitive.
+    "desperate survival",
+    // Extra Bonus Action usable only for a maneuver — GM/player-tracked economy.
+    "deft maneuver",
+    // "Always considered Bloodied" state override — no separate sheet primitive.
+    "wayworn",
+  ]
+  if (VAGABOND_NARRATIVE_FEATURE_NAMES.some((entry) => new RegExp(`^${entry}$`, "i").test(name))) {
+    return true
+  }
+
   return false
 }
 

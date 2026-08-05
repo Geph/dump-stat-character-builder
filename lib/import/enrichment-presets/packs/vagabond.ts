@@ -1,5 +1,5 @@
 import { createModifierInstanceId, syncModifierRefs } from "@/lib/compendium/linked-modifiers"
-import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
@@ -342,6 +342,25 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
     operations: [
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "vagabond_tenacity_reroll",
+          catalogRefId: effectCatalogRefId("check_roll_modifier"),
+          effects: [
+            {
+              id: modId("tenacity_reroll"),
+              kind: "check_roll_modifier",
+              checkRollMode: "bonus",
+              checkCategory: "save",
+              bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "battle_dice" },
+              label:
+                "Expend one Battle Die to reroll a failed save (to avoid/end a condition on yourself) and add the die to the new roll — you must use the new roll",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
         text: "Expend one Battle Die to reroll a failed save and add the die — keep expend phrasing so battle_dice links.",
       },
@@ -384,6 +403,43 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "Advantage on saves vs spells/magical effects while Bloodied — gate with below_half_hp when detectable.",
+      },
+    ],
+  },
+  {
+    id: "vagabond.subclass.grudge",
+    pack: "vagabond",
+    target: "subclass_feature",
+    match: { subclassClassName: /vagabond/i, name: /^grudge$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Marks a Grudge target within 30 ft.; grants a Grudge Battle Die (class_resources.grudge_battle_die, d6, max 1) each turn while held — usable only for maneuvers against that target.",
+      },
+    ],
+  },
+  {
+    id: "vagabond.subclass.mercurial",
+    pack: "vagabond",
+    target: "subclass_feature",
+    match: { subclassClassName: /vagabond/i, name: /^mercurial$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "vagabond.subclass.old_dog_new_tricks",
+    pack: "vagabond",
+    target: "subclass_feature",
+    match: { subclassClassName: /vagabond/i, name: /^old dog,?\s*new tricks$/i },
+    operations: [
+      { op: "setSheetDisplay", sheetDisplay: { featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Hound's own Battle Dice pool lives in class_resources.hound_battle_dice (2×d10, initiative/rest recharge) — distinct from your own battle_dice pool. Maneuvers picked here are auto-known by the hound, not the player.",
       },
     ],
   },

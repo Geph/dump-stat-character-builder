@@ -23,4 +23,20 @@ describe("resolve-wildcard-preset-conflict", () => {
       shouldSkipWildcardPreset("Cunning Strike", description, "*::Cunning Strike"),
     ).toBe(false)
   })
+
+  it("skips Tactical Master weapon-mastery-swap preset for an ally save aura (Warmage House of Kings)", () => {
+    const description =
+      "Allies within 10 feet of you add your Intelligence modifier (minimum of 1) to their saving throws against spells and magical effects."
+    expect(
+      shouldSkipWildcardPreset("Tactical Master", description, "*::Tactical Master"),
+    ).toBe(true)
+  })
+
+  it("does not skip Tactical Master preset for SRD Fighter weapon mastery text", () => {
+    const description =
+      "When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack."
+    expect(
+      shouldSkipWildcardPreset("Tactical Master", description, "*::Tactical Master"),
+    ).toBe(false)
+  })
 })

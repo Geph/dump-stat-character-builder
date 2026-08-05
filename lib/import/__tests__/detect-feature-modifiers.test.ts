@@ -570,6 +570,24 @@ describe("detectFeatureModifiers", () => {
     expect(detectFeatureModifiers(text, baseCtx)).toEqual([])
   })
 
+  it("scopes the Precognitive Dreams temp-HP rule to that exact feature name", () => {
+    const text =
+      "Whenever a companion drops to 0 Hit Points after a Long Rest, it regains temporary hit points equal to your Intelligence modifier."
+    // Same sentence shape, but on an unrelated feature (e.g. a Warmage card-table result) —
+    // must not fire the Precognitive Dreams-only rule.
+    expect(
+      detectFeatureModifiers(text, { ...baseCtx, featureName: "Deck of Fate" }).some(
+        (entry) => entry.ruleId === "precognitive.dreams.thp",
+      ),
+    ).toBe(false)
+    // The real Psion talent still gets the rule.
+    expect(
+      detectFeatureModifiers(text, { ...baseCtx, featureName: "Precognitive Dreams" }).some(
+        (entry) => entry.ruleId === "precognitive.dreams.thp",
+      ),
+    ).toBe(true)
+  })
+
   it("preserves an alternate-skill ability's target condition", () => {
     const detections = detectFeatureModifiers(
       "You can use Intelligence instead of Wisdom when making an Insight check against a creature with an Intelligence score of 6 or higher.",

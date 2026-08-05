@@ -769,6 +769,14 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: "languageChoiceCount 1; choicePool standard",
   },
   {
+    ruleId: "spell.know_cantrips_named_list",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: ["You learn the Mage Hand and Ray of Frost cantrips"],
+    mechanicsKind: "spells_known",
+    notes: 'spellNames: ["Mage Hand", "Ray of Frost"]',
+  },
+  {
     ruleId: "spell.know_cantrip",
     trigger: "description",
     catalog: "cat_char_spells_known",
