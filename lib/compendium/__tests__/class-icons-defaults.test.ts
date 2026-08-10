@@ -30,6 +30,7 @@ describe("class icon defaults", () => {
       HOMEBREW_CLASS_ICONS_BY_NAME.Psion,
       HOMEBREW_CLASS_ICONS_BY_NAME.Occultist,
       HOMEBREW_CLASS_ICONS_BY_NAME.Warden,
+      HOMEBREW_CLASS_ICONS_BY_NAME.Dancer,
     ]) {
       expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${icon}.svg`))).toBe(true)
     }

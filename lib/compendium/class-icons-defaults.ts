@@ -31,6 +31,7 @@ export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Vagabond: "treasure-map",
   Warmage: "hypersonic-bolt",
   Witch: "witch-flight",
+  Dancer: "ballerina-shoes",
 }
 
 const PSION_ICON = "rear-aura"

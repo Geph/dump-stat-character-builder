@@ -1229,11 +1229,11 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "ac.unarmored.ability",
     confidence: "high",
     test:
-      /\b(?:base\s+)?(?:AC|armor\s+class)\s+(?:equals|is)\s+(\d+)\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier(?:\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier)?/i,
+      /\b(?:base\s+)?(?:AC|armor\s+class)\s+(?:equals|is)\s+(\d+)\s*(?:\+|plus)\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(?:modifier(?:\s*(?:\+|plus)\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier)?|and\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifiers)/i,
     build: (match, ctx) => {
       const base = parseInt(match[1], 10)
       const first = parseAbilityWord(match[2])
-      const second = match[3] ? parseAbilityWord(match[3]) : null
+      const second = match[3] || match[4] ? parseAbilityWord(match[3] || match[4]) : null
       if (!first || !Number.isFinite(base)) return null
       const abilities = [first, second]
         .filter(Boolean)
@@ -1253,10 +1253,10 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "ac.unarmored.ten",
     confidence: "high",
     test:
-      /\b(?:AC|armor\s+class)\s+(?:equals|is)\s+10\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier(?:\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier)?/i,
+      /\b(?:AC|armor\s+class)\s+(?:equals|is)\s+10\s*(?:\+|plus)\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(?:modifier(?:\s*(?:\+|plus)\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier)?|and\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifiers)/i,
     build: (match, ctx) => {
       const first = parseAbilityWord(match[1])
-      const second = match[2] ? parseAbilityWord(match[2]) : null
+      const second = match[2] || match[3] ? parseAbilityWord(match[2] || match[3]) : null
       if (!first) return null
       const abilities = [first, second]
         .filter(Boolean)
@@ -1959,6 +1959,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "uses.ability_modifier",
     confidence: "medium",
+    scope: "full",
     test:
       /\b(?:a\s+)?number(?:\s+of\s+times)?\s+equal\s+to\s+your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier\b/i,
     build: (match, ctx, text) => {
@@ -1969,10 +1970,17 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         return null
       }
       const ability = match[1].toUpperCase().slice(0, 3) as UsesConfig["abilityModifier"]
+      const recharges: UsesConfig["recharges"] = [{ rest: "long_rest" }]
+      if (
+        /\bregain(?:ing)?\s+(?:one|1|an?)\s+expended\s+use\b/i.test(text) &&
+        /\bshort\s+rest\b/i.test(text)
+      ) {
+        recharges.unshift({ rest: "short_rest", amount: 1 })
+      }
       const uses: UsesConfig = {
         type: "ability_modifier",
         abilityModifier: ability,
-        recharges: [{ rest: "long_rest" }],
+        recharges,
       }
       return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
     },
@@ -1980,14 +1988,22 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "uses.proficiency",
     confidence: "medium",
+    scope: "full",
     test: /\b(?:a\s+)?number\s+of\s+times\s+equal\s+to\s+your\s+proficiency\s+bonus\b/i,
     build: (_match, ctx, text) => {
       if (!/\bregain(?:ing)?\s+all\s+(?:expended\s+)?uses\b/i.test(text) && !/\bper\s+long\s+rest\b/i.test(text)) {
         return null
       }
+      const recharges: UsesConfig["recharges"] = [{ rest: "long_rest" }]
+      if (
+        /\bregain(?:ing)?\s+(?:one|1|an?)\s+expended\s+use\b/i.test(text) &&
+        /\bshort\s+rest\b/i.test(text)
+      ) {
+        recharges.unshift({ rest: "short_rest", amount: 1 })
+      }
       const uses: UsesConfig = {
         type: "proficiency",
-        recharges: [{ rest: "long_rest" }],
+        recharges,
       }
       return usesInstance(newInstanceId(), uses, ctx.featureName ?? "Limited uses")
     },

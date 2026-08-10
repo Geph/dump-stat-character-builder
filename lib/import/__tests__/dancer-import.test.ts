@@ -104,7 +104,7 @@ describe("Dancer enrichment", () => {
     )
 
     const finale = features.find((f) => f.name === "Grand Finale") as Feature
-    expect(finale.activation?.action).toBe(true)
+    expect(finale.activation?.action).not.toBe(true)
     expect(finale.limitedUses?.restoreByResource).toMatchObject({
       resourceKey: "dances",
       resourceAmount: 2,
@@ -197,7 +197,7 @@ describe("Dancer enrichment", () => {
     expect(spinning.ability_role).toBe("upgrade")
   })
 
-  it("wires Deadly D4s weapon die override and Momentum class resource spend", () => {
+  it("wires Deadly D4s as a play-time rider (not die override) and Momentum class resource spend", () => {
     const enriched = applyImportEnrichmentPresets({
       classes: [
         {
@@ -209,14 +209,20 @@ describe("Dancer enrichment", () => {
             {
               level: 1,
               name: "Dervish Fighting",
-              description: "Deadly D4s. Your weapon damage dice become d4s.",
+              description: "Deadly D4s. Whenever you roll damage with a weapon that deals 1d4 or 1d6 damage or an Unarmed Strike, you can deal 2d4 damage instead.",
+            },
+            {
+              level: 1,
+              name: "Unarmored Defense",
+              description:
+                "While you aren't wearing armor or wielding a Shield, your base Armor Class equals 10 plus your Dexterity and Charisma modifiers.",
             },
           ],
         },
       ],
       subclasses: [
         {
-          name: "Momentum",
+          name: "Acrobat",
           class_name: "Dancer",
           description: null,
           features: [
@@ -231,10 +237,15 @@ describe("Dancer enrichment", () => {
     } as unknown as ImportContent)
 
     const dervish = enriched.classes?.[0]?.features?.[0] as Feature
-    const override = (dervish.linkedModifiers ?? [])
+    const chars = (dervish.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(chars.some((char) => char.type === "weapon_damage_die_override")).toBe(false)
+    expect(chars.some((char) => char.type === "power_rider")).toBe(true)
+
+    const ud = enriched.classes?.[0]?.features?.find((f) => f.name === "Unarmored Defense") as Feature
+    const ac = (ud.linkedModifiers ?? [])
       .flatMap((mod) => mod.characteristics ?? [])
-      .find((char) => char.type === "weapon_damage_die_override")
-    expect(override).toMatchObject({ dieSides: 4, scope: "weapons" })
+      .find((char) => char.type === "ac")
+    expect(ac).toMatchObject({ mode: "ability_modifiers", base: 10, abilities: ["DEX", "CHA"] })
 
     const momentum = enriched.subclasses?.[0]?.features?.[0] as Feature
     expect(momentum.limitedUses).toMatchObject({

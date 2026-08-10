@@ -49,6 +49,16 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
       "<p><strong>Becoming a Craftsman</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Craftsman Traits table.</li><li>Gain the Craftsman's level 1 features, which are listed in the Craftsman Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Craftsman Traits table: Hit Point Die, Tool Proficiencies, proficiency with Martial weapons, and training with Light and Medium armor and Shields.</li><li>Gain the Craftsman's level 1 features, which are listed in the Craftsman Features table.</li></ul>",
     card_image_slug: "craftsman",
   },
+  Dancer: {
+    icon: "ballerina-shoes",
+    card_blurb:
+      "A graceful, evasive skirmisher who turns footwork and flair into a deadly weapon in battle.",
+    creator_url:
+      "https://magehandpress.com/category/content/mage-hand-press-classes/dancer/\nIn accordance with https://magehandpress.com/content-usage-policy/",
+    description:
+      "<p><strong>Becoming a Dancer</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Dancer Traits table.</li><li>Gain the Dancer's level 1 features, which are listed in the Dancer Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Dancer Traits table: Hit Point Die, proficiency with Simple weapons, and training with Light armor.</li><li>Gain the Dancer's level 1 features, which are listed in the Dancer Features table.</li></ul>",
+    card_image_slug: "dancer",
+  },
   Gunslinger: {
     icon: "gunshot",
     card_blurb:

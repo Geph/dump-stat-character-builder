@@ -383,15 +383,21 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
       /\bspend\s+(?:one|an?|1)\s+momentum\b/i,
     ],
     defaultUses: {
-      type: "fixed",
-      fixedAmount: 3,
-      recharges: [{ rest: "long_rest" }],
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 3, count: 1 },
+        { level: 14, count: 3 },
+      ],
     },
     proposeFromText: true,
     textProposalUses: {
-      type: "fixed",
-      fixedAmount: 3,
-      recharges: [{ rest: "long_rest" }],
+      type: "at_level",
+      atLevelMode: "tier",
+      atLevelTable: [
+        { level: 3, count: 1 },
+        { level: 14, count: 3 },
+      ],
     },
   },
   {

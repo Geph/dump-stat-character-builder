@@ -81,24 +81,51 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         preset: {
           kind: "char_instance",
           idKey: "deadly_d4s",
-          catalogRefId: "cat_char_weapon_damage_die_override",
+          catalogRefId: "cat_char_power_rider",
           characteristics: [
             {
               id: "char_deadly_d4s",
-              type: "weapon_damage_die_override",
-              dieSides: 4,
-              scope: "weapons",
-              label: "Deadly D4s: weapon damage dice become d4s",
+              type: "power_rider",
+              parentPowerNames: ["Attack", "Unarmed Strike"],
+              alertSummary:
+                "Deadly D4s: when you roll damage with a 1d4/1d6 weapon or Unarmed Strike, you can deal 2d4 instead. Dervish Firearms (optional): 2d4 → 3d4. Extra Finesse on 1d4/1d6 weapons.",
             },
           ],
         },
-        replaceCharacteristicTypes: ["weapon_damage_die_override"],
+        replaceCharacteristicTypes: ["power_rider", "weapon_damage_die_override"],
       },
       {
         op: "appendDescription",
-        text: "Deadly D4s rewrites equipped weapon damage dice to d4s on the sheet. Extra Finesse / Dervish Firearms remain play-time.",
+        text: "Deadly D4s is optional 2d4 replacement (not a sheet die rewrite). Dervish Firearms (firearms settings): when you roll 2d4 weapon damage, you can deal 3d4 instead.",
       },
       { op: "setSheetDisplay", sheetDisplay: { featuresTab: true, combatActions: true } },
+    ],
+  },
+  {
+    id: "dancer.class.unarmored_defense",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^unarmored defense$/i },
+    skipIfCharacteristicTypes: ["ac"],
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "dancer_uac",
+          catalogRefId: "cat_char_ac",
+          characteristics: [
+            {
+              id: "char_dancer_uac",
+              type: "ac",
+              mode: "ability_modifiers",
+              base: 10,
+              abilities: ["DEX", "CHA"],
+              label: "Unarmored Defense",
+            },
+          ],
+        },
+      },
     ],
   },
   {
@@ -320,7 +347,6 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /dancer/i, name: /^grand finale$/i },
     operations: [
-      { op: "setActivation", activation: { action: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
       {
         op: "setLimitedUses",
@@ -334,7 +360,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "Requires Dance active (enable Dancing). Not usable on the first round. Hits crit until end of turn; two extra attacks as a Bonus Action; then Dance ends. Restore by spending 2 Dances.",
+        text: "Attack-action rider while Dance is active (enable Dancing) — not its own Action. Not usable on the first round of combat. Hits crit until end of turn; two extra attacks as a Bonus Action; then Dance ends. Restore by spending 2 Dances.",
       },
     ],
   },
@@ -485,8 +511,16 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { reaction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
       {
+        op: "setLimitedUses",
+        uses: {
+          type: "ability_modifier",
+          abilityModifier: "DEX",
+          recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+        },
+      },
+      {
         op: "appendDescription",
-        text: "When you use Graceful Dodge: Reaction to add another Dance Die to AC. At 11+, miss → Graceful Retaliation as part of the same Reaction.",
+        text: "When you use Graceful Dodge: Reaction to add another Dance Die to AC. At 11+, miss → Graceful Retaliation as part of the same Reaction. Uses = DEX mod (min 1); regain 1 on Short Rest, all on Long Rest.",
       },
     ],
   },

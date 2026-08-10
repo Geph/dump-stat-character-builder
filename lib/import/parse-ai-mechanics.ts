@@ -97,7 +97,10 @@ function usesRechargesFromImport(
     return undefined
   }
   if (recharge === "short_rest") return [{ rest: "short_rest" }]
-  if (recharge === "both") return [{ rest: "short_rest" }, { rest: "long_rest" }]
+  if (recharge === "both") {
+    // Common 2024/MHP pattern: regain 1 on a Short Rest, all on a Long Rest.
+    return [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }]
+  }
   return [{ rest: "long_rest" }]
 }
 

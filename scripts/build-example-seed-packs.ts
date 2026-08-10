@@ -56,6 +56,7 @@ const MHP_FILES: PackFileSpec[] = [
   { sourceName: "magehandpress-alchemist-class", outName: "magehandpress-alchemist-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-captain-class", outName: "magehandpress-captain-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-craftsman-class", outName: "magehandpress-craftsman-class.json", filterMhpSubclasses: true },
+  { sourceName: "magehandpress-dancer-class", outName: "magehandpress-dancer-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-gunslinger-class", outName: "magehandpress-gunslinger-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-investigator-class", outName: "magehandpress-investigator-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-martyr-class", outName: "magehandpress-martyr-class.json", filterMhpSubclasses: true },

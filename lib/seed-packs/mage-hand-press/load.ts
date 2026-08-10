@@ -2,6 +2,7 @@ import type { ImportContent } from "@/lib/import/content-schema"
 import alchemist from "./magehandpress-alchemist-class.json"
 import captain from "./magehandpress-captain-class.json"
 import craftsman from "./magehandpress-craftsman-class.json"
+import dancer from "./magehandpress-dancer-class.json"
 import gunslinger from "./magehandpress-gunslinger-class.json"
 import investigator from "./magehandpress-investigator-class.json"
 import martyr from "./magehandpress-martyr-class.json"
@@ -25,6 +26,7 @@ export function loadMageHandPressPack() {
       alchemist,
       captain,
       craftsman,
+      dancer,
       gunslinger,
       investigator,
       martyr,
