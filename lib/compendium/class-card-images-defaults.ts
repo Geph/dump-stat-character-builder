@@ -23,7 +23,8 @@ export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Sorcerer: classCardImage("sorcerer"),
   Warlock: classCardImage("warlock"),
   Wizard: classCardImage("wizard"),
-  // Collision-labeled seed / import name for KibblesTasty Warden.
+  // KibblesTasty Warden — bare name (legacy rows) and collision-labeled seed name.
+  Warden: classCardImage("warden-kibbles"),
   "Warden (Kibbles Tasty)": classCardImage("warden-kibbles"),
 }
 

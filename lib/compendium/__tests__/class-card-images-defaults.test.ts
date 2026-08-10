@@ -22,6 +22,7 @@ const EXPECTED_CLASS_NAMES = [
   "Sorcerer",
   "Warlock",
   "Wizard",
+  "Warden",
   "Warden (Kibbles Tasty)",
 ]
 

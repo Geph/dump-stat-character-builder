@@ -100,7 +100,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     card_image_slug: "vagabond",
   },
   Warmage: {
-    icon: "magic-shield",
+    icon: "hypersonic-bolt",
     card_blurb:
       "Turns simple cantrips into a devastating arsenal through relentless magical customization.",
     creator_url:

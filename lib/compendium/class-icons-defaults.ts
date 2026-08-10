@@ -18,6 +18,9 @@ export const SRD_CLASS_ICONS_BY_NAME: Record<string, string> = {
 export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Psion: "rear-aura",
   "KibblesTasty Psion": "rear-aura",
+  Occultist: "pentacle",
+  Warden: "tribal-shield",
+  "Warden (Kibbles Tasty)": "tribal-shield",
   Alchemist: "potion-of-madness",
   Captain: "captain-hat-profile",
   Craftsman: "blacksmith",
@@ -26,11 +29,13 @@ export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Martyr: "bleeding-heart",
   Necromancer: "stoned-skull",
   Vagabond: "treasure-map",
-  Warmage: "magic-shield",
+  Warmage: "hypersonic-bolt",
   Witch: "witch-flight",
 }
 
 const PSION_ICON = "rear-aura"
+const OCCULTIST_ICON = "pentacle"
+const KIBBLES_WARDEN_ICON = "tribal-shield"
 
 /** Resolve a default game-icons slug for a class name when none is stored. */
 export function defaultClassIconForName(name: string): string | null {
@@ -43,6 +48,13 @@ export function defaultClassIconForName(name: string): string | null {
 
   // Kibbles'Tasty Psion and similar publisher-prefixed names.
   if (/\bkibbles/i.test(trimmed) && /\bpsion\b/i.test(trimmed)) return PSION_ICON
+  if (/\boccultist\b/i.test(trimmed) && !/\bmage\s*hand|\bmhp\b/i.test(trimmed)) {
+    return OCCULTIST_ICON
+  }
+  // Kibbles Warden (including "Warden (Kibbles Tasty)"); skip Mage Hand Press label.
+  if (/\bwarden\b/i.test(trimmed) && !/\bmage\s*hand|\bmhp\b/i.test(trimmed)) {
+    return KIBBLES_WARDEN_ICON
+  }
 
   return null
 }

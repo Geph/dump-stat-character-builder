@@ -18,9 +18,21 @@ describe("class icon defaults", () => {
     expect(defaultClassIconForName("LaserLlama Psion")).toBeNull()
   })
 
-  it("ships rear-aura in public/icons", () => {
-    const icon = HOMEBREW_CLASS_ICONS_BY_NAME.Psion
-    expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${icon}.svg`))).toBe(true)
+  it("maps Kibbles Occultist and Warden to curated icons", () => {
+    expect(defaultClassIconForName("Occultist")).toBe("pentacle")
+    expect(defaultClassIconForName("Warden")).toBe("tribal-shield")
+    expect(defaultClassIconForName("Warden (Kibbles Tasty)")).toBe("tribal-shield")
+    expect(defaultClassIconForName("Warden (Mage Hand Press)")).toBeNull()
+  })
+
+  it("ships curated Kibbles icons in public/icons", () => {
+    for (const icon of [
+      HOMEBREW_CLASS_ICONS_BY_NAME.Psion,
+      HOMEBREW_CLASS_ICONS_BY_NAME.Occultist,
+      HOMEBREW_CLASS_ICONS_BY_NAME.Warden,
+    ]) {
+      expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${icon}.svg`))).toBe(true)
+    }
   })
 
   it("uses rear-aura in compendium default icon lookup", () => {
