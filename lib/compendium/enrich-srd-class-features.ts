@@ -7092,8 +7092,24 @@ function resolvePresetKey(
 }
 
 /** Apply only global `*::Feature` presets (safe for homebrew imports). */
-export function enrichWildcardFeaturePresets(feature: Feature): Feature {
-  const key = `*::${(feature.name ?? "").trim().replace(/[\u2018\u2019\u201B']/g, "'")}`
+/**
+ * When `presetScope` is supplied, resolve the class/subclass-scoped preset key first
+ * (matching the static SRD seed-data build path) before falling back to the generic
+ * `*::FeatureName` wildcard. Without it, only the generic wildcard is checked — this is
+ * what call sites without class/subclass context (feats, species traits, abilities,
+ * equipment) still get. Callers that DO know the class/subclass (import of class/subclass
+ * JSON) must pass `presetScope` so name collisions between an SRD feature and an unrelated
+ * homebrew wildcard preset resolve to the correctly scoped entry instead of the wrong one.
+ */
+export function enrichWildcardFeaturePresets(
+  feature: Feature,
+  presetScope?: { className?: string | null; subclassName?: string | null },
+): Feature {
+  const normalizedName = (feature.name ?? "").trim().replace(/[\u2018\u2019\u201B']/g, "'")
+  const key = presetScope?.className
+    ? resolvePresetKey(presetScope.className, presetScope.subclassName ?? null, normalizedName)
+    : `*::${normalizedName}`
+  if (!key) return feature
   const preset = SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]
   if (!preset) return feature
   if (shouldSkipWildcardPreset(feature.name ?? "", feature.description ?? "", key)) {

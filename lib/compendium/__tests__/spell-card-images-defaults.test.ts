@@ -14,6 +14,29 @@ describe("spell card image defaults", () => {
     expect(spellNameToCardImageSlug("Acid Splash")).toBe("acid-splash")
     expect(spellNameToCardImageSlug("Green-Flame Blade")).toBe("green-flame-blade")
     expect(spellNameToCardImageSlug("Spare the Dying")).toBe("spare-the-dying")
+    expect(spellNameToCardImageSlug("Dancing Object (Animate Object)")).toBe(
+      "dancing-object-animate-object",
+    )
+    expect(spellNameToCardImageSlug("Trary\u2019s Terrific Transposition")).toBe(
+      "trarys-terrific-transposition",
+    )
+  })
+
+  it("maps Kibbles import spell names to bundled art", () => {
+    expect(defaultSpellCardImageUrl("Mutate")).toMatch(/\/mutate\.png$/)
+    expect(defaultSpellCardImageUrl("Awaken Rope")).toMatch(/\/awaken-rope\.png$/)
+    expect(defaultSpellCardImageUrl("Dancing Object (Animate Object)")).toMatch(
+      /\/dancing-object-animate-object\.png$/,
+    )
+    expect(defaultSpellCardImageUrl("Dancing Objects (Animate Object)")).toMatch(
+      /\/dancing-object-animate-object\.png$/,
+    )
+    expect(defaultSpellCardImageUrl("Trary\u2019s Terrific Transposition")).toMatch(
+      /\/trarys-terrific-transposition\.png$/,
+    )
+    expect(defaultSpellCardImageUrl("Beam of Annihilation")).toMatch(
+      /\/beam-of-annihilation\.png$/,
+    )
   })
 
   it("exposes bundled art for every listed spell name", () => {

@@ -174,7 +174,7 @@ export function WeaponDamageRollButton({
       : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
 
   const rollButtonClass = filled
-    ? "min-h-0 flex-1 w-full rounded-lg border-2 border-rose-400/80 bg-gradient-to-b from-rose-500 to-rose-800 px-2 text-sm text-white shadow-md shadow-rose-500/20 hover:from-rose-400 hover:to-rose-700"
+    ? "sheet-fill-tile sheet-fill-hp min-h-0 flex-1 w-full rounded-lg px-2 text-sm"
     : "h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs hover:bg-muted"
 
   const optionsTrigger = (

@@ -4,6 +4,7 @@ import {
   CreatureImportDocumentSchema,
   CreatureImportV2Schema,
   isCreatureImportV2,
+  type CreatureImportV2,
 } from "@/lib/import/creature-import-v2-schema"
 import {
   CreatureImportValidationException,
@@ -197,6 +198,53 @@ describe("mapCreatureImportV2ToTemplate + persist", () => {
     expect(rows[0].category).toBe("creature")
     expect(rows[0].import_payload).toBeNull()
     expect(rows[0].stat_block.actions[0]?.name).toBe("Shortsword")
+  })
+
+  it("coerces omitted nullable keys on otherwise-valid companions", () => {
+    const { initiative_modifier: _i, initiative_passive: _p, ac_note: _a, ...partial } = {
+      ...MINSTREL_V2,
+    }
+    const incomplete = {
+      ...partial,
+      resistances: undefined,
+      damage_immunities: undefined,
+      condition_immunities: undefined,
+      vulnerabilities: undefined,
+      legendary_actions: undefined,
+    }
+    const rows = buildCreaturePersistRows([incomplete as typeof MINSTREL_V2], "MHP")
+    expect(rows).toHaveLength(1)
+    expect(rows[0].name).toBe(MINSTREL_V2.name)
+    expect(rows[0].import_payload).not.toBeNull()
+    expect(rows[0].category).toBe("companion")
+  })
+
+  it("does not throw on homebrew-shaped structured rows (coerce or legacy fallback)", () => {
+    const rows = buildCreaturePersistRows(
+      [
+        {
+          name: "Golem",
+          description: "A mechanical golem bound to its inventor.",
+          category: "companion",
+          scaling: { scales_with: "inventor_level", notes: "scales" },
+          ac: "14 (natural armor)",
+          hp: "5 + inventor level",
+          speed: "30 ft.",
+          ability_scores: {
+            strength: 14,
+            dexterity: 12,
+            constitution: 12,
+            intelligence: 4,
+            wisdom: 5,
+            charisma: 1,
+          },
+        } as unknown as CreatureImportV2,
+      ],
+      "Kibbles Tasty",
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].name).toBe("Golem")
+    expect(rows[0].stat_block.name).toBe("Golem")
   })
 })
 

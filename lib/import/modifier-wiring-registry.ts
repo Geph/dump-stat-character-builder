@@ -1423,7 +1423,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Mage Hand Press Warden (not Kibbles)",
     guidance: [
-      "Distinct from KibblesTasty Warden (Endurance Dice / Primal Manifestations). On name collision, the import UI asks the user what to rename to (suggestion: \"Mage Hand Press Warden\").",
+      "Distinct from KibblesTasty Warden (Endurance Dice / Primal Manifestations). On name collision, the import UI asks the user what to rename to (suggestion: \"Warden (Mage Hand Press)\").",
       "Interrupt column → class_resources.interrupt (short regain 1 / long all). Interdict subclass may add rechargeOnInitiative: 1.",
       "Unyielding Resolve / Improved Resolve: \"While you are Bloodied\" → damage_resistance gated with below_half_hp.",
       "Guardian Tactics: resource_ability_menu (Block / Challenge / Grasp + Extended Tactics unlock at 14, waive cost); ally/enemy effects remain play-time. Interrupt: reaction + class_resource interrupt. Survive / Selfless Survival / Undying share useShareKey \"survive\".",

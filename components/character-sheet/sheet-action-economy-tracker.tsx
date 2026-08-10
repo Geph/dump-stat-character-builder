@@ -10,6 +10,7 @@ const ECONOMY_BUTTONS: {
   label: string
   short: string
   Icon: typeof Swords
+  fillClass: string
   idleClass: string
   litClass: string
 }[] = [
@@ -18,30 +19,27 @@ const ECONOMY_BUTTONS: {
     label: "Action",
     short: "Action",
     Icon: Swords,
-    idleClass:
-      "border-amber-500/45 bg-gradient-to-b from-amber-600/50 to-amber-950/75 text-white/90 hover:from-amber-500/60",
-    litClass:
-      "border-amber-400/80 bg-gradient-to-b from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25",
+    fillClass: "sheet-fill-action",
+    idleClass: "sheet-fill-economy-idle",
+    litClass: "sheet-fill-economy-lit",
   },
   {
     kind: "bonus",
     label: "Bonus Action",
     short: "Bonus",
     Icon: Zap,
-    idleClass:
-      "border-sky-500/45 bg-gradient-to-b from-sky-600/50 to-sky-950/75 text-white/90 hover:from-sky-500/60",
-    litClass:
-      "border-sky-400/80 bg-gradient-to-b from-sky-500 to-sky-600 text-white shadow-md shadow-sky-500/25",
+    fillClass: "sheet-fill-bonus",
+    idleClass: "sheet-fill-economy-idle",
+    litClass: "sheet-fill-economy-lit",
   },
   {
     kind: "reaction",
     label: "Reaction",
     short: "Reaction",
     Icon: Shield,
-    idleClass:
-      "border-violet-500/45 bg-gradient-to-b from-violet-600/50 to-violet-950/75 text-white/90 hover:from-violet-500/60",
-    litClass:
-      "border-violet-400/80 bg-gradient-to-b from-violet-500 to-violet-600 text-white shadow-md shadow-violet-500/25",
+    fillClass: "sheet-fill-reaction",
+    idleClass: "sheet-fill-economy-idle",
+    litClass: "sheet-fill-economy-lit",
   },
 ]
 
@@ -62,7 +60,7 @@ export function SheetActionEconomyTracker({
 
   return (
     <div className="mb-3 grid w-full grid-cols-[1fr_1fr_1fr_auto] gap-2">
-      {ECONOMY_BUTTONS.map(({ kind, label, short, Icon, idleClass, litClass }) => {
+      {ECONOMY_BUTTONS.map(({ kind, label, short, Icon, fillClass, idleClass, litClass }) => {
         const lit = spent[kind]
         return (
           <button
@@ -73,7 +71,8 @@ export function SheetActionEconomyTracker({
             title={lit ? `${label} used — click to clear` : `Mark ${label} used`}
             onClick={() => onToggle(kind)}
             className={cn(
-              "relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-1.5 py-2.5 transition-all",
+              "relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 py-2.5 transition-all",
+              fillClass,
               lit ? litClass : idleClass,
               lit && "ring-2 ring-inset ring-white/25",
               disabled && "pointer-events-none opacity-50",

@@ -41,6 +41,9 @@ const SKIP_NAMES = new Set([
 const ALLOWED_UNMATCHED = new Set([
   "Hunter's Lore",
   "Pact Magic",
+  // Great Old One patron: damage-type override (psychic) + no-components clause on a spell you
+  // already know — descriptive rider on existing spellcasting, not a new modifier hook.
+  "Psychic Spells",
   // Level-up markers; damage scales via bonusByLevel on the level-7 Blessed Strikes choice.
   "Improved Blessed Strikes",
   // Level-up marker; damage scales via bonusByLevel on the level-7 Elemental Fury choice.

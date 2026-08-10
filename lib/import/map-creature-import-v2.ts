@@ -12,8 +12,11 @@ import type {
   CreatureImportLegacy,
   CreatureImportRow,
 } from "@/lib/import/creature-import-v2-schema"
-import { isCreatureImportV2 } from "@/lib/import/creature-import-v2-schema"
-import { parseCreatureImportV2 } from "@/lib/import/load-creature-import-v2"
+import { coerceCreatureImportCandidate } from "@/lib/import/coerce-creature-import-v2"
+import {
+  CreatureImportV2Schema,
+  isCreatureImportV2,
+} from "@/lib/import/creature-import-v2-schema"
 import { parseCreatureStatBlock } from "@/lib/character/parse-creature-stat-block"
 
 const ABILITY_KEY_MAP = {
@@ -153,9 +156,9 @@ export function mapCreatureImportV2ToTemplate(
     name: creature.name,
     sizeTypeAlignment: `${creature.size} ${creature.creature_type}, ${creature.alignment}`,
     ac: parseCreatureScaledStat(creature.ac),
-    acNote: creature.ac_note,
+    acNote: creature.ac_note ?? null,
     hp: parseCreatureScaledStat(creature.hp),
-    hitDiceNote: creature.hit_dice,
+    hitDiceNote: creature.hit_dice ?? null,
     initiative,
     speed: formatSpeed(creature.speed),
     abilityScores: mapAbilityScores(creature.ability_scores),
@@ -164,15 +167,15 @@ export function mapCreatureImportV2ToTemplate(
     damageImmunities: splitList(creature.damage_immunities),
     conditionImmunities: splitList(creature.condition_immunities),
     senses: formatSenses(creature.senses),
-    languages: creature.languages,
-    skills: creature.skills,
-    proficiencies: creature.proficiencies,
-    gear: creature.gear,
-    cr: creature.category === "companion" ? null : creature.cr,
+    languages: creature.languages ?? null,
+    skills: creature.skills ?? null,
+    proficiencies: creature.proficiencies ?? null,
+    gear: creature.gear ?? null,
+    cr: creature.category === "companion" ? null : (creature.cr ?? null),
     category: creature.category,
-    scaling: creature.scaling,
-    xp: creature.xp,
-    proficiencyBonusLabel: creature.proficiency_bonus,
+    scaling: creature.scaling ?? null,
+    xp: creature.xp ?? null,
+    proficiencyBonusLabel: creature.proficiency_bonus ?? null,
     traits: mapAbilityEntries(creature.traits),
     actions: mapAbilityEntries(creature.actions),
     bonusActions: creature.bonus_actions?.length
@@ -253,10 +256,10 @@ function v2ToPersistRow(creature: CreatureImportV2, source: string): CreaturePer
     creature_type: creature.creature_type,
     size: creature.size,
     alignment: creature.alignment,
-    cr: creature.category === "companion" ? null : creature.cr,
+    cr: creature.category === "companion" ? null : (creature.cr ?? null),
     category: creature.category,
-    xp: creature.xp,
-    scaling: creature.scaling,
+    xp: creature.xp ?? null,
+    scaling: creature.scaling ?? null,
     import_payload: creature,
     stat_block: template,
     prerequisite_rules: creature.prerequisite_rules ?? null,
@@ -267,14 +270,24 @@ function v2ToPersistRow(creature: CreatureImportV2, source: string): CreaturePer
 /**
  * Map import creatures[] rows (v2 structured or legacy prose) onto the creatures
  * table shape. Companion formulas are preserved as scaled parts — not resolved here.
+ *
+ * Seed-pack / LLM rows often omit nullable keys or use slightly wrong shapes. Those are
+ * coerced toward v2; if they still fail strict validation, fall back to legacy instead of
+ * aborting the whole import.
  */
 export function buildCreaturePersistRows(
   creatures: CreatureImportRow[],
   source: string,
 ): CreaturePersistRow[] {
-  return creatures.map((creature) =>
-    isCreatureImportV2(creature)
-      ? v2ToPersistRow(parseCreatureImportV2(creature), source)
-      : legacyToPersistRow(creature, source),
-  )
+  return creatures.map((creature) => {
+    if (!isCreatureImportV2(creature)) {
+      return legacyToPersistRow(creature, source)
+    }
+    const coerced = coerceCreatureImportCandidate(creature)
+    const parsed = CreatureImportV2Schema.safeParse(coerced)
+    if (parsed.success) {
+      return v2ToPersistRow(parsed.data, source)
+    }
+    return legacyToPersistRow(creature, source)
+  })
 }

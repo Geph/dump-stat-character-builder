@@ -2990,12 +2990,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const magicalSleepImmunity = derived?.magicalSleepImmunity ?? false
   const noSleepRequired = derived?.noSleepRequired ?? false
   const forcedSaveRemaps = derived?.forcedSaveRemaps ?? []
+  const vision = derived?.vision ?? []
+  const resistances = derived?.resistances ?? []
+  const immunities = derived?.immunities ?? []
+  const conditionImmunities = derived?.conditionImmunities ?? []
+  const movementEffects = derived?.movementEffects ?? null
+  const extraTurns = derived?.extraTurns ?? []
+  const movementEffectNotes = movementEffects
+    ? [
+        movementEffects.movementMoveThroughLargerSpaces
+          ? "Can move through the space of creatures at least one size larger"
+          : null,
+        movementEffects.movementHideBehindLargerCreatures
+          ? "Can Hide behind creatures at least one size larger than you"
+          : null,
+        movementEffects.movementDash ? "Can Dash as part of another action" : null,
+        movementEffects.movementDisengage ? "Can Disengage without spending an action" : null,
+        movementEffects.movementHide ? "Can Hide as part of another action" : null,
+        movementEffects.spiderClimb ? "Can climb difficult surfaces (including ceilings) without a check" : null,
+      ].filter((note): note is string => Boolean(note))
+    : []
   const hasSenseNotes =
     Boolean(telepathy) ||
     Boolean(restReplacement) ||
     magicalSleepImmunity ||
     noSleepRequired ||
-    forcedSaveRemaps.length > 0
+    forcedSaveRemaps.length > 0 ||
+    movementEffectNotes.length > 0 ||
+    extraTurns.length > 0
 
   const alwaysPreparedSpellIds = (() => {
     const ids = new Set<string>()
@@ -4049,6 +4071,76 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                         </div>
                       )}
+                      {vision.length > 0 && (
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Senses</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {vision.map((entry) => (
+                              <span
+                                key={`vision-${entry.type}`}
+                                className="px-2 py-0.5 bg-muted text-foreground rounded-full text-xs"
+                              >
+                                {entry.type} {entry.rangeFeet} ft.
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(resistances.length > 0 || immunities.length > 0 || conditionImmunities.length > 0) && (
+                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 space-y-2">
+                          {resistances.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">
+                                Resistances
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {resistances.map((item) => (
+                                  <span
+                                    key={`resist-${item}`}
+                                    className="px-2 py-0.5 bg-muted text-foreground rounded-full text-xs"
+                                  >
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {immunities.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">
+                                Immunities
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {immunities.map((item) => (
+                                  <span
+                                    key={`immune-${item}`}
+                                    className="px-2 py-0.5 bg-muted text-foreground rounded-full text-xs"
+                                  >
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {conditionImmunities.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">
+                                Condition Immunities
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {conditionImmunities.map((item) => (
+                                  <span
+                                    key={`cond-immune-${item}`}
+                                    className="px-2 py-0.5 bg-muted text-foreground rounded-full text-xs"
+                                  >
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {hasSenseNotes ? (
                         <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 space-y-1.5">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
@@ -4080,6 +4172,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             >
                               {remap.label?.trim() ||
                                 `Forced saves: ${remap.fromAbility} → ${remap.toAbility} (${remap.scope.replace(/_/g, " ")})`}
+                            </p>
+                          ))}
+                          {movementEffectNotes.map((note) => (
+                            <p key={`movement-note-${note}`} className="text-xs text-foreground">
+                              {note}
+                            </p>
+                          ))}
+                          {extraTurns.map((entry, index) => (
+                            <p key={`extra-turn-${index}`} className="text-xs text-foreground">
+                              {entry.label?.trim() ||
+                                `Extra turn${entry.firstRoundOnly ? " (first round of combat)" : ""}`}
                             </p>
                           ))}
                         </div>

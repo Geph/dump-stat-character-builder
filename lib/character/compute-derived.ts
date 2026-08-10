@@ -1,4 +1,5 @@
 import { resolveAllSpeeds } from "@/lib/character/resolve-all-speeds"
+import { resolveVisionEntries } from "@/lib/character/resolve-vision"
 import {
   applyAbilityScoreOverrides,
 } from "@/lib/character/apply-characteristic-runtime"
@@ -984,6 +985,15 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     restReplacement: aggregatedCharacteristics.restReplacement,
     magicalSleepImmunity: aggregatedCharacteristics.magicalSleepImmunity,
     noSleepRequired: aggregatedCharacteristics.noSleepRequired,
+    vision: resolveVisionEntries({
+      speciesTraits: inputs.species?.traits,
+      aggregatedVision: aggregatedCharacteristics.vision,
+    }),
+    resistances: aggregatedCharacteristics.resistances,
+    immunities: aggregatedCharacteristics.immunities,
+    conditionImmunities: aggregatedCharacteristics.conditionImmunities,
+    movementEffects: aggregatedCharacteristics.movementEffects,
+    extraTurns: aggregatedCharacteristics.extraTurns,
     healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
     grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
     featureChoiceCountBonuses: aggregatedCharacteristics.featureChoiceCountBonuses,

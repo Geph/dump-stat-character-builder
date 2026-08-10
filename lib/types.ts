@@ -106,6 +106,14 @@ export interface FeatureChoice {
   featCategories?: string[]
 }
 
+/**
+ * Actionable, per-feature effects (new actions, limited uses, per-weapon/target scoping) live
+ * here on `activation.effects[]`, read directly off the owning `LinkedModifierInstance` by
+ * per-feature walkers (`lib/character/sheet-actions.ts`, etc). Passive character-wide effects
+ * that should flow into `DerivedCharacter` belong on `CharacteristicModifier`
+ * (`lib/compendium/characteristic-modifiers.ts`) instead — see
+ * `docs/modifier-vs-feature-effect.md` for the full decision rule.
+ */
 export interface FeatureEffect {
   id: string
   kind: string

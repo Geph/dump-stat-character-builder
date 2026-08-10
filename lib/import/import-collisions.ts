@@ -50,9 +50,9 @@ function suggestRenamedName(
     // Distinct homebrew classes that commonly share a short name (Kibbles vs Mage Hand Press).
     if (/^warden$/i.test(trimmed)) {
       const existing = (existingSource ?? "").toLowerCase()
-      if (/mage\s*hand|mhp/.test(existing)) return "KibblesTasty Warden"
-      if (/kibble/.test(existing)) return "Mage Hand Press Warden"
-      return "Mage Hand Press Warden"
+      if (/mage\s*hand|mhp/.test(existing)) return "Warden (Kibbles Tasty)"
+      if (/kibble/.test(existing)) return "Warden (Mage Hand Press)"
+      return "Warden (Mage Hand Press)"
     }
     if (!/\balternate\b/i.test(trimmed) && !/\bhomebrew\b/i.test(trimmed)) {
       return `${trimmed} (Alternate)`

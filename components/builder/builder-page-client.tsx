@@ -2000,19 +2000,14 @@ export default function BuilderPageClient() {
     activeClassLevels,
   ])
   
-  // Darkvision from species traits + characteristic modifiers
-  const speciesDarkvision = parseInt(
-    selectedSpecies?.traits?.find((t) => t.name.toLowerCase().includes("darkvision"))
-      ?.description?.match(/(\d+)/)?.[1] || "0",
-    10,
-  )
-  const characteristicDarkvision = aggregatedCharacteristics.vision
-    .filter((v) => v.type.toLowerCase().includes("darkvision"))
-    .reduce((max, v) => Math.max(max, v.rangeFeet), 0)
-  const darkvision = Math.max(speciesDarkvision, characteristicDarkvision).toString()
+  // Darkvision: engine merges species-trait text with CharacteristicModifier vision entries
+  // (see resolve-vision.ts) — read from DerivedCharacter instead of re-deriving here.
+  const darkvision = (
+    characterDerived.vision.find((v) => v.type.toLowerCase().includes("darkvision"))?.rangeFeet ?? 0
+  ).toString()
 
   const resistanceDisplay = [
-    ...aggregatedCharacteristics.resistances,
+    ...characterDerived.resistances,
     ...((selectedSpecies?.traits ?? [])
       .filter(
         (t) =>
@@ -2021,7 +2016,7 @@ export default function BuilderPageClient() {
       )
       .map((t) => t.name)),
   ]
-  const immunityDisplay = aggregatedCharacteristics.immunities
+  const immunityDisplay = characterDerived.immunities
 
   const saveCharacter = async () => {
     if (!meetsMulticlassRequirements) {

@@ -172,6 +172,15 @@ export type DerivedCharacter = {
   } | null
   magicalSleepImmunity: boolean
   noSleepRequired: boolean
+  /** Darkvision/tremorsense/etc, merged from species-trait text and CharacteristicModifiers. */
+  vision: { type: string; rangeFeet: number }[]
+  resistances: string[]
+  immunities: string[]
+  conditionImmunities: string[]
+  /** Passive movement rules (Halfling Nimbleness, Naturally Stealthy, Spider Climb, …). */
+  movementEffects: import("@/lib/compendium/characteristic-modifiers").AggregatedCharacteristics["movementEffects"]
+  /** Extra-turn rules (Thief's Reflexes, etc) — informational; no turn-order simulation exists. */
+  extraTurns: import("@/lib/compendium/characteristic-modifiers").ExtraTurnCharacteristic[]
   healingReceivedModifiers: import("@/lib/compendium/characteristic-modifiers").HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
   featureChoiceCountBonuses: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceCountBonusCharacteristic[]

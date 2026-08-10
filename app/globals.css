@@ -110,6 +110,15 @@
   --sidebar-accent-foreground: oklch(0.28 0.04 65);
   --sidebar-border: oklch(0.78 0.03 85);
   --sidebar-ring: oklch(0.48 0.1 65);
+
+  /* Sheet combat fills — saturated enough for white text on parchment */
+  --sheet-fill-ac: oklch(0.46 0.12 145);
+  --sheet-fill-speed: oklch(0.48 0.1 220);
+  --sheet-fill-init: oklch(0.55 0.14 65);
+  --sheet-fill-hp: oklch(0.48 0.14 20);
+  --sheet-fill-action: oklch(0.55 0.15 55);
+  --sheet-fill-bonus: oklch(0.5 0.11 230);
+  --sheet-fill-reaction: oklch(0.48 0.13 295);
 }
 
 /* Astral — dark purple + neon accents */
@@ -206,6 +215,15 @@
   --sidebar-accent-foreground: oklch(0.94 0.01 270);
   --sidebar-border: oklch(0.28 0.04 285);
   --sidebar-ring: oklch(0.62 0.26 290);
+
+  /* Sheet combat fills — neon-forward to match Astral chrome */
+  --sheet-fill-ac: oklch(0.62 0.2 155);
+  --sheet-fill-speed: oklch(0.65 0.16 230);
+  --sheet-fill-init: oklch(0.72 0.18 75);
+  --sheet-fill-hp: oklch(0.58 0.22 15);
+  --sheet-fill-action: oklch(0.72 0.18 75);
+  --sheet-fill-bonus: oklch(0.65 0.16 230);
+  --sheet-fill-reaction: oklch(0.58 0.22 295);
 }
 
 /* Stone — cool granite and slate */
@@ -263,6 +281,15 @@
   --sidebar-accent-foreground: oklch(0.9 0.01 250);
   --sidebar-border: oklch(0.38 0.02 250);
   --sidebar-ring: oklch(0.52 0.06 250);
+
+  /* Sheet combat fills — cool slate-readable accents */
+  --sheet-fill-ac: oklch(0.48 0.1 145);
+  --sheet-fill-speed: oklch(0.5 0.09 240);
+  --sheet-fill-init: oklch(0.55 0.1 70);
+  --sheet-fill-hp: oklch(0.48 0.1 340);
+  --sheet-fill-action: oklch(0.55 0.1 70);
+  --sheet-fill-bonus: oklch(0.5 0.09 240);
+  --sheet-fill-reaction: oklch(0.5 0.1 295);
 }
 
 /* Moss — forest floor, bark, amber light */
@@ -320,6 +347,15 @@
   --sidebar-accent-foreground: oklch(0.9 0.02 130);
   --sidebar-border: oklch(0.34 0.05 145);
   --sidebar-ring: oklch(0.58 0.11 145);
+
+  /* Sheet combat fills — forest canopy + amber light */
+  --sheet-fill-ac: oklch(0.48 0.14 145);
+  --sheet-fill-speed: oklch(0.5 0.1 210);
+  --sheet-fill-init: oklch(0.58 0.14 75);
+  --sheet-fill-hp: oklch(0.48 0.14 25);
+  --sheet-fill-action: oklch(0.58 0.14 75);
+  --sheet-fill-bonus: oklch(0.5 0.1 210);
+  --sheet-fill-reaction: oklch(0.5 0.12 300);
 }
 
 /* Sands — desert warmth, terracotta, sun-baked sand */
@@ -377,6 +413,15 @@
   --sidebar-accent-foreground: oklch(0.92 0.02 85);
   --sidebar-border: oklch(0.4 0.05 55);
   --sidebar-ring: oklch(0.55 0.14 45);
+
+  /* Sheet combat fills — terracotta / desert sky accents */
+  --sheet-fill-ac: oklch(0.48 0.12 145);
+  --sheet-fill-speed: oklch(0.5 0.1 220);
+  --sheet-fill-init: oklch(0.58 0.16 55);
+  --sheet-fill-hp: oklch(0.48 0.16 25);
+  --sheet-fill-action: oklch(0.58 0.16 55);
+  --sheet-fill-bonus: oklch(0.5 0.1 220);
+  --sheet-fill-reaction: oklch(0.48 0.12 295);
 }
 
 @theme inline {
@@ -462,6 +507,66 @@
 .glow-lime    { box-shadow: 0 0 12px color-mix(in oklch, var(--lime) 60%, transparent); }
 .glow-orange  { box-shadow: 0 0 12px color-mix(in oklch, var(--orange) 60%, transparent); }
 .glow-magenta { box-shadow: 0 0 12px color-mix(in oklch, var(--magenta) 60%, transparent); }
+
+/* Theme-aware sheet combat fills (AC / Speed / Init / HP / action economy / roll buttons).
+   Tokens are set per [data-theme]; these utilities keep high-contrast white type. */
+.sheet-fill-tile {
+  color: white;
+  border-width: 2px;
+  border-style: solid;
+  border-color: color-mix(in oklch, var(--_sheet-fill) 75%, white);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--_sheet-fill) 92%, white),
+    color-mix(in oklch, var(--_sheet-fill) 62%, black)
+  );
+  box-shadow: 0 4px 14px color-mix(in oklch, var(--_sheet-fill) 28%, transparent);
+}
+.sheet-fill-tile:hover {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--_sheet-fill) 98%, white),
+    color-mix(in oklch, var(--_sheet-fill) 70%, black)
+  );
+}
+.sheet-fill-ac { --_sheet-fill: var(--sheet-fill-ac); }
+.sheet-fill-speed { --_sheet-fill: var(--sheet-fill-speed); }
+.sheet-fill-init { --_sheet-fill: var(--sheet-fill-init); }
+.sheet-fill-hp { --_sheet-fill: var(--sheet-fill-hp); }
+.sheet-fill-action { --_sheet-fill: var(--sheet-fill-action); }
+.sheet-fill-bonus { --_sheet-fill: var(--sheet-fill-bonus); }
+.sheet-fill-reaction { --_sheet-fill: var(--sheet-fill-reaction); }
+
+.sheet-fill-economy-idle {
+  color: color-mix(in oklch, white 90%, transparent);
+  border-width: 2px;
+  border-style: solid;
+  border-color: color-mix(in oklch, var(--_sheet-fill) 45%, transparent);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--_sheet-fill) 50%, transparent),
+    color-mix(in oklch, var(--_sheet-fill) 22%, black)
+  );
+}
+.sheet-fill-economy-idle:hover {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--_sheet-fill) 60%, transparent),
+    color-mix(in oklch, var(--_sheet-fill) 28%, black)
+  );
+}
+.sheet-fill-economy-lit {
+  color: white;
+  border-width: 2px;
+  border-style: solid;
+  border-color: color-mix(in oklch, var(--_sheet-fill) 80%, white);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--_sheet-fill) 95%, white),
+    color-mix(in oklch, var(--_sheet-fill) 75%, black)
+  );
+  box-shadow: 0 4px 14px color-mix(in oklch, var(--_sheet-fill) 28%, transparent);
+}
 
 /* Card */
 .card-flat {

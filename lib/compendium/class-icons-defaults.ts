@@ -18,6 +18,16 @@ export const SRD_CLASS_ICONS_BY_NAME: Record<string, string> = {
 export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Psion: "rear-aura",
   "KibblesTasty Psion": "rear-aura",
+  Alchemist: "potion-of-madness",
+  Captain: "captain-hat-profile",
+  Craftsman: "blacksmith",
+  Gunslinger: "gunshot",
+  Investigator: "magnifying-glass",
+  Martyr: "bleeding-heart",
+  Necromancer: "stoned-skull",
+  Vagabond: "treasure-map",
+  Warmage: "magic-shield",
+  Witch: "witch-flight",
 }
 
 const PSION_ICON = "rear-aura"

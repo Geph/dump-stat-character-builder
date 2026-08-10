@@ -12,13 +12,26 @@ import { z } from "zod"
 
 export const CREATURE_IMPORT_SCHEMA_VERSION = "2.0" as const
 
-export const CreatureAbilityEntrySchema = z.object({
-  unlock_level_label: z.string().nullable(),
-  unlock_level_number: z.number().int().nullable(),
-  name: z.string().min(1),
-  tag: z.string().nullable(),
-  text: z.string(),
-})
+export const CreatureAbilityEntrySchema = z.preprocess(
+  (raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
+    const row = { ...(raw as Record<string, unknown>) }
+    if (typeof row.text !== "string" && typeof row.description === "string") {
+      row.text = row.description
+    }
+    if (!("unlock_level_label" in row)) row.unlock_level_label = null
+    if (!("unlock_level_number" in row)) row.unlock_level_number = null
+    if (!("tag" in row)) row.tag = null
+    return row
+  },
+  z.object({
+    unlock_level_label: z.string().nullish(),
+    unlock_level_number: z.number().int().nullish(),
+    name: z.string().min(1),
+    tag: z.string().nullish(),
+    text: z.string(),
+  }),
+)
 
 export const CreatureAbilityScoreSchema = z.object({
   score: z.number(),
@@ -72,32 +85,32 @@ export const CreatureImportV2Schema = z
       (val) => (val === "monster" ? "creature" : val),
       z.enum(["creature", "companion"]),
     ),
-    cr: z.string().nullable(),
-    xp: z.number().nullable(),
-    proficiency_bonus: z.string().nullable(),
-    scaling: CreatureScalingSchema.nullable(),
+    cr: z.string().nullish(),
+    xp: z.number().nullish(),
+    proficiency_bonus: z.string().nullish(),
+    scaling: CreatureScalingSchema.nullish(),
     ac: z.string().min(1),
-    ac_note: z.string().nullable(),
-    initiative_modifier: z.string().nullable(),
-    initiative_passive: z.number().nullable(),
+    ac_note: z.string().nullish(),
+    initiative_modifier: z.string().nullish(),
+    initiative_passive: z.number().nullish(),
     hp: z.string().min(1),
-    hit_dice: z.string().nullable(),
+    hit_dice: z.string().nullish(),
     speed: CreatureSpeedSchema,
     ability_scores: abilityScoresShape,
-    skills: z.string().nullable(),
-    proficiencies: z.string().nullable(),
-    gear: z.string().nullable(),
-    resistances: z.string().nullable(),
-    damage_immunities: z.string().nullable(),
-    condition_immunities: z.string().nullable(),
-    vulnerabilities: z.string().nullable(),
+    skills: z.string().nullish(),
+    proficiencies: z.string().nullish(),
+    gear: z.string().nullish(),
+    resistances: z.string().nullish(),
+    damage_immunities: z.string().nullish(),
+    condition_immunities: z.string().nullish(),
+    vulnerabilities: z.string().nullish(),
     senses: CreatureSensesSchema,
-    languages: z.string().nullable(),
-    traits: z.array(CreatureAbilityEntrySchema).nullable(),
-    actions: z.array(CreatureAbilityEntrySchema).nullable(),
-    bonus_actions: z.array(CreatureAbilityEntrySchema).nullable(),
-    reactions: z.array(CreatureAbilityEntrySchema).nullable(),
-    legendary_actions: z.array(CreatureAbilityEntrySchema).nullable(),
+    languages: z.string().nullish(),
+    traits: z.array(CreatureAbilityEntrySchema).nullish(),
+    actions: z.array(CreatureAbilityEntrySchema).nullish(),
+    bonus_actions: z.array(CreatureAbilityEntrySchema).nullish(),
+    reactions: z.array(CreatureAbilityEntrySchema).nullish(),
+    legendary_actions: z.array(CreatureAbilityEntrySchema).nullish(),
     description: z.string(),
     source: z.string().nullable().optional(),
     prerequisite_rules: z

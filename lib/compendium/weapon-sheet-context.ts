@@ -2,7 +2,6 @@ import { attachClassDetails, classLevelsToRows } from "@/lib/character/character
 import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-resource-die"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import {
-  aggregateCharacteristics,
   type AttackRollModifiersCharacteristic,
   type BonusDamageRidersCharacteristic,
   type CharacteristicModifier,
@@ -288,8 +287,12 @@ export function buildWeaponSheetContext(
     modifierCatalog: inputs.modifierCatalog,
   })
 
+  // Per-weapon modifiers (attack/damage/reach/riders) are filtered by weapon target
+  // (melee/ranged/subtype/property) below, which the flattened AggregatedCharacteristics
+  // contract can't represent — a single global `criticalHitMinimum`/`bonusDamageRiders` would
+  // incorrectly apply weapon-type-scoped effects to every weapon. Walk the raw mods instead of
+  // calling aggregateCharacteristics() here.
   const allMods = [...builderMods, ...equipmentMagicMods]
-  aggregateCharacteristics(allMods)
 
   const classRows = classLevelsToRows(
     inputs.classLevels,

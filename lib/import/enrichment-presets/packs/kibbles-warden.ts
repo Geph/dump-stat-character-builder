@@ -26,8 +26,11 @@ function asRecord(value: unknown): Row | null {
 
 /** KibblesTasty Warden (Endurance Dice) — not Mage Hand Press Warden (Interrupt / Survive). */
 export function isKibblesTastyWarden(content: ImportContent): boolean {
-  const cls = (content.classes ?? []).find((c) => /^warden$/i.test(c.name ?? ""))
+  const cls = (content.classes ?? []).find((c) =>
+    /^warden(?:\s*\(.*\))?$/i.test((c.name ?? "").trim()),
+  )
   if (!cls) return false
+  if (/\bmage\s*hand|\bmhp\b/i.test(cls.name ?? "")) return false
   const featureNames = (cls.features ?? []).map((f) => f.name ?? "")
   if (featureNames.some((n) => /^interrupt$/i.test(n) || /^survive$/i.test(n))) return false
   if (

@@ -129,7 +129,7 @@ export function LinkedModifiersEditor({
         <p className="text-xs text-muted-foreground italic">{emptyMessage}</p>
       ) : (
         <div className="space-y-3">
-          {value.map((instance) => {
+          {value.map((instance, index) => {
             const entry = catalog.find((item) => item.id === instance.catalogRefId)
             const showCharacteristics = hasConfigurableCharacteristics(instance, entry)
             const showActivation = hasConfigurableActivation(instance, entry)
@@ -138,7 +138,7 @@ export function LinkedModifiersEditor({
 
             return (
               <div
-                key={instance.instanceId}
+                key={`${instance.instanceId}::${index}`}
                 className="rounded-xl border-2 border-primary/20 bg-card/50 p-3 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">

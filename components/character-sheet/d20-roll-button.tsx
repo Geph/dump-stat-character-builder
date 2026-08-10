@@ -144,9 +144,9 @@ export function D20RollButton({
 
   const toneClass =
     tone === "action"
-      ? "border-2 border-amber-400/80 bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-600"
+      ? "sheet-fill-tile sheet-fill-action"
       : tone === "bonus"
-        ? "border-2 border-sky-400/80 bg-gradient-to-b from-sky-500 to-sky-700 text-white shadow-md shadow-sky-500/20 hover:from-sky-400 hover:to-sky-600"
+        ? "sheet-fill-tile sheet-fill-bonus"
         : "border border-border bg-muted/80 hover:bg-muted"
 
   const modLabel = effectiveModifier >= 0 ? `+${effectiveModifier}` : `${effectiveModifier}`

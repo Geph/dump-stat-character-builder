@@ -173,8 +173,8 @@ describe("MHP batch wiring (Risk / Martyr / Thralls / Warden)", () => {
       { class: [{ name: "Warden", source: "KibblesTasty" }] },
     )
     expect(collisions).toHaveLength(1)
-    expect(collisions[0]?.suggestedName).toBe("Mage Hand Press Warden")
-    expect(collisions[0]?.suggestedResourcePrefix).toBe("mage_hand_press_warden")
+    expect(collisions[0]?.suggestedName).toBe("Warden (Mage Hand Press)")
+    expect(collisions[0]?.suggestedResourcePrefix).toBe("warden_mage_hand_press")
   })
 
   it("wires Guardian Tactics as a free Block/Challenge/Grasp menu", () => {

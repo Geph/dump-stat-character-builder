@@ -56,17 +56,23 @@ type ImportMechanicsCarrier = {
   companion_stat_block?: Feature["companion_stat_block"]
 }
 
+type PresetScope = { className: string; subclassName?: string | null }
+
 function enrichFeatureLike<T extends ImportMechanicsCarrier>(
   item: T,
   ctx: DetectFeatureContext,
+  presetScope?: PresetScope,
 ): T {
   const basedOn = item.basedOnSrdFeature?.trim()
-  let baseFeature = enrichWildcardFeaturePresets(item as unknown as Feature) as unknown as T
+  let baseFeature = enrichWildcardFeaturePresets(item as unknown as Feature, presetScope) as unknown as T
   if (basedOn && basedOn !== item.name.trim()) {
-    const aliasPresets = enrichWildcardFeaturePresets({
-      ...(item as unknown as Feature),
-      name: basedOn,
-    })
+    const aliasPresets = enrichWildcardFeaturePresets(
+      {
+        ...(item as unknown as Feature),
+        name: basedOn,
+      },
+      presetScope,
+    )
     if ((aliasPresets.linkedModifiers?.length ?? 0) > 0) {
       const existing = baseFeature.linkedModifiers ?? []
       const existingIds = new Set(existing.map((entry) => entry.instanceId))
@@ -136,16 +142,21 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
 function enrichFeatures(
   features: Feature[] | undefined,
   ctx: Omit<DetectFeatureContext, "featureName">,
+  presetScope?: PresetScope,
 ): Feature[] | undefined {
   if (!features?.length) return features
   return features.map((feature) =>
     enrichChoiceOptionModifiers(
-      enrichFeatureLike(feature as ImportMechanicsCarrier, {
-        ...ctx,
-        featureName: feature.name,
-        basedOnSrdFeature: (feature as ImportMechanicsCarrier).basedOnSrdFeature,
-        level: feature.level,
-      }) as unknown as Feature,
+      enrichFeatureLike(
+        feature as ImportMechanicsCarrier,
+        {
+          ...ctx,
+          featureName: feature.name,
+          basedOnSrdFeature: (feature as ImportMechanicsCarrier).basedOnSrdFeature,
+          level: feature.level,
+        },
+        presetScope,
+      ) as unknown as Feature,
       ctx,
     ),
   )
@@ -364,20 +375,28 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   if (content.classes?.length) {
     next.classes = content.classes.map((cls) => ({
       ...cls,
-      features: enrichFeatures(cls.features as Feature[], {
-        contentKind: "class_feature",
-        sourceName: cls.name,
-      }) as typeof cls.features,
+      features: enrichFeatures(
+        cls.features as Feature[],
+        {
+          contentKind: "class_feature",
+          sourceName: cls.name,
+        },
+        { className: cls.name },
+      ) as typeof cls.features,
     }))
   }
 
   if (content.subclasses?.length) {
     next.subclasses = content.subclasses.map((subclass) => ({
       ...subclass,
-      features: enrichFeatures(subclass.features as Feature[], {
-        contentKind: "subclass_feature",
-        sourceName: subclass.name,
-      }) as typeof subclass.features,
+      features: enrichFeatures(
+        subclass.features as Feature[],
+        {
+          contentKind: "subclass_feature",
+          sourceName: subclass.name,
+        },
+        { className: subclass.class_name, subclassName: subclass.name },
+      ) as typeof subclass.features,
     }))
   }
 

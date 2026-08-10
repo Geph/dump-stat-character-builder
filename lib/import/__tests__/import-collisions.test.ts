@@ -71,7 +71,7 @@ describe("buildImportCollisions", () => {
       { class: [{ name: "Warden", source: "KibblesTasty" }] },
     )
     expect(defaultRenameMap(collisions)).toEqual({})
-    expect(collisions[0]?.suggestedName).toBe("Mage Hand Press Warden")
+    expect(collisions[0]?.suggestedName).toBe("Warden (Mage Hand Press)")
   })
 
   it("keeps the original name when overwrite is selected", () => {

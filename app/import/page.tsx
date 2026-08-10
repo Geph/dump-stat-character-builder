@@ -21,6 +21,13 @@ import {
 } from "@/components/import/import-ai-settings"
 import { MainNav } from "@/components/main-nav"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   pageFloatingHintClass,
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
@@ -37,6 +44,9 @@ import {
 } from "@/lib/import/client-byo-import"
 import { mergeImportedSpellSchools } from "@/lib/compendium/schools-of-magic"
 import { seedLocalSrd } from "@/lib/data/local-seed"
+import { seedLocalExamplePack } from "@/lib/data/local-seed-packs"
+import { EXAMPLE_SEED_PACKS, type ExampleSeedPackId } from "@/lib/seed-packs/pack-ids"
+import type { ExampleSeedFileError } from "@/lib/seed-packs/seed-example-pack"
 import {
   importDumpStatExportItemsLocal,
   parseDumpStatExportJson,
@@ -105,7 +115,14 @@ import {
   validatePastedSourceTextLength,
 } from "@/lib/import/import-source-limits"
 
-type ImportStatus = "idle" | "uploading" | "processing" | "review" | "success" | "error"
+type ImportStatus =
+  | "idle"
+  | "uploading"
+  | "processing"
+  | "review"
+  | "success"
+  | "partial"
+  | "error"
 type ImportTab = "clipboard" | "pdf" | "pack"
 
 const SERVER_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof ClipboardPaste }[] = [
@@ -148,6 +165,8 @@ export default function ImportPage() {
   const [pdfStatus, setPdfStatus] = useState<ImportStatus>("idle")
   const [textStatus, setTextStatus] = useState<ImportStatus>("idle")
   const [seedStatus, setSeedStatus] = useState<ImportStatus>("idle")
+  const [seedPackErrors, setSeedPackErrors] = useState<ExampleSeedFileError[]>([])
+  const [seedPackId, setSeedPackId] = useState<ExampleSeedPackId | null>(null)
   const [packStatus, setPackStatus] = useState<ImportStatus>("idle")
   const [packFile, setPackFile] = useState<File | null>(null)
   const [message, setMessage] = useState("")
@@ -865,6 +884,14 @@ export default function ImportPage() {
     void submitTextImport({ text: textContent, importMode: "server-ai" })
   }
 
+  const formatSeedBreakdown = (breakdown: Record<string, number> | undefined) =>
+    breakdown
+      ? ` (${Object.entries(breakdown)
+          .filter(([, n]) => (n as number) > 0)
+          .map(([k, n]) => `${n} ${k}`)
+          .join(", ")})`
+      : ""
+
   const handleSeedSRD = async () => {
     setSeedStatus("processing")
     setMessage("")
@@ -874,13 +901,7 @@ export default function ImportPage() {
         const data = await seedLocalSrd()
         setSeedStatus("success")
         setMessage(
-          `Loaded ${data.total} SRD items into ${getStorageLabel()}` +
-            (data.breakdown
-              ? ` (${Object.entries(data.breakdown)
-                  .filter(([, n]) => (n as number) > 0)
-                  .map(([k, n]) => `${n} ${k}`)
-                  .join(", ")})`
-              : ""),
+          `Loaded ${data.total} SRD items into ${getStorageLabel()}${formatSeedBreakdown(data.breakdown)}`,
         )
         return
       }
@@ -896,13 +917,7 @@ export default function ImportPage() {
       if (response.ok) {
         setSeedStatus("success")
         setMessage(
-          `Successfully seeded ${data.total} SRD items` +
-            (data.breakdown
-              ? ` (${Object.entries(data.breakdown)
-                  .filter(([, n]) => (n as number) > 0)
-                  .map(([k, n]) => `${n} ${k}`)
-                  .join(", ")})`
-              : ""),
+          `Successfully seeded ${data.total} SRD items${formatSeedBreakdown(data.breakdown)}`,
         )
       } else {
         setSeedStatus("error")
@@ -911,6 +926,80 @@ export default function ImportPage() {
     } catch (err) {
       setSeedStatus("error")
       setMessage(err instanceof Error ? err.message : "Failed to seed database. Please try again.")
+    }
+  }
+
+  const applySeedPackResult = (
+    packId: ExampleSeedPackId,
+    data: {
+      total?: number
+      label?: string
+      breakdown?: Record<string, number>
+      errors?: ExampleSeedFileError[]
+      partial?: boolean
+      filesSucceeded?: number
+      filesAttempted?: number
+      error?: string
+    },
+    storageSuffix: string,
+  ) => {
+    const errors = Array.isArray(data.errors) ? data.errors : []
+    setSeedPackId(packId)
+    setSeedPackErrors(errors)
+    const label = data.label ?? packId
+    const breakdown = formatSeedBreakdown(data.breakdown)
+    if (errors.length === 0) {
+      setSeedStatus("success")
+      setMessage(`Loaded ${data.total ?? 0} ${label} items${storageSuffix}${breakdown}`)
+      return
+    }
+    if ((data.filesSucceeded ?? 0) > 0 || data.partial) {
+      setSeedStatus("partial")
+      setMessage(
+        `Partially loaded ${data.total ?? 0} ${label} items (${data.filesSucceeded ?? 0}/${data.filesAttempted ?? "?"} files)${storageSuffix}${breakdown}. ${errors.length} file(s) failed — retry or dismiss below.`,
+      )
+      return
+    }
+    setSeedStatus("error")
+    setMessage(data.error || errors.map((e) => `${e.fileLabel}: ${e.message}`).join("\n"))
+  }
+
+  const handleSeedExamplePack = async (
+    packId: ExampleSeedPackId,
+    onlyFileIndexes?: number[],
+  ) => {
+    setSeedStatus("processing")
+    setMessage("")
+    if (!onlyFileIndexes?.length) {
+      setSeedPackErrors([])
+      setSeedPackId(packId)
+    }
+
+    try {
+      if (staticMode) {
+        const data = await seedLocalExamplePack(packId, { onlyFileIndexes })
+        applySeedPackResult(packId, data, ` into ${getStorageLabel()}`)
+        return
+      }
+
+      const response = await fetch("/api/seed/packs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId, includeCardArt, onlyFileIndexes }),
+      })
+      const data = await response.json()
+
+      if (response.ok || (Array.isArray(data.errors) && data.errors.length > 0)) {
+        applySeedPackResult(packId, data, "")
+      } else {
+        setSeedStatus("error")
+        setSeedPackErrors([])
+        setMessage(data.error || "Failed to seed example pack")
+      }
+    } catch (err) {
+      setSeedStatus("error")
+      setSeedPackErrors([])
+      setMessage(err instanceof Error ? err.message : "Failed to seed example pack. Please try again.")
     }
   }
 
@@ -951,6 +1040,8 @@ export default function ImportPage() {
         return <Info className="w-5 h-5 text-primary" />
       case "success":
         return <CheckCircle className="w-5 h-5 text-success" />
+      case "partial":
+        return <AlertCircle className="w-5 h-5 text-orange" />
       case "error":
         return <AlertCircle className="w-5 h-5 text-destructive" />
       default:
@@ -964,11 +1055,17 @@ export default function ImportPage() {
     textStatus === "success" ||
     packStatus === "success"
 
+  const isPartialMessage = seedStatus === "partial"
+
   const isReviewMessage = pdfStatus === "review" || textStatus === "review"
 
   const SRD_SEED_DESCRIPTION = staticMode
     ? "Load or reset the bundled SRD 5.2.1 into browser storage (IndexedDB). First visit auto-seeds; use this button to reload after clearing data."
     : "Populate your database with bundled SRD 5.2.1 content: 12 classes, 12 subclasses, 9 species, backgrounds, 340 spells, 17 feats, and 100+ equipment entries (parsed from the SRD, not a hand-picked sample)."
+
+  const EXAMPLE_CONTENT_INFO = staticMode
+    ? "Load a bundled example content pack into browser storage (IndexedDB). More packs beyond the free SRD will show up here over time."
+    : "Populate your database with a bundled example content pack. More packs beyond the free SRD will show up here over time."
 
   return (
     <div id="import-root" className="min-h-screen bg-background flex flex-col">
@@ -978,27 +1075,55 @@ export default function ImportPage() {
         {/* SRD quickseed — upper right (in-flow on mobile, floating on sm+) */}
         <div className="flex justify-end mb-4 sm:mb-0 sm:absolute sm:top-8 sm:right-4 z-20">
           <div className="relative">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={seedStatus === "processing"}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  {getStatusIcon(seedStatus)}
+                  <span className="hidden sm:inline">
+                    {seedStatus === "processing"
+                      ? "Seeding..."
+                      : staticMode
+                        ? "Load Example Content"
+                        : "Seed Example Content"}
+                  </span>
+                  <span className="sm:hidden">
+                    {seedStatus === "processing" ? "Seeding..." : "Examples"}
+                  </span>
+                  {seedStatus !== "processing" && <ChevronDown className="w-3.5 h-3.5 opacity-70" />}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Example content packs</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onSelect={() => void handleSeedSRD()}
+                  disabled={seedStatus === "processing"}
+                  className="flex flex-col items-start gap-0.5 py-2 cursor-pointer"
+                >
+                  <span className="font-semibold">SRD 5.2.1</span>
+                  <span className="text-xs text-muted-foreground leading-snug">
+                    Free 5e SRD content: 12 classes, 12 subclasses, 9 species, spells, feats & equipment.
+                  </span>
+                </DropdownMenuItem>
+                {EXAMPLE_SEED_PACKS.map((pack) => (
+                  <DropdownMenuItem
+                    key={pack.id}
+                    onSelect={() => void handleSeedExamplePack(pack.id)}
+                    disabled={seedStatus === "processing"}
+                    className="flex flex-col items-start gap-0.5 py-2 cursor-pointer"
+                  >
+                    <span className="font-semibold">{pack.label}</span>
+                    <span className="text-xs text-muted-foreground leading-snug">{pack.description}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               type="button"
-              onClick={handleSeedSRD}
-              disabled={seedStatus === "processing"}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              {getStatusIcon(seedStatus)}
-              <span className="hidden sm:inline">
-                {seedStatus === "processing"
-                  ? "Seeding..."
-                  : staticMode
-                    ? "Load bundled SRD"
-                    : "Seed SRD 5.2.1 Content"}
-              </span>
-              <span className="sm:hidden">
-                {seedStatus === "processing" ? "Seeding..." : staticMode ? "Load SRD" : "Seed SRD"}
-              </span>
-            </button>
-            <button
-              type="button"
-              aria-label="About SRD quickseed"
+              aria-label="About example content"
               aria-expanded={showSeedInfo}
               onClick={(e) => {
                 e.stopPropagation()
@@ -1018,9 +1143,10 @@ export default function ImportPage() {
                   className="absolute top-full right-0 mt-2 w-72 sm:w-80 p-4 rounded-xl border border-primary/20 bg-card shadow-xl z-30"
                 >
                   <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1.5">
-                    Quickseed
+                    Example content
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{SRD_SEED_DESCRIPTION}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{EXAMPLE_CONTENT_INFO}</p>
+                  <p className="text-xs text-muted-foreground/80 leading-relaxed mt-2">{SRD_SEED_DESCRIPTION}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1053,12 +1179,55 @@ export default function ImportPage() {
             className={`p-4 rounded-xl mb-6 ${
               isSuccessMessage
                 ? "bg-success/10 text-success border border-success/20"
-                : isReviewMessage
-                  ? "bg-primary/10 text-foreground border border-primary/20"
-                  : "bg-destructive/10 text-destructive border border-destructive/20"
+                : isPartialMessage
+                  ? "bg-orange/10 text-foreground border border-orange/30"
+                  : isReviewMessage
+                    ? "bg-primary/10 text-foreground border border-primary/20"
+                    : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}
           >
-            {message}
+            <div className="whitespace-pre-wrap">{message}</div>
+            {seedPackErrors.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <ul className="list-disc pl-5 text-sm space-y-1">
+                  {seedPackErrors.map((err) => (
+                    <li key={`${err.fileIndex}-${err.fileLabel}`}>
+                      <span className="font-semibold">{err.fileLabel}:</span> {err.message}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {seedPackId && (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                      onClick={() =>
+                        void handleSeedExamplePack(
+                          seedPackId,
+                          seedPackErrors.map((e) => e.fileIndex),
+                        )
+                      }
+                      disabled={seedStatus === "processing"}
+                    >
+                      Retry failed files
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                    onClick={() => {
+                      setSeedPackErrors([])
+                      if (seedStatus === "partial" || seedStatus === "error") {
+                        setSeedStatus(seedStatus === "partial" ? "success" : "idle")
+                        if (seedStatus === "error") setMessage("")
+                      }
+                    }}
+                  >
+                    Dismiss errors
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

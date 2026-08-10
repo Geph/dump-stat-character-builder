@@ -565,6 +565,9 @@ export const ClassImportSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
+  icon: z.string().nullable().optional(),
+  creator_url: z.string().max(512).nullable().optional(),
+  source: z.string().nullable().optional(),
   card_image_url: z.string().nullable().optional(),
   card_blurb: z.string().max(120).nullable().optional(),
   complexity: z.enum(["easy", "medium", "hard"]).nullable().optional(),
@@ -1022,7 +1025,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
 - **Martyr Max Spell Levels:** special cap (resource_key "max_spell_level") from the Max Spell Levels column — not a spendable pool and not normal caster progression.
 - **Investigator Ritual Level / Finisher / Rushed Incantation / Trinkets:** Ritual Level = special cap; Finisher = special NdM rider with resource_key "finisher" (never "finisher_dice"); Rushed Incantation + Trinkets = spendable short-regain-1 / long-all pools.
-- **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Mage Hand Press Warden").
+- **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Warden (Mage Hand Press)").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\".
 - **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Cantrip spellChoiceGrants stay incremental (3, +1@4, +1@10). Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
@@ -1063,7 +1066,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 
 export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Designer> <Class Name>, Gunslinger):
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
-- **Known same-name collisions:** Mage Hand Press Warden ≠ KibblesTasty Warden (Endurance Dice / Primal Manifestations). Keep the source header name "Warden" in JSON; Dump Stat's collision UI will ask the user to choose a rename (suggestion: "Mage Hand Press Warden" or "KibblesTasty Warden") when the other already exists — do not invent a prefix unless the user asks.
+- **Known same-name collisions:** Mage Hand Press Warden ≠ KibblesTasty Warden (Endurance Dice / Primal Manifestations). Keep the source header name "Warden" in JSON; Dump Stat's collision UI will ask the user to choose a rename (suggestion: "Warden (Mage Hand Press)" or "Warden (Kibbles Tasty)") when the other already exists — do not invent a prefix unless the user asks.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
 - Put the full class in classes[] with hit_die, armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
 - Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options

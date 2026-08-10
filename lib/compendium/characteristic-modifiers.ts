@@ -1,3 +1,9 @@
+/**
+ * Passive, character-wide effects live here and flow through `aggregateCharacteristics()` into
+ * `DerivedCharacter`. Actionable effects (new actions, limited uses, per-weapon/target scoping)
+ * belong on `FeatureEffect` (`lib/types.ts`) instead — see
+ * `docs/modifier-vs-feature-effect.md` for the full decision rule.
+ */
 import type { UsesConfig } from "@/lib/types"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
@@ -724,6 +730,12 @@ export interface MagicalSleepImmunityCharacteristic extends CharacteristicModifi
   immuneToNamedSpells?: string[]
 }
 
+/**
+ * Authored (e.g. Goliath's Large Form) and aggregated into `AggregatedCharacteristics.creatureSize`,
+ * but not yet consumed anywhere — no derived stat (reach, carrying capacity, AC formulas that key
+ * off size) currently reacts to it, and "activatable" has no on/off toggle state. See
+ * docs/modifier-vs-feature-effect.md ("Known gaps") before wiring a consumer.
+ */
 export interface CreatureSizeCharacteristic extends CharacteristicModifierBase {
   type: "creature_size"
   size: CreatureSizeValue
@@ -1087,6 +1099,12 @@ export interface OnCastSpellTriggerCharacteristic extends CharacteristicModifier
   effect?: NestedModifierEffect | null
 }
 
+/**
+ * Authored (e.g. Life Domain's Disciple of Life) and aggregated into
+ * `AggregatedCharacteristics.spellHealingModifiers`, but not yet consumed anywhere — the app has
+ * no "resolve a healing spell" calculator to apply the bonus to. See
+ * docs/modifier-vs-feature-effect.md ("Known gaps") before wiring a consumer.
+ */
 export interface SpellHealingModifierCharacteristic extends CharacteristicModifierBase {
   type: "spell_healing_modifier"
   /** Disciple of Life flat bonus on healing spells. */
@@ -1132,6 +1150,11 @@ export interface ResourceAbilityMenuCharacteristic extends CharacteristicModifie
   appliesOnAbilities?: string[]
 }
 
+/**
+ * Authored (e.g. Thief's Reflexes) and surfaced as an informational sheet note
+ * (character-sheet-client.tsx "Senses & Rest" panel) — there is no turn-order/round simulation
+ * in the app, so this cannot actually grant a second turn mechanically.
+ */
 export interface ExtraTurnCharacteristic extends CharacteristicModifierBase {
   type: "extra_turn"
   firstRoundOnly?: boolean

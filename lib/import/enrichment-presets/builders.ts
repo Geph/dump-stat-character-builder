@@ -119,7 +119,7 @@ function finisherModifiers(): LinkedModifierInstance[] {
         effect: { catalogRefId: "cat_fx_extra_damage_on_hit" },
       },
     ]),
-    fxInstance("modinst_finisher_damage", "cat_fx_extra_damage_on_hit", {
+    fxInstance(createModifierInstanceId(), "cat_fx_extra_damage_on_hit", {
       effects: [
         {
           id: modId("finisher_damage"),
@@ -149,7 +149,7 @@ function improvedFinisherModifiers(): LinkedModifierInstance[] {
         effect: { catalogRefId: "cat_fx_extra_damage_on_hit" },
       },
     ]),
-    fxInstance("modinst_improved_finisher_damage", "cat_fx_extra_damage_on_hit", {
+    fxInstance(createModifierInstanceId(), "cat_fx_extra_damage_on_hit", {
       effects: [
         {
           id: modId("improved_finisher_damage"),

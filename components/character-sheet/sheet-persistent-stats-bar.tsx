@@ -70,8 +70,8 @@ function hpBarTone(currentHp: number, maxHp: number): string {
   if (maxHp <= 0) return "from-muted-foreground/40 to-muted-foreground/30"
   const ratio = currentHp / maxHp
   if (ratio <= 0.25) return "from-destructive to-destructive/70"
-  if (ratio <= 0.5) return "from-amber-500 to-amber-400"
-  return "from-emerald-500 to-emerald-400"
+  if (ratio <= 0.5) return "from-orange to-orange/70"
+  return "from-lime to-lime/70"
 }
 
 function CompactStatHeader({
@@ -121,7 +121,7 @@ function CombatStatsCompactRow({
 
   return (
     <div className="flex flex-wrap items-stretch gap-2">
-      <div className="@container flex min-w-[5rem] flex-1 basis-[5rem] flex-col items-center justify-center gap-2 rounded-xl border-2 border-emerald-400/70 bg-gradient-to-b from-emerald-500 to-emerald-700 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-emerald-500/20">
+      <div className="sheet-fill-tile sheet-fill-ac @container flex min-w-[5rem] flex-1 basis-[5rem] flex-col items-center justify-center gap-2 rounded-xl px-3 py-3 min-h-[5.625rem]">
         <CompactStatHeader
           label="AC"
           icon={<Shield className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
@@ -150,7 +150,7 @@ function CombatStatsCompactRow({
         ) : null}
       </div>
 
-      <div className="@container flex min-w-[5rem] flex-1 basis-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl border-2 border-sky-400/70 bg-gradient-to-b from-sky-500 to-sky-700 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-sky-500/20">
+      <div className="sheet-fill-tile sheet-fill-speed @container flex min-w-[5rem] flex-1 basis-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl px-3 py-3 min-h-[5.625rem]">
         <CompactStatHeader
           label="Speed"
           icon={<Footprints className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
@@ -179,7 +179,7 @@ function CombatStatsCompactRow({
         </StatExplainPopover>
       </div>
 
-      <div className="@container flex min-w-[4.75rem] flex-1 basis-[5.25rem] flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/70 bg-gradient-to-b from-amber-500 to-amber-700 px-2 py-3 min-h-[5.625rem] text-white shadow-md shadow-amber-500/20 sm:px-3">
+      <div className="sheet-fill-tile sheet-fill-init @container flex min-w-[4.75rem] flex-1 basis-[5.25rem] flex-col items-center justify-center gap-1.5 rounded-xl px-2 py-3 min-h-[5.625rem] sm:px-3">
         <CompactStatHeader
           label="Initiative"
           icon={<Zap className="h-4 w-4 text-white/90 shrink-0" aria-hidden />}
@@ -204,7 +204,7 @@ function CombatStatsCompactRow({
         </StatExplainPopover>
       </div>
 
-      <div className="@container flex w-full min-w-[min(100%,17rem)] flex-[1.4] basis-[17rem] flex-col justify-center gap-2.5 rounded-xl border-2 border-rose-400/70 bg-gradient-to-b from-rose-500 to-rose-800 px-3 py-3 min-h-[5.625rem] text-white shadow-md shadow-rose-500/20">
+      <div className="sheet-fill-tile sheet-fill-hp @container flex w-full min-w-[min(100%,17rem)] flex-[1.4] basis-[17rem] flex-col justify-center gap-2.5 rounded-xl px-3 py-3 min-h-[5.625rem]">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Heart className="h-4 w-4 text-white/90 shrink-0" aria-hidden />
@@ -229,12 +229,12 @@ function CombatStatsCompactRow({
               <span className="text-sm font-bold text-white/80 tabular-nums">/ {maxHp}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0 rounded-lg border border-cyan-300/40 bg-cyan-950/35 px-1.5 py-1">
-            <ShieldPlus className="h-3 w-3 text-cyan-100 shrink-0" aria-hidden />
-            <span className="hidden text-[9px] font-semibold uppercase text-cyan-50 @[18rem]:inline">
+          <div className="flex items-center gap-1 shrink-0 rounded-lg border border-white/30 bg-black/30 px-1.5 py-1">
+            <ShieldPlus className="h-3 w-3 text-white/90 shrink-0" aria-hidden />
+            <span className="hidden text-[9px] font-semibold uppercase text-white/90 @[18rem]:inline">
               Temporary HP
             </span>
-            <span className="text-[9px] font-semibold uppercase text-cyan-50 @[18rem]:hidden">
+            <span className="text-[9px] font-semibold uppercase text-white/90 @[18rem]:hidden">
               Temp HP
             </span>
             <input
@@ -246,7 +246,7 @@ function CombatStatsCompactRow({
                 onTempHpChange(Number.isNaN(next) ? 0 : Math.max(0, next))
               }}
               aria-label="Temporary hit points"
-              className="w-8 min-h-6 text-center bg-black/25 border border-cyan-200/30 rounded text-[11px] font-bold text-cyan-50 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-8 min-h-6 text-center bg-black/25 border border-white/25 rounded text-[11px] font-bold text-white tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
           {hitDicePool.length > 0 && onShortRestHeal && onSetHitDiceSpent ? (

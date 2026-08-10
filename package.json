@@ -16,6 +16,7 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:flush": "node scripts/db-flush-connections.mjs",
     "srd:build": "node scripts/build-srd-seed.mjs",
+    "seed-packs:build": "node scripts/run-vite-node.mjs scripts/build-example-seed-packs.ts",
     "version:bump": "node scripts/bump-version.mjs",
     "push": "node scripts/git-push.mjs Cursor",
     "check:mysql": "node scripts/check-no-supabase.mjs",
