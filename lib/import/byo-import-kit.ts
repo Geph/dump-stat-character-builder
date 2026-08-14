@@ -7,6 +7,12 @@ import {
   SPELLS_PDF_MAX_PAGES,
   maxPdfPagesForContentTypeHint,
 } from "@/lib/import/import-source-limits"
+import {
+  CARD_ART_HOSTING_GUIDELINES,
+  CARD_ART_IMPORT_SYSTEM_PROMPT,
+} from "@/lib/import/card-art-import-hints"
+
+export { CARD_ART_HOSTING_GUIDELINES, CARD_ART_IMPORT_SYSTEM_PROMPT } from "@/lib/import/card-art-import-hints"
 
 export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from PDF or web)
 
@@ -93,6 +99,8 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on custom ability libraries and class_resources[]. Split hierarchy (do not mash): category label (not a row) → mid-level packages → leaf powers / class_talent rows + nested Discipline Talents in choices. Prefer import_proposals.custom_abilities[] for discipline packages (ability_role discipline), psionic powers (ability_role psionic_power — NOT spells[]), class-level/feat-gated talents (ability_role class_talent), exploits, and upgrades. Distinguish Discipline Talents vs Class Talents category/resourceKey. Set source_type and source_name consistently. Keep spend phrasing (expend N psi points, expend one Exploit Die). Psionic power bodies (ability_role psionic_power): keep the augment gate sentence verbatim ('You can spend psi points up to your per-use limit to add multiple modifiers') and each augment as a '<strong>Name (N psi points):</strong> …' list item — the importer parses those into selectable augments; do NOT add a base psi cost to augmented powers (base use is free) and do not expect passive modifier wiring from a power's own effect text. Talent/discipline rows DO phrase-wire: keep sentences like 'You can cast X by expending N psi points', 'The X and Y spells are added to your … Alternate Effects list', 'Once you do, you can't do so again until you finish a long rest' intact. Default Alternate Effects tables MUST stay as HTML <table> with columns 'Point Cost' | 'Alternate Effects' (spell names comma-separated) — the importer wires every listed spell as known (cast via psi points). Specializations that replace Alternate Effects: prefer specialization_choices with one option per specialization and that option's replacement HTML table in its description (keep talents in choices). Fallback: Specializations heading + bold names + replacement tables/prose cost lists in the package description. See Custom ability library structure examples. Homebrew weapon masteries (Parry, Shift, Explode, …): emit one custom_abilities[] / import_proposals.custom_abilities[] row per mastery with name + rule description so they merge into the Weapon Mastery Properties catalog — do this in a separate pass before (or with) the Equipment weapons table; do not bury mastery write-ups only inside weapon rows. If the library is too large to return complete in one response (e.g. a full exploit compendium), do not truncate silently — split deterministically by degree/level tier (then alphabetically), return the first batch, and tell the user which tiers remain for a follow-up pass; keep source_type, source_name, and naming identical across batches so Dump Stat merges them.",
   invocations_metamagic:
     "Focus on Eldritch Invocation, Metamagic, Warmage Tricks, and similar pick-from-a-list option libraries. Route through the same custom abilities pipeline: one import_proposals.custom_abilities[] row per option (not section headers). Prefer ability_role knack when the class selects from a known pool (wire granting features with optionsSource class_knacks); otherwise omit ability_role (do not invent ability_role metamagic). Always put Prerequisite/Prerequisites lines into prerequisite (cantrips, Level N+ class, subclass names, prior options) — Dump Stat gates picks against known spells, level, and subclass. Do not put these in feats[] or spells[]. Keep Sorcery Point / resource cost sentences verbatim in description (fixed costs like \"costs 1 sorcery point\" and variable ones like \"equal to the spell's level\") — the sheet parses cast cost from that text; do not invent a separate cost schema. Do NOT emit mechanics[] for per-cast spell modifications (range, duration, targets, components, casting time, cover, concentration riders, damage-type swaps) — those stay description-only on the cast-menu card. When a Metamagic/Invocation library has no marker legend but includes SRD-named entries (Careful Spell, Distant Spell, Agonizing Blast, etc.), extract every supplied entry as written — alternate-class rewrites often differ from SRD, and Dump Stat's proposals review / collision UI handles duplicates.",
+  images:
+    "Output only card_art[]. Map each public image URL (or filename in a directory listing) to a content_type + exact name. Include class_name on subclasses when needed to disambiguate. Do not emit classes[], spells[], or other rules arrays.",
   all: "Extract any content types present. Prefer one primary type per response when the source is focused.",
 }
 
@@ -556,6 +564,26 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
       ],
     },
   },
+  images: {
+    card_art: [
+      {
+        content_type: "class",
+        name: "Dancer",
+        card_image_url: "https://example.com/images/classes/dancer.png",
+      },
+      {
+        content_type: "background",
+        name: "Folk Hero",
+        card_image_url: "https://example.com/images/backgrounds/folk-hero.webp",
+      },
+      {
+        content_type: "subclass",
+        name: "Fencer",
+        class_name: "Dancer",
+        card_image_url: "https://example.com/images/subclasses/dancer-fencer.png",
+      },
+    ],
+  },
 }
 
 function resolveHint(contentTypeHint?: string | null): ImportContentTypeHint {
@@ -574,6 +602,27 @@ export function buildByoExtractionPrompt(
   options?: ByoExtractionPromptOptions,
 ): string {
   const hint = resolveHint(contentTypeHint)
+  if (hint === "images") {
+    const template = JSON.stringify(IMPORT_JSON_TEMPLATES.images, null, 2)
+    return [
+      CARD_ART_IMPORT_SYSTEM_PROMPT,
+      "",
+      CARD_ART_HOSTING_GUIDELINES,
+      "",
+      CONTENT_TYPE_JSON_FOCUS.images,
+      "",
+      `Output format (required)
+
+Return ONLY valid JSON — no markdown fences, no commentary before or after.
+Escape newlines inside strings as \\n (never put a raw line break between quotes — that makes JSON.parse fail).
+Use null for optional fields you do not have data for.
+Emit only card_art[] (omit every other top-level array).`,
+      "",
+      "Example JSON shape:",
+      template,
+    ].join("\n")
+  }
+
   const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all ?? ""
   const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
 

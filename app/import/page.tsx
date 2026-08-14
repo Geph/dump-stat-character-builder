@@ -737,7 +737,9 @@ export default function ImportPage() {
           setPdfStatus("review")
           const collisions = (data.collisions ?? []) as ImportCollision[]
           setRenameMap(defaultRenameMap(collisions))
-          setCollisionResolutionMap(defaultCollisionResolutionMap(collisions))
+          setCollisionResolutionMap(
+            defaultCollisionResolutionMap(collisions, data.pendingContent as ImportContent),
+          )
           setPendingImport({
             content: data.pendingContent as ImportContent,
             proposals: data.proposals as ImportProposalSet,
@@ -786,7 +788,9 @@ export default function ImportPage() {
         if ("needsConfirmation" in data && data.needsConfirmation) {
           setTextStatus("review")
           setRenameMap(defaultRenameMap(data.collisions))
-          setCollisionResolutionMap(defaultCollisionResolutionMap(data.collisions))
+          setCollisionResolutionMap(
+            defaultCollisionResolutionMap(data.collisions, data.pendingContent),
+          )
           setPendingImport({
             content: data.pendingContent,
             proposals: data.proposals,
@@ -840,7 +844,9 @@ export default function ImportPage() {
           setTextStatus("review")
           const collisions = (data.collisions ?? []) as ImportCollision[]
           setRenameMap(defaultRenameMap(collisions))
-          setCollisionResolutionMap(defaultCollisionResolutionMap(collisions))
+          setCollisionResolutionMap(
+            defaultCollisionResolutionMap(collisions, data.pendingContent as ImportContent),
+          )
           setPendingImport({
             content: data.pendingContent as ImportContent,
             proposals: data.proposals as ImportProposalSet,

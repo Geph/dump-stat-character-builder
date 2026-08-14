@@ -10,6 +10,7 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "equipment", label: "Equipment" },
   { value: "abilities", label: "Custom Abilities / Resources" },
   { value: "invocations_metamagic", label: "Custom Invocations / Metamagic" },
+  { value: "images", label: "Images from URL" },
 ] as const
 
 export type ImportContentTypeHint = (typeof IMPORT_CONTENT_TYPE_HINTS)[number]["value"]
@@ -27,6 +28,9 @@ export function appendContentTypeHintToPrompt(
   contentTypeHint: string | null | undefined,
 ): string {
   if (contentTypeHint && contentTypeHint !== "all") {
+    if (contentTypeHint === "images") {
+      return `${systemPrompt}\n\nFocus only on card_art[] image URL mapping. Do not extract class features, spells, or other rules content.`
+    }
     const label =
       IMPORT_CONTENT_TYPE_HINTS.find((entry) => entry.value === contentTypeHint)?.label ??
       contentTypeHint

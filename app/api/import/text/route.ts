@@ -14,6 +14,7 @@ import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-prev
 import { runWithBundledCardArtAssignment } from "@/lib/site-settings/app-presentation-mode"
 import { normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
 import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
+import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { parseImportContentJsonDetailed } from "@/lib/import/parse-import-content-json"
 import { extractImportContentFromText } from "@/lib/import/run-ai-import"
 import { runTextImportPipeline } from "@/lib/import/text-import-pipeline"
@@ -58,7 +59,9 @@ export async function POST(request: NextRequest) {
 
       const previewSkipKeys = Array.isArray(skippedPreviewKeys) ? skippedPreviewKeys : []
       const contentForGate = stripSkippedImportPreviewItems(pendingContent, previewSkipKeys)
-      const multiClassBlock = getMultipleClassImportBlock(contentForGate, "text")
+      const multiClassBlock = !isCardArtOnlyImport(contentForGate)
+        ? getMultipleClassImportBlock(contentForGate, "text")
+        : null
       if (multiClassBlock) {
         return NextResponse.json(
           {

@@ -1,5 +1,9 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
+  expandCardArtIntoReviewStubs,
+  isCardArtOnlyImport,
+} from "@/lib/import/apply-card-art-import"
+import {
   enrichImportedClassList,
   mergeTableParsedClassResources,
   type ClassResourceImportRow,
@@ -36,6 +40,9 @@ import {
 import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
 
 export function summarizeImportPreview(content: ImportContent): string {
+  if (content.card_art?.length && isCardArtOnlyImport(content)) {
+    return `${content.card_art.length} card image URL${content.card_art.length === 1 ? "" : "s"} ready to apply to matching compendium entries.`
+  }
   const parts = Object.entries({
     classes: content.classes?.length ?? 0,
     subclasses: content.subclasses?.length ?? 0,
@@ -44,6 +51,7 @@ export function summarizeImportPreview(content: ImportContent): string {
     species: content.species?.length ?? 0,
     backgrounds: content.backgrounds?.length ?? 0,
     equipment: content.equipment?.length ?? 0,
+    card_art: content.card_art?.length ?? 0,
   })
     .filter(([, count]) => count > 0)
     .map(([type, count]) => `${count} ${type}`)
@@ -110,7 +118,8 @@ export function prepareImportedContent(
   content: ImportContent,
   options: PrepareImportOptions = {},
 ): PreparedImportResult {
-  const sanitized = withSanitizedClassRows(content)
+  const withArtStubs = expandCardArtIntoReviewStubs(content)
+  const sanitized = withSanitizedClassRows(withArtStubs)
   const enriched = enrichImportContentModifiers(sanitized)
   const proposals = collectImportProposals(enriched)
   const collisions = options.collisions ?? []

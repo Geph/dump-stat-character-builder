@@ -920,6 +920,22 @@ export const ImportProposalsSchema = z.object({
   custom_abilities: z.array(ProposedCustomAbilityImportSchema).optional(),
 })
 
+export const CardArtImportEntrySchema = z.object({
+  content_type: z.enum([
+    "class",
+    "subclass",
+    "species",
+    "background",
+    "spell",
+    "equipment",
+    "ability",
+  ]),
+  name: z.string(),
+  card_image_url: z.string(),
+  /** Disambiguate subclasses that share a display name across classes. */
+  class_name: z.string().nullable().optional(),
+})
+
 /** Internal validation shape for import content (not sent to OpenAI). Use `buildImportContentAiSchema` for AI extraction. */
 export function buildImportContentSchema(options?: { includeAbilities?: boolean }) {
   const base = {
@@ -945,6 +961,8 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
     creatures: z.array(CreatureImportSchema).optional(),
     equipment: z.array(EquipmentImportSchema).optional(),
     import_proposals: ImportProposalsSchema.optional(),
+    /** Map public image URLs onto existing compendium rows (Images from URL import). */
+    card_art: z.array(CardArtImportEntrySchema).optional(),
   }
 
   if (options?.includeAbilities) {

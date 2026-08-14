@@ -1,4 +1,5 @@
 import { appendContentTypeHintToPrompt, isCustomAbilitiesContentTypeHint } from "@/lib/import/content-type-hints"
+import { CARD_ART_IMPORT_SYSTEM_PROMPT } from "@/lib/import/card-art-import-hints"
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 import { CLASS_SPELL_LIST_IMPORT_HINT, SPELL_SCHOOL_IMPORT_HINT } from "@/lib/import/class-spell-lists"
 import {
@@ -90,10 +91,13 @@ export function buildImportSystemPrompt(
   contentTypeHint?: string | null,
   options?: ImportSystemPromptOptions,
 ): string {
+  const hint = contentTypeHint?.trim().toLowerCase()
+  if (hint === "images") {
+    return CARD_ART_IMPORT_SYSTEM_PROMPT
+  }
   const base = appendContentTypeHintToPrompt(IMPORT_BASE_SYSTEM_PROMPT, contentTypeHint)
   const customSystemsHint = formatCustomSystemsImportHint(options?.customSystems)
   const subclassMatchHint = formatSubclassMatchImportHint(options?.subclassMatch)
-  const hint = contentTypeHint?.trim().toLowerCase()
   const parts = [base]
   if (customSystemsHint) {
     parts.push(customSystemsHint)

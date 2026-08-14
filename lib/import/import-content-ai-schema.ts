@@ -704,6 +704,21 @@ const EquipmentAiSchema = z.object({
   rarity: z.string().nullable(),
 })
 
+const CardArtAiSchema = z.object({
+  content_type: z.enum([
+    "class",
+    "subclass",
+    "species",
+    "background",
+    "spell",
+    "equipment",
+    "ability",
+  ]),
+  name: z.string(),
+  card_image_url: z.string(),
+  class_name: z.string().nullable(),
+})
+
 const ImportContentAiSchemaBase = z.object({
   species: z.array(SpeciesAiSchema).nullable(),
   classes: z.array(ClassAiSchema).nullable(),
@@ -715,6 +730,7 @@ const ImportContentAiSchemaBase = z.object({
   creatures: z.array(CreatureAiSchema).nullable(),
   equipment: z.array(EquipmentAiSchema).nullable(),
   import_proposals: ImportProposalsAiSchema.nullable(),
+  card_art: z.array(CardArtAiSchema).nullable(),
 })
 
 const ImportContentAiSchemaWithAbilities = ImportContentAiSchemaBase.extend({
@@ -778,6 +794,10 @@ export function buildImportContentAiSchema(options?: {
     case "equipment":
       return z.object({
         equipment: z.array(EquipmentAiSchema).nullable(),
+      })
+    case "images":
+      return z.object({
+        card_art: z.array(CardArtAiSchema).nullable(),
       })
     default:
       if (options?.includeAbilities) return ImportContentAiSchemaWithAbilities
@@ -1217,6 +1237,22 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
     if (proposals.class_resources?.length || proposals.custom_abilities?.length) {
       content.import_proposals = proposals
     }
+  }
+
+  if (raw.card_art?.length) {
+    content.card_art = raw.card_art
+      .map((entry) =>
+        omitNull({
+          content_type: entry.content_type,
+          name: entry.name,
+          card_image_url: entry.card_image_url,
+          class_name: entry.class_name,
+        }),
+      )
+      .filter(
+        (entry): entry is NonNullable<ImportContent["card_art"]>[number] =>
+          Boolean(entry.name && entry.card_image_url && entry.content_type),
+      )
   }
 
   return content

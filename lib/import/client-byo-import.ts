@@ -18,6 +18,10 @@ import type { ImportProposalSelections, ImportProposalSet } from "@/lib/import/i
 import type { ImportStage } from "@/lib/import/import-staging"
 import type { ImportCardArtUrlMap } from "@/lib/import/import-card-art"
 import { stripSkippedImportPreviewItems } from "@/lib/import/import-content-preview"
+import {
+  expandCardArtIntoReviewStubs,
+  isCardArtOnlyImport,
+} from "@/lib/import/apply-card-art-import"
 
 export type ClientByoImportReviewResult = {
   needsConfirmation: true
@@ -52,13 +56,18 @@ export async function runClientByoJsonImport(
   }
   const content = parsed.content
 
-  const multiClassBlock = getMultipleClassImportBlock(content, "text")
+  const multiClassBlock =
+    !isCardArtOnlyImport(content) ? getMultipleClassImportBlock(content, "text") : null
   if (multiClassBlock) {
     throw new Error(multiClassBlock.message)
   }
 
-  const collisions = await detectImportCollisionsLocal(content)
-  const prepared = prepareImportedContent(content, { collisions, charLength: trimmed.length })
+  const reviewContent = expandCardArtIntoReviewStubs(content)
+  const collisions = await detectImportCollisionsLocal(reviewContent)
+  const prepared = prepareImportedContent(reviewContent, {
+    collisions,
+    charLength: trimmed.length,
+  })
 
   if (prepared.kind === "confirm") {
     return {

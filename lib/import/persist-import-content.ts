@@ -73,6 +73,11 @@ import {
   preferredSourceForPersist,
   type PersistImportOptions,
 } from "@/lib/import/persist-import-options"
+import {
+  isCardArtOnlyImport,
+  persistCardArtImport,
+  syncCardArtEntriesFromContent,
+} from "@/lib/import/apply-card-art-import"
 
 export type { PersistImportResult } from "@/lib/import/persist-import-types"
 export type { PersistImportOptions } from "@/lib/import/persist-import-options"
@@ -112,6 +117,21 @@ export async function persistImportedContent(
   let classNameById = new Map<string, string>()
   let spellCatalog = await loadSpellCatalog()
   const explicitResources = asClassResourceImports(sanitized)
+
+  if (isCardArtOnlyImport(sanitized) && sanitized.card_art?.length) {
+    const artResult = await persistCardArtImport(syncCardArtEntriesFromContent(sanitized), {
+      listRows,
+      upsertByName: async (store, rows) => {
+        await upsertByName(store, rows)
+        return rows
+      },
+    })
+    return {
+      totalImported: artResult.totalImported,
+      breakdown: artResult.breakdown,
+      warnings: artResult.warnings,
+    }
+  }
 
   if (sanitized.species?.length) {
     await upsertByName(

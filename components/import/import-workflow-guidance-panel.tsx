@@ -13,6 +13,7 @@ import {
   WEAPON_MASTERY_IMPORT_TIP,
 } from "@/lib/import/import-workflow-guidance"
 import { CLEAN_SOURCE_TEXT_UI_GUIDELINES } from "@/lib/import/byo-import-kit"
+import { CARD_ART_HOSTING_UI_GUIDELINES } from "@/lib/import/card-art-import-hints"
 import {
   Dialog,
   DialogContent,
@@ -26,11 +27,12 @@ import {
   BookOpen,
   ChevronRight,
   ClipboardPaste,
+  ImageIcon,
   Library,
   ScrollText,
 } from "lucide-react"
 
-type GuidanceTopic = "scope-schema" | "import-order" | "clean-source"
+type GuidanceTopic = "scope-schema" | "import-order" | "clean-source" | "card-art"
 
 const TOPIC_BUTTONS: {
   id: GuidanceTopic
@@ -59,6 +61,13 @@ const TOPIC_BUTTONS: {
     blurb: "PDF & paste tips before extract",
     icon: BookOpen,
     accent: "text-lime",
+  },
+  {
+    id: "card-art",
+    title: "Hosting card images",
+    blurb: "Public URLs that work with Images from URL",
+    icon: ImageIcon,
+    accent: "text-violet-700 dark:text-violet-300",
   },
 ]
 
@@ -98,7 +107,7 @@ export function ImportWorkflowGuidancePanel() {
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Import tips</p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {TOPIC_BUTTONS.map((entry) => {
           const Icon = entry.icon
           return (
@@ -106,7 +115,7 @@ export function ImportWorkflowGuidancePanel() {
               key={entry.id}
               type="button"
               onClick={() => setTopic(entry.id)}
-              className="inline-flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border bg-background/80 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 sm:min-w-[12rem]"
+              className="inline-flex min-w-0 items-center gap-2.5 rounded-xl border border-border bg-background/80 px-3 py-2.5 text-left transition-colors hover:bg-muted/40"
             >
               <Icon className={cn("h-4 w-4 shrink-0", entry.accent)} aria-hidden />
               <span className="min-w-0 flex-1">
@@ -213,6 +222,18 @@ export function ImportWorkflowGuidancePanel() {
       >
         <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
           {CLEAN_SOURCE_TEXT_UI_GUIDELINES}
+        </pre>
+      </GuidanceDialog>
+
+      <GuidanceDialog
+        open={topic === "card-art"}
+        onOpenChange={(open) => setTopic(open ? "card-art" : null)}
+        title="Hosting card images"
+        description="Where to put art so Images from URL can attach it to existing compendium entries."
+        contentClassName="sm:max-w-xl"
+      >
+        <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
+          {CARD_ART_HOSTING_UI_GUIDELINES}
         </pre>
       </GuidanceDialog>
     </div>

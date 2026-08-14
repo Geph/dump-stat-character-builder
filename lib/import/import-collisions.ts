@@ -1,4 +1,5 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { slugClassPrefix } from "@/lib/import/third-party-resources"
 
 export type ImportCollisionKind = "class" | "feat" | "species" | "spell" | "background" | "ability"
@@ -160,9 +161,16 @@ export function collisionRenamesResolved(
 
 export function defaultCollisionResolutionMap(
   collisions: ImportCollision[],
+  content?: ImportContent | null,
 ): ImportCollisionResolutionMap {
+  const artOnly = content ? isCardArtOnlyImport(content) : false
   const map: ImportCollisionResolutionMap = {}
   for (const collision of collisions) {
+    if (artOnly) {
+      // Card-art import only patches card_image_url on existing rows.
+      map[collision.id] = "overwrite"
+      continue
+    }
     // Existing spells should be matched/linked, not overwritten by import stubs.
     map[collision.id] = collision.kind === "spell" ? "link" : "rename"
   }

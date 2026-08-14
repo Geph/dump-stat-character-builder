@@ -7,6 +7,10 @@ import { getMultipleClassImportBlock } from "@/lib/import/import-class-limits"
 import type { ImportTokenSavingsReport } from "@/lib/import/import-route-utils"
 import { prepareImportedContent } from "@/lib/import/finalize-import"
 import { persistImportedContent, normalizeImportMaterialSource } from "@/lib/import/persist-import-content"
+import {
+  expandCardArtIntoReviewStubs,
+  isCardArtOnlyImport,
+} from "@/lib/import/apply-card-art-import"
 import { NextResponse } from "next/server"
 
 export async function runTextImportPipeline(
@@ -30,7 +34,9 @@ export async function runTextImportPipeline(
       "Custom",
     )
 
-    const multiClassBlock = getMultipleClassImportBlock(content, "text")
+    const multiClassBlock = !isCardArtOnlyImport(content)
+      ? getMultipleClassImportBlock(content, "text")
+      : null
     if (multiClassBlock) {
       return NextResponse.json(
         {
@@ -41,8 +47,9 @@ export async function runTextImportPipeline(
       )
     }
 
-    const { collisions, warning: collisionWarning } = await detectImportCollisionsSafe(content)
-    const prepared = prepareImportedContent(content, { collisions, charLength })
+    const reviewContent = expandCardArtIntoReviewStubs(content)
+    const { collisions, warning: collisionWarning } = await detectImportCollisionsSafe(reviewContent)
+    const prepared = prepareImportedContent(reviewContent, { collisions, charLength })
     if (prepared.kind === "confirm") {
       return NextResponse.json({
         needsConfirmation: true,

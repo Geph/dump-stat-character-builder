@@ -34,6 +34,11 @@ import {
   listRowsLocal,
 } from "@/lib/import/detect-import-collisions-local"
 import { collectSpellSchoolsFromImportContent } from "@/lib/compendium/schools-of-magic"
+import {
+  isCardArtOnlyImport,
+  persistCardArtImport,
+  syncCardArtEntriesFromContent,
+} from "@/lib/import/apply-card-art-import"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
 import {
   preferredSourceForPersist,
@@ -105,6 +110,18 @@ export async function persistImportedContentLocal(
   let classNameById = new Map<string, string>()
   let spellCatalog = await loadSpellCatalogLocal()
   const explicitResources = asClassResourceImports(sanitized)
+
+  if (isCardArtOnlyImport(sanitized) && sanitized.card_art?.length) {
+    const artResult = await persistCardArtImport(syncCardArtEntriesFromContent(sanitized), {
+      listRows: listRowsLocal,
+      upsertByName: upsertByNameLocal,
+    })
+    return {
+      totalImported: artResult.totalImported,
+      breakdown: artResult.breakdown,
+      warnings: artResult.warnings,
+    }
+  }
 
   if (sanitized.species?.length) {
     await upsertByNameLocal(

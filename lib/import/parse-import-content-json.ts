@@ -18,6 +18,8 @@ const IMPORT_CONTENT_KEYS = [
   "equipment",
   "abilities",
   "import_proposals",
+  "card_art",
+  "creatures",
 ] as const
 
 function hasImportContentShape(value: unknown): value is Record<string, unknown> {
@@ -37,8 +39,10 @@ function countImportRows(content: ImportContent): number {
     (content.feats?.length ?? 0) +
     (content.equipment?.length ?? 0) +
     (content.abilities?.length ?? 0) +
+    (content.creatures?.length ?? 0) +
     (content.import_proposals?.class_resources?.length ?? 0) +
-    (content.import_proposals?.custom_abilities?.length ?? 0)
+    (content.import_proposals?.custom_abilities?.length ?? 0) +
+    (content.card_art?.length ?? 0)
   )
 }
 
