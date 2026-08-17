@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { WelcomeSplashOverlay } from "@/components/home/welcome-splash-overlay"
@@ -20,6 +21,12 @@ import {
   getCustomHeroBackground,
   HERO_BG_CHANGE_EVENT,
 } from "@/lib/site-settings/hero-background"
+import { characterSheetHref } from "@/lib/compendium/edit-href"
+import {
+  getLastCharacterId,
+  isResumeLastCharacterEnabled,
+} from "@/lib/site-settings/resume-last-character"
+import { isWelcomeSplashSuppressed } from "@/lib/site-settings/welcome-splash"
 
 const features = [
   {
@@ -89,6 +96,7 @@ type LibraryStats = {
 }
 
 export default function HomePage() {
+  const router = useRouter()
   const { isCompactOnly } = useAppPresentationMode()
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
@@ -112,6 +120,12 @@ export default function HomePage() {
   }, [])
 
   const heroBackgroundUrl = customHeroBg ?? heroBg
+
+  useEffect(() => {
+    if (!isResumeLastCharacterEnabled() || !isWelcomeSplashSuppressed()) return
+    const lastId = getLastCharacterId()
+    if (lastId) router.replace(characterSheetHref(lastId))
+  }, [router])
 
   useEffect(() => {
     const fetchStats = async () => {

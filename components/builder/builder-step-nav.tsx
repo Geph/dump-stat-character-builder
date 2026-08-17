@@ -5,17 +5,19 @@ import Link from "next/link"
 import { ChevronLeft, ChevronRight, Check, ExternalLink } from "lucide-react"
 import { ProceedBlockerBanner } from "@/components/builder/proceed-blocker-banner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import type { BuilderBlocker } from "@/lib/builder/proceed-blockers"
 import { cn } from "@/lib/utils"
 
 type BuilderStepNavProps = {
   currentStep: number
   canProceed: boolean
   /** Shown in a popover on the disabled Continue button. */
-  proceedBlockers?: string[]
+  proceedBlockers?: Array<string | BuilderBlocker>
   /** When set, controls save on the final step instead of canProceed. */
   canSave?: boolean
   /** Shown in a popover on the disabled Save button. */
-  saveBlockers?: string[]
+  saveBlockers?: Array<string | BuilderBlocker>
+  onJumpBlocker?: (blocker: BuilderBlocker) => void
   saving: boolean
   onBack: () => void
   onContinue: () => void
@@ -99,12 +101,14 @@ function BlockedActionButton({
   compact = false,
   title,
   heading,
+  onJump,
   children,
 }: {
-  blockers: string[]
+  blockers: Array<string | BuilderBlocker>
   compact?: boolean
   title: string
   heading?: string
+  onJump?: (blocker: BuilderBlocker) => void
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -135,7 +139,7 @@ function BlockedActionButton({
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
       >
-        <ProceedBlockerBanner blockers={blockers} heading={heading} />
+        <ProceedBlockerBanner blockers={blockers} heading={heading} onJump={onJump} />
       </PopoverContent>
     </Popover>
   )
@@ -156,6 +160,7 @@ export function BuilderStepNav({
   className = "",
   lastStep = 6,
   compact = false,
+  onJumpBlocker,
 }: BuilderStepNavProps) {
   const saveEnabled = canSave ?? canProceed
   const showBlockerPopover = !canProceed && proceedBlockers.length > 0
@@ -182,6 +187,7 @@ export function BuilderStepNav({
             blockers={proceedBlockers}
             compact={compact}
             title="Continue unavailable. Show required steps."
+            onJump={onJumpBlocker}
           >
             <ContinueButton
               disabled
@@ -213,6 +219,7 @@ export function BuilderStepNav({
               compact={compact}
               title="Save unavailable. Show required steps."
               heading="Complete these to save:"
+              onJump={onJumpBlocker}
             >
               <SaveButton
                 disabled

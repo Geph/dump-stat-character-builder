@@ -94,6 +94,7 @@ import {
 } from "@/lib/character/collect-limited-feature-effects"
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
+import { resolveSkillAbility } from "@/lib/character/skill-ability-overrides"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Acrobatics", ability: "dexterity" },
@@ -360,6 +361,7 @@ function buildSkillBonuses(
     limitationCtx: import("@/lib/compendium/modifier-limitations").LimitationEvaluationContext
     characterLevel: number
   },
+  skillAbilityOverrides?: Record<string, AbilityScoreKey> | null,
 ): SkillBonus[] {
   const srdSkillNames = new Set(SKILL_ROWS.map((row) => row.name))
 
@@ -386,18 +388,23 @@ function buildSkillBonuses(
       )
       bonus += total
     }
-    return { name, ability, proficient, expertise, bonus }
+    return { name, ability, defaultAbility: ability, proficient, expertise, bonus }
   }
 
   const srd = SKILL_ROWS.map(({ name, ability }) => {
     const proficient = skillProficiencies.includes(name)
     const expertise = skillExpertise.includes(name)
-    return buildOne(name, ability, proficient, expertise)
+    const governing = resolveSkillAbility(name, ability, skillAbilityOverrides)
+    return { ...buildOne(name, governing, proficient, expertise), defaultAbility: ability }
   })
 
   const custom = customSkills
     .filter((entry) => entry.name.trim() && !srdSkillNames.has(entry.name.trim()))
-    .map((entry) => buildOne(entry.name.trim(), entry.ability, true, entry.expertise))
+    .map((entry) => {
+      const name = entry.name.trim()
+      const governing = resolveSkillAbility(name, entry.ability, skillAbilityOverrides)
+      return { ...buildOne(name, governing, true, entry.expertise), defaultAbility: entry.ability }
+    })
 
   return [...srd, ...custom]
 }
@@ -829,9 +836,10 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     proficiencyBonus,
   )
 
+  const skillAbilityOverrides = inputs.skillAbilityOverrides
   const passivePerception = passiveSkillScore(
     "Perception",
-    "wisdom",
+    resolveSkillAbility("Perception", "wisdom", skillAbilityOverrides),
     abilityMods,
     skillProficiencies,
     skillExpertise,
@@ -839,7 +847,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   )
   const passiveInsight = passiveSkillScore(
     "Insight",
-    "wisdom",
+    resolveSkillAbility("Insight", "wisdom", skillAbilityOverrides),
     abilityMods,
     skillProficiencies,
     skillExpertise,
@@ -847,7 +855,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   )
   const passiveInvestigation = passiveSkillScore(
     "Investigation",
-    "intelligence",
+    resolveSkillAbility("Investigation", "intelligence", skillAbilityOverrides),
     abilityMods,
     skillProficiencies,
     skillExpertise,
@@ -964,6 +972,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
             characterLevel: totalLevel,
           }
         : undefined,
+      skillAbilityOverrides,
     ),
     tools: buildToolBonuses(
       proficiencyBonus,

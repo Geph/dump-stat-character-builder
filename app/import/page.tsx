@@ -102,6 +102,7 @@ import {
   buildInitialImportCardArtUrlMap,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
   renameImportClassAtIndex,
@@ -300,6 +301,9 @@ export default function ImportPage() {
     )
   }
 
+  const isCardArtReview = Boolean(
+    pendingImport && isCardArtOnlyImport(pendingImport.content),
+  )
   const stagedReview = Boolean(
     pendingImport?.stagingSummary && pendingImport.stages.length > 0,
   )
@@ -1268,6 +1272,7 @@ export default function ImportPage() {
                       onChange={setRenameMap}
                       resolutionMap={collisionResolutionMap}
                       onResolutionChange={setCollisionResolutionMap}
+                      variant={isCardArtReview ? "card-art" : "default"}
                     />
                     <ImportContentPreviewPanel
                       key={`preview-${activeReviewStage?.id ?? "all"}`}
@@ -1279,9 +1284,9 @@ export default function ImportPage() {
                       showModifierReviewHint={stageHasModifiers}
                       cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
                       onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
-                      onRenameItem={handleRenameImportPreview}
+                      onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
                       skippedKeys={previewSkipKeys}
-                      onSkippedKeysChange={setPreviewSkipKeys}
+                      onSkippedKeysChange={isCardArtReview ? undefined : setPreviewSkipKeys}
                     />
                     {includeCardArt ? (
                       <ImportCardArtPanel
@@ -1315,6 +1320,7 @@ export default function ImportPage() {
                   onChange={setRenameMap}
                   resolutionMap={collisionResolutionMap}
                   onResolutionChange={setCollisionResolutionMap}
+                  variant={isCardArtReview ? "card-art" : "default"}
                 />
                 <ImportContentPreviewPanel
                   content={pendingImport.content}
@@ -1322,9 +1328,9 @@ export default function ImportPage() {
                   showModifierReviewHint={modifierReviewRows.length > 0}
                   cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
                   onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
-                  onRenameItem={handleRenameImportPreview}
+                  onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
                   skippedKeys={previewSkipKeys}
-                  onSkippedKeysChange={setPreviewSkipKeys}
+                  onSkippedKeysChange={isCardArtReview ? undefined : setPreviewSkipKeys}
                 />
                 {modifierReviewRows.length > 0 ? (
                   <ImportModifierReviewPanel

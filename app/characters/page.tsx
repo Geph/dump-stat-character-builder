@@ -6,7 +6,8 @@ import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, MoreHorizontal } from "lucide-react"
+import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, MoreHorizontal, ArrowUp } from "lucide-react"
+import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import type { Character, DndClass, Species, Background } from "@/lib/types"
@@ -61,6 +62,7 @@ export default function CharactersPage() {
   const [importing, setImporting] = useState(false)
   const [parties, setParties] = useState<AdventuringParty[]>([])
   const [partiesOpen, setPartiesOpen] = useState(false)
+  const [levelUpCharacterId, setLevelUpCharacterId] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const fetchCharacters = async () => {
@@ -522,6 +524,14 @@ export default function CharactersPage() {
                       >
                         <Download className="w-4 h-4" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setLevelUpCharacterId(character.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Level up"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
                       <Link
                         href={`/builder?edit=${character.id}`}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
@@ -594,6 +604,14 @@ export default function CharactersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {levelUpCharacterId ? (
+        <LevelUpWizard
+          characterId={levelUpCharacterId}
+          open
+          onClose={() => setLevelUpCharacterId(null)}
+          onComplete={() => void fetchCharacters()}
+        />
+      ) : null}
       <SiteFooter />
     </div>
   )

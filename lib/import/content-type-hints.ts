@@ -16,6 +16,10 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
 export type ImportContentTypeHint = (typeof IMPORT_CONTENT_TYPE_HINTS)[number]["value"]
 
 /** Hints that extract via the custom abilities / import_proposals.custom_abilities pipeline. */
+export function isImagesContentTypeHint(contentTypeHint: string | null | undefined): boolean {
+  return contentTypeHint?.trim().toLowerCase() === "images"
+}
+
 export function isCustomAbilitiesContentTypeHint(
   contentTypeHint: string | null | undefined,
 ): boolean {

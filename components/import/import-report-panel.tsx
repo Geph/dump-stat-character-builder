@@ -109,6 +109,28 @@ export function ImportReportPanel({ report, onDismiss }: ImportReportPanelProps)
               {report.summary.autoWiredModifiers === 1 ? "" : "s"} linked from import text.
             </p>
           ) : null}
+          {report.summary.wiring ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-success/30 bg-success/10 px-2 py-1.5">
+                <p className="text-lg font-black text-success">{report.summary.wiring.linked}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-success">Wired</p>
+              </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5">
+                <p className="text-lg font-black text-amber-700 dark:text-amber-300">
+                  {report.summary.wiring.presetOnly}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  Preset
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                <p className="text-lg font-black text-muted-foreground">{report.summary.wiring.textOnly}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Not wired
+                </p>
+              </div>
+            </div>
+          ) : null}
           {report.warnings.length > 0 && (
             <ul className="mt-2 space-y-1 text-destructive">
               {report.warnings.map((warning) => (

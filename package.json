@@ -1,6 +1,6 @@
 {
   "name": "my-project",
-  "version": "0.24",
+  "version": "0.25",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,7 +26,8 @@
     "import:audit": "node scripts/run-vite-node.mjs scripts/homebrew-import-ops.ts audit",
     "import:merge": "node scripts/run-vite-node.mjs scripts/homebrew-import-ops.ts merge",
     "import:ops": "node scripts/run-vite-node.mjs scripts/homebrew-import-ops.ts",
-    "import:smoke": "vitest run lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts"
+    "import:smoke": "vitest run lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts",
+    "content:lint": "node scripts/content-lint.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.85",

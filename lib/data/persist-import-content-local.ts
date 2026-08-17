@@ -44,6 +44,13 @@ import {
   preferredSourceForPersist,
   type PersistImportOptions,
 } from "@/lib/import/persist-import-options"
+import {
+  applyUpdateMergesToNamedRows,
+  filterNewResourceRows,
+  findExistingSubclassRow,
+  mergeRowForUpdate,
+  shouldMergeClassResources,
+} from "@/lib/import/merge-collision-update"
 
 function withResolvedFeatureSpells(
   rows: Record<string, unknown>[],
@@ -124,15 +131,20 @@ export async function persistImportedContentLocal(
   }
 
   if (sanitized.species?.length) {
-    await upsertByNameLocal(
-      "species",
-      withResolvedFeatureSpells(
-        sanitized.species.map((s) => stampSource({ ...s }, source)),
-        "traits",
-        spellCatalog,
-        preferredSource,
-      ),
+    let speciesRows = withResolvedFeatureSpells(
+      sanitized.species.map((s) => stampSource({ ...s }, source)),
+      "traits",
+      spellCatalog,
+      preferredSource,
     )
+    if (options.updateExistingNames?.species?.length) {
+      speciesRows = applyUpdateMergesToNamedRows(
+        speciesRows,
+        await listRowsLocal("species"),
+        options.updateExistingNames.species,
+      )
+    }
+    await upsertByNameLocal("species", speciesRows)
     breakdown.species = sanitized.species.length
     totalImported += sanitized.species.length
   }
@@ -155,6 +167,15 @@ export async function persistImportedContentLocal(
       spellCatalog,
       preferredSource,
     )
+    const updateClassNames = new Set(options.updateExistingNames?.class ?? [])
+    if (updateClassNames.size) {
+      const existingClasses = await listRowsLocal("classes")
+      enrichedClasses = applyUpdateMergesToNamedRows(
+        enrichedClasses,
+        existingClasses,
+        updateClassNames,
+      )
+    }
     await upsertByNameLocal("classes", enrichedClasses)
     breakdown.classes = enrichedClasses.length
     totalImported += enrichedClasses.length
@@ -205,15 +226,27 @@ export async function persistImportedContentLocal(
         classId,
       )
 
-      for (const resource of resourceRows) {
-        await deleteWhereLocal("class_resources", [
-          { op: "eq", column: "class_id", value: classId },
-          { op: "eq", column: "resource_key", value: resource.resource_key as string },
-        ])
+      const mergeResources = shouldMergeClassResources(
+        parent.name,
+        options.updateExistingNames?.class,
+      )
+      let rowsToWrite = resourceRows
+      if (mergeResources) {
+        const existingResources = await listRowsLocal("class_resources", {
+          filters: [{ op: "eq", column: "class_id", value: classId }],
+        })
+        rowsToWrite = filterNewResourceRows(resourceRows, existingResources)
+      } else {
+        for (const resource of resourceRows) {
+          await deleteWhereLocal("class_resources", [
+            { op: "eq", column: "class_id", value: classId },
+            { op: "eq", column: "resource_key", value: resource.resource_key as string },
+          ])
+        }
       }
-      if (resourceRows.length > 0) {
-        await insertRowsLocal("class_resources", resourceRows)
-        resourceCount += resourceRows.length
+      if (rowsToWrite.length > 0) {
+        await insertRowsLocal("class_resources", rowsToWrite)
+        resourceCount += rowsToWrite.length
       }
     }
 
@@ -239,15 +272,20 @@ export async function persistImportedContentLocal(
       await upsertByNameLocal("classes", enrichedClasses)
     }
     if (sanitized.species?.length) {
-      await upsertByNameLocal(
-        "species",
-        withResolvedFeatureSpells(
-          sanitized.species.map((s) => stampSource({ ...s }, source)),
-          "traits",
-          spellCatalog,
-          preferredSource,
-        ),
+      let speciesRows = withResolvedFeatureSpells(
+        sanitized.species.map((s) => stampSource({ ...s }, source)),
+        "traits",
+        spellCatalog,
+        preferredSource,
       )
+      if (options.updateExistingNames?.species?.length) {
+        speciesRows = applyUpdateMergesToNamedRows(
+          speciesRows,
+          await listRowsLocal("species"),
+          options.updateExistingNames.species,
+        )
+      }
+      await upsertByNameLocal("species", speciesRows)
     }
   }
 
@@ -338,15 +376,30 @@ export async function persistImportedContentLocal(
         }
       })
 
-      for (const sc of enrichedSubclasses) {
-        await deleteWhereLocal("subclasses", [
-          { op: "eq", column: "name", value: sc.name as string },
-          { op: "eq", column: "source", value: source },
-        ])
+      const existingSubclasses = await listRowsLocal("subclasses")
+      const subclassesToInsert: Record<string, unknown>[] = []
+      for (let index = 0; index < enrichedSubclasses.length; index++) {
+        const sc = enrichedSubclasses[index]!
+        const sourceRow = subclassesWithIds[index]!
+        if (shouldMergeClassResources(sourceRow.class_name, options.updateExistingNames?.class)) {
+          const existing = findExistingSubclassRow(existingSubclasses, sc.name, sourceRow.class_id)
+          if (existing) {
+            await deleteWhereLocal("subclasses", [{ op: "eq", column: "id", value: existing.id }])
+            subclassesToInsert.push(mergeRowForUpdate(existing, sc))
+          } else {
+            subclassesToInsert.push(sc)
+          }
+        } else {
+          await deleteWhereLocal("subclasses", [
+            { op: "eq", column: "name", value: sc.name as string },
+            { op: "eq", column: "source", value: source },
+          ])
+          subclassesToInsert.push(sc)
+        }
       }
-      await insertRowsLocal("subclasses", enrichedSubclasses)
-      breakdown.subclasses = enrichedSubclasses.length
-      totalImported += enrichedSubclasses.length
+      await insertRowsLocal("subclasses", subclassesToInsert)
+      breakdown.subclasses = subclassesToInsert.length
+      totalImported += subclassesToInsert.length
     }
   }
 
@@ -364,7 +417,15 @@ export async function persistImportedContentLocal(
         ),
       }
     })
-    await upsertByNameLocal("backgrounds", backgroundRows)
+    let backgroundsToWrite = backgroundRows
+    if (options.updateExistingNames?.background?.length) {
+      backgroundsToWrite = applyUpdateMergesToNamedRows(
+        backgroundRows,
+        await listRowsLocal("backgrounds"),
+        options.updateExistingNames.background,
+      )
+    }
+    await upsertByNameLocal("backgrounds", backgroundsToWrite)
     breakdown.backgrounds = sanitized.backgrounds.length
     totalImported += sanitized.backgrounds.length
   }
@@ -400,7 +461,15 @@ export async function persistImportedContentLocal(
         prerequisite_feat_ids: [] as string[],
       }
     })
-    await upsertByNameLocal("feats", featRows)
+    let featsToWrite = featRows
+    if (options.updateExistingNames?.feat?.length) {
+      featsToWrite = applyUpdateMergesToNamedRows(
+        featRows,
+        await listRowsLocal("feats"),
+        options.updateExistingNames.feat,
+      )
+    }
+    await upsertByNameLocal("feats", featsToWrite)
 
     const existingFeats = (await listRowsLocal("feats")).map((row) => ({
       id: row.id as string,
@@ -481,8 +550,16 @@ export async function persistImportedContentLocal(
           : {}),
       }
     })
-    await upsertByNameLocal("custom_abilities", abilityRows)
-    breakdown.abilities = abilityRows.length
+    let abilitiesToWrite = abilityRows
+    if (options.updateExistingNames?.ability?.length) {
+      abilitiesToWrite = applyUpdateMergesToNamedRows(
+        abilityRows,
+        await listRowsLocal("custom_abilities"),
+        options.updateExistingNames.ability,
+      )
+    }
+    await upsertByNameLocal("custom_abilities", abilitiesToWrite)
+    breakdown.abilities = abilitiesToWrite.length
     totalImported += abilityRows.length
   }
 

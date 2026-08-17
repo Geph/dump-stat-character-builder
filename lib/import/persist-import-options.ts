@@ -1,3 +1,4 @@
+import type { ImportCollisionKind } from "@/lib/import/import-collisions"
 import type { ImportSourceLabel } from "@/lib/import/import-material-source"
 
 /** Options for persistImportedContent / persistImportedContentLocal. */
@@ -8,6 +9,8 @@ export type PersistImportOptions = {
    * prefer_same_source_replacements on the imported classes.
    */
   preferSameSourceReplacements?: boolean
+  /** Lowercased names to merge into existing rows instead of replacing them. */
+  updateExistingNames?: Partial<Record<ImportCollisionKind, string[]>>
 }
 
 export function preferredSourceForPersist(

@@ -14,6 +14,12 @@ import {
   normalizeRampageTurnState,
   type RampageTurnState,
 } from "@/lib/character/rampage-die"
+import {
+  normalizeDurationReminders,
+  type DurationReminder,
+} from "@/lib/character/duration-reminders"
+import { normalizeSkillAbilityOverrides } from "@/lib/character/skill-ability-overrides"
+import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 /** Per-resource banked value with optional real-time decay (Influence, Balance of Power). */
 export type AccumulatedResourceState = {
@@ -58,6 +64,10 @@ export type CharacterSheetPlayState = {
   pinnedSkillNames: string[]
   /** Equipment item ids pinned to the top of the equipment list. */
   pinnedEquipmentIds: string[]
+  /** Timed effect reminders shown near conditions. */
+  durationReminders: DurationReminder[]
+  /** House-rule remaps of which ability governs a skill check. */
+  skillAbilityOverrides: Record<string, AbilityScoreKey>
   /** Set when the player last saved play state to the database. */
   savedAt: string | null
 }
@@ -86,6 +96,8 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     skillSortMode: "ability",
     pinnedSkillNames: [],
     pinnedEquipmentIds: [],
+    durationReminders: [],
+    skillAbilityOverrides: {},
     savedAt: null,
   }
 }
@@ -165,6 +177,8 @@ export function normalizeSheetPlayState(
     pinnedEquipmentIds: Array.isArray(raw.pinnedEquipmentIds)
       ? raw.pinnedEquipmentIds.filter((entry): entry is string => typeof entry === "string")
       : base.pinnedEquipmentIds,
+    durationReminders: normalizeDurationReminders(raw.durationReminders),
+    skillAbilityOverrides: normalizeSkillAbilityOverrides(raw.skillAbilityOverrides),
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : base.savedAt,
   }
 }

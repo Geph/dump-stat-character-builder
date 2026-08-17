@@ -711,4 +711,47 @@ describe("collectSheetActions", () => {
     expect(actions.map((a) => a.name)).not.toContain("Scimitar")
     expect(actions.map((a) => a.name)).not.toContain("Longsword")
   })
+
+  it("attaches ally-targeted buffs and inspiration to sheet actions", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Bardic Inspiration",
+            description: "Give an ally a Bardic Inspiration die.",
+            activation: { bonusAction: true },
+            linkedModifiers: [
+              {
+                instanceId: "modinst_bi",
+                catalogRefId: "cat_fx_modify_creature",
+                activation: {
+                  bonusAction: true,
+                  effects: [
+                    {
+                      id: "fx_bi",
+                      kind: "modify_creature",
+                      rollTarget: "ally",
+                      label: "Bardic Inspiration",
+                    },
+                  ],
+                },
+              },
+            ],
+          } as Feature,
+          {
+            level: 1,
+            name: "Encouraging Song",
+            description: "After a rest, give Heroic Inspiration to allies who hear you.",
+            activation: { action: true },
+          } as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const bardic = actions.find((action) => action.name === "Bardic Inspiration")
+    expect(bardic?.healEffects?.some((effect) => effect.kind === "modify_creature")).toBe(true)
+    const song = actions.find((action) => action.name === "Encouraging Song")
+    expect(song?.healEffects?.some((effect) => effect.kind === "grant_inspiration")).toBe(true)
+  })
 })

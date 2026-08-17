@@ -182,7 +182,8 @@ export function RichTextContent({
     return <p className={cn("text-sm text-muted-foreground", className)}>{fallback}</p>
   }
 
-  const rendered = isHtml(html) ? html : markdownToHtml(html)
+  // Always run through markdownToHtml so leftover ** / _ in HTML-wrapped SRD text renders.
+  const rendered = markdownToHtml(html)
 
   return (
     <div

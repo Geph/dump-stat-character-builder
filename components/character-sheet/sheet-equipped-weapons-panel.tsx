@@ -35,10 +35,18 @@ type EquippedWeaponCard = {
   onSpendAmmoHp?: () => void
 }
 
+export type ExtraWeaponMasteryControl = {
+  slotCount: number
+  picks: string[]
+  options: { name: string; description?: string }[]
+}
+
 type SheetEquippedWeaponsPanelProps = {
   weapons: EquippedWeaponCard[]
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
+  extraMasteryByWeaponId?: Record<string, ExtraWeaponMasteryControl>
+  onExtraMasteryChange?: (equipmentId: string, names: string[]) => void
   /** Weapon attack rolls spend the Attack action. */
   onAttackRoll?: () => void
   /** Weapon damage rolls signal that damage was dealt this turn (Rampage Die). */
@@ -56,11 +64,15 @@ function WeaponAttackCard({
   onSpendAmmoHp,
   buildInputs,
   weaponProficiencies,
+  extraMastery,
+  onExtraMasteryChange,
   onAttackRoll,
   onDamageRoll,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
+  extraMastery?: ExtraWeaponMasteryControl
+  onExtraMasteryChange?: (equipmentId: string, names: string[]) => void
   onAttackRoll?: () => void
   onDamageRoll?: () => void
 }) {
@@ -120,7 +132,10 @@ function WeaponAttackCard({
             </p>
           ) : null}
 
-          {mastery || properties.length > 0 || sheetContext?.appliedModifiers.length ? (
+          {mastery ||
+          properties.length > 0 ||
+          sheetContext?.appliedModifiers.length ||
+          sheetContext?.extraMasteries.length ? (
             <div className="flex flex-wrap gap-1">
               {mastery ? (
                 <span
@@ -138,6 +153,18 @@ function WeaponAttackCard({
                   />
                 </span>
               ) : null}
+              {(sheetContext?.extraMasteries ?? []).map((entry) => (
+                <span
+                  key={`extra-${entry.name}`}
+                  className="inline-flex items-center gap-0.5 rounded-full border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                >
+                  {entry.name}
+                  <ConditionInfoTip
+                    description={entry.description ?? entry.name}
+                    ariaLabel={`${entry.name} mastery`}
+                  />
+                </span>
+              ))}
               {properties.map((property) => {
                 const description = describeWeaponProperty(property)
                 return (
@@ -173,6 +200,33 @@ function WeaponAttackCard({
             </div>
           ) : null}
 
+          {extraMastery && extraMastery.slotCount > 0 && onExtraMasteryChange ? (
+            <div className="space-y-1 pt-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Extra mastery {extraMastery.slotCount === 1 ? "property" : "properties"}
+              </p>
+              {Array.from({ length: extraMastery.slotCount }).map((_, index) => (
+                <select
+                  key={`${weapon.id}-extra-${index}`}
+                  value={extraMastery.picks[index] ?? ""}
+                  onChange={(event) => {
+                    const next = [...extraMastery.picks]
+                    if (event.target.value) next[index] = event.target.value
+                    else next.splice(index, 1)
+                    onExtraMasteryChange(weapon.id, next.filter(Boolean))
+                  }}
+                  className="w-full rounded-md border border-border bg-card px-2 py-1 text-[11px]"
+                >
+                  <option value="">Choose…</option>
+                  {extraMastery.options.map((option) => (
+                    <option key={option.name} value={option.name}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              ))}
+            </div>
+          ) : null}
           {note ? (
             <p className="text-[10px] leading-snug text-amber-800 dark:text-amber-200">{note}</p>
           ) : null}
@@ -217,6 +271,8 @@ export function SheetEquippedWeaponsPanel({
   weapons,
   buildInputs,
   weaponProficiencies,
+  extraMasteryByWeaponId,
+  onExtraMasteryChange,
   onAttackRoll,
   onDamageRoll,
 }: SheetEquippedWeaponsPanelProps) {
@@ -234,6 +290,8 @@ export function SheetEquippedWeaponsPanel({
             {...entry}
             buildInputs={buildInputs}
             weaponProficiencies={weaponProficiencies}
+            extraMastery={extraMasteryByWeaponId?.[entry.weapon.id]}
+            onExtraMasteryChange={onExtraMasteryChange}
             onAttackRoll={onAttackRoll}
             onDamageRoll={onDamageRoll}
           />

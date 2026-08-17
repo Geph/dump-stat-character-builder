@@ -16,7 +16,7 @@ export type ImportCollision = {
 
 export type ImportRenameMap = Record<string, string>
 
-export type ImportCollisionResolution = "overwrite" | "rename" | "link" | "skip"
+export type ImportCollisionResolution = "update" | "overwrite" | "rename" | "link" | "skip"
 
 
 export type ImportCollisionResolutionMap = Record<string, ImportCollisionResolution>
@@ -168,7 +168,7 @@ export function defaultCollisionResolutionMap(
   for (const collision of collisions) {
     if (artOnly) {
       // Card-art import only patches card_image_url on existing rows.
-      map[collision.id] = "overwrite"
+      map[collision.id] = "update"
       continue
     }
     // Existing spells should be matched/linked, not overwritten by import stubs.
@@ -189,7 +189,7 @@ function effectiveRenameMap(
       delete effective[collision.id]
       continue
     }
-    if (resolution === "overwrite" || resolution === "link") {
+    if (resolution === "overwrite" || resolution === "update" || resolution === "link") {
       // Keep the existing name so references resolve to the compendium entry.
       effective[collision.id] = collision.incomingName
       continue
@@ -274,7 +274,7 @@ function stripSkippedCollisionRows(
   return next
 }
 
-/** Apply collision resolutions (overwrite / rename / link / skip) before persisting. */
+/** Apply collision resolutions (update / overwrite / rename / link / skip) before persisting. */
 export function applyImportCollisionResolutions(
   content: ImportContent,
   collisions: ImportCollision[],
@@ -413,4 +413,20 @@ export function applyImportRenames(content: ImportContent, renameMap: ImportRena
 
 export function importCollisionsNeedResolution(collisions: ImportCollision[]): boolean {
   return collisions.length > 0
+}
+
+/** Lowercased incoming names the user chose to merge into existing rows. */
+export function collisionUpdateNamesByKind(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): Partial<Record<ImportCollisionKind, string[]>> {
+  const byKind: Partial<Record<ImportCollisionKind, string[]>> = {}
+  for (const collision of collisions) {
+    const resolution = resolutionMap[collision.id] ?? defaultResolutionFor(collision)
+    if (resolution !== "update") continue
+    const list = byKind[collision.kind] ?? []
+    list.push(collision.incomingName.trim().toLowerCase())
+    byKind[collision.kind] = list
+  }
+  return byKind
 }

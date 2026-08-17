@@ -50,6 +50,34 @@ describe("import-card-art", () => {
     )
   })
 
+  it("keeps Images from URL dumpstat art instead of treating it as an old WotC default", () => {
+    const cardArtOnly: ImportContent = {
+      card_art: [
+        {
+          content_type: "class",
+          name: "Alchemist",
+          card_image_url:
+            "https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png",
+        },
+      ],
+      classes: [
+        {
+          name: "Alchemist",
+          description: null,
+          hit_die: 8,
+          primary_ability: [],
+          features: [],
+          card_image_url:
+            "https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png",
+        },
+      ],
+    }
+    const map = buildInitialImportCardArtUrlMap(cardArtOnly)
+    expect(map[importCardArtTargetKey("classes", 0)]).toBe(
+      "https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png",
+    )
+  })
+
   it("builds an initial URL map from staged content", () => {
     const map = buildInitialImportCardArtUrlMap(content)
     expect(map[importCardArtTargetKey("species", 0)]).toBe("https://example.com/catfolk.png")

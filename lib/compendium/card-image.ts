@@ -120,9 +120,12 @@ export function isBundledCompendiumCardImagePath(url: string): boolean {
   return /(?:^|\/)images\/compendium\//.test(url)
 }
 
-/** Hosted dumpstat card art — never auto-kept; replace with bundled art or clear. */
+/**
+ * Old hosted WotC/SRD defaults on dumpstat — replace with bundled `/images/compendium` art.
+ * Custom art on the same host (e.g. `/dumpstat/images/…`, `/dumpstat/magehandpress/…`) is kept.
+ */
 export function isHostedDumpstatCardImageUrl(url: string): boolean {
-  return /jeffginger\.com\/dumpstat\//i.test(url)
+  return /jeffginger\.com\/dumpstat\/wotc\//i.test(url)
 }
 
 function isUpgradeableDefaultCardImage(url: string): boolean {
@@ -131,7 +134,7 @@ function isUpgradeableDefaultCardImage(url: string): boolean {
 
 /**
  * Keep true custom card art; otherwise apply defaults by item name for SRD-sourced rows.
- * Bundled `/images/compendium/…` paths and dumpstat hosts are treated as upgradeable defaults.
+ * Bundled `/images/compendium/…` paths and leftover WotC dumpstat hosts are treated as upgradeable defaults.
  * Compact Only skips assigning bundled defaults (and clears upgradeable URLs).
  */
 export function applySrdCardImage(
@@ -165,7 +168,7 @@ export function applySrdCardImage(
 /**
  * Keep true custom card art; otherwise apply bundled defaults by item **name** (any source).
  * Source labels are ignored so Ravenloft/Planescape rows mis-tagged as PHB still match.
- * Dumpstat jeffginger.com URLs are never kept — replaced by a local default or cleared.
+ * Leftover WotC dumpstat hosts (`/dumpstat/wotc/`) are replaced by a local default or cleared.
  * Compact Only skips assigning bundled defaults (and clears upgradeable URLs).
  */
 export function applyBundledCardImage(

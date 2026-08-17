@@ -19,7 +19,8 @@ import {
   orderEquipmentWithPins,
   type EquipmentSheetFilter,
 } from "@/lib/compendium/equipment-display"
-import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
+import { isArmorItem, isShieldItem } from "@/lib/compendium/combat-stats"
+import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import type { Equipment } from "@/lib/types"
@@ -171,6 +172,40 @@ export function SheetEquipmentPanel({
                 </option>
               ))}
             </select>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                Attuned
+              </span>
+              {Array.from({ length: slotCap }, (_, index) => {
+                const attunedId = attunedItemIds[index]
+                const attunedItem = attunedId
+                  ? equipment.find((entry) => entry.id === attunedId)
+                  : undefined
+                const filled = Boolean(attunedId)
+                return (
+                  <input
+                    key={`attune-slot-${index}`}
+                    type="checkbox"
+                    checked={filled}
+                    disabled={!filled}
+                    title={
+                      attunedItem
+                        ? `Unattune ${attunedItem.name}`
+                        : `Attunement slot ${index + 1} of ${slotCap}`
+                    }
+                    aria-label={
+                      attunedItem
+                        ? `Unattune ${attunedItem.name}`
+                        : `Empty attunement slot ${index + 1} of ${slotCap}`
+                    }
+                    onChange={() => {
+                      if (attunedId) onToggleAttune(attunedId)
+                    }}
+                    className="h-4 w-4 rounded accent-primary disabled:opacity-40"
+                  />
+                )
+              })}
+            </div>
           </>
         ) : null}
         <button
@@ -187,16 +222,13 @@ export function SheetEquipmentPanel({
         <p className="text-xs text-muted-foreground italic">No equipment owned</p>
       ) : (
         <>
-      <span className="text-[10px] text-muted-foreground">
-        Attuned {attunedCount}/{slotCap}
-      </span>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 max-h-[420px] overflow-y-auto pr-1">
         {filtered.length ? (
           filtered.map((item) => {
             const resolved = resolveCharacterEquipment(item, catalog, equipmentBaseSelections)
             const isArmor = isArmorItem(resolved)
             const isShield = isShieldItem(resolved)
-            const isWeapon = isWeaponItem(resolved)
+            const isWeapon = isWieldableWeaponItem(item) || isWieldableWeaponItem(resolved)
             const attunable = isAttunableItem(item)
             const isAttuned = attunedItemIds.includes(item.id)
             const attunementSlot = isAttuned ? attunedItemIds.indexOf(item.id) + 1 : null
@@ -239,7 +271,7 @@ export function SheetEquipmentPanel({
                         aria-label={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
                         aria-pressed={pinned}
                         className={cn(
-                          "hidden max-sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors",
+                          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors",
                           pinned
                             ? "text-primary bg-primary/10 hover:bg-primary/15"
                             : "text-muted-foreground/70 hover:bg-muted hover:text-foreground",

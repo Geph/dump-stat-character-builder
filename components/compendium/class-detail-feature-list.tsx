@@ -129,7 +129,13 @@ export function ClassDetailFeatureList({
               ) : null}
             </p>
             {showSummary && feature.summary ? (
-              <p className={cn(summaryClass, !comfortableFromMd && "line-clamp-1")}>{feature.summary}</p>
+              <div className={cn(summaryClass, !comfortableFromMd && "line-clamp-1")}>
+                <RichTextContent
+                  html={feature.summary}
+                  className="text-inherit [&_p]:mb-0 [&_p]:inline"
+                  fallback=""
+                />
+              </div>
             ) : null}
           </li>
         ))}

@@ -5,6 +5,7 @@ import {
   type AiImportContent,
 } from "@/lib/import/import-content-ai-schema"
 import { combineImportContents } from "@/lib/import/merge-import-content"
+import { sanitizeImportedCardArt } from "@/lib/import/apply-card-art-import"
 import { repairLlmJsonText, stripLlmJsonText } from "@/lib/import/strip-llm-json"
 
 const IMPORT_CONTENT_KEYS = [
@@ -131,7 +132,7 @@ export function parseImportContentJsonDetailed(raw: string): ParseImportContentJ
       continue
     }
     const content = contentFromParsed(parsed.value)
-    if (content) return { ok: true, content }
+    if (content) return { ok: true, content: sanitizeImportedCardArt(content) }
     return {
       ok: false,
       error:

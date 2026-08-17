@@ -16,6 +16,11 @@ import {
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
 import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
+import {
+  extraMasteriesForWeapon,
+  extraWeaponMasterySlotCount,
+  isExtraWeaponMasteryPickKey,
+} from "@/lib/character/weapon-mastery-picks"
 import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { resolveSubclassUnlockLevel } from "@/lib/builder/choices"
@@ -30,10 +35,17 @@ export type WeaponSheetAppliedModifier = {
   sourceType?: StatContributionSourceType
 }
 
+export type WeaponSheetExtraMastery = {
+  name: string
+  description: string | null
+}
+
 export type WeaponSheetContext = {
   masteryName: string | null
   masteryDescription: string | null
   masteryActive: boolean
+  extraMasteries: WeaponSheetExtraMastery[]
+  extraMasterySlotCount: number
   appliedModifiers: WeaponSheetAppliedModifier[]
 }
 
@@ -207,10 +219,29 @@ function collectWeaponMasteryPicks(inputs: CharacterBuildInputs): string[] {
   for (const values of Object.values(inputs.modifierPlayerPicks ?? {})) {
     for (const value of values) picks.add(value)
   }
-  for (const values of Object.values(inputs.featureChoicePicks ?? {})) {
+  for (const [key, values] of Object.entries(inputs.featureChoicePicks ?? {})) {
+    if (isExtraWeaponMasteryPickKey(key)) continue
     for (const value of values) picks.add(value)
   }
   return [...picks]
+}
+
+function collectUnlockedFeatures(inputs: CharacterBuildInputs): Feature[] {
+  const features: Feature[] = []
+  for (const entry of inputs.classLevels) {
+    const cls = inputs.classes.find((row) => row.id === entry.classId)
+    for (const feature of cls?.features ?? []) {
+      if (feature.level <= entry.level) features.push(feature)
+    }
+    const subclassId = inputs.subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
+      const subclass = inputs.subclasses.find((row) => row.id === subclassId)
+      for (const feature of subclass?.features ?? []) {
+        if (feature.level <= entry.level) features.push(feature)
+      }
+    }
+  }
+  return features
 }
 
 function pickMatchesWeapon(pick: string, weapon: Equipment): boolean {
@@ -316,11 +347,18 @@ export function buildWeaponSheetContext(
     hasMasteryFeature &&
     proficient &&
     (masteryPicks.length === 0 || masteryPicks.some((pick) => pickMatchesWeapon(pick, weapon)))
+  const extraMasterySlotCount = extraWeaponMasterySlotCount(collectUnlockedFeatures(inputs))
+  const extraMasteries = extraMasteriesForWeapon(inputs.featureChoicePicks, weapon.id).map((name) => ({
+    name,
+    description: describeWeaponMastery(name, masteryCatalogEntries),
+  }))
 
   return {
     masteryName,
     masteryDescription,
     masteryActive,
+    extraMasteries,
+    extraMasterySlotCount,
     appliedModifiers: collectAppliedModifiers(weapon, allMods, classResourceDieSides),
   }
 }

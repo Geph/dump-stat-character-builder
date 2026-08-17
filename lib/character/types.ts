@@ -63,11 +63,15 @@ export type CharacterBuildInputs = {
   currentHp?: number
   /** Enriched class/subclass features for gated FeatureEffect consumers (Rage damage, JoAT, etc.). */
   resolvedFeatures?: Feature[]
+  /** House-rule remaps of which ability governs a skill check. */
+  skillAbilityOverrides?: Record<string, AbilityScoreKey>
 }
 
 export type SkillBonus = {
   name: string
   ability: AbilityScoreKey
+  /** SRD or custom-skill default before a house-rule remap. */
+  defaultAbility?: AbilityScoreKey
   proficient: boolean
   expertise: boolean
   bonus: number

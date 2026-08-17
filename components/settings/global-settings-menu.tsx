@@ -24,6 +24,8 @@ import { PageBackgroundSettings } from "@/components/settings/page-background-se
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { useGmDashboardNav } from "@/components/settings/use-gm-dashboard-nav"
+import { useResumeLastCharacter } from "@/components/settings/use-resume-last-character"
+import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
 import { LayoutGrid, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +51,8 @@ export function GlobalSettingsMenu() {
   const { layout: builderLayout, setLayout: setBuilderLayout } = useBuilderLayout()
   const { isCompactOnly } = useAppPresentationMode()
   const { enabled: gmDashboardNavEnabled, setEnabled: setGmDashboardNavEnabled } = useGmDashboardNav()
+  const { enabled: resumeLastCharacter, setEnabled: setResumeLastCharacter } = useResumeLastCharacter()
+  const { enabled: manualSkillAbility, setEnabled: setManualSkillAbility } = useManualSkillAbility()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
@@ -214,6 +218,41 @@ export function GlobalSettingsMenu() {
                     </span>
                     <span className="mt-1 block text-xs text-muted-foreground">
                       Adds a GM Dashboard link to the header for multi-character table tools.
+                    </span>
+                  </span>
+                </label>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={resumeLastCharacter}
+                    onChange={(event) => setResumeLastCharacter(event.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-semibold text-foreground">Resume last character on Home</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      After the first visit, opening the home page jumps to the last character sheet you viewed.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-foreground">House rules</p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={manualSkillAbility}
+                    onChange={(event) => setManualSkillAbility(event.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-semibold text-foreground">
+                      Allow manual ability selection for skills
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      On the character sheet, tap the ability next to a skill name (for example INT on
+                      Arcana) to use a different ability modifier.
                     </span>
                   </span>
                 </label>

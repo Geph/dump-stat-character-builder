@@ -5,6 +5,7 @@
  * - class_talent rows folded under a "General Psionic Talents" package
  */
 import { createCatalogEntryId, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { markdownToHtml } from "@/lib/compendium/markdown-to-html"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { activationFromCastingTime } from "@/lib/import/parse-special-attack-from-power"
 import type { FeatureActivation } from "@/lib/types"
@@ -120,7 +121,7 @@ function entry(
     name,
     group,
     summary: summary ?? "",
-    description: description.startsWith("<") ? description : `<p>${description}</p>`,
+    description: markdownToHtml(description),
     characteristics,
     activation,
   }

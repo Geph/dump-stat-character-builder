@@ -29,6 +29,14 @@ type SheetRestOverlayProps = {
   /** Long rest — swap known Weapon Mastery weapon types. */
   weaponMasteryChoices?: LongRestWeaponMasteryChoice[]
   onWeaponMasteryChange?: (key: string, next: string[]) => void
+  extraWeaponMasteryChoices?: {
+    equipmentId: string
+    weaponName: string
+    slotCount: number
+    picks: string[]
+    options: { name: string }[]
+  }[]
+  onExtraWeaponMasteryChange?: (equipmentId: string, next: string[]) => void
 }
 
 export function SheetRestOverlay({
@@ -43,6 +51,8 @@ export function SheetRestOverlay({
   onSpendDice,
   weaponMasteryChoices = [],
   onWeaponMasteryChange,
+  extraWeaponMasteryChoices = [],
+  onExtraWeaponMasteryChange,
 }: SheetRestOverlayProps) {
   const isShort = rest === "short_rest"
   const title = isShort ? "Short Rest" : "Long Rest"
@@ -50,6 +60,8 @@ export function SheetRestOverlay({
     isShort && hitDicePool.length > 0 && onHeal && onSpendDice && currentHp < maxHp
   const showWeaponMastery =
     !isShort && weaponMasteryChoices.length > 0 && onWeaponMasteryChange
+  const showExtraWeaponMastery =
+    !isShort && extraWeaponMasteryChoices.length > 0 && onExtraWeaponMasteryChange
 
   return (
     <motion.div
@@ -166,6 +178,45 @@ export function SheetRestOverlay({
                 </div>
               )
             })}
+          </div>
+        ) : null}
+
+        {showExtraWeaponMastery ? (
+          <div className="mb-4 space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                Masterwork mastery properties
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                After a Long Rest you can change extra mastery properties on each Masterwork weapon.
+                The weapon must meet the property&apos;s prerequisites.
+              </p>
+            </div>
+            {extraWeaponMasteryChoices.map((entry) => (
+              <div key={entry.equipmentId} className="space-y-1.5">
+                <p className="text-[11px] font-semibold text-foreground">{entry.weaponName}</p>
+                {Array.from({ length: entry.slotCount }).map((_, index) => (
+                  <select
+                    key={`${entry.equipmentId}-${index}`}
+                    value={entry.picks[index] ?? ""}
+                    onChange={(event) => {
+                      const next = [...entry.picks]
+                      if (event.target.value) next[index] = event.target.value
+                      else next.splice(index, 1)
+                      onExtraWeaponMasteryChange(entry.equipmentId, next.filter(Boolean))
+                    }}
+                    className="w-full rounded-md border border-border bg-card px-2.5 py-2 text-xs"
+                  >
+                    <option value="">Choose…</option>
+                    {entry.options.map((option) => (
+                      <option key={option.name} value={option.name}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+            ))}
           </div>
         ) : null}
 

@@ -6,7 +6,14 @@ import {
 import type { ImportConfidenceAssessment } from "@/lib/import/assess-import-confidence"
 import { chunkImportText } from "@/lib/import/chunk-import-text"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { isImagesContentTypeHint } from "@/lib/import/content-type-hints"
 import { extractImportContentDeterministic } from "@/lib/import/extract-import-content-deterministic"
+import {
+  createFetchUrlSession,
+  createFetchUrlTool,
+  FETCH_URL_MAX_CALLS,
+  FETCH_URL_TOOL_NAME,
+} from "@/lib/import/fetch-url-tool"
 import {
   getCachedImportChunk,
   importExtractionCacheKey,
@@ -23,11 +30,12 @@ import {
 } from "@/lib/import/import-ai-limits"
 import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { combineImportContents } from "@/lib/import/merge-import-content"
+import { parseImportContentJsonDetailed } from "@/lib/import/parse-import-content-json"
 import {
   preprocessImportText,
   type ImportPreprocessStats,
 } from "@/lib/import/preprocess-import-text"
-import { generateText, Output } from "ai"
+import { generateText, Output, stepCountIs } from "ai"
 
 export type ImportExtractionMode = "deterministic" | "hybrid" | "ai" | "byo-json"
 
@@ -49,11 +57,79 @@ export type ExtractImportContentResult = {
 
 export { ImportExtractionError } from "@/lib/import/ai-errors"
 
+function passthroughPreprocessStats(text: string): ImportPreprocessStats {
+  const chars = text.length
+  const tokens = Math.ceil(chars / 4)
+  return {
+    inputCharsBefore: chars,
+    inputCharsAfter: chars,
+    estimatedTokensBefore: tokens,
+    estimatedTokensAfter: tokens,
+    estimatedTokensSaved: 0,
+    savedPercent: 0,
+    subtractedRegions: [],
+    detectedClassName: null,
+  }
+}
+
+async function extractCardArtImportFromText(
+  text: string,
+  systemPrompt: string,
+  options?: ExtractImportContentOptions,
+): Promise<ExtractImportContentResult> {
+  const resolvedConfig = resolveImportAiConfig({
+    provider: options?.provider,
+    modelId: options?.modelId,
+  })
+  if ("error" in resolvedConfig) {
+    throw new Error(resolvedConfig.error)
+  }
+
+  const session = createFetchUrlSession(text)
+  const model = getImportModel({
+    provider: options?.provider,
+    modelId: options?.modelId,
+  })
+
+  try {
+    const result = await generateText({
+      model,
+      maxOutputTokens: maxOutputTokensForImport("images"),
+      system: systemPrompt,
+      prompt: `Map image URLs from this source. If you need a directory listing or index page, call ${FETCH_URL_TOOL_NAME} instead of guessing filenames.\n\n${text}`,
+      tools: {
+        [FETCH_URL_TOOL_NAME]: createFetchUrlTool(session),
+      },
+      stopWhen: stepCountIs(FETCH_URL_MAX_CALLS + 1),
+    })
+
+    const parsed = parseImportContentJsonDetailed(result.text)
+    if (!parsed.ok) {
+      throw new Error(parsed.error)
+    }
+
+    return {
+      content: parsed.content,
+      preprocessStats: passthroughPreprocessStats(text),
+      chunkCount: 1,
+      aiProvider: resolvedConfig.provider,
+      aiModelId: resolvedConfig.modelId,
+      extractionMode: "ai",
+    }
+  } catch (error) {
+    throw toImportExtractionError(error)
+  }
+}
+
 export async function extractImportContentFromText(
   text: string,
   systemPrompt: string,
   options?: ExtractImportContentOptions,
 ): Promise<ExtractImportContentResult> {
+  if (isImagesContentTypeHint(options?.contentTypeHint)) {
+    return extractCardArtImportFromText(text, systemPrompt, options)
+  }
+
   const preprocess = preprocessImportText(text, {
     contentTypeHint: options?.contentTypeHint,
   })

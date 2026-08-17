@@ -14,6 +14,8 @@ type ImportCollisionPanelProps = {
   onChange: (map: ImportRenameMap) => void
   resolutionMap: ImportCollisionResolutionMap
   onResolutionChange: (map: ImportCollisionResolutionMap) => void
+  /** Card-art imports only apply images to existing rows — no rename/skip choices. */
+  variant?: "default" | "card-art"
 }
 
 const KIND_LABELS: Record<ImportCollision["kind"], string> = {
@@ -35,8 +37,43 @@ export function ImportCollisionPanel({
   onChange,
   resolutionMap,
   onResolutionChange,
+  variant = "default",
 }: ImportCollisionPanelProps) {
   if (!collisions.length) return null
+
+  if (variant === "card-art") {
+    return (
+      <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-foreground">Matching existing entries</p>
+            <p className="mt-1 text-muted-foreground">
+              These names already exist in your compendium. Confirming applies the imported images
+              to those entries — it does not create new classes or replace their rules. Review the
+              images below.
+            </p>
+          </div>
+        </div>
+        <ul className="space-y-1.5">
+          {collisions.map((collision) => (
+            <li
+              key={collision.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-border/90 bg-card/88 px-3 py-2 text-xs"
+            >
+              <span className="rounded bg-muted px-2 py-0.5 font-medium">
+                {KIND_LABELS[collision.kind]}
+              </span>
+              <span className="text-foreground">{collision.existingName}</span>
+              {collision.existingSource ? (
+                <span className="text-muted-foreground">({collision.existingSource})</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   const hasSpellCollisions = collisions.some((collision) => collision.kind === "spell")
   const hasOtherCollisions = collisions.some((collision) => collision.kind !== "spell")
@@ -113,10 +150,10 @@ export function ImportCollisionPanel({
           </div>
           <p className="mt-1 text-muted-foreground">
             {hasSpellCollisions && hasOtherCollisions
-              ? "Matching spells link to the existing compendium entry by default. Other content can replace the existing version, import under a new name, or be skipped."
+              ? "Matching spells link to the existing compendium entry by default. Other content can update (add new features and images), replace the entire entry, import under a new name, or be skipped."
               : hasSpellCollisions
                 ? "These spells already exist in the compendium. They will be matched and linked by default (not replaced). You can still import a copy under a new name, or skip them."
-                : "These entries match existing compendium content by name. Choose whether to replace the existing version, import under a new name, or skip importing them."}
+                : "These entries match existing compendium content by name. Update adds new features, resources, and images. Replace wipes the stored entry with the imported version. You can also import under a new name or skip."}
           </p>
         </div>
       </div>
@@ -126,7 +163,10 @@ export function ImportCollisionPanel({
           const resolution = resolutionMap[collision.id] ?? defaultResolution(collision)
           const isSpell = collision.kind === "spell"
           const renameDisabled =
-            resolution === "overwrite" || resolution === "link" || resolution === "skip"
+            resolution === "update" ||
+            resolution === "overwrite" ||
+            resolution === "link" ||
+            resolution === "skip"
 
           return (
             <div
@@ -157,17 +197,30 @@ export function ImportCollisionPanel({
                     Use existing
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => updateResolution(collision, "overwrite")}
-                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                      resolution === "overwrite"
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    Replace existing
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => updateResolution(collision, "update")}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                        resolution === "update"
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      Update existing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateResolution(collision, "overwrite")}
+                      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                        resolution === "overwrite"
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      Replace existing
+                    </button>
+                  </>
                 )}
                 <button
                   type="button"
@@ -193,11 +246,18 @@ export function ImportCollisionPanel({
                 </button>
               </div>
 
-              {resolution === "overwrite" ? (
+              {resolution === "update" ? (
                 <p className="text-xs text-muted-foreground">
-                  The compendium entry{" "}
-                  <span className="font-medium text-foreground">{collision.existingName}</span> will
-                  be updated with the imported version.
+                  Keep the existing rules for{" "}
+                  <span className="font-medium text-foreground">{collision.existingName}</span>.
+                  New features, resources, and images from the import will be added. Existing
+                  feature text is not replaced.
+                </p>
+              ) : resolution === "overwrite" ? (
+                <p className="text-xs text-muted-foreground">
+                  The imported version will replace the entire{" "}
+                  <span className="font-medium text-foreground">{collision.existingName}</span>{" "}
+                  entry — features, resources, and other fields are wiped and rewritten.
                 </p>
               ) : resolution === "link" ? (
                 <p className="text-xs text-muted-foreground">

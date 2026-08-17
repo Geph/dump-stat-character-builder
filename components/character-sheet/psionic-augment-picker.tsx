@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   augmentPointsCost,
   formatPsionicAugmentCost,
@@ -174,9 +175,11 @@ export function PsionicAugmentPicker({
                       {formatPsionicAugmentCost(augment)}
                     </span>
                   </span>
-                  <span className="block text-xs text-muted-foreground mt-1 leading-relaxed">
-                    {augment.description}
-                  </span>
+                  <RichTextContent
+                    html={augment.description}
+                    className="block text-xs text-muted-foreground mt-1 leading-relaxed [&_p]:mb-0"
+                    fallback=""
+                  />
                 </span>
               </label>
 

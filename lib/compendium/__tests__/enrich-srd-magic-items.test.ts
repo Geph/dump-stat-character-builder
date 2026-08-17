@@ -34,6 +34,17 @@ describe("enrichSrdMagicItemList", () => {
     expect(plusOne.magic_effects).toHaveLength(2)
   })
 
+  it("links staff-type items to Quarterstaff", () => {
+    const [staff] = enrichSrdMagicItemList([
+      {
+        name: "Staff of Fire",
+        source: "D&D 5.5e SRD",
+        magic_item_category: "Staff",
+      },
+    ])
+    expect(staff.base_equipment_names).toEqual(["Quarterstaff"])
+  })
+
   it("adds AC modifiers to +1 shields", () => {
     const [plusOneShield] = enrichSrdMagicItemList([
       {

@@ -1,4 +1,5 @@
 import { isChoiceOptionEligible } from "@/lib/builder/choice-option-eligibility"
+import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisite"
 import type { CustomAbility } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -48,10 +49,11 @@ export function upgradeAbilitiesForClass(
   })
 }
 
-export function isUpgradeEligible(upgrade: CustomAbility, classLevel: number): boolean {
-  if (upgrade.ability_role === "weapon_mastery") {
-    return upgrade.level_requirement == null || classLevel >= upgrade.level_requirement
-  }
+export function isUpgradeEligible(
+  upgrade: CustomAbility,
+  classLevel: number,
+  context?: Pick<ChoicePrerequisiteContext, "classNames" | "weapon">,
+): boolean {
   return isChoiceOptionEligible(
     {
       name: upgrade.name,
@@ -59,7 +61,12 @@ export function isUpgradeEligible(upgrade: CustomAbility, classLevel: number): b
       prerequisite: upgrade.prerequisites,
       level_requirement: upgrade.level_requirement,
     },
-    { classLevel, selectedAbilityNames: [] },
+    {
+      classLevel,
+      selectedAbilityNames: [],
+      classNames: context?.classNames,
+      weapon: context?.weapon,
+    },
   )
 }
 
@@ -82,7 +89,7 @@ export function aggregateUpgradeOptions(params: {
   }[] = []
 
   for (const upgrade of upgrades) {
-    if (!isUpgradeEligible(upgrade, params.classLevel)) continue
+    if (!isUpgradeEligible(upgrade, params.classLevel, { classNames: params.classNames })) continue
     const countInSelection = selected.filter((name) => normalizeName(name) === normalizeName(upgrade.name)).length
     if (!upgrade.repeatable && countInSelection > 0) continue
     options.push({
@@ -94,6 +101,37 @@ export function aggregateUpgradeOptions(params: {
   }
 
   return options.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function aggregateWeaponMasteryOptionsForWeapon(params: {
+  customAbilities: CustomAbility[]
+  classNames: string[]
+  classLevel: number
+  weapon: NonNullable<ChoicePrerequisiteContext["weapon"]>
+  subclassName?: string | null
+}): { name: string; description: string; prerequisite?: string | null }[] {
+  return upgradeAbilitiesForClass(params.customAbilities, params.classNames, {
+    subclassName: params.subclassName,
+  })
+    .filter((upgrade) => upgrade.ability_role === "weapon_mastery")
+    .filter((upgrade) =>
+      isWeaponMasteryEligibleForWeapon(upgrade, params.classLevel, params.weapon, params.classNames),
+    )
+    .map((upgrade) => ({
+      name: upgrade.name,
+      description: upgrade.description ?? "",
+      prerequisite: upgrade.prerequisites,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function isWeaponMasteryEligibleForWeapon(
+  upgrade: CustomAbility,
+  classLevel: number,
+  weapon: NonNullable<ChoicePrerequisiteContext["weapon"]>,
+  classNames: string[] = [],
+): boolean {
+  return isUpgradeEligible(upgrade, classLevel, { classNames, weapon })
 }
 
 export function validateUpgradeSelectionChange(params: {
@@ -112,7 +150,7 @@ export function validateUpgradeSelectionChange(params: {
     const upgrade = upgradeByName.get(normalizeName(name))
     if (!upgrade) continue
     if (!isUpgradeEligible(upgrade, params.classLevel)) {
-      return { ok: false, message: `${name} is not available at your current level.` }
+      return { ok: false, message: `${name} is not available with your current prerequisites.` }
     }
     if (upgrade.repeatable) {
       counts.set(normalizeName(name), (counts.get(normalizeName(name)) ?? 0) + 1)

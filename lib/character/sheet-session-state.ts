@@ -69,6 +69,8 @@ export function buildSheetPlayStateFromSheet(params: {
   skillSortMode?: CharacterSheetPlayState["skillSortMode"]
   pinnedSkillNames?: CharacterSheetPlayState["pinnedSkillNames"]
   pinnedEquipmentIds?: CharacterSheetPlayState["pinnedEquipmentIds"]
+  durationReminders?: CharacterSheetPlayState["durationReminders"]
+  skillAbilityOverrides?: CharacterSheetPlayState["skillAbilityOverrides"]
   savedAt?: string | null
 }): CharacterSheetPlayState {
   return normalizeSheetPlayState({

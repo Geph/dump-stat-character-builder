@@ -639,6 +639,7 @@ export function mergeCompanionState(
 ): Array<
   ResolvedCompanion & {
     currentHp: number
+    tempHp: number
     displayName: string
     activeConditions: string[]
     polymorphActive: boolean
@@ -648,9 +649,11 @@ export function mergeCompanionState(
   return companions.map((companion) => {
     const state = stateByKey.get(companion.key)
     const currentHp = state?.currentHp ?? companion.maxHp
+    const tempHp = typeof state?.tempHp === "number" && state.tempHp > 0 ? state.tempHp : 0
     return {
       ...companion,
       currentHp: Math.min(Math.max(0, currentHp), companion.maxHp),
+      tempHp,
       displayName: state?.customName?.trim() || companion.template.name,
       activeConditions: state?.activeConditions ?? [],
       polymorphActive: state?.polymorphActive ?? false,
@@ -662,6 +665,7 @@ export function companionStateFromResolved(
   companions: Array<
     ResolvedCompanion & {
       currentHp: number
+      tempHp?: number
       displayName: string
       activeConditions?: string[]
       polymorphActive?: boolean
@@ -671,6 +675,7 @@ export function companionStateFromResolved(
   return companions.map((c) => ({
     key: c.key,
     currentHp: c.currentHp,
+    tempHp: (c.tempHp ?? 0) > 0 ? c.tempHp : null,
     customName: c.displayName !== c.template.name ? c.displayName : null,
     activeConditions: c.activeConditions?.length ? c.activeConditions : null,
     polymorphActive: c.polymorphActive ? true : null,

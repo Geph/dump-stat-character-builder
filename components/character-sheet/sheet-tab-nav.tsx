@@ -79,6 +79,7 @@ const SHEET_TABS: {
 type SheetTabNavProps = {
   activeTab: SheetTab
   onTabChange: (tab: SheetTab) => void
+  visibleTabs?: SheetTab[]
 }
 
 function tabButtonClassName(selected: boolean) {
@@ -142,7 +143,10 @@ function SheetTabButton({
   )
 }
 
-export function SheetTabNav({ activeTab, onTabChange }: SheetTabNavProps) {
+export function SheetTabNav({ activeTab, onTabChange, visibleTabs }: SheetTabNavProps) {
+  const tabs = visibleTabs?.length
+    ? SHEET_TABS.filter((tab) => visibleTabs.includes(tab.id))
+    : SHEET_TABS
   const outerRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
   const [outerWidth, setOuterWidth] = useState(0)
@@ -176,8 +180,8 @@ export function SheetTabNav({ activeTab, onTabChange }: SheetTabNavProps) {
   }, [])
 
   const allTabIndices = useMemo(
-    () => SHEET_TABS.map((_, index) => index),
-    [],
+    () => tabs.map((_, index) => index),
+    [tabs],
   )
 
   const needsPagination = useMemo(() => {
@@ -200,7 +204,7 @@ export function SheetTabNav({ activeTab, onTabChange }: SheetTabNavProps) {
   const visibleTabIndices = pages[safePage] ?? allTabIndices
 
   useEffect(() => {
-    const activeIndex = SHEET_TABS.findIndex((tab) => tab.id === activeTab)
+    const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
     if (activeIndex < 0) return
 
     const pageIndex = pages.findIndex((page) => page.includes(activeIndex))
@@ -220,7 +224,7 @@ export function SheetTabNav({ activeTab, onTabChange }: SheetTabNavProps) {
         aria-hidden
         className="pointer-events-none absolute left-0 top-0 -z-10 flex w-max gap-1.5 opacity-0"
       >
-        {SHEET_TABS.map((tab) => (
+        {tabs.map((tab) => (
           <SheetTabButton key={tab.id} tab={tab} selected={false} />
         ))}
       </div>
@@ -241,7 +245,7 @@ export function SheetTabNav({ activeTab, onTabChange }: SheetTabNavProps) {
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex gap-1.5" role="tablist" aria-label="Sheet sections">
             {visibleTabIndices.map((tabIndex) => {
-              const tab = SHEET_TABS[tabIndex]!
+              const tab = tabs[tabIndex]!
               const selected = activeTab === tab.id
               return (
                 <SheetTabButton

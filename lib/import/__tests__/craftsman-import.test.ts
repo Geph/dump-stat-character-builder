@@ -282,5 +282,33 @@ describe("Craftsman enrichment", () => {
       flatBonusFromClassResourceKey: "masterwork_bonus",
       flatBonusClassResourceScale: "half_ceil",
     })
+    expect(weapons.choices?.resourceKey).toBe("weapon_mastery_extra")
+    expect(weapons.choices?.count).toBe(1)
+    expect(weapons.isChoice).toBe(false)
+  })
+
+  it("wires Improved Masterwork to a third per-weapon mastery slot", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Craftsman",
+          description: "",
+          hit_die: 10,
+          primary_ability: ["Strength"],
+          features: [
+            {
+              level: 17,
+              name: "Improved Masterwork",
+              description: "Third Mastery Property. You can add a third mastery property.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const improved = enriched.classes?.[0]?.features?.[0] as Feature
+    expect(improved.choices?.resourceKey).toBe("weapon_mastery_extra")
+    expect(improved.choices?.count).toBe(2)
+    expect(improved.isChoice).toBe(false)
   })
 })

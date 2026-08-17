@@ -9,6 +9,7 @@ import { createClient } from "@/lib/db/client"
 import {
   Angry,
   ArrowLeft,
+  ArrowUp,
   User,
   Smile,
   Sparkles,
@@ -33,7 +34,9 @@ import {
   Layers,
   Pin,
   Moon,
+  Printer,
   RefreshCw,
+  GripVertical,
 } from "lucide-react"
 import Link from "next/link"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -166,7 +169,6 @@ import {
 } from "@/lib/character/action-economy"
 import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreTileClass, abilityScoreModifierFrameClass, abilityScorePillClass } from "@/lib/character/sheet-status-colors"
 import { useAppTheme } from "@/components/providers/app-theme-provider"
-import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
@@ -266,6 +268,13 @@ import { SheetRestOverlay } from "@/components/character-sheet/sheet-rest-overla
 import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
 import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
+import { weaponTargetFromEquipment } from "@/lib/builder/weapon-property-prerequisite"
+import { aggregateWeaponMasteryOptionsForWeapon } from "@/lib/builder/upgrade-choices"
+import {
+  extraMasteriesForWeapon,
+  extraWeaponMasteryPickKey,
+  extraWeaponMasterySlotCountFromClassFeatures,
+} from "@/lib/character/weapon-mastery-picks"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
   formSelectionsFromState,
@@ -282,6 +291,32 @@ import { CompanionAttackRedirect } from "@/components/character-sheet/companion-
 import { SheetPersistentStatsBar } from "@/components/character-sheet/sheet-persistent-stats-bar"
 import { HitDiceTracker } from "@/components/character-sheet/hit-dice-tracker"
 import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-tab-nav"
+import { SheetTabSectionNav } from "@/components/character-sheet/sheet-tab-section-nav"
+import { DurationRemindersPanel } from "@/components/character-sheet/duration-reminders-panel"
+import { SkillAbilityLabel } from "@/components/character-sheet/skill-ability-label"
+import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
+import { setSkillAbilityOverride } from "@/lib/character/skill-ability-overrides"
+import { FeatureCardMenu } from "@/components/character-sheet/feature-card-menu"
+import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
+import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
+import {
+  applyOrder,
+  defaultFeatureLayout,
+  loadFeatureLayout,
+  moveOrderedId,
+  saveFeatureLayout,
+  sortPinnedFirst,
+  toggleActionPin,
+  togglePinnedFeature,
+  type FeatureLayoutState,
+} from "@/lib/character/feature-layout"
+import {
+  buildFeatureTabSections,
+  featureTabNavLabel,
+} from "@/lib/character/feature-tab-sections"
+import { rememberLastCharacterId } from "@/lib/site-settings/resume-last-character"
+import { createDurationReminder, type DurationReminder } from "@/lib/character/duration-reminders"
+import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
@@ -335,6 +370,10 @@ const ABILITY_FULL_LABELS: Record<string, string> = {
 const SHEET_SELECTABLE_CONDITIONS = SRD_CONDITIONS.filter(
   (condition) => condition.name !== "Exhaustion",
 )
+
+const MANUAL_CONCENTRATION = "Concentration: (active)"
+const CONCENTRATION_CONDITION_DESCRIPTION =
+  "You are concentrating on a spell or effect. Concentration ends if you take damage and fail a Constitution save, cast another concentration spell, or become incapacitated."
 
 const EXHAUSTION_CONDITION = SRD_CONDITIONS.find((condition) => condition.name === "Exhaustion")
 
@@ -402,29 +441,6 @@ function CollapsibleDetailField({
   )
 }
 
-/**
- * Collapse features that share the same name (e.g. Ability Score Improvement taken at several
- * levels) into a single entry that records every level it was gained. Order is preserved by first
- * appearance, and the first instance's data is used for the card body.
- */
-function dedupeFeaturesByName(
-  features: import("@/lib/types").Feature[],
-): { feature: import("@/lib/types").Feature; levels: number[] }[] {
-  const byName = new Map<string, { feature: import("@/lib/types").Feature; levels: number[] }>()
-  const order: string[] = []
-  for (const feature of features) {
-    const existing = byName.get(feature.name)
-    if (existing) {
-      if (!existing.levels.includes(feature.level)) existing.levels.push(feature.level)
-    } else {
-      byName.set(feature.name, { feature, levels: [feature.level] })
-      order.push(feature.name)
-    }
-  }
-  for (const entry of byName.values()) entry.levels.sort((a, b) => a - b)
-  return order.map((name) => byName.get(name)!)
-}
-
 /** Sheet-only display title — ASI features read as Feat or ASI. */
 function sheetFeatureDisplayName(name: string): string {
   return /^ability score improvement$/i.test(name.trim()) ? "Feat or ASI" : name
@@ -441,6 +457,12 @@ function CollapsibleFeatureCard({
   description,
   collapsedLines,
   children,
+  chosenLabel,
+  menu,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }: {
   name: string
   level?: number | null
@@ -448,9 +470,15 @@ function CollapsibleFeatureCard({
   description?: string | null
   collapsedLines?: number
   children?: React.ReactNode
+  chosenLabel?: string | null
+  menu?: React.ReactNode
+  draggable?: boolean
+  onDragStart?: () => void
+  onDragOver?: (event: React.DragEvent) => void
+  onDrop?: () => void
 }) {
   const [open, setOpen] = useState(true)
-  const displayName = sheetFeatureDisplayName(name)
+  const displayName = withChosenOptionChrome(sheetFeatureDisplayName(name), chosenLabel ? [chosenLabel] : [])
   const levelLabel =
     levels && levels.length
       ? levels.map((value) => `Lv ${value}`).join(", ")
@@ -458,11 +486,21 @@ function CollapsibleFeatureCard({
         ? `Lv ${level}`
         : null
   return (
-    <div className="bg-muted rounded-lg text-xs overflow-hidden">
+    <div
+      className="bg-muted rounded-lg text-xs overflow-hidden"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={(event) => {
+        event.preventDefault()
+        onDrop?.()
+      }}
+    >
+      <div className="flex items-stretch">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-2 p-2 text-left hover:bg-muted/70 transition-colors"
+        className="flex min-w-0 flex-1 items-center justify-between gap-2 p-2 text-left hover:bg-muted/70 transition-colors"
         aria-expanded={open}
       >
         <span className="font-bold min-w-0">
@@ -477,6 +515,8 @@ function CollapsibleFeatureCard({
           }`}
         />
       </button>
+      {menu ? <div className="flex items-center pr-1">{menu}</div> : null}
+      </div>
       {open && (description || children) ? (
         <div className="px-2 pb-2">
           {description ? (
@@ -642,6 +682,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("ability")
   const [pinnedSkillNames, setPinnedSkillNames] = useState<string[]>([])
   const [pinnedEquipmentIds, setPinnedEquipmentIds] = useState<string[]>([])
+  const [durationReminders, setDurationReminders] = useState<DurationReminder[]>([])
+  const [skillAbilityOverrides, setSkillAbilityOverrides] = useState<Record<string, AbilityScoreKey>>({})
+  const { enabled: manualSkillAbilityEnabled } = useManualSkillAbility()
+  const [featureLayout, setFeatureLayout] = useState<FeatureLayoutState>(defaultFeatureLayout)
+  const [levelUpOpen, setLevelUpOpen] = useState(false)
+  const [sheetReloadKey, setSheetReloadKey] = useState(0)
+  const [featureDrag, setFeatureDrag] = useState<{ kind: "section" | "item"; id: string; sectionId?: string } | null>(
+    null,
+  )
+  const featureDragRef = useRef(featureDrag)
+  featureDragRef.current = featureDrag
   const [skillsInfoOpen, setSkillsInfoOpen] = useState(false)
   const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
@@ -735,6 +786,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setSkillSortMode(playState.skillSortMode)
         setPinnedSkillNames(playState.pinnedSkillNames)
         setPinnedEquipmentIds(playState.pinnedEquipmentIds)
+        setDurationReminders(playState.durationReminders ?? [])
+        setSkillAbilityOverrides(playState.skillAbilityOverrides ?? {})
         setSessionHydrated(true)
 
         if (row.spell_ids?.length) {
@@ -802,7 +855,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     }
 
     fetchCharacter()
+  }, [id, sheetReloadKey])
+
+  useEffect(() => {
+    if (id) rememberLastCharacterId(id)
   }, [id])
+
+  useEffect(() => {
+    if (id) setFeatureLayout(loadFeatureLayout(id))
+  }, [id])
+
+  useEffect(() => {
+    if (id) saveFeatureLayout(id, featureLayout)
+  }, [id, featureLayout])
 
   useEffect(() => {
     if (!sessionHydrated) return
@@ -831,6 +896,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
+        durationReminders,
+        skillAbilityOverrides,
         savedAt: null,
       }),
     )
@@ -859,6 +926,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     skillSortMode,
     pinnedSkillNames,
     pinnedEquipmentIds,
+    durationReminders,
+    skillAbilityOverrides,
   ])
 
   const equipmentMagicContext = useMemo(
@@ -950,6 +1019,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           : {}),
       },
       featureChoicePicks,
+      customAbilities,
       equipmentCatalog,
       equippedArmorId,
       equippedShieldId,
@@ -959,6 +1029,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equipmentBaseSelections,
       activeSheetToggles: effectiveSheetToggles,
       activeConditions,
+      skillAbilityOverrides: manualSkillAbilityEnabled ? skillAbilityOverrides : undefined,
     }
   }, [
     character,
@@ -967,6 +1038,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equipmentCatalog,
     modifierCatalog,
     featureChoicePicks,
+    customAbilities,
     equippedArmorId,
     equippedShieldId,
     equippedWeaponId,
@@ -979,6 +1051,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     currentHp,
     acFormulaPick,
     resourceDieSidesByKey.rampage_die,
+    skillAbilityOverrides,
+    manualSkillAbilityEnabled,
   ])
 
   const derived = useMemo(() => {
@@ -1273,6 +1347,56 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return entries
   }, [classDetails, featureChoicePicks])
 
+  const extraWeaponMasterySlotCount = useMemo(
+    () => extraWeaponMasterySlotCountFromClassFeatures(classDetails),
+    [classDetails],
+  )
+
+  const extraMasteryByWeaponId = useMemo(() => {
+    if (!extraWeaponMasterySlotCount) return {}
+    const classNames = classDetails
+      .map((entry) => entry.class?.name)
+      .filter((name): name is string => Boolean(name))
+    const classLevel = classDetails.reduce((max, entry) => Math.max(max, entry.row.level), 0)
+    const map: Record<
+      string,
+      { slotCount: number; picks: string[]; options: { name: string; description?: string }[] }
+    > = {}
+    for (const item of equipment) {
+      if (!/weapon/i.test(item.category ?? "")) continue
+      map[item.id] = {
+        slotCount: extraWeaponMasterySlotCount,
+        picks: extraMasteriesForWeapon(featureChoicePicks, item.id),
+        options: aggregateWeaponMasteryOptionsForWeapon({
+          customAbilities,
+          classNames,
+          classLevel,
+          weapon: weaponTargetFromEquipment(item),
+        }),
+      }
+    }
+    return map
+  }, [extraWeaponMasterySlotCount, classDetails, equipment, featureChoicePicks, customAbilities])
+
+  const extraWeaponMasteryRestChoices = useMemo(
+    () =>
+      Object.entries(extraMasteryByWeaponId).map(([equipmentId, control]) => ({
+        equipmentId,
+        weaponName: equipment.find((item) => item.id === equipmentId)?.name ?? "Weapon",
+        slotCount: control.slotCount,
+        picks: control.picks,
+        options: control.options,
+      })),
+    [extraMasteryByWeaponId, equipment],
+  )
+
+  const persistExtraWeaponMasteries = useCallback(
+    (equipmentId: string, names: string[]) => {
+      void persistFeatureChoicePicks(extraWeaponMasteryPickKey(equipmentId), names)
+    },
+    [persistFeatureChoicePicks],
+  )
+
   const sheetClassFeatures = useMemo(() => {
     const features: Feature[] = []
     for (const entry of classDetails) {
@@ -1505,6 +1629,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
+        durationReminders,
+        skillAbilityOverrides,
         savedAt,
       }),
     [
@@ -1530,6 +1656,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       skillSortMode,
       pinnedSkillNames,
       pinnedEquipmentIds,
+      durationReminders,
+      skillAbilityOverrides,
     ],
   )
 
@@ -1978,15 +2106,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     ],
   )
 
-  const combatActions = useMemo(
-    () => sheetActions.filter((action) => action.category !== "utility"),
-    [sheetActions],
-  )
-  const utilityActions = useMemo(
-    () => sheetActions.filter((action) => action.category === "utility"),
-    [sheetActions],
-  )
-
   const equippedWeapon = useMemo(() => {
     if (!equippedWeaponId) return null
     const raw = equipment.find((item) => item.id === equippedWeaponId)
@@ -2116,6 +2235,83 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       return true
     })
   }, [characterFeats, originFeat, effectiveBackgroundFeatGranted])
+
+  const featureTabSections = useMemo(
+    () =>
+      buildFeatureTabSections({
+        classDetails,
+        species: character?.species ?? null,
+        backgroundFeature: character?.backgrounds?.feature ?? null,
+        originFeat,
+        originFeatFallbackName: effectiveBackgroundFeatGranted,
+        originFeatFallbackDescription: originFeat?.description ?? "Granted by your background at 1st level.",
+        feats: characterFeatsForDisplay,
+        featureChoicePicks,
+      }),
+    [
+      classDetails,
+      character?.species,
+      character?.backgrounds?.feature,
+      originFeat,
+      effectiveBackgroundFeatGranted,
+      characterFeatsForDisplay,
+      featureChoicePicks,
+    ],
+  )
+
+  const orderedFeatureSections = useMemo(() => {
+    const sections = applyOrder(featureTabSections, featureLayout.sectionOrder, (section) => section.id)
+    return sections.map((section) => {
+      const orderedItems = applyOrder(
+        section.items,
+        featureLayout.itemOrderBySection[section.id],
+        (item) => item.id,
+      )
+      return {
+        ...section,
+        items: sortPinnedFirst(orderedItems, featureLayout.pinnedFeatureIds, (item) => item.id),
+      }
+    })
+  }, [featureTabSections, featureLayout])
+
+  const pinnedSheetActions = useMemo((): SheetActionEntry[] => {
+    const actions: SheetActionEntry[] = []
+    const itemById = new Map(
+      featureTabSections.flatMap((section) => section.items.map((item) => [item.id, item] as const)),
+    )
+    for (const [featureId, targets] of Object.entries(featureLayout.actionPins)) {
+      const item = itemById.get(featureId)
+      const name = item?.name ?? featureId.split(":").slice(-1)[0] ?? featureId
+      for (const target of targets) {
+        actions.push({
+          id: `pin:${target}:${featureId}`,
+          name: item?.chosenNames.length ? `${name} — ${item.chosenNames.join(", ")}` : name,
+          sourceLabel: "Pinned feature",
+          kinds: ["action"],
+          category: target,
+          limitedUses: null,
+          classLevel: character?.level ?? 1,
+          description: item?.description ?? null,
+        })
+      }
+    }
+    return actions
+  }, [featureLayout.actionPins, character?.level, featureTabSections])
+
+  const combatActions = useMemo(
+    () => [
+      ...sheetActions.filter((action) => action.category !== "utility"),
+      ...pinnedSheetActions.filter((action) => action.category === "combat"),
+    ],
+    [sheetActions, pinnedSheetActions],
+  )
+  const utilityActions = useMemo(
+    () => [
+      ...sheetActions.filter((action) => action.category === "utility"),
+      ...pinnedSheetActions.filter((action) => action.category === "utility"),
+    ],
+    [sheetActions, pinnedSheetActions],
+  )
 
   const canRollHitDiceOutsideShortRest = useMemo(() => {
     const featNames = [
@@ -2555,6 +2751,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const companionRows = companionResolution.rows
   const companionFormGroups = companionResolution.formGroups
+  const visibleSheetTabs = useMemo(() => {
+    const tabs: SheetTab[] = ["abilities", "combat", "equipment", "features"]
+    if (companionFormGroups.length > 0 || companionRows.length > 0) tabs.push("companions")
+    if (sheetCustomAbilities.length > 0) tabs.push("custom")
+    tabs.push("details")
+    return tabs
+  }, [companionFormGroups.length, companionRows.length, sheetCustomAbilities.length])
+
+  useEffect(() => {
+    if (!visibleSheetTabs.includes(activeTab)) setActiveTab("abilities")
+  }, [activeTab, visibleSheetTabs])
 
   const persistCompanionState = useCallback(
     async (next: CharacterCompanionState[]) => {
@@ -2584,6 +2791,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         const base: CharacterCompanionState = {
           key: row.key,
           currentHp: row.currentHp,
+          tempHp: row.tempHp > 0 ? row.tempHp : null,
           customName: row.displayName !== row.template.name ? row.displayName : null,
           activeConditions: row.activeConditions.length ? row.activeConditions : null,
           polymorphActive: row.polymorphActive ? true : null,
@@ -2633,6 +2841,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         {
           key: groupKey,
           currentHp: existing?.currentHp ?? null,
+          tempHp: existing?.tempHp ?? null,
           customName: existing?.customName ?? null,
           activeConditions: existing?.activeConditions ?? null,
           polymorphActive: existing?.polymorphActive ?? null,
@@ -2733,13 +2942,23 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const allyCandidates = useMemo(() => {
-    if (!partyForAllies) return []
     const byId = new Map(partyCharacters.map((row) => [row.id, row]))
     if (character && !byId.has(character.id)) byId.set(character.id, character)
-    return collectPartyAllyCandidates(partyForAllies.character_ids, byId, {
+    const rows = collectPartyAllyCandidates(partyForAllies?.character_ids ?? [], byId, {
+      includeSelfId: character?.id,
       includeCompanions: true,
     })
-  }, [partyForAllies, partyCharacters, character])
+    const maxByKey = new Map(companionRows.map((row) => [row.key, row.maxHp]))
+    const tempByKey = new Map(companionRows.map((row) => [row.key, row.tempHp]))
+    return rows.map((row) => {
+      if (row.kind !== "companion" || row.characterId !== character?.id) return row
+      return {
+        ...row,
+        maxHp: maxByKey.get(row.companionKey) ?? row.maxHp,
+        tempHp: tempByKey.get(row.companionKey) ?? row.tempHp,
+      }
+    })
+  }, [partyForAllies, partyCharacters, character, companionRows])
 
   const healContext = useMemo(() => {
     const mods = derived?.abilityMods ?? {
@@ -2776,6 +2995,26 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     },
     [sheetMaxHpForHeal],
   )
+
+  const applySelfInspiration = useCallback(() => {
+    setHasInspiration(true)
+  }, [])
+
+  const applySelfConditions = useCallback((add: string[], remove: string[]) => {
+    setActiveConditions((prev) => {
+      const next = new Set(prev)
+      for (const name of remove) next.delete(name)
+      for (const name of add) {
+        const trimmed = name.trim()
+        if (trimmed) next.add(trimmed)
+      }
+      return [...next]
+    })
+  }, [])
+
+  const addDurationReminderFromAction = useCallback((label: string) => {
+    setDurationReminders((prev) => [...prev, createDurationReminder(label)])
+  }, [])
 
   const shareClassLabel = useMemo(() => {
     if (classDetails.length) {
@@ -2856,6 +3095,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       prev.includes(skillName) ? prev.filter((name) => name !== skillName) : [...prev, skillName],
     )
   }, [])
+
+  const handleSkillAbilityChange = useCallback(
+    (skillName: string, defaultAbility: AbilityScoreKey, ability: AbilityScoreKey | null) => {
+      setSkillAbilityOverrides((prev) => setSkillAbilityOverride(prev, skillName, ability, defaultAbility))
+    },
+    [],
+  )
 
   const togglePinnedEquipment = useCallback((itemId: string) => {
     setPinnedEquipmentIds((prev) =>
@@ -3205,6 +3451,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
                     >
+                      <Printer className="w-4 h-4 shrink-0" />
                       Print
                     </button>
                     <button
@@ -3229,6 +3476,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </>
               ) : null}
             </div>
+            <button
+              type="button"
+              onClick={() => setLevelUpOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-border bg-card font-bold text-sm hover:border-primary transition-colors"
+              title="Level up"
+            >
+              <ArrowUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Level up</span>
+            </button>
             <Link
               href={`/builder?edit=${character.id}`}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg font-bold text-sm hover:bg-primary/90 transition-colors"
@@ -3318,6 +3574,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <span className="hidden sm:inline-flex">
                     <ManualRollTrigger />
                   </span>
+                  <DurationRemindersPanel reminders={durationReminders} onChange={setDurationReminders} />
                   <div className="relative shrink-0">
                     <button
                       ref={conditionButtonRef}
@@ -3349,6 +3606,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto overscroll-contain"
                           style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
                         >
+                          <label className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm">
+                            <input
+                              type="checkbox"
+                              checked={activeConditions.some(isConcentrationCondition)}
+                              onChange={() => {
+                                if (activeConditions.some(isConcentrationCondition)) {
+                                  setActiveConditions((prev) => prev.filter((name) => !isConcentrationCondition(name)))
+                                } else {
+                                  applyConcentration(MANUAL_CONCENTRATION)
+                                }
+                              }}
+                              className="h-4 w-4 rounded accent-destructive shrink-0"
+                            />
+                            <span className="flex-1 min-w-0">Concentrating</span>
+                            <ConditionInfoTip description={CONCENTRATION_CONDITION_DESCRIPTION} />
+                          </label>
                           {SHEET_SELECTABLE_CONDITIONS.map((condition) => (
                             <label
                               key={condition.name}
@@ -3576,9 +3849,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="flex w-full flex-col gap-2">
-              {(exhaustionLevel > 0 || bloodiedActive || activeConditions.length > 0) ? (
-                <div className="flex flex-wrap items-center justify-end gap-1">
+            {(exhaustionLevel > 0 || bloodiedActive || activeConditions.length > 0) ? (
+              <div className="flex w-full flex-wrap items-center justify-end gap-1">
                   {exhaustionLevel > 0 ? (
                     <span className={SHEET_BANNER_CHIP.exhaustion} title={getExhaustionEffectSummary(exhaustionLevel)}>
                       Exhaustion {exhaustionLevel}
@@ -3610,7 +3882,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       const condDescription =
                         getConditionDescription(condName) ??
                         (isConcentrationCondition(condName)
-                          ? "You are concentrating on a spell. Concentration ends if you take damage and fail a Constitution save, cast another concentration spell, or become incapacitated."
+                          ? CONCENTRATION_CONDITION_DESCRIPTION
                           : undefined)
                       return (
                         <span
@@ -3636,25 +3908,50 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </span>
                       )
                     })}
-                </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         </motion.div>
 
-        <SheetTabNav activeTab={activeTab} onTabChange={setActiveTab} />
+        <SheetTabNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          visibleTabs={visibleSheetTabs}
+        />
+        <SheetTabSectionNav
+          sections={
+            activeTab === "abilities"
+              ? [
+                  { id: "sheet-skills", label: "Skills" },
+                  { id: "sheet-scores", label: "Abilities" },
+                  { id: "sheet-proficiencies", label: "Proficiencies" },
+                  { id: "sheet-utility-actions", label: "Actions" },
+                ]
+              : activeTab === "combat"
+                ? [
+                    { id: "sheet-combat-stats", label: "Stats" },
+                    { id: "sheet-combat-actions", label: "Actions" },
+                    { id: "sheet-spells", label: "Spells" },
+                    { id: "sheet-saves", label: "Saves" },
+                  ]
+                : activeTab === "features"
+                  ? orderedFeatureSections.map((section) => ({
+                      id: `feature-section-${section.id}`,
+                      label: featureTabNavLabel(section.title),
+                    }))
+                  : []
+          }
+        />
 
         <motion.div
-          key={activeTab}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
           className={SHEET_TAB_CONTENT_CLASS}
         >
-          {activeTab === "abilities" && (
-            <div className="space-y-3">
+          <div className={activeTab === "abilities" ? "space-y-3" : "hidden print-sheet-section space-y-3"}>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[11fr_5fr_4fr]">
-                <div className={`${SHEET_ABILITIES_PANEL.skills} rounded-xl p-3 border border-border min-w-0`}>
+                <div id="sheet-skills" className={`${SHEET_ABILITIES_PANEL.skills} rounded-xl p-3 border border-border min-w-0`}>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <SheetSectionHeading gameIcon="diploma" size="xs" as="h3" className="mb-0">
@@ -3707,9 +4004,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         derivedSkill?.expertise ??
                         character.skill_expertise?.includes(skill.name) ??
                         false
+                      const governingAbility = derivedSkill?.ability ?? skill.ability
                       const mod =
                         derivedSkill?.bonus ??
-                        abilityMods[skill.ability] +
+                        abilityMods[governingAbility] +
                           (isProficient ? proficiencyBonus * (hasExpertise ? 2 : 1) : 0)
                       const pinned = pinnedSkillNames.includes(skill.name)
                       return (
@@ -3738,8 +4036,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                 <Pin className="h-4 w-4" aria-hidden />
                               )}
                             </button>
-                            <span className="truncate min-w-0 max-md:text-sm">
-                              {skill.name} ({ABILITY_ABBREVIATIONS[skill.ability]})
+                            <span className="flex min-w-0 items-baseline gap-1 max-md:text-sm">
+                              <span className="truncate">{skill.name}</span>
+                              <SkillAbilityLabel
+                                skillName={skill.name}
+                                defaultAbility={skill.ability}
+                                currentAbility={governingAbility}
+                                enabled={manualSkillAbilityEnabled}
+                                onSelect={(ability) =>
+                                  handleSkillAbilityChange(skill.name, skill.ability, ability)
+                                }
+                              />
                             </span>
                           </div>
                           <span className="flex items-center gap-1 shrink-0">
@@ -3756,7 +4063,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               rollContext={{
                                 kind: "skill",
                                 skillName: skill.name,
-                                ability: skill.ability as AbilityScoreKey,
+                                ability: governingAbility as AbilityScoreKey,
                               }}
                             />
                           </span>
@@ -3765,6 +4072,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     })}
                     {customSkillRows.map((skill) => {
                       const pinned = pinnedSkillNames.includes(skill.name)
+                      const defaultAbility = skill.defaultAbility ?? skill.ability
                       return (
                       <div
                         key={skill.name}
@@ -3789,11 +4097,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               <Pin className="h-4 w-4" aria-hidden />
                             )}
                           </button>
-                          <span className="truncate min-w-0 max-md:text-sm">
-                            {skill.name} (
-                            {ABILITY_ABBREVIATIONS[skill.ability as keyof typeof ABILITY_ABBREVIATIONS] ??
-                              skill.ability.slice(0, 3).toUpperCase()}
-                            )
+                          <span className="flex min-w-0 items-baseline gap-1 max-md:text-sm">
+                            <span className="truncate">{skill.name}</span>
+                            <SkillAbilityLabel
+                              skillName={skill.name}
+                              defaultAbility={defaultAbility}
+                              currentAbility={skill.ability}
+                              enabled={manualSkillAbilityEnabled}
+                              onSelect={(ability) =>
+                                handleSkillAbilityChange(skill.name, defaultAbility, ability)
+                              }
+                            />
                           </span>
                         </div>
                         <span className="flex items-center gap-1 shrink-0">
@@ -3871,7 +4185,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className={`${SHEET_ABILITIES_PANEL.abilityScores} rounded-xl p-3 border border-border min-w-0`}>
+                <div id="sheet-scores" className={`${SHEET_ABILITIES_PANEL.abilityScores} rounded-xl p-3 border border-border min-w-0`}>
                   <SheetSectionHeading gameIcon="mighty-force" size="xs" as="h3">
                     Ability Scores
                   </SheetSectionHeading>
@@ -3977,7 +4291,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
 
-                <div className={`${SHEET_ABILITIES_PANEL.proficiencies} rounded-xl p-3 border border-border min-w-0`}>
+                <div id="sheet-proficiencies" className={`${SHEET_ABILITIES_PANEL.proficiencies} rounded-xl p-3 border border-border min-w-0`}>
                   <SheetSectionHeading gameIcon="classical-knowledge" size="xs" as="h3">
                     Proficiencies
                   </SheetSectionHeading>
@@ -4193,7 +4507,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               </div>
 
               <div className={`${SHEET_ABILITIES_PANEL.actions} rounded-xl p-3 border border-border`}>
-                <div className="flex items-center justify-between gap-2 mb-2">
+                <div id="sheet-utility-actions" className="flex items-center justify-between gap-2 mb-2">
                   <SheetSectionHeading icon={Swords} className="mb-0">
                     Actions
                   </SheetSectionHeading>
@@ -4225,6 +4539,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onMarkEconomy={markActionEconomy}
                     characterId={character.id}
                     onApplySelfHeal={applySelfHeal}
+                    onApplySelfInspiration={applySelfInspiration}
+                    onApplySelfConditions={applySelfConditions}
+                    onAddDurationReminder={addDurationReminderFromAction}
+                    onApplyCompanionState={patchCompanionState}
                     perfectedEnhancementBonus={perfectedEnhancementBonusValue}
                     empoweredPsionicsBonus={empoweredPsionicsBonusValue}
                     onMarkDamageDealt={markRampageDamageDealtThisTurn}
@@ -4317,11 +4635,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </div>
               )}
+          </div>
 
-            </div>
-          )}
-
-          {activeTab === "details" && (
+          <div className={activeTab === "details" ? "" : "hidden print-sheet-section"}>
             <div className={`${SHEET_DETAILS_PANEL} rounded-xl p-4 border border-border`}>
               <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                 <Scroll className="h-4 w-4 text-primary" aria-hidden />
@@ -4366,13 +4682,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {activeTab === "combat" && (
-            <div className="space-y-3">
+          <div className={activeTab === "combat" ? "space-y-3" : "hidden print-sheet-section space-y-3"}>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[7fr_3fr] md:items-start">
                 <div className="space-y-3 min-w-0">
-                <div className={`${SHEET_COMBAT_PANEL.combatStats} rounded-xl p-3 border border-border min-w-0 overflow-hidden`}>
+                <div id="sheet-combat-stats" className={`${SHEET_COMBAT_PANEL.combatStats} rounded-xl p-3 border border-border min-w-0 overflow-hidden`}>
                   <SheetSectionHeading icon={Shield}>Combat Stats</SheetSectionHeading>
                   <SheetPersistentStatsBar
                     panel
@@ -4437,9 +4752,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         weapons={equippedWeaponCards}
                         buildInputs={characterBuildInputs}
                         weaponProficiencies={derived?.weaponProficiencies ?? []}
+                        extraMasteryByWeaponId={extraMasteryByWeaponId}
+                        onExtraMasteryChange={persistExtraWeaponMasteries}
                         onAttackRoll={() => markActionEconomy("action")}
                         onDamageRoll={markRampageDamageDealtThisTurn}
                       />
+                      <div id="sheet-combat-actions">
                       <SheetActionsPanel
                         actions={combatActions}
                         usedByActionId={usedActionUsesById}
@@ -4465,6 +4783,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onMarkEconomy={markActionEconomy}
                         characterId={character.id}
                         onApplySelfHeal={applySelfHeal}
+                        onApplySelfInspiration={applySelfInspiration}
+                        onApplySelfConditions={applySelfConditions}
+                        onAddDurationReminder={addDurationReminderFromAction}
+                        onApplyCompanionState={patchCompanionState}
                         perfectedEnhancementBonus={perfectedEnhancementBonusValue}
                         empoweredPsionicsBonus={empoweredPsionicsBonusValue}
                         onMarkDamageDealt={markRampageDamageDealtThisTurn}
@@ -4484,7 +4806,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
 
                 {showSpellsPanel && (
-                  <div className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
+                  <div id="sheet-spells" className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
                     <SheetSectionHeading icon={Wand2}>Spells</SheetSectionHeading>
                     {spellsGroupedByLevel.length ? (
                       <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
@@ -4538,9 +4860,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 )}
                 </div>
+              </div>
 
                 <div className="space-y-3 min-w-0">
-                <div className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
+                <div id="sheet-saves" className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
                   <SheetSectionHeading icon={ShieldCheck}>Saving Throws</SheetSectionHeading>
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-1.5 min-w-0">
@@ -4797,10 +5120,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
               </div>
             </div>
-          )}
 
-          {activeTab === "equipment" && (
-            <div className="space-y-3">
+          <div className={activeTab === "equipment" ? "space-y-3" : "hidden print-sheet-section space-y-3"}>
               <div className={`${SHEET_EQUIPMENT_PANEL} rounded-xl p-3 border border-border`}>
                 <SheetSectionHeading icon={Package}>Gear</SheetSectionHeading>
                 <SheetEquipmentPanel
@@ -4901,11 +5222,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   onShowDetails={setSelectedEquipment}
                 />
               </div>
-            </div>
-          )}
+          </div>
 
-          {activeTab === "features" && (
-            <div className={`${SHEET_TAB_CONTENT_CLASS} columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid`}>
+          <div
+            id="sheet-features"
+            className={
+              activeTab === "features"
+                ? `${SHEET_TAB_CONTENT_CLASS} columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid`
+                : `hidden print-sheet-section ${SHEET_TAB_CONTENT_CLASS} columns-1 sm:columns-2 gap-3 [&>section]:mb-3 [&>section]:break-inside-avoid`
+            }
+          >
               {magicItemPowers.length > 0 ? (
                 <MagicItemPowersPanel
                   powers={magicItemPowers}
@@ -4927,137 +5253,114 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   }}
                 />
               ) : null}
-              {classDetails.map((entry) => {
-                const classFeatures = ((entry.class?.features as
-                  | import("@/lib/types").Feature[]
-                  | undefined)?.filter(
-                  (feature) => feature.level <= entry.row.level && featureShowsOnSheetTab(feature),
-                ) ?? [])
-                if (!classFeatures.length) return null
-                const dedupedFeatures = dedupeFeaturesByName(classFeatures)
-                return (
-                  <section key={entry.row.class_id} className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                    <SheetSectionHeading icon={Layers}>
-                      {entry.class?.name} Features
-                      {classDetails.length > 1 ? ` (Level ${entry.row.level})` : ""}
-                    </SheetSectionHeading>
-                    <div className="space-y-2">
-                      {dedupedFeatures.map(({ feature, levels }, index) => (
-                        <CollapsibleFeatureCard
-                          key={`${entry.row.class_id}-${index}`}
-                          name={feature.name}
-                          level={feature.level}
-                          levels={levels.length > 1 ? levels : undefined}
-                          description={feature.description}
-                        >
-                          <RestSwappableChoiceControl
-                            feature={feature}
-                            classId={entry.row.class_id}
-                            picks={
-                              featureChoicePicks[
-                                featureChoiceKey(entry.row.class_id, feature.name, feature.level)
-                              ] ?? []
-                            }
-                            onChange={(key, next) => void persistFeatureChoicePicks(key, next)}
-                          />
-                        </CollapsibleFeatureCard>
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-
-              {classDetails.map((entry) => {
-                const subclassFeatures =
-                  ((entry.subclass?.features as import("@/lib/types").Feature[] | undefined)?.filter(
-                    (feature) => feature.level <= entry.row.level && featureShowsOnSheetTab(feature),
-                  ) ?? [])
-                if (!subclassFeatures.length || !entry.subclass) return null
-                return (
-                  <section
-                    key={`${entry.row.class_id}-subclass`}
-                    className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}
+              {orderedFeatureSections.map((section) => (
+                <section
+                  key={section.id}
+                  id={`feature-section-${section.id}`}
+                  className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    const drag = featureDragRef.current
+                    if (!drag || drag.kind !== "section" || drag.id === section.id) return
+                    setFeatureLayout((prev) => ({
+                      ...prev,
+                      sectionOrder: moveOrderedId(
+                        featureTabSections.map((entry) => entry.id),
+                        prev.sectionOrder,
+                        drag.id,
+                        section.id,
+                      ),
+                    }))
+                    setFeatureDrag(null)
+                  }}
+                >
+                  <div
+                    className="mb-2 flex cursor-grab items-center gap-1 active:cursor-grabbing"
+                    draggable
+                    onDragStart={() => setFeatureDrag({ kind: "section", id: section.id })}
                   >
-                    <SheetSectionHeading icon={Layers}>{entry.subclass.name} Features</SheetSectionHeading>
-                    <div className="space-y-2">
-                      {subclassFeatures.map((feature, index) => (
-                        <CollapsibleFeatureCard
-                          key={index}
-                          name={feature.name}
-                          level={feature.level}
-                          description={feature.description}
-                        >
+                    <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <SheetSectionHeading
+                      className="mb-0 flex-1"
+                      icon={
+                        section.id === "species"
+                          ? User
+                          : section.id === "background"
+                            ? BookOpen
+                            : section.id === "feats"
+                              ? Star
+                              : Layers
+                      }
+                    >
+                      {section.title}
+                    </SheetSectionHeading>
+                  </div>
+                  <div className="space-y-2">
+                    {section.items.map((item) => (
+                      <CollapsibleFeatureCard
+                        key={item.id}
+                        name={item.name}
+                        level={item.level}
+                        levels={item.levels}
+                        description={item.description}
+                        collapsedLines={item.collapsedLines}
+                        chosenLabel={item.chosenNames.join(", ") || undefined}
+                        draggable
+                        onDragStart={() =>
+                          setFeatureDrag({ kind: "item", id: item.id, sectionId: section.id })
+                        }
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          const drag = featureDragRef.current
+                          if (!drag || drag.kind !== "item" || drag.sectionId !== section.id) return
+                          if (drag.id === item.id) return
+                          setFeatureLayout((prev) => ({
+                            ...prev,
+                            itemOrderBySection: {
+                              ...prev.itemOrderBySection,
+                              [section.id]: moveOrderedId(
+                                section.items.map((entry) => entry.id),
+                                prev.itemOrderBySection[section.id],
+                                drag.id,
+                                item.id,
+                              ),
+                            },
+                          }))
+                          setFeatureDrag(null)
+                        }}
+                        menu={
+                          <FeatureCardMenu
+                            pinned={featureLayout.pinnedFeatureIds.includes(item.id)}
+                            actionPins={featureLayout.actionPins[item.id] ?? []}
+                            onTogglePin={() =>
+                              setFeatureLayout((prev) => togglePinnedFeature(prev, item.id))
+                            }
+                            onToggleAction={(target) =>
+                              setFeatureLayout((prev) => toggleActionPin(prev, item.id, target))
+                            }
+                          />
+                        }
+                      >
+                        {item.feature && item.classId ? (
                           <RestSwappableChoiceControl
-                            feature={feature}
-                            classId={entry.row.class_id}
+                            feature={item.feature}
+                            classId={item.classId}
                             picks={
                               featureChoicePicks[
-                                featureChoiceKey(entry.row.class_id, feature.name, feature.level)
+                                featureChoiceKey(item.classId, item.feature.name, item.feature.level)
                               ] ?? []
                             }
                             onChange={(key, next) => void persistFeatureChoicePicks(key, next)}
                           />
-                        </CollapsibleFeatureCard>
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-
-              {character.species?.traits && character.species.traits.length > 0 && (
-                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <SheetSectionHeading icon={User}>{character.species.name} Traits</SheetSectionHeading>
-                  <div className="space-y-2">
-                    {character.species.traits.map((trait, index) => (
-                      <CollapsibleFeatureCard
-                        key={index}
-                        name={trait.name}
-                        description={trait.description}
-                      />
+                        ) : null}
+                      </CollapsibleFeatureCard>
                     ))}
                   </div>
                 </section>
-              )}
+              ))}
+          </div>
 
-              {character.backgrounds?.feature && (
-                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <SheetSectionHeading icon={BookOpen}>Background Feature</SheetSectionHeading>
-                  <CollapsibleFeatureCard
-                    name={character.backgrounds.feature.name}
-                    description={character.backgrounds.feature.description}
-                  />
-                </section>
-              )}
-
-              {(originFeat || effectiveBackgroundFeatGranted || characterFeatsForDisplay.length > 0) && (
-                <section className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border`}>
-                  <SheetSectionHeading icon={Star}>Feats &amp; Boons</SheetSectionHeading>
-                  <div className="space-y-2">
-                    {(originFeat || effectiveBackgroundFeatGranted) && (
-                      <CollapsibleFeatureCard
-                        name={originFeat?.name ?? effectiveBackgroundFeatGranted ?? "Origin Feat"}
-                        description={
-                          originFeat?.description ?? "Granted by your background at 1st level."
-                        }
-                        collapsedLines={4}
-                      />
-                    )}
-                    {characterFeatsForDisplay.map((feat, index) => (
-                      <CollapsibleFeatureCard
-                        key={`${feat.id}-${index}`}
-                        name={feat.name}
-                        description={feat.description}
-                        collapsedLines={4}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          )}
-
-          {activeTab === "companions" && (
-            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+          <div className={activeTab === "companions" ? "space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1" : "hidden print-sheet-section space-y-3"}>
               {companionFormGroups.map((group) => (
                 <CompanionFormPicker
                   key={group.key}
@@ -5127,10 +5430,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </p>
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
-          {activeTab === "custom" && (
+          <div className={activeTab === "custom" ? "" : "hidden print-sheet-section"}>
             <div className="bg-card rounded-xl p-3 border border-border">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <SheetSectionHeading icon={Sparkles} className="mb-0">
@@ -5170,7 +5472,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <p className="text-xs text-muted-foreground text-center py-4">No custom abilities</p>
               )}
             </div>
-          )}
+          </div>
         </motion.div>
       </main>
 
@@ -5242,6 +5544,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               restOverlay.rest === "long_rest" ? longRestWeaponMasteryChoices : []
             }
             onWeaponMasteryChange={(key, next) => void persistFeatureChoicePicks(key, next)}
+            extraWeaponMasteryChoices={
+              restOverlay.rest === "long_rest" ? extraWeaponMasteryRestChoices : []
+            }
+            onExtraWeaponMasteryChange={persistExtraWeaponMasteries}
           />
         ) : null}
         {defaultActionsContext ? (
@@ -5392,6 +5698,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           </motion.div>
         ) : null}
       </AnimatePresence>
+      {levelUpOpen && character ? (
+        <LevelUpWizard
+          characterId={character.id}
+          open
+          onClose={() => setLevelUpOpen(false)}
+          onComplete={() => setSheetReloadKey((value) => value + 1)}
+        />
+      ) : null}
       <SiteFooter />
     </div>
       </SheetRollProvider>

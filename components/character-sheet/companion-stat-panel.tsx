@@ -23,6 +23,7 @@ function formatMod(value: number): string {
 
 export type CompanionStatPanelCompanion = ResolvedCompanion & {
   currentHp: number
+  tempHp?: number
   displayName: string
   activeConditions: string[]
   polymorphActive: boolean
@@ -108,7 +109,7 @@ export function CompanionStatPanel({
   onConditionsChange,
   onPolymorphActiveChange,
 }: CompanionStatPanelProps) {
-  const { template, ac, maxHp, currentHp, source, polymorph, activeConditions, polymorphActive } =
+  const { template, ac, maxHp, currentHp, tempHp = 0, source, polymorph, activeConditions, polymorphActive } =
     companion
   const abilityScores = companion.abilityScores ?? template.abilityScores
   const hasAbilities = abilityScores && Object.keys(abilityScores).length > 0
@@ -186,6 +187,9 @@ export function CompanionStatPanel({
             />
             <span className="text-[10px] text-muted-foreground">/ {maxHp}</span>
           </div>
+          {tempHp > 0 ? (
+            <p className="text-[9px] font-semibold text-primary tabular-nums">+{tempHp} temp</p>
+          ) : null}
         </div>
         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
           <Footprints className="w-3 h-3 mx-auto text-secondary mb-0.5" />

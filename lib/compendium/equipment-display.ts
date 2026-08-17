@@ -10,6 +10,7 @@ import {
   isShieldItem,
   isWeaponItem,
 } from "@/lib/compendium/combat-stats"
+import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 
 export type EquipmentDetailRow = {
   label: string
@@ -173,7 +174,7 @@ export function matchesEquipmentSheetFilter(
     case "armor":
       return isArmorItem(item) || isShieldItem(item)
     case "weapons":
-      return isWeaponItem(item)
+      return isWieldableWeaponItem(item)
     case "adventuring_gear": {
       const category = (item.category ?? "").trim().toLowerCase()
       return category === "adventuring gear" || category === "tool"

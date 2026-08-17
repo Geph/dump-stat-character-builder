@@ -1,5 +1,6 @@
 import type { Equipment } from "@/lib/types"
-import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
+import { isArmorItem, isShieldItem } from "@/lib/compendium/combat-stats"
+import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 import {
   EQUIPMENT_RARITIES,
   MAGIC_ITEM_CATEGORIES,
@@ -61,7 +62,7 @@ export function isMagicItem(item: Equipment): boolean {
 export function mustAttuneBeforeEquip(item: Equipment): boolean {
   return (
     equipmentRequiresAttunement(item) &&
-    (isArmorItem(item) || isShieldItem(item) || isWeaponItem(item))
+    (isArmorItem(item) || isShieldItem(item) || isWieldableWeaponItem(item))
   )
 }
 
@@ -70,7 +71,7 @@ export function isSheetEquippableItem(item: Equipment): boolean {
   return (
     isArmorItem(item) ||
     isShieldItem(item) ||
-    isWeaponItem(item) ||
+    isWieldableWeaponItem(item) ||
     isMagicItem(item)
   )
 }

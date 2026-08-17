@@ -27,11 +27,14 @@ import type { ResourceTrackerEntry } from "@/components/character-sheet/resource
 import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
+import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
   collectTargetableEffects,
   type PartyEffectTarget,
 } from "@/lib/character/effect-target-policy"
+import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
 import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
+import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
 import {
   resolveFeatureEffectHealAmount,
   type HealResolveContext,
@@ -78,6 +81,10 @@ type SheetActionsPanelProps = {
   characterId?: string | null
   /** Apply heal / temp HP to the open sheet's local play state. */
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  onApplySelfInspiration?: () => void
+  onApplySelfConditions?: (add: string[], remove: string[]) => void
+  onAddDurationReminder?: (label: string) => void
+  onApplyCompanionState?: (key: string, patch: Partial<CharacterCompanionState>) => void
   /** Extra temp HP from Perfected Enhancement when granting via a psionic power. */
   perfectedEnhancementBonus?: number
   /** +INT added to psionic discipline power damage (Empowered Psionics). */
@@ -86,7 +93,7 @@ type SheetActionsPanelProps = {
   onMarkDamageDealt?: () => void
   /** Bank heal/THP amounts into Balance of Power after a psionic ability. */
   onBankBalanceOfPower?: (amount: number) => void
-  /** Party allies + companions available as heal targets. */
+  /** Party allies + companions available as effect targets. */
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
   /** Force a single card column (e.g. narrow combat right rail). */
@@ -372,6 +379,10 @@ function ActionDetailOverlay({
   onClose,
   characterId,
   onApplySelfHeal,
+  onApplySelfInspiration,
+  onApplySelfConditions,
+  onAddDurationReminder,
+  onApplyCompanionState,
   perfectedEnhancementBonus = 0,
   empoweredPsionicsBonus = 0,
   onMarkDamageDealt,
@@ -404,6 +415,10 @@ function ActionDetailOverlay({
   onClose: () => void
   characterId?: string | null
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  onApplySelfInspiration?: () => void
+  onApplySelfConditions?: (add: string[], remove: string[]) => void
+  onAddDurationReminder?: (label: string) => void
+  onApplyCompanionState?: (key: string, patch: Partial<CharacterCompanionState>) => void
   perfectedEnhancementBonus?: number
   empoweredPsionicsBonus?: number
   onMarkDamageDealt?: () => void
@@ -604,68 +619,96 @@ function ActionDetailOverlay({
       const parts: string[] = useFeedback ? [useFeedback] : []
       let banked = 0
       let perfectedApplied = false
+      const candidate = allyCandidates.find((row) =>
+        row.kind === "companion" && target.kind === "companion"
+          ? row.characterId === target.characterId && row.companionKey === target.companionKey
+          : row.kind === "character" &&
+            target.kind === "character" &&
+            row.characterId === target.characterId,
+      )
+      const isLocalTarget = target.characterId === characterId
+
       for (const effect of pendingHealEffects) {
-        if (
-          target.kind === "character" &&
-          target.characterId === characterId &&
-          onApplySelfHeal
-        ) {
-          let amount = resolveFeatureEffectHealAmount(effect, healContext)
-          if (amount <= 0) continue
-          const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
-          if (
-            kind === "temp_hp" &&
-            action.abilityRole === "psionic_power" &&
-            perfectedEnhancementBonus > 0 &&
-            !perfectedApplied
-          ) {
-            amount += perfectedEnhancementBonus
-            perfectedApplied = true
-            parts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
-          }
-          onApplySelfHeal(amount, kind)
-          if (action.abilityRole === "psionic_power") banked += amount
-          parts.push(
-            kind === "temp_hp"
-              ? `+${amount} temp HP → ${target.label}`
-              : `Healed ${amount} HP → ${target.label}`,
-          )
-          continue
-        }
-        let effectForParty = effect
+        let effectForApply = effect
         if (
           effect.kind === "grant_temp_hp" &&
           action.abilityRole === "psionic_power" &&
           perfectedEnhancementBonus > 0 &&
           !perfectedApplied
         ) {
-          effectForParty = {
+          effectForApply = {
             ...effect,
             healFlatBonus: (effect.healFlatBonus ?? 0) + perfectedEnhancementBonus,
           }
           perfectedApplied = true
           parts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
         }
+
+        if (isLocalTarget) {
+          const play =
+            target.kind === "character"
+              ? {
+                  ...defaultSheetPlayState(),
+                  currentHp: candidate?.currentHp ?? null,
+                  tempHp: candidate?.tempHp ?? 0,
+                  activeConditions: candidate?.activeConditions ?? [],
+                  hasInspiration: candidate?.hasInspiration ?? false,
+                }
+              : null
+          const companion =
+            target.kind === "companion"
+              ? {
+                  key: target.companionKey,
+                  currentHp: candidate?.currentHp ?? null,
+                  tempHp: candidate?.tempHp ?? null,
+                  activeConditions: candidate?.activeConditions ?? [],
+                }
+              : null
+          const result = applyAllyEffectLocally({
+            effect: effectForApply,
+            target,
+            healContext,
+            play,
+            companion,
+            maxHp: candidate?.maxHp ?? null,
+          })
+          if (!result) continue
+          if (result.kind === "heal" || result.kind === "temp_hp") {
+            if (target.kind === "character" && result.amount > 0 && onApplySelfHeal) {
+              onApplySelfHeal(result.amount, result.kind)
+            }
+            if (action.abilityRole === "psionic_power") banked += result.amount
+          }
+          if (target.kind === "character") {
+            if (result.playPatch?.hasInspiration) onApplySelfInspiration?.()
+            const add = effectForApply.effectConditionTypes ?? []
+            const remove = effectForApply.removeConditions ?? []
+            if (add.length || remove.length) onApplySelfConditions?.(add, remove)
+            const reminder = result.playPatch?.durationReminders?.at(-1)
+            if (reminder) onAddDurationReminder?.(reminder.label)
+          } else if (result.companionPatch) {
+            onApplyCompanionState?.(target.companionKey, result.companionPatch)
+          }
+          parts.push(`${result.summary} → ${result.targetLabel}`)
+          continue
+        }
+
         const result = await applyPartyHealEffect({
-          effect: effectForParty,
+          effect: effectForApply,
           target,
           healContext,
           selfCharacterId: characterId,
         })
         if (!result) continue
-        if (action.abilityRole === "psionic_power") banked += result.amount
-        parts.push(
-          result.kind === "temp_hp"
-            ? `+${result.amount} temp HP → ${result.targetLabel}`
-            : `Healed ${result.amount} HP → ${result.targetLabel}`,
-        )
+        if (action.abilityRole === "psionic_power" && result.amount > 0) banked += result.amount
+        parts.push(`${result.summary} → ${result.targetLabel}`)
       }
       if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
       setUseFeedback(parts.join(" · ") || "Used!")
       setStep("detail")
       setPendingHealEffects([])
     } catch (error) {
-      setUseFeedback(error instanceof Error ? error.message : "Could not apply heal.")
+      setUseFeedback(error instanceof Error ? error.message : "Could not apply effect.")
     } finally {
       setApplyingHeal(false)
     }
@@ -735,8 +778,8 @@ function ActionDetailOverlay({
             <p className="text-sm text-muted-foreground">Choose who receives this effect.</p>
             {allyCandidates.length === 0 ? (
               <p className="text-sm text-destructive">
-                No party allies found. Create a party on the Characters page that includes this
-                character.
+                No allies found. Your companions appear here even without a party; add a party on
+                the Characters page to include other characters.
               </p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
@@ -745,6 +788,14 @@ function ActionDetailOverlay({
                     candidate.kind === "companion"
                       ? `${candidate.characterId}:${candidate.companionKey}`
                       : candidate.characterId
+                  const hpLabel =
+                    candidate.currentHp != null
+                      ? `HP ${candidate.currentHp}${candidate.maxHp != null ? `/${candidate.maxHp}` : ""}`
+                      : candidate.kind === "companion"
+                        ? "Companion"
+                        : "Ally"
+                  const tempLabel =
+                    candidate.tempHp != null && candidate.tempHp > 0 ? ` · +${candidate.tempHp} temp` : ""
                   return (
                     <button
                       key={key}
@@ -755,11 +806,8 @@ function ActionDetailOverlay({
                     >
                       <div className="font-semibold">{candidate.label}</div>
                       <div className="text-xs text-muted-foreground">
-                        {candidate.currentHp != null
-                          ? `HP ${candidate.currentHp}${candidate.maxHp != null ? `/${candidate.maxHp}` : ""}`
-                          : candidate.kind === "companion"
-                            ? "Companion"
-                            : "Party member"}
+                        {hpLabel}
+                        {tempLabel}
                       </div>
                     </button>
                   )
@@ -816,9 +864,11 @@ function ActionDetailOverlay({
                             <span className="ml-2 text-muted-foreground">{cost} Hit Dice</span>
                           ) : null}
                           {option.description ? (
-                            <p className="mt-1 text-muted-foreground leading-relaxed">
-                              {option.description}
-                            </p>
+                            <RichTextContent
+                              html={option.description}
+                              className="mt-1 text-xs text-muted-foreground leading-relaxed [&_p]:mb-0"
+                              fallback=""
+                            />
                           ) : null}
                         </button>
                       )
@@ -1008,6 +1058,10 @@ export function SheetActionsPanel({
   onMarkEconomy,
   characterId = null,
   onApplySelfHeal,
+  onApplySelfInspiration,
+  onApplySelfConditions,
+  onAddDurationReminder,
+  onApplyCompanionState,
   perfectedEnhancementBonus = 0,
   empoweredPsionicsBonus = 0,
   onMarkDamageDealt,
@@ -1250,6 +1304,10 @@ export function SheetActionsPanel({
             onClose={() => setOpenActionId(null)}
             characterId={characterId}
             onApplySelfHeal={onApplySelfHeal}
+            onApplySelfInspiration={onApplySelfInspiration}
+            onApplySelfConditions={onApplySelfConditions}
+            onAddDurationReminder={onAddDurationReminder}
+            onApplyCompanionState={onApplyCompanionState}
             perfectedEnhancementBonus={perfectedEnhancementBonus}
             empoweredPsionicsBonus={empoweredPsionicsBonus}
             onMarkDamageDealt={onMarkDamageDealt}

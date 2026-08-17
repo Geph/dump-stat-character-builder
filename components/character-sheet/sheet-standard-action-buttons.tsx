@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, X } from "lucide-react"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   DEFAULT_SHEET_ACTIONS,
   type DefaultSheetAction,
@@ -110,9 +111,11 @@ export function SheetStandardActionButtons({
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
                 Action used
               </p>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                {detail.description}
-              </p>
+              <RichTextContent
+                html={detail.description}
+                className="mt-2 text-sm text-muted-foreground leading-relaxed [&_p]:mb-0"
+                fallback=""
+              />
             </motion.div>
           </motion.div>
         ) : null}

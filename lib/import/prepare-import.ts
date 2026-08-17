@@ -18,6 +18,7 @@ import {
 import {
   applyImportCollisionResolutions,
   applyImportRenames,
+  collisionUpdateNamesByKind,
   type ImportCollision,
   type ImportCollisionResolutionMap,
   type ImportRenameMap,
@@ -119,10 +120,24 @@ export function prepareImportedContent(
   options: PrepareImportOptions = {},
 ): PreparedImportResult {
   const withArtStubs = expandCardArtIntoReviewStubs(content)
+  const collisions = options.collisions ?? []
+
+  if (isCardArtOnlyImport(content) || isCardArtOnlyImport(withArtStubs)) {
+    return {
+      kind: "confirm",
+      proposals: { classResources: [], customAbilities: [] },
+      pendingContent: withArtStubs,
+      previewSummary: summarizeImportPreview(withArtStubs),
+      collisions,
+      stages: buildImportStages(withArtStubs),
+      stagingSummary: "",
+      isLarge: false,
+    }
+  }
+
   const sanitized = withSanitizedClassRows(withArtStubs)
   const enriched = enrichImportContentModifiers(sanitized)
   const proposals = collectImportProposals(enriched)
-  const collisions = options.collisions ?? []
   const stages = buildImportStages(enriched)
   const isLarge = isLargeImport(enriched, options.charLength)
   const stagingSummary = isLarge ? largeImportSummary(stages) : ""
@@ -164,6 +179,19 @@ export async function finalizeImportWithPersist(
         renameMap,
       )
     : applyImportRenames(pendingContent, renameMap)
+
+  if (isCardArtOnlyImport(pendingContent) || isCardArtOnlyImport(renamed)) {
+    const withCardArt = applyImportCardArtUrls(renamed, cardArtUrlMap)
+    const toPersist = stripSkippedImportPreviewItems(withCardArt, skippedPreviewKeys)
+    return persist(toPersist, materialSource, {
+      ...persistOptions,
+      updateExistingNames: {
+        ...persistOptions?.updateExistingNames,
+        ...collisionUpdateNamesByKind(collisions, collisionResolutionMap),
+      },
+    })
+  }
+
   const proposals = collectImportProposals(renamed)
   const withModifiers = enrichImportContentModifiers(
     applyProposalSelections(renamed, proposals, selections),
@@ -171,5 +199,11 @@ export async function finalizeImportWithPersist(
   const withCardArt = applyImportCardArtUrls(withModifiers, cardArtUrlMap)
   // Strip after renames/card art so preview indices stay valid for those maps.
   const toPersist = stripSkippedImportPreviewItems(withCardArt, skippedPreviewKeys)
-  return persist(toPersist, materialSource, persistOptions)
+  return persist(toPersist, materialSource, {
+    ...persistOptions,
+    updateExistingNames: {
+      ...persistOptions?.updateExistingNames,
+      ...collisionUpdateNamesByKind(collisions, collisionResolutionMap),
+    },
+  })
 }

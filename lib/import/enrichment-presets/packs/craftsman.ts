@@ -324,8 +324,44 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
       },
       { op: "setSheetDisplay", sheetDisplay: { featuresTab: true, combatActions: true } },
       {
+        op: "setChoices",
+        isChoice: false,
+        choices: {
+          category: "Weapon Mastery Property",
+          resourceKey: "weapon_mastery_extra",
+          count: 1,
+          options: [],
+          swappableOnRest: true,
+          swapRestType: "long",
+        },
+      },
+      {
         op: "appendDescription",
-        text: "Enable Masterwork weapon while attacking with your Masterwork weapon so +Masterwork Bonus applies to attack and damage. Second mastery property: pick on a Long Rest.",
+        text: "Enable Masterwork weapon while attacking with your Masterwork weapon so +Masterwork Bonus applies to attack and damage. Second mastery property: pick per weapon on the sheet or after a Long Rest.",
+      },
+    ],
+  },
+  {
+    id: "craftsman.class.improved_masterwork",
+    pack: "craftsman",
+    target: "class_feature",
+    match: { className: /craftsman/i, name: /^improved masterwork$/i },
+    operations: [
+      {
+        op: "setChoices",
+        isChoice: false,
+        choices: {
+          category: "Weapon Mastery Property",
+          resourceKey: "weapon_mastery_extra",
+          count: 2,
+          options: [],
+          swappableOnRest: true,
+          swapRestType: "long",
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Third mastery property: pick a second extra property per Masterwork weapon on the sheet or after a Long Rest. The weapon must meet each property's prerequisites.",
       },
     ],
   },

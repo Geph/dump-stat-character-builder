@@ -12,8 +12,8 @@ import {
 } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, PawPrint, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid, Info } from "lucide-react"
-import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool, Creature } from "@/lib/types"
+import { Search, BookOpen, Users, Wand2, Shield, Sparkles, Package, Gauge, Languages, Wrench, PawPrint, Plus, Edit, Copy, Trash2, Settings, Download, Upload, LayoutGrid, Info, Ban } from "lucide-react"
+import type { Species, DndClass, Background, Spell, Feat, Equipment, Subclass, ClassResourceRow, Language, Tool, Creature, CustomAbility } from "@/lib/types"
 import { CreatureStatBlockView } from "@/components/compendium/creature-stat-block-view"
 import { ClassResourcesOverview } from "@/components/compendium/class-resources-overview"
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
@@ -24,11 +24,27 @@ import {
   COMPENDIUM_TOGGLE_LABELS,
   contentTypeToTable,
   findCompendiumDependents,
+  findCompendiumDependentsForTargets,
   findDisabledCompendiumDependents,
+  groupCompendiumToggleTargets,
   isProtectedSystemCompendiumRow,
   setCompendiumItemsEnabled,
   type CompendiumToggleTarget,
 } from "@/lib/compendium/compendium-toggle"
+import {
+  collectCompendiumSourceOptions,
+  itemMatchesSourceFilter,
+} from "@/lib/compendium/compendium-source"
+import {
+  UNASSIGNED_CLASS_FILTER,
+  abilityMatchesClassFilter,
+  resolveClassFilterName,
+  subclassMatchesClassFilter,
+} from "@/lib/compendium/compendium-class-filter"
+import {
+  collectCreatureTypeOptions,
+  creatureMatchesTypeFilter,
+} from "@/lib/compendium/creature-type-filter"
 import { Switch } from "@/components/ui/switch"
 import { GameIcon } from "@/components/game-icon-picker"
 import { formatCompendiumSource } from "@/lib/srd/source"
@@ -67,6 +83,13 @@ import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { BackgroundDetailStrip } from "@/components/compendium/background-detail-strip"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
 import { classComplexityDetailRow } from "@/components/compendium/class-complexity-display"
+import {
+  CLASS_COMPLEXITY_OPTIONS,
+  formatClassComplexityLabel,
+  isClassComplexity,
+  resolveClassComplexity,
+  type ClassComplexity,
+} from "@/lib/compendium/class-complexity"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
   CLASS_CARD_ASPECT_CLASS,
@@ -259,14 +282,19 @@ export default function CompendiumPageClient() {
   const [spellSchools, setSpellSchoolsState] = useState<string[]>(() => getSpellSchools())
   const [spellSchoolsEditorOpen, setSpellSchoolsEditorOpen] = useState(false)
   const [featFilterCategory, setFeatFilterCategory] = useState<string>("all")
-  const [featFilterSource, setFeatFilterSource] = useState<string>("all")
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
+  const [complexityFilter, setComplexityFilter] = useState<"all" | ClassComplexity>("all")
+  const [creatureTypeFilter, setCreatureTypeFilter] = useState<string>("all")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState<string>("all")
   const [magicItemFilterCategory, setMagicItemFilterCategory] = useState<string>("all")
   const [languageFilterPool, setLanguageFilterPool] = useState<"all" | "standard" | "rare">("all")
   const [toolFilterGroup, setToolFilterGroup] = useState<string>("all")
   const [backgroundFilterAbilities, setBackgroundFilterAbilities] = useState<AbilityModifierKey[]>([])
-  const [backgroundFilterSource, setBackgroundFilterSource] = useState<string>("all")
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
+  const [bulkToggleConfirm, setBulkToggleConfirm] = useState<{
+    items: CompendiumToggleTarget[]
+    dependents: CompendiumToggleTarget[]
+  } | null>(null)
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
     species: 0,
@@ -290,6 +318,10 @@ export default function CompendiumPageClient() {
       setActiveTab(tab)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    setSourceFilter("all")
+  }, [activeTab])
 
   useEffect(() => {
     const syncSchools = () => setSpellSchoolsState(getSpellSchools())
@@ -405,12 +437,20 @@ export default function CompendiumPageClient() {
         }))
       } else {
         let classNamesForEnrich = classNamesById
-        if (activeTab === "subclasses") {
-          const { data: classes } = await db.from("classes").select("id, name").order("name")
+        if (activeTab === "subclasses" || activeTab === "abilities") {
+          const [{ data: classes }, { data: subclasses }] = await Promise.all([
+            db.from("classes").select("id, name").order("name"),
+            activeTab === "abilities"
+              ? db.from("subclasses").select("id, name, class_id").order("name").limit(500)
+              : Promise.resolve({ data: null }),
+          ])
           classNamesForEnrich = Object.fromEntries(
             asCompendiumRows<{ id: string; name: string }>(classes).map((cls) => [cls.id, cls.name]),
           )
           setClassNamesById(classNamesForEnrich)
+          if (activeTab === "abilities") {
+            setSubclassesForClasses(asCompendiumRows(subclasses) as unknown as Subclass[])
+          }
         }
         setContent((prev) => ({
           ...prev,
@@ -478,6 +518,19 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     new Set(spellData.map((s) => s.level))
   ).sort((a, b) => a - b)
 
+  const creatureTypeOptions = useMemo(() => {
+    if (activeTab !== "creatures" && activeTab !== "species") return []
+    const rows = content[activeTab] as { creature_type?: string | null }[]
+    const options = collectCreatureTypeOptions(rows)
+    if (
+      creatureTypeFilter !== "all" &&
+      !options.some((type) => type.toLowerCase() === creatureTypeFilter.toLowerCase())
+    ) {
+      return [...options, creatureTypeFilter]
+    }
+    return options
+  }, [activeTab, content, creatureTypeFilter])
+
   const filteredContent = useMemo(() => {
     const query = searchQuery.toLowerCase()
     const classResourceRows =
@@ -511,6 +564,21 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         }
         // Nested powers/talents stay hidden unless the user searches for them.
         if (!query && !isTopLevelCompendiumAbility(ability)) return false
+        if (
+          !abilityMatchesClassFilter(
+            item as CustomAbility,
+            classResourceFilterClassId,
+            classNamesById,
+            subclassesForClasses,
+          )
+        ) {
+          return false
+        }
+      }
+      if (activeTab === "subclasses") {
+        if (!subclassMatchesClassFilter(item as Subclass, classResourceFilterClassId)) {
+          return false
+        }
       }
       if (activeTab === "spells") {
         const spell = item as Spell
@@ -527,12 +595,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         const feat = item as Feat
         const category = feat.category || "General"
         if (featFilterCategory !== "all" && category !== featFilterCategory) return false
-        if (
-          featFilterSource !== "all" &&
-          (feat.source?.trim() || "Custom") !== featFilterSource
-        ) {
-          return false
-        }
       }
       if (activeTab === "equipment") {
         const eq = item as Equipment
@@ -558,17 +620,31 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       if (activeTab === "backgrounds") {
         const background = item as Background
         if (
-          backgroundFilterSource !== "all" &&
-          (background.source?.trim() || "Custom") !== backgroundFilterSource
-        ) {
-          return false
-        }
-        if (
           backgroundFilterAbilities.length > 0 &&
           !backgroundMatchesAbilityFilter(background, backgroundFilterAbilities)
         ) {
           return false
         }
+      }
+      if (
+        !itemMatchesSourceFilter(
+          (item as { source?: string | null }).source,
+          sourceFilter,
+        )
+      ) {
+        return false
+      }
+      if (activeTab === "classes" && complexityFilter !== "all") {
+        if (resolveClassComplexity(item as DndClass) !== complexityFilter) return false
+      }
+      if (
+        (activeTab === "creatures" || activeTab === "species") &&
+        !creatureMatchesTypeFilter(
+          (item as Creature | Species).creature_type,
+          creatureTypeFilter,
+        )
+      ) {
+        return false
       }
       return true
     })
@@ -577,13 +653,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   }, [
     activeTab,
     backgroundFilterAbilities,
-    backgroundFilterSource,
     classNamesById,
     classResourceFilterClassId,
+    complexityFilter,
     content,
+    creatureTypeFilter,
     equipmentFilterCategory,
     featFilterCategory,
-    featFilterSource,
+    sourceFilter,
     languageFilterPool,
     magicItemFilterCategory,
     searchQuery,
@@ -601,18 +678,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       Array.from(new Set(equipmentData.map((e) => e.category).filter(Boolean) as string[])).sort(),
     [equipmentData],
   )
-  const backgroundSourceOptions = useMemo(() => {
-    const rows = (content.backgrounds ?? []) as Background[]
-    return [
-      ...new Set(rows.map((bg) => bg.source?.trim() || "Custom").filter(Boolean)),
-    ].sort((a, b) => a.localeCompare(b))
-  }, [content.backgrounds])
-  const featSourceOptions = useMemo(() => {
-    const rows = (content.feats ?? []) as Feat[]
-    return [
-      ...new Set(rows.map((feat) => feat.source?.trim() || "Custom").filter(Boolean)),
-    ].sort((a, b) => a.localeCompare(b))
-  }, [content.feats])
+  const sourceOptions = useMemo(() => {
+    const rows = (content[activeTab] ?? []) as { source?: string | null }[]
+    return collectCompendiumSourceOptions(rows)
+  }, [activeTab, content])
   const magicItemCategoryOptions = useMemo(
     () => getMagicItemCategoryOptions(magicItemData),
     [magicItemData],
@@ -879,6 +948,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       const db = createClient()
       await setCompendiumItemsEnabled(db, targets, enabled)
       setToggleConfirm(null)
+      setBulkToggleConfirm(null)
     } catch (err) {
       console.error("[v0] Toggle compendium item error:", err)
       patchContentEnabled(targets, !enabled)
@@ -922,6 +992,34 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
     setToggleError(null)
     setToggleConfirm({ item: target, dependents, action: "disable" })
+  }
+
+  const displayedDisableTargets = useMemo(() => {
+    const table = contentTypeToTable(activeTab)
+    return (filteredContent as { id?: string; name?: string; enabled?: boolean | number | null }[])
+      .filter((item) => item.id && item.name && !isProtectedSystemCompendiumRow(item))
+      .filter((item) => isCompendiumItemEnabled(item))
+      .map((item) => ({
+        table,
+        contentType: activeTab,
+        id: item.id as string,
+        name: item.name as string,
+      }))
+  }, [activeTab, filteredContent])
+
+  const handleDisableDisplayed = async () => {
+    if (displayedDisableTargets.length === 0) return
+    setToggleError(null)
+    setToggleSaving(true)
+    try {
+      const db = createClient()
+      const dependents = await findCompendiumDependentsForTargets(db, displayedDisableTargets)
+      setBulkToggleConfirm({ items: displayedDisableTargets, dependents })
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : "Failed to check related items")
+    } finally {
+      setToggleSaving(false)
+    }
   }
 
   const handleCopyItem = async (item: Record<string, unknown>) => {
@@ -1007,6 +1105,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       </div>
     )
 
+    const subclassSourceLabel =
+      activeTab === "subclasses"
+        ? formatCompendiumSource(castCompendiumRow<Subclass>(data).source) || "Custom"
+        : null
+    const showSubclassSourceEyebrow =
+      Boolean(subclassSourceLabel) && cardLayout === "visual" && !isCompactOnly
+
     const cardTitle = (
       <h3
         className={cn(
@@ -1041,6 +1146,24 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           </Tooltip>
         )}
       </h3>
+    )
+
+    const cardTitleBlock = showSubclassSourceEyebrow ? (
+      <div className="min-w-0">
+        <p
+          className={cn(
+            "mb-0.5 text-[10px] font-bold uppercase tracking-[0.16em]",
+            cardImage
+              ? "text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+              : "text-muted-foreground",
+          )}
+        >
+          {subclassSourceLabel}
+        </p>
+        {cardTitle}
+      </div>
+    ) : (
+      cardTitle
     )
 
     const cardIcon = !hideCardIcon ? (
@@ -1092,12 +1215,12 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 {cardIcon}
                 {cardActions}
               </div>
-              {cardTitle}
+              {cardTitleBlock}
             </div>
             <div className="mb-2 hidden items-start justify-between gap-2 sm:flex">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
                 {cardIcon}
-                {cardTitle}
+                {cardTitleBlock}
               </div>
               {cardActions}
             </div>
@@ -1111,7 +1234,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           >
             <div className="flex min-w-0 items-center gap-3">
               {cardIcon}
-              {cardTitle}
+              {cardTitleBlock}
             </div>
             {cardActions}
           </div>
@@ -1405,6 +1528,14 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem
+                  onClick={() => void handleDisableDisplayed()}
+                  disabled={displayedDisableTargets.length === 0 || toggleSaving}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Ban className="w-4 h-4" />
+                  Disable all displayed
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={handleExportSection}
                   className="gap-2 cursor-pointer"
                 >
@@ -1570,6 +1701,92 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           </div>
         )}
 
+        {bulkToggleConfirm && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-2xl border-2 border-border p-6 max-w-lg w-full shadow-xl">
+              <h2 className="text-xl font-black text-foreground mb-2">
+                Disable {bulkToggleConfirm.items.length} displayed{" "}
+                {tabs.find((tab) => tab.id === activeTab)?.label.toLowerCase()}?
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                This turns off the items currently shown in this section
+                {sourceFilter !== "all" ? ` from ${sourceFilter}` : ""}
+                {complexityFilter !== "all"
+                  ? ` with ${formatClassComplexityLabel(complexityFilter).toLowerCase()} complexity`
+                  : ""}
+                {classResourceFilterClassId !== "all"
+                  ? classResourceFilterClassId === UNASSIGNED_CLASS_FILTER
+                    ? " that are unassigned"
+                    : ` for ${resolveClassFilterName(classResourceFilterClassId, classNamesById) || "the selected class"}`
+                  : ""}
+                {creatureTypeFilter !== "all" ? ` of type ${creatureTypeFilter}` : ""}
+                {searchQuery.trim() ? " that match your search" : ""}. Related entries
+                that depend on them can be disabled at the same time.
+              </p>
+              {bulkToggleConfirm.dependents.length > 0 ? (
+                <div className="max-h-56 overflow-y-auto space-y-3 mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Related items that will also be disabled
+                  </p>
+                  {groupCompendiumToggleTargets(bulkToggleConfirm.dependents).map((group) => (
+                    <div key={group.contentType}>
+                      <p className="text-sm font-semibold text-foreground">
+                        {group.label} · {group.names.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {group.names.length > 8
+                          ? `${group.names.slice(0, 8).join(", ")} +${group.names.length - 8} more`
+                          : group.names.join(", ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-4">
+                  No related subclasses, resources, or other entries were found.
+                </p>
+              )}
+              {toggleError && <p className="text-sm text-destructive mb-4">{toggleError}</p>}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkToggleConfirm(null)
+                    setToggleError(null)
+                  }}
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-semibold hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void applyItemEnabled(bulkToggleConfirm.items, false).then(() => setBulkToggleConfirm(null))}
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50"
+                >
+                  {toggleSaving ? "Saving..." : "Only displayed items"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void applyItemEnabled(
+                      [...bulkToggleConfirm.items, ...bulkToggleConfirm.dependents],
+                      false,
+                    ).then(() => setBulkToggleConfirm(null))
+                  }
+                  disabled={toggleSaving}
+                  className="flex-1 px-4 py-3 rounded-xl font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {toggleSaving
+                    ? "Saving..."
+                    : `Disable all (${bulkToggleConfirm.items.length + bulkToggleConfirm.dependents.length})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {toggleConfirm && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-2xl border-2 border-border p-6 max-w-lg w-full shadow-xl">
@@ -1674,6 +1891,81 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         {/* Tab filters + search */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex flex-1 min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            {sourceOptions.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Source
+                </label>
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                  aria-label="Filter by source"
+                >
+                  <option value="all">All sources</option>
+                  {sourceOptions.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {(activeTab === "creatures" || activeTab === "species") &&
+            creatureTypeOptions.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                    Type
+                  </label>
+                  <select
+                    value={creatureTypeFilter}
+                    onChange={(e) => setCreatureTypeFilter(e.target.value)}
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                    aria-label="Filter by creature type"
+                  >
+                    <option value="all">All types</option>
+                    {creatureTypeOptions.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {creatureTypeFilter !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setCreatureTypeFilter("all")}
+                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+            ) : null}
+            {activeTab === "classes" ? (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Complexity
+                </label>
+                <select
+                  value={complexityFilter}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    setComplexityFilter(isClassComplexity(next) ? next : "all")
+                  }}
+                  className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                  aria-label="Filter by complexity"
+                >
+                  <option value="all">All complexities</option>
+                  {CLASS_COMPLEXITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             {activeTab === "feats" && (
               <div id="feat-filters" className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-2">
@@ -1694,31 +1986,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     <option value="Planar Pact">Planar Pact</option>
                   </select>
                 </div>
-                {featSourceOptions.length > 1 ? (
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                      Source
-                    </label>
-                    <select
-                      value={featFilterSource}
-                      onChange={(e) => setFeatFilterSource(e.target.value)}
-                      className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
-                      aria-label="Filter feats by source"
-                    >
-                      <option value="all">All sources</option>
-                      {featSourceOptions.map((source) => (
-                        <option key={source} value={source}>
-                          {source}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-                {(featFilterCategory !== "all" || featFilterSource !== "all") && (
+                {featFilterCategory !== "all" && (
                   <button
                     onClick={() => {
                       setFeatFilterCategory("all")
-                      setFeatFilterSource("all")
                     }}
                     className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                   >
@@ -1728,7 +1999,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               </div>
             )}
 
-            {activeTab === "class_resources" && (
+            {(activeTab === "class_resources" ||
+              activeTab === "subclasses" ||
+              activeTab === "abilities") && (
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
@@ -1737,9 +2010,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   <select
                     value={classResourceFilterClassId}
                     onChange={(e) => setClassResourceFilterClassId(e.target.value)}
-                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
+                    aria-label="Filter by class"
                   >
-                    <option value="all">All Classes</option>
+                    <option value="all">All classes</option>
+                    {activeTab === "abilities" ? (
+                      <option value={UNASSIGNED_CLASS_FILTER}>Unassigned / shared</option>
+                    ) : null}
                     {Object.entries(classNamesById)
                       .sort(([, a], [, b]) => a.localeCompare(b))
                       .map(([id, name]) => (
@@ -1841,26 +2118,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
             {activeTab === "backgrounds" && (
               <div id="background-filters" className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {backgroundSourceOptions.length > 1 ? (
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                      Source
-                    </label>
-                    <select
-                      value={backgroundFilterSource}
-                      onChange={(e) => setBackgroundFilterSource(e.target.value)}
-                      className="bg-card border-2 border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors max-w-[14rem]"
-                      aria-label="Filter backgrounds by source"
-                    >
-                      <option value="all">All sources</option>
-                      {backgroundSourceOptions.map((source) => (
-                        <option key={source} value={source}>
-                          {source}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                     Abilities
@@ -1891,12 +2148,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     })}
                   </div>
                 </div>
-                {(backgroundFilterAbilities.length > 0 || backgroundFilterSource !== "all") && (
+                {backgroundFilterAbilities.length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
                       setBackgroundFilterAbilities([])
-                      setBackgroundFilterSource("all")
                     }}
                     className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-xl transition-colors"
                   >

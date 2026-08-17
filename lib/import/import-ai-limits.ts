@@ -15,6 +15,8 @@ export function maxOutputTokensForImport(contentTypeHint?: string | null): numbe
       return 8192
     case "equipment":
       return 4096
+    case "images":
+      return 8192
     default:
       return 12_288
   }

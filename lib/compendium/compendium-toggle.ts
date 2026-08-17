@@ -242,6 +242,52 @@ export async function findDisabledCompendiumDependents(
   return disabled.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+export function mergeCompendiumToggleTargets(
+  groups: readonly CompendiumToggleTarget[][],
+  exclude?: ReadonlySet<string>,
+): CompendiumToggleTarget[] {
+  const seen = new Set<string>()
+  const out: CompendiumToggleTarget[] = []
+  for (const group of groups) {
+    for (const target of group) {
+      const key = `${target.table}:${target.id}`
+      if (exclude?.has(key) || seen.has(key)) continue
+      seen.add(key)
+      out.push(target)
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function groupCompendiumToggleTargets(
+  targets: readonly CompendiumToggleTarget[],
+): { contentType: CompendiumContentType; label: string; names: string[] }[] {
+  const byType = new Map<CompendiumContentType, string[]>()
+  for (const target of targets) {
+    const list = byType.get(target.contentType) ?? []
+    list.push(target.name)
+    byType.set(target.contentType, list)
+  }
+  return [...byType.entries()]
+    .map(([contentType, names]) => ({
+      contentType,
+      label: COMPENDIUM_TOGGLE_LABELS[contentType],
+      names: [...names].sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+export async function findCompendiumDependentsForTargets(
+  db: DataClient,
+  targets: readonly CompendiumToggleTarget[],
+): Promise<CompendiumToggleTarget[]> {
+  const groups = await Promise.all(
+    targets.map((target) => findCompendiumDependents(db, target.contentType, target.id)),
+  )
+  const exclude = new Set(targets.map((target) => `${target.table}:${target.id}`))
+  return mergeCompendiumToggleTargets(groups, exclude)
+}
+
 export async function setCompendiumItemsEnabled(
   db: DataClient,
   targets: CompendiumToggleTarget[],

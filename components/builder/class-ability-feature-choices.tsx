@@ -10,6 +10,7 @@ import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import type { FeatureChoiceCountBonusCharacteristic, FeatureChoiceOptionGrantCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
+import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import type { CustomAbility, Equipment, Feature } from "@/lib/types"
 
 type Props = {
@@ -213,7 +214,7 @@ export function ClassAbilityFeatureChoices({
             </p>
             {isWeaponMastery ? (
               <WeaponMasteryChoices
-                title={feature.name}
+                title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                 hint={hint}
                 options={choiceOptions}
                 maxCount={choiceCount}
@@ -225,7 +226,7 @@ export function ClassAbilityFeatureChoices({
               />
             ) : (
               <MultiSelectChoices
-                title={feature.name}
+                title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                 hint={hint}
                 options={optionsWithLocked}
                 maxCount={choiceCount}

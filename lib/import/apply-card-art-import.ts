@@ -33,6 +33,66 @@ const STORE_BY_TYPE: Record<CardArtContentType, CompendiumTable> = {
   ability: "custom_abilities",
 }
 
+/** Direct image file URL/path, including optional query string (foo.png?v=2). */
+const CARD_ART_IMAGE_URL_RE = /\.(?:png|jpe?g|webp|gif)(?:\?[^#]*)?$/i
+
+export function isDirectCardArtImageUrl(url: string): boolean {
+  const trimmed = url.trim()
+  if (!trimmed) return false
+  if (trimmed.startsWith("data:image/")) return true
+  const withoutHash = trimmed.split("#")[0] ?? trimmed
+  return CARD_ART_IMAGE_URL_RE.test(withoutHash)
+}
+
+function cardArtDedupeKey(entry: CardArtImportEntry): string {
+  return [
+    entry.content_type,
+    entry.name.trim().toLowerCase(),
+    (entry.class_name ?? "").trim().toLowerCase(),
+  ].join("\0")
+}
+
+/**
+ * Drop hallucinated/truncated URLs and duplicate (content_type, name, class_name) rows
+ * after the LLM JSON comes back.
+ */
+export function sanitizeCardArtEntries(entries: CardArtImportEntry[] | null | undefined): {
+  entries: CardArtImportEntry[]
+  droppedInvalid: number
+  droppedDuplicate: number
+} {
+  const kept: CardArtImportEntry[] = []
+  const seen = new Set<string>()
+  let droppedInvalid = 0
+  let droppedDuplicate = 0
+  for (const entry of entries ?? []) {
+    const url = entry.card_image_url?.trim() ?? ""
+    if (!entry.name.trim() || !isDirectCardArtImageUrl(url)) {
+      droppedInvalid += 1
+      continue
+    }
+    const key = cardArtDedupeKey(entry)
+    if (seen.has(key)) {
+      droppedDuplicate += 1
+      continue
+    }
+    seen.add(key)
+    kept.push({
+      ...entry,
+      name: entry.name.trim(),
+      card_image_url: url,
+      class_name: entry.class_name?.trim() || entry.class_name,
+    })
+  }
+  return { entries: kept, droppedInvalid, droppedDuplicate }
+}
+
+export function sanitizeImportedCardArt(content: ImportContent): ImportContent {
+  if (!content.card_art?.length) return content
+  const { entries } = sanitizeCardArtEntries(content.card_art)
+  return { ...content, card_art: entries.length ? entries : undefined }
+}
+
 /** True when this paste is an images/card-art map (not a full content extract). */
 export function isCardArtOnlyImport(content: ImportContent): boolean {
   if (!content.card_art?.length) return false
@@ -237,7 +297,19 @@ export async function persistCardArtImport(
   let totalImported = 0
 
   const byStore = new Map<CompendiumTable, CardArtImportEntry[]>()
-  for (const entry of entries) {
+  const { entries: sanitizedEntries, droppedInvalid, droppedDuplicate } =
+    sanitizeCardArtEntries(entries)
+  if (droppedInvalid > 0) {
+    warnings.push(
+      `Skipped ${droppedInvalid} card art URL${droppedInvalid === 1 ? "" : "s"} that did not end in .png, .jpg, .jpeg, .webp, or .gif.`,
+    )
+  }
+  if (droppedDuplicate > 0) {
+    warnings.push(
+      `Skipped ${droppedDuplicate} duplicate card art row${droppedDuplicate === 1 ? "" : "s"} (same type, name, and class).`,
+    )
+  }
+  for (const entry of sanitizedEntries) {
     const store = STORE_BY_TYPE[entry.content_type]
     const list = byStore.get(store) ?? []
     list.push(entry)

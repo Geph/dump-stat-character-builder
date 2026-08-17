@@ -26,6 +26,15 @@
     break-inside: avoid;
   }
 
+  .print-sheet-section {
+    display: block !important;
+    break-before: page;
+  }
+
+  .print-sheet-section:first-of-type {
+    break-before: auto;
+  }
+
   a[href]::after {
     content: " (" attr(href) ")";
     font-size: 9pt;

@@ -8,6 +8,8 @@ export type PartyAllyCandidate = PartyEffectTarget & {
   currentHp: number | null
   maxHp: number | null
   tempHp?: number | null
+  activeConditions?: string[]
+  hasInspiration?: boolean
 }
 
 type CharacterLike = Pick<
@@ -22,9 +24,12 @@ export function collectPartyAllyCandidates(
   options?: { includeSelfId?: string | null; includeCompanions?: boolean },
 ): PartyAllyCandidate[] {
   const includeCompanions = options?.includeCompanions !== false
+  const ids = normalizePartyCharacterIds(partyCharacterIds)
+  const selfId = options?.includeSelfId?.trim() || ""
+  if (selfId && !ids.includes(selfId)) ids.unshift(selfId)
   const out: PartyAllyCandidate[] = []
 
-  for (const characterId of normalizePartyCharacterIds(partyCharacterIds)) {
+  for (const characterId of ids) {
     const character = charactersById.get(characterId)
     if (!character) continue
 
@@ -38,6 +43,8 @@ export function collectPartyAllyCandidates(
       currentHp: typeof currentHp === "number" ? currentHp : null,
       maxHp: typeof maxHp === "number" ? maxHp : null,
       tempHp: play?.tempHp ?? null,
+      activeConditions: play?.activeConditions ?? [],
+      hasInspiration: play?.hasInspiration ?? false,
     })
 
     if (!includeCompanions) continue
@@ -51,7 +58,8 @@ export function collectPartyAllyCandidates(
         label: `${character.name}'s ${companion.customName?.trim() || companion.key}`,
         currentHp: typeof companion.currentHp === "number" ? companion.currentHp : null,
         maxHp: null,
-        tempHp: null,
+        tempHp: typeof companion.tempHp === "number" ? companion.tempHp : null,
+        activeConditions: companion.activeConditions ?? [],
       })
     }
   }

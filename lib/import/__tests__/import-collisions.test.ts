@@ -3,6 +3,7 @@ import {
   applyImportCollisionResolutions,
   applyImportRenames,
   buildImportCollisions,
+  collisionUpdateNamesByKind,
   defaultCollisionResolutionMap,
   defaultRenameMap,
   type ImportCollisionKind,
@@ -72,6 +73,25 @@ describe("buildImportCollisions", () => {
     )
     expect(defaultRenameMap(collisions)).toEqual({})
     expect(collisions[0]?.suggestedName).toBe("Warden (Mage Hand Press)")
+  })
+
+  it("keeps the original name when update is selected", () => {
+    const content = {
+      classes: [{ name: "Alchemist", description: "Incoming", features: [{ name: "New Trick" }] }],
+    }
+    const collisions = buildImportCollisions(content as unknown as ImportContent, {
+      class: [{ name: "Alchemist", source: "Mage Hand Press" }],
+    })
+    const next = applyImportCollisionResolutions(
+      content as unknown as ImportContent,
+      collisions,
+      { [collisions[0].id]: "update" },
+      defaultRenameMap(collisions),
+    )
+    expect(next.classes?.[0].name).toBe("Alchemist")
+    expect(collisionUpdateNamesByKind(collisions, { [collisions[0].id]: "update" })).toEqual({
+      class: ["alchemist"],
+    })
   })
 
   it("keeps the original name when overwrite is selected", () => {

@@ -12,6 +12,10 @@ import {
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
+import {
+  inferGrantInspirationEffect,
+  shouldCollectTargetableEffect,
+} from "@/lib/character/effect-target-policy"
 import type { CustomAbility, Feature, FeatureActivation, FeatureEffect, Species, UsesConfig } from "@/lib/types"
 
 export type ActionEconomyKind = "action" | "bonus" | "reaction"
@@ -52,7 +56,7 @@ export type SheetActionEntry = {
   spendHitDice?: number | null
   /** Hit die sides for this action's owning class (e.g. Draconic Vengeance damage). */
   hitDieSides?: number | null
-  /** heal_self / grant_temp_hp effects applied when the action is used. */
+  /** Heal, temp HP, and other ally-targetable effects applied when the action is used. */
   healEffects?: FeatureEffect[]
   /**
    * When false, Use does not mark Action/Bonus/Reaction spent
@@ -365,7 +369,7 @@ function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
   const seen = new Set<string>()
   const push = (list: FeatureEffect[] | undefined) => {
     for (const effect of list ?? []) {
-      if (effect.kind !== "heal_self" && effect.kind !== "grant_temp_hp") continue
+      if (!shouldCollectTargetableEffect(effect)) continue
       const key = effect.id || `${effect.kind}:${effect.label ?? ""}:${effect.healMode ?? ""}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -375,6 +379,10 @@ function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
   push(item.activation?.effects)
   for (const instance of item.linkedModifiers ?? []) {
     push(instance.activation?.effects)
+  }
+  if (!effects.length) {
+    const inferred = inferGrantInspirationEffect(item.name, item.description)
+    if (inferred) effects.push(inferred)
   }
   return effects
 }
@@ -452,6 +460,7 @@ type MovementOptionExpansion = {
   description: string
   kinds: ActionEconomyKind[]
   category: SheetActionCategory
+  healEffects?: FeatureEffect[]
 }
 
 function expansionsFromStandardActions(
@@ -492,6 +501,7 @@ function expansionsFromMovementOptions(
   const expansions: MovementOptionExpansion[] = []
   for (const effect of instance.activation?.effects ?? []) {
     if ((effect as { kind?: string }).kind !== "movement_option") continue
+    const allyEffects = shouldCollectTargetableEffect(effect) ? [effect] : undefined
     for (const { flag, actionId } of MOVEMENT_OPTION_DEFAULT_ACTIONS) {
       if (!(effect as unknown as Record<string, unknown>)[flag]) continue
       const defaultAction = DEFAULT_ACTION_BY_ID.get(actionId)
@@ -503,6 +513,7 @@ function expansionsFromMovementOptions(
           (effect as { label?: string | null }).label?.trim() || defaultAction.description,
         kinds,
         category: defaultAction.category === "combat" ? "combat" : "utility",
+        healEffects: allyEffects,
       })
     }
     if ((effect as { movementHideBehindLargerCreatures?: boolean }).movementHideBehindLargerCreatures) {
@@ -635,6 +646,7 @@ function pushActivatableItemActions(
       classResourceKey: resolveActionResourceKey(feature),
       spendHitDice: resolveSpendHitDice(feature),
       hitDieSides: hitDieSides ?? null,
+      healEffects: expansion.healEffects,
     })
   }
 }

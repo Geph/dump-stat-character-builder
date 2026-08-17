@@ -125,6 +125,8 @@ export type ResolvedCompanion = {
 export type CharacterCompanionState = {
   key: string
   currentHp: number | null
+  /** Temporary hit points stored on the companion (same rules as character temp HP). */
+  tempHp?: number | null
   customName?: string | null
   /** Active conditions tracked on the companion sub-sheet. */
   activeConditions?: string[] | null

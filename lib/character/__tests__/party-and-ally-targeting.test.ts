@@ -4,7 +4,14 @@ import {
   normalizePartyCharacterIds,
   validatePartyMembers,
 } from "@/lib/character/party"
-import { resolveEffectTargetPolicy } from "@/lib/character/effect-target-policy"
+import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
+import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
+import {
+  collectTargetableEffects,
+  inferGrantInspirationEffect,
+  resolveEffectTargetPolicy,
+} from "@/lib/character/effect-target-policy"
+import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
 import { resolveFeatureEffectHealAmount } from "@/lib/character/resolve-feature-effect-heal"
 import {
   dashboardPartyHref,
@@ -68,6 +75,130 @@ describe("ally heal targeting", () => {
       resolveEffectTargetPolicy({ kind: "grant_temp_hp", label: "Grant 5 temp HP to an ally" }),
     ).toBe("choose_ally")
     expect(resolveEffectTargetPolicy({ kind: "heal_self", healTarget: "self" })).toBe("self")
+    expect(resolveEffectTargetPolicy({ kind: "modify_creature", rollTarget: "ally" })).toBe(
+      "choose_ally",
+    )
+    expect(
+      resolveEffectTargetPolicy({
+        kind: "movement_option",
+        label: "An ally within 30 ft moves half their Speed",
+      }),
+    ).toBe("choose_ally")
+  })
+
+  it("collects buffs, conditions, movement, and inspiration for the ally picker", () => {
+    const collected = collectTargetableEffects([
+      { id: "bi", kind: "modify_creature", rollTarget: "ally" },
+      { id: "veil", kind: "modify_creature", rollTarget: "ally", effectConditionTypes: ["Invisible"] },
+      {
+        id: "move",
+        kind: "movement_option",
+        label: "Then an ally within 30 ft moves half their Speed",
+      },
+      { id: "adv", kind: "check_roll_modifier", checkRollMode: "advantage", rollTarget: "ally" },
+      { id: "insp", kind: "grant_inspiration", healTarget: "choose_ally" },
+      { id: "self-dash", kind: "movement_option", movementDash: true },
+      { id: "cut", kind: "modify_creature", rollTarget: "enemy" },
+    ])
+    expect(collected.map((row) => row.effect.id)).toEqual(["bi", "veil", "move", "adv", "insp"])
+    expect(collected.every((row) => row.policy === "choose_ally")).toBe(true)
+  })
+
+  it("infers Heroic Inspiration grants to allies from action text", () => {
+    const inferred = inferGrantInspirationEffect(
+      "Encouraging Song",
+      "After a Short or Long Rest, give Heroic Inspiration to PB allies who hear you",
+    )
+    expect(inferred?.kind).toBe("grant_inspiration")
+    expect(inferred?.healTarget).toBe("choose_ally")
+    expect(
+      inferGrantInspirationEffect("Bardic Inspiration", "Give a creature a Bardic Inspiration die"),
+    ).toBeNull()
+  })
+})
+
+describe("party ally candidates", () => {
+  it("includes this character and their companion even with no party", () => {
+    const charactersById = new Map<string, Character>([
+      [
+        "solo",
+        {
+          id: "solo",
+          name: "Druid",
+          companion_state: [{ key: "wolf", currentHp: 11, tempHp: 4, customName: "Ash" }],
+        } as Character,
+      ],
+    ])
+    const rows = collectPartyAllyCandidates([], charactersById, {
+      includeSelfId: "solo",
+      includeCompanions: true,
+    })
+    expect(rows.map((row) => row.label)).toEqual(["Druid", "Druid's Ash"])
+    const companion = rows.find((row) => row.kind === "companion")
+    expect(companion?.tempHp).toBe(4)
+    expect(companion?.currentHp).toBe(11)
+  })
+})
+
+describe("apply ally effects", () => {
+  const healContext = { characterLevel: 5, proficiencyBonus: 3, abilityMods: {} }
+
+  it("stores temp HP on a companion", () => {
+    const result = applyAllyEffectLocally({
+      effect: { id: "thp", kind: "grant_temp_hp", healMode: "fixed", healFixed: 8 },
+      target: { kind: "companion", characterId: "solo", companionKey: "wolf", label: "Ash" },
+      healContext,
+      companion: { key: "wolf", currentHp: 11, tempHp: 2 },
+    })
+    expect(result?.kind).toBe("temp_hp")
+    expect(result?.companionPatch?.tempHp).toBe(8)
+    expect(result?.companionPatch?.currentHp).toBeUndefined()
+  })
+
+  it("heals a companion without clearing temp HP", () => {
+    const result = applyAllyEffectLocally({
+      effect: { id: "heal", kind: "heal_self", healMode: "fixed", healFixed: 5 },
+      target: { kind: "companion", characterId: "solo", companionKey: "wolf", label: "Ash" },
+      healContext,
+      companion: { key: "wolf", currentHp: 11, tempHp: 4 },
+      maxHp: 20,
+    })
+    expect(result?.companionPatch?.currentHp).toBe(16)
+    expect(result?.companionPatch?.tempHp).toBeUndefined()
+  })
+
+  it("applies conditions, inspiration, and a duration reminder on a character", () => {
+    const play = defaultSheetPlayState()
+    const invisible = applyAllyEffectLocally({
+      effect: {
+        id: "veil",
+        kind: "modify_creature",
+        rollTarget: "ally",
+        effectConditionTypes: ["Invisible"],
+      },
+      target: { kind: "character", characterId: "ally", label: "Bard" },
+      healContext,
+      play,
+    })
+    expect(invisible?.playPatch?.activeConditions).toContain("Invisible")
+
+    const inspiration = applyAllyEffectLocally({
+      effect: { id: "insp", kind: "grant_inspiration", healTarget: "choose_ally" },
+      target: { kind: "character", characterId: "ally", label: "Bard" },
+      healContext,
+      play,
+    })
+    expect(inspiration?.playPatch?.hasInspiration).toBe(true)
+
+    const buff = applyAllyEffectLocally({
+      effect: { id: "bi", kind: "modify_creature", rollTarget: "ally", label: "Bardic Inspiration" },
+      target: { kind: "character", characterId: "ally", label: "Bard" },
+      healContext,
+      play,
+    })
+    expect(buff?.playPatch?.durationReminders?.some((row) => row.label === "Bardic Inspiration")).toBe(
+      true,
+    )
   })
 
   it("resolves heal amounts from feature effects", () => {

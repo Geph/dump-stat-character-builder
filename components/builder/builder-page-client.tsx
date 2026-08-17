@@ -71,6 +71,11 @@ import {
   isWeaponItem,
 } from "@/lib/compendium/combat-stats"
 import { BuilderStepNav } from "@/components/builder/builder-step-nav"
+import {
+  asBuilderBlockers,
+  scrollToBuilderTarget,
+  type BuilderBlocker,
+} from "@/lib/builder/proceed-blockers"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { EquipmentShoppingPanel } from "@/components/builder/equipment-shopping-panel"
 import { BackgroundDetailStrip } from "@/components/compendium/background-detail-strip"
@@ -126,6 +131,7 @@ import {
   weaponMasteryCatalogEntriesFromAbilities,
 } from "@/lib/compendium/weapon-mastery"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
+import { chosenOptionNames, withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
 import { AbilityScoreCards } from "@/components/builder/ability-score-cards"
 import {
@@ -2638,7 +2644,7 @@ export default function BuilderPageClient() {
       default:
         break
     }
-    return blockers
+    return asBuilderBlockers(blockers, currentStep)
   }, [
     currentStep,
     activeClassLevels,
@@ -2706,7 +2712,15 @@ export default function BuilderPageClient() {
     for (const issue of multiclassAbilityIssues) {
       blockers.push(formatMulticlassAbilityIssue(issue))
     }
-    return blockers
+    return asBuilderBlockers(blockers, BUILDER_STEP_IDS.DETAILS).map((blocker) => {
+      if (/class/i.test(blocker.message) && !/name/i.test(blocker.message)) {
+        return { ...blocker, stepId: BUILDER_STEP_IDS.CLASS, targetId: "builder-class-skills" }
+      }
+      if (/ability/i.test(blocker.message)) {
+        return { ...blocker, stepId: BUILDER_STEP_IDS.ABILITIES, targetId: "builder-abilities" }
+      }
+      return blocker
+    })
   }, [character.name, activeClassLevels.length, multiclassAbilityIssues])
 
   const hasSpellStep = spellcastingClasses.length > 0
@@ -2746,6 +2760,11 @@ export default function BuilderPageClient() {
     if (builderStepOrder(stepId) <= maxOrder) {
       setCurrentStep(stepId)
     }
+  }
+
+  const jumpToBlocker = (blocker: BuilderBlocker) => {
+    if (blocker.stepId) setCurrentStep(blocker.stepId)
+    window.setTimeout(() => scrollToBuilderTarget(blocker.targetId), 80)
   }
 
   const goBackStep = () => {
@@ -2973,6 +2992,7 @@ export default function BuilderPageClient() {
                   }
                   lastStep={lastVisibleStepId}
                   compact={cardViewMode === "dense"}
+                  onJumpBlocker={jumpToBlocker}
                 />
               </div>
             </div>
@@ -2993,7 +3013,7 @@ export default function BuilderPageClient() {
               >
             {/* Step 1: Class Selection */}
             {currentStep === 1 && (
-              <div>
+              <div id="builder-class-skills">
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Class & Level</h2>
                 <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
                 
@@ -3481,7 +3501,7 @@ export default function BuilderPageClient() {
                               <div key={key} className="space-y-2">
                                 {isWeaponMastery ? (
                                   <WeaponMasteryChoices
-                                    title={feature.name}
+                                    title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                                     hint={masteryHint}
                                     options={choiceOptions}
                                     maxCount={choiceCount}
@@ -3495,7 +3515,7 @@ export default function BuilderPageClient() {
                                   />
                                 ) : (
                                   <MultiSelectChoices
-                                    title={feature.name}
+                                    title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                                     hint={masteryHint}
                                     options={choiceOptions}
                                     maxCount={choiceCount}
@@ -3841,7 +3861,7 @@ export default function BuilderPageClient() {
 
             {/* Step 2: Origin (Species + Background) */}
             {currentStep === 2 && (
-              <div className="space-y-6">
+              <div id="builder-origin-species" className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Species</h2>
                   <p className={`${pageFloatingHintClass} mb-3`}>Your species grants unique traits and abilities.</p>
@@ -4635,7 +4655,7 @@ export default function BuilderPageClient() {
 
             {/* Step 3: Ability Scores */}
             {currentStep === 3 && (
-              <div>
+              <div id="builder-abilities">
                 <h2 className="text-2xl font-black text-foreground mb-2">Determine Ability Scores</h2>
                 <p className={`${pageFloatingHintClass} mb-6`}>Set your character&apos;s core abilities.</p>
 
@@ -5609,6 +5629,7 @@ export default function BuilderPageClient() {
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-foreground mb-2">Character Name *</label>
                     <input
+                      id="builder-details-name"
                       type="text"
                       value={character.name}
                       onChange={(e) => patchCharacter({ name: e.target.value })}
@@ -5693,6 +5714,7 @@ export default function BuilderPageClient() {
                 }
                 lastStep={lastVisibleStepId}
                 compact={cardViewMode === "dense"}
+                onJumpBlocker={jumpToBlocker}
               />
             </div>
           </div>
@@ -5959,7 +5981,7 @@ export default function BuilderPageClient() {
                             .filter((f) => f.level <= cls.level)
                             .map((feature, i) => (
                             <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
-                              <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
+                              <p className="font-bold text-foreground">{withChosenOptionChrome(feature.name, chosenOptionNames(feature, cls.id, featureChoicePicks))} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
                               <ClampedRichText html={feature.description} lines={2} className="text-[10px]" />
                             </div>
                           ))}
@@ -5974,7 +5996,7 @@ export default function BuilderPageClient() {
                           .filter((f) => f.level <= totalLevel)
                           .map((feature, i) => (
                           <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
-                            <p className="font-bold text-foreground">{feature.name} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
+                            <p className="font-bold text-foreground">{withChosenOptionChrome(feature.name, chosenOptionNames(feature, primaryClass.id, featureChoicePicks))} <span className="text-muted-foreground">(Lv {feature.level})</span></p>
                             <ClampedRichText html={feature.description} lines={2} className="text-[10px]" />
                           </div>
                         ))}
@@ -5991,7 +6013,7 @@ export default function BuilderPageClient() {
                       <div className="space-y-1">
                         {selectedSpecies.traits.map((trait, i) => (
                           <div key={i} className="p-1.5 bg-muted/30 rounded text-[10px]">
-                            <p className="font-bold text-foreground">{trait.name}</p>
+                            <p className="font-bold text-foreground">{withChosenOptionChrome(trait.name, chosenOptionNames(trait, null, featureChoicePicks))}</p>
                             <ClampedRichText html={trait.description} lines={2} className="text-[10px]" />
                           </div>
                         ))}
@@ -6004,7 +6026,7 @@ export default function BuilderPageClient() {
                     <div>
                       <p className="text-[9px] text-accent uppercase font-bold mb-1">Background Feature</p>
                       <div className="p-1.5 bg-muted/30 rounded text-[10px]">
-                        <p className="font-bold text-foreground">{selectedBackground.feature.name}</p>
+                        <p className="font-bold text-foreground">{withChosenOptionChrome(selectedBackground.feature.name, chosenOptionNames(selectedBackground.feature, null, featureChoicePicks))}</p>
                         <ClampedRichText
                           html={selectedBackground.feature.description}
                           lines={3}

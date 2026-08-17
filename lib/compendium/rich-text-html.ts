@@ -1,22 +1,12 @@
 /** Shared HTML helpers for rich text fields (editor + import). */
 
+import { escapeHtml, isHtml } from "@/lib/compendium/html-utils"
 import { markdownToHtml } from "@/lib/compendium/markdown-to-html"
 
-export function isHtml(value: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(value)
-}
-
-export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
+export { escapeHtml, isHtml }
 
 export function toEditorHtml(value: string): string {
   if (!value?.trim()) return ""
-  if (isHtml(value)) return value
   return markdownToHtml(value)
 }
 

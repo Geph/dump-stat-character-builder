@@ -1,6 +1,7 @@
 "use client"
 
 import { Info } from "lucide-react"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function ConditionInfoTip({
@@ -24,7 +25,11 @@ export function ConditionInfoTip({
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={6} className="max-w-[260px] text-left">
-        {description}
+        <RichTextContent
+          html={description}
+          className="text-xs text-inherit [&_p]:mb-1 [&_p:last-child]:mb-0"
+          fallback=""
+        />
       </TooltipContent>
     </Tooltip>
   )

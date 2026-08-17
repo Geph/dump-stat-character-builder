@@ -38,17 +38,23 @@ A modern 5E compatible character builder and compendium built with Next.js and M
 - **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level
 - **Spell editor** — Casting time, range, and duration presets with “Other” custom values; ritual and concentration on the same row as level and school; edit sections open by default
 - **Section export & clear** — Export or wipe an entire compendium tab from the gear menu
-- **Filtering & search** — Find content quickly with search and category filters
+- **Filtering & search** — Find content quickly with search, source, and category filters. Creatures and Species also filter by **type** (`Humanoid (Goblinoid)` matches `Humanoid`). Abilities and subclasses can filter by parent class
 
 ### Character Management
 - **Save & load characters** — Persist characters to MySQL; resume editing from the builder
 - **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab driven by Creatures & Companions grants, roll-able special actions from features, off-hand weapon slots for dual wielding, and class-feature toggles (e.g. Rage, Innate Sorcery) with conditional combat bonuses
+- **Level-up wizard** — On the sheet, gain a level and walk through new features, subclass unlocks, and ASI / feat picks
+- **Duration reminders** — Pin timed effects on the sheet (concentration, 1 minute, end of next turn) so they stay visible during play
+- **Resume last character** — Optional Home shortcut that opens the last sheet you used
+- **Manual skill ability** — Optional house rule: click a skill’s ability label to roll it with a different modifier
 - **Export options** — Download character and compendium data as JSON
 
 ### Import
 - **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including armor types and Creatures & Companions); **no AI**
 - **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
-- **Content-type hints** — Focus extraction on Class + subclasses (include spell list), Subclasses only (parent already imported), Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, or Custom Invocations / Metamagic (same custom-abilities pipeline)
+- **Content-type hints** — Focus extraction on Class + subclasses (include spell list), Subclasses only (parent already imported), Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, Custom Invocations / Metamagic, or **Images from URL** (card art only)
+- **Images from URL** — Map card art from a directory or page of image links. Server AI can call a same-host `fetch_url` tool (SSRF-limited) instead of guessing filenames. Image-only imports apply art to matching entries and do not invent class features
+- **Name collisions** — When an import matches an existing name: **Update existing** adds new features, resources, and images; **Replace existing** wipes the stored row; or import under a new name / skip
 - **Same-source replacements** — When importing a class that replaces SRD spells or feats, optionally prefer matching names from the import’s Source label over base SRD entries
 - **Creature import v2** — Structured creatures/companions JSON (schema `2.0`) with loud validation; Foundry NPC actors map into the same Creatures catalog
 - **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
@@ -248,7 +254,7 @@ Restart the dev server after changing keys. Without any provider key, seed, Dump
 
 ## Import formats
 
-Dump Stat supports five compendium import paths:
+Dump Stat supports six compendium import paths:
 
 | Method | Input | AI? | Best for |
 |--------|--------|-----|----------|
@@ -256,6 +262,7 @@ Dump Stat supports five compendium import paths:
 | **Dump Stat JSON** | `.json` file or pasted JSON | No | Homebrew with full `linkedModifiers`, repeatable imports |
 | **Foundry VTT JSON** | `dnd5e` item/NPC/pack export (file or pasted) | No | Migrating items, feats, spells, classes, and creatures from Foundry |
 | **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, website copy-paste, copied stat blocks |
+| **Images from URL** | Directory or page URL + Images from URL hint | Optional server AI or BYO LLM | Card art mapping without rewriting rules |
 | **PDF import** | Uploaded PDF (+ optional page range) | Optional server AI | Same as text; also accepts JSON export files (no AI) |
 
 ### Dump Stat JSON export
@@ -567,20 +574,27 @@ app/
 ├── builder/              # Character builder
 ├── characters/           # Character list and sheets
 ├── compendium/           # Content browser and editors
-├── import/               # PDF and text import
+├── import/               # PDF, text, and Images from URL import
 └── api/                  # REST routes (seed, import, data, characters)
 
 lib/
 ├── db/                   # MySQL connection, Drizzle schema, migrations
 ├── builder/              # Draft storage, ASI allocation, feat selection, equipment utils
-├── compendium/           # Background proficiencies, display helpers, editor field styles
+├── character/            # Live sheet math (DerivedCharacter), level-up, rest, companions
+├── compendium/           # Modifiers, enrichment, display helpers, card-image defaults
 ├── srd/                  # SRD seed data and parsers
-├── import/               # Import normalization and dump-stat export format
+├── import/               # Import pipeline, collisions, enrichment presets, card art
 └── site-images.ts        # Marketing image paths
+
+docs/
+├── repository-overview.md          # Directory map, key files, copyright
+├── homebrew-import-review.md       # Drive extract → audit → enrich loop
+└── modifier-vs-feature-effect.md   # Which effect system to author
 
 components/
 ├── compendium/           # Editor header row, card image field, selection cards, detail overlays
 ├── builder/              # Step nav, multi-select choices, ASI allocator
+├── character-sheet/      # Play sheet, level-up wizard, duration reminders
 └── game-icon-picker.tsx  # SVG game-icons.net picker for compendium entries
 
 mysql/

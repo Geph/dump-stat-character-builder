@@ -66,11 +66,18 @@ export type ImportReportClass = {
   notes: string[]
 }
 
+export type ImportWiringScoreboard = {
+  linked: number
+  presetOnly: number
+  textOnly: number
+}
+
 export type ImportReport = {
   summary: {
     totalImported: number
     breakdown: Record<string, number>
     autoWiredModifiers: number
+    wiring: ImportWiringScoreboard
   }
   tokenSavings?: {
     inputCharsBefore: number
@@ -504,11 +511,24 @@ export function buildImportReport(params: {
     })
   }
 
+  const wiring = subclasses.reduce(
+    (acc, subclass) => {
+      for (const feature of subclass.features) {
+        if (feature.modifierStatus === "linked") acc.linked += 1
+        else if (feature.modifierStatus === "preset_only") acc.presetOnly += 1
+        else acc.textOnly += 1
+      }
+      return acc
+    },
+    { linked: 0, presetOnly: 0, textOnly: unmatchedFeatures.length },
+  )
+
   const baseReport: ImportReport = {
     summary: {
       totalImported: params.totalImported,
       breakdown: params.breakdown,
       autoWiredModifiers,
+      wiring,
     },
     warnings: params.warnings,
     classes,

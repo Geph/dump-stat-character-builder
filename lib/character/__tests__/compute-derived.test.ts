@@ -147,6 +147,21 @@ describe("computeDerivedCharacter", () => {
     )
   })
 
+  it("applies house-rule skill ability overrides to bonuses and passives", () => {
+    const derived = computeDerivedCharacter({
+      ...barbarianShieldFixture(),
+      skillAbilityOverrides: {
+        Arcana: "strength",
+        Perception: "strength",
+      },
+    })
+    const arcana = derived.skills.find((skill) => skill.name === "Arcana")
+    expect(arcana?.ability).toBe("strength")
+    expect(arcana?.defaultAbility).toBe("intelligence")
+    expect(arcana?.bonus).toBe(3)
+    expect(derived.passivePerception).toBe(13)
+  })
+
   it("Fighter 1 with Archery and background ASI applies ability boosts and ranged bonus", () => {
     const inputs = fighterArcheryBackgroundFixture()
     const derived = computeDerivedCharacter(inputs)

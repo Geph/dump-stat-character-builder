@@ -108,7 +108,9 @@ export async function confirmClientByoJsonImport(params: {
     params.pendingContent,
     params.skippedPreviewKeys ?? [],
   )
-  const multiClassBlock = getMultipleClassImportBlock(contentForGate, "text")
+  const multiClassBlock = !isCardArtOnlyImport(contentForGate)
+    ? getMultipleClassImportBlock(contentForGate, "text")
+    : null
   if (multiClassBlock) {
     throw new Error(multiClassBlock.message)
   }

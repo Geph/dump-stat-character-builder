@@ -92,6 +92,8 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
       skillSortMode: "ability",
       pinnedSkillNames: [],
       pinnedEquipmentIds: [],
+      durationReminders: [],
+      skillAbilityOverrides: {},
       savedAt: "2026-01-01T00:00:00.000Z",
     },
     created_at: "2026-01-01T00:00:00.000Z",

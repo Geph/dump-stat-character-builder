@@ -39,13 +39,17 @@ import {
   ClipboardCopy,
   Download,
   FileText,
+  ImageIcon,
   Info,
   Library,
   Loader2,
   Type,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { isCustomAbilitiesContentTypeHint } from "@/lib/import/content-type-hints"
+import {
+  isCustomAbilitiesContentTypeHint,
+  isImagesContentTypeHint,
+} from "@/lib/import/content-type-hints"
 
 type ClipboardImportPanelProps = {
   contentType: string
@@ -214,6 +218,7 @@ export function ClipboardImportPanel({
   }
 
   const isProcessing = status === "processing"
+  const isImagesImport = isImagesContentTypeHint(contentType)
 
   return (
     <div className="space-y-8">
@@ -428,13 +433,18 @@ export function ClipboardImportPanel({
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-base font-bold text-foreground">Step 1 — Extract with your LLM</h2>
+          <h2 className="text-base font-bold text-foreground">
+            {isImagesImport ? "Step 1 — Map image URLs" : "Step 1 — Extract with your LLM"}
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Choose one path below. Both produce the same JSON format for Step 2.
+            {isImagesImport
+              ? "Paste direct image URLs and/or a public directory listing URL. Server AI crawls listings with fetch_url. For BYO, copy the prompt into a tool-capable LLM, then paste the returned card_art JSON in Step 2. Or download the template and fill it in yourself."
+              : "Choose one path below. Both produce the same JSON format for Step 2."}
           </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className={isImagesImport ? "space-y-4" : "grid gap-4 lg:grid-cols-2"}>
+          {!isImagesImport ? (
           <div className="rounded-xl border-2 border-border bg-card p-4 space-y-4 flex flex-col">
             <div className="flex items-start gap-3">
               <div className="rounded-lg bg-lime/10 p-2 shrink-0">
@@ -541,31 +551,43 @@ export function ClipboardImportPanel({
               Copy extraction prompt for PDF upload
             </button>
           </div>
+          ) : null}
 
           <div className="rounded-xl border-2 border-border bg-card p-4 space-y-4 flex flex-col">
             <div className="flex items-start gap-3">
               <div className="rounded-lg bg-lime/10 p-2 shrink-0">
-                <Type className="h-5 w-5 text-lime" />
+                {isImagesImport ? (
+                  <ImageIcon className="h-5 w-5 text-lime" />
+                ) : (
+                  <Type className="h-5 w-5 text-lime" />
+                )}
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Option B
+                  {isImagesImport ? "Image URLs" : "Option B"}
                 </p>
-                <h3 className="text-sm font-semibold text-foreground">Pasted source text</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {isImagesImport ? "Paste one or more URLs" : "Pasted source text"}
+                </h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  Paste raw text from a PDF copy, website, wiki, or other document — then copy the
-                  combined prompt and text into your LLM.
+                  {isImagesImport
+                    ? "One URL per line: a direct image file (.png, .jpg, .webp, .gif) or a public directory / listing page. Server AI fetches listings with fetch_url (same host/path, 20-call cap). Not a PDF."
+                    : "Paste raw text from a PDF copy, website, wiki, or other document — then copy the combined prompt and text into your LLM."}
                 </p>
               </div>
             </div>
 
             <div className="space-y-2 flex-1">
               <label htmlFor="byo-source-text" className="text-xs font-medium text-foreground">
-                Source text
+                {isImagesImport ? "Image URLs" : "Source text"}
               </label>
               <textarea
                 id="byo-source-text"
-                placeholder="Paste class features, spell text, species traits, or PDF-extracted text here..."
+                placeholder={
+                  isImagesImport
+                    ? "https://example.com/images/\nhttps://example.com/images/classes/dancer.png"
+                    : "Paste class features, spell text, species traits, or PDF-extracted text here..."
+                }
                 value={sourceText}
                 maxLength={PASTED_SOURCE_TEXT_MAX_CHARS}
                 onChange={(event) => onSourceTextChange(event.target.value)}
@@ -580,29 +602,61 @@ export function ClipboardImportPanel({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => handleCopy("full")}
-              disabled={!sourceText.trim() || !sourceTextLimit.ok}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
-            >
-              {copied === "full" ? (
-                <Check className="h-4 w-4 text-success" />
-              ) : (
-                <ClipboardCopy className="h-4 w-4" />
-              )}
-              Copy prompt + source text
-            </button>
+            {isImagesImport ? (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => handleCopy("prompt")}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium hover:bg-muted/60"
+                >
+                  {copied === "prompt" ? (
+                    <Check className="h-4 w-4 text-success" />
+                  ) : (
+                    <ClipboardCopy className="h-4 w-4" />
+                  )}
+                  Copy extraction prompt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCopy("full")}
+                  disabled={!sourceText.trim() || !sourceTextLimit.ok}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
+                >
+                  {copied === "full" ? (
+                    <Check className="h-4 w-4 text-success" />
+                  ) : (
+                    <ClipboardCopy className="h-4 w-4" />
+                  )}
+                  Copy prompt + URLs
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleCopy("full")}
+                disabled={!sourceText.trim() || !sourceTextLimit.ok}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-lime/30 bg-lime/10 px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-lime/15 disabled:opacity-50"
+              >
+                {copied === "full" ? (
+                  <Check className="h-4 w-4 text-success" />
+                ) : (
+                  <ClipboardCopy className="h-4 w-4" />
+                )}
+                Copy prompt + source text
+              </button>
+            )}
           </div>
         </div>
 
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Option C
+              {isImagesImport ? "Optional" : "Option C"}
             </p>
             <p className="text-sm text-foreground mt-0.5">
-              Skip the LLM — download the JSON template and fill it in by hand.
+              {isImagesImport
+                ? "Skip the LLM — download the card_art JSON template and fill in URLs by hand."
+                : "Skip the LLM — download the JSON template and fill it in by hand."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
@@ -650,7 +704,11 @@ export function ClipboardImportPanel({
           </p>
         </div>
         <textarea
-          placeholder='Paste the model JSON here, e.g. { "classes": [ ... ] }'
+          placeholder={
+            isImagesImport
+              ? 'Paste the model JSON here, e.g. { "card_art": [ ... ] }'
+              : 'Paste the model JSON here, e.g. { "classes": [ ... ] }'
+          }
           value={jsonText}
           onChange={(event) => onJsonTextChange(event.target.value)}
           rows={8}
@@ -686,8 +744,11 @@ export function ClipboardImportPanel({
           {showServerAi ? (
             <div className="space-y-3 border-t border-border px-4 py-4">
               <p className="text-xs text-muted-foreground">
-                Runs extraction on the server using the host&apos;s API key. Uses the source text
-                from Option B above — not the JSON output box.
+                Runs extraction on the server using the host&apos;s API key. Uses the{" "}
+                {isImagesImport
+                  ? "image or directory URLs from Step 1 — the model can call fetch_url so Dump Stat fetches listings server-side"
+                  : "source text from Step 1 above"}
+                — not the JSON output box.
               </p>
               <ImportAiSettings value={importAiSettings} onChange={onImportAiSettingsChange} />
               <div className="flex justify-end">

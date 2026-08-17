@@ -48,7 +48,15 @@ describe("equipment sheet pins and filters", () => {
     const armor = item({ id: "mail", name: "Chain Mail", category: "Armor" })
 
     expect(matchesEquipmentSheetFilter(armor, "armor")).toBe(true)
+    const staff = item({
+      id: "staff",
+      name: "Staff of Fire",
+      category: "Adventuring Gear",
+      magic_item_category: "Staff",
+      rarity: "Very Rare",
+    })
     expect(matchesEquipmentSheetFilter(sword, "weapons")).toBe(true)
+    expect(matchesEquipmentSheetFilter(staff, "weapons")).toBe(true)
     expect(matchesEquipmentSheetFilter(pack, "adventuring_gear")).toBe(true)
     expect(matchesEquipmentSheetFilter(magicSword, "magic")).toBe(true)
     expect(matchesEquipmentSheetFilter(sword, "magic")).toBe(false)

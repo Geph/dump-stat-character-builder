@@ -11,6 +11,7 @@ import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { magicItemSummonCreaturePresets } from "@/lib/compendium/magic-item-summon-creatures"
 import { isSrdSource } from "@/lib/srd/source"
 import { applySrdItemIcon, SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
+import { applyInferredMagicItemWeaponBases } from "@/lib/compendium/magic-item-weapon-base"
 
 type MagicItemSeedRow = Record<string, unknown> & {
   name: string
@@ -189,10 +190,10 @@ function presetForRow(row: MagicItemSeedRow): MagicItemPreset | null {
 }
 
 export function enrichSrdMagicItemRow(row: MagicItemSeedRow): MagicItemSeedRow {
-  if (!isSrdSource(row.source ?? "")) return row
+  if (!isSrdSource(row.source ?? "")) return applyInferredMagicItemWeaponBases(row)
   const preset = presetForRow(row)
   const summonEffects = magicItemSummonCreaturePresets(row.name)
-  if (!preset && !summonEffects?.length) return row
+  if (!preset && !summonEffects?.length) return applyInferredMagicItemWeaponBases(row)
 
   const byId = new Map<string, LinkedModifierInstance>()
   for (const effect of [
@@ -204,14 +205,14 @@ export function enrichSrdMagicItemRow(row: MagicItemSeedRow): MagicItemSeedRow {
   }
   const magic_effects = [...byId.values()]
 
-  return {
+  return applyInferredMagicItemWeaponBases({
     ...row,
     requires_attunement: preset?.requires_attunement ?? row.requires_attunement,
     rarity: preset?.rarity ?? row.rarity,
     base_equipment_names: preset?.base_equipment_names ?? row.base_equipment_names,
     base_equipment_filter: preset?.base_equipment_filter ?? row.base_equipment_filter,
     magic_effects: magic_effects.length ? magic_effects : row.magic_effects,
-  }
+  })
 }
 
 export function expandSrdMagicItemRows(rows: MagicItemSeedRow[]): MagicItemSeedRow[] {

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { BookOpen, X } from "lucide-react"
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   DEFAULT_ACTION_CATEGORY_LABELS,
   defaultActionsByCategory,
@@ -107,9 +108,11 @@ export function DefaultActionsOverlay({ onClose, context }: DefaultActionsOverla
                       className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2.5"
                     >
                       <p className="text-sm font-semibold text-foreground">{action.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        {action.description}
-                      </p>
+                      <RichTextContent
+                        html={action.description}
+                        className="text-xs text-muted-foreground mt-1 leading-relaxed [&_p]:mb-0"
+                        fallback=""
+                      />
                     </div>
                   ))}
                 </div>

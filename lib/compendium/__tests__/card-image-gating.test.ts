@@ -242,3 +242,12 @@ describe("bundled card art assignment under Compact Only", () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe("custom dumpstat card art", () => {
+  it("keeps magehandpress dumpstat URLs instead of clearing them", async () => {
+    const { applyBundledCardImage } = await import("@/lib/compendium/card-image")
+    const url = "https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png"
+    const row = applyBundledCardImage({ name: "Alchemist", card_image_url: url }, {})
+    expect(row.card_image_url).toBe(url)
+  })
+})

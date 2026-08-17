@@ -1,5 +1,6 @@
 import { itemMatchesBaseEquipmentFilter } from "@/lib/compendium/equipment-magic"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
+import { inferMagicItemWeaponBaseNames } from "@/lib/compendium/magic-item-weapon-base"
 import { resolveEffectiveEquipment } from "@/lib/compendium/resolve-effective-equipment"
 import type { Equipment } from "@/lib/types"
 
@@ -21,7 +22,14 @@ export function getBaseSelectionOptions(item: Equipment, catalog: Equipment[]): 
   if (item.base_equipment_filter) {
     return catalog.filter((entry) => itemMatchesBaseEquipmentFilter(entry, item.base_equipment_filter!))
   }
-  return []
+  const inferredNames = inferMagicItemWeaponBaseNames(item)
+  if (!inferredNames.length) return []
+  const mundaneByName = new Map(
+    catalog.filter((entry) => !isMagicItem(entry)).map((entry) => [entry.name, entry]),
+  )
+  return inferredNames
+    .map((name) => mundaneByName.get(name))
+    .filter((entry): entry is Equipment => Boolean(entry))
 }
 
 export function needsBaseSelection(

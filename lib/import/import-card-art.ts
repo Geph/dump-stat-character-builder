@@ -4,6 +4,7 @@ import {
   isHostedDumpstatCardImageUrl,
   normalizeCardImageUrl,
 } from "@/lib/compendium/card-image"
+import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { defaultBackgroundCardImageUrl } from "@/lib/compendium/background-card-images-defaults"
 import { defaultClassCardImageUrl } from "@/lib/compendium/class-card-images-defaults"
 import { defaultSpeciesCardImageUrl } from "@/lib/compendium/species-card-images-defaults"
@@ -90,12 +91,14 @@ export function defaultImportCardArtUrl(
 function rowInitialUrl(
   section: ImportCardArtSection,
   row: { name: string; card_image_url?: string | null; class_name?: string | null },
+  options?: { keepExistingUrl?: boolean },
 ): string | null {
   const existing = normalizeCardImageUrl(row.card_image_url)
+  if (options?.keepExistingUrl && existing) return existing
   const bundled = defaultImportCardArtUrl(section, row.name, {
     className: row.class_name,
   })
-  // Prefer bundled defaults over dumpstat hosts (same rule as applyBundledCardImage).
+  // Prefer bundled defaults over leftover WotC dumpstat hosts (same rule as applyBundledCardImage).
   if (existing && isHostedDumpstatCardImageUrl(existing)) {
     return bundled
   }
@@ -109,6 +112,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
   options?: {
     detail?: (row: T) => string | undefined
     include?: (row: T) => boolean
+    keepExistingUrl?: boolean
   },
 ): void {
   if (!rows?.length) return
@@ -126,7 +130,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
       name,
       detail: options?.detail?.(row),
       compendiumTab,
-      initialUrl: rowInitialUrl(section, row),
+      initialUrl: rowInitialUrl(section, row, { keepExistingUrl: options.keepExistingUrl }),
     })
   })
 }
@@ -136,15 +140,18 @@ export function collectImportCardArtTargets(content: ImportContent): ImportCardA
   if (!shouldAssignBundledCardArt()) return []
 
   const targets: ImportCardArtTarget[] = []
+  const keepExistingUrl = isCardArtOnlyImport(content)
 
-  pushTargets(targets, "classes", content.classes)
+  pushTargets(targets, "classes", content.classes, { keepExistingUrl })
   pushTargets(targets, "subclasses", content.subclasses, {
+    keepExistingUrl,
     detail: (row) => (row.class_name ? row.class_name : undefined),
   })
-  pushTargets(targets, "species", content.species)
-  pushTargets(targets, "backgrounds", content.backgrounds)
-  pushTargets(targets, "spells", content.spells)
+  pushTargets(targets, "species", content.species, { keepExistingUrl })
+  pushTargets(targets, "backgrounds", content.backgrounds, { keepExistingUrl })
+  pushTargets(targets, "spells", content.spells, { keepExistingUrl })
   pushTargets(targets, "equipment", content.equipment, {
+    keepExistingUrl,
     include: (row) => isMagicItem(row as Equipment),
     detail: (row) => {
       const item = row as Equipment
@@ -153,7 +160,7 @@ export function collectImportCardArtTargets(content: ImportContent): ImportCardA
   })
 
   const abilities = (content as ImportContentWithAbilities).abilities
-  pushTargets(targets, "abilities", abilities)
+  pushTargets(targets, "abilities", abilities, { keepExistingUrl })
 
   return targets
 }

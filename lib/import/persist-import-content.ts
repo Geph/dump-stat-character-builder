@@ -78,6 +78,13 @@ import {
   persistCardArtImport,
   syncCardArtEntriesFromContent,
 } from "@/lib/import/apply-card-art-import"
+import {
+  applyUpdateMergesToNamedRows,
+  filterNewResourceRows,
+  findExistingSubclassRow,
+  mergeRowForUpdate,
+  shouldMergeClassResources,
+} from "@/lib/import/merge-collision-update"
 
 export type { PersistImportResult } from "@/lib/import/persist-import-types"
 export type { PersistImportOptions } from "@/lib/import/persist-import-options"
@@ -134,15 +141,20 @@ export async function persistImportedContent(
   }
 
   if (sanitized.species?.length) {
-    await upsertByName(
-      "species",
-      withResolvedFeatureSpells(
-        sanitized.species.map((s) => stampSource({ ...s }, source)),
-        "traits",
-        spellCatalog,
-        preferredSource,
-      ),
+    let speciesRows = withResolvedFeatureSpells(
+      sanitized.species.map((s) => stampSource({ ...s }, source)),
+      "traits",
+      spellCatalog,
+      preferredSource,
     )
+    if (options.updateExistingNames?.species?.length) {
+      speciesRows = applyUpdateMergesToNamedRows(
+        speciesRows,
+        await listRows("species"),
+        options.updateExistingNames.species,
+      )
+    }
+    await upsertByName("species", speciesRows)
     breakdown.species = sanitized.species.length
     totalImported += sanitized.species.length
   }
@@ -165,6 +177,15 @@ export async function persistImportedContent(
       spellCatalog,
       preferredSource,
     )
+    const updateClassNames = new Set(options.updateExistingNames?.class ?? [])
+    if (updateClassNames.size) {
+      const existingClasses = await listRows("classes")
+      enrichedClasses = applyUpdateMergesToNamedRows(
+        enrichedClasses,
+        existingClasses,
+        updateClassNames,
+      )
+    }
     await upsertByName("classes", enrichedClasses)
     breakdown.classes = enrichedClasses.length
     totalImported += enrichedClasses.length
@@ -215,15 +236,27 @@ export async function persistImportedContent(
         classId,
       )
 
-      for (const resource of resourceRows) {
-        await deleteWhere("class_resources", [
-          { op: "eq", column: "class_id", value: classId },
-          { op: "eq", column: "resource_key", value: resource.resource_key as string },
-        ])
+      const mergeResources = shouldMergeClassResources(
+        parent.name,
+        options.updateExistingNames?.class,
+      )
+      let rowsToWrite = resourceRows
+      if (mergeResources) {
+        const existingResources = await listRows("class_resources", {
+          filters: [{ op: "eq", column: "class_id", value: classId }],
+        })
+        rowsToWrite = filterNewResourceRows(resourceRows, existingResources)
+      } else {
+        for (const resource of resourceRows) {
+          await deleteWhere("class_resources", [
+            { op: "eq", column: "class_id", value: classId },
+            { op: "eq", column: "resource_key", value: resource.resource_key as string },
+          ])
+        }
       }
-      if (resourceRows.length > 0) {
-        await insertRows("class_resources", resourceRows)
-        resourceCount += resourceRows.length
+      if (rowsToWrite.length > 0) {
+        await insertRows("class_resources", rowsToWrite)
+        resourceCount += rowsToWrite.length
       }
     }
 
@@ -248,15 +281,20 @@ export async function persistImportedContent(
       await upsertByName("classes", enrichedClasses)
     }
     if (sanitized.species?.length) {
-      await upsertByName(
-        "species",
-        withResolvedFeatureSpells(
-          sanitized.species.map((s) => stampSource({ ...s }, source)),
-          "traits",
-          spellCatalog,
-          preferredSource,
-        ),
+      let speciesRows = withResolvedFeatureSpells(
+        sanitized.species.map((s) => stampSource({ ...s }, source)),
+        "traits",
+        spellCatalog,
+        preferredSource,
       )
+      if (options.updateExistingNames?.species?.length) {
+        speciesRows = applyUpdateMergesToNamedRows(
+          speciesRows,
+          await listRows("species"),
+          options.updateExistingNames.species,
+        )
+      }
+      await upsertByName("species", speciesRows)
     }
   }
 
@@ -349,15 +387,30 @@ export async function persistImportedContent(
         }
       })
 
-      for (const sc of enrichedSubclasses) {
-        await deleteWhere("subclasses", [
-          { op: "eq", column: "name", value: sc.name as string },
-          { op: "eq", column: "source", value: source },
-        ])
+      const existingSubclasses = await listRows("subclasses")
+      const subclassesToInsert: Record<string, unknown>[] = []
+      for (let index = 0; index < enrichedSubclasses.length; index++) {
+        const sc = enrichedSubclasses[index]!
+        const sourceRow = subclassesWithIds[index]!
+        if (shouldMergeClassResources(sourceRow.class_name, options.updateExistingNames?.class)) {
+          const existing = findExistingSubclassRow(existingSubclasses, sc.name, sourceRow.class_id)
+          if (existing) {
+            await deleteWhere("subclasses", [{ op: "eq", column: "id", value: existing.id }])
+            subclassesToInsert.push(mergeRowForUpdate(existing, sc))
+          } else {
+            subclassesToInsert.push(sc)
+          }
+        } else {
+          await deleteWhere("subclasses", [
+            { op: "eq", column: "name", value: sc.name as string },
+            { op: "eq", column: "source", value: source },
+          ])
+          subclassesToInsert.push(sc)
+        }
       }
-      await insertRows("subclasses", enrichedSubclasses)
-      breakdown.subclasses = enrichedSubclasses.length
-      totalImported += enrichedSubclasses.length
+      await insertRows("subclasses", subclassesToInsert)
+      breakdown.subclasses = subclassesToInsert.length
+      totalImported += subclassesToInsert.length
 
       const gatedResourceRows: Record<string, unknown>[] = []
       for (let index = 0; index < enrichedSubclasses.length; index++) {
@@ -379,16 +432,30 @@ export async function persistImportedContent(
           resource,
         )
       }
+      const gatedToInsert: Record<string, unknown>[] = []
       for (const resource of uniqueGatedByKey.values()) {
-        await deleteWhere("class_resources", [
-          { op: "eq", column: "class_id", value: resource.class_id as string },
-          { op: "eq", column: "resource_key", value: resource.resource_key as string },
-        ])
+        const parentName = classNameById.get(resource.class_id as string) ?? ""
+        if (shouldMergeClassResources(parentName, options.updateExistingNames?.class)) {
+          const existing = await listRows("class_resources", {
+            filters: [
+              { op: "eq", column: "class_id", value: resource.class_id as string },
+              { op: "eq", column: "resource_key", value: resource.resource_key as string },
+            ],
+          })
+          if (existing.length) continue
+          gatedToInsert.push(resource)
+        } else {
+          await deleteWhere("class_resources", [
+            { op: "eq", column: "class_id", value: resource.class_id as string },
+            { op: "eq", column: "resource_key", value: resource.resource_key as string },
+          ])
+          gatedToInsert.push(resource)
+        }
       }
-      if (uniqueGatedByKey.size > 0) {
-        await insertRows("class_resources", [...uniqueGatedByKey.values()])
-        breakdown.class_resources = (breakdown.class_resources ?? 0) + uniqueGatedByKey.size
-        totalImported += uniqueGatedByKey.size
+      if (gatedToInsert.length > 0) {
+        await insertRows("class_resources", gatedToInsert)
+        breakdown.class_resources = (breakdown.class_resources ?? 0) + gatedToInsert.length
+        totalImported += gatedToInsert.length
       }
     }
   }
@@ -407,7 +474,15 @@ export async function persistImportedContent(
         ),
       }
     })
-    await upsertByName("backgrounds", backgroundRows)
+    let backgroundsToWrite = backgroundRows
+    if (options.updateExistingNames?.background?.length) {
+      backgroundsToWrite = applyUpdateMergesToNamedRows(
+        backgroundRows,
+        await listRows("backgrounds"),
+        options.updateExistingNames.background,
+      )
+    }
+    await upsertByName("backgrounds", backgroundsToWrite)
     breakdown.backgrounds = sanitized.backgrounds.length
     totalImported += sanitized.backgrounds.length
   }
@@ -443,7 +518,15 @@ export async function persistImportedContent(
         prerequisite_feat_ids: [] as string[],
       }
     })
-    await upsertByName("feats", featRows)
+    let featsToWrite = featRows
+    if (options.updateExistingNames?.feat?.length) {
+      featsToWrite = applyUpdateMergesToNamedRows(
+        featRows,
+        await listRows("feats"),
+        options.updateExistingNames.feat,
+      )
+    }
+    await upsertByName("feats", featsToWrite)
 
     const existingFeats = (await listRows("feats")).map((row) => ({
       id: row.id as string,
@@ -548,8 +631,16 @@ export async function persistImportedContent(
       return resolveAbilityAttachmentRow(withSpells, attachmentMaps)
     })
 
-    await upsertByName("custom_abilities", abilityRows)
-    breakdown.abilities = abilityRows.length
+    let abilitiesToWrite = abilityRows
+    if (options.updateExistingNames?.ability?.length) {
+      abilitiesToWrite = applyUpdateMergesToNamedRows(
+        abilityRows,
+        await listRows("custom_abilities"),
+        options.updateExistingNames.ability,
+      )
+    }
+    await upsertByName("custom_abilities", abilitiesToWrite)
+    breakdown.abilities = abilitiesToWrite.length
     totalImported += abilityRows.length
   }
 

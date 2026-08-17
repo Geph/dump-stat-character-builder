@@ -1,19 +1,35 @@
 /**
  * Parse and evaluate freeform choice-item prerequisites (Warmage Tricks, knacks, etc.).
  *
- * Supported patterns (AND across comma-separated clauses; OR within a clause):
+ * Supported patterns (AND across comma-separated clauses and semicolons; OR within a clause):
  * - Class level: "Level 5+ Warmage", "Level 10+ Warmage", "5th-level Warmage"
  * - Spell/cantrip: "Light Cantrip", "Force Buckler cantrip"
  * - Spell OR group: "Quickstep or Springheel Cantrip",
  *   "Arc Blade, Burning Blade, Frigid Blade, or True Strike Cantrip"
  * - Named ability / subclass: "Slayer I", "House of Bishops"
+ * - Weapon tags (when `weapon` is provided): "Melee Weapon", "Finesse Property", "Fire Damage"
+ * - Class-only tags: "[Craftsman Only]"
  */
+
+import {
+  isWeaponPrerequisiteClause,
+  stripClassOnlyBrackets,
+  weaponSatisfiesPrerequisiteClause,
+  type WeaponPrerequisiteTarget,
+} from "@/lib/builder/weapon-property-prerequisite"
 
 export type ChoicePrerequisiteContext = {
   classLevel: number
   knownSpellNames?: string[]
   selectedAbilityNames?: string[]
   subclassName?: string | null
+  /** Class names on the character — used for "[Craftsman Only]" tags. */
+  classNames?: string[]
+  /**
+   * When set, weapon-property / damage-type / melee-ranged clauses are validated
+   * against this weapon. When omitted those clauses are skipped (catalog listing).
+   */
+  weapon?: WeaponPrerequisiteTarget | null
 }
 
 function normalizeName(value: string): string {
@@ -179,12 +195,33 @@ export function isChoicePrerequisiteMet(
 
   if (!prerequisite?.trim()) return true
 
-  const remainder = removeLevelClauses(prerequisite)
+  const { cleaned, classOnlyNames } = stripClassOnlyBrackets(prerequisite)
+  if (classOnlyNames.length && context.classNames?.length) {
+    const hasClass = classOnlyNames.some((required) =>
+      (context.classNames ?? []).some((name) => nameMatches(name, required)),
+    )
+    if (!hasClass) return false
+  }
+
+  const remainder = removeLevelClauses(cleaned)
   if (!remainder) return true
 
-  const groups = parseNamedRequirementGroups(remainder)
-  for (const group of groups) {
-    if (!group.some((req) => requirementSatisfied(req, context))) return false
+  const chunks = remainder
+    .split(/\s*;\s*/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+  for (const chunk of chunks) {
+    const groups = parseNamedRequirementGroups(chunk)
+    for (const group of groups) {
+      const satisfied = group.some((req) => {
+        if (isWeaponPrerequisiteClause(req.name)) {
+          if (!context.weapon) return true
+          return weaponSatisfiesPrerequisiteClause(req.name, context.weapon)
+        }
+        return requirementSatisfied(req, context)
+      })
+      if (!satisfied) return false
+    }
   }
   return true
 }

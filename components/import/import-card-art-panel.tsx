@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronDown, ImageIcon, Search } from "lucide-react"
+import { ChevronDown, ImageIcon, Search, X } from "lucide-react"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   CLASS_CARD_ASPECT_CLASS,
@@ -52,14 +52,29 @@ export function ImportCardArtControls({
         <label className="sr-only" htmlFor={`card-art-${rowKey}`}>
           Image URL for {name}
         </label>
-        <input
-          id={`card-art-${rowKey}`}
-          type="url"
-          value={url}
-          onChange={(event) => onUrlChange(event.target.value)}
-          placeholder="https://… (optional card art)"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
-        />
+        <div className="relative">
+          <input
+            id={`card-art-${rowKey}`}
+            type="url"
+            value={url}
+            onChange={(event) => onUrlChange(event.target.value)}
+            placeholder="https://… (optional card art)"
+            className={cn(
+              "w-full rounded-lg border border-border bg-background py-2 pl-3 text-sm text-foreground placeholder:text-muted-foreground",
+              url.trim() ? "pr-9" : "pr-3",
+            )}
+          />
+          {url.trim() ? (
+            <button
+              type="button"
+              onClick={() => onUrlChange("")}
+              aria-label={`Clear image URL for ${name}`}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
       </div>
       <div
         className={cn(

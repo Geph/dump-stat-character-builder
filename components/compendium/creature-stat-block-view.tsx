@@ -1,3 +1,4 @@
+import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import type {
   CompanionNamedBlock,
   CompanionStatBlockTemplate,
@@ -48,7 +49,11 @@ function NamedBlocks({ title, blocks }: { title: string; blocks?: CompanionNamed
           return (
             <li key={`${block.unlockLevelLabel ?? ""}:${block.name}:${block.tag ?? ""}`} className="text-sm text-white/85">
               <span className="font-semibold italic text-white">{label}.</span>{" "}
-              {block.description}
+              <RichTextContent
+                html={block.description}
+                className="inline text-inherit [&_p]:mb-0 [&_p]:inline"
+                fallback=""
+              />
             </li>
           )
         })}

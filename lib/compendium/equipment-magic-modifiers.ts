@@ -1,7 +1,8 @@
 import { characteristicsFromLinkedModifiers } from "@/lib/compendium/builder-modifier-refs"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import { tagModifierSource } from "@/lib/character/tag-modifier-source"
-import { isArmorItem, isShieldItem, isWeaponItem } from "@/lib/compendium/combat-stats"
+import { isArmorItem, isShieldItem } from "@/lib/compendium/combat-stats"
+import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 import {
   equipmentRequiresAttunement,
   isMagicItem,
@@ -95,7 +96,7 @@ export function resolveEquippedItems(
   return {
     armor: resolve(loadout.equippedArmorId, isArmorItem),
     shield: resolve(loadout.equippedShieldId, isShieldItem),
-    weapon: resolve(loadout.equippedWeaponId, isWeaponItem),
-    offHandWeapon: resolve(loadout.equippedOffHandWeaponId ?? null, isWeaponItem),
+    weapon: resolve(loadout.equippedWeaponId, isWieldableWeaponItem),
+    offHandWeapon: resolve(loadout.equippedOffHandWeaponId ?? null, isWieldableWeaponItem),
   }
 }
