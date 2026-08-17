@@ -192,7 +192,7 @@ describe("import-card-art", () => {
     vi.unstubAllGlobals()
   })
 
-  it("scopes Reanimator card art to Artificer, not Necromancer", () => {
+  it("does not assign bundled art to Artificer or Necromancer Reanimator", () => {
     const content: ImportContent = {
       subclasses: [
         {
@@ -210,9 +210,7 @@ describe("import-card-art", () => {
       ],
     }
     const map = buildInitialImportCardArtUrlMap(content)
-    expect(map[importCardArtTargetKey("subclasses", 0)]).toMatch(
-      /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
-    )
+    expect(map[importCardArtTargetKey("subclasses", 0)]).toBe("")
     expect(map[importCardArtTargetKey("subclasses", 1)]).toBe("")
   })
 

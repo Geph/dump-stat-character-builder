@@ -278,7 +278,7 @@ Enrichment packs under `lib/import/enrichment-presets/packs/` are Dump Stat wiri
 - **Custom art the user attaches** (upload or URL) stays on that user’s data. Image-only import updates `card_image_url` and does not rewrite rules.
 - **Full-resolution drop folders** (`scripts/*-card-sources/`, `scripts/page-bg-sources/`) are gitignored. Only optimized outputs under `public/images/` are committed.
 - **Leftover remote WotC dumpstat hosts** (`/dumpstat/wotc/…`) are treated as old defaults and replaced or cleared (`lib/compendium/card-image.ts`). User-hosted paths such as `/dumpstat/images/…` are kept.
-- Bundled `/images/compendium/…` portraits are **local UI defaults**, not SRD text. They are not covered by the SRD CC-BY grant (the SRD licenses game *text*, not Wizards product illustrations). Treat them as replaceable presentation assets; users can override every row with their own licensed art.
+- Bundled `/images/compendium/…` portraits are **local UI defaults**, not SRD text. Subclass defaults are limited to art converted from `scripts/graphics` (SRD uploads, PHB Barbarian subclasses placed there on purpose) plus Kibbles / Mage Hand Press. PHB / Eberron / Ravenloft / FRUA product art is not hosted. Users can attach their own licensed art on import.
 
 ### 8. Trademarks and privacy
 

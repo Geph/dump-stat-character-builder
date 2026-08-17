@@ -12,7 +12,11 @@ import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation
  * so same-named subclasses from different parent classes do not collide
  * (e.g. Artificer Reanimator vs Necromancer Reanimator).
  *
- * Masters: `scripts/subclass-card-sources/{class-slug}/{subclass-slug}.*`
+ * Only ship art that was converted from `scripts/graphics` (SRD uploads,
+ * PHB Barbarian subclasses placed there on purpose) plus Kibbles / Mage Hand Press.
+ * Do not map PHB / Eberron / Ravenloft / FRUA product art.
+ *
+ * Masters for a re-optimize: `scripts/subclass-card-sources/{class-slug}/{subclass-slug}.*`
  */
 
 export function subclassClassSlug(className: string): string {
@@ -31,20 +35,30 @@ const subclassCardImage = (className: string, itemSlug: string) =>
 type SubclassCardImageEntry = {
   className: string
   name: string
-  /** Filename slug under the class folder (may differ from kebab name, e.g. shadow-magic). */
+  /** Filename slug under the class folder. */
   slug: string
 }
 
 const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
-  // Artificer (Eberron + Ravenloft)
-  { className: "Artificer", name: "Alchemist", slug: "alchemist" },
-  { className: "Artificer", name: "Armorer", slug: "armorer" },
-  { className: "Artificer", name: "Artillerist", slug: "artillerist" },
-  { className: "Artificer", name: "Battle Smith", slug: "battle-smith" },
-  { className: "Artificer", name: "Cartographer", slug: "cartographer" },
-  { className: "Artificer", name: "Reanimator", slug: "reanimator" },
+  // SRD — scripts/graphics/subclass card images/SRD
+  { className: "Barbarian", name: "Path of the Berserker", slug: "path-of-the-berserker" },
+  { className: "Bard", name: "College of Lore", slug: "college-of-lore" },
+  { className: "Cleric", name: "Life Domain", slug: "life-domain" },
+  { className: "Druid", name: "Circle of the Land", slug: "circle-of-the-land" },
+  { className: "Fighter", name: "Champion", slug: "champion" },
+  { className: "Monk", name: "Warrior of the Open Hand", slug: "warrior-of-the-open-hand" },
+  { className: "Paladin", name: "Oath of Devotion", slug: "oath-of-devotion" },
+  { className: "Ranger", name: "Hunter", slug: "hunter" },
+  { className: "Rogue", name: "Thief", slug: "thief" },
+  { className: "Sorcerer", name: "Draconic Sorcery", slug: "draconic-sorcery" },
+  { className: "Warlock", name: "Fiend Patron", slug: "fiend-patron" },
 
-  // Inventor (KibblesTasty)
+  // PHB Barbarian — converted from scripts/graphics/subclass card images/PHB
+  { className: "Barbarian", name: "Path of the Wild Heart", slug: "path-of-the-wild-heart" },
+  { className: "Barbarian", name: "Path of the World Tree", slug: "path-of-the-world-tree" },
+  { className: "Barbarian", name: "Path of the Zealot", slug: "path-of-the-zealot" },
+
+  // KibblesTasty Inventor
   { className: "Inventor", name: "Fleshsmith", slug: "fleshsmith" },
   { className: "Inventor", name: "Gadgetsmith", slug: "gadgetsmith" },
   { className: "Inventor", name: "Golemsmith", slug: "golemsmith" },
@@ -53,93 +67,6 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Inventor", name: "Runesmith", slug: "runesmith" },
   { className: "Inventor", name: "Thundersmith", slug: "thundersmith" },
   { className: "Inventor", name: "Warsmith", slug: "warsmith" },
-
-  // Barbarian
-  { className: "Barbarian", name: "Path of the Berserker", slug: "path-of-the-berserker" },
-  { className: "Barbarian", name: "Path of the Wild Heart", slug: "path-of-the-wild-heart" },
-  { className: "Barbarian", name: "Path of the World Tree", slug: "path-of-the-world-tree" },
-  { className: "Barbarian", name: "Path of the Zealot", slug: "path-of-the-zealot" },
-
-  // Bard
-  { className: "Bard", name: "College of Dance", slug: "college-of-dance" },
-  { className: "Bard", name: "College of Glamour", slug: "college-of-glamour" },
-  { className: "Bard", name: "College of Lore", slug: "college-of-lore" },
-  { className: "Bard", name: "College of Spirits", slug: "college-of-spirits" },
-  { className: "Bard", name: "College of the Moon", slug: "college-of-the-moon" },
-  { className: "Bard", name: "College of Valor", slug: "college-of-valor" },
-
-  // Cleric
-  { className: "Cleric", name: "Grave Domain", slug: "grave-domain" },
-  { className: "Cleric", name: "Knowledge Domain", slug: "knowledge-domain" },
-  { className: "Cleric", name: "Life Domain", slug: "life-domain" },
-  { className: "Cleric", name: "Light Domain", slug: "light-domain" },
-  { className: "Cleric", name: "Trickery Domain", slug: "trickery-domain" },
-  { className: "Cleric", name: "War Domain", slug: "war-domain" },
-
-  // Druid
-  { className: "Druid", name: "Circle of the Land", slug: "circle-of-the-land" },
-  { className: "Druid", name: "Circle of the Moon", slug: "circle-of-the-moon" },
-  { className: "Druid", name: "Circle of the Sea", slug: "circle-of-the-sea" },
-  { className: "Druid", name: "Circle of the Stars", slug: "circle-of-the-stars" },
-
-  // Fighter
-  { className: "Fighter", name: "Banneret", slug: "banneret" },
-  { className: "Fighter", name: "Battle Master", slug: "battle-master" },
-  { className: "Fighter", name: "Champion", slug: "champion" },
-  { className: "Fighter", name: "Eldritch Knight", slug: "eldritch-knight" },
-  { className: "Fighter", name: "Psi Warrior", slug: "psi-warrior" },
-
-  // Monk
-  { className: "Monk", name: "Warrior of Mercy", slug: "warrior-of-mercy" },
-  { className: "Monk", name: "Warrior of Shadow", slug: "warrior-of-shadow" },
-  { className: "Monk", name: "Warrior of the Elements", slug: "warrior-of-the-elements" },
-  { className: "Monk", name: "Warrior of the Open Hand", slug: "warrior-of-the-open-hand" },
-
-  // Paladin
-  { className: "Paladin", name: "Oath of Devotion", slug: "oath-of-devotion" },
-  { className: "Paladin", name: "Oath of Glory", slug: "oath-of-glory" },
-  { className: "Paladin", name: "Oath of the Ancients", slug: "oath-of-the-ancients" },
-  { className: "Paladin", name: "Oath of the Noble Genies", slug: "oath-of-the-noble-genies" },
-  { className: "Paladin", name: "Oath of Vengeance", slug: "oath-of-vengeance" },
-
-  // Ranger
-  { className: "Ranger", name: "Beast Master", slug: "beast-master" },
-  { className: "Ranger", name: "Fey Wanderer", slug: "fey-wanderer" },
-  { className: "Ranger", name: "Gloom Stalker", slug: "gloom-stalker" },
-  { className: "Ranger", name: "Hollow Warden", slug: "hollow-warden" },
-  { className: "Ranger", name: "Hunter", slug: "hunter" },
-  { className: "Ranger", name: "Winter Walker", slug: "winter-walker" },
-
-  // Rogue
-  { className: "Rogue", name: "Arcane Trickster", slug: "arcane-trickster" },
-  { className: "Rogue", name: "Assassin", slug: "assassin" },
-  { className: "Rogue", name: "Gadgeteer", slug: "gadgeteer" },
-  { className: "Rogue", name: "Phantom", slug: "phantom" },
-  { className: "Rogue", name: "Scion of the Three", slug: "scion-of-the-three" },
-  { className: "Rogue", name: "Soulknife", slug: "soulknife" },
-  { className: "Rogue", name: "Thief", slug: "thief" },
-
-  // Sorcerer
-  { className: "Sorcerer", name: "Aberrant Sorcery", slug: "aberrant-sorcery" },
-  { className: "Sorcerer", name: "Clockwork Sorcery", slug: "clockwork-sorcery" },
-  { className: "Sorcerer", name: "Draconic Sorcery", slug: "draconic-sorcery" },
-  { className: "Sorcerer", name: "Shadow Sorcery", slug: "shadow-magic" },
-  { className: "Sorcerer", name: "Spellfire Sorcery", slug: "spellfire-sorcery" },
-  { className: "Sorcerer", name: "Wild Magic Sorcery", slug: "wild-magic-sorcery" },
-
-  // Warlock
-  { className: "Warlock", name: "Archfey Patron", slug: "archfey-patron" },
-  { className: "Warlock", name: "Celestial Patron", slug: "celestial-patron" },
-  { className: "Warlock", name: "Fiend Patron", slug: "fiend-patron" },
-  { className: "Warlock", name: "Great Old One Patron", slug: "great-old-one-patron" },
-  { className: "Warlock", name: "Undead Patron", slug: "undead-patron" },
-
-  // Wizard
-  { className: "Wizard", name: "Abjurer", slug: "abjurer" },
-  { className: "Wizard", name: "Bladesinger", slug: "bladesinger" },
-  { className: "Wizard", name: "Diviner", slug: "diviner" },
-  { className: "Wizard", name: "Evoker", slug: "evoker" },
-  { className: "Wizard", name: "Illusionist", slug: "illusionist" },
 
   // KibblesTasty Psion
   { className: "Psion", name: "Awakened Mind", slug: "awakened-mind" },
@@ -151,6 +78,10 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Psion", name: "Transcended Mind", slug: "transcended-mind" },
   { className: "Psion", name: "Unleashed Mind", slug: "unleashed-mind" },
   { className: "Psion", name: "Wandering Mind", slug: "wandering-mind" },
+
+  // KibblesTasty extras
+  { className: "Rogue", name: "Gadgeteer", slug: "gadgeteer" },
+  { className: "Wizard", name: "Evoker", slug: "evoker" },
 ]
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {

@@ -21,20 +21,19 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Gadgetsmith", "Inventor")).toMatch(
       /\/images\/compendium\/subclasses\/inventor\/gadgetsmith\.png$/,
     )
-    expect(defaultSubclassCardImageUrl("Alchemist", "Artificer")).toMatch(
-      /\/images\/compendium\/subclasses\/artificer\/alchemist\.png$/,
+    expect(defaultSubclassCardImageUrl("Evoker", "Wizard")).toMatch(
+      /\/images\/compendium\/subclasses\/wizard\/evoker\.png$/,
     )
-    expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toMatch(
-      /\/images\/compendium\/subclasses\/sorcerer\/shadow-magic\.png$/,
-    )
+    expect(defaultSubclassCardImageUrl("Alchemist", "Artificer")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toBeNull()
   })
 
-  it("disambiguates Reanimator by parent class", () => {
-    expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toMatch(
-      /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
-    )
-    // Necromancer Reanimator is a different subclass — do not reuse Artificer art.
+  it("does not ship Eberron or Ravenloft subclass portraits", () => {
+    expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toBeNull()
     expect(defaultSubclassCardImageUrl("Reanimator", "Necromancer")).toBeNull()
+    expect(defaultSubclassCardImageUrl("College of Spirits", "Bard")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toBeNull()
   })
 
   it("ships an optimized image file for every mapped subclass", () => {
@@ -65,6 +64,7 @@ describe("subclass card images", () => {
     }
     walk(sourcesDir)
     sourceSlugs.sort()
+    if (sourceSlugs.length === 0) return
 
     const mappedSlugs = [
       ...new Set(

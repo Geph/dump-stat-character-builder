@@ -28,6 +28,9 @@ data/*.pdf
 # Generated at build time (pnpm icons:manifest / build:static)
 public/icons/manifest.json
 
+# Working card-art masters (PHB/Eberron/Ravenloft packs must not be committed)
+scripts/graphics/
+
 # Full-res page background sources (WebP outputs in public/ are committed)
 scripts/page-bg-sources/*
 !scripts/page-bg-sources/README.md
