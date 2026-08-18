@@ -21,6 +21,24 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Gadgetsmith", "Inventor")).toMatch(
       /\/images\/compendium\/subclasses\/inventor\/gadgetsmith\.png$/,
     )
+    expect(defaultSubclassCardImageUrl("Hedge Mage", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/hedge-mage\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Oracle", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/oracle\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Elemental Soul", "Warden")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/elemental-soul\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Dreadwing", "Warden")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/dreadwing\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Dread Wing", "Warden")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/dreadwing\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Timetwister", "Warden")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/timetwister\.png$/,
+    )
     expect(defaultSubclassCardImageUrl("Evoker", "Wizard")).toMatch(
       /\/images\/compendium\/subclasses\/wizard\/evoker\.png$/,
     )
@@ -138,7 +156,7 @@ describe("subclass card images", () => {
     )
   })
 
-  it("applies named card art on non-SRD imports (Inventor / Psion)", () => {
+  it("applies named card art on non-SRD imports (Inventor / Psion / Occultist / Warden)", () => {
     const gadgetsmith = enrichSrdSubclassRow(
       { name: "Gadgetsmith", source: "KibblesTasty Inventor", features: [] },
       "Inventor",
@@ -149,6 +167,16 @@ describe("subclass card images", () => {
     )
     expect(gadgetsmith.card_image_url).toBe(defaultSubclassCardImageUrl("Gadgetsmith", "Inventor"))
     expect(knowing.card_image_url).toBe(defaultSubclassCardImageUrl("Knowing Mind", "Psion"))
+    const hedgeMage = enrichSrdSubclassRow(
+      { name: "Hedge Mage", source: "KibblesTasty Occultist", features: [] },
+      "Occultist",
+    )
+    const dreadwing = enrichSrdSubclassRow(
+      { name: "Dreadwing", source: "KibblesTasty Warden", features: [] },
+      "Warden",
+    )
+    expect(hedgeMage.card_image_url).toBe(defaultSubclassCardImageUrl("Hedge Mage", "Occultist"))
+    expect(dreadwing.card_image_url).toBe(defaultSubclassCardImageUrl("Dreadwing", "Warden"))
   })
 
   it("does not assign Artificer Reanimator art to Necromancer Reanimator", () => {

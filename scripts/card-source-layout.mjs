@@ -136,6 +136,10 @@ const SUBCLASS_SHORT_TO_DISPLAY = {
     Unleashed: "Unleashed Mind",
     Wandering: "Wandering Mind",
   },
+  Warden: {
+    "Dread Wing": "Dreadwing",
+    "Time Twister": "Timetwister",
+  },
 }
 
 export function subclassClassSlug(className) {

@@ -126,6 +126,25 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
 
   // KibblesTasty extras
   { className: "Rogue", name: "Gadgeteer", slug: "gadgeteer" },
+
+  // KibblesTasty Occultist
+  { className: "Occultist", name: "Hedge Mage", slug: "hedge-mage" },
+  { className: "Occultist", name: "Oracle", slug: "oracle" },
+
+  // KibblesTasty Warden
+  { className: "Warden", name: "Astral Guardian", slug: "astral-guardian" },
+  { className: "Warden", name: "Beasthide", slug: "beasthide" },
+  { className: "Warden", name: "Bone Binder", slug: "bone-binder" },
+  { className: "Warden", name: "Dreadwing", slug: "dreadwing" },
+  { className: "Warden", name: "Dread Wing", slug: "dreadwing" },
+  { className: "Warden", name: "Elderheart", slug: "elderheart" },
+  { className: "Warden", name: "Elemental Soul", slug: "elemental-soul" },
+  { className: "Warden", name: "Gravity Binder", slug: "gravity-binder" },
+  { className: "Warden", name: "Ironbound", slug: "ironbound" },
+  { className: "Warden", name: "Stoneblood", slug: "stoneblood" },
+  { className: "Warden", name: "Sunwatcher", slug: "sunwatcher" },
+  { className: "Warden", name: "Timetwister", slug: "timetwister" },
+  { className: "Warden", name: "Time Twister", slug: "timetwister" },
 ]
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {
