@@ -9,7 +9,7 @@ import { createClient } from "@/lib/db/client"
 import {
   Angry,
   ArrowLeft,
-  ArrowUp,
+  Award,
   User,
   Smile,
   Sparkles,
@@ -209,6 +209,7 @@ import {
   clearExclusiveSheetToggleGroup,
   END_WEAPON_MORPH_TOGGLE_ID,
   GUARDIAN_TACTICS_TOGGLES,
+  inactiveSheetToggleLabel,
   PRIMORDIAL_ASPECT_TOGGLES,
   sheetToggleDefinitionsFromNewToggles,
   WEAPON_MORPH_TOGGLES,
@@ -1569,7 +1570,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const active = activeSheetToggleIds.includes(toggle.id)
       const isRagingToggle = toggle.id === "while_raging"
       const isInnateSorceryToggle = toggle.id === "while_innate_sorcery_active"
-      const label = active ? toggle.label : `Not ${toggle.label.toLowerCase()}`
+      const label = active ? toggle.label : inactiveSheetToggleLabel(toggle.label)
       const RagingIcon = active ? Angry : Smile
       return (
         <button
@@ -3482,7 +3483,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-border bg-card font-bold text-sm hover:border-primary transition-colors"
               title="Level up"
             >
-              <ArrowUp className="w-4 h-4" />
+              <Award className="w-4 h-4" />
               <span className="hidden sm:inline">Level up</span>
             </button>
             <Link
@@ -3672,17 +3673,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                   <span className="sm:hidden">
                     <BannerStatusMenu
-                      active={
-                        hasInspiration ||
-                        Boolean(ragingSheetToggle && activeSheetToggleIds.includes(ragingSheetToggle.id)) ||
-                        Boolean(
-                          innateSorcerySheetToggle &&
-                            isSorcerer &&
-                            activeSheetToggleIds.includes(innateSorcerySheetToggle.id),
-                        ) ||
-                        secondaryManualSheetToggles.some((toggle) =>
+                      activeCount={
+                        (hasInspiration ? 1 : 0) +
+                        (ragingSheetToggle && activeSheetToggleIds.includes(ragingSheetToggle.id)
+                          ? 1
+                          : 0) +
+                        (innateSorcerySheetToggle &&
+                        isSorcerer &&
+                        activeSheetToggleIds.includes(innateSorcerySheetToggle.id)
+                          ? 1
+                          : 0) +
+                        secondaryManualSheetToggles.filter((toggle) =>
                           activeSheetToggleIds.includes(toggle.id),
-                        )
+                        ).length
                       }
                     >
                       {(close) => (
@@ -3924,7 +3927,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               ? [
                   { id: "sheet-skills", label: "Skills" },
                   { id: "sheet-scores", label: "Abilities" },
-                  { id: "sheet-proficiencies", label: "Proficiencies" },
+                  { id: "sheet-proficiencies", label: "Prof." },
                   { id: "sheet-utility-actions", label: "Actions" },
                 ]
               : activeTab === "combat"
@@ -4013,7 +4016,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       return (
                         <div
                           key={skill.name}
-                          className={`flex justify-between items-center gap-2 px-2 py-1.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${
+                          className={`flex justify-between items-center gap-2 px-2 py-0.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${
                             isProficient ? SHEET_STATUS_ROW.skillProficient : SHEET_STATUS_ROW.muted
                           }`}
                         >
@@ -4058,6 +4061,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                               modifier={mod}
                               title={`Roll ${skill.name}`}
                               size="md"
+                              className="md:h-7 md:min-w-7"
                               skillProficient={isProficient}
                               featureBonusesIncluded={Boolean(derivedSkill)}
                               rollContext={{
@@ -4076,7 +4080,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       return (
                       <div
                         key={skill.name}
-                        className={`flex justify-between items-center gap-2 px-2 py-1.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${SHEET_STATUS_ROW.skillCustom}`}
+                        className={`flex justify-between items-center gap-2 px-2 py-0.5 max-md:min-h-[4.125rem] max-md:py-2.5 rounded text-xs ${SHEET_STATUS_ROW.skillCustom}`}
                       >
                         <div className="flex min-w-0 items-center gap-1">
                           <button
@@ -4119,6 +4123,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             modifier={skill.bonus}
                             title={`Roll ${skill.name}`}
                             size="md"
+                            className="md:h-7 md:min-w-7"
                             skillProficient
                             featureBonusesIncluded
                             rollContext={{

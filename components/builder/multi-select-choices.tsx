@@ -403,8 +403,8 @@ export function MultiSelectChoices({
         ) : null}
         {displayOptions.length === 0 ? (
           <p className="text-xs text-muted-foreground italic py-3">
-            No choices available yet. Import the related custom abilities (for example Psion
-            disciplines and talents) into the compendium, then return here.
+            No choices available yet. Import the related custom abilities into the
+            compendium, then return here.
           </p>
         ) : null}
         {displayOptions.length > 0 && filteredOptions.length === 0 ? (

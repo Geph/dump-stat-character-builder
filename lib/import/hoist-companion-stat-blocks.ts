@@ -15,6 +15,18 @@ function normalizeCreatureName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+const SUMMONED_CREATURE_NAMES: Readonly<Record<string, string>> = {
+  "Summon Dragon": "Summoned Dragon",
+  "Summon Horror": "Summoned Horror",
+}
+
+function displayNameForTemplate(carrier: Carrier, template: CompanionStatBlockTemplate): string {
+  const carrierName = carrier.name?.trim()
+  const templateName = template.name.trim()
+  if (carrierName !== templateName) return templateName
+  return SUMMONED_CREATURE_NAMES[carrierName] ?? templateName
+}
+
 function isUsableTemplate(value: unknown): value is CompanionStatBlockTemplate {
   if (!value || typeof value !== "object") return false
   const row = value as CompanionStatBlockTemplate
@@ -100,10 +112,13 @@ export function hoistCompanionStatBlocksToCreatures(content: ImportContent): Imp
 
   const consider = (carrier: Carrier) => {
     for (const template of collectTemplatesFromCarrier(carrier)) {
-      const key = normalizeCreatureName(template.name)
+      const displayName = displayNameForTemplate(carrier, template)
+      const key = normalizeCreatureName(displayName)
       if (!key || seen.has(key)) continue
       seen.add(key)
-      additions.push(templateToCreatureRow(template, carrier.description))
+      additions.push(
+        templateToCreatureRow({ ...template, name: displayName }, carrier.description),
+      )
     }
   }
 

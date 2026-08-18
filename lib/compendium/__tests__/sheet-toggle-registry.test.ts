@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   BUILTIN_SHEET_TOGGLES,
   getSheetToggleDefinition,
+  inactiveSheetToggleLabel,
   isKnownSheetToggleId,
   mergeSheetToggleDefinitions,
   sheetToggleDefinitionsFromNewToggles,
@@ -98,5 +99,12 @@ describe("sheet-toggle-registry", () => {
     )
     expect(sheetToggleIdActivatedByAction({ name: "Reckless Attack" })).toBe("reckless_attack")
     expect(sheetToggleIdActivatedByAction({ name: "Bardic Inspiration" })).toBeNull()
+  })
+
+  it("uses a not-activated prefix for exclusive-style toggle labels", () => {
+    expect(inactiveSheetToggleLabel("Dance Style: Inspiring Chant")).toBe(
+      "Dance Style: not activated",
+    )
+    expect(inactiveSheetToggleLabel("Raging")).toBe("Not raging")
   })
 })

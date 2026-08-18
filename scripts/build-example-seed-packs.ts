@@ -28,6 +28,11 @@ import {
   MHP_WARDEN_CREATOR_URL,
   mhpClassCardImageUrl,
 } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import {
+  applyKibblesRowPresentation,
+  KIBBLES_BACKGROUND_PRESENTATION,
+  KIBBLES_SPECIES_PRESENTATION,
+} from "@/lib/seed-packs/kibbles-tasty/species-background-presentation"
 
 const DRIVE_IMPORT_JSON =
   "d:/Google Drive/Code Projects/dump stat working files/import-json"
@@ -43,11 +48,13 @@ type PackFileSpec = {
 }
 
 const KIBBLES_FILES: PackFileSpec[] = [
+  { sourceName: "kibbles-backgrounds.txt", outName: "kibbles-backgrounds.json" },
   { sourceName: "kibbles-crafting-feats", outName: "kibbles-crafting-feats.json" },
   { sourceName: "kibbles-inventor-class", outName: "kibbles-inventor-class.json" },
   { sourceName: "kibbles-occultist-class", outName: "kibbles-occultist-class.json" },
   { sourceName: "kibbles-psion-class", outName: "kibbles-psion-class.json" },
   { sourceName: "kibbles-psionics-custom", outName: "kibbles-psionics-custom.json" },
+  { sourceName: "kibbles-species.txt", outName: "kibbles-species.json" },
   { sourceName: "kibbles-spells.json", outName: "kibbles-spells.json" },
   { sourceName: "kibbles-warden-class", outName: "kibbles-warden-class.json" },
 ]
@@ -210,6 +217,29 @@ function applyMhpClassPresentation(content: ImportContent): ImportContent {
   }
 }
 
+function applyKibblesSpeciesBackgroundPresentation(content: ImportContent): ImportContent {
+  const next: ImportContent = { ...content }
+  if (content.species?.length) {
+    next.species = content.species.map((row) =>
+      applyKibblesRowPresentation(
+        row as Record<string, unknown>,
+        KIBBLES_SPECIES_PRESENTATION,
+        { overwrite: true },
+      ),
+    ) as typeof content.species
+  }
+  if (content.backgrounds?.length) {
+    next.backgrounds = content.backgrounds.map((row) =>
+      applyKibblesRowPresentation(
+        row as Record<string, unknown>,
+        KIBBLES_BACKGROUND_PRESENTATION,
+        { overwrite: true },
+      ),
+    ) as typeof content.backgrounds
+  }
+  return next
+}
+
 /**
  * Rename colliding class display names for bundled packs.
  * Does not re-prefix resource_key values — feature modifiers already bind to the short keys.
@@ -286,7 +316,11 @@ function applyPackClassCollisionLabels(content: ImportContent, source: string): 
 function prepareFile(
   raw: string,
   source: string,
-  options: { filterMhpSubclasses?: boolean; applyMhpPresentation?: boolean },
+  options: {
+    filterMhpSubclasses?: boolean
+    applyMhpPresentation?: boolean
+    applyKibblesPresentation?: boolean
+  },
   warnings: string[],
 ): ImportContent {
   const parsed = parseImportContentJson(raw)
@@ -304,6 +338,9 @@ function prepareFile(
   content = enrichImportContentModifiers(content)
   if (options.applyMhpPresentation) {
     content = applyMhpClassPresentation(content)
+  }
+  if (options.applyKibblesPresentation) {
+    content = applyKibblesSpeciesBackgroundPresentation(content)
   }
   content = stampSourceDeep(content, source)
   content = applyPackClassCollisionLabels(content, source)
@@ -351,6 +388,9 @@ function writePack(params: {
       {
         filterMhpSubclasses: spec.filterMhpSubclasses,
         applyMhpPresentation: params.packId === "mage-hand-press" && Boolean(spec.filterMhpSubclasses),
+        applyKibblesPresentation:
+          params.packId === "kibbles-tasty" &&
+          (spec.outName === "kibbles-species.json" || spec.outName === "kibbles-backgrounds.json"),
       },
       warnings,
     )
@@ -363,6 +403,8 @@ function writePack(params: {
       "subclasses",
       "spells",
       "feats",
+      "species",
+      "backgrounds",
       "creatures",
       "equipment",
       "class_resources",

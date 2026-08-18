@@ -34,7 +34,7 @@ Important D&D 2024 rules:
 - "Species" is the new term (not "Race")
 - Backgrounds grant ability score bonuses (+2 to one, +1 to another, or +1/+1/+1)
 - For backgrounds, set ability_bonuses to an object listing eligible abilities with value 0 (e.g. {"intelligence":0,"wisdom":0,"charisma":0}) or fixed bonuses with +1/+2 values. Keys must be only: strength, dexterity, constitution, intelligence, wisdom, charisma — never invent keys like "desktop"
-- Backgrounds grant a 1st-level feat
+- 2024 backgrounds grant an Origin feat (or preserve an explicit Dark Gift/or-choice); pre-2024 legacy backgrounds use feat_granted: null
 - Species no longer grant ability score bonuses
 - Class features are tied to specific levels
 - Subclass features typically come at levels 3, 6, 7, 10, 14, 15, and 18 (homebrew may use 1, 3, 6, 10, 14)

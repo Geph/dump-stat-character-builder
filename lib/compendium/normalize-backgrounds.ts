@@ -14,6 +14,10 @@ import { grantFeatCharacteristic, GRANT_FEAT_CATALOG_ID } from "@/lib/compendium
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { wireBackgroundProficiencyChoices } from "@/lib/compendium/wire-background-proficiency-choices"
+import {
+  applyKibblesRowPresentation,
+  KIBBLES_BACKGROUND_PRESENTATION,
+} from "@/lib/seed-packs/kibbles-tasty/species-background-presentation"
 
 const bundledBackgroundByName = new Map(
   (bundledBackgrounds as unknown as {
@@ -155,7 +159,13 @@ export function enrichBackgroundList<
     // Match bundled card art by background name (any source) — never jeffginger hosts.
     return applyBundledCardImage(
       applySrdItemIcon(
-        applySrdFlavorDescription(enriched as unknown as Record<string, unknown>, "background"),
+        applySrdFlavorDescription(
+          applyKibblesRowPresentation(
+            enriched as unknown as Record<string, unknown>,
+            KIBBLES_BACKGROUND_PRESENTATION,
+          ),
+          "background",
+        ),
         SRD_BACKGROUND_ICONS_BY_NAME,
       ),
       SRD_BACKGROUND_CARD_IMAGES_BY_NAME,

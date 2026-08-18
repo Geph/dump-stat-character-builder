@@ -141,6 +141,32 @@ describe("detectFeatureModifiers", () => {
       ruleId: "vision.darkvision",
     },
     {
+      label: "classic darkvision prose",
+      text:
+        "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray.",
+      ruleId: "vision.darkvision.classic_prose",
+      assert: (detections) => {
+        const char = detections[0]?.instance.characteristics?.[0]
+        expect(char?.type).toBe("vision")
+        if (char?.type === "vision") {
+          expect(char.visionType).toBe("darkvision")
+          expect(char.rangeFeet).toBe(60)
+        }
+      },
+    },
+    {
+      label: "speak read write language",
+      text: "You can speak, read, and write Sylvan.",
+      ruleId: "language.speak_read_write",
+      assert: (detections) => {
+        const char = detections[0]?.instance.characteristics?.[0]
+        expect(char?.type).toBe("languages")
+        if (char?.type === "languages") {
+          expect(char.values).toEqual(["Sylvan"])
+        }
+      },
+    },
+    {
       label: "extra attack",
       text: "Beginning at 5th level, you can attack twice whenever you take the Attack action.",
       ruleId: "attack.extra",

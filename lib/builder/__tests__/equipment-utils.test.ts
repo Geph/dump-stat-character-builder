@@ -3,6 +3,7 @@ import {
   collapseWeaponCategoryPackageOptions,
   filterStartingEquipmentOptionsByWeaponProficiency,
   formatPackageOptionTitle,
+  isGoldOnlyOption,
   resolvePackageEquipmentIds,
 } from "@/lib/builder/equipment-utils"
 import type { Equipment } from "@/lib/types"
@@ -26,6 +27,34 @@ function weapon(id: string, name: string, subcategory: string): Equipment {
     created_at: "",
   }
 }
+
+describe("isGoldOnlyOption", () => {
+  it("treats a gold-only second package as gold even when starting_gold is unset", () => {
+    expect(
+      isGoldOnlyOption({ label: "(B) 75 GP", items: [{ name: "Gold Pieces", quantity: 75 }] }, 0),
+    ).toBe(true)
+    expect(isGoldOnlyOption({ label: "(B) 75 GP", items: [] }, 0)).toBe(true)
+    expect(isGoldOnlyOption({ label: "B", items: [{ name: "GP", quantity: 90 }] }, 0)).toBe(true)
+    expect(isGoldOnlyOption({ label: "(B) 4d4 × 10 GP", items: [], goldDice: "4d4 × 10" }, 0)).toBe(
+      true,
+    )
+  })
+
+  it("does not treat a gear package that includes pocket GP as gold-only", () => {
+    expect(
+      isGoldOnlyOption(
+        {
+          label: "(A) Greataxe, 4 Handaxes, Explorer's Pack, and 15 GP",
+          items: [
+            { name: "Gold Pieces", quantity: 15 },
+            { name: "Greataxe", quantity: 1 },
+          ],
+        },
+        75,
+      ),
+    ).toBe(false)
+  })
+})
 
 describe("formatPackageOptionTitle", () => {
   it("strips gear text from verbose option labels", () => {

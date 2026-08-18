@@ -1,7 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { Clock, Plus, X } from "lucide-react"
+import { Bell, Plus, X } from "lucide-react"
 import { useState } from "react"
 import {
   createDurationReminder,
@@ -48,7 +48,7 @@ export function DurationRemindersPanel({
             : SHEET_BANNER_BUTTON.durationReminders,
         )}
       >
-        <Clock className="h-5 w-5" aria-hidden />
+        <Bell className="h-5 w-5" aria-hidden />
         {count > 0 ? (
           <span className="absolute -top-1 -right-1 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-black leading-none text-primary-foreground">
             {count > 99 ? "99+" : count}

@@ -18,11 +18,22 @@ export type BackgroundAbilityGrant = {
   eligible: AbilityScoreKey[]
 }
 
+/** True when the background has no assigned ASI map — treat as free +2/+1 (any abilities). */
+export function backgroundUsesAnyAbilityChoice(
+  abilityBonuses: Background["ability_bonuses"] | undefined,
+): boolean {
+  if (abilityBonuses == null) return true
+  return Object.keys(normalizeBackgroundAbilityBonuses(abilityBonuses)).length === 0
+}
+
 export function getBackgroundAbilityGrant(
   background: Background | null | undefined,
 ): BackgroundAbilityGrant {
-  /** Pre-2024 backgrounds import with null — player chooses +2/+1 or +1/+1/+1 across any abilities. */
-  if (background?.ability_bonuses === null) {
+  /**
+   * Null / empty ability_bonuses — player chooses +2/+1 or +1/+1/+1 across any abilities.
+   * Empty is the automatic fallback when a background has no stat boosts assigned.
+   */
+  if (backgroundUsesAnyAbilityChoice(background?.ability_bonuses)) {
     return {
       fixed: {},
       needsChoice: true,
@@ -32,10 +43,6 @@ export function getBackgroundAbilityGrant(
 
   const normalized = normalizeBackgroundAbilityBonuses(background?.ability_bonuses)
   const keys = Object.keys(normalized) as AbilityScoreKey[]
-
-  if (!keys.length) {
-    return { fixed: {}, needsChoice: false, eligible: [] }
-  }
 
   const fixed: AsiAllocation = {}
   const eligible: AbilityScoreKey[] = []

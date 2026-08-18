@@ -3,11 +3,12 @@
 import { Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
+  ABILITY_OPTION_CATALOG_GROUPS,
+  COMMON_MODIFIER_CATALOG_GROUPS,
   createCatalogEntryId,
   catalogEditorSectionId,
   CATALOG_EDITOR_SECTION_CLASS,
   groupModifierCatalogEntries,
-  MODIFIER_CATALOG_GROUPS,
   TEMPLATE_PREVIEW_SECTION_CLASS,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
@@ -68,12 +69,16 @@ export function ModifierCatalogAdminEditor({
   }
 
   const addEntry = () => {
+    const defaultGroup =
+      variant === "abilityOption"
+        ? ABILITY_OPTION_CATALOG_GROUPS[0]
+        : COMMON_MODIFIER_CATALOG_GROUPS[0]
     onChange([
       ...value,
       {
         id: createCatalogEntryId(),
         name: variant === "abilityOption" ? "New option" : "New modifier",
-        group: MODIFIER_CATALOG_GROUPS[0],
+        group: defaultGroup,
         summary: "",
         description: "",
         characteristics: [],
@@ -217,7 +222,7 @@ function AbilityOptionEntryEditor({
               onChange={(e) => onChange({ group: e.target.value })}
               className="w-full px-3 py-2 bg-background border-2 border-border rounded-lg text-foreground focus:outline-none focus:border-primary"
             >
-              {MODIFIER_CATALOG_GROUPS.map((group) => (
+              {ABILITY_OPTION_CATALOG_GROUPS.map((group) => (
                 <option key={group} value={group}>
                   {group}
                 </option>
@@ -362,7 +367,7 @@ function CatalogTemplateEntryEditor({
               onChange={(e) => onChange({ group: e.target.value })}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             >
-              {MODIFIER_CATALOG_GROUPS.map((group) => (
+              {COMMON_MODIFIER_CATALOG_GROUPS.map((group) => (
                 <option key={group} value={group}>
                   {group}
                 </option>

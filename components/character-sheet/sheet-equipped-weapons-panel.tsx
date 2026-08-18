@@ -232,34 +232,30 @@ function WeaponAttackCard({
           ) : null}
         </div>
 
-        <div className="flex w-[6.75rem] shrink-0 flex-col gap-1 self-stretch min-h-[6.5rem]">
-          <div className="min-h-0 flex-1">
-            <D20RollButton
-              modifier={attack.attackBonus}
-              title={`${weapon.name} attack`}
-              breakdown={attack.attackBreakdown}
-              rollContext={{ kind: "attack" }}
-              onRoll={handleAttackRoll}
-              layout="panel"
-              tone={hand === "off" ? "bonus" : "action"}
-              caption="To Hit"
-            />
-          </div>
+        <div className="flex w-[6.75rem] shrink-0 flex-col gap-1 self-start">
+          <D20RollButton
+            modifier={attack.attackBonus}
+            title={`${weapon.name} attack`}
+            breakdown={attack.attackBreakdown}
+            rollContext={{ kind: "attack" }}
+            onRoll={handleAttackRoll}
+            layout="panel"
+            tone={hand === "off" ? "bonus" : "action"}
+            caption="To Hit"
+          />
           {damageExpression ? (
-            <div className="min-h-0 flex-1">
-              <WeaponDamageRollButton
-                expression={damageExpression}
-                label={`${weapon.name} damage`}
-                diceOptions={diceOptions}
-                showNoModToggle={hand === "off"}
-                defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
-                abilityModifier={abilityModifier}
-                layout="panel"
-                tone="damage"
-                caption="Dmg"
-                onRoll={onDamageRoll}
-              />
-            </div>
+            <WeaponDamageRollButton
+              expression={damageExpression}
+              label={`${weapon.name} damage`}
+              diceOptions={diceOptions}
+              showNoModToggle={hand === "off"}
+              defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
+              abilityModifier={abilityModifier}
+              layout="panel"
+              tone="damage"
+              caption="Dmg"
+              onRoll={onDamageRoll}
+            />
           ) : null}
         </div>
       </div>

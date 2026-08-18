@@ -45,10 +45,18 @@ export const ImportMechanicSchema = z.object({
   criticalHitMinimumByLevel: z
     .array(z.object({ level: z.number(), fixed: z.number().min(2).max(20) }))
     .optional(),
+  /** Ranged-attack cover handling (Sharpshooter / Zeroed Sights). */
+  ignoreHalfCover: z.boolean().optional(),
+  treatThreeQuartersCoverAsHalf: z.boolean().optional(),
   /** Flat damage bonus (Dueling +2). Prefer over inventing bonusDice for non-dice bonuses. */
   damageBonus: z.number().optional(),
   damageTarget: z.enum(["all", "melee", "ranged"]).optional(),
   bonusDice: z.string().optional(),
+  /** Add the governing ability modifier when the base damage roll omits it. */
+  grantAbilityModifierWhenMissing: z.boolean().optional(),
+  /** Alternate extra dice when the base damage roll already includes its ability modifier. */
+  bonusDiceWhenModifierIncluded: z.string().optional(),
+  bonusDiceUsesWeaponDamageType: z.boolean().optional(),
   damageType: z.string().optional(),
   damageTypes: z.array(z.string()).optional(),
   conditions: z.array(z.string()).optional(),
@@ -264,6 +272,7 @@ export const ImportMechanicSchema = z.object({
   /** telepathy */
   telepathyRangeFeet: z.number().optional(),
   /** unarmed_strike_damage */
+  unarmedDie: z.string().optional(),
   dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).optional(),
   /** weapon_damage_die_override — sides to rewrite weapon dice to (NdX → NdY). Not for optional 2d4 replacements like Deadly D4s. */
   dieSides: z.number().optional(),
@@ -312,8 +321,6 @@ export const ImportMechanicSchema = z.object({
   /** weapon_reach_modifier */
   reachBonusFeet: z.number().optional(),
   weaponPropertyFilter: z.array(z.string()).optional(),
-  /** extra_weapon_mastery */
-  masteryProperties: z.array(z.string()).optional(),
   /** special_attack */
   attackName: z.string().optional(),
   attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).optional(),
@@ -720,6 +727,8 @@ export const BACKGROUND_LEGACY_IMPORT_HINT = `Background ability scores and feat
   Put pouch GP for package A as a Gold Pieces item inside option A (or set background-level starting_gold). Do NOT put starting_gold on each option. Wrong (will be dropped): [{ "label": "A", "items": [...], "starting_gold": 8 }, { "label": "B", "items": [...] }].
 - Prefer quantity on the item (e.g. Parchment quantity 10) over parenthetical counts in the name.
 - Flat starting_equipment alone is package A only — use groups whenever the source says Choose A or B.
+- Classic "belt pouch containing N gp" packages (no Choose A/B): emit starting_equipment including a Belt Pouch item AND starting_gold: N. Do not drop the pouch when you set starting_gold.
+- Do not invent feat_granted from a separate feats chapter that only says a feat is "provided by some backgrounds" (e.g. Old Hand) unless that background's own text grants the feat.
 - Assign each Feature to the background whose toolset/theme it matches — do not attach a feature to the wrong background because of PDF column flow.
 - Do not copy d6 Ideals/Bonds/Flaws/Personality Trait tables into descriptions.`
 

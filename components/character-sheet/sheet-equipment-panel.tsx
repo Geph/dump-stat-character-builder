@@ -9,7 +9,6 @@ import {
 } from "@/lib/compendium/equipment-attunement"
 import {
   getBaseSelectionOptions,
-  magicItemSummaryLine,
   needsBaseSelection,
   resolveCharacterEquipment,
 } from "@/lib/compendium/equipment-base-selection"
@@ -82,7 +81,7 @@ function EquipRow({
       aria-pressed={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        "inline-flex min-h-9 items-center justify-center rounded-lg border-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors",
+        "inline-flex min-h-8 items-center justify-center rounded-md border-2 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors",
         checked
           ? "border-primary bg-primary/15 text-primary"
           : "border-border bg-background/80 text-muted-foreground hover:border-primary/40 hover:text-foreground",
@@ -244,15 +243,13 @@ export function SheetEquipmentPanel({
               needsBaseSelection(item, catalog, equipmentBaseSelections) && baseOptions.length > 0
             const selectedBaseId =
               equipmentBaseSelections[item.id] ?? item.selected_base_equipment_id ?? ""
-            const summary = magicItemSummaryLine(item, resolved)
-            const showSummary = Boolean(summary && !summary.startsWith("Damage "))
             const pinned = pinnedEquipmentIds.includes(item.id)
 
             return (
               <div
                 key={item.id}
                 className={cn(
-                  "rounded-lg border px-2.5 py-2 bg-muted/40 min-w-0",
+                  "rounded-lg border px-2 py-1.5 bg-muted/40 min-w-0",
                   (equippedArmorId === item.id ||
                     equippedShieldId === item.id ||
                     equippedWeaponId === item.id ||
@@ -261,131 +258,126 @@ export function SheetEquipmentPanel({
                   pinned && "border-primary/35",
                 )}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onTogglePinnedEquipment(item.id)}
-                        title={pinned ? "Unpin item" : "Pin item to top"}
-                        aria-label={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
-                        aria-pressed={pinned}
-                        className={cn(
-                          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors",
-                          pinned
-                            ? "text-primary bg-primary/10 hover:bg-primary/15"
-                            : "text-muted-foreground/70 hover:bg-muted hover:text-foreground",
-                        )}
-                      >
-                        {pinned ? (
-                          <Pin className="h-4 w-4 fill-current" aria-hidden />
-                        ) : (
-                          <Pin className="h-4 w-4" aria-hidden />
-                        )}
-                      </button>
-                      <p className="text-xs font-semibold text-foreground truncate">{item.name}</p>
-                      <MagicEquipmentBadges item={item} />
-                    </div>
-                    {showSummary && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{summary}</p>
-                    )}
-                    {showBasePicker && (
-                      <select
-                        value={selectedBaseId}
-                        onChange={(e) => onBaseSelectionChange(item.id, e.target.value)}
-                        className="mt-1.5 w-full text-[10px] px-2 py-1 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      >
-                        <option value="">Choose base item…</option>
-                        {baseOptions.map((base) => (
-                          <option key={base.id} value={base.id}>
-                            {base.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                      {isArmor && (
-                        <EquipRow
-                          label="Wear"
-                          checked={equippedArmorId === item.id}
-                          disabled={equipBlocked && equippedArmorId !== item.id}
-                          title={equipBlocked && equippedArmorId !== item.id ? equipBlockedTitle : undefined}
-                          onChange={(checked) => onEquipArmor(checked ? item.id : null)}
-                        />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onTogglePinnedEquipment(item.id)}
+                      title={pinned ? "Unpin item" : "Pin item to top"}
+                      aria-label={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
+                      aria-pressed={pinned}
+                      className={cn(
+                        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors",
+                        pinned
+                          ? "text-primary bg-primary/10 hover:bg-primary/15"
+                          : "text-muted-foreground/70 hover:bg-muted hover:text-foreground",
                       )}
-                      {isShield && (
-                        <EquipRow
-                          label="Wield"
-                          checked={equippedShieldId === item.id}
-                          disabled={equipBlocked && equippedShieldId !== item.id}
-                          title={equipBlocked && equippedShieldId !== item.id ? equipBlockedTitle : undefined}
-                          onChange={(checked) => onEquipShield(checked ? item.id : null)}
-                        />
+                    >
+                      {pinned ? (
+                        <Pin className="h-4 w-4 fill-current" aria-hidden />
+                      ) : (
+                        <Pin className="h-4 w-4" aria-hidden />
                       )}
-                      {isWeapon && isLightWeapon(resolved) ? (
-                        <>
-                          <EquipRow
-                            label="Main"
-                            checked={equippedWeaponId === item.id}
-                            disabled={equipBlocked && equippedWeaponId !== item.id}
-                            title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
-                            onChange={(checked) => {
-                              if (checked) {
-                                if (equippedOffHandWeaponId === item.id) {
-                                  onEquipOffHandWeapon(null)
-                                }
-                                onEquipWeapon(item.id)
-                                return
-                              }
-                              if (equippedWeaponId === item.id) onEquipWeapon(null)
-                            }}
-                          />
-                          <EquipRow
-                            label="Off-hand"
-                            checked={equippedOffHandWeaponId === item.id}
-                            disabled={equipBlocked && equippedOffHandWeaponId !== item.id}
-                            title={equipBlocked && equippedOffHandWeaponId !== item.id ? equipBlockedTitle : undefined}
-                            onChange={(checked) => {
-                              if (checked) {
-                                if (equippedWeaponId === item.id) {
-                                  onEquipWeapon(null)
-                                }
-                                onEquipOffHandWeapon(item.id)
-                                return
-                              }
-                              if (equippedOffHandWeaponId === item.id) onEquipOffHandWeapon(null)
-                            }}
-                          />
-                        </>
-                      ) : isWeapon ? (
+                    </button>
+                    <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                    <MagicEquipmentBadges item={item} />
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    {isArmor && (
+                      <EquipRow
+                        label="Wear"
+                        checked={equippedArmorId === item.id}
+                        disabled={equipBlocked && equippedArmorId !== item.id}
+                        title={equipBlocked && equippedArmorId !== item.id ? equipBlockedTitle : undefined}
+                        onChange={(checked) => onEquipArmor(checked ? item.id : null)}
+                      />
+                    )}
+                    {isShield && (
+                      <EquipRow
+                        label="Wield"
+                        checked={equippedShieldId === item.id}
+                        disabled={equipBlocked && equippedShieldId !== item.id}
+                        title={equipBlocked && equippedShieldId !== item.id ? equipBlockedTitle : undefined}
+                        onChange={(checked) => onEquipShield(checked ? item.id : null)}
+                      />
+                    )}
+                    {isWeapon && isLightWeapon(resolved) ? (
+                      <>
                         <EquipRow
-                          label="Wield"
+                          label="Main"
                           checked={equippedWeaponId === item.id}
                           disabled={equipBlocked && equippedWeaponId !== item.id}
                           title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
-                          onChange={(checked) => onEquipWeapon(checked ? item.id : null)}
+                          onChange={(checked) => {
+                            if (checked) {
+                              if (equippedOffHandWeaponId === item.id) {
+                                onEquipOffHandWeapon(null)
+                              }
+                              onEquipWeapon(item.id)
+                              return
+                            }
+                            if (equippedWeaponId === item.id) onEquipWeapon(null)
+                          }}
                         />
-                      ) : null}
-                      {attunable && (
                         <EquipRow
-                          label={attunementSlot != null ? `Attune ${attunementSlot}` : "Attune"}
-                          checked={isAttuned}
-                          disabled={attuneDisabled}
-                          title={attuneDisabledTitle}
-                          onChange={() => onToggleAttune(item.id)}
+                          label="Off-hand"
+                          checked={equippedOffHandWeaponId === item.id}
+                          disabled={equipBlocked && equippedOffHandWeaponId !== item.id}
+                          title={equipBlocked && equippedOffHandWeaponId !== item.id ? equipBlockedTitle : undefined}
+                          onChange={(checked) => {
+                            if (checked) {
+                              if (equippedWeaponId === item.id) {
+                                onEquipWeapon(null)
+                              }
+                              onEquipOffHandWeapon(item.id)
+                              return
+                            }
+                            if (equippedOffHandWeaponId === item.id) onEquipOffHandWeapon(null)
+                          }}
                         />
-                      )}
-                    </div>
+                      </>
+                    ) : isWeapon ? (
+                      <EquipRow
+                        label="Wield"
+                        checked={equippedWeaponId === item.id}
+                        disabled={equipBlocked && equippedWeaponId !== item.id}
+                        title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
+                        onChange={(checked) => onEquipWeapon(checked ? item.id : null)}
+                      />
+                    ) : null}
+                    {attunable && (
+                      <EquipRow
+                        label={attunementSlot != null ? `Attune ${attunementSlot}` : "Attune"}
+                        checked={isAttuned}
+                        disabled={attuneDisabled}
+                        title={attuneDisabledTitle}
+                        onChange={() => onToggleAttune(item.id)}
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onShowDetails(item)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
+                      aria-label={`Details for ${item.name}`}
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onShowDetails(item)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
-                    aria-label={`Details for ${item.name}`}
-                  >
-                    <Info className="w-4 h-4" />
-                  </button>
                 </div>
+                {showBasePicker ? (
+                  <select
+                    value={selectedBaseId}
+                    onChange={(e) => onBaseSelectionChange(item.id, e.target.value)}
+                    className="mt-1.5 w-full text-xs px-2 py-1 bg-card border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <option value="">Choose base item…</option>
+                    {baseOptions.map((base) => (
+                      <option key={base.id} value={base.id}>
+                        {base.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
               </div>
             )
           })

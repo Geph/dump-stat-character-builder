@@ -228,12 +228,18 @@ function enrichTraits(
 ): Trait[] | undefined {
   if (!traits?.length) return traits
   return traits.map((trait) =>
-    enrichFeatureLike(trait as ImportMechanicsCarrier, {
-      contentKind: "species_trait",
-      sourceName,
-      featureName: trait.name,
-      level: trait.level,
-    }),
+    enrichChoiceOptionModifiers(
+      enrichFeatureLike(trait as ImportMechanicsCarrier, {
+        contentKind: "species_trait",
+        sourceName,
+        featureName: trait.name,
+        level: trait.level,
+      }) as unknown as Feature,
+      {
+        contentKind: "species_trait",
+        sourceName,
+      },
+    ),
   ) as unknown as Trait[]
 }
 

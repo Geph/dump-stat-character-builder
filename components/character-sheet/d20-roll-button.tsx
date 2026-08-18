@@ -135,7 +135,7 @@ export function D20RollButton({
   const filled = tone !== "default" || layout === "panel"
   const sizeClass =
     layout === "panel"
-      ? "min-h-0 flex-1 w-full px-2 text-sm gap-1"
+      ? "h-auto min-h-[2.75rem] w-full px-2 py-1.5 pr-9 text-sm gap-1"
       : size === "lg"
         ? "h-11 min-w-11 px-2 text-sm gap-1.5"
         : size === "md"
@@ -200,7 +200,7 @@ export function D20RollButton({
         event.stopPropagation()
         setManualOverride((current) => cycleManualOverride(current))
       }}
-      className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
+      className={`inline-flex min-h-6 min-w-6 items-center justify-center rounded border px-1.5 py-1 text-[10px] font-bold uppercase leading-none ${
         filled
           ? modeBadge || manualOverride !== "normal"
             ? "border-white/55 bg-black/15 text-white"
@@ -221,7 +221,9 @@ export function D20RollButton({
       type="button"
       onClick={handleRoll}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded font-bold tabular-nums shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${sizeClass} ${toneClass} ${className ?? ""}`}
+      className={`inline-flex items-center justify-center font-bold tabular-nums shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+        layout === "panel" ? "rounded-lg" : "rounded"
+      } ${sizeClass} ${toneClass} ${className ?? ""}`}
       title={disabledReason ?? tooltip}
       aria-label={title ?? `Roll d20 ${modLabel}`}
     >
@@ -274,8 +276,8 @@ export function D20RollButton({
 
   if (layout === "panel") {
     return (
-      <span className="flex h-full min-h-0 w-full flex-col items-stretch gap-0.5">
-        <span className="flex justify-end">{modeToggle}</span>
+      <span className="relative block w-full">
+        <span className="pointer-events-auto absolute right-2 top-1.5 z-10">{modeToggle}</span>
         {rollButton}
       </span>
     )

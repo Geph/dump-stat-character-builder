@@ -15,6 +15,7 @@ import {
   BACKGROUND_GRANT_CHARACTER_LEVELS,
   formatGrantedSpellLevelKey,
 } from "@/lib/compendium/background-utils"
+import { backgroundUsesAnyAbilityChoice } from "@/lib/builder/background-asi"
 import { CompendiumEditorHeaderRow } from "@/components/compendium/editor-header-row"
 import { RichTextEditor } from "@/components/compendium/rich-text-editor"
 import {
@@ -59,6 +60,8 @@ interface EquipmentItem {
 interface BackgroundFormData {
   name: string
   description: string
+  /** "any" = Choose any +2/+1 (stored as ability_bonuses: null). */
+  abilityBonusMode: "any" | "specific"
   ability_bonuses: Record<string, number>
   skill_proficiencies: string[]
   proficiencies: BackgroundProficiencies
@@ -82,6 +85,7 @@ interface BackgroundFormData {
 const defaultBackground: BackgroundFormData = {
   name: "",
   description: "",
+  abilityBonusMode: "any",
   ability_bonuses: {},
   skill_proficiencies: [],
   proficiencies: emptyBackgroundProficiencies(),
@@ -172,12 +176,18 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
         } else if (data) {
           const row = data as unknown as Record<string, unknown> & { name: string }
           const enriched = enrichBackgroundList([row])[0]
+          const abilityBonuses = normalizeBackgroundAbilityBonuses(
+            enriched.ability_bonuses as Record<string, number> | null | undefined,
+          )
           setForm({
             name: String(row.name || ""),
             description: String(row.description || ""),
-            ability_bonuses: normalizeBackgroundAbilityBonuses(
+            abilityBonusMode: backgroundUsesAnyAbilityChoice(
               enriched.ability_bonuses as Record<string, number> | null | undefined,
-            ),
+            )
+              ? "any"
+              : "specific",
+            ability_bonuses: abilityBonuses,
             skill_proficiencies: (row.skill_proficiencies as string[]) || [],
             proficiencies: normalizeBackgroundProficiencies(
               row.proficiencies as BackgroundProficiencies | null | undefined,
@@ -231,12 +241,17 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
       grants_spells,
       granted_spells,
       proficiencies,
+      abilityBonusMode,
       ...rest
     } = form
     const normalizedProficiencies = normalizeBackgroundProficiencies(proficiencies)
+    const abilityBonusesForSave =
+      abilityBonusMode === "any" || !Object.keys(rest.ability_bonuses).length
+        ? null
+        : rest.ability_bonuses
     const normalizedRow = normalizeBackgroundRow({
       ...rest,
-      ability_bonuses: Object.keys(rest.ability_bonuses).length ? rest.ability_bonuses : null,
+      ability_bonuses: abilityBonusesForSave,
     })
     const payload = {
       ...normalizedRow,
@@ -272,7 +287,18 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
   }
 
   const handleExport = () => {
-    const exportData = { type: "dnd-background", version: 1, data: form }
+    const { abilityBonusMode: _mode, ...exportForm } = form
+    const exportData = {
+      type: "dnd-background",
+      version: 1,
+      data: {
+        ...exportForm,
+        ability_bonuses:
+          form.abilityBonusMode === "any" || !Object.keys(form.ability_bonuses).length
+            ? null
+            : form.ability_bonuses,
+      },
+    }
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -424,41 +450,91 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
 
           <CompendiumEditorPanel
             title="Ability Score Bonuses"
-            hint="Check which abilities are eligible for player choice (+2/+1 or +1/+1/+1). Use +1 or +2 for fixed bonuses instead of +0."
+            hint="Choose any +2/+1 is the default when no specific boosts are assigned. Players allocate +2/+1 or +1/+1/+1."
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {BACKGROUND_ABILITY_KEYS.map((ability) => {
-                const included = ability in form.ability_bonuses
-                const value = form.ability_bonuses[ability] ?? 0
-                return (
-                  <div
-                    key={ability}
-                    className="flex flex-wrap items-center gap-3 p-2 rounded-lg border border-border bg-background"
-                  >
-                    <label className="flex items-center gap-2 text-sm cursor-pointer min-w-[8rem]">
-                      <input
-                        type="checkbox"
-                        checked={included}
-                        onChange={(e) => toggleEligibleAbility(ability, e.target.checked)}
-                        className="accent-primary"
-                      />
-                      <span className="text-foreground capitalize">{ability}</span>
-                    </label>
-                    {included && (
-                      <select
-                        value={value}
-                        onChange={(e) => setAbilityBonus(ability, parseInt(e.target.value, 10))}
-                        className="flex-1 min-w-[5rem] px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-                      >
-                        <option value={0}>+0 (eligible)</option>
-                        <option value={1}>+1 fixed</option>
-                        <option value={2}>+2 fixed</option>
-                      </select>
-                    )}
-                  </div>
-                )
-              })}
+            <div className="flex flex-col gap-3 mb-4">
+              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background p-3">
+                <input
+                  type="radio"
+                  name="ability-bonus-mode"
+                  className="mt-1 accent-primary"
+                  checked={form.abilityBonusMode === "any"}
+                  onChange={() =>
+                    setForm((prev) => ({
+                      ...prev,
+                      abilityBonusMode: "any",
+                      ability_bonuses: {},
+                    }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">
+                    Choose any +2/+1
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Player picks any abilities (+2/+1 or +1/+1/+1). Used automatically when no
+                    boosts are assigned.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background p-3">
+                <input
+                  type="radio"
+                  name="ability-bonus-mode"
+                  className="mt-1 accent-primary"
+                  checked={form.abilityBonusMode === "specific"}
+                  onChange={() =>
+                    setForm((prev) => ({
+                      ...prev,
+                      abilityBonusMode: "specific",
+                    }))
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">
+                    Specific abilities
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Check eligible scores for player choice (+0), or set fixed +1 / +2 bonuses.
+                  </span>
+                </span>
+              </label>
             </div>
+            {form.abilityBonusMode === "specific" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {BACKGROUND_ABILITY_KEYS.map((ability) => {
+                  const included = ability in form.ability_bonuses
+                  const value = form.ability_bonuses[ability] ?? 0
+                  return (
+                    <div
+                      key={ability}
+                      className="flex flex-wrap items-center gap-3 p-2 rounded-lg border border-border bg-background"
+                    >
+                      <label className="flex items-center gap-2 text-sm cursor-pointer min-w-[8rem]">
+                        <input
+                          type="checkbox"
+                          checked={included}
+                          onChange={(e) => toggleEligibleAbility(ability, e.target.checked)}
+                          className="accent-primary"
+                        />
+                        <span className="text-foreground capitalize">{ability}</span>
+                      </label>
+                      {included && (
+                        <select
+                          value={value}
+                          onChange={(e) => setAbilityBonus(ability, parseInt(e.target.value, 10))}
+                          className="flex-1 min-w-[5rem] px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                        >
+                          <option value={0}>+0 (eligible)</option>
+                          <option value={1}>+1 fixed</option>
+                          <option value={2}>+2 fixed</option>
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </CompendiumEditorPanel>
 
           <CompendiumEditorPanel title="Skill Proficiencies">

@@ -43,6 +43,14 @@ import { clearModifierReviewPending, featureNeedsModifierReview } from "@/lib/co
 import { cn } from "@/lib/utils"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
+import { RelatedCascadeOptions } from "@/components/compendium/related-cascade-options"
+import {
+  deleteCompendiumTargets,
+  EMPTY_RELATED_CASCADE,
+  findRelatedFeatsAndCompanions,
+  flattenRelatedCascade,
+  type RelatedCascadeGroup,
+} from "@/lib/compendium/related-cascade"
 
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
@@ -128,6 +136,11 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [subclassCount, setSubclassCount] = useState(0)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [relatedCascade, setRelatedCascade] = useState<RelatedCascadeGroup>(EMPTY_RELATED_CASCADE)
+  const [includeRelatedFeats, setIncludeRelatedFeats] = useState(false)
+  const [includeRelatedCreatures, setIncludeRelatedCreatures] = useState(false)
+  const [includeRelatedAbilities, setIncludeRelatedAbilities] = useState(false)
+  const [relatedLoading, setRelatedLoading] = useState(false)
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("classes", id)
@@ -265,21 +278,64 @@ export default function ClassEditorPage({ id }: { id: string }) {
   }
 
   const handleDelete = () => {
+    setIncludeRelatedFeats(false)
+    setIncludeRelatedCreatures(false)
+    setIncludeRelatedAbilities(false)
+    setRelatedCascade(EMPTY_RELATED_CASCADE)
     setDeleteConfirmOpen(true)
+    setRelatedLoading(true)
+    void (async () => {
+      try {
+        const db = createClient()
+        const related = await findRelatedFeatsAndCompanions(db, "classes", id)
+        setRelatedCascade(related)
+      } catch (err) {
+        console.error("[v0] Failed to load related cascade targets:", err)
+      } finally {
+        setRelatedLoading(false)
+      }
+    })()
   }
 
   const confirmDelete = async () => {
     setDeleting(true)
     setError(null)
     const db = createClient()
-    const { error: deleteError } = await db.from("classes").delete().eq("id", id)
-    if (deleteError) {
-      setError(deleteError.message || "Failed to delete class")
+    try {
+      const cascadeTargets = flattenRelatedCascade(relatedCascade, {
+        includeFeats: includeRelatedFeats,
+        includeCreatures: includeRelatedCreatures,
+        includeAbilities: includeRelatedAbilities,
+      })
+      if (cascadeTargets.length) {
+        await deleteCompendiumTargets(db, cascadeTargets)
+      }
+
+      const { data: subclassRows } = await db.from("subclasses").select("id").eq("class_id", id)
+      for (const row of asCompendiumRows(subclassRows)) {
+        await db.from("subclasses").delete().eq("id", row.id as string)
+      }
+      const { data: resourceRows } = await db
+        .from("class_resources")
+        .select("id")
+        .eq("class_id", id)
+      for (const row of asCompendiumRows(resourceRows)) {
+        await db.from("class_resources").delete().eq("id", row.id as string)
+      }
+
+      const { error: deleteError } = await db.from("classes").delete().eq("id", id)
+      if (deleteError) {
+        setError(deleteError.message || "Failed to delete class")
+        setDeleting(false)
+        setDeleteConfirmOpen(false)
+        return
+      }
+      router.push("/compendium?tab=classes")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete class")
       setDeleting(false)
       setDeleteConfirmOpen(false)
-      return
     }
-    router.push("/compendium?tab=classes")
   }
 
   const addFeature = () => {
@@ -515,8 +571,23 @@ export default function ClassEditorPage({ id }: { id: string }) {
                   will be removed.
                 </>
               ) : null}{" "}
-              Saved characters that use this class will lose those class levels.
+              Spells that list this class by name are kept. Saved characters that use this class will
+              lose those class levels.
             </p>
+            {relatedLoading ? (
+              <p className="mb-6 text-sm text-muted-foreground">Checking for related feats and companions…</p>
+            ) : (
+              <RelatedCascadeOptions
+                related={relatedCascade}
+                includeFeats={includeRelatedFeats}
+                includeCreatures={includeRelatedCreatures}
+                includeAbilities={includeRelatedAbilities}
+                onIncludeFeatsChange={setIncludeRelatedFeats}
+                onIncludeCreaturesChange={setIncludeRelatedCreatures}
+                onIncludeAbilitiesChange={setIncludeRelatedAbilities}
+                disabled={deleting}
+              />
+            )}
             <div className="flex gap-3">
               <button
                 type="button"
@@ -529,7 +600,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => void confirmDelete()}
-                disabled={deleting}
+                disabled={deleting || relatedLoading}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
               >
                 {deleting ? "Deleting…" : "Delete class"}

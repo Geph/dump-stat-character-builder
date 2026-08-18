@@ -16,7 +16,7 @@ export const EXAMPLE_SEED_PACKS: ExampleSeedPackMeta[] = [
     label: "Kibbles Tasty",
     source: "Kibbles Tasty",
     description:
-      "Inventor, Occultist, Psion, Warden, Kibbles spells, psionics catalog, and crafting feats.",
+      "Inventor, Occultist, Psion, Warden, species, crafting backgrounds and feats, Kibbles spells, and the psionics catalog.",
   },
   {
     id: "mage-hand-press",

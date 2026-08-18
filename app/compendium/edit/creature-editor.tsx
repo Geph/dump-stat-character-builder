@@ -185,6 +185,13 @@ export default function CreatureEditor({ id }: { id: string }) {
     router.push("/compendium?tab=creatures")
   }
 
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this creature?")) return
+    const db = createClient()
+    await db.from("creatures").delete().eq("id", id)
+    router.push("/compendium?tab=creatures")
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -203,6 +210,7 @@ export default function CreatureEditor({ id }: { id: string }) {
         isNew={id === "new"}
         saving={saving}
         saveLabel="Save Creature"
+        onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">

@@ -7,18 +7,37 @@ import { existsSync, readdirSync, statSync } from "node:fs"
 import { basename, join } from "node:path"
 import { homedir } from "node:os"
 
-const DRIVE_ROOT = join(
-  homedir(),
-  "Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files",
-)
+const DRIVE_CANDIDATES = [
+  join(
+    homedir(),
+    "Library/CloudStorage/GoogleDrive-thejeffginger@gmail.com/My Drive/Code Projects/dump stat working files",
+  ),
+  join("d:", "Google Drive", "Code Projects", "dump stat working files"),
+  join("D:", "Google Drive", "Code Projects", "dump stat working files"),
+]
+
+function firstExisting(...paths: string[]): string | null {
+  for (const path of paths) {
+    if (path && existsSync(path)) return path
+  }
+  return null
+}
 
 export function homebrewImportJsonDir(): string {
-  return process.env.HOMEBREW_IMPORT_JSON_DIR?.trim() || join(DRIVE_ROOT, "import-json")
+  const fromEnv = process.env.HOMEBREW_IMPORT_JSON_DIR?.trim()
+  if (fromEnv) return fromEnv
+  return (
+    firstExisting(...DRIVE_CANDIDATES.map((root) => join(root, "import-json"))) ??
+    join(DRIVE_CANDIDATES[0]!, "import-json")
+  )
 }
 
 export function homebrewSourceTextsDir(): string {
+  const fromEnv = process.env.HOMEBREW_SOURCE_TEXTS_DIR?.trim()
+  if (fromEnv) return fromEnv
   return (
-    process.env.HOMEBREW_SOURCE_TEXTS_DIR?.trim() || join(DRIVE_ROOT, "source-texts", "Classes")
+    firstExisting(...DRIVE_CANDIDATES.map((root) => join(root, "source-texts", "Classes"))) ??
+    join(DRIVE_CANDIDATES[0]!, "source-texts", "Classes")
   )
 }
 

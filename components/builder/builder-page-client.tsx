@@ -307,7 +307,6 @@ import {
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import {
-  useIsMediumPickerScreen,
   useIsPhonePickerScreen,
   usePickerPageSize,
   useSpellPickerPageSize,
@@ -446,9 +445,8 @@ export default function BuilderPageClient() {
   const pickerPageSize = usePickerPageSize(cardViewMode)
   const spellPickerPageSize = useSpellPickerPageSize()
   const isPhonePickerScreen = useIsPhonePickerScreen()
-  const isMediumPickerScreen = useIsMediumPickerScreen()
   const useSwipeVisualPicker = cardViewMode === "cinematic" && isPhonePickerScreen
-  const useCinematicPortraitCards = cardViewMode === "cinematic" && isMediumPickerScreen
+  const useCinematicPortraitCards = cardViewMode === "cinematic" && !isPhonePickerScreen
   
   // Details modal state
   const [detailsModal, setDetailsModal] = useState<{
@@ -5556,7 +5554,7 @@ export default function BuilderPageClient() {
                 )}
 
                 {/* Portrait & banner uploads */}
-                <div className="flex flex-col lg:flex-row gap-6 mb-6">
+                <div className="mb-6 space-y-6">
                   <div className="flex w-full min-w-0 items-start gap-2 sm:gap-4">
                     <div className="relative shrink-0">
                     {character.portrait_url ? (
@@ -5625,8 +5623,8 @@ export default function BuilderPageClient() {
                       )}
                     </div>
                   </div>
-                  
-                  <div className="flex-1">
+
+                  <div>
                     <label className="block text-sm font-medium text-foreground mb-2">Character Name *</label>
                     <input
                       id="builder-details-name"

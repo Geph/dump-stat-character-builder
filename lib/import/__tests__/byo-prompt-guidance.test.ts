@@ -127,7 +127,7 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("new_toggles")
     expect(prompt).toContain("half_character_level_round_down")
     expect(prompt).toContain("weapon_reach_modifier")
-    expect(prompt).toContain("extra_weapon_mastery")
+    expect(prompt).toContain("do not emit extra_weapon_mastery")
     expect(prompt).toContain("canHover")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Divine Fury")
     // Every phrase-index catalog that previously lacked a kind is now documentable
@@ -239,6 +239,16 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     )
     expect(prompt).toContain("Survivor or a Dark Gift feat of your choice")
     expect(prompt).toContain("Choose one Dark Gift feat")
+    expect(prompt).toContain("Belt Pouch")
+    expect(prompt).toContain("do NOT invent Old Hand")
+  })
+
+  it("covers Kibbles-style species choice tables in BYO species focus", () => {
+    const prompt = buildByoExtractionPrompt("species")
+    expect(prompt).toContain("Remains / Animating Force / Modular Design")
+    expect(prompt).toContain("You know Sylvan")
+    expect(prompt).toContain("see in dim light within N feet")
+    expect(prompt).toContain("size: null")
   })
 
   it("warns on schema-fit mismatches and advises separate weapon mastery imports", () => {

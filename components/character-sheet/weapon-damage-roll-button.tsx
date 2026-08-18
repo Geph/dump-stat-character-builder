@@ -165,24 +165,32 @@ export function WeaponDamageRollButton({
   }
 
   const filled = tone === "damage" || layout === "panel"
+  const optionsActive =
+    Boolean(modeBadge) ||
+    (showNoModToggle && !includeAbilityModifier) ||
+    selectedDiceId !== (defaultDiceId ?? diceOptions[0]?.id)
   const modeToggleClass = filled
-    ? modeBadge || !includeAbilityModifier || selectedDiceId !== (defaultDiceId ?? diceOptions[0]?.id)
+    ? optionsActive
       ? "border-white/55 bg-black/15 text-white"
       : "border-white/25 bg-black/10 text-white/80 hover:border-white/45"
-    : modeBadge || !includeAbilityModifier || selectedDiceId !== (defaultDiceId ?? diceOptions[0]?.id)
+    : optionsActive
       ? "border-primary/40 text-primary"
       : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
 
-  const rollButtonClass = filled
-    ? "sheet-fill-tile sheet-fill-hp min-h-0 flex-1 w-full rounded-lg px-2 text-sm"
-    : "h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs hover:bg-muted"
+  const rollButtonClass =
+    layout === "panel"
+      ? "sheet-fill-tile sheet-fill-hp h-auto min-h-[2.75rem] w-full rounded-lg px-2 py-1.5 pr-9 text-sm"
+      : filled
+        ? "sheet-fill-tile sheet-fill-hp h-6 min-w-[2.25rem] rounded px-1.5 text-xs"
+        : "h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs hover:bg-muted"
 
   const optionsTrigger = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${modeToggleClass}`}
+          onClick={(event) => event.stopPropagation()}
+          className={`inline-flex min-h-6 min-w-6 items-center justify-center rounded border px-1.5 py-1 text-[10px] font-bold uppercase leading-none ${modeToggleClass}`}
           title="Damage roll options"
           aria-label="Damage roll options"
         >
@@ -268,8 +276,8 @@ export function WeaponDamageRollButton({
 
   if (layout === "panel") {
     return (
-      <span className="flex h-full min-h-0 w-full flex-col items-stretch gap-0.5">
-        <span className="flex justify-end">{optionsTrigger}</span>
+      <span className="relative block w-full">
+        <span className="pointer-events-auto absolute right-2 top-1.5 z-10">{optionsTrigger}</span>
         {rollButton}
       </span>
     )

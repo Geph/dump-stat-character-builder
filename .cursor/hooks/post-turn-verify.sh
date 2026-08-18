@@ -1,28 +1,30 @@
 #!/usr/bin/env bash
 #
-# Cursor `stop` hook — runs after every agent turn.
+# Cursor `stop` hook — runs after agent turns (quietly when possible).
 #
-# It runs the repo's fast correctness gate (lint + typecheck, the same checks
-# CI blocks on). If either fails, it returns a `followup_message` so Cursor
-# feeds the error output back to the agent as the next user message, letting the
-# agent fix the problem before the turn really ends. On success it prints `{}`
-# (no follow-up) so it never manufactures an infinite loop.
+# Default behavior (less intrusive):
+#   - Skip when no relevant source files changed since the last successful run
+#   - Keep stderr quiet unless CURSOR_HOOK_VERBOSE=1 (Cursor may still flash the
+#     Hooks output channel; that is IDE UI and cannot be fully suppressed here)
+#   - On failure, emit followup_message so the agent can fix issues
 #
-# Contract (Cursor Agent Hooks, schema v1):
-#   stdin : { "status": "completed" | "aborted" | "error", "loop_count": N }
-#   stdout: {}  OR  { "followup_message": "..." }   (must be the ONLY stdout)
-#   Diagnostics go to stderr (the Hooks output channel), never stdout.
-#
-# Opt-in: set CURSOR_HOOK_RUN_BUILD=1 to also run the full `next build`
-# (slow — minutes). By default we skip it; CI runs the build separately.
-#
-# Bypass: remove/disable this hook in Cursor's Hooks settings, or delete the
-# `stop` entry from .cursor/hooks.json.
+# Force a run: CURSOR_HOOK_FORCE=1
+# Also run next build: CURSOR_HOOK_RUN_BUILD=1
+# Bypass: remove the `stop` entry from .cursor/hooks.json
 
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT" || { printf '%s\n' '{}'; exit 0; }
+
+STAMP_FILE="$ROOT/.git/dumpstat-post-turn-verify"
+VERBOSE="${CURSOR_HOOK_VERBOSE:-0}"
+
+log() {
+  if [ "$VERBOSE" = "1" ]; then
+    echo "post-turn-verify: $*" >&2
+  fi
+}
 
 input="$(cat)"
 
@@ -35,28 +37,39 @@ if command -v jq >/dev/null 2>&1; then
   [ -n "$parsed_loop" ] && [ "$parsed_loop" != "null" ] && loop_count="$parsed_loop"
 fi
 
-# The user cancelled this turn — don't burn time on a full lint/typecheck cycle.
 if [ "$status" = "aborted" ]; then
-  echo "post-turn-verify: status=aborted — skipping checks" >&2
+  log "status=aborted — skipping"
   printf '%s\n' '{}'
   exit 0
 fi
 
-# Cursor spawns hooks with its own bundled Node early on PATH, which can be
-# older than the repo toolchain and break ESM-only packages. Strip it so the
-# project's node/binaries win.
+# Prefer project Node over Cursor's bundled runtime.
 if command -v python3 >/dev/null 2>&1; then
-  PATH="$(python3 -c 'import os
+  PATH="$(python3 - <<'PY'
+import os
 skip = (".cursor-server", ".vscode-server")
-p = os.environ.get("PATH", "")
-print(":".join(x for x in p.split(":") if x and not any(s in x for s in skip)))')"
+sep = os.pathsep
+parts = [p for p in os.environ.get("PATH", "").split(sep) if p and not any(s in p for s in skip)]
+print(sep.join(parts))
+PY
+)"
+  export PATH
+elif command -v python >/dev/null 2>&1; then
+  PATH="$(python - <<'PY'
+import os
+skip = (".cursor-server", ".vscode-server")
+sep = os.pathsep
+parts = [p for p in os.environ.get("PATH", "").split(sep) if p and not any(s in p for s in skip)]
+print(sep.join(parts))
+PY
+)"
   export PATH
 fi
 
-# Emit a follow-up message (valid JSON) and exit 0. Exit 0 is important: a
-# non-zero exit signals "the hook crashed", not "a check failed".
 emit_followup() {
   local label="$1" code="$2" file="$3"
+  # Failures always log — useful in Hooks channel when something broke.
+  echo "post-turn-verify: ${label} FAILED (exit ${code})" >&2
   if command -v python3 >/dev/null 2>&1; then
     head -c 12000 "$file" | python3 -c '
 import json, sys
@@ -78,22 +91,65 @@ print(json.dumps({"followup_message": msg}, ensure_ascii=False))
   exit 0
 }
 
-# Run a check; on failure emit the follow-up and stop (first failure wins).
 run_check() {
   local label="$1"; shift
   local tmp; tmp="$(mktemp)"
-  echo "post-turn-verify: running ${label}…" >&2
+  log "running ${label}…"
   "$@" >"$tmp" 2>&1
   local code=$?
   if [ "$code" -ne 0 ]; then
-    echo "post-turn-verify: ${label} FAILED (exit ${code})" >&2
     emit_followup "$label" "$code" "$tmp"
   fi
   rm -f "$tmp"
 }
 
-# Resolve toolchain binaries. Prefer the repo-local node_modules/.bin (works
-# regardless of whether pnpm is on PATH in the hook environment).
+list_relevant_changes() {
+  {
+    git diff --name-only HEAD 2>/dev/null || true
+    git diff --cached --name-only 2>/dev/null || true
+    git ls-files --others --exclude-standard 2>/dev/null || true
+  } | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json)$' | grep -Ev '(^|/)(node_modules|\.next)/' || true
+}
+
+changes_since_stamp() {
+  if [ ! -f "$STAMP_FILE" ]; then
+    return 0
+  fi
+  local changed
+  changed="$(list_relevant_changes)"
+  if [ -z "$changed" ]; then
+    return 1
+  fi
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    [ ! -e "$path" ] && continue
+    if [ "$path" -nt "$STAMP_FILE" ]; then
+      return 0
+    fi
+  done <<< "$changed"
+  return 1
+}
+
+should_run() {
+  if [ "${CURSOR_HOOK_FORCE:-0}" = "1" ]; then
+    return 0
+  fi
+  # Always re-check when we are already in a fix-up follow-up loop.
+  if [ "${loop_count:-0}" -gt 0 ] 2>/dev/null; then
+    return 0
+  fi
+  if ! changes_since_stamp; then
+    return 1
+  fi
+  return 0
+}
+
+if ! should_run; then
+  log "skipped (no relevant source changes since last pass)"
+  printf '%s\n' '{}'
+  exit 0
+fi
+
 if [ -x node_modules/.bin/eslint ]; then
   LINT=(node_modules/.bin/eslint .)
 elif command -v pnpm >/dev/null 2>&1; then
@@ -113,8 +169,6 @@ fi
 run_check "eslint ." "${LINT[@]}"
 run_check "tsc --noEmit" "${TYPECHECK[@]}"
 
-# (#6) When this turn touched homebrew import enrichment / LLM hints / ops,
-# also run the focused import vitest pack (Drive smoke skips if files missing).
 should_run_import_smoke() {
   if [ "${CURSOR_HOOK_SKIP_IMPORT_SMOKE:-0}" = "1" ]; then
     return 1
@@ -138,13 +192,14 @@ if should_run_import_smoke; then
   fi
   run_check "vitest import-homebrew smoke" "${IMPORT_SMOKE[@]}"
 else
-  echo "post-turn-verify: import-homebrew smoke skipped (no matching changed files)" >&2
+  log "import-homebrew smoke skipped"
 fi
 
 if [ "${CURSOR_HOOK_RUN_BUILD:-0}" = "1" ]; then
   run_check "next build" node scripts/build-hosted.mjs
 fi
 
-echo "post-turn-verify: all checks passed" >&2
+touch "$STAMP_FILE" 2>/dev/null || true
+log "all checks passed"
 printf '%s\n' '{}'
 exit 0

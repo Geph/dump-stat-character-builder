@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, MoreHorizontal, ArrowUp } from "lucide-react"
+import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, ArrowUp } from "lucide-react"
 import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
@@ -254,10 +254,9 @@ export default function CharactersPage() {
                 <button
                   type="button"
                   className="flex items-center gap-2 px-4 py-3 bg-card border-2 border-border text-foreground rounded-xl font-bold hover:border-primary transition-colors 2xl:hidden"
-                  aria-label="Manage Characters"
+                  aria-label="Manage"
                 >
-                  <MoreHorizontal className="w-5 h-5" />
-                  Manage Characters
+                  Manage
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

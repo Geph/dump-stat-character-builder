@@ -64,7 +64,7 @@ const TOPIC_BUTTONS: {
   },
   {
     id: "card-art",
-    title: "Hosting card images",
+    title: "Hosting images",
     blurb: "Public URLs that work with Images from URL",
     icon: ImageIcon,
     accent: "text-violet-700 dark:text-violet-300",
@@ -90,12 +90,14 @@ function GuidanceDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("gap-0 overflow-hidden p-0 sm:max-w-lg", contentClassName)}>
+      <DialogContent className={cn("gap-0 overflow-hidden p-0 sm:max-w-lg lg:max-w-xl", contentClassName)}>
         <DialogHeader className="border-b border-border px-6 py-4 text-left pr-12">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4 text-sm">{children}</div>
+        <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4 text-sm lg:max-h-[min(80vh,42rem)]">
+          {children}
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -135,7 +137,7 @@ export function ImportWorkflowGuidancePanel() {
         onOpenChange={(open) => setTopic(open ? "scope-schema" : null)}
         title="Scope & schema fit"
         description="Keep each pass one class, match the schema, and chunk small on free LLMs."
-        contentClassName="sm:max-w-xl"
+        contentClassName="sm:max-w-xl lg:max-w-2xl"
       >
         <div className="space-y-4">
           <section className="space-y-1.5">
@@ -168,8 +170,8 @@ export function ImportWorkflowGuidancePanel() {
         open={topic === "import-order"}
         onOpenChange={(open) => setTopic(open ? "import-order" : null)}
         title="Importing a class"
-        description="The usual pattern for homebrew classes — works for casters, martials, psions, and similar."
-        contentClassName="sm:max-w-xl"
+        description="The usual pattern for homebrew classes — works for most special abilities"
+        contentClassName="sm:max-w-xl lg:max-w-2xl"
       >
         <div className="space-y-4">
           <p className="leading-relaxed text-muted-foreground">{MULTI_FILE_IMPORT_TIP}</p>
@@ -218,7 +220,7 @@ export function ImportWorkflowGuidancePanel() {
         onOpenChange={(open) => setTopic(open ? "clean-source" : null)}
         title="Clean source text"
         description="Quick prep tips before you extract a class chapter."
-        contentClassName="sm:max-w-xl"
+        contentClassName="sm:max-w-xl lg:max-w-2xl"
       >
         <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
           {CLEAN_SOURCE_TEXT_UI_GUIDELINES}
@@ -228,9 +230,9 @@ export function ImportWorkflowGuidancePanel() {
       <GuidanceDialog
         open={topic === "card-art"}
         onOpenChange={(open) => setTopic(open ? "card-art" : null)}
-        title="Hosting card images"
+        title="Hosting images"
         description="Where to put art so Images from URL can attach it to existing compendium entries."
-        contentClassName="sm:max-w-xl"
+        contentClassName="sm:max-w-xl lg:max-w-2xl"
       >
         <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-muted-foreground">
           {CARD_ART_HOSTING_UI_GUIDELINES}

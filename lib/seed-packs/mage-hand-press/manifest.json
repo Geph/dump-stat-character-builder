@@ -2,7 +2,7 @@
   "id": "mage-hand-press",
   "label": "Mage Hand Press",
   "source": "Mage Hand Press",
-  "version": "2026-08-10",
+  "version": "2026-08-18",
   "files": [
     "magehandpress-alchemist-class.json",
     "magehandpress-captain-class.json",
@@ -21,9 +21,7 @@
   ],
   "notes": [
     "Subclasses filtered to the free allowlist only.",
-    "Class icons, card blurbs, and source details stamped from the curated default load set.",
-    "Flavor class descriptions stripped to Becoming / rules stubs; Warden description cleared.",
-    "Warden labeled Warden (Mage Hand Press) to avoid colliding with Kibbles Tasty.",
+    "Dancer class file was not present in Drive import-json at build time.",
     "Gunslinger: free subclass \"Pistolero\" not found in source JSON",
     "Necromancer: free subclass \"Cyberghoul\" not found in source JSON"
   ]

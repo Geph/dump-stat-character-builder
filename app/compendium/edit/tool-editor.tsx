@@ -127,6 +127,13 @@ export default function ToolEditor({ id }: { id: string }) {
     router.push("/compendium?tab=tools")
   }
 
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this tool?")) return
+    const db = createClient()
+    await db.from("tools").delete().eq("id", id)
+    router.push("/compendium?tab=tools")
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -145,6 +152,7 @@ export default function ToolEditor({ id }: { id: string }) {
         isNew={id === "new"}
         saving={saving}
         saveLabel="Save Tool"
+        onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">

@@ -119,13 +119,11 @@ export function HitDiceTracker({
         }
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="inline-flex shrink-0 items-center gap-1 rounded border border-emerald-500/25 bg-emerald-500/5 px-1.5 py-1 transition-colors hover:bg-emerald-500/15"
+        className="inline-flex shrink-0 items-center gap-1 rounded border border-white/30 bg-black/25 px-1.5 py-1 text-white transition-colors hover:bg-black/40 hover:border-white/45"
       >
-        <Dices className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-        <span className="text-[9px] font-semibold uppercase text-emerald-700 dark:text-emerald-300">
-          HD
-        </span>
-        <span className="text-[10px] font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
+        <Dices className="h-3 w-3 shrink-0 text-white/90" aria-hidden />
+        <span className="text-[9px] font-semibold uppercase text-white/90">HD</span>
+        <span className="text-[10px] font-bold tabular-nums text-white">
           {totalRemaining}/{totalDice}
         </span>
       </button>

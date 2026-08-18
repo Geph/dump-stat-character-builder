@@ -7,6 +7,8 @@ export type SheetSectionLink = {
   label: string
 }
 
+const MAIN_NAV_OFFSET_PX = 64
+
 export function SheetTabSectionNav({
   sections,
   className,
@@ -17,29 +19,41 @@ export function SheetTabSectionNav({
   if (!sections.length) return null
 
   const jump = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const el = document.getElementById(id)
+    if (!el) return
+    const stickyNav = document.getElementById("sheet-tab-section-nav")
+    const stickyHeight = stickyNav?.offsetHeight ?? 52
+    const top =
+      el.getBoundingClientRect().top + window.scrollY - MAIN_NAV_OFFSET_PX - stickyHeight - 8
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" })
   }
 
   return (
-    <div className={`mb-3 flex flex-wrap items-center gap-1.5 md:hidden ${className ?? ""}`}>
-      {sections.map((section) => (
+    <div
+      id="sheet-tab-section-nav"
+      className={`sticky top-16 z-40 -mx-4 mb-3 border-b border-border bg-background/95 px-4 py-2 backdrop-blur-lg md:hidden ${className ?? ""}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => jump(section.id)}
+            className="inline-flex min-h-11 items-center rounded-full border border-border bg-card px-3.5 text-sm font-semibold text-foreground"
+          >
+            {section.label}
+          </button>
+        ))}
         <button
-          key={section.id}
           type="button"
-          onClick={() => jump(section.id)}
-          className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-primary"
+          aria-label="Back to top"
+          title="Back to top"
         >
-          {section.label}
+          <ArrowUp className="h-4 w-4" aria-hidden />
         </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary"
-      >
-        <ArrowUp className="h-3 w-3" />
-        Top
-      </button>
+      </div>
     </div>
   )
 }

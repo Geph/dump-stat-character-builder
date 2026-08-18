@@ -10,6 +10,7 @@ import {
   filterStartingEquipmentOptionsByWeaponProficiency,
   formatPackageOptionTitle,
   isGoldOnlyOption,
+  sumPackageGoldPieces,
 } from "@/lib/builder/equipment-utils"
 import { getCinematicPickerContainerClass } from "@/lib/builder/picker-pagination"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
@@ -88,6 +89,7 @@ export function StartingEquipmentPackagePicker({
           const side =
             imageSide === "alternate" ? (displayIndex % 2 === 0 ? "left" : "right") : imageSide
           const optionItems = option.items ?? []
+          const displayedGold = startingGold > 0 ? startingGold : sumPackageGoldPieces(optionItems)
           const edgeImage = goldOnly
             ? STARTING_EQUIPMENT_CARD_IMAGES.gold
             : STARTING_EQUIPMENT_CARD_IMAGES.gear
@@ -145,7 +147,7 @@ export function StartingEquipmentPackagePicker({
                   <div className="flex items-center gap-2">
                     <Coins className="h-5 w-5 text-primary" />
                     <span className="font-serif text-2xl font-black text-foreground">
-                      {startingGold} GP
+                      {displayedGold} GP
                     </span>
                   </div>
                 ) : (

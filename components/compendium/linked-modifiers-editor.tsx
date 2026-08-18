@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { Check, ChevronsUpDown, Trash2 } from "lucide-react"
 import {
-  MODIFIER_CATALOG_GROUPS,
+  COMMON_MODIFIER_CATALOG_GROUPS,
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
 import { filterModifierCatalogEntries } from "@/lib/compendium/modifier-catalog-search"
@@ -71,11 +71,12 @@ export function LinkedModifiersEditor({
 
   const grouped = useMemo(() => {
     const map = new Map<string, ModifierCatalogEntry[]>()
-    for (const group of MODIFIER_CATALOG_GROUPS) map.set(group, [])
-    map.set("Other", [])
+    for (const group of COMMON_MODIFIER_CATALOG_GROUPS) map.set(group, [])
 
     for (const entry of catalog) {
-      const key = MODIFIER_CATALOG_GROUPS.includes(entry.group as (typeof MODIFIER_CATALOG_GROUPS)[number])
+      const key = COMMON_MODIFIER_CATALOG_GROUPS.includes(
+        entry.group as (typeof COMMON_MODIFIER_CATALOG_GROUPS)[number],
+      )
         ? entry.group
         : "Other"
       if (!map.has(key)) map.set(key, [])

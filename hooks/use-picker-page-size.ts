@@ -40,7 +40,7 @@ export function useIsPhonePickerScreen(): boolean {
   return isPhone
 }
 
-/** Tablet range (`sm` through `lg`−1) — portrait compendium cards in visual builder. */
+/** Tablet range (`sm` through `lg`−1). */
 export function useIsMediumPickerScreen(): boolean {
   const [isMedium, setIsMedium] = useState(false)
 

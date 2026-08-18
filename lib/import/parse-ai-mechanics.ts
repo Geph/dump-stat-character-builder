@@ -121,22 +121,35 @@ function buildDamageRollModifiersCharacteristic(
 ) {
   const flatBonus = mechanic.damageBonus
   const dice = mechanic.bonusDice?.trim()
-  if (flatBonus == null && !dice) return null
+  const grantsMissingAbility = mechanic.grantAbilityModifierWhenMissing === true
+  const includedModifierDice = mechanic.bonusDiceWhenModifierIncluded?.trim()
+  if (flatBonus == null && !dice && !grantsMissingAbility && !includedModifierDice) return null
   const damageType = mechanic.damageType ? titleCaseWords(mechanic.damageType) : undefined
   const creatureTypes = mechanic.targetCreatureTypes?.map(titleCaseWords).filter(Boolean)
   const target = mechanic.damageTarget ?? "all"
 
-  if (flatBonus != null) {
-    const baseLabel = `+${flatBonus}${damageType ? ` ${damageType}` : ""} damage`
+  if (flatBonus != null || grantsMissingAbility || includedModifierDice) {
+    const effectiveFlatBonus = flatBonus ?? 0
+    const baseLabel =
+      grantsMissingAbility || includedModifierDice
+        ? "Conditional weapon damage modifier"
+        : `+${effectiveFlatBonus}${damageType ? ` ${damageType}` : ""} damage`
     return {
       id: modId(instanceKey(ctx, idSuffix)),
       type: "damage_roll_modifiers" as const,
       entries: [
         {
-          bonus: flatBonus,
+          bonus: effectiveFlatBonus,
           target,
           ...(damageType ? { customTarget: damageType } : {}),
           ...(creatureTypes?.length ? { onlyVsCreatureTypes: creatureTypes } : {}),
+          ...(grantsMissingAbility ? { grantAbilityModifierWhenMissing: true } : {}),
+          ...(includedModifierDice
+            ? { bonusDiceWhenModifierIncluded: includedModifierDice }
+            : {}),
+          ...(mechanic.bonusDiceUsesWeaponDamageType
+            ? { bonusDiceUsesWeaponDamageType: true }
+            : {}),
         },
       ],
       label: labelSuffix ? `${baseLabel} ${labelSuffix}` : baseLabel,
@@ -675,8 +688,13 @@ function buildFromMechanic(
   }
 
   if (mechanic.kind === "unarmed_strike_damage") {
-    if (!mechanic.dieByLevel?.length) return null
-    const dieByLevel = mechanic.dieByLevel.map((entry) => {
+    const fixedDieRaw = mechanic.unarmedDie?.trim().toLowerCase()
+    const fixedDie =
+      fixedDieRaw && /^(?:1|1d4|1d6|1d8|1d10|1d12)$/.test(fixedDieRaw)
+        ? (fixedDieRaw as "1" | "1d4" | "1d6" | "1d8" | "1d10" | "1d12")
+        : null
+    if (!fixedDie && !mechanic.dieByLevel?.length) return null
+    const dieByLevel = (mechanic.dieByLevel ?? []).map((entry) => {
       const match = entry.die.match(/^(\d+)d(\d+)$/i)
       return {
         level: entry.level,
@@ -693,7 +711,10 @@ function buildFromMechanic(
         {
           id: modId(instanceKey(ctx, "unarmed_die")),
           type: "unarmed_strike_damage",
-          dieByLevel,
+          ...(fixedDie ? { die: fixedDie } : {}),
+          ...(dieByLevel.length ? { dieByLevel } : {}),
+          ...(mechanic.damageType ? { damageType: titleCaseWords(mechanic.damageType) } : {}),
+          ...(mechanic.ability ? { ability: mechanic.ability } : {}),
         },
       ]),
     }
@@ -806,13 +827,6 @@ function buildFromMechanic(
         },
       ]),
     }
-  }
-
-  // extra_weapon_mastery: accepted in mechanics[] for import review only (no stable
-  // characteristic mapping yet — applying extra Weapon Mastery properties needs per-weapon
-  // mastery-slot bookkeeping this pipeline doesn't have).
-  if (mechanic.kind === "extra_weapon_mastery") {
-    return null
   }
 
   if (mechanic.kind === "movement_grant") {
@@ -1118,7 +1132,9 @@ function buildFromMechanic(
       if (
         mechanic.attackBonus == null &&
         mechanic.criticalHitMinimum == null &&
-        !mechanic.criticalHitMinimumByLevel?.length
+        !mechanic.criticalHitMinimumByLevel?.length &&
+        !mechanic.ignoreHalfCover &&
+        !mechanic.treatThreeQuartersCoverAsHalf
       ) {
         return null
       }
@@ -1138,6 +1154,10 @@ function buildFromMechanic(
                 criticalHitMinimumByLevel: (mechanic.criticalHitMinimumByLevel ?? []).map(
                   (entry) => ({ level: entry.level, mode: "fixed" as const, fixed: entry.fixed }),
                 ),
+                ...(mechanic.ignoreHalfCover ? { ignoreHalfCover: true } : {}),
+                ...(mechanic.treatThreeQuartersCoverAsHalf
+                  ? { treatThreeQuartersCoverAsHalf: true }
+                  : {}),
               },
             ],
           },

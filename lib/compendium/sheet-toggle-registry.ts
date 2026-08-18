@@ -258,6 +258,15 @@ export function isKnownSheetToggleId(id: string): boolean {
   return builtinById.has(id) || optionalById.has(id) || id.startsWith("magic_item:")
 }
 
+/** Idle banner copy — "Dance Style: Inspiring Chant" → "Dance Style: not activated". */
+export function inactiveSheetToggleLabel(label: string): string {
+  const colon = label.indexOf(":")
+  if (colon > 0) {
+    return `${label.slice(0, colon).trim()}: not activated`
+  }
+  return `Not ${label.toLowerCase()}`
+}
+
 export function getSheetToggleDefinition(id: string): SheetToggleDefinition | null {
   const builtin = builtinById.get(id)
   if (builtin) return builtin

@@ -12,9 +12,9 @@ import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation
  * so same-named subclasses from different parent classes do not collide
  * (e.g. Artificer Reanimator vs Necromancer Reanimator).
  *
- * Only ship art that was converted from `scripts/graphics` (SRD uploads,
- * PHB Barbarian subclasses placed there on purpose) plus Kibbles / Mage Hand Press.
- * Do not map PHB / Eberron / Ravenloft / FRUA product art.
+ * Only ship art converted from `scripts/graphics` (SRD uploads, PHB Barbarian
+ * subclasses placed there on purpose, Artificer masters, Kibbles / Mage Hand Press).
+ * Do not map other PHB / Ravenloft / FRUA product art.
  *
  * Masters for a re-optimize: `scripts/subclass-card-sources/{class-slug}/{subclass-slug}.*`
  */
@@ -57,6 +57,16 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Barbarian", name: "Path of the Wild Heart", slug: "path-of-the-wild-heart" },
   { className: "Barbarian", name: "Path of the World Tree", slug: "path-of-the-world-tree" },
   { className: "Barbarian", name: "Path of the Zealot", slug: "path-of-the-zealot" },
+
+  // Artificer — scripts/graphics/subclass card images/Artificer
+  { className: "Artificer", name: "Alchemist", slug: "alchemist" },
+  { className: "Artificer", name: "Armorer", slug: "armorer" },
+  { className: "Artificer", name: "Artillerist", slug: "artillerist" },
+  { className: "Artificer", name: "Battle Smith", slug: "battle-smith" },
+  { className: "Artificer", name: "Cartographer", slug: "cartographer" },
+  { className: "Artificer", name: "Forge Adept", slug: "forge-adept" },
+  { className: "Artificer", name: "Maverick", slug: "maverick" },
+  { className: "Artificer", name: "Reanimator", slug: "reanimator" },
 
   // KibblesTasty Inventor
   { className: "Inventor", name: "Fleshsmith", slug: "fleshsmith" },

@@ -1,4 +1,5 @@
 import type { Background } from "@/lib/types"
+import { backgroundUsesAnyAbilityChoice } from "@/lib/builder/background-asi"
 
 /** Spell lists offered by the Magic Initiate origin feat (SRD 2024). */
 export const MAGIC_INITIATE_SPELL_LISTS = ["Cleric", "Druid", "Wizard"] as const
@@ -144,15 +145,15 @@ function backgroundFeatureGrantsFeatPick(
 }
 
 /**
- * Pre-2024 backgrounds: both ability_bonuses and feat_granted are null at import.
- * null is intentional — the builder offers free ASI and an Origin feat pick.
+ * Pre-2024 backgrounds: no assigned ability boosts and no feat_granted at import.
+ * Null/empty ability_bonuses is intentional — the builder offers free ASI and an Origin feat pick.
  * Proficiency choice linkedModifiers (tools/languages/skills) do not disqualify legacy.
  */
 export function isLegacyBackground(
   background: Pick<Background, "ability_bonuses" | "feat_granted" | "feature"> | null | undefined,
 ): boolean {
   if (!background) return false
-  if (background.ability_bonuses !== null) return false
+  if (!backgroundUsesAnyAbilityChoice(background.ability_bonuses)) return false
   if (background.feat_granted?.trim()) return false
   if (backgroundFeatureGrantsFeatPick(background)) return false
   return true

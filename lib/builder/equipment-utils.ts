@@ -17,15 +17,41 @@ export function getStartingEquipmentGroups(
   return normalizeStartingEquipmentGroups(groups)
 }
 
+function isGoldPiecesItemName(name: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  return (
+    normalized === "gold pieces" ||
+    normalized === "gold piece" ||
+    normalized === "gp" ||
+    normalized === "gold" ||
+    /^\d+\s*gp$/.test(normalized)
+  )
+}
+
+/** "(B) 75 GP" / "4d4 × 10 GP" — gold alternative with no gear list. */
+function isGoldOnlyOptionLabel(label: string): boolean {
+  const stripped = label
+    .trim()
+    .replace(/^(?:option\s+)?\(?[A-Za-z]\)?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!stripped) return false
+  return /^\d+\s*gp$/i.test(stripped) || /^\d+d\d+\s*[×x]\s*\d+\s*gp$/i.test(stripped)
+}
+
 export function isGoldOnlyOption(
-  option: { label: string; items: { name: string; quantity: number }[] },
-  startingGold: number,
+  option: {
+    label?: string
+    items?: { name: string; quantity: number }[]
+    goldDice?: string | null
+  },
+  _startingGold = 0,
 ): boolean {
+  if (option.goldDice?.trim()) return true
+  if (isGoldOnlyOptionLabel(option.label ?? "")) return true
   const items = option.items ?? []
-  if (items.length !== 1) return false
-  const item = items[0]
-  if (item.name.toLowerCase() !== "gold pieces") return false
-  return startingGold > 0 && item.quantity === startingGold
+  if (!items.length) return false
+  return items.every((item) => isGoldPiecesItemName(item.name))
 }
 
 /** "Martial Weapon" / "any simple weapon" style category lines. */
@@ -214,14 +240,18 @@ export function resolvePackageEquipmentIds(
   return ids
 }
 
+function goldQuantityFromItem(item: { name: string; quantity: number }): number {
+  const namedAmount = item.name.trim().match(/^(\d+)\s*gp$/i)
+  if (namedAmount) return parseInt(namedAmount[1], 10)
+  return isGoldPiecesItemName(item.name) ? item.quantity : 0
+}
+
 /** Sum GP bundled in a starting equipment package (excluding resolved item rows). */
 export function sumPackageGoldPieces(
   items: { name: string; quantity: number }[] | undefined,
 ): number {
   if (!items?.length) return 0
-  return items
-    .filter((item) => item.name.toLowerCase() === "gold pieces")
-    .reduce((sum, item) => sum + item.quantity, 0)
+  return items.reduce((sum, item) => sum + goldQuantityFromItem(item), 0)
 }
 
 export function computeStartingCharacterGold(options: {

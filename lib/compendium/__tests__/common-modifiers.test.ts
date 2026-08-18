@@ -7,12 +7,20 @@ import {
   featureHasModifierPreset,
   enrichClassFeatureWithModifierPresets,
 } from "@/lib/compendium/enrich-srd-class-features"
+import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import { enrichCustomSpeciesRow, speciesHasTraitPresetRegistry } from "@/lib/compendium/enrich-custom-species"
 import type { Feature, Trait } from "@/lib/types"
 
 const PHB_SOURCE = "Player's Handbook"
 
 describe("Tier 1 common modifier types", () => {
+  it("includes the Initiative template referenced by import wiring", () => {
+    const entry = buildDefaultModifierCatalog().find((row) => row.id === "cat_char_initiative")
+    expect(entry?.name).toBe("Initiative Bonus")
+    expect(entry?.characteristics?.[0]?.type).toBe("initiative")
+    expect(entry?.summary).toMatch(/initiative advantage/i)
+  })
+
   it("normalizes d20_test_reaction defaults", () => {
     const mod = createCharacteristicModifier("d20_test_reaction")
     const [normalized] = normalizeCharacteristics([mod], null)

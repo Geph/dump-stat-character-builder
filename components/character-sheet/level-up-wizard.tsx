@@ -16,10 +16,11 @@ import {
   spellsEligibleForLevelUp,
   type LevelUpPlan,
 } from "@/lib/character/level-up-plan"
+import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { asCompendiumRows } from "@/lib/data/types"
-import type { Character, DndClass, Feat, Spell, Subclass } from "@/lib/types"
+import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 const ABILITY_LABELS: Record<AbilityScoreKey, string> = {
@@ -44,6 +45,7 @@ type Loaded = {
   subclasses: Subclass[]
   feats: Feat[]
   spells: Spell[]
+  customAbilities: CustomAbility[]
 }
 
 export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelUpWizardProps) {
@@ -66,13 +68,20 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     const load = async () => {
       setError(null)
       const db = createClient()
-      const [{ data: character }, { data: classes }, { data: subclasses }, { data: feats }, { data: spells }] =
-        await Promise.all([
+      const [
+        { data: character },
+        { data: classes },
+        { data: subclasses },
+        { data: feats },
+        { data: spells },
+        { data: customAbilities },
+      ] = await Promise.all([
           db.from("characters").select("*").eq("id", characterId).single(),
           db.from("classes").select("*"),
           db.from("subclasses").select("*"),
           db.from("feats").select("*"),
           db.from("spells").select("*"),
+          db.from("custom_abilities").select("*"),
         ])
       if (cancelled) return
       if (!character) {
@@ -92,6 +101,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         subclasses: asCompendiumRows(subclasses) as unknown as Subclass[],
         feats: asCompendiumRows(feats) as unknown as Feat[],
         spells: asCompendiumRows(spells) as unknown as Spell[],
+        customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
       setChoicePicks(char.feature_choice_picks ?? {})
@@ -129,6 +139,24 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     const owned = new Set(loaded.character.feat_ids ?? [])
     return loaded.feats.filter((feat) => !owned.has(feat.id) && (feat.level_requirement ?? 1) <= (plan?.toLevel ?? 1))
   }, [loaded, plan?.toLevel])
+
+  const knownSpellNames = useMemo(() => {
+    if (!loaded) return []
+    const knownIds = new Set(loaded.character.spell_ids ?? [])
+    return loaded.spells.filter((spell) => knownIds.has(spell.id)).map((spell) => spell.name)
+  }, [loaded])
+
+  const featureChoiceOptions = useMemo(() => {
+    if (!loaded || !plan || !selectedEntry || current?.kind !== "feature_choice") return []
+    return resolveFeatureChoiceOptions(current.feature, {
+      customAbilities: loaded.customAbilities,
+      featureChoicePicks: choicePicks,
+      classNames: [plan.className],
+      classLevel: plan.toLevel,
+      knownSpellNames,
+      subclassName: selectedEntry.subclass?.name ?? null,
+    })
+  }, [choicePicks, current, knownSpellNames, loaded, plan, selectedEntry])
 
   const canAdvance = (): boolean => {
     if (!current) return true
@@ -319,7 +347,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               {current?.kind === "feature_choice" ? (
                 <MultiSelectChoices
                   title={withChosenOptionChrome(current.title, choicePicks[current.id] ?? [])}
-                  options={(current.feature.choices?.options ?? []).map((option) => ({
+                  options={featureChoiceOptions.map((option) => ({
                     name: option.name,
                     description: option.description,
                   }))}

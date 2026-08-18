@@ -118,6 +118,34 @@ describe("hoistCompanionStatBlocksToCreatures", () => {
     expect((hoisted.creatures?.[0] as { description?: string }).description).toBe("Explicit v2 row")
   })
 
+  it.each([
+    ["Summon Dragon", "Summoned Dragon"],
+    ["Summon Horror", "Summoned Horror"],
+  ])("uses a creature label for the %s spell's generated companion", (spellName, creatureName) => {
+    const content = {
+      spells: [
+        {
+          name: spellName,
+          description: "A summoned companion.",
+          companion_stat_block: {
+            name: spellName,
+            ac: { parts: [{ type: "fixed", value: 12 }] },
+            hp: { parts: [{ type: "fixed", value: 20 }] },
+            traits: [],
+            actions: [],
+            category: "companion",
+          },
+        },
+      ],
+    } as unknown as ImportContent
+
+    const hoisted = hoistCompanionStatBlocksToCreatures(content)
+    expect(hoisted.creatures?.[0]?.name).toBe(creatureName)
+    expect(
+      (hoisted.creatures?.[0] as { stat_block?: { name?: string } } | undefined)?.stat_block?.name,
+    ).toBe(creatureName)
+  })
+
   it("runs during enrichImportContentModifiers for subclass companion features", () => {
     const enriched = enrichImportContentModifiers({
       classes: [

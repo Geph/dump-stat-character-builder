@@ -42,7 +42,7 @@ type CompendiumSelectionCardProps = {
   selectLabel?: string
   className?: string
   size?: "sm" | "md" | "lg"
-  /** Wide landscape (default) or portrait 3:4 for tablet visual builder. */
+  /** Wide landscape (default) or portrait 3:4 for visual builder grids from `sm` up. */
   cardShape?: "wide" | "portrait"
   /** @deprecated Always landscape; kept for call-site compatibility. */
   imageAspect?: "21/9"

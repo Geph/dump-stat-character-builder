@@ -18,11 +18,14 @@ describe("class icon defaults", () => {
     expect(defaultClassIconForName("LaserLlama Psion")).toBeNull()
   })
 
-  it("maps Kibbles Occultist and Warden to curated icons", () => {
+  it("maps Kibbles Occultist, Warden, and Inventor to curated icons", () => {
     expect(defaultClassIconForName("Occultist")).toBe("pentacle")
     expect(defaultClassIconForName("Warden")).toBe("tribal-shield")
     expect(defaultClassIconForName("Warden (Kibbles Tasty)")).toBe("tribal-shield")
     expect(defaultClassIconForName("Warden (Mage Hand Press)")).toBeNull()
+    expect(defaultClassIconForName("Inventor")).toBe("gears")
+    expect(defaultClassIconForName("KibblesTasty Inventor")).toBe("gears")
+    expect(defaultClassIconForName("Kibbles' Tasty Inventor")).toBe("gears")
   })
 
   it("ships curated Kibbles icons in public/icons", () => {
@@ -30,6 +33,7 @@ describe("class icon defaults", () => {
       HOMEBREW_CLASS_ICONS_BY_NAME.Psion,
       HOMEBREW_CLASS_ICONS_BY_NAME.Occultist,
       HOMEBREW_CLASS_ICONS_BY_NAME.Warden,
+      HOMEBREW_CLASS_ICONS_BY_NAME.Inventor,
       HOMEBREW_CLASS_ICONS_BY_NAME.Dancer,
     ]) {
       expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${icon}.svg`))).toBe(true)
@@ -38,6 +42,10 @@ describe("class icon defaults", () => {
 
   it("uses rear-aura in compendium default icon lookup", () => {
     expect(getCompendiumItemIcon("classes", { name: "KibblesTasty Psion" })).toBe("rear-aura")
+  })
+
+  it("uses gears for Inventor in compendium default icon lookup", () => {
+    expect(getCompendiumItemIcon("classes", { name: "Inventor" })).toBe("gears")
   })
 
   it("stamps rear-aura onto imported Psion class rows without an icon", () => {
@@ -51,5 +59,18 @@ describe("class icon defaults", () => {
       undefined,
     )
     expect(row.icon).toBe("rear-aura")
+  })
+
+  it("stamps gears onto imported Inventor class rows without an icon", () => {
+    const row = enrichImportedClassRow(
+      {
+        name: "Inventor",
+        description: null,
+        hit_die: 8,
+        features: [],
+      },
+      undefined,
+    )
+    expect(row.icon).toBe("gears")
   })
 })

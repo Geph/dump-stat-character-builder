@@ -538,21 +538,22 @@
 .sheet-fill-reaction { --_sheet-fill: var(--sheet-fill-reaction); }
 
 .sheet-fill-economy-idle {
-  color: color-mix(in oklch, white 90%, transparent);
+  color: color-mix(in oklch, white 90%, var(--_sheet-fill));
   border-width: 2px;
   border-style: solid;
-  border-color: color-mix(in oklch, var(--_sheet-fill) 45%, transparent);
+  /* Mix with --card, not transparent: oklch transparent is black@0 and paints a muddy dark rim. */
+  border-color: color-mix(in oklch, var(--_sheet-fill) 55%, var(--card));
   background: linear-gradient(
     to bottom,
-    color-mix(in oklch, var(--_sheet-fill) 50%, transparent),
-    color-mix(in oklch, var(--_sheet-fill) 22%, black)
+    color-mix(in oklch, var(--_sheet-fill) 52%, var(--card)),
+    color-mix(in oklch, var(--_sheet-fill) 28%, black)
   );
 }
 .sheet-fill-economy-idle:hover {
   background: linear-gradient(
     to bottom,
-    color-mix(in oklch, var(--_sheet-fill) 60%, transparent),
-    color-mix(in oklch, var(--_sheet-fill) 28%, black)
+    color-mix(in oklch, var(--_sheet-fill) 62%, var(--card)),
+    color-mix(in oklch, var(--_sheet-fill) 34%, black)
   );
 }
 .sheet-fill-economy-lit {

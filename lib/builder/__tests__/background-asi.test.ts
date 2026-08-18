@@ -58,6 +58,15 @@ describe("getBackgroundAbilityGrant", () => {
     expect(grant.fixed).toEqual({})
   })
 
+  it("falls back to choose-any when ability_bonuses is empty", () => {
+    const grant = getBackgroundAbilityGrant({
+      ...legacyBackground(),
+      ability_bonuses: {},
+    } as Background)
+    expect(grant.needsChoice).toBe(true)
+    expect(grant.eligible).toHaveLength(6)
+  })
+
   it("keeps three zero-valued eligible keys for 2024-style backgrounds", () => {
     const grant = getBackgroundAbilityGrant(modernChoiceBackground())
     expect(grant.needsChoice).toBe(true)

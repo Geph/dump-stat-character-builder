@@ -12,7 +12,7 @@ export type MhpClassPresentation = {
   card_image_slug: string
 }
 
-const MHP_CARD_IMAGE_BASE = "https://jeffginger.com/dumpstat/magehandpress/classes"
+const MHP_CARD_IMAGE_BASE = "https://jeffginger.com/dumpstat/images/magehandpress/classes"
 
 export function mhpClassCardImageUrl(slug: string): string {
   return `${MHP_CARD_IMAGE_BASE}/${slug}.png`

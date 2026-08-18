@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Settings, ExternalLink, Bug } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { Settings, ExternalLink, Bug, LayoutGrid, Sparkles, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useAppTheme, APP_THEMES } from "@/components/providers/app-theme-provider"
 import {
@@ -26,7 +26,17 @@ import { useAppPresentationMode } from "@/components/settings/use-app-presentati
 import { useGmDashboardNav } from "@/components/settings/use-gm-dashboard-nav"
 import { useResumeLastCharacter } from "@/components/settings/use-resume-last-character"
 import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
-import { LayoutGrid, Sparkles } from "lucide-react"
+import { useWelcomeSplashSuppress } from "@/components/settings/use-welcome-splash-suppress"
+import {
+  getCustomHeroBackground,
+  HERO_BG_CHANGE_EVENT,
+  setCustomHeroBackground,
+} from "@/lib/site-settings/hero-background"
+import {
+  hasCustomPageBackground,
+  PAGE_BG_CHANGE_EVENT,
+  setCustomPageBackground,
+} from "@/lib/site-settings/page-background"
 import { cn } from "@/lib/utils"
 
 const GITHUB_ISSUES_URL = "https://github.com/Geph/dump-stat-character-builder/issues"
@@ -46,6 +56,9 @@ const BUILDER_LAYOUT_OPTIONS = [
   },
 ]
 
+const TAB_TRIGGER_CLASS =
+  "rounded-lg border border-transparent px-2 py-2 text-xs sm:px-3 sm:text-sm data-[state=active]:border-border data-[state=active]:bg-muted data-[state=active]:shadow-none"
+
 export function GlobalSettingsMenu() {
   const { theme, setTheme } = useAppTheme()
   const { layout: builderLayout, setLayout: setBuilderLayout } = useBuilderLayout()
@@ -53,8 +66,34 @@ export function GlobalSettingsMenu() {
   const { enabled: gmDashboardNavEnabled, setEnabled: setGmDashboardNavEnabled } = useGmDashboardNav()
   const { enabled: resumeLastCharacter, setEnabled: setResumeLastCharacter } = useResumeLastCharacter()
   const { enabled: manualSkillAbility, setEnabled: setManualSkillAbility } = useManualSkillAbility()
+  const { suppressed: hideWelcomeSplash, setSuppressed: setHideWelcomeSplash } =
+    useWelcomeSplashSuppress()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [hasCustomGraphics, setHasCustomGraphics] = useState(false)
+
+  const refreshCustomGraphics = useCallback(() => {
+    setHasCustomGraphics(Boolean(getCustomHeroBackground()) || hasCustomPageBackground())
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    refreshCustomGraphics()
+    const onChange = () => refreshCustomGraphics()
+    window.addEventListener(HERO_BG_CHANGE_EVENT, onChange)
+    window.addEventListener(PAGE_BG_CHANGE_EVENT, onChange)
+    return () => {
+      window.removeEventListener(HERO_BG_CHANGE_EVENT, onChange)
+      window.removeEventListener(PAGE_BG_CHANGE_EVENT, onChange)
+    }
+  }, [open, refreshCustomGraphics])
+
+  const clearAllCustomGraphics = () => {
+    setCustomHeroBackground(null)
+    setCustomPageBackground(null)
+    setHasCustomGraphics(false)
+    setStatus("Cleared custom hero and page backgrounds")
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -69,34 +108,32 @@ export function GlobalSettingsMenu() {
           <Settings className="w-5 h-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b border-border px-6 py-4 text-left">
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>
-            Appearance and site preferences.
-          </DialogDescription>
+          <DialogDescription>Theme, graphics, preferences, and about.</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="appearance" className="gap-0">
-          <div className="border-b border-border px-6 pt-3">
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-transparent p-0">
-              <TabsTrigger
-                value="appearance"
-                className="rounded-lg border border-transparent px-3 py-2 data-[state=active]:border-border data-[state=active]:bg-muted data-[state=active]:shadow-none"
-              >
-                Appearance
+        <Tabs defaultValue="theme" className="gap-0">
+          <div className="border-b border-border px-4 pt-3 sm:px-6">
+            <TabsList className="grid h-auto w-full grid-cols-4 gap-1 bg-transparent p-0">
+              <TabsTrigger value="theme" className={TAB_TRIGGER_CLASS}>
+                Theme
               </TabsTrigger>
-              <TabsTrigger
-                value="general"
-                className="rounded-lg border border-transparent px-3 py-2 data-[state=active]:border-border data-[state=active]:bg-muted data-[state=active]:shadow-none"
-              >
-                General
+              <TabsTrigger value="graphics" className={TAB_TRIGGER_CLASS}>
+                Graphics
+              </TabsTrigger>
+              <TabsTrigger value="options" className={TAB_TRIGGER_CLASS}>
+                Options
+              </TabsTrigger>
+              <TabsTrigger value="about" className={TAB_TRIGGER_CLASS}>
+                About
               </TabsTrigger>
             </TabsList>
           </div>
 
           <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4">
-            <TabsContent value="appearance" className="mt-0 space-y-3">
+            <TabsContent value="theme" className="mt-0 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">Card layout</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -105,7 +142,9 @@ export function GlobalSettingsMenu() {
                     : "Default Visual or Compact presentation for the character builder and compendium. You can still toggle it on those pages, however if you selected compact mode from the initial choice on the home page visual art may not import."}
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {BUILDER_LAYOUT_OPTIONS.filter((option) => !isCompactOnly || option.id === "compact").map((option) => {
+                  {BUILDER_LAYOUT_OPTIONS.filter(
+                    (option) => !isCompactOnly || option.id === "compact",
+                  ).map((option) => {
                     const Icon = option.icon
                     const active = builderLayout === option.id
                     return (
@@ -135,7 +174,8 @@ export function GlobalSettingsMenu() {
               </div>
 
               <div className="border-t border-border pt-4 space-y-3">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">Color theme</p>
+                <p className="text-xs text-muted-foreground">
                   Choose a color theme for the app interface.
                 </p>
                 <ul className="space-y-2">
@@ -171,35 +211,43 @@ export function GlobalSettingsMenu() {
                   ))}
                 </ul>
               </div>
-
-              <div className="border-t border-border pt-4 space-y-4">
-                {!isCompactOnly ? (
-                  <>
-                    <HeroBackgroundSettings onStatus={setStatus} />
-                    <PageBackgroundSettings onStatus={setStatus} />
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Background graphics are hidden in Compact Only mode. Choose Visual + Compact on
-                    the home page splash to re-enable them.
-                  </p>
-                )}
-              </div>
             </TabsContent>
 
-            <TabsContent value="general" className="mt-0 space-y-6">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
-                <p className="text-xs font-semibold text-foreground">Deployment</p>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] leading-tight">
-                  <dt className="text-muted-foreground">Version</dt>
-                  <dd className="font-medium text-foreground tabular-nums">{getAppVersion()}</dd>
-                  <dt className="text-muted-foreground">Mode</dt>
-                  <dd className="font-medium text-foreground">{getDeployMode()}</dd>
-                  <dt className="text-muted-foreground">Storage</dt>
-                  <dd className="font-medium text-foreground">{getStorageLabel()}</dd>
-                </dl>
-              </div>
+            <TabsContent value="graphics" className="mt-0 space-y-4">
+              {!isCompactOnly ? (
+                <>
+                  <HeroBackgroundSettings onStatus={setStatus} />
+                  <div className="border-t border-border pt-4">
+                    <PageBackgroundSettings onStatus={setStatus} />
+                  </div>
+                  <div className="border-t border-border pt-4">
+                    <p className="text-sm font-semibold text-foreground">Reset graphics</p>
+                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                      Remove custom hero and page backgrounds stored in this browser. Theme defaults
+                      stay available.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 gap-2 text-destructive hover:text-destructive"
+                      disabled={!hasCustomGraphics}
+                      onClick={clearAllCustomGraphics}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete all custom graphics
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Background graphics are hidden in Compact Only mode. Choose Visual + Compact on the
+                  home page splash to re-enable them.
+                </p>
+              )}
+            </TabsContent>
 
+            <TabsContent value="options" className="mt-0 space-y-6">
               <div>
                 <p className="text-sm font-semibold text-foreground">Navigation</p>
                 <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
@@ -231,7 +279,25 @@ export function GlobalSettingsMenu() {
                   <span className="text-sm leading-snug">
                     <span className="font-semibold text-foreground">Resume last character on Home</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      After the first visit, opening the home page jumps to the last character sheet you viewed.
+                      After the first visit, opening the home page jumps to the last character sheet
+                      you viewed.
+                    </span>
+                  </span>
+                </label>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={hideWelcomeSplash}
+                    onChange={(event) => setHideWelcomeSplash(event.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-semibold text-foreground">
+                      Don&apos;t show home page splash
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      Hides the first-visit Visual / Compact / No AI choice overlay. Uncheck to see it
+                      again on the next home page visit.
                     </span>
                   </span>
                 </label>
@@ -256,6 +322,20 @@ export function GlobalSettingsMenu() {
                     </span>
                   </span>
                 </label>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="about" className="mt-0 space-y-6">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
+                <p className="text-xs font-semibold text-foreground">Deployment</p>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px] leading-tight">
+                  <dt className="text-muted-foreground">Version</dt>
+                  <dd className="font-medium text-foreground tabular-nums">{getAppVersion()}</dd>
+                  <dt className="text-muted-foreground">Mode</dt>
+                  <dd className="font-medium text-foreground">{getDeployMode()}</dd>
+                  <dt className="text-muted-foreground">Storage</dt>
+                  <dd className="font-medium text-foreground">{getStorageLabel()}</dd>
+                </dl>
               </div>
 
               <div>
@@ -282,12 +362,7 @@ export function GlobalSettingsMenu() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   Report bugs or request features on GitHub.
                 </p>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 gap-2"
-                >
+                <Button asChild variant="outline" size="sm" className="mt-3 gap-2">
                   <a href={GITHUB_ISSUES_URL} target="_blank" rel="noopener noreferrer">
                     <Bug className="h-4 w-4" />
                     Report an issue on GitHub

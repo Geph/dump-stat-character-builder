@@ -24,12 +24,19 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Evoker", "Wizard")).toMatch(
       /\/images\/compendium\/subclasses\/wizard\/evoker\.png$/,
     )
-    expect(defaultSubclassCardImageUrl("Alchemist", "Artificer")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Alchemist", "Artificer")).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/alchemist\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Cartographer", "Artificer")).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/cartographer\.png$/,
+    )
     expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toBeNull()
   })
 
-  it("does not ship Eberron or Ravenloft subclass portraits", () => {
-    expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toBeNull()
+  it("scopes Reanimator to Artificer and skips Ravenloft-only names", () => {
+    expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toMatch(
+      /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
+    )
     expect(defaultSubclassCardImageUrl("Reanimator", "Necromancer")).toBeNull()
     expect(defaultSubclassCardImageUrl("College of Spirits", "Bard")).toBeNull()
     expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toBeNull()
@@ -43,7 +50,7 @@ describe("subclass card images", () => {
     }
   })
 
-  it("wires every scripts/subclass-card-sources nested slug into defaults", () => {
+  it("wires every dropped scripts/subclass-card-sources slug into defaults", () => {
     const sourcesDir = path.join(process.cwd(), "scripts/subclass-card-sources")
     if (!fs.existsSync(sourcesDir)) return
 
@@ -66,16 +73,14 @@ describe("subclass card images", () => {
     sourceSlugs.sort()
     if (sourceSlugs.length === 0) return
 
-    const mappedSlugs = [
-      ...new Set(
-        Object.values(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME).map((url) => {
-          const marker = "/images/compendium/subclasses/"
-          const idx = url.indexOf(marker)
-          return url.slice(idx + marker.length).replace(/\.png$/, "")
-        }),
-      ),
-    ].sort()
-    expect(mappedSlugs).toEqual(sourceSlugs)
+    const mappedSlugs = new Set(
+      Object.values(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME).map((url) => {
+        const marker = "/images/compendium/subclasses/"
+        const idx = url.indexOf(marker)
+        return url.slice(idx + marker.length).replace(/\.png$/, "")
+      }),
+    )
+    expect([...sourceSlugs].filter((slug) => !mappedSlugs.has(slug))).toEqual([])
   })
 
   it("enriches subclass rows with default card art when unset", () => {

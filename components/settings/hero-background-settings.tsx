@@ -5,6 +5,7 @@ import { ImageIcon, Trash2 } from "lucide-react"
 import {
   formatHeroBackgroundUploadHint,
   getCustomHeroBackground,
+  HERO_BG_CHANGE_EVENT,
   readHeroBackgroundFile,
   setCustomHeroBackground,
 } from "@/lib/site-settings/hero-background"
@@ -27,6 +28,9 @@ export function HeroBackgroundSettings({
 
   useEffect(() => {
     refreshPreview()
+    const onChange = () => refreshPreview()
+    window.addEventListener(HERO_BG_CHANGE_EVENT, onChange)
+    return () => window.removeEventListener(HERO_BG_CHANGE_EVENT, onChange)
   }, [refreshPreview])
 
   const handleFile = async (file: File) => {

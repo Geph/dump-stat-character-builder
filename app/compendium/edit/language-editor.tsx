@@ -108,6 +108,13 @@ export default function LanguageEditor({ id }: { id: string }) {
     router.push("/compendium?tab=languages")
   }
 
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this language?")) return
+    const db = createClient()
+    await db.from("languages").delete().eq("id", id)
+    router.push("/compendium?tab=languages")
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -126,6 +133,7 @@ export default function LanguageEditor({ id }: { id: string }) {
         isNew={id === "new"}
         saving={saving}
         saveLabel="Save Language"
+        onDelete={id !== "new" ? handleDelete : undefined}
       />
 
       <main className="max-w-4xl mx-auto px-4 py-8">

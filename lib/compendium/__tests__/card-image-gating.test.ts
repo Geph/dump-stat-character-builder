@@ -244,10 +244,40 @@ describe("bundled card art assignment under Compact Only", () => {
 })
 
 describe("custom dumpstat card art", () => {
-  it("keeps magehandpress dumpstat URLs instead of clearing them", async () => {
+  it("keeps magehandpress dumpstat URLs under /images/ instead of clearing them", async () => {
     const { applyBundledCardImage } = await import("@/lib/compendium/card-image")
     const url = "https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png"
     const row = applyBundledCardImage({ name: "Alchemist", card_image_url: url }, {})
     expect(row.card_image_url).toBe(url)
+  })
+
+  it("rewrites legacy magehandpress paths missing /images/", async () => {
+    const { normalizeCardImageUrl, rewriteLegacyDumpstatCardImageUrl } = await import(
+      "@/lib/compendium/card-image"
+    )
+    expect(
+      rewriteLegacyDumpstatCardImageUrl(
+        "https://jeffginger.com/dumpstat/magehandpress/classes/alchemist.png",
+      ),
+    ).toBe("https://jeffginger.com/dumpstat/images/magehandpress/classes/alchemist.png")
+    expect(
+      normalizeCardImageUrl("https://jeffginger.com/dumpstat/magehandpress/classes/witch.png"),
+    ).toBe("https://jeffginger.com/dumpstat/images/magehandpress/classes/witch.png")
+  })
+
+  it("replaces broken kibbles dumpstat hosts with bundled class art", async () => {
+    const { enrichClassesList } = await import("@/lib/compendium/normalize-class-data")
+    const { SRD_CLASS_CARD_IMAGES_BY_NAME } = await import(
+      "@/lib/compendium/class-card-images-defaults"
+    )
+    const [inventor] = enrichClassesList([
+      {
+        name: "Inventor",
+        source: "Kibbles Tasty",
+        features: [],
+        card_image_url: "https://jeffginger.com/dumpstat/kibbles/classes/Inventor.png",
+      },
+    ])
+    expect(inventor.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Inventor)
   })
 })

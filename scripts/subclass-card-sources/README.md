@@ -20,10 +20,11 @@ Only convert art we are allowed to host:
 
 - **SRD** subclass portraits already under `scripts/graphics/subclass card images/SRD`
 - **PHB Barbarian** subclasses placed in `scripts/graphics/subclass card images/PHB` on purpose
+- **Artificer** masters under `scripts/graphics/subclass card images/Artificer`
 - **KibblesTasty** Inventor / Psion / extras
 - **Mage Hand Press** when a master exists
 
-Do **not** drop PHB / Eberron / Ravenloft / FRUA product art here. Those must not be committed under `public/images/compendium/subclasses/`.
+Do **not** drop other PHB / Ravenloft / FRUA product art here. Those must not be committed under `public/images/compendium/subclasses/`.
 
 Output: `public/images/compendium/subclasses/{class-slug}/{subclass-slug}.png` at **771×1024** (**3:4** portrait, same as class/species card art).
 

@@ -1823,6 +1823,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "vision.darkvision.classic_prose",
+    confidence: "high",
+    // Classic 5e phrasing that never says the word "darkvision" (Kibbles Night Mode, Arcane Eye, etc.).
+    test:
+      /\bsee in dim light within (\d+)\s+feet\b[^.]{0,80}\bdarkness as if it were dim light\b/i,
+    build: (match, ctx) => {
+      const rangeFeet = parseInt(match[1], 10)
+      if (!Number.isFinite(rangeFeet)) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("vision"), [
+        {
+          id: modId(instanceKey(ctx, "darkvision")),
+          type: "vision",
+          visionType: "darkvision",
+          rangeFeet,
+        },
+      ])
+    },
+  },
+  {
     id: "vision.mindsight",
     confidence: "high",
     scope: "full",
@@ -2337,6 +2356,23 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       if (notLanguages.has(raw)) return null
       const language = titleCaseWords(raw)
       if (!language) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
+        {
+          id: modId(instanceKey(ctx, `lang_${language}`)),
+          type: "languages",
+          values: [language],
+          label: `You know ${language}`,
+        },
+      ])
+    },
+  },
+  {
+    id: "language.speak_read_write",
+    confidence: "high",
+    test: /\b(?:can\s+)?speak,?\s+read,?\s+and\s+write\s+([A-Z][A-Za-z'’\-]+(?:\s+[A-Z][A-Za-z'’\-]+)?)\b/,
+    build: (match, ctx) => {
+      const language = titleCaseWords(match[1].trim())
+      if (!language || /language|common|choice/i.test(language)) return null
       return charInstance(newInstanceId(), characteristicCatalogRefId("languages"), [
         {
           id: modId(instanceKey(ctx, `lang_${language}`)),

@@ -178,4 +178,101 @@ describe("import content AI schema", () => {
       { rest: "long_rest" },
     ])
   })
+
+  it("preserves advanced choices, resource recovery, and subclass spellcasting", () => {
+    const normalized = normalizeAiImportContent({
+      classes: [
+        {
+          name: "Tactician",
+          description: null,
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [
+            {
+              level: 2,
+              name: "Techniques",
+              description: "Choose techniques.",
+              isChoice: true,
+              choices: {
+                category: "Technique",
+                count: 1,
+                options: [{ name: "Feint", description: "Feint.", prerequisite: null, repeatable: null }],
+                optionsSource: "class_knacks",
+                resourceKey: "techniques_known",
+                choiceCountByLevel: [{ level: 2, count: 1 }],
+                swappableOnRest: true,
+                swapRestType: "long",
+              },
+              mechanics: null,
+            },
+          ],
+        },
+      ],
+      class_resources: [
+        {
+          class_name: "Tactician",
+          subclass_name: null,
+          resource_key: "technique_dice",
+          name: "Technique Dice",
+          description: null,
+          uses: {
+            type: "at_level",
+            fixedAmount: null,
+            abilityModifier: null,
+            specialDescription: null,
+            atLevelTable: [{ level: 2, count: 2 }],
+            atLevelMode: "tier",
+            recharges: [{ rest: "long_rest", amount: null, amountFormula: null, amountFormulaAbility: null, maxPerLongRest: null }],
+            rechargeOverrides: null,
+            restoreBySpellSlot: { minSpellLevel: 1, restores: 1 },
+            useShareKey: "technique_dice",
+            classResourceKey: null,
+            classResourceAmount: null,
+            dieType: "d6",
+            dieSidesByLevel: [{ level: 2, count: 6 }],
+            rechargeOnInitiative: 1,
+            freeUseAfterLevel: null,
+          },
+        },
+      ],
+      subclasses: [
+        {
+          name: "Arcane House",
+          class_name: "Tactician",
+          description: null,
+          card_blurb: null,
+          prerequisite_rules: null,
+          features: [],
+          new_toggles: null,
+          spellcasting: {
+            ability: "Intelligence",
+            cantrips: 2,
+            spells_known: null,
+            prepared: true,
+            caster_progression: "third",
+            progression: null,
+            explicit_slot_progression: null,
+            point_pool: null,
+          },
+        },
+      ],
+    } as unknown as Parameters<typeof normalizeAiImportContent>[0])
+
+    expect(normalized.classes?.[0]?.features[0]?.choices).toMatchObject({
+      optionsSource: "class_knacks",
+      resourceKey: "techniques_known",
+      swappableOnRest: true,
+      swapRestType: "long",
+    })
+    expect(normalized.class_resources?.[0]?.uses).toMatchObject({
+      restoreBySpellSlot: { minSpellLevel: 1, restores: 1 },
+      dieType: "d6",
+      rechargeOnInitiative: 1,
+    })
+    expect(normalized.subclasses?.[0]?.spellcasting).toMatchObject({
+      ability: "Intelligence",
+      caster_progression: "third",
+      prepared: true,
+    })
+  })
 })

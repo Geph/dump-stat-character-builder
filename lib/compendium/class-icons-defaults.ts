@@ -21,6 +21,8 @@ export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Occultist: "pentacle",
   Warden: "tribal-shield",
   "Warden (Kibbles Tasty)": "tribal-shield",
+  Inventor: "gears",
+  "KibblesTasty Inventor": "gears",
   Alchemist: "potion-of-madness",
   Captain: "captain-hat-profile",
   Craftsman: "blacksmith",
@@ -37,6 +39,7 @@ export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
 const PSION_ICON = "rear-aura"
 const OCCULTIST_ICON = "pentacle"
 const KIBBLES_WARDEN_ICON = "tribal-shield"
+const INVENTOR_ICON = "gears"
 
 /** Resolve a default game-icons slug for a class name when none is stored. */
 export function defaultClassIconForName(name: string): string | null {
@@ -49,6 +52,8 @@ export function defaultClassIconForName(name: string): string | null {
 
   // Kibbles'Tasty Psion and similar publisher-prefixed names.
   if (/\bkibbles/i.test(trimmed) && /\bpsion\b/i.test(trimmed)) return PSION_ICON
+  if (/\bkibbles/i.test(trimmed) && /\binventor\b/i.test(trimmed)) return INVENTOR_ICON
+  if (/\binventor\b/i.test(trimmed)) return INVENTOR_ICON
   if (/\boccultist\b/i.test(trimmed) && !/\bmage\s*hand|\bmhp\b/i.test(trimmed)) {
     return OCCULTIST_ICON
   }

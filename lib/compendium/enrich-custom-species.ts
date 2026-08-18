@@ -11,6 +11,10 @@ import {
   defaultSpeciesCardImageUrl,
   SPECIES_CARD_IMAGES_BY_NAME,
 } from "@/lib/compendium/species-card-images-defaults"
+import {
+  applyKibblesRowPresentation,
+  KIBBLES_SPECIES_PRESENTATION,
+} from "@/lib/seed-packs/kibbles-tasty/species-background-presentation"
 import { isSrdSource } from "@/lib/srd/source"
 import type { FeatureActivation, Trait, UsesConfig } from "@/lib/types"
 import type { Feature } from "@/lib/types"
@@ -1443,7 +1447,7 @@ export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<str
   const speciesName = String(row.name ?? "")
 
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
-  let next = { ...row }
+  let next = applyKibblesRowPresentation({ ...row }, KIBBLES_SPECIES_PRESENTATION)
 
   const sizeFromRegistry = speciesNameAliases(speciesName).find((alias) => SPECIES_SIZE_OPTIONS[alias])
   const sizeOptions =

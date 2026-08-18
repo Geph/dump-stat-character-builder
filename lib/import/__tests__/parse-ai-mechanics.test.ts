@@ -100,6 +100,75 @@ describe("aiMechanicsToDetections", () => {
     })
   })
 
+  it("builds fixed natural-weapon damage from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "unarmed_strike_damage",
+          unarmedDie: "1d6",
+          damageType: "slashing",
+          ability: "strength",
+          sourcePhrase: "Unarmed strikes deal 1d6 + Strength modifier slashing damage.",
+        },
+      ],
+      { contentKind: "species_trait", featureName: "Talons" },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "unarmed_strike_damage",
+      die: "1d6",
+      damageType: "Slashing",
+      ability: "strength",
+    })
+  })
+
+  it("preserves cover and conditional weapon-damage fields from AI mechanics", () => {
+    const attack = aiMechanicsToDetections(
+      [
+        {
+          kind: "attack_roll_modifiers",
+          attackTarget: "ranged",
+          ignoreHalfCover: true,
+          treatThreeQuartersCoverAsHalf: true,
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Zeroed Sights" },
+    )
+    expect(attack[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "attack_roll_modifiers",
+      entries: [
+        {
+          target: "ranged",
+          ignoreHalfCover: true,
+          treatThreeQuartersCoverAsHalf: true,
+        },
+      ],
+    })
+
+    const damage = aiMechanicsToDetections(
+      [
+        {
+          kind: "damage_roll_modifiers",
+          damageTarget: "ranged",
+          grantAbilityModifierWhenMissing: true,
+          bonusDiceWhenModifierIncluded: "1d8",
+          bonusDiceUsesWeaponDamageType: true,
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Deadeye" },
+    )
+    expect(damage[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "damage_roll_modifiers",
+      entries: [
+        {
+          target: "ranged",
+          grantAbilityModifierWhenMissing: true,
+          bonusDiceWhenModifierIncluded: "1d8",
+          bonusDiceUsesWeaponDamageType: true,
+        },
+      ],
+    })
+  })
+
   it("builds skill proficiency from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [{ kind: "skills", skills: ["Stealth"], sourcePhrase: "You gain proficiency in Stealth." }],

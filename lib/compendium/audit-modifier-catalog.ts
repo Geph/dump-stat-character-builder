@@ -8,6 +8,7 @@ import { join, relative } from "node:path"
 export type ModifierCatalogAuditRow = {
   type: string
   applied: boolean
+  sideChannel: boolean
   derivedConsumes: boolean
   authorable: boolean
   inCatalog: boolean
@@ -17,6 +18,25 @@ export type ModifierCatalogAuditRow = {
   inDetectorRules: boolean
   tested: boolean
 }
+
+/**
+ * Characteristics consumed outside aggregateCharacteristics/compute-derived.
+ * Treating these as dead is actively misleading: each has a dedicated runtime
+ * collector for feature grants, reactions, triggers, or alternate abilities.
+ */
+const SIDE_CHANNEL_TYPES = new Set([
+  "d20_test_reaction",
+  "damage_halving_reaction",
+  "grant_creature",
+  "grant_feat",
+  "healing_dice_pool",
+  "on_creature_death_trigger",
+  "skill_check_alternate_ability",
+  "turn_start_trigger",
+])
+
+/** Catalog entries intentionally inserted by a specialized builder. */
+const MANUALLY_ADDED_CATALOG_TYPES = new Set(["custom_skill"])
 
 export type ModifierCatalogAuditSummary = {
   dead: string[]
@@ -373,14 +393,15 @@ export function auditModifierCatalog(): ModifierCatalogAuditResult {
   const testedTypes = collectTestedTypes(types)
 
   const rows: ModifierCatalogAuditRow[] = types.map((type) => {
-    const applied = handled.has(type)
+    const sideChannel = SIDE_CHANNEL_TYPES.has(type)
+    const applied = handled.has(type) || sideChannel
     const written = extractResultFieldsWritten(caseBodies.get(type) ?? "")
     const derivedConsumes =
-      applied &&
+      handled.has(type) &&
       (written.size === 0
         ? false
         : [...written].some((field) => derivedFields.has(field)))
-    const inCatalog = !excludedCatalog.has(type)
+    const inCatalog = !excludedCatalog.has(type) || MANUALLY_ADDED_CATALOG_TYPES.has(type)
     const hasEditor = editorCases.has(type) || effectListCases.has(type)
     const inAiKinds = aiKinds.has(type)
     const inDetectorRules = detectorTypes.has(type)
@@ -391,6 +412,7 @@ export function auditModifierCatalog(): ModifierCatalogAuditResult {
     return {
       type,
       applied,
+      sideChannel,
       derivedConsumes,
       authorable,
       inCatalog,
@@ -424,6 +446,7 @@ export function formatModifierCatalogAudit(result: ModifierCatalogAuditResult): 
   const headers = [
     "TYPE",
     "APPLIED",
+    "SIDE-CHANNEL",
     "DERIVED",
     "AUTHORABLE",
     "IMPORTABLE",
@@ -432,6 +455,7 @@ export function formatModifierCatalogAudit(result: ModifierCatalogAuditResult): 
   const tableRows = result.rows.map((row) => [
     row.type,
     yn(row.applied),
+    yn(row.sideChannel),
     yn(row.derivedConsumes),
     yn(row.authorable),
     yn(row.importable),
@@ -451,7 +475,7 @@ export function formatModifierCatalogAudit(result: ModifierCatalogAuditResult): 
     "",
     `Types: ${result.rows.length}`,
     "",
-    "DEAD (defined but never applied):",
+    "DEAD (defined but never applied by aggregate or a dedicated runtime collector):",
     ...(result.summary.dead.length
       ? result.summary.dead.map((type) => `  - ${type}`)
       : ["  (none)"]),

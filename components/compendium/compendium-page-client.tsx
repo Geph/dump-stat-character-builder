@@ -31,6 +31,16 @@ import {
   setCompendiumItemsEnabled,
   type CompendiumToggleTarget,
 } from "@/lib/compendium/compendium-toggle"
+import { RelatedCascadeOptions } from "@/components/compendium/related-cascade-options"
+import {
+  deleteCompendiumTargets,
+  EMPTY_RELATED_CASCADE,
+  findAttachedAbilitiesForSectionClear,
+  findRelatedFeatsAndCompanionsForSection,
+  flattenRelatedCascade,
+  relatedCascadeHasOptions,
+  type RelatedCascadeGroup,
+} from "@/lib/compendium/related-cascade"
 import {
   collectCompendiumSourceOptions,
   itemMatchesSourceFilter,
@@ -266,6 +276,11 @@ export default function CompendiumPageClient() {
   const [clearingAll, setClearingAll] = useState(false)
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [clearError, setClearError] = useState<string | null>(null)
+  const [clearRelated, setClearRelated] = useState<RelatedCascadeGroup>(EMPTY_RELATED_CASCADE)
+  const [includeClearFeats, setIncludeClearFeats] = useState(false)
+  const [includeClearCreatures, setIncludeClearCreatures] = useState(false)
+  const [includeClearAbilities, setIncludeClearAbilities] = useState(false)
+  const [clearRelatedLoading, setClearRelatedLoading] = useState(false)
   const [toggleConfirm, setToggleConfirm] = useState<{
     item: CompendiumToggleTarget
     dependents: CompendiumToggleTarget[]
@@ -810,11 +825,42 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     }))
   }
 
+  const openClearConfirm = () => {
+    setClearError(null)
+    setIncludeClearFeats(false)
+    setIncludeClearCreatures(false)
+    setIncludeClearAbilities(false)
+    setClearRelated(EMPTY_RELATED_CASCADE)
+    setClearConfirmOpen(true)
+    setClearRelatedLoading(true)
+    void (async () => {
+      try {
+        const db = createClient()
+        if (activeTab === "classes" || activeTab === "species") {
+          setClearRelated(await findRelatedFeatsAndCompanionsForSection(db, activeTab))
+        } else {
+          const abilities = await findAttachedAbilitiesForSectionClear(db, activeTab)
+          setClearRelated({ ...EMPTY_RELATED_CASCADE, abilities })
+        }
+      } catch (err) {
+        console.error("[v0] Failed to load related cascade for clear:", err)
+      } finally {
+        setClearRelatedLoading(false)
+      }
+    })()
+  }
+
   const handleClearSection = async () => {
     setClearingAll(true)
     setClearError(null)
     
     try {
+      const cascadeTargets = flattenRelatedCascade(clearRelated, {
+        includeFeats: includeClearFeats,
+        includeCreatures: includeClearCreatures,
+        includeAbilities: includeClearAbilities,
+      })
+
       if (activeTab === "equipment") {
         await clearEquipmentSubset("mundane")
       } else if (activeTab === "magic_items") {
@@ -873,14 +919,41 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           setSpellFilterSchool("all")
         }
       }
+
+      if (cascadeTargets.length) {
+        const db = createClient()
+        await deleteCompendiumTargets(db, cascadeTargets)
+        const removedFeatIds = new Set(
+          cascadeTargets.filter((t) => t.contentType === "feats").map((t) => t.id),
+        )
+        const removedCreatureIds = new Set(
+          cascadeTargets.filter((t) => t.contentType === "creatures").map((t) => t.id),
+        )
+        const removedAbilityIds = new Set(
+          cascadeTargets.filter((t) => t.contentType === "abilities").map((t) => t.id),
+        )
+        setContent((prev) => ({
+          ...prev,
+          feats: removedFeatIds.size
+            ? prev.feats.filter((row) => !removedFeatIds.has(row.id))
+            : prev.feats,
+          creatures: removedCreatureIds.size
+            ? prev.creatures.filter((row) => !removedCreatureIds.has(row.id))
+            : prev.creatures,
+          abilities: removedAbilityIds.size
+            ? prev.abilities.filter((row) => !removedAbilityIds.has(row.id))
+            : prev.abilities,
+        }))
+      }
+
       await refreshTabCounts()
       await refreshActiveTabContent()
+      setClearConfirmOpen(false)
     } catch (err) {
       console.error("[v0] Clear section error:", err)
       setClearError("Failed to clear section")
     } finally {
       setClearingAll(false)
-      setClearConfirmOpen(false)
     }
   }
 
@@ -1508,7 +1581,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               id="compendium-mobile-tab-select"
               value={activeTab}
               onChange={(event) => setActiveTab(event.target.value as ContentType)}
-              className="min-w-0 flex-1 basis-[min(100%,12rem)] rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none sm:hidden"
+              className="min-w-0 w-[60%] rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none max-sm:order-1 sm:hidden"
             >
               {tabs.map((tab) => (
                 <option key={tab.id} value={tab.id}>
@@ -1516,109 +1589,106 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 </option>
               ))}
             </select>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            {!isCompactOnly ? (
+              <div className="flex shrink-0 overflow-hidden rounded-lg border border-border max-sm:order-2 sm:order-3">
                 <button
                   type="button"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-12 sm:w-12"
-                  aria-label="Compendium section options"
+                  title="Visual cards"
+                  aria-pressed={cardLayout === "visual"}
+                  onClick={() => setCardLayout("visual")}
+                  className={`flex items-center gap-1 px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
+                    cardLayout === "visual"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Visual</span>
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => void handleDisableDisplayed()}
-                  disabled={displayedDisableTargets.length === 0 || toggleSaving}
-                  className="gap-2 cursor-pointer"
+                <button
+                  type="button"
+                  title="Compact list cards"
+                  aria-pressed={cardLayout === "compact"}
+                  onClick={() => setCardLayout("compact")}
+                  className={`flex items-center gap-1 border-l border-border px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
+                    cardLayout === "compact"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <Ban className="w-4 h-4" />
-                  Disable all displayed
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleExportSection}
-                  className="gap-2 cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  Export all {tabs.find((t) => t.id === activeTab)?.label}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setClearError(null)
-                    setClearConfirmOpen(true)
-                  }}
-                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Clear {tabs.find((t) => t.id === activeTab)?.label}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Compact</span>
+                </button>
+              </div>
+            ) : null}
+            <div className="shrink-0 max-sm:order-3 sm:order-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-12 sm:w-12"
+                    aria-label="Compendium section options"
+                  >
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onClick={() => void handleDisableDisplayed()}
+                    disabled={displayedDisableTargets.length === 0 || toggleSaving}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Disable all displayed
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleExportSection}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export all {tabs.find((t) => t.id === activeTab)?.label}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={openClearConfirm}
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear {tabs.find((t) => t.id === activeTab)?.label}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {activeTab === "spells" && (
               <button
                 type="button"
                 onClick={() => setSpellListDialogOpen(true)}
-                className="hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 border-border bg-card px-5 py-3 font-semibold text-foreground transition-colors hover:bg-muted sm:inline-flex"
+                className="hidden shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border-2 border-border bg-card px-5 py-3 font-semibold text-foreground transition-colors hover:bg-muted sm:order-2 sm:inline-flex"
               >
                 <Upload className="w-5 h-5 shrink-0" />
                 Upload class spell list
               </button>
             )}
-            <div
-              id="compendium-search"
-              className="flex min-w-0 flex-1 basis-full items-center gap-1.5 sm:basis-auto sm:flex-none sm:gap-2"
-            >
-              {!isCompactOnly ? (
-                <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
-                  <button
-                    type="button"
-                    title="Visual cards"
-                    aria-pressed={cardLayout === "visual"}
-                    onClick={() => setCardLayout("visual")}
-                    className={`flex items-center gap-1 px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
-                      cardLayout === "visual"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Visual</span>
-                  </button>
-                  <button
-                    type="button"
-                    title="Compact list cards"
-                    aria-pressed={cardLayout === "compact"}
-                    onClick={() => setCardLayout("compact")}
-                    className={`flex items-center gap-1 border-l border-border px-2 py-2 text-xs font-semibold transition-colors sm:px-2.5 ${
-                      cardLayout === "compact"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Compact</span>
-                  </button>
-                </div>
-              ) : null}
-              <div className="relative min-w-0 flex-1 sm:w-36 sm:flex-none">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3 sm:h-4 sm:w-4" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Search content"
-                  className="w-full rounded-lg border-2 border-border bg-card py-2 pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none sm:pl-9 sm:pr-3"
-                />
-              </div>
-            </div>
             <Link
               href={compendiumEditHref(activeTab, "new")}
-              className="inline-flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
+              className="inline-flex max-w-[min(100%,11rem)] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 max-sm:order-4 sm:order-5 sm:max-w-none sm:gap-2 sm:px-5 sm:py-3"
             >
               <Plus className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
               <span className="truncate">{newItemButtonLabels[activeTab]}</span>
             </Link>
+            <div
+              id="compendium-search"
+              className="relative min-w-0 flex-1 max-sm:order-5 sm:order-4 sm:w-36 sm:flex-none"
+            >
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3 sm:h-4 sm:w-4" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search content"
+                className="w-full rounded-lg border-2 border-border bg-card py-2 pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none sm:pl-9 sm:pr-3"
+              />
+            </div>
           </div>
         </div>
 
@@ -1670,14 +1740,50 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 {activeTab === "classes" && tabCounts.class_resources > 0 && (
                   <> All {tabCounts.class_resources} class resources will be cleared as well.</>
                 )}
+                {activeTab === "classes" && (
+                  <> Spells that list these classes by name are kept.</>
+                )}
                 {activeTab === "abilities" && (
-                  <> The system <strong className="text-foreground">Common Modifier Effects</strong> catalog will be recreated automatically with default entries.</>
+                  <>
+                    {" "}
+                    System catalogs (
+                    <strong className="text-foreground">Common Modifier Effects</strong>,{" "}
+                    <strong className="text-foreground">Metamagic Options</strong>,{" "}
+                    <strong className="text-foreground">Eldritch Invocations</strong>, and{" "}
+                    <strong className="text-foreground">Weapon Mastery Properties</strong>
+                    ) will be recreated automatically with default entries.
+                  </>
                 )}
                 {activeTab === "spells" && (
                   <> The <strong className="text-foreground">Schools of Magic</strong> list will reset to the SRD defaults.</>
-                )}{" "}
-                Other sections will not be affected.
+                )}
+                {relatedCascadeHasOptions(clearRelated) ? (
+                  includeClearFeats || includeClearCreatures || includeClearAbilities ? (
+                    <> Selected related content below will also be cleared.</>
+                  ) : (
+                    <> Other sections stay unless you opt into related cleanup below.</>
+                  )
+                ) : (
+                  <> Other sections will not be affected.</>
+                )}
               </p>
+              {clearRelatedLoading ? (
+                <p className="mb-6 text-sm text-muted-foreground">
+                  Checking for related content…
+                </p>
+              ) : (
+                <RelatedCascadeOptions
+                  related={clearRelated}
+                  includeFeats={includeClearFeats}
+                  includeCreatures={includeClearCreatures}
+                  includeAbilities={includeClearAbilities}
+                  onIncludeFeatsChange={setIncludeClearFeats}
+                  onIncludeCreaturesChange={setIncludeClearCreatures}
+                  onIncludeAbilitiesChange={setIncludeClearAbilities}
+                  disabled={clearingAll}
+                  abilitiesOnly={activeTab !== "classes" && activeTab !== "species"}
+                />
+              )}
               {clearError && (
                 <p className="text-sm text-destructive mb-4">{clearError}</p>
               )}
@@ -1691,7 +1797,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 </button>
                 <button
                   onClick={handleClearSection}
-                  disabled={clearingAll}
+                  disabled={clearingAll || clearRelatedLoading}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-destructive text-destructive-foreground rounded-xl font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
                 >
                   {clearingAll ? "Clearing..." : `Clear ${tabs.find(t => t.id === activeTab)?.label}`}

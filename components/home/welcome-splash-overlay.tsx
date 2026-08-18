@@ -3,14 +3,12 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
-  type RefObject,
 } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, ImageIcon } from "lucide-react"
+import { ImageIcon } from "lucide-react"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { getCinematicSpellPickerContainerClass } from "@/lib/builder/picker-pagination"
 import { cn } from "@/lib/utils"
@@ -90,40 +88,6 @@ const VERSION_OPTIONS: VersionOption[] = [
 
 const SPLASH_LINK_CLASS =
   "block text-inherit no-underline hover:text-inherit hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded-lg"
-
-/** Phone-only control that scrolls the splash dialog to the next input section. */
-function ScrollToNextSectionButton({
-  scrollContainerRef,
-  targetRef,
-  label = "Scroll to next",
-}: {
-  scrollContainerRef: RefObject<HTMLElement | null>
-  targetRef: RefObject<HTMLElement | null>
-  label?: string
-}) {
-  return (
-    <div className="mt-3 flex justify-center sm:hidden">
-      <button
-        type="button"
-        onClick={() => {
-          const container = scrollContainerRef.current
-          const target = targetRef.current
-          if (!container || !target) return
-          const top =
-            target.getBoundingClientRect().top -
-            container.getBoundingClientRect().top +
-            container.scrollTop -
-            12
-          container.scrollTo({ top, behavior: "smooth" })
-        }}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:text-foreground"
-      >
-        {label}
-        <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      </button>
-    </div>
-  )
-}
 
 function VersionOptionCard({
   option,
@@ -221,8 +185,6 @@ function VersionOptionCard({
 export function WelcomeSplashOverlay() {
   const [open, setOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
-  const scrollBodyRef = useRef<HTMLDivElement>(null)
-  const nextInputRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isWelcomeSplashSuppressed()) return
@@ -303,10 +265,7 @@ export function WelcomeSplashOverlay() {
           >
             <div className="pointer-events-none absolute inset-3 rounded-xl border border-primary/20" aria-hidden />
 
-            <div
-              ref={scrollBodyRef}
-              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-card/85 backdrop-blur-sm px-4 py-4 sm:px-8 sm:py-5"
-            >
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-card/85 backdrop-blur-sm px-4 py-4 sm:px-8 sm:py-5">
               <header className="shrink-0 text-center">
                 <h2
                   id="welcome-splash-title"
@@ -344,28 +303,24 @@ export function WelcomeSplashOverlay() {
                     <VersionOptionCard key={option.id} option={option} onChoose={handleChoose} />
                   ))}
                 </SwipeVisualPicker>
-
-                <ScrollToNextSectionButton
-                  scrollContainerRef={scrollBodyRef}
-                  targetRef={nextInputRef}
-                  label="Scroll to next"
-                />
               </section>
 
-              <div
-                ref={nextInputRef}
-                className="mt-4 scroll-mt-3 pb-1 sm:mt-5"
-              >
-                <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground">
+              <label className="mt-4 flex shrink-0 cursor-pointer justify-center px-1 sm:mt-5">
+                <span className="inline-flex max-w-full items-start gap-2.5 text-center">
                   <input
                     type="checkbox"
                     checked={dontShowAgain}
                     onChange={(event) => setDontShowAgain(event.target.checked)}
-                    className="size-4 rounded border-border accent-primary"
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
                   />
-                  Don&apos;t show this again
-                </label>
-              </div>
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Don&apos;t show this again
+                    <span className="mt-0.5 block text-xs text-muted-foreground/80">
+                      You can turn this back on in Settings → Options.
+                    </span>
+                  </span>
+                </span>
+              </label>
             </div>
           </motion.div>
         </motion.div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Plus, X } from "lucide-react"
+import { Plus, X, Trash2 } from "lucide-react"
 import {
   CompendiumEditorPanel,
   CompendiumEditorSection,
@@ -40,6 +40,14 @@ import { DurationEditor } from "@/components/compendium/duration-editor"
 import type { Trait, Species } from "@/lib/types"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
+import { RelatedCascadeOptions } from "@/components/compendium/related-cascade-options"
+import {
+  deleteCompendiumTargets,
+  EMPTY_RELATED_CASCADE,
+  findRelatedFeatsAndCompanions,
+  flattenRelatedCascade,
+  type RelatedCascadeGroup,
+} from "@/lib/compendium/related-cascade"
 
 interface SpeciesFormData {
   name: string
@@ -86,6 +94,13 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [relatedCascade, setRelatedCascade] = useState<RelatedCascadeGroup>(EMPTY_RELATED_CASCADE)
+  const [includeRelatedFeats, setIncludeRelatedFeats] = useState(false)
+  const [includeRelatedCreatures, setIncludeRelatedCreatures] = useState(false)
+  const [includeRelatedAbilities, setIncludeRelatedAbilities] = useState(false)
+  const [relatedLoading, setRelatedLoading] = useState(false)
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("species", id)
 
@@ -200,12 +215,52 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
     URL.revokeObjectURL(url)
   }
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this species?")) return
-    
+  const handleDelete = () => {
+    setIncludeRelatedFeats(false)
+    setIncludeRelatedCreatures(false)
+    setIncludeRelatedAbilities(false)
+    setRelatedCascade(EMPTY_RELATED_CASCADE)
+    setDeleteConfirmOpen(true)
+    setRelatedLoading(true)
+    void (async () => {
+      try {
+        const db = createClient()
+        const related = await findRelatedFeatsAndCompanions(db, "species", id)
+        setRelatedCascade(related)
+      } catch (err) {
+        console.error("[v0] Failed to load related cascade targets:", err)
+      } finally {
+        setRelatedLoading(false)
+      }
+    })()
+  }
+
+  const confirmDelete = async () => {
+    setDeleting(true)
+    setError(null)
     const db = createClient()
-    await db.from("species").delete().eq("id", id)
-    router.push("/compendium?tab=species")
+    try {
+      const cascadeTargets = flattenRelatedCascade(relatedCascade, {
+        includeFeats: includeRelatedFeats,
+        includeCreatures: includeRelatedCreatures,
+        includeAbilities: includeRelatedAbilities,
+      })
+      if (cascadeTargets.length) {
+        await deleteCompendiumTargets(db, cascadeTargets)
+      }
+      const { error: deleteError } = await db.from("species").delete().eq("id", id)
+      if (deleteError) {
+        setError(deleteError.message || "Failed to delete species")
+        setDeleting(false)
+        setDeleteConfirmOpen(false)
+        return
+      }
+      router.push("/compendium?tab=species")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete species")
+      setDeleting(false)
+      setDeleteConfirmOpen(false)
+    }
   }
 
   // Trait management
@@ -324,6 +379,61 @@ export default function SpeciesEditorPage({ id }: { id: string }) {
         copying={copying}
         onDelete={id !== "new" ? handleDelete : undefined}
       />
+
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border-2 border-destructive/40 bg-card p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                <Trash2 className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-foreground">
+                  Delete {form.name.trim() || "this species"}?
+                </h2>
+                <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+              </div>
+            </div>
+            <p className="mb-6 text-muted-foreground">
+              This permanently removes{" "}
+              <strong className="text-foreground">{form.name.trim() || "this species"}</strong> from
+              your compendium. Saved characters that use this species will need a new species chosen.
+            </p>
+            {relatedLoading ? (
+              <p className="mb-6 text-sm text-muted-foreground">Checking for related feats and companions…</p>
+            ) : (
+              <RelatedCascadeOptions
+                related={relatedCascade}
+                includeFeats={includeRelatedFeats}
+                includeCreatures={includeRelatedCreatures}
+                includeAbilities={includeRelatedAbilities}
+                onIncludeFeatsChange={setIncludeRelatedFeats}
+                onIncludeCreaturesChange={setIncludeRelatedCreatures}
+                onIncludeAbilitiesChange={setIncludeRelatedAbilities}
+                disabled={deleting}
+              />
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="flex-1 rounded-xl border-2 border-border bg-card px-4 py-3 font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                disabled={deleting || relatedLoading}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete species"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {(error || copyError) && (

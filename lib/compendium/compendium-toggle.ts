@@ -1,10 +1,11 @@
 import { COMMON_MODIFIERS_CATALOG_ID } from "@/lib/compendium/modifier-catalog"
 import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
-import { compendiumStorageContentType, type CompendiumContentType } from "@/lib/compendium/content-types"
+import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import type { CompendiumTable } from "@/lib/db/tables"
 import type { DataClient } from "@/lib/db/client"
 import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
+import { prerequisiteMentionsName } from "@/lib/compendium/prerequisite-match"
 
 export type CompendiumToggleTarget = {
   table: CompendiumTable
@@ -120,14 +121,25 @@ export async function findCompendiumDependents(
       addDependent(dependents, seen, "class_resources", row.id as string, row.name as string, id)
     }
 
-    const { data: feats } = await db.from("feats").select("id, name, prerequisite_class_ids")
+    const { data: feats } = await db
+      .from("feats")
+      .select("id, name, prerequisite, prerequisite_class_ids")
     for (const row of asCompendiumRows(feats)) {
-      if (idsInclude(row.prerequisite_class_ids, id)) {
+      const byId = idsInclude(row.prerequisite_class_ids, id)
+      const byText =
+        !!className &&
+        prerequisiteMentionsName(
+          typeof row.prerequisite === "string" ? row.prerequisite : null,
+          className,
+        )
+      if (byId || byText) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
     }
 
     if (className) {
+      // Spells listing this class stay in the catalog on clear/delete (multi-class lists).
+      // Disable still offers them so the builder can hide class-tied spells together.
       const { data: spells } = await db.from("spells").select("id, name, classes")
       for (const row of asCompendiumRows(spells)) {
         if (stringArrayIncludes(row.classes, className)) {
@@ -137,13 +149,34 @@ export async function findCompendiumDependents(
     }
 
     await addAttachedAbilities(db, "class", id, dependents, seen)
+    for (const row of asCompendiumRows(subclasses)) {
+      await addAttachedAbilities(db, "subclass", row.id as string, dependents, seen)
+    }
+    return dependents.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  if (table === "subclasses") {
+    await addAttachedAbilities(db, "subclass", id, dependents, seen)
     return dependents.sort((a, b) => a.name.localeCompare(b.name))
   }
 
   if (table === "species") {
-    const { data: feats } = await db.from("feats").select("id, name, prerequisite_species_ids")
+    const { data: species } = await db.from("species").select("name").eq("id", id).single()
+    const speciesRow = asCompendiumRow(species)
+    const speciesName = typeof speciesRow?.name === "string" ? speciesRow.name : null
+
+    const { data: feats } = await db
+      .from("feats")
+      .select("id, name, prerequisite, prerequisite_species_ids")
     for (const row of asCompendiumRows(feats)) {
-      if (idsInclude(row.prerequisite_species_ids, id)) {
+      const byId = idsInclude(row.prerequisite_species_ids, id)
+      const byText =
+        !!speciesName &&
+        prerequisiteMentionsName(
+          typeof row.prerequisite === "string" ? row.prerequisite : null,
+          speciesName,
+        )
+      if (byId || byText) {
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
     }

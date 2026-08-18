@@ -245,7 +245,9 @@ export const EXCLUDED_ACTION_CATALOG_KINDS = new Set([
 ])
 
 /** Passive characteristic types omitted from the default common-modifiers catalog. */
-export const EXCLUDED_PASSIVE_CATALOG_TYPES = new Set(["initiative", "custom_skill"])
+// Custom Skill is added as a manually configured singleton catalog entry.
+// Initiative is generated normally because import wiring links cat_char_initiative.
+export const EXCLUDED_PASSIVE_CATALOG_TYPES = new Set(["custom_skill"])
 
 export type CheckRollMode = "bonus" | "advantage" | "disadvantage" | "replace_failure"
 

@@ -2,18 +2,19 @@
   "id": "kibbles-tasty",
   "label": "Kibbles Tasty",
   "source": "Kibbles Tasty",
-  "version": "2026-08-10",
+  "version": "2026-08-18",
   "files": [
+    "kibbles-backgrounds.json",
     "kibbles-crafting-feats.json",
     "kibbles-inventor-class.json",
     "kibbles-occultist-class.json",
     "kibbles-psion-class.json",
     "kibbles-psionics-custom.json",
+    "kibbles-species.json",
     "kibbles-spells.json",
     "kibbles-warden-class.json"
   ],
   "notes": [
-    "All Kibbles Tasty Drive import-json files included.",
-    "Warden labeled Warden (Kibbles Tasty) to avoid colliding with Mage Hand Press."
+    "All Kibbles Tasty Drive import-json files included."
   ]
 }

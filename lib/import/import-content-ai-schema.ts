@@ -23,6 +23,24 @@ const ChoiceOptionsAiSchema = z.object({
       repeatable: z.boolean().nullable(),
     }),
   ),
+  optionsSource: z
+    .enum([
+      "known_discipline_talents",
+      "fusion_talents",
+      "class_talents",
+      "class_disciplines",
+      "class_knacks",
+      "class_upgrades",
+      "class_bomb_formulas",
+      "class_discoveries",
+    ])
+    .nullable(),
+  resourceKey: z.string().nullable(),
+  choiceCountByLevel: z
+    .array(z.object({ level: z.number(), count: z.number() }))
+    .nullable(),
+  swappableOnRest: z.boolean().nullable(),
+  swapRestType: z.enum(["short", "long"]).nullable(),
 })
 
 const PrerequisiteRuleAiSchema = z.object({
@@ -56,14 +74,20 @@ const ImportMechanicAiSchema = z.object({
   criticalHitMinimumByLevel: z
     .array(z.object({ level: z.number(), fixed: z.number() }))
     .nullable(),
+  ignoreHalfCover: z.boolean().nullable(),
+  treatThreeQuartersCoverAsHalf: z.boolean().nullable(),
   damageBonus: z.number().nullable(),
   damageTarget: z.enum(["all", "melee", "ranged"]).nullable(),
   bonusDice: z.string().nullable(),
+  grantAbilityModifierWhenMissing: z.boolean().nullable(),
+  bonusDiceWhenModifierIncluded: z.string().nullable(),
+  bonusDiceUsesWeaponDamageType: z.boolean().nullable(),
   damageType: z.string().nullable(),
   damageTypes: z.array(z.string()).nullable(),
   conditions: z.array(z.string()).nullable(),
   speedType: z.enum(["walk", "fly", "swim", "climb"]).nullable(),
   speedFeet: z.number().nullable(),
+  speedMode: z.enum(["fixed", "equal_to_walk"]).nullable(),
   visionRangeFeet: z.number().nullable(),
   visionType: z.enum(["darkvision", "blindsight", "truesight", "tremorsense"]).nullable(),
   usesFixed: z.number().nullable(),
@@ -135,6 +159,7 @@ const ImportMechanicAiSchema = z.object({
   fraction: z.number().nullable(),
   trigger: z.string().nullable(),
   provokesOpportunityAttacks: z.boolean().nullable(),
+  teleport: z.boolean().nullable(),
   featCategories: z
     .array(
       z.enum([
@@ -171,6 +196,7 @@ const ImportMechanicAiSchema = z.object({
   languageChoiceCount: z.number().nullable(),
   choicePool: z.enum(["standard", "standard_and_rare"]).nullable(),
   spellNames: z.array(z.string()).nullable(),
+  unlocksAtClassLevel: z.number().nullable(),
   spellChoiceGrants: z
     .array(
       z.object({
@@ -235,13 +261,20 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   scalingMode: z.enum(["none", "character_level", "half_character_level_round_down"]).nullable(),
   damageTypeOptions: z.array(z.string()).nullable(),
-  initiativeMode: z.enum(["flat_bonus", "add_proficiency", "ability_modifier"]).nullable(),
+  initiativeMode: z
+    .enum(["flat_bonus", "add_proficiency", "ability_modifier", "add_ability_modifier"])
+    .nullable(),
   initiativeAbility: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),
   initiativeFlatBonus: z.number().nullable(),
   telepathyRangeFeet: z.number().nullable(),
+  unarmedDie: z.string().nullable(),
   dieByLevel: z.array(z.object({ level: z.number(), die: z.string() })).nullable(),
+  dieSides: z.number().nullable(),
+  weaponDamageScope: z
+    .enum(["all", "melee", "ranged", "unarmed", "weapons", "specific"])
+    .nullable(),
   waiveResourceCost: z.boolean().nullable(),
   menuAbilityNames: z.array(z.string()).nullable(),
   menuOptions: z
@@ -276,7 +309,6 @@ const ImportMechanicAiSchema = z.object({
   blockedByConditions: z.array(z.string()).nullable(),
   reachBonusFeet: z.number().nullable(),
   weaponPropertyFilter: z.array(z.string()).nullable(),
-  masteryProperties: z.array(z.string()).nullable(),
   attackName: z.string().nullable(),
   attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).nullable(),
   targetMode: z.enum(["single", "multi", "area"]).nullable(),
@@ -338,6 +370,15 @@ const SpellcastingAiSchema = z.object({
       }),
     )
     .nullable(),
+  point_pool: z
+    .object({
+      resource_key: z.string(),
+      cost_by_level: z.record(z.string(), z.number()),
+      base_cost_cap_resource_key: z.string().nullable(),
+      metamagic_cost_cap: z.enum(["proficiency_bonus"]).nullable(),
+      replaces_spell_slots: z.boolean(),
+    })
+    .nullable(),
 })
 
 const SkillChoicesAiSchema = z.object({
@@ -374,10 +415,50 @@ const UsesConfigAiSchema = z.object({
         z.object({
           rest: z.enum(["short_rest", "long_rest"]),
           amount: z.number().nullable(),
+          amountFormula: z
+            .enum(["half_class_level_round_up", "ability_modifier"])
+            .nullable(),
+          amountFormulaAbility: z
+            .enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"])
+            .nullable(),
+          maxPerLongRest: z.number().nullable(),
         }),
       ]),
     )
     .nullable(),
+  rechargeOverrides: z
+    .array(
+      z.object({
+        atClassLevel: z.number(),
+        recharges: z.array(
+          z.object({
+            rest: z.enum(["short_rest", "long_rest"]),
+            amount: z.number().nullable(),
+            amountFormula: z
+              .enum(["half_class_level_round_up", "ability_modifier"])
+              .nullable(),
+            amountFormulaAbility: z
+              .enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"])
+              .nullable(),
+            maxPerLongRest: z.number().nullable(),
+          }),
+        ),
+      }),
+    )
+    .nullable(),
+  restoreBySpellSlot: z
+    .object({
+      minSpellLevel: z.number(),
+      restores: z.number(),
+    })
+    .nullable(),
+  useShareKey: z.string().nullable(),
+  classResourceKey: z.string().nullable(),
+  classResourceAmount: z.number().nullable(),
+  dieType: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]).nullable(),
+  dieSidesByLevel: z.array(UsesAtLevelAiSchema).nullable(),
+  rechargeOnInitiative: z.union([z.boolean(), z.number()]).nullable(),
+  freeUseAfterLevel: z.number().nullable(),
 })
 
 const NewToggleAiSchema = z.object({
@@ -514,6 +595,7 @@ const SubclassAiSchema = z.object({
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
   features: z.array(ClassFeatureAiSchema),
   new_toggles: z.array(NewToggleAiSchema).nullable(),
+  spellcasting: SpellcastingAiSchema.nullable(),
 })
 
 const SpeciesAiSchema = z.object({
@@ -834,6 +916,35 @@ function normalizeSkillChoices(
   }
 }
 
+type ImportChoiceOptions = NonNullable<
+  NonNullable<ImportContent["classes"]>[number]["features"][number]["choices"]
+>
+
+function normalizeChoiceOptions(
+  choices: z.infer<typeof ChoiceOptionsAiSchema> | null | undefined,
+): ImportChoiceOptions | undefined {
+  if (!choices) return undefined
+  return {
+    category: choices.category,
+    count: choices.count,
+    options: choices.options.map((option) =>
+      omitNull({
+        name: option.name,
+        description: option.description,
+        prerequisite: option.prerequisite,
+        repeatable: option.repeatable,
+      }),
+    ) as ImportChoiceOptions["options"],
+    ...omitNull({
+      optionsSource: choices.optionsSource,
+      resourceKey: choices.resourceKey,
+      choiceCountByLevel: choices.choiceCountByLevel,
+      swappableOnRest: choices.swappableOnRest,
+      swapRestType: choices.swapRestType,
+    }),
+  } as ImportChoiceOptions
+}
+
 /** Drop null ability slots from structured-output objects; null/empty → null (legacy). */
 function compactBackgroundAbilityBonuses(
   bonuses: z.infer<typeof BackgroundAbilityBonusesAiSchema> | null | undefined,
@@ -864,6 +975,20 @@ function normalizeUsesConfig(
         return null
       })
       .filter(Boolean)
+  }
+  if (Array.isArray(next.rechargeOverrides)) {
+    next.rechargeOverrides = next.rechargeOverrides.map((override) => {
+      const cleaned = omitNull(override as Record<string, unknown>)
+      if (Array.isArray(cleaned.recharges)) {
+        cleaned.recharges = cleaned.recharges.map((entry) =>
+          omitNull(entry as Record<string, unknown>),
+        )
+      }
+      return cleaned
+    })
+  }
+  if (next.restoreBySpellSlot && typeof next.restoreBySpellSlot === "object") {
+    next.restoreBySpellSlot = omitNull(next.restoreBySpellSlot as Record<string, unknown>)
   }
   return next as NonNullable<ImportContent["class_resources"]>[number]["uses"]
 }
@@ -904,7 +1029,7 @@ function normalizeFeatureLike(
     description: feature.description,
     prerequisite_rules: feature.prerequisite_rules,
     isChoice: feature.isChoice === true ? true : undefined,
-    choices: feature.choices ?? undefined,
+    choices: normalizeChoiceOptions(feature.choices),
     mechanics: normalizeMechanics(feature.mechanics),
     basedOnSrdFeature: feature.basedOnSrdFeature ?? undefined,
   })
@@ -915,18 +1040,33 @@ function normalizeFeatureLike(
     : never
 }
 
-function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<ImportContent["classes"]>[number] {
-  const spellcasting = row.spellcasting
+function normalizeSpellcasting(
+  spellcasting: z.infer<typeof SpellcastingAiSchema> | null | undefined,
+): NonNullable<NonNullable<ImportContent["classes"]>[number]["spellcasting"]> | undefined {
+  if (!spellcasting) return undefined
+  const pointPool = spellcasting.point_pool
     ? omitNull({
-        ability: row.spellcasting.ability,
-        cantrips: row.spellcasting.cantrips ?? undefined,
-        spells_known: row.spellcasting.spells_known ?? undefined,
-        prepared: row.spellcasting.prepared ?? undefined,
-        caster_progression: row.spellcasting.caster_progression ?? undefined,
-        progression: row.spellcasting.progression ?? undefined,
-        explicit_slot_progression: row.spellcasting.explicit_slot_progression ?? undefined,
+        resource_key: spellcasting.point_pool.resource_key,
+        cost_by_level: spellcasting.point_pool.cost_by_level,
+        base_cost_cap_resource_key: spellcasting.point_pool.base_cost_cap_resource_key,
+        metamagic_cost_cap: spellcasting.point_pool.metamagic_cost_cap,
+        replaces_spell_slots: spellcasting.point_pool.replaces_spell_slots,
       })
     : undefined
+  return omitNull({
+    ability: spellcasting.ability,
+    cantrips: spellcasting.cantrips,
+    spells_known: spellcasting.spells_known,
+    prepared: spellcasting.prepared,
+    caster_progression: spellcasting.caster_progression,
+    progression: spellcasting.progression,
+    explicit_slot_progression: spellcasting.explicit_slot_progression,
+    point_pool: pointPool,
+  }) as NonNullable<NonNullable<ImportContent["classes"]>[number]["spellcasting"]>
+}
+
+function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<ImportContent["classes"]>[number] {
+  const spellcasting = normalizeSpellcasting(row.spellcasting)
 
   return {
     name: row.name,
@@ -983,7 +1123,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           description: trait.description,
           prerequisite_rules: trait.prerequisite_rules,
           isChoice: trait.isChoice === true ? true : undefined,
-          choices: trait.choices ?? undefined,
+          choices: normalizeChoiceOptions(trait.choices),
           mechanics: normalizeMechanics(trait.mechanics),
           basedOnSrdFeature: trait.basedOnSrdFeature ?? undefined,
         }),
@@ -1014,17 +1154,21 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   }
 
   if (raw.subclasses?.length) {
-    content.subclasses = raw.subclasses.map((subclass) => ({
-      name: subclass.name,
-      class_name: subclass.class_name,
-      description: subclass.description,
-      prerequisite_rules: subclass.prerequisite_rules ?? undefined,
-      features: subclass.features.map(normalizeFeatureLike),
-      ...omitNull({
-        card_blurb: subclass.card_blurb,
-        new_toggles: subclass.new_toggles?.length ? subclass.new_toggles : undefined,
-      }),
-    }))
+    content.subclasses = raw.subclasses.map((subclass) => {
+      const spellcasting = normalizeSpellcasting(subclass.spellcasting)
+      return {
+        name: subclass.name,
+        class_name: subclass.class_name,
+        description: subclass.description,
+        prerequisite_rules: subclass.prerequisite_rules ?? undefined,
+        features: subclass.features.map(normalizeFeatureLike),
+        ...omitNull({
+          card_blurb: subclass.card_blurb,
+          new_toggles: subclass.new_toggles?.length ? subclass.new_toggles : undefined,
+        }),
+        ...(spellcasting ? { spellcasting } : {}),
+      }
+    })
   }
 
   if (raw.backgrounds?.length) {
@@ -1069,7 +1213,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           ? feat.recommended_classes
           : undefined,
         isChoice: feat.isChoice === true ? true : undefined,
-        choices: feat.choices ?? undefined,
+        choices: normalizeChoiceOptions(feat.choices),
         mechanics: normalizeMechanics(feat.mechanics),
       }),
     ) as NonNullable<ImportContent["feats"]>
@@ -1203,34 +1347,8 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
           prerequisite: ability.prerequisite ?? undefined,
           prerequisite_rules: ability.prerequisite_rules ?? undefined,
           repeatable: ability.repeatable ?? undefined,
-          choices: ability.choices
-            ? {
-                category: ability.choices.category,
-                count: ability.choices.count,
-                options: ability.choices.options.map((option) =>
-                  omitNull({
-                    name: option.name,
-                    description: option.description,
-                    prerequisite: option.prerequisite ?? undefined,
-                    repeatable: option.repeatable ?? undefined,
-                  }),
-                ),
-              }
-            : undefined,
-          specialization_choices: ability.specialization_choices
-            ? {
-                category: ability.specialization_choices.category,
-                count: ability.specialization_choices.count,
-                options: ability.specialization_choices.options.map((option) =>
-                  omitNull({
-                    name: option.name,
-                    description: option.description,
-                    prerequisite: option.prerequisite ?? undefined,
-                    repeatable: option.repeatable ?? undefined,
-                  }),
-                ),
-              }
-            : undefined,
+          choices: normalizeChoiceOptions(ability.choices),
+          specialization_choices: normalizeChoiceOptions(ability.specialization_choices),
         }),
       ) as NonNullable<NonNullable<ImportContent["import_proposals"]>["custom_abilities"]>
     }

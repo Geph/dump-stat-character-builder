@@ -51,7 +51,8 @@ export const COMMON_MODIFIERS_CATALOG_NAME = "Common Modifier Effects"
 export const MODIFIER_CATALOG_INFO =
   "This system entry defines reusable mechanical effect templates shared across class features, subclasses, feats, species traits, and backgrounds. Set the possible choices for each effect here; compendium editors link these entries and configure specifics inline (e.g. damage types, check categories)."
 
-export const MODIFIER_CATALOG_GROUPS = [
+/** Mechanical templates shown by the Common Modifier Effects catalog. */
+export const COMMON_MODIFIER_CATALOG_GROUPS = [
   "Ability scores & checks",
   "Skills & saving throws",
   "Proficiencies",
@@ -65,13 +66,23 @@ export const MODIFIER_CATALOG_GROUPS = [
   "Resources & uses",
   "Feats & choices",
   "Equipment & items",
-  /** Nested custom-ability entries (Psion disciplines, talent pools, etc.) */
+  "Other",
+] as const
+
+/** Feature-like groups used only by nested class/custom-ability option catalogs. */
+export const ABILITY_OPTION_CATALOG_GROUPS = [
   "Passive Features",
   "Psionic Powers",
   "Alternate Effects",
   "Specializations",
   "Discipline Talents",
   "General Talents",
+] as const
+
+/** All groups supported by the shared catalog editor shell. */
+export const MODIFIER_CATALOG_GROUPS = [
+  ...COMMON_MODIFIER_CATALOG_GROUPS,
+  ...ABILITY_OPTION_CATALOG_GROUPS,
 ] as const
 
 export type ModifierCatalogGroup = (typeof MODIFIER_CATALOG_GROUPS)[number]
@@ -192,10 +203,16 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
           ? "Gain a Feat"
           : option.value === "grant_creature"
             ? "Grant Creature / Companion"
+          : option.value === "initiative"
+            ? "Initiative Bonus"
           : option.value === "attack_roll_modifiers"
             ? "Attack Roll and Crit Modifiers"
             : option.value === "damage_roll_modifiers"
               ? "Weapon Damage Modifiers"
+              : option.value === "bonus_damage_riders"
+                ? "Passive Bonus Damage Riders"
+                : option.value === "damage_reduction"
+                  ? "Flat Damage Reduction (Passive)"
               : option.label,
       group: CHARACTERISTIC_GROUP[option.value],
       summary:
@@ -207,8 +224,14 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
             ? "Passive: grant known languages and/or player picks from the Languages compendium (Standard or Rare pool)"
           : option.value === "ability_scores"
             ? "Passive: fixed ability bonuses or ASI-style player choice"
+            : option.value === "initiative"
+              ? "Passive: flat, proficiency, replacement-ability, or added-ability initiative bonus; use Check Roll Modifier for initiative advantage"
             : option.value === "special_attack"
               ? "Passive: configurable special attack (breath weapon, horns, etc.)"
+              : option.value === "bonus_damage_riders"
+                ? "Passive: merged always-available damage rider options; use the activated rider template for a feature action or menu"
+                : option.value === "damage_reduction"
+                  ? "Passive: flat damage reduction applied continuously; use the activated mitigation template for resistance, immunity, Evasion, or Uncanny Dodge"
               : option.value === "attack_roll_modifiers"
                 ? "Passive: bonus to hit and expanded critical range (optional by level)"
                 : option.value === "damage_roll_modifiers"
@@ -234,11 +257,25 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
   for (const option of ACTION_EFFECT_OPTIONS) {
     if (EXCLUDED_ACTION_CATALOG_KINDS.has(option.value)) continue
     const groupMeta = ACTION_EFFECT_GROUPS.find((g) => g.id === option.group)
+    const name =
+      option.value === "bonus_damage_riders"
+        ? "Activated Bonus Damage Riders"
+        : option.value === "damage_reduction"
+          ? "Activated Resistance / Immunity / Reduction"
+          : option.label
+    const summary =
+      option.value === "bonus_damage_riders"
+        ? "Activated feature menu: choose a costed or triggered damage rider (Cunning Strike / Brutal Strike)"
+        : option.value === "damage_reduction"
+          ? "Activated mitigation: resistance, immunity, Evasion, Uncanny Dodge, or a one-use reduction"
+          : groupMeta
+            ? `${groupMeta.label} — ${option.label}`
+            : option.label
     entries.push({
       id: catalogId("fx", option.value),
-      name: option.label,
+      name,
       group: ACTION_EFFECT_GROUP[option.group] ?? "Active abilities",
-      summary: groupMeta ? `${groupMeta.label} — ${option.label}` : option.label,
+      summary,
       activation: {
         effects: [{ id: `fx_${option.value}`, kind: option.value }],
       },
@@ -249,7 +286,7 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
     id: catalogId("other", "gain_inspiration"),
     name: "Gain Inspiration",
     group: "Other",
-    summary: "Passive: gain Heroic Inspiration",
+    summary: "Narrative marker: gain Heroic Inspiration (no automatic sheet state change)",
     description:
       "<p>The character gains Heroic Inspiration. Configure when inspiration is granted in the linked feature or trait description (e.g. after a long rest, or when rolling a natural 1 on a d20).</p>",
   })
@@ -368,7 +405,9 @@ export function groupModifierCatalogEntries(catalog: ModifierCatalogEntry[]): {
   )
 
   if (otherEntries.length > 0) {
-    grouped.push({ group: "Other", entries: otherEntries })
+    const otherSection = grouped.find((section) => section.group === "Other")
+    if (otherSection) otherSection.entries.push(...otherEntries)
+    else grouped.push({ group: "Other", entries: otherEntries })
   }
 
   return grouped

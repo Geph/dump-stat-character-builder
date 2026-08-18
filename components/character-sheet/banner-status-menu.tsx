@@ -10,10 +10,17 @@ type BannerStatusMenuProps = {
   className?: string
   /** When true, shows an active accent (e.g. inspiration / rage on). */
   active?: boolean
+  /** Number of active statuses to show as a corner badge. */
+  activeCount?: number
 }
 
 /** Compact chevron-only menu for Rest / Inspiration / Rage on the smallest phones. */
-export function BannerStatusMenu({ children, className, active = false }: BannerStatusMenuProps) {
+export function BannerStatusMenu({
+  children,
+  className,
+  active = false,
+  activeCount = 0,
+}: BannerStatusMenuProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -71,13 +78,18 @@ export function BannerStatusMenu({ children, className, active = false }: Banner
           openMenu()
         }}
         className={cn(
-          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 transition-colors",
-          active ? SHEET_BANNER_BUTTON.toggleActive : SHEET_BANNER_BUTTON.icon,
+          "relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 transition-colors",
+          active || activeCount > 0 ? SHEET_BANNER_BUTTON.toggleActive : SHEET_BANNER_BUTTON.icon,
           "text-muted-foreground",
           className,
         )}
       >
         <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+        {activeCount > 0 ? (
+          <span className="absolute -top-1 -right-1 flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-black leading-none text-primary-foreground">
+            {activeCount > 99 ? "99+" : activeCount}
+          </span>
+        ) : null}
       </button>
       {open && pos ? (
         <>
