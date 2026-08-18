@@ -1,6 +1,13 @@
 import fs from "node:fs"
 import path from "node:path"
 import sharp from "sharp"
+import {
+  flattenSourceBasenameToSlug,
+  kebabSlug,
+  parseSpellCardSourceBase,
+  parseSubclassSourceBasename,
+  stripCopySuffix,
+} from "./card-source-layout.mjs"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const ASSETS = process.env.PAGE_BG_SOURCES ?? path.join(ROOT, "scripts", "page-bg-sources")
@@ -101,53 +108,6 @@ function resolveSourcePath(basenames, assetsDir = ASSETS) {
   return null
 }
 
-/**
- * Source basenames → output basenames (without extension).
- * Keeps Drive’s `aasimar-2024` / `changeling-2024` masters while shipping canonical URLs.
- * MotM portraits stay year-suffixed (`aasimar-2022`, `changeling-2022`).
- */
-const CARD_OUTPUT_SLUG_ALIASES = {
-  "aasimar-2024": "aasimar",
-  "changeling-2024": "changeling",
-}
-
-/**
- * Spell source basename → output slug (after Title Case / version normalization).
- * Used for typos and shortened filenames that should match Kibbles import names.
- */
-const SPELL_CARD_OUTPUT_SLUG_ALIASES = {
-  "beam-of-annhilation": "beam-of-annihilation",
-  "dancing-object": "dancing-object-animate-object",
-  "terrific-transposition": "trarys-terrific-transposition",
-}
-
-/** Match lib/compendium/spell-card-images-defaults.ts spellNameToCardImageSlug. */
-function spellCardSourceToSlug(basename) {
-  return basename
-    .trim()
-    .toLowerCase()
-    .replace(/['\u2019]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-}
-
-/**
- * Parse spell card masters like "Mutate 2.png" / "Repair Front.png".
- * Trailing version numbers collapse to one slug; higher version wins (use the 2nd Mutate).
- */
-function parseSpellCardSourceBase(base) {
-  let stem = base.replace(/\s+Front$/i, "").trim()
-  let version = 0
-  const versionMatch = stem.match(/^(.*?)(?:\s+|-)(\d+)$/)
-  if (versionMatch) {
-    stem = versionMatch[1].trim()
-    version = Number(versionMatch[2])
-  }
-  const slug = spellCardSourceToSlug(stem)
-  const outputSlug = SPELL_CARD_OUTPUT_SLUG_ALIASES[slug] ?? slug
-  return { outputSlug, version }
-}
-
 function extensionRank(ext) {
   if (ext === ".png") return 0
   if (ext === ".webp") return 1
@@ -155,13 +115,7 @@ function extensionRank(ext) {
   return 9
 }
 
-/** Discover card sources by slug basename (supports nested dirs, e.g. artificer/reanimator). Prefer .png > .webp > .jpg/.jpeg when duplicates exist. */
-function discoverCardSlugs(sourcesDir) {
-  if (!fs.existsSync(sourcesDir)) return []
-  /** Prefer *-2024 aliased sources over a plain canonical file when both exist. */
-  const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
-  const byOutputSlug = new Map()
-
+function walkImageFiles(sourcesDir, onFile) {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue
@@ -172,27 +126,41 @@ function discoverCardSlugs(sourcesDir) {
       }
       const ext = path.extname(entry.name).toLowerCase()
       if (!EXTENSIONS.includes(ext)) continue
-      const rel = path.relative(sourcesDir, full)
-      const sourceSlug = rel.slice(0, -ext.length).split(path.sep).join("/")
-      if (!sourceSlug) continue
-      const parts = sourceSlug.split("/")
-      const base = parts[parts.length - 1]
-      const lowerBase = base.toLowerCase()
-      const aliasedBase = CARD_OUTPUT_SLUG_ALIASES[lowerBase] ?? CARD_OUTPUT_SLUG_ALIASES[base] ?? lowerBase
-      parts[parts.length - 1] = aliasedBase
-      const outputSlug = parts.join("/")
-      const prev = byOutputSlug.get(outputSlug)
-      if (
-        !prev ||
-        sourceRank(lowerBase) < sourceRank(prev.sourceSlug) ||
-        (sourceRank(lowerBase) === sourceRank(prev.sourceSlug) &&
-          extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
-      ) {
-        byOutputSlug.set(outputSlug, { path: full, sourceSlug: lowerBase })
-      }
+      onFile({ full, ext, base: entry.name.slice(0, -ext.length) })
     }
   }
   walk(sourcesDir)
+}
+
+function pickBetter(prev, next, rankNext, rankPrev) {
+  if (!prev) return true
+  if (rankNext < rankPrev) return true
+  if (rankNext === rankPrev && extensionRank(next.ext) < extensionRank(path.extname(prev.path).toLowerCase())) {
+    return true
+  }
+  return false
+}
+
+/** Flat class masters: `barbarian.png`, `Warden-Kibbles.png`. */
+function discoverCardSlugs(sourcesDir) {
+  if (!fs.existsSync(sourcesDir)) return []
+  const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
+  const byOutputSlug = new Map()
+
+  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+    const outputSlug = flattenSourceBasenameToSlug(base)
+    if (!outputSlug) return
+    const lowerBase = base.toLowerCase()
+    const prev = byOutputSlug.get(outputSlug)
+    if (
+      !prev ||
+      sourceRank(lowerBase) < sourceRank(prev.sourceSlug) ||
+      (sourceRank(lowerBase) === sourceRank(prev.sourceSlug) &&
+        extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
+    ) {
+      byOutputSlug.set(outputSlug, { path: full, sourceSlug: lowerBase })
+    }
+  })
 
   return [...byOutputSlug.entries()]
     .map(([slug, { path: full }]) => [slug, full])
@@ -200,44 +168,76 @@ function discoverCardSlugs(sourcesDir) {
 }
 
 /**
- * Spell cards: Title Case masters, optional " 2" / "Front" suffixes.
- * When Mutate 1 + Mutate 2 (etc.) exist, emit one slug and keep the higher version.
+ * Origin folders + Title Case names (`PHB/Artisan.png`, `Air Genasi.png`, `Dragonborn (1).png`).
+ * Output is always a flat slug — origin folders are organization only.
+ */
+function discoverFlatCardSlugs(sourcesDir) {
+  if (!fs.existsSync(sourcesDir)) return []
+  const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
+  const byOutputSlug = new Map()
+
+  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+    const outputSlug = flattenSourceBasenameToSlug(base)
+    if (!outputSlug) return
+    // Rank on the pre-alias slug so `aasimar-2024` still beats a plain `aasimar`.
+    const raw = kebabSlug(stripCopySuffix(base))
+    const prev = byOutputSlug.get(outputSlug)
+    if (pickBetter(prev, { ext }, sourceRank(raw), prev ? sourceRank(prev.sourceSlug) : 99)) {
+      byOutputSlug.set(outputSlug, { path: full, sourceSlug: raw })
+    }
+  })
+
+  return [...byOutputSlug.entries()]
+    .map(([slug, { path: full }]) => [slug, full])
+    .sort(([a], [b]) => a.localeCompare(b))
+}
+
+/**
+ * Origin folders + `Class Remainder.png` (`PHB/Bard Dance.png` → bard/college-of-dance).
+ */
+function discoverSubclassCardSlugs(sourcesDir) {
+  if (!fs.existsSync(sourcesDir)) return []
+  const byOutputSlug = new Map()
+
+  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+    const parsed = parseSubclassSourceBasename(base)
+    if (!parsed) {
+      console.warn(`  − skip unrecognized subclass source: ${base}`)
+      return
+    }
+    const outputSlug = `${parsed.classSlug}/${parsed.itemSlug}`
+    const prev = byOutputSlug.get(outputSlug)
+    if (!prev || extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase())) {
+      byOutputSlug.set(outputSlug, { path: full })
+    }
+  })
+
+  return [...byOutputSlug.entries()]
+    .map(([slug, { path: full }]) => [slug, full])
+    .sort(([a], [b]) => a.localeCompare(b))
+}
+
+/**
+ * Spell cards: Title Case masters in origin folders, optional " 2" / "Front" suffixes.
+ * Origin folders are ignored so outputs stay under public/images/compendium/spells/.
  */
 function discoverSpellCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
   const byOutputSlug = new Map()
 
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith(".")) continue
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory()) {
-        walk(full)
-        continue
-      }
-      const ext = path.extname(entry.name).toLowerCase()
-      if (!EXTENSIONS.includes(ext)) continue
-      const rel = path.relative(sourcesDir, full)
-      const sourcePathSlug = rel.slice(0, -ext.length).split(path.sep).join("/")
-      if (!sourcePathSlug) continue
-      const parts = sourcePathSlug.split("/")
-      const base = parts[parts.length - 1]
-      const { outputSlug: stemSlug, version } = parseSpellCardSourceBase(base)
-      if (!stemSlug) continue
-      parts[parts.length - 1] = stemSlug
-      const outputSlug = parts.join("/")
-      const prev = byOutputSlug.get(outputSlug)
-      if (
-        !prev ||
-        version > prev.version ||
-        (version === prev.version &&
-          extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
-      ) {
-        byOutputSlug.set(outputSlug, { path: full, version })
-      }
+  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+    const { outputSlug, version } = parseSpellCardSourceBase(base)
+    if (!outputSlug) return
+    const prev = byOutputSlug.get(outputSlug)
+    if (
+      !prev ||
+      version > prev.version ||
+      (version === prev.version &&
+        extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
+    ) {
+      byOutputSlug.set(outputSlug, { path: full, version })
     }
-  }
-  walk(sourcesDir)
+  })
 
   return [...byOutputSlug.entries()]
     .map(([slug, { path: full }]) => [slug, full])
@@ -455,15 +455,30 @@ if (readmeHeroInput) {
 }
 
 missing += await encodeCardBatch("Class card art", CLASS_CARD_SOURCES, CLASS_CARD_OUT)
-missing += await encodeCardBatch("Subclass card art", SUBCLASS_CARD_SOURCES, SUBCLASS_CARD_OUT)
+missing += await encodeCardBatch(
+  "Subclass card art",
+  SUBCLASS_CARD_SOURCES,
+  SUBCLASS_CARD_OUT,
+  CARD_WIDTH,
+  CARD_HEIGHT,
+  discoverSubclassCardSlugs,
+)
 missing += await encodeCardBatch(
   "Background card art",
   BACKGROUND_CARD_SOURCES,
   BACKGROUND_CARD_OUT,
   BACKGROUND_CARD_WIDTH,
   BACKGROUND_CARD_HEIGHT,
+  discoverFlatCardSlugs,
 )
-missing += await encodeCardBatch("Species card art", SPECIES_CARD_SOURCES, SPECIES_CARD_OUT)
+missing += await encodeCardBatch(
+  "Species card art",
+  SPECIES_CARD_SOURCES,
+  SPECIES_CARD_OUT,
+  CARD_WIDTH,
+  CARD_HEIGHT,
+  discoverFlatCardSlugs,
+)
 missing += await encodeCardBatch(
   "Spell card art",
   SPELL_CARD_SOURCES,

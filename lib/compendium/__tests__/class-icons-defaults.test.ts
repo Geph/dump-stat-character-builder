@@ -48,6 +48,13 @@ describe("class icon defaults", () => {
     expect(getCompendiumItemIcon("classes", { name: "Inventor" })).toBe("gears")
   })
 
+  it("uses the parent class icon for subclasses without an assigned icon", () => {
+    expect(
+      getCompendiumItemIcon("subclasses", { name: "College of Dance", class_name: "Bard" }),
+    ).toBe("musical-notes")
+    expect(getCompendiumItemIcon("subclasses", { name: "Champion" })).toBe("mounted-knight")
+  })
+
   it("stamps rear-aura onto imported Psion class rows without an icon", () => {
     const row = enrichImportedClassRow(
       {

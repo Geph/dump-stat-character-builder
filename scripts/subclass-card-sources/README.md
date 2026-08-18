@@ -4,31 +4,21 @@ Drop **full-resolution** subclass card art here, then run:
 npm run images:optimize
 ```
 
-Organize by **parent class** so same-named subclasses do not collide:
+Organize by **origin book/pack**, not by output path. Filenames are `{Class} {Remainder}.png`. Remainder can be a short label (`Life`, `Knowing`) or the full subclass name (`College of the Moon`). Origin folders are ignored when writing outputs.
 
 ```
 scripts/subclass-card-sources/
-  artificer/reanimator.png
-  necromancer/reanimator.png   # different art when available
-  barbarian/path-of-the-berserker.png
-  psion/knowing-mind.png
+  SRD/Cleric Life.png
+  PHB/Bard Dance.png
+  faerun/Bard College of the Moon.png
+  eberron/Artificer Alchemist.png
+  kibbles/Psion Knowing.png
+  acrana unleashed/Monk Mystric Arts.png
 ```
 
-Sources are matched by relative slug (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`). The optimizer discovers every nested slug — keep filenames as the output slug.
+The optimizer expands short remainders (`Cleric Light` → `cleric/light-domain`) and writes:
 
-Only convert art we are allowed to host:
-
-- **SRD** subclass portraits already under `scripts/graphics/subclass card images/SRD`
-- **PHB Barbarian** subclasses placed in `scripts/graphics/subclass card images/PHB` on purpose
-- **Artificer** masters under `scripts/graphics/subclass card images/Artificer`
-- **KibblesTasty** Inventor / Psion / extras
-- **Mage Hand Press** when a master exists
-
-Do **not** drop other PHB / Ravenloft / FRUA product art here. Those must not be committed under `public/images/compendium/subclasses/`.
-
-Output: `public/images/compendium/subclasses/{class-slug}/{subclass-slug}.png` at **771×1024** (**3:4** portrait, same as class/species card art).
-
-Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
+`public/images/compendium/subclasses/{class-slug}/{subclass-slug}.png` at **771×1024** (**3:4** portrait).
 
 Wire display names → class + slug in `lib/compendium/subclass-card-images-defaults.ts`.
 

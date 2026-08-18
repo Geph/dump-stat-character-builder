@@ -21,6 +21,7 @@ describe("species card images", () => {
         "Aasimar (2024)",
         "Air Genasi",
         "Astral Elf",
+        "Augmented",
         "Autognome",
         "Boggart",
         "Boggarts",
@@ -47,6 +48,7 @@ describe("species card images", () => {
         "Eladrin",
         "Elf",
         "Fairy",
+        "Farling",
         "Firbolg",
         "Fire Genasi",
         "Flamekin",
@@ -67,6 +69,7 @@ describe("species card images", () => {
         "Halfling",
         "Hexblood",
         "Human",
+        "Ironwrought",
         "Jhorgun'taal",
         "Jhorgun'taal (Half-Orc)",
         "Kalashtar",
@@ -173,27 +176,30 @@ describe("species card images", () => {
     }
   })
 
-  it("wires every scripts/species-card-sources slug into defaults or 2024 aliases", () => {
+  it("wires every scripts/species-card-sources slug into defaults or 2024 aliases", async () => {
     const sourcesDir = path.join(process.cwd(), "scripts/species-card-sources")
     if (!fs.existsSync(sourcesDir)) return
-    const sourceSlugs = fs
-      .readdirSync(sourcesDir)
-      .filter((entry) => /\.(png|jpe?g|webp)$/i.test(entry))
-      .map((entry) => path.basename(entry, path.extname(entry)))
-      .sort()
+    const { flattenSourceBasenameToSlug } = await import("../../../scripts/card-source-layout.mjs")
+    const sourceSlugs: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.startsWith(".")) continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+          continue
+        }
+        if (!/\.(png|jpe?g|webp)$/i.test(entry.name)) continue
+        sourceSlugs.push(flattenSourceBasenameToSlug(entry.name.replace(/\.[^.]+$/, "")))
+      }
+    }
+    walk(sourcesDir)
     const mappedSlugs = new Set(
       Object.values(SPECIES_CARD_IMAGES_BY_NAME).map((url) =>
         path.basename(url).replace(/\.png$/, ""),
       ),
     )
-    // Canonical outputs for *-2024 sources.
-    mappedSlugs.add("aasimar")
-    mappedSlugs.add("changeling")
-    const missing = sourceSlugs.filter((slug) => {
-      if (mappedSlugs.has(slug)) return false
-      if (slug.endsWith("-2024") && mappedSlugs.has(slug.replace(/-2024$/, ""))) return false
-      return true
-    })
+    const missing = [...new Set(sourceSlugs)].filter((slug) => slug && !mappedSlugs.has(slug)).sort()
     expect(missing, `unmapped source slugs: ${missing.join(", ")}`).toEqual([])
   })
 

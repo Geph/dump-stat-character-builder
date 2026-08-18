@@ -1,19 +1,21 @@
 Drop **full-resolution** species card art here, then run:
 
 ```bash
-pnpm images:optimize
+npm run images:optimize
 ```
 
-Sources are matched by slug basename (first extension wins among `.png` / `.jpg` / `.jpeg` / `.webp`).
+Basenames can be Title Case (`Air Genasi.png`), kebab-case (`halfling.png`), or Drive duplicates (`Dragonborn (1).png`). Origin folders, if present, are ignored when writing outputs.
 
-Examples: `elf`, `warforged`, `kalashtar`, `astral-elf`, `autognome`, `plasmoid`.
+Prefer `Aasimar-2024` / `Changeling-2024` for the canonical `aasimar` / `changeling` outputs.
+Use `Aasimar-2022` / `Changeling-2022` for MotM portraits (import names `Aasimar (2022)` / `Changeling (2022)`).
 
-Prefer `aasimar-2024` / `changeling-2024` source basenames for the canonical `aasimar` / `changeling` outputs.
-Use `aasimar-2022` / `changeling-2022` for MotM portraits (import names `Aasimar (2022)` / `Changeling (2022)`). True 2014 Volo’s-era art can be added later as `*-2014` if needed.
+Known filename aliases:
+
+- `Aasimar-2024` → `aasimar`
+- `Changeling-2024` → `changeling`
+- `Dhakanni Golin'dar` → `dhakaani-golindar`
 
 Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portrait).
-
-Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
 
 Wire display names → slugs in `lib/compendium/species-card-images-defaults.ts`.
 

@@ -58,6 +58,48 @@ describe("background card images", () => {
     }
   })
 
+  it("maps Eberron house heirs, House Agent, and Kibbles Engineer/Tinker", () => {
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Agent"]).toMatch(/house-agent\.png$/)
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Engineer).toMatch(/engineer\.png$/)
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME.Tinker).toMatch(/tinker\.png$/)
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Gate Guardian"]).toBe(
+      SRD_BACKGROUND_CARD_IMAGES_BY_NAME["Gate Warden"],
+    )
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Thurani Heir"]).toBe(
+      SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Thuranni Heir"],
+    )
+    expect(SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Tharashk"]).toBe(
+      SRD_BACKGROUND_CARD_IMAGES_BY_NAME["House Tharashk Heir"],
+    )
+  })
+
+  it("wires every scripts/background-card-sources slug into defaults", async () => {
+    const sourcesDir = path.join(process.cwd(), "scripts/background-card-sources")
+    if (!fs.existsSync(sourcesDir)) return
+    const { flattenSourceBasenameToSlug } = await import("../../../scripts/card-source-layout.mjs")
+    const sourceSlugs: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.startsWith(".")) continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+          continue
+        }
+        if (!/\.(png|jpe?g|webp)$/i.test(entry.name)) continue
+        sourceSlugs.push(flattenSourceBasenameToSlug(entry.name.replace(/\.[^.]+$/, "")))
+      }
+    }
+    walk(sourcesDir)
+    const mappedSlugs = new Set(
+      Object.values(SRD_BACKGROUND_CARD_IMAGES_BY_NAME).map((url) =>
+        path.basename(url).replace(/\.png$/, ""),
+      ),
+    )
+    const missing = [...new Set(sourceSlugs)].filter((slug) => slug && !mappedSlugs.has(slug)).sort()
+    expect(missing, `unmapped source slugs: ${missing.join(", ")}`).toEqual([])
+  })
+
   it("ships landscape 21:9 optimized files for every bundled background", async () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/backgrounds")
     const { default: sharp } = await import("sharp")

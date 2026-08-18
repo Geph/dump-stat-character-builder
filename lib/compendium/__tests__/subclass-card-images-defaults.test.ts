@@ -33,12 +33,53 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toBeNull()
   })
 
-  it("scopes Reanimator to Artificer and skips Ravenloft-only names", () => {
+  it("maps dropped PHB subclass sources by class and name", () => {
+    expect(defaultSubclassCardImageUrl("College of Dance", "Bard")).toMatch(
+      /\/images\/compendium\/subclasses\/bard\/college-of-dance\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("College of Spirits", "Bard")).toMatch(
+      /\/images\/compendium\/subclasses\/bard\/college-of-spirits\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Light Domain", "Cleric")).toMatch(
+      /\/images\/compendium\/subclasses\/cleric\/light-domain\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Trickery Domain", "Cleric")).toMatch(
+      /\/images\/compendium\/subclasses\/cleric\/trickery-domain\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Circle of the Moon", "Druid")).toMatch(
+      /\/images\/compendium\/subclasses\/druid\/circle-of-the-moon\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Battle Master", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/battle-master\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Psi Warrior", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/psi-warrior\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Warrior of Mercy", "Monk")).toMatch(
+      /\/images\/compendium\/subclasses\/monk\/warrior-of-mercy\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Banneret", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/banneret\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Mystic Arts", "Monk")).toMatch(
+      /\/images\/compendium\/subclasses\/monk\/mystic-arts\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Knowledge Domain", "Cleric")).toMatch(
+      /\/images\/compendium\/subclasses\/cleric\/knowledge-domain\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Eldritch Knight", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/eldritch-knight\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Arcane Archer", "Fighter")).toMatch(
+      /\/images\/compendium\/subclasses\/fighter\/arcane-archer\.png$/,
+    )
+  })
+
+  it("scopes Reanimator to Artificer and skips unmapped names", () => {
     expect(defaultSubclassCardImageUrl("Reanimator", "Artificer")).toMatch(
       /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
     )
     expect(defaultSubclassCardImageUrl("Reanimator", "Necromancer")).toBeNull()
-    expect(defaultSubclassCardImageUrl("College of Spirits", "Bard")).toBeNull()
     expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toBeNull()
     expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toBeNull()
   })
@@ -50,9 +91,10 @@ describe("subclass card images", () => {
     }
   })
 
-  it("wires every dropped scripts/subclass-card-sources slug into defaults", () => {
+  it("wires every dropped scripts/subclass-card-sources slug into defaults", async () => {
     const sourcesDir = path.join(process.cwd(), "scripts/subclass-card-sources")
     if (!fs.existsSync(sourcesDir)) return
+    const { parseSubclassSourceBasename } = await import("../../../scripts/card-source-layout.mjs")
 
     const sourceSlugs: string[] = []
     const walk = (dir: string) => {
@@ -64,9 +106,8 @@ describe("subclass card images", () => {
           continue
         }
         if (!/\.(png|jpe?g|webp)$/i.test(entry.name)) continue
-        const rel = path.relative(sourcesDir, full)
-        const slug = rel.replace(/\.[^.]+$/, "").split(path.sep).join("/")
-        sourceSlugs.push(slug)
+        const parsed = parseSubclassSourceBasename(entry.name.replace(/\.[^.]+$/, ""))
+        if (parsed) sourceSlugs.push(`${parsed.classSlug}/${parsed.itemSlug}`)
       }
     }
     walk(sourcesDir)
@@ -153,5 +194,19 @@ describe("subclass card images", () => {
         "Bard",
       ),
     ).toMatch(/\/bard\/college-of-lore\.png$/)
+    expect(
+      rewriteLegacyFlatSubclassCardImageUrl(
+        "/images/compendium/subclasses/cleric/light.png",
+        "Light Domain",
+        "Cleric",
+      ),
+    ).toMatch(/\/cleric\/light-domain\.png$/)
+    expect(
+      rewriteLegacyFlatSubclassCardImageUrl(
+        "/images/compendium/subclasses/druid/moon.png",
+        "Circle of the Moon",
+        "Druid",
+      ),
+    ).toMatch(/\/druid\/circle-of-the-moon\.png$/)
   })
 })

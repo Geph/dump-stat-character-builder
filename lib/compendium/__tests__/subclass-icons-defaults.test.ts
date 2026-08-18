@@ -2,8 +2,12 @@ import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
 import bundledSubclasses from "@/lib/srd/seed-data/subclasses.json"
+import { SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
 import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
-import { SRD_SUBCLASS_ICONS_BY_NAME } from "@/lib/compendium/subclass-icons-defaults"
+import {
+  defaultSubclassIconForName,
+  SRD_SUBCLASS_ICONS_BY_NAME,
+} from "@/lib/compendium/subclass-icons-defaults"
 
 describe("SRD subclass icon defaults", () => {
   it("maps every bundled SRD subclass to an installed game-icons slug", () => {
@@ -40,15 +44,36 @@ describe("SRD subclass icon defaults", () => {
     expect(row.icon).toBe(SRD_SUBCLASS_ICONS_BY_NAME["Circle of the Land"])
   })
 
-  it("does not apply defaults to custom homebrew subclasses", () => {
+  it("falls back to the parent class icon when no subclass icon is assigned", () => {
+    expect(defaultSubclassIconForName("College of Dance", "Bard")).toBe(
+      SRD_CLASS_ICONS_BY_NAME.Bard,
+    )
+    expect(defaultSubclassIconForName("Consuming Mind", "Psion")).toBe("rear-aura")
+    expect(defaultSubclassIconForName("Oath of Devotion", "Paladin")).toBe(
+      SRD_SUBCLASS_ICONS_BY_NAME["Oath of Devotion"],
+    )
+
     const row = enrichSrdSubclassRow(
       {
-        name: "Circle of the Land",
-        source: "Custom",
+        name: "College of Dance",
+        source: "Player's Handbook",
         features: [],
       },
-      "Druid",
+      "Bard",
     )
-    expect(row.icon).toBeUndefined()
+    expect(row.icon).toBe(SRD_CLASS_ICONS_BY_NAME.Bard)
+  })
+
+  it("keeps a stored custom icon instead of the class fallback", () => {
+    const row = enrichSrdSubclassRow(
+      {
+        name: "College of Dance",
+        source: "Custom",
+        features: [],
+        icon: "custom-icon",
+      },
+      "Bard",
+    )
+    expect(row.icon).toBe("custom-icon")
   })
 })

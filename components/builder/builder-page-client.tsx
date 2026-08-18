@@ -3379,10 +3379,10 @@ export default function BuilderPageClient() {
                                     ...displaySubclass,
                                     icon:
                                       displaySubclass.icon?.trim() ||
-                                      getCompendiumItemIcon(
-                                        "subclasses",
-                                        displaySubclass as unknown as Record<string, unknown>,
-                                      ),
+                                      getCompendiumItemIcon("subclasses", {
+                                        ...(displaySubclass as unknown as Record<string, unknown>),
+                                        class_name: cls.name,
+                                      }),
                                   }
 
                                   // Visual (cinematic) and compact (dense) both use selection cards —
@@ -6224,7 +6224,10 @@ export default function BuilderPageClient() {
             ...subclass,
             icon:
               subclass.icon?.trim() ||
-              getCompendiumItemIcon("subclasses", subclass as unknown as Record<string, unknown>),
+              getCompendiumItemIcon("subclasses", {
+                ...(subclass as unknown as Record<string, unknown>),
+                class_name: parentClass?.name,
+              }),
           }
           return (
             <CompendiumDetailOverlay

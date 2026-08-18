@@ -32,6 +32,30 @@ describe("enrichSubclassDisplayDefaults", () => {
     expect(row.card_image_url).toBe("https://example.com/custom.png")
   })
 
+  it("falls back to the parent class icon when the subclass has no assigned icon", () => {
+    const dance = enrichSubclassDisplayDefaults(
+      {
+        name: "College of Dance",
+        icon: null,
+        card_image_url: null,
+        source: "Player's Handbook",
+      },
+      "Bard",
+    )
+    expect(dance.icon).toBe("musical-notes")
+
+    const homebrew = enrichSubclassDisplayDefaults(
+      {
+        name: "Path of the Homebrew",
+        icon: null,
+        card_image_url: null,
+        source: "Custom",
+      },
+      "Barbarian",
+    )
+    expect(homebrew.icon).toBe("sharp-axe")
+  })
+
   it("fills Psion named card art with parent class regardless of source", () => {
     const row = enrichSubclassDisplayDefaults(
       {
@@ -69,5 +93,6 @@ describe("enrichSubclassDisplayDefaults", () => {
       "Barbarian",
     )
     expect(row.card_image_url).toBeNull()
+    expect(row.icon).toBe("sharp-axe")
   })
 })

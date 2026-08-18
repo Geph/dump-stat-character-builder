@@ -12,11 +12,9 @@ import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation
  * so same-named subclasses from different parent classes do not collide
  * (e.g. Artificer Reanimator vs Necromancer Reanimator).
  *
- * Only ship art converted from `scripts/graphics` (SRD uploads, PHB Barbarian
- * subclasses placed there on purpose, Artificer masters, Kibbles / Mage Hand Press).
- * Do not map other PHB / Ravenloft / FRUA product art.
- *
- * Masters for a re-optimize: `scripts/subclass-card-sources/{class-slug}/{subclass-slug}.*`
+ * Masters live in origin folders under `scripts/subclass-card-sources`
+ * (`PHB/Bard Dance.png`, `SRD/Cleric Life.png`, `kibbles/Psion Knowing.png`).
+ * Output stays `{class-slug}/{subclass-slug}.png`.
  */
 
 export function subclassClassSlug(className: string): string {
@@ -40,7 +38,7 @@ type SubclassCardImageEntry = {
 }
 
 const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
-  // SRD — scripts/graphics/subclass card images/SRD
+  // SRD
   { className: "Barbarian", name: "Path of the Berserker", slug: "path-of-the-berserker" },
   { className: "Bard", name: "College of Lore", slug: "college-of-lore" },
   { className: "Cleric", name: "Life Domain", slug: "life-domain" },
@@ -52,13 +50,35 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Rogue", name: "Thief", slug: "thief" },
   { className: "Sorcerer", name: "Draconic Sorcery", slug: "draconic-sorcery" },
   { className: "Warlock", name: "Fiend Patron", slug: "fiend-patron" },
+  { className: "Wizard", name: "Evoker", slug: "evoker" },
 
-  // PHB Barbarian — converted from scripts/graphics/subclass card images/PHB
+  // PHB
   { className: "Barbarian", name: "Path of the Wild Heart", slug: "path-of-the-wild-heart" },
   { className: "Barbarian", name: "Path of the World Tree", slug: "path-of-the-world-tree" },
   { className: "Barbarian", name: "Path of the Zealot", slug: "path-of-the-zealot" },
+  { className: "Bard", name: "College of Dance", slug: "college-of-dance" },
+  { className: "Bard", name: "College of Glamour", slug: "college-of-glamour" },
+  { className: "Bard", name: "College of Valor", slug: "college-of-valor" },
+  { className: "Cleric", name: "Light Domain", slug: "light-domain" },
+  { className: "Cleric", name: "Trickery Domain", slug: "trickery-domain" },
+  { className: "Cleric", name: "Trickster Domain", slug: "trickery-domain" },
+  { className: "Cleric", name: "War Domain", slug: "war-domain" },
+  { className: "Druid", name: "Circle of the Moon", slug: "circle-of-the-moon" },
+  { className: "Druid", name: "Circle of the Sea", slug: "circle-of-the-sea" },
+  { className: "Druid", name: "Circle of the Stars", slug: "circle-of-the-stars" },
+  { className: "Fighter", name: "Battle Master", slug: "battle-master" },
+  { className: "Fighter", name: "Eldritch Knight", slug: "eldritch-knight" },
+  { className: "Fighter", name: "Psi Warrior", slug: "psi-warrior" },
+  { className: "Monk", name: "Warrior of the Elements", slug: "warrior-of-the-elements" },
+  { className: "Monk", name: "Warrior of Mercy", slug: "warrior-of-mercy" },
+  { className: "Monk", name: "Warrior of Shadow", slug: "warrior-of-shadow" },
 
-  // Artificer — scripts/graphics/subclass card images/Artificer
+  // Heroes of Faerûn
+  { className: "Bard", name: "College of the Moon", slug: "college-of-the-moon" },
+  { className: "Cleric", name: "Knowledge Domain", slug: "knowledge-domain" },
+  { className: "Fighter", name: "Banneret", slug: "banneret" },
+
+  // Eberron
   { className: "Artificer", name: "Alchemist", slug: "alchemist" },
   { className: "Artificer", name: "Armorer", slug: "armorer" },
   { className: "Artificer", name: "Artillerist", slug: "artillerist" },
@@ -66,7 +86,22 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Artificer", name: "Cartographer", slug: "cartographer" },
   { className: "Artificer", name: "Forge Adept", slug: "forge-adept" },
   { className: "Artificer", name: "Maverick", slug: "maverick" },
+  { className: "Bard", name: "Dirge Singer", slug: "dirge-singer" },
+  { className: "Cleric", name: "Mind Domain", slug: "mind-domain" },
+  { className: "Druid", name: "Circle of the Forged", slug: "circle-of-the-forged" },
+  { className: "Monk", name: "Warrior of the Living Weapon", slug: "warrior-of-the-living-weapon" },
+  { className: "Monk", name: "Living Weapon", slug: "warrior-of-the-living-weapon" },
+
+  // Arcana Unleashed
+  { className: "Cleric", name: "Arcana Domain", slug: "arcana-domain" },
+  { className: "Fighter", name: "Arcane Archer", slug: "arcane-archer" },
+  { className: "Monk", name: "Mystic Arts", slug: "mystic-arts" },
+  { className: "Monk", name: "Way of the Mystic Arts", slug: "mystic-arts" },
+
+  // Ravenloft
   { className: "Artificer", name: "Reanimator", slug: "reanimator" },
+  { className: "Bard", name: "College of Spirits", slug: "college-of-spirits" },
+  { className: "Cleric", name: "Grave Domain", slug: "grave-domain" },
 
   // KibblesTasty Inventor
   { className: "Inventor", name: "Fleshsmith", slug: "fleshsmith" },
@@ -84,14 +119,13 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Psion", name: "Elemental Mind", slug: "elemental-mind" },
   { className: "Psion", name: "Knowing Mind", slug: "knowing-mind" },
   { className: "Psion", name: "Shaper's Mind", slug: "shapers-mind" },
-  { className: "Psion", name: "Shaper’s Mind", slug: "shapers-mind" }, // curly apostrophe
+  { className: "Psion", name: "Shaper’s Mind", slug: "shapers-mind" },
   { className: "Psion", name: "Transcended Mind", slug: "transcended-mind" },
   { className: "Psion", name: "Unleashed Mind", slug: "unleashed-mind" },
   { className: "Psion", name: "Wandering Mind", slug: "wandering-mind" },
 
   // KibblesTasty extras
   { className: "Rogue", name: "Gadgeteer", slug: "gadgeteer" },
-  { className: "Wizard", name: "Evoker", slug: "evoker" },
 ]
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {
@@ -193,6 +227,25 @@ export function isLegacyFlatSubclassCardImagePath(url: string): boolean {
 }
 
 /**
+ * First PHB drop used the filename remainder as the output slug (`cleric/light.png`).
+ * Canonical files now use the full display-name slug (`cleric/light-domain.png`).
+ */
+const SHORT_NESTED_SUBCLASS_SLUG_ALIASES: Record<string, string> = {
+  "cleric/arcana": "cleric/arcana-domain",
+  "cleric/grave": "cleric/grave-domain",
+  "cleric/knowledge": "cleric/knowledge-domain",
+  "cleric/light": "cleric/light-domain",
+  "cleric/mind": "cleric/mind-domain",
+  "cleric/trickery": "cleric/trickery-domain",
+  "cleric/trickster": "cleric/trickery-domain",
+  "cleric/war": "cleric/war-domain",
+  "druid/forged": "druid/circle-of-the-forged",
+  "druid/moon": "druid/circle-of-the-moon",
+  "druid/sea": "druid/circle-of-the-sea",
+  "druid/stars": "druid/circle-of-the-stars",
+}
+
+/**
  * Rewrite stale flat subclass card URLs to `{class}/{slug}` paths after the nesting migration.
  * Returns null when the flat file no longer exists and no nested mapping is known.
  */
@@ -203,6 +256,13 @@ export function rewriteLegacyFlatSubclassCardImageUrl(
 ): string | null {
   const existing = normalizeCardImageUrl(url)
   if (!existing) return null
+
+  const nested = existing.match(/\/images\/compendium\/subclasses\/([^/]+\/[^/]+)\.png$/i)
+  const nestedAlias = nested?.[1] ? SHORT_NESTED_SUBCLASS_SLUG_ALIASES[nested[1].toLowerCase()] : null
+  if (nestedAlias) {
+    return withBasePath(`/images/compendium/subclasses/${nestedAlias}.png`)
+  }
+
   if (!isLegacyFlatSubclassCardImagePath(existing)) return existing
 
   const fromClass = defaultSubclassCardImageUrl(String(subclassName ?? ""), className)

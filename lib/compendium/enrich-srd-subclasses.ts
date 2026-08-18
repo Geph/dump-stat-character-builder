@@ -2,10 +2,9 @@ import { enrichSubclassFeaturesWithResources } from "@/lib/compendium/class-reso
 import { enrichSubclassFeaturesWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import { enrichSubclassSpellTableFeatures } from "@/lib/compendium/enrich-subclass-spell-features"
 import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
-import { applySrdItemIcon } from "@/lib/compendium/srd-item-icons-defaults"
 import type { NamedSourceRow } from "@/lib/compendium/prefer-same-source"
 import { applyBundledSubclassCardImage } from "@/lib/compendium/subclass-card-images-defaults"
-import { SRD_SUBCLASS_ICONS_BY_NAME } from "@/lib/compendium/subclass-icons-defaults"
+import { applySubclassIcon } from "@/lib/compendium/subclass-icons-defaults"
 
 /** Apply SRD defaults to subclass feature rows (class resource links, modifier presets, icons, card art). */
 export function enrichSrdSubclassRow(
@@ -29,7 +28,7 @@ export function enrichSrdSubclassRow(
     : withPresets
   // Card art is keyed by parent class + subclass name (avoids Reanimator-style collisions).
   return applyBundledSubclassCardImage(
-    applySrdItemIcon(withSpells, SRD_SUBCLASS_ICONS_BY_NAME),
+    applySubclassIcon(withSpells, parentClassName),
     parentClassName,
   )
 }

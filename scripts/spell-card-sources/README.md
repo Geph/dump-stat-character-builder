@@ -1,17 +1,21 @@
 Drop **full-resolution** spell card art here, then run:
 
 ```bash
-pnpm images:optimize
+npm run images:optimize
 ```
 
-Sources are Title Case or kebab-case basenames. The optimizer slugifies them (spaces → hyphens), strips a trailing `Front`, and collapses version suffixes (`Mutate 1` / `Mutate 2` → `mutate`). **When multiple versions exist, the highest number wins** (use the second Mutate, etc.). Prefer `.png` over `.webp` / `.jpg` when versions tie.
+Organize by **origin** (`kibbles/`, `srd cantrips/`, …). Origin folders are ignored when writing outputs. Basenames can be Title Case (`Acid Splash.jpg`) or kebab-case (`green-flame-blade.png`).
 
-Examples: `Fire Bolt.png`, `Mutate 2.png`, `Awaken Rope 2.png`, `green-flame-blade.png`.
+The optimizer slugifies names, strips a trailing `Front`, and collapses version suffixes (`Mutate 1` / `Mutate 2` → `mutate`). **When multiple versions exist, the highest number wins.** Prefer `.png` over `.webp` / `.jpg` when versions tie.
 
-Masters are typically **2:3**; the optimizer cover-crops to **771×1024 (3:4)** portrait output.
+Known filename aliases:
 
-Backgrounds use **21:9** — see `scripts/background-card-sources/README.md`.
+- `sapre-the-dying` → `spare-the-dying`
+- `beam-of-annhilation` → `beam-of-annihilation`
+- `Terrific Transposition` → `trarys-terrific-transposition`
 
-Wire display names → slugs in `lib/compendium/spell-card-images-defaults.ts` (`BUNDLED_SPELL_CARD_IMAGE_NAMES`). Names must match Kibbles / SRD import rows exactly.
+Output: `public/images/compendium/spells/*.png` at **771×1024** (**3:4** portrait).
+
+Wire display names in `lib/compendium/spell-card-images-defaults.ts` (`BUNDLED_SPELL_CARD_IMAGE_NAMES`).
 
 Source files here are gitignored — only the optimized outputs in `public/images/` are committed.
