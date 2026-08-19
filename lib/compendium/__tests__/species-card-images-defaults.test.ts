@@ -9,6 +9,7 @@ import {
   SPECIES_CARD_IMAGES_BY_NAME,
   SRD_SPECIES_CARD_IMAGE_NAMES,
 } from "@/lib/compendium/species-card-images-defaults"
+import { isBundledPublicCardArtPath, publicCardArtPathFromUrl } from "../../../scripts/bundled-card-art.mjs"
 
 describe("species card images", () => {
   it("maps all bundled species art paths", () => {
@@ -23,6 +24,7 @@ describe("species card images", () => {
         "Astral Elf",
         "Augmented",
         "Autognome",
+        "Awakened Undead",
         "Boggart",
         "Boggarts",
         "Bugbear",
@@ -92,6 +94,7 @@ describe("species card images", () => {
         "Thri-kreen",
         "Tiefling",
         "Warforged",
+        "Warped",
         "Water Genasi",
       ].sort(),
     )
@@ -166,11 +169,13 @@ describe("species card images", () => {
     )
   })
 
-  it("ships an optimized image file for every mapped species", () => {
+  it("ships an optimized image file for every bundled species", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/species")
     for (const [name, url] of Object.entries(SPECIES_CARD_IMAGES_BY_NAME)) {
+      const repoRel = publicCardArtPathFromUrl(url)
+      if (!repoRel || !isBundledPublicCardArtPath(repoRel)) continue
       const file = path.basename(url)
-      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
+      expect(fs.existsSync(path.join(imagesDir, file)), `missing bundled art for ${name}: ${file}`).toBe(
         true,
       )
     }

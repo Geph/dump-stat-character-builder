@@ -18,3 +18,5 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 3. Prefer reasonable file sizes (hero images are large backgrounds; compress if needed).
 
 Game icons for the compendium live separately in `public/icons/` (SVGs).
+
+Compendium portraits under `compendium/` follow the same rule as the optimizer: **only SRD, Kibbles Tasty, and Mage Hand Press** files are committed. Other setting-book art can live here on your machine after `pnpm images:optimize` and is gitignored.

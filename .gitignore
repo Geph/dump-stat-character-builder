@@ -36,7 +36,7 @@ scripts/page-bg-sources/*
 !scripts/page-bg-sources/README.md
 !scripts/page-bg-sources/.gitkeep
 
-# Full-res compendium card sources (optimized outputs in public/ are committed)
+# Full-res compendium card sources (optimized outputs: only SRD / Kibbles / Mage Hand Press)
 scripts/class-card-sources/*
 !scripts/class-card-sources/README.md
 !scripts/class-card-sources/.gitkeep
@@ -52,6 +52,77 @@ scripts/species-card-sources/*
 scripts/spell-card-sources/*
 !scripts/spell-card-sources/README.md
 !scripts/spell-card-sources/.gitkeep
+
+# Non-bundled origin folders (PHB, settings books, extras) — never commit, even if
+# someone later un-ignores the drop folders above. Keep SRD / kibbles / magehandpress.
+scripts/**/PHB/
+scripts/**/phb/
+scripts/**/WotC/
+scripts/**/wotc/
+scripts/**/extra/
+scripts/**/eberron/
+scripts/**/Eberron/
+scripts/**/faerun/
+scripts/**/Faerun/
+scripts/**/ravenloft/
+scripts/**/Ravenloft/
+scripts/**/Ravenloft-Astarion/
+scripts/**/Planescape/
+scripts/**/acrana unleashed/
+scripts/**/Arcana Unleashed/
+
+# Optimized card art: ignore local-only portraits, then re-include bundled SRD / Kibbles / MHP.
+public/images/compendium/classes/artificer.png
+
+public/images/compendium/backgrounds/*
+!public/images/compendium/backgrounds/acolyte.png
+!public/images/compendium/backgrounds/apothecary.png
+!public/images/compendium/backgrounds/criminal.png
+!public/images/compendium/backgrounds/engineer.png
+!public/images/compendium/backgrounds/sage.png
+!public/images/compendium/backgrounds/soldier.png
+!public/images/compendium/backgrounds/tinker.png
+
+public/images/compendium/species/*
+!public/images/compendium/species/augmented.png
+!public/images/compendium/species/awakened-undead.png
+!public/images/compendium/species/dragonborn.png
+!public/images/compendium/species/dwarf.png
+!public/images/compendium/species/elf.png
+!public/images/compendium/species/farling.png
+!public/images/compendium/species/gnome.png
+!public/images/compendium/species/goliath.png
+!public/images/compendium/species/halfling.png
+!public/images/compendium/species/human.png
+!public/images/compendium/species/ironwrought.png
+!public/images/compendium/species/orc.png
+!public/images/compendium/species/tiefling.png
+!public/images/compendium/species/warped.png
+
+public/images/compendium/subclasses/**
+!public/images/compendium/subclasses/
+!public/images/compendium/subclasses/**/
+!public/images/compendium/subclasses/barbarian/path-of-the-berserker.png
+!public/images/compendium/subclasses/bard/college-of-lore.png
+!public/images/compendium/subclasses/cleric/life-domain.png
+!public/images/compendium/subclasses/druid/circle-of-the-land.png
+!public/images/compendium/subclasses/fighter/champion.png
+!public/images/compendium/subclasses/inventor/
+!public/images/compendium/subclasses/inventor/**
+!public/images/compendium/subclasses/monk/warrior-of-the-open-hand.png
+!public/images/compendium/subclasses/occultist/
+!public/images/compendium/subclasses/occultist/**
+!public/images/compendium/subclasses/paladin/oath-of-devotion.png
+!public/images/compendium/subclasses/psion/
+!public/images/compendium/subclasses/psion/**
+!public/images/compendium/subclasses/ranger/hunter.png
+!public/images/compendium/subclasses/rogue/gadgeteer.png
+!public/images/compendium/subclasses/rogue/thief.png
+!public/images/compendium/subclasses/sorcerer/draconic-sorcery.png
+!public/images/compendium/subclasses/warden/
+!public/images/compendium/subclasses/warden/**
+!public/images/compendium/subclasses/warlock/fiend-patron.png
+!public/images/compendium/subclasses/wizard/evoker.png
 # Local third-party / copyrighted import extracts (dev-only; never commit)
 lib/import/__tests__/fixtures/*eberron*
 lib/import/__tests__/fixtures/*homebrew*

@@ -49,7 +49,11 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Ranger", name: "Hunter", slug: "hunter" },
   { className: "Rogue", name: "Thief", slug: "thief" },
   { className: "Sorcerer", name: "Draconic Sorcery", slug: "draconic-sorcery" },
+  { className: "Sorcerer", name: "Aberrant Sorcery", slug: "aberrant-sorcery" },
+  { className: "Sorcerer", name: "Clockwork Sorcery", slug: "clockwork-sorcery" },
+  { className: "Sorcerer", name: "Wild Magic Sorcery", slug: "wild-magic-sorcery" },
   { className: "Warlock", name: "Fiend Patron", slug: "fiend-patron" },
+  { className: "Warlock", name: "Celestial Patron", slug: "celestial-patron" },
   { className: "Wizard", name: "Evoker", slug: "evoker" },
 
   // PHB
@@ -72,11 +76,25 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Monk", name: "Warrior of the Elements", slug: "warrior-of-the-elements" },
   { className: "Monk", name: "Warrior of Mercy", slug: "warrior-of-mercy" },
   { className: "Monk", name: "Warrior of Shadow", slug: "warrior-of-shadow" },
+  { className: "Paladin", name: "Oath of the Ancients", slug: "oath-of-the-ancients" },
+  { className: "Paladin", name: "Oath of Glory", slug: "oath-of-glory" },
+  { className: "Paladin", name: "Oath of Vengeance", slug: "oath-of-vengeance" },
+  { className: "Ranger", name: "Beast Master", slug: "beast-master" },
+  { className: "Ranger", name: "Beastmaster", slug: "beast-master" },
+  { className: "Ranger", name: "Fey Wanderer", slug: "fey-wanderer" },
+  { className: "Ranger", name: "Gloom Stalker", slug: "gloom-stalker" },
+  { className: "Rogue", name: "Assassin", slug: "assassin" },
+  { className: "Rogue", name: "Arcane Trickster", slug: "arcane-trickster" },
+  { className: "Rogue", name: "Soulknife", slug: "soulknife" },
+  { className: "Rogue", name: "Soul Knife", slug: "soulknife" },
 
   // Heroes of Faerûn
   { className: "Bard", name: "College of the Moon", slug: "college-of-the-moon" },
   { className: "Cleric", name: "Knowledge Domain", slug: "knowledge-domain" },
   { className: "Fighter", name: "Banneret", slug: "banneret" },
+  { className: "Paladin", name: "Oath of the Noble Genies", slug: "oath-of-the-noble-genies" },
+  { className: "Ranger", name: "Winter Walker", slug: "winter-walker" },
+  { className: "Rogue", name: "Scion of the Three", slug: "scion-of-the-three" },
 
   // Eberron
   { className: "Artificer", name: "Alchemist", slug: "alchemist" },
@@ -102,13 +120,17 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Artificer", name: "Reanimator", slug: "reanimator" },
   { className: "Bard", name: "College of Spirits", slug: "college-of-spirits" },
   { className: "Cleric", name: "Grave Domain", slug: "grave-domain" },
+  { className: "Ranger", name: "Warden", slug: "warden" },
+  { className: "Rogue", name: "Phantom", slug: "phantom" },
 
   // KibblesTasty Inventor
+  { className: "Inventor", name: "Cursesmith", slug: "cursesmith" },
   { className: "Inventor", name: "Fleshsmith", slug: "fleshsmith" },
   { className: "Inventor", name: "Gadgetsmith", slug: "gadgetsmith" },
   { className: "Inventor", name: "Golemsmith", slug: "golemsmith" },
   { className: "Inventor", name: "Infusionsmith", slug: "infusionsmith" },
   { className: "Inventor", name: "Potionsmith", slug: "potionsmith" },
+  { className: "Inventor", name: "Relicsmith", slug: "relicsmith" },
   { className: "Inventor", name: "Runesmith", slug: "runesmith" },
   { className: "Inventor", name: "Thundersmith", slug: "thundersmith" },
   { className: "Inventor", name: "Warsmith", slug: "warsmith" },
@@ -130,6 +152,9 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   // KibblesTasty Occultist
   { className: "Occultist", name: "Hedge Mage", slug: "hedge-mage" },
   { className: "Occultist", name: "Oracle", slug: "oracle" },
+  { className: "Occultist", name: "Shaman", slug: "shaman" },
+  { className: "Occultist", name: "Voidwatcher", slug: "voidwatcher" },
+  { className: "Occultist", name: "Witch", slug: "witch" },
 
   // KibblesTasty Warden
   { className: "Warden", name: "Astral Guardian", slug: "astral-guardian" },
@@ -149,6 +174,25 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {
   return `${className.trim()}::${subclassName.trim()}`
+}
+
+/**
+ * Seed/import may rename colliding classes (`Warden (Kibbles Tasty)`).
+ * Mage Hand Press Warden must not receive Kibbles bond art.
+ */
+export function subclassCardParentClassMatches(actual: string, mapped: string): boolean {
+  const a = actual.trim()
+  const m = mapped.trim()
+  if (!a || !m) return false
+  if (a.toLowerCase() === m.toLowerCase()) return true
+  if (/\bwarden\b/i.test(m) && /\bmage\s*hand|\bmhp\b/i.test(a)) return false
+  if (/\bwarden\b/i.test(a) && /\bmage\s*hand|\bmhp\b/i.test(m)) return false
+  const an = a.toLowerCase()
+  const mn = m.toLowerCase()
+  if (an.startsWith(`${mn} (`) || an.startsWith(`${mn} `)) return true
+  if (mn.startsWith(`${an} (`) || mn.startsWith(`${an} `)) return true
+  if (an.endsWith(` ${mn}`) || mn.endsWith(` ${an}`)) return true
+  return false
 }
 
 /** Keyed `ClassName::SubclassName` → bundled URL. */
@@ -190,6 +234,16 @@ export function defaultSubclassCardImageUrl(
     const lowerKey = subclassCardImageLookupKey(cls, trimmed).toLowerCase()
     for (const [key, url] of Object.entries(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME)) {
       if (key.toLowerCase() === lowerKey) return url
+    }
+    const lowerName = trimmed.toLowerCase()
+    for (const [key, url] of Object.entries(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME)) {
+      const sep = key.indexOf("::")
+      if (sep < 0) continue
+      const mappedClass = key.slice(0, sep)
+      const mappedName = key.slice(sep + 2)
+      if (mappedName.toLowerCase() === lowerName && subclassCardParentClassMatches(cls, mappedClass)) {
+        return url
+      }
     }
     return null
   }

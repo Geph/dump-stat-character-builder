@@ -24,6 +24,7 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Astral Elf": speciesCardImage("astral-elf"),
   Augmented: speciesCardImage("augmented"),
   Autognome: speciesCardImage("autognome"),
+  "Awakened Undead": speciesCardImage("awakened-undead"),
   Boggart: speciesCardImage("boggarts"),
   Boggarts: speciesCardImage("boggarts"),
   Bugbear: speciesCardImage("bugbear"),
@@ -94,6 +95,7 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Thri-kreen": speciesCardImage("thri-kreen"),
   Tiefling: speciesCardImage("tiefling"),
   Warforged: speciesCardImage("warforged"),
+  Warped: speciesCardImage("warped"),
   "Water Genasi": speciesCardImage("water-genasi"),
 }
 

@@ -22,4 +22,5 @@ The optimizer expands short remainders (`Cleric Light` → `cleric/light-domain`
 
 Wire display names → class + slug in `lib/compendium/subclass-card-images-defaults.ts`.
 
-Source files here are gitignored — only the optimized outputs in `public/images/` are committed.
+**GitHub only ships SRD, Kibbles Tasty, and Mage Hand Press art.** Put those masters in `SRD/`, `kibbles/`, or `magehandpress/` (aliases: `mage-hand-press`, `mhp`). Other origin folders (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, …) still optimize into `public/images/` on your machine; those outputs are gitignored and must not be committed. See the README “Local card art” section.
+

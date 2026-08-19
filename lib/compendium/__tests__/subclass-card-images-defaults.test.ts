@@ -9,6 +9,7 @@ import {
   SRD_SUBCLASS_CARD_IMAGES_BY_NAME,
   SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME,
 } from "@/lib/compendium/subclass-card-images-defaults"
+import { isBundledPublicCardArtPath } from "../../../scripts/bundled-card-art.mjs"
 
 describe("subclass card images", () => {
   it("stores art under parent-class subdirectories", () => {
@@ -38,6 +39,16 @@ describe("subclass card images", () => {
     )
     expect(defaultSubclassCardImageUrl("Timetwister", "Warden")).toMatch(
       /\/images\/compendium\/subclasses\/warden\/timetwister\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Elemental Soul", "Warden (Kibbles Tasty)")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/elemental-soul\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Dreadwing", "Warden (Kibbles Tasty)")).toMatch(
+      /\/images\/compendium\/subclasses\/warden\/dreadwing\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Elemental Soul", "Warden (Mage Hand Press)")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Hedge Mage", "KibblesTasty Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/hedge-mage\.png$/,
     )
     expect(defaultSubclassCardImageUrl("Evoker", "Wizard")).toMatch(
       /\/images\/compendium\/subclasses\/wizard\/evoker\.png$/,
@@ -91,6 +102,43 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Arcane Archer", "Fighter")).toMatch(
       /\/images\/compendium\/subclasses\/fighter\/arcane-archer\.png$/,
     )
+    expect(defaultSubclassCardImageUrl("Oath of Vengeance", "Paladin")).toMatch(
+      /\/images\/compendium\/subclasses\/paladin\/oath-of-vengeance\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Oath of the Noble Genies", "Paladin")).toMatch(
+      /\/images\/compendium\/subclasses\/paladin\/oath-of-the-noble-genies\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Beast Master", "Ranger")).toMatch(
+      /\/images\/compendium\/subclasses\/ranger\/beast-master\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Winter Walker", "Ranger")).toMatch(
+      /\/images\/compendium\/subclasses\/ranger\/winter-walker\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Warden", "Ranger")).toMatch(
+      /\/images\/compendium\/subclasses\/ranger\/warden\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Warden", "Warden (Kibbles Tasty)")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Soulknife", "Rogue")).toMatch(
+      /\/images\/compendium\/subclasses\/rogue\/soulknife\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Scion of the Three", "Rogue")).toMatch(
+      /\/images\/compendium\/subclasses\/rogue\/scion-of-the-three\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Cursesmith", "Inventor")).toMatch(
+      /\/images\/compendium\/subclasses\/inventor\/cursesmith\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Relicsmith", "Inventor")).toMatch(
+      /\/images\/compendium\/subclasses\/inventor\/relicsmith\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Witch", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/witch\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Voidwatcher", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/voidwatcher\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Shaman", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/shaman\.png$/,
+    )
   })
 
   it("scopes Reanimator to Artificer and skips unmapped names", () => {
@@ -98,14 +146,18 @@ describe("subclass card images", () => {
       /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
     )
     expect(defaultSubclassCardImageUrl("Reanimator", "Necromancer")).toBeNull()
-    expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toMatch(
+      /\/images\/compendium\/subclasses\/rogue\/phantom\.png$/,
+    )
     expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toBeNull()
   })
 
-  it("ships an optimized image file for every mapped subclass", () => {
+  it("ships an optimized image file for every bundled subclass", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/subclasses")
     for (const rel of listSubclassCardImageRelativePaths()) {
-      expect(fs.existsSync(path.join(imagesDir, rel)), `missing art: ${rel}`).toBe(true)
+      const repoRel = `public/images/compendium/subclasses/${rel}`
+      if (!isBundledPublicCardArtPath(repoRel)) continue
+      expect(fs.existsSync(path.join(imagesDir, rel)), `missing bundled art: ${rel}`).toBe(true)
     }
   })
 
@@ -173,7 +225,7 @@ describe("subclass card images", () => {
     )
     const dreadwing = enrichSrdSubclassRow(
       { name: "Dreadwing", source: "KibblesTasty Warden", features: [] },
-      "Warden",
+      "Warden (Kibbles Tasty)",
     )
     expect(hedgeMage.card_image_url).toBe(defaultSubclassCardImageUrl("Hedge Mage", "Occultist"))
     expect(dreadwing.card_image_url).toBe(defaultSubclassCardImageUrl("Dreadwing", "Warden"))

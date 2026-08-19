@@ -9,6 +9,7 @@ const bundledBackgroundCardImage = (slug: string) =>
  */
 export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Acolyte: bundledBackgroundCardImage("acolyte"),
+  Apothecary: bundledBackgroundCardImage("apothecary"),
   Archaeologist: bundledBackgroundCardImage("archaeologist"),
   Artisan: bundledBackgroundCardImage("artisan"),
   Carouser: bundledBackgroundCardImage("carouser"),

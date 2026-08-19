@@ -208,10 +208,10 @@ Optional **Seed Example Content** packs, kept separate from SRD seed. See `lib/s
 | `scripts/build-srd-seed.mjs` (via `pnpm srd:build`) | Download CC-BY SRD markdown → `lib/srd/seed-data/` |
 | `scripts/homebrew-import-ops.ts` | Audit / merge Drive import JSON |
 | `scripts/build-example-seed-packs.ts` | Rebuild publisher example packs from local Drive JSON |
-| `scripts/*-card-sources/` | Full-resolution card art drop folders (**gitignored** except README). `pnpm images:optimize` writes `public/images/compendium/` |
+| `scripts/*-card-sources/` | Full-resolution card art drop folders (**gitignored** except README). `pnpm images:optimize` writes `public/images/compendium/`; only SRD / Kibbles / Mage Hand Press outputs are committed |
 | `scripts/page-bg-sources/` | Theme / marketing image sources (gitignored); outputs under `public/images/` |
 | `public/icons/` | game-icons.net SVGs + `manifest.json` |
-| `public/images/compendium/` | Optimized card defaults used when a row has no custom art |
+| `public/images/compendium/` | Optimized card defaults. GitHub has SRD + Kibbles + Mage Hand Press only; other origins stay local |
 
 ---
 
@@ -276,9 +276,10 @@ Enrichment packs under `lib/import/enrichment-presets/packs/` are Dump Stat wiri
 ### 7. Card art and marketing images
 
 - **Custom art the user attaches** (upload or URL) stays on that user’s data. Image-only import updates `card_image_url` and does not rewrite rules.
-- **Full-resolution drop folders** (`scripts/*-card-sources/`, `scripts/page-bg-sources/`) are gitignored. Only optimized outputs under `public/images/` are committed.
+- **Full-resolution drop folders** (`scripts/*-card-sources/`, `scripts/page-bg-sources/`) are gitignored.
+- **Optimized card art on GitHub** is limited to **SRD**, **Kibbles Tasty**, and **Mage Hand Press**. PHB / Eberron / Ravenloft / Faerûn / other setting portraits still optimize locally (`pnpm images:optimize`) and stay gitignored. See the README “Local card art” section.
 - **Leftover remote WotC dumpstat hosts** (`/dumpstat/wotc/…`) are treated as old defaults and replaced or cleared (`lib/compendium/card-image.ts`). User-hosted paths such as `/dumpstat/images/…` are kept.
-- Bundled `/images/compendium/…` portraits are **local UI defaults**, not SRD text. Subclass defaults are limited to art converted from `scripts/graphics` (SRD uploads, PHB Barbarian subclasses placed there on purpose) plus Kibbles / Mage Hand Press. PHB / Eberron / Ravenloft / FRUA product art is not hosted. Users can attach their own licensed art on import.
+- Bundled `/images/compendium/…` portraits that *are* committed are **local UI defaults**, not SRD rules text. Users can attach their own licensed art on import.
 
 ### 8. Trademarks and privacy
 

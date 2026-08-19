@@ -19,4 +19,4 @@ Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portr
 
 Wire display names → slugs in `lib/compendium/species-card-images-defaults.ts`.
 
-Source files here are gitignored — only the optimized outputs in `public/images/` are committed.
+Source files here are gitignored. GitHub only ships SRD 2024 species portraits plus Kibbles species (Augmented, Awakened Undead, Farling, Ironwrought, Warped). Organize future Kibbles/MHP/SRD masters under those origin folder names when you add them.

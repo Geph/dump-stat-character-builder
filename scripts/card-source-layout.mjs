@@ -119,12 +119,38 @@ const SUBCLASS_SHORT_TO_DISPLAY = {
   },
   Paladin: {
     Devotion: "Oath of Devotion",
+    Ancients: "Oath of the Ancients",
+    Glory: "Oath of Glory",
+    Vengeance: "Oath of Vengeance",
+    Vengence: "Oath of Vengeance",
+    Genies: "Oath of the Noble Genies",
+  },
+  Ranger: {
+    Beastmaster: "Beast Master",
+    "Beast Master": "Beast Master",
+    "Fey Wanderer": "Fey Wanderer",
+    "Gloom Stalker": "Gloom Stalker",
+    "Winter Walker": "Winter Walker",
+    Warden: "Warden",
+  },
+  Rogue: {
+    "Arcane Trickster": "Arcane Trickster",
+    Assassin: "Assassin",
+    "Soul Knife": "Soulknife",
+    Soulknife: "Soulknife",
+    "Scion of the Three": "Scion of the Three",
+    Phantom: "Phantom",
   },
   Sorcerer: {
     Draconic: "Draconic Sorcery",
+    Aberrent: "Aberrant Sorcery",
+    Aberrant: "Aberrant Sorcery",
+    Clockwork: "Clockwork Sorcery",
+    "Wild Magic": "Wild Magic Sorcery",
   },
   Warlock: {
     Fiend: "Fiend Patron",
+    Celestial: "Celestial Patron",
   },
   Psion: {
     Awakened: "Awakened Mind",

@@ -3,6 +3,7 @@ import path from "node:path"
 import { describe, expect, it } from "vitest"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { SRD_BACKGROUND_CARD_IMAGES_BY_NAME } from "@/lib/compendium/background-card-images-defaults"
+import { isBundledPublicCardArtPath, publicCardArtPathFromUrl } from "../../../scripts/bundled-card-art.mjs"
 
 describe("background card images", () => {
   it("maps PHB / SRD backgrounds to bundled local art", () => {
@@ -104,9 +105,11 @@ describe("background card images", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/backgrounds")
     const { default: sharp } = await import("sharp")
     for (const [name, url] of Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME)) {
+      const repoRel = publicCardArtPathFromUrl(url)
+      if (!repoRel || !isBundledPublicCardArtPath(repoRel)) continue
       const file = path.basename(url)
       const full = path.join(imagesDir, file)
-      expect(fs.existsSync(full), `missing art for ${name}: ${file}`).toBe(true)
+      expect(fs.existsSync(full), `missing bundled art for ${name}: ${file}`).toBe(true)
       const meta = await sharp(full).metadata()
       expect(meta.width, `${name} width`).toBe(1680)
       expect(meta.height, `${name} height`).toBe(720)

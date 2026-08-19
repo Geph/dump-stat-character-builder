@@ -17,4 +17,4 @@ Output: `public/images/compendium/backgrounds/*.png` at **1680×720** (**21:9** 
 
 Wire display names → slugs in `lib/compendium/background-card-images-defaults.ts`.
 
-Source files here are gitignored — only the optimized outputs in `public/images/` are committed.
+Source files here are gitignored. Commit optimized outputs only from `SRD/` and `Kibbles/` (and `magehandpress/` if you add MHP art). `PHB/`, `Eberron/`, `Ravenloft-Astarion/`, and `Planescape/` stay on your machine.

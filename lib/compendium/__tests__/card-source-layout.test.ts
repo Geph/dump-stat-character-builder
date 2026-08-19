@@ -30,6 +30,31 @@ describe("card source layout", () => {
       classSlug: "druid",
       itemSlug: "circle-of-the-forged",
     })
+    expect(parseSubclassSourceBasename("Paladin Vengence")).toMatchObject({
+      classSlug: "paladin",
+      itemSlug: "oath-of-vengeance",
+      displayName: "Oath of Vengeance",
+    })
+    expect(parseSubclassSourceBasename("Paladin Genies")).toMatchObject({
+      classSlug: "paladin",
+      itemSlug: "oath-of-the-noble-genies",
+      displayName: "Oath of the Noble Genies",
+    })
+    expect(parseSubclassSourceBasename("Ranger Beastmaster")).toMatchObject({
+      classSlug: "ranger",
+      itemSlug: "beast-master",
+      displayName: "Beast Master",
+    })
+    expect(parseSubclassSourceBasename("Rogue Soul Knife")).toMatchObject({
+      classSlug: "rogue",
+      itemSlug: "soulknife",
+      displayName: "Soulknife",
+    })
+    expect(parseSubclassSourceBasename("Ranger Warden")).toMatchObject({
+      classSlug: "ranger",
+      itemSlug: "warden",
+      displayName: "Warden",
+    })
   })
 
   it("flattens Title Case, Drive copies, and typo aliases", () => {

@@ -647,6 +647,45 @@ Track bugs and feature ideas in [GitHub Issues](https://github.com/Geph/v0-dump-
 
 ---
 
+## Local card art (optional)
+
+The public repo only ships card art for **SRD 5.2.1**, **Kibbles Tasty**, and **Mage Hand Press**. Other portraits (Player’s Handbook, Eberron, Ravenloft, Faerûn, and similar) can still run on *your* copy of the app; they are not committed or pushed.
+
+### Drop masters, then optimize
+
+1. Put **full-resolution** images in the matching drop folder. Origin subfolders are organization only; the optimizer writes a flat/nested slug under `public/images/compendium/`.
+
+| Drop folder | Typical filename | Optimized output |
+|-------------|------------------|------------------|
+| `scripts/subclass-card-sources/` | `{Class} {Remainder}.png` (e.g. `SRD/Cleric Life.png`, `kibbles/Psion Knowing.png`) | `public/images/compendium/subclasses/{class}/{slug}.png` at 771×1024 |
+| `scripts/class-card-sources/` | `{slug}.png` (e.g. `Kibbles/inventor.png`) | `public/images/compendium/classes/{slug}.png` at 771×1024 |
+| `scripts/species-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/species/{slug}.png` at 771×1024 |
+| `scripts/background-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/backgrounds/{slug}.png` at 1680×720 |
+| `scripts/spell-card-sources/` | Title Case basename | `public/images/compendium/spells/{slug}.png` at 771×1024 |
+| `scripts/page-bg-sources/` | Theme / hero / feature basenames | `public/images/page-backgrounds/`, `hero/`, `features/`, `welcome-splash/` |
+
+2. Use these **origin folder names** when you want GitHub-eligible art (after optimize):
+
+- `SRD/` (spell cantrips may use `srd cantrips/`)
+- `kibbles/`
+- `magehandpress/` (also `mage-hand-press/` or `mhp/`)
+
+Anything else (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, `WotC/`, …) is compressed for local use only.
+
+3. Run:
+
+```bash
+pnpm images:optimize
+```
+
+The script tags local-only outputs as `[local-only, not for GitHub]`. Do **not** `git add` those files. `.gitignore` already excludes them. After optimize, only commit new or updated files under the bundled origins (SRD / Kibbles / Mage Hand Press).
+
+4. Map display names in the matching `lib/compendium/*-card-images-defaults.ts` file so import and compendium browse pick up the portrait.
+
+Masters in `scripts/*-card-sources/` stay gitignored (they are large). Keep a local backup of those folders; cloning the repo does not restore PHB-style sources.
+
+---
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branch naming, and PR expectations, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.

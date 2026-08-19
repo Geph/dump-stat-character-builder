@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
+import { isBundledPublicCardArtPath, publicCardArtPathFromUrl } from "../../../scripts/bundled-card-art.mjs"
 
 const EXPECTED_CLASS_NAMES = [
   "Artificer",
@@ -38,11 +39,13 @@ describe("class card images", () => {
     )
   })
 
-  it("ships an optimized image file for every mapped class", () => {
+  it("ships an optimized image file for every bundled class", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/classes")
     for (const [name, url] of Object.entries(SRD_CLASS_CARD_IMAGES_BY_NAME)) {
+      const repoRel = publicCardArtPathFromUrl(url)
+      if (!repoRel || !isBundledPublicCardArtPath(repoRel)) continue
       const file = path.basename(url)
-      expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
+      expect(fs.existsSync(path.join(imagesDir, file)), `missing bundled art for ${name}: ${file}`).toBe(
         true,
       )
     }

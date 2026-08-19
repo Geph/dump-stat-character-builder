@@ -8,6 +8,7 @@ import {
   parseSubclassSourceBasename,
   stripCopySuffix,
 } from "./card-source-layout.mjs"
+import { isBundledPublicCardArtPath } from "./bundled-card-art.mjs"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const ASSETS = process.env.PAGE_BG_SOURCES ?? path.join(ROOT, "scripts", "page-bg-sources")
@@ -329,6 +330,8 @@ async function encodeCardBatch(
     return 0
   }
   let missing = 0
+  let bundled = 0
+  let localOnly = 0
   for (const [slug, input] of entries) {
     const output = path.join(outDir, `${slug}.png`)
     fs.mkdirSync(path.dirname(output), { recursive: true })
@@ -339,13 +342,22 @@ async function encodeCardBatch(
         width,
         height,
       )
+      const repoRel = path.relative(ROOT, output).replace(/\\/g, "/")
+      const ship = isBundledPublicCardArtPath(repoRel)
+      if (ship) bundled += 1
+      else localOnly += 1
       console.log(
-        `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+        `  ${slug}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]${ship ? "" : " [local-only, not for GitHub]"}`,
       )
     } catch (error) {
       console.error(`  ✗ ${slug}: ${error instanceof Error ? error.message : error}`)
       missing += 1
     }
+  }
+  if (entries.length > 0) {
+    console.log(
+      `  → ${bundled} bundled (SRD / Kibbles / Mage Hand Press) · ${localOnly} local-only (gitignored)`,
+    )
   }
   return missing
 }
