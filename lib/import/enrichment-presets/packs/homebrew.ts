@@ -342,6 +342,114 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    id: "psion.subclass.mind_reader",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^mind reader$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["modify_custom_ability"],
+        preset: {
+          kind: "char_instance",
+          idKey: "mind_reader_upgrade",
+          catalogRefId: "cat_char_modify_custom_ability",
+          characteristics: [
+            {
+              id: "mod_mind_reader_upgrade",
+              type: "modify_custom_ability",
+              abilityNames: ["Telepathic Intrusion"],
+              addendum:
+                "Mind Reader: you can force the target to make an Intelligence saving throw instead of a Wisdom saving throw, deciding when you use the ability. When a creature fails a saving throw against your Telepathic Intrusion you gain a d4; until the end of your next turn you can add or subtract it from an attack roll against that creature, or from a saving throw it makes against another of your psionic powers, deciding before the roll.",
+              label: "Mind Reader",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.astral_metastability",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^astral metastability$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["modify_custom_ability"],
+        preset: {
+          kind: "char_instance",
+          idKey: "astral_metastability_upgrade",
+          catalogRefId: "cat_char_modify_custom_ability",
+          characteristics: [
+            {
+              id: "mod_astral_metastability_upgrade",
+              type: "modify_custom_ability",
+              abilityNames: ["Astral Construct"],
+              addendum:
+                "Astral Metastability: this construct does not require concentration to maintain and lasts until dismissed, but you cannot summon another Astral Construct while one is summoned.",
+              label: "Astral Metastability",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.phase_dancer",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^phase dancer$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["modify_custom_ability"],
+        preset: {
+          kind: "char_instance",
+          idKey: "phase_dancer_upgrade",
+          catalogRefId: "cat_char_modify_custom_ability",
+          characteristics: [
+            {
+              id: "mod_phase_dancer_upgrade",
+              type: "modify_custom_ability",
+              abilityNames: ["Phase Rift"],
+              addendum:
+                "Phase Dancer: once per turn, using this power automatically gains you one illusory duplicate, as from the Blurring modifier, and your first attack roll before the end of your turn after using it has advantage.",
+              label: "Phase Dancer",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "psion.subclass.winding_paths",
+    pack: "psion",
+    target: "subclass_feature",
+    match: { subclassClassName: /psion/i, name: /^winding paths$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["modify_custom_ability"],
+        preset: {
+          kind: "char_instance",
+          idKey: "winding_paths_upgrade",
+          catalogRefId: "cat_char_modify_custom_ability",
+          characteristics: [
+            {
+              id: "mod_winding_paths_upgrade",
+              type: "modify_custom_ability",
+              abilityNames: ["Phase Rift"],
+              addendum:
+                "Winding Paths: this power no longer has to travel in a straight line, though it can pass through a creature's space only once.",
+              label: "Winding Paths",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     id: "psion.subclass.rampage_die",
     pack: "psion",
     target: "subclass_feature",

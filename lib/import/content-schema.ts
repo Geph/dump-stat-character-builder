@@ -315,6 +315,8 @@ export const ImportMechanicSchema = z.object({
   expiresOnTriggerEnd: z.boolean().optional(),
   /** grant_custom_ability — names of custom abilities / formulas / discoveries to unlock. */
   abilityNames: z.array(z.string()).optional(),
+  /** modify_custom_ability — upgrade text appended to each named ability. */
+  abilityAddendum: z.string().optional(),
   /** speed hover */
   canHover: z.boolean().optional(),
   /** turn_start_trigger */

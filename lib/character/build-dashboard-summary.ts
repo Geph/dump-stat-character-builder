@@ -4,6 +4,7 @@ import { collectFeatureUsesResources } from "@/lib/character/collect-feature-use
 import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/character/compute-derived"
 import type { DashboardHydratedCharacter, DashboardCharacterRecord } from "@/lib/character/hydrate-dashboard"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
+import { applyCustomAbilityModifications } from "@/lib/character/modify-custom-ability"
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
 import {
   formSelectionsFromState,
@@ -239,25 +240,28 @@ function buildCompanionSummaries(
   const spellSaveDc = spellcastingAbilityKey ? 8 + proficiencyBonus + spellAbilityMod : null
   const spellAttackMod = spellcastingAbilityKey ? proficiencyBonus + spellAbilityMod : null
 
-  const sheetCustomAbilities = filterCustomAbilitiesForCharacterSheet(customAbilities, {
-    classIds: classDetails.map((entry) => entry.row.class_id),
-    classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
-    subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
-    subclassNames: classDetails.map((entry) => entry.subclass?.name).filter(Boolean) as string[],
-    speciesId: character.species_id ?? null,
-    speciesName: character.species?.name ?? null,
-    backgroundId: character.background_id ?? null,
-    backgroundName: character.backgrounds?.name ?? null,
-    featIds: character.feat_ids ?? [],
-    featNames: hydrated.feats.map((feat) => feat.name),
-    equipmentIds: character.equipment_ids ?? [],
-    equipmentCategories: hydrated.equipment.map((item) => item.category),
-    spellIds: character.spell_ids ?? [],
-    selectedAbilityNames: collectSelectedCustomAbilityNames({
-      featureChoicePicks: character.feature_choice_picks ?? {},
-      grantedCustomAbilityNames: derived.grantedCustomAbilityNames,
+  const sheetCustomAbilities = applyCustomAbilityModifications(
+    filterCustomAbilitiesForCharacterSheet(customAbilities, {
+      classIds: classDetails.map((entry) => entry.row.class_id),
+      classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
+      subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
+      subclassNames: classDetails.map((entry) => entry.subclass?.name).filter(Boolean) as string[],
+      speciesId: character.species_id ?? null,
+      speciesName: character.species?.name ?? null,
+      backgroundId: character.background_id ?? null,
+      backgroundName: character.backgrounds?.name ?? null,
+      featIds: character.feat_ids ?? [],
+      featNames: hydrated.feats.map((feat) => feat.name),
+      equipmentIds: character.equipment_ids ?? [],
+      equipmentCategories: hydrated.equipment.map((item) => item.category),
+      spellIds: character.spell_ids ?? [],
+      selectedAbilityNames: collectSelectedCustomAbilityNames({
+        featureChoicePicks: character.feature_choice_picks ?? {},
+        grantedCustomAbilityNames: derived.grantedCustomAbilityNames,
+      }),
     }),
-  })
+    derived.customAbilityModifications,
+  )
 
   const ctx = {
     abilityMods,

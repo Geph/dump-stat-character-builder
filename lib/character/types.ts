@@ -187,6 +187,8 @@ export type DerivedCharacter = {
   extraTurns: import("@/lib/compendium/characteristic-modifiers").ExtraTurnCharacteristic[]
   healingReceivedModifiers: import("@/lib/compendium/characteristic-modifiers").HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
+  /** Upgrades applied to custom abilities the character already knows. */
+  customAbilityModifications: import("@/lib/compendium/characteristic-modifiers").ModifyCustomAbilityCharacteristic[]
   featureChoiceCountBonuses: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceCountBonusCharacteristic[]
   featureChoiceOptionGrants: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceOptionGrantCharacteristic[]
   powerRiders: import("@/lib/compendium/characteristic-modifiers").PowerRiderCharacteristic[]

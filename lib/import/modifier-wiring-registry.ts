@@ -57,6 +57,7 @@ export const AI_MECHANIC_KINDS = [
   "ability_score_override",
   "healing_received_modifier",
   "grant_custom_ability",
+  "modify_custom_ability",
   "feature_choice_count_bonus",
   "power_rider",
   "failed_roll_trigger",

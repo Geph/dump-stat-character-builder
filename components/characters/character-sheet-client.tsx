@@ -181,6 +181,7 @@ import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-a
 import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
+import { applyCustomAbilityModifications } from "@/lib/character/modify-custom-ability"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -1902,7 +1903,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       featureChoicePicks,
       grantedAbilityNames: derived?.grantedCustomAbilityNames,
     })
-    return filterCustomAbilitiesForCharacterSheet(customAbilities, {
+    const visible = filterCustomAbilitiesForCharacterSheet(customAbilities, {
       classIds: classDetails.map((entry) => entry.row.class_id),
       classNames: classDetails.map((entry) => entry.class?.name).filter(Boolean) as string[],
       subclassIds: classDetails.map((entry) => entry.row.subclass_id).filter(Boolean) as string[],
@@ -1926,6 +1927,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       selectedAbilityNames,
       knownDisciplineNames,
     })
+    return applyCustomAbilityModifications(visible, derived?.customAbilityModifications ?? [])
   }, [
     customAbilities,
     character,
@@ -1935,6 +1937,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equipment,
     featureChoicePicks,
     derived?.grantedCustomAbilityNames,
+    derived?.customAbilityModifications,
   ])
 
   const spellResourceCastCosts = useMemo(

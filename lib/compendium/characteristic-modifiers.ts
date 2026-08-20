@@ -261,6 +261,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Know / unlock a named custom ability (e.g. Telekinetic Weapons power)",
   },
   {
+    value: "modify_custom_ability",
+    label: "Modify Custom Ability",
+    hint: "Upgrade a named custom ability you already know (e.g. Phase Dancer improving Phase Rift)",
+  },
+  {
     value: "feature_choice_count_bonus",
     label: "Feature Choice Count Bonus",
     hint: "Extra picks for a named feature or choice category (Unlimited Imagination, Skill Thief)",
@@ -1290,6 +1295,20 @@ export interface GrantCustomAbilityCharacteristic extends CharacteristicModifier
   abilityNames: string[]
 }
 
+/**
+ * Upgrade a named custom ability you already know, rather than granting a new one
+ * (Psion cross-power upgrades such as Phase Dancer improving Phase Rift).
+ */
+export interface ModifyCustomAbilityCharacteristic extends CharacteristicModifierBase {
+  type: "modify_custom_ability"
+  /** Custom abilities this upgrade applies to, by name. */
+  abilityNames: string[]
+  /** Text appended to the target ability wherever its description is shown. */
+  addendum?: string | null
+  /** Extra options appended to the target ability's own choice pool. */
+  appendOptions?: { name: string; description: string }[]
+}
+
 /** Extra picks for a feature choice pool (Unlimited Imagination, Skill Thief slots). */
 export interface FeatureChoiceCountBonusCharacteristic extends CharacteristicModifierBase {
   type: "feature_choice_count_bonus"
@@ -1372,6 +1391,7 @@ export type CharacteristicModifier =
   | AbilityScoreOverrideCharacteristic
   | HealingReceivedModifierCharacteristic
   | GrantCustomAbilityCharacteristic
+  | ModifyCustomAbilityCharacteristic
   | FeatureChoiceCountBonusCharacteristic
   | FeatureChoiceOptionGrantCharacteristic
   | SubclassUnlockCharacteristic
@@ -1567,6 +1587,8 @@ export function createCharacteristicModifier(
       return { id, type, multiplier: 0.5, magicalOnly: true, includePotions: true }
     case "grant_custom_ability":
       return { id, type, abilityNames: [] }
+    case "modify_custom_ability":
+      return { id, type, abilityNames: [], addendum: null, appendOptions: [] }
     case "feature_choice_count_bonus":
       return { id, type, targetFeatureName: null, choiceCategory: null, bonus: 1, bonusFrom: null }
     case "feature_choice_option_grant":
@@ -2222,6 +2244,7 @@ export type AggregatedCharacteristics = {
   abilityScoreOverrides: AbilityScoreOverrideCharacteristic[]
   healingReceivedModifiers: HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
+  customAbilityModifications: ModifyCustomAbilityCharacteristic[]
   featureChoiceCountBonuses: FeatureChoiceCountBonusCharacteristic[]
   featureChoiceOptionGrants: FeatureChoiceOptionGrantCharacteristic[]
 }
@@ -2320,6 +2343,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   abilityScoreOverrides: [],
   healingReceivedModifiers: [],
   grantedCustomAbilityNames: [],
+  customAbilityModifications: [],
   featureChoiceCountBonuses: [],
   featureChoiceOptionGrants: [],
 })
@@ -2835,6 +2859,9 @@ export function aggregateCharacteristics(
         break
       case "grant_custom_ability":
         pushUnique(result.grantedCustomAbilityNames, mod.abilityNames)
+        break
+      case "modify_custom_ability":
+        result.customAbilityModifications.push(mod)
         break
       case "feature_choice_count_bonus":
         result.featureChoiceCountBonuses.push(mod)

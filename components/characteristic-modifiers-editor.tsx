@@ -2930,6 +2930,51 @@ function ModifierFields({
         </div>
       )
 
+    case "modify_custom_ability":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Custom ability names to upgrade
+            </label>
+            <textarea
+              value={(mod.abilityNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  abilityNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Phase Rift"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Names must match exactly. This upgrades an ability the character already knows rather
+              than granting a new one.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Upgrade text
+            </label>
+            <textarea
+              value={mod.addendum ?? ""}
+              onChange={(e) => onChange({ ...mod, addendum: e.target.value || null })}
+              rows={3}
+              placeholder="Your Phase Rift no longer has to travel in a straight line."
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Appended wherever the ability&apos;s description is shown.
+            </p>
+          </div>
+        </div>
+      )
+
     case "feature_choice_count_bonus":
       return (
         <div className="space-y-3">

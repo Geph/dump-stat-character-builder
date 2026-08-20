@@ -1567,6 +1567,28 @@ function buildFromMechanic(
         ]),
       }
     }
+    case "modify_custom_ability": {
+      const abilityNames = (mechanic.abilityNames ?? [])
+        .map((name) => name.trim())
+        .filter(Boolean)
+      if (!abilityNames.length) return null
+      const addendum = mechanic.abilityAddendum?.trim() || matchedPhrase || null
+      if (!addendum) return null
+      return {
+        ruleId: "ai.modify_custom_ability",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("modify_custom_ability"), [
+          {
+            id: modId(instanceKey(ctx, "modify_custom_ability")),
+            type: "modify_custom_ability",
+            abilityNames,
+            addendum,
+            label: matchedPhrase || `Upgrades ${abilityNames.join(", ")}`,
+          },
+        ]),
+      }
+    }
     default:
       return null
   }
