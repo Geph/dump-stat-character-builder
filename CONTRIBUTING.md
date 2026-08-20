@@ -1,10 +1,10 @@
 # Contributing to Dump Stat
 
-Thank you for your interest in contributing. This guide covers local setup, pull request expectations, and where different kinds of changes belong in the codebase.
+Thanks for wanting to help. This guide is for people opening pull requests — setup, what we check before merge, and a few rules that keep the public repo clean.
 
 ## Getting started
 
-Follow the [Quick start](README.md#quick-start) section in the README:
+Follow [Quick start](README.md#quick-start) in the README:
 
 ```bash
 git clone https://github.com/Geph/dump-stat-character-builder.git
@@ -17,33 +17,27 @@ pnpm db:setup   # or apply mysql/schema.sql manually
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). If you use npm instead of pnpm: `npm install` and `npm run dev`.
+Open [http://localhost:3000](http://localhost:3000). With npm instead of pnpm: `npm install` and `npm run dev`.
 
-## Checks before opening a pull request
+## Checks before you push
 
-Install the repository's pre-push gate once per clone:
+Install the local pre-push gate once per clone:
 
 ```bash
 pnpm hooks:install
 ```
 
-Every normal `git push` then runs the same checks as both CI jobs and blocks the
-push on the first failure:
+A normal `git push` then runs the same checks as CI and blocks on the first failure:
 
 ```bash
 pnpm verify:ci
 ```
 
-That includes the MySQL dependency audit, ESLint, TypeScript, the full Vitest
-suite, all modifier/SRD audits, and the static export. A successful result is
-cached for that commit, so retrying the same push does not run it twice.
+That covers the MySQL dependency audit, ESLint, TypeScript, the Vitest suite, modifier/SRD audits, and the static export. A successful run is cached for that commit so retrying the same push does not redo the whole suite.
 
-Emergency bypass: `git push --no-verify`. Use it only when intentionally
-accepting that GitHub CI may fail.
+Emergency bypass: `git push --no-verify`. Use it only when you are intentionally accepting that GitHub CI may fail.
 
 ## Branch naming
-
-Use a short prefix that matches the kind of change:
 
 | Prefix | Use for |
 |--------|---------|
@@ -55,34 +49,43 @@ Examples: `feature/compendium-card-images`, `fix/builder-feat-slots`, `chore/ci-
 
 ## Pull request expectations
 
-- **Keep PRs small and focused** — one logical change per PR when possible.
+- **Keep PRs small and focused** — one logical change when you can.
 - **Link an issue** if one exists (`Fixes #123` or `Relates to #456`).
-- **Describe manual testing** — there is no automated test suite yet. List what you exercised (e.g. builder step X, compendium editor save, static build).
-- **Update the README** if user-facing behavior or setup steps changed.
-- **Do not bump the release version** — see [Updating the release version](README.md#updating-the-release-version) in the README. Contributors must not run `pnpm version:bump` or hand-edit `VERSION`, `package.json` `version`, or a “Current release” line in the README; that is maintainer-only after merge to `main`.
+- **Say how you tested** — note what you ran (for example `pnpm verify:ci`, or the builder / sheet / import steps you clicked through).
+- **Update the README** when setup steps or user-facing behavior change.
+- **Do not bump the release version** in a contributor PR — see [Updating the release version](#updating-the-release-version) below.
 
 ### SRD and rules accuracy
 
-Changes that affect SRD / 5E rules accuracy (class features, species traits, spell data, builder calculations, etc.) should cite the source in the PR description — for example the [SRD on D&D Beyond](https://www.dndbeyond.com/srd) section or page reference you used. Seed data is rebuilt from SRD 5.2.1 markdown via `pnpm srd:build`; see [lib/srd/README.md](lib/srd/README.md).
+Changes that affect SRD / 5E rules accuracy (class features, species traits, spell data, builder calculations, and so on) should cite the source in the PR description — for example the [SRD on D&D Beyond](https://www.dndbeyond.com/srd) section you used. Seed data is rebuilt from SRD 5.2.1 markdown via `pnpm srd:build`; see [lib/srd/README.md](lib/srd/README.md).
 
-## Where changes belong
+## What not to commit
 
-Use the [Project Structure](README.md#project-structure) section in the README as the map. In short:
+Please keep copyrighted and personal working files out of the public tree:
 
-| Area | Path | Examples |
-|------|------|----------|
-| **Pages & routes** | `app/` | Builder, compendium browser, character sheets, API routes under `app/api/` |
-| **UI components** | `components/` | Builder steps, compendium editors, selection cards, overlays, icon picker |
-| **Builder logic** | `lib/builder/` | Draft storage, ASI allocation, feat selection, equipment helpers, sheet calculations |
-| **Compendium logic** | `lib/compendium/` | Proficiencies, display helpers, effect metadata, theme colors, card images |
-| **SRD & seed data** | `lib/srd/`, `seed-data/` | Parsers, bundled SRD JSON consumed by import/seed |
-| **Database** | `lib/db/`, `mysql/` | Drizzle schema, migrations, MySQL DDL |
-| **Static / client data** | `lib/data/` | IndexedDB layer for `build:static` deployments |
-| **Import pipeline** | `lib/import/` | Normalization, export format, AI import helpers |
+- **Card art** — Only ship art you are allowed to distribute. GitHub-eligible optimized art comes from licensed/allowed source folders (for example `SRD/` under the card-source drop directories). Player’s Handbook and other setting-book portraits stay on your machine after `pnpm images:optimize`; do not `git add` those PNGs or `public/images/compendium/local-available-card-art.json`.
+- **Custom content folders** — If you add your own uniquely named art or import folders under `scripts/` or `public/images/compendium/`, leave them uncommitted; the app can still use them locally.
+- **Secrets** — Never commit `.env`, `.env.local`, API keys, or database passwords.
+- **Scratch files** — Skip local prompts, audit dumps, and temporary scripts unless the PR is deliberately adding a maintained tool.
 
-Put **UI** in `app/` and `components/`, **business rules and calculations** in `lib/builder/` and `lib/compendium/`, and **rulebook-style content** in compendium seed data (`seed-data/`, rebuilt with `pnpm srd:build`) or custom entries edited through the compendium UI.
+More on how the repo separates licensed content from local-only books: [docs/repository-overview.md](docs/repository-overview.md#copyright-and-licensing). Optional local art workflow: [README — Local card art](README.md#local-card-art-optional).
 
-GitHub-eligible class/subclass/background/species/spell/item art comes from `SRD/` source directories. Anything else should be compressed for local use only. Please do **not** `git add` PNGs or `public/images/compendium/local-available-card-art.json` for any copyrighted artworks. If you add art in your own new uniquely-named content folders in scripts or compendium they should remain uncommitted but still work.
+## Where everyday changes go
+
+A short map (see the [README project structure](README.md#project-structure) for the tree):
+
+| Kind of change | Start here |
+|----------------|------------|
+| Pages and API routes | `app/` |
+| UI (builder, sheet, compendium, import) | `components/` |
+| Builder / sheet rules and calculations | `lib/builder/`, `lib/character/` |
+| Catalog, modifiers, enrichment | `lib/compendium/` |
+| Import pipeline | `lib/import/` |
+| SRD seed | `lib/srd/` (rebuild with `pnpm srd:build`) |
+| Hosted database | `lib/db/`, `mysql/` |
+| Static / browser storage | `lib/data/` |
+
+Put UI in `app/` and `components/`, calculations in `lib/`, and rulebook-style content in seed data or the compendium UI — not hard-coded into a single class component.
 
 ## Code of conduct
 
@@ -90,7 +93,7 @@ This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By particip
 
 ## Updating the release version
 
-**Maintainers only** — do not bump version in contributor PRs.
+**Maintainers only** — do not bump the version in contributor PRs.
 
 After merging to `main`, run:
 
@@ -98,4 +101,4 @@ After merging to `main`, run:
 pnpm version:bump
 ```
 
-This increments `VERSION` and syncs `package.json` `version` (e.g. `0.3` → `0.4`). Commit the result as part of the release push.
+That increments `VERSION` and syncs `package.json` `version` (for example `0.3` → `0.4`). Commit the result as part of the release push. Do not hand-edit `VERSION`, `package.json` `version`, or the “Current release” line in the README in a normal contribution.

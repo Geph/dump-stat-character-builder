@@ -611,7 +611,27 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
       { op: "setCastingTime", castingTime: "1 action" },
       {
         op: "appendDescription",
-        text: "Using this action turns on Mind Rider on the sheet while you see through the target (you are deaf and blind to your own senses). Ally Int/Wis/Cha save advantage stays play-time — turn the toggle off when the link ends.",
+        text: "Using this action turns on Mind Rider on the sheet. Name the target creature on the toggle; you are deaf and blind to your own senses. Ally Int/Wis/Cha save advantage stays play-time — turn the toggle off when the link ends.",
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "mind_rider_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_mind_rider_rider",
+              type: "power_rider",
+              parentPowerNames: ["Mind Rider"],
+              alertSummary:
+                "While linked: fill in the target on the Mind Rider toggle. You are blind/deaf to your own senses; that creature has Advantage on Intelligence, Wisdom, and Charisma saves.",
+              label: "Mind Rider",
+              limitations: [requiresActiveToggleLimitation("mind_rider_active")],
+            },
+          ],
+        },
       },
     ],
   },
@@ -685,9 +705,8 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
               id: "mod_projected_nightmares_rider",
               type: "power_rider",
               parentPowerNames: ["Astral Construct"],
-              parentMenuOptionNames: ["Horrifying Nightmare"],
               alertSummary:
-                "Boundless Imagination option — Horrifying Nightmare: chosen creatures starting within 5 ft. of your Astral Construct WIS save or frightened until their next turn.",
+                "If Boundless Imagination is Horrifying Nightmare: chosen creatures starting within 5 ft. of your Astral Construct WIS save or frightened until their next turn.",
               label: "Projected Nightmares",
             },
           ],
@@ -887,6 +906,18 @@ export const PSION_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "Sheet reminder: harmless illustrative images — no spend. Track duration play-time.",
+      },
+    ],
+  },
+  {
+    id: "psion.ability.mental_broadcast",
+    pack: "psion",
+    target: "proposal_ability",
+    match: { name: /^mental broadcast$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Sheet reminder: only willing creatures you choose can see your minor illusion / Mental Projection images while this is active — track targets play-time.",
       },
     ],
   },
@@ -1718,6 +1749,33 @@ export const MHP_WARDEN_PRESETS: EnrichmentPreset[] = [
           type: "class_resource",
           classResourceKey: "interrupt",
           classResourceAmount: 1,
+        },
+      },
+    ],
+  },
+  {
+    id: "mhp_warden.subclass.interdict",
+    pack: "mhp_warden",
+    target: "subclass_feature",
+    match: { className: /warden/i, name: /^interdict$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "interdict_init",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: "mod_interdict_init",
+              kind: "class_resource",
+              classResourceKey: "interrupt",
+              classResourceChange: "reset",
+              resourceRefreshOnInitiative: true,
+              classResourceAmount: 1,
+              label: "Regain 1 Interrupt on Initiative",
+            },
+          ],
         },
       },
     ],

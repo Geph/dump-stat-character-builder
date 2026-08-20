@@ -87,11 +87,15 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
       name: /^potion brewing$/i,
     },
     operations: [
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
       {
         op: "parseCraftableItemsTable",
         idKey: "alchemist_potions_known",
         label: "Known potions",
         category: "Potion",
+        resourceKey: REAGENTS_KEY,
+        includeDistillOptions: true,
       },
       {
         op: "attachNamedPreset",
@@ -112,15 +116,20 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: {
       className: /alchemist/i,
+      name: /^(?!potion brewing$).+/i,
       description: /brew the following potions|craftable potions|potions table/i,
     },
     operations: [
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
       {
         op: "parseCraftableItemsTable",
         idKey: "alchemist_potions_known",
         label: "Known potions",
         category: "Potion",
         descriptionGate: /brew the following potions|craftable potions|potions table|brew potions/i,
+        resourceKey: REAGENTS_KEY,
+        includeDistillOptions: true,
       },
     ],
   },
@@ -258,10 +267,36 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /alchemist/i, name: /^philosopher[’']?s stone$/i },
     operations: [
-      { op: "setActivation", activation: { onInitiative: true } },
+      { op: "setActivation", activation: { action: true, onInitiative: true } },
       {
         op: "setSheetDisplay",
-        sheetDisplay: { combatActions: true, featuresTab: true },
+        sheetDisplay: { abilitiesActions: true, featuresTab: true },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "philosophers_stone_actions",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_philosophers_stone_actions",
+              type: "resource_ability_menu",
+              resourceKey: "",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Quick Brewing",
+                  description: "Brew a potion as a Utilize action instead of taking 10 minutes.",
+                  resourceCost: 0,
+                  actionKind: "action",
+                },
+              ],
+              label: "Philosopher's Stone actions",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
       },
       {
         op: "appendDescription",
@@ -372,6 +407,39 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
           ],
         },
         replaceCharacteristicTypes: ["damage_immunity"],
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.mutagens",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^mutagens$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "mutagens_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_mutagens_menu",
+              type: "resource_ability_menu",
+              resourceKey: "",
+              waiveResourceCost: true,
+              options: [
+                { name: "Strength Mutagen", resourceCost: 0 },
+                { name: "Dexterity Mutagen", resourceCost: 0 },
+                { name: "Constitution Mutagen", resourceCost: 0 },
+              ],
+              label: "Inject a Mutagen",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
       },
     ],
   },
@@ -496,6 +564,8 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^alchemical romance$/i },
     operations: [
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true } },
       {
         op: "attachNamedPreset",
         preset: {
@@ -513,6 +583,49 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
           ],
         },
         replaceCharacteristicTypes: ["condition_immunity", "power_rider"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "alchemical_romance_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_alchemical_romance_menu",
+              type: "resource_ability_menu",
+              resourceKey: REAGENTS_KEY,
+              options: [
+                {
+                  name: "Spend 1 Reagent",
+                  description: "Choose 1 Alchemical Romance benefit for this Pheromone Bomb.",
+                  resourceCost: 1,
+                },
+                {
+                  name: "Spend 2 Reagents",
+                  description: "Choose 2 Alchemical Romance benefits for this Pheromone Bomb.",
+                  resourceCost: 2,
+                },
+                {
+                  name: "Spend 3 Reagents",
+                  description: "Choose 3 Alchemical Romance benefits for this Pheromone Bomb.",
+                  resourceCost: 3,
+                },
+                {
+                  name: "Spend 4 Reagents",
+                  description: "Choose all 4 Alchemical Romance benefits for this Pheromone Bomb.",
+                  resourceCost: 4,
+                },
+              ],
+              label: "Apply while using Pheromone Bomb (no separate Action)",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
+      },
+      {
+        op: "appendDescription",
+        text: "Sheet tracking button: using it spends the selected Reagents but does not represent a separate Action; apply the selected benefit as part of Pheromone Bomb.",
       },
     ],
   },
@@ -579,7 +692,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^alchemical resurrection$/i },
     operations: [
-      { op: "setActivation", activation: { action: true } },
+      { op: "setActivation", activation: { action: true, bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
@@ -598,6 +711,39 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
           ],
         },
         skipIfCharacteristicTypes: ["craftable_items"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "alchemical_resurrection_actions",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_alchemical_resurrection_actions",
+              type: "resource_ability_menu",
+              resourceKey: "",
+              waiveResourceCost: true,
+              options: [
+                {
+                  name: "Create Potion of Resurrection",
+                  description:
+                    "Magic action: use 1,000+ GP diamond dust and a Superior or Supreme Healing potion.",
+                  resourceCost: 0,
+                  actionKind: "action",
+                },
+                {
+                  name: "Administer Potion of Resurrection",
+                  description: "Administer the crafted potion as a Bonus Action.",
+                  resourceCost: 0,
+                  actionKind: "bonus",
+                },
+              ],
+              label: "Potion of Resurrection",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
       },
       {
         op: "appendDescription",
@@ -734,6 +880,164 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
           ],
         },
         replaceCharacteristicTypes: ["power_rider"],
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.bottled_oozes",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^bottled oozes?$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "bottled_oozes_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_bottled_oozes_menu",
+              type: "resource_ability_menu",
+              resourceKey: REAGENTS_KEY,
+              options: [
+                {
+                  name: "Bottled Ooze (Gray Ooze)",
+                  description: "Brew a Gray Ooze bottle, then throw it as a Bonus Action.",
+                  resourceCost: 2,
+                  unlocksAtLevel: 6,
+                },
+                {
+                  name: "Bottled Ooze (Ochre Jelly)",
+                  description: "Brew an Ochre Jelly bottle, then throw it as a Bonus Action.",
+                  resourceCost: 4,
+                  unlocksAtLevel: 9,
+                },
+                {
+                  name: "Bottled Ooze (Gelatinous Cube)",
+                  description: "Brew a Gelatinous Cube bottle, then throw it as a Bonus Action.",
+                  resourceCost: 4,
+                  unlocksAtLevel: 9,
+                },
+                {
+                  name: "Bottled Ooze (Black Pudding)",
+                  description: "Brew a Black Pudding bottle, then throw it as a Bonus Action.",
+                  resourceCost: 6,
+                  unlocksAtLevel: 13,
+                },
+              ],
+              label: "Brew and throw a Bottled Ooze",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.restoring_the_golem",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^restoring the golem$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: REAGENTS_KEY,
+          classResourceAmount: 1,
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Magic action, 1 Reagent: restore your golem as described by the feature.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.its_alive",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^it[’']?s alive!?$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Bonus Action: direct your golem.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.arcane_recycler",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^arcane recycler$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "arcane_recycler_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "char_arcane_recycler_menu",
+              type: "resource_ability_menu",
+              resourceKey: SPELL_DYNAMOS_KEY,
+              options: [
+                {
+                  name: "Capture triggering spell",
+                  description: "Restore one expended Spell Dynamo by capturing the triggering spell.",
+                  resourceCost: -1,
+                  actionKind: "reaction",
+                },
+              ],
+              label: "Arcane Recycler",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["resource_ability_menu"],
+      },
+      {
+        op: "appendDescription",
+        text: "Reaction when targeted by a spell: capture it in an expended Spell Dynamo as described by the feature.",
+      },
+    ],
+  },
+  {
+    id: "alchemist.subclass.sacrificial_slime",
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /alchemist/i, name: /^sacrificial slime$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "ability_modifier",
+          abilityModifier: "INT",
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Reaction: have an allied Ooze intercept the triggering attack.",
       },
     ],
   },

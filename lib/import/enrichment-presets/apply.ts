@@ -267,20 +267,55 @@ function applyOperations(
         const catalogRefId =
           operation.catalogRefId ?? characteristicCatalogRefId("craftable_items")
         const instanceId = createModifierInstanceId()
+        const attached = [
+          charInstance(instanceId, catalogRefId, [
+            {
+              id: modId(operation.idKey),
+              type: "craftable_items",
+              category: operation.category,
+              items,
+              label: operation.label,
+            } as never,
+          ]),
+        ]
+        if (operation.resourceKey) {
+          const menuOptions = items.flatMap((item) => [
+            {
+              name: `Brew ${item.itemName}`,
+              description: `Create ${item.itemName}.`,
+              resourceCost: item.resourceCost,
+              unlocksAtLevel: item.unlocksAtClassLevel,
+            },
+            ...(operation.includeDistillOptions
+              ? [
+                  {
+                    name: `Distill ${item.itemName}`,
+                    description: `Destroy ${item.itemName} and recover the Reagents spent to brew it.`,
+                    resourceCost: -item.resourceCost,
+                    unlocksAtLevel: item.unlocksAtClassLevel,
+                  },
+                ]
+              : []),
+          ])
+          attached.push(
+            charInstance(
+              createModifierInstanceId(),
+              characteristicCatalogRefId("resource_ability_menu"),
+              [
+                {
+                  id: modId(`${operation.idKey}_menu`),
+                  type: "resource_ability_menu",
+                  resourceKey: operation.resourceKey,
+                  options: menuOptions,
+                  label: operation.label,
+                } as never,
+              ],
+            ),
+          )
+        }
         next = syncModifierRefs({
           ...next,
-          linkedModifiers: [
-            ...(next.linkedModifiers ?? []),
-            charInstance(instanceId, catalogRefId, [
-              {
-                id: modId(operation.idKey),
-                type: "craftable_items",
-                category: operation.category,
-                items,
-                label: operation.label,
-              } as never,
-            ]),
-          ],
+          linkedModifiers: [...(next.linkedModifiers ?? []), ...attached],
         }) as FeatureLike
         break
       }
@@ -643,8 +678,11 @@ export function applyImportEnrichmentPresets(
 
 /** Feature-gated initiative restores that must not apply from the level table alone. */
 function patchInitiativeRechargeFromFeatures(content: ImportContent): ImportContent {
-  const classes = content.classes ?? []
-  if (!classes.length) return content
+  const stripInitiative = (uses: UsesConfig): UsesConfig => {
+    if (uses.rechargeOnInitiative == null) return uses
+    const { rechargeOnInitiative: _drop, ...rest } = uses
+    return rest
+  }
 
   const patchRows = <T extends { class_name?: string; className?: string; resource_key?: string; resourceKey?: string; uses: UsesConfig }>(
     rows: T[] | undefined,
@@ -652,61 +690,19 @@ function patchInitiativeRechargeFromFeatures(content: ImportContent): ImportCont
     if (!rows?.length) return { rows: rows ?? [], changed: false }
     let changed = false
     const nextRows = rows.map((row) => {
-      const className = row.class_name ?? row.className ?? ""
       const resourceKey = row.resource_key ?? row.resourceKey ?? ""
-      const cls = classes.find((c) => c.name === className)
-      if (!cls) return row
-
-      const features = cls.features ?? []
-      const hasDireGambit = features.some((f) => /^dire gambit$/i.test(f.name ?? ""))
-      if (resourceKey === "risk_dice") {
-        if (hasDireGambit && row.uses.rechargeOnInitiative !== 1) {
-          changed = true
-          return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
-        }
-        // LLM extracts often set initiative recharge on the pool even before Dire Gambit.
-        if (!hasDireGambit && row.uses.rechargeOnInitiative != null) {
-          changed = true
-          const { rechargeOnInitiative: _drop, ...restUses } = row.uses
-          return { ...row, uses: restUses }
-        }
-      }
-
-      const hasEmpoweredEndurance = features.some((f) => /^empowered endurance$/i.test(f.name ?? ""))
-      if (resourceKey === "endurance_dice") {
-        if (hasEmpoweredEndurance && row.uses.rechargeOnInitiative !== 1) {
-          changed = true
-          return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
-        }
-        if (!hasEmpoweredEndurance && row.uses.rechargeOnInitiative != null) {
-          changed = true
-          const { rechargeOnInitiative: _drop, ...restUses } = row.uses
-          return { ...row, uses: restUses }
-        }
-      }
-
-      const subclassHit = (content.subclasses ?? []).some(
-        (sub) =>
-          sub.class_name === className &&
-          (sub.features ?? []).some(
-            (f) =>
-              /^interdict$/i.test(f.name ?? "") ||
-              /regain a use of Interrupt when you roll Initiative/i.test(f.description ?? ""),
-          ),
-      )
-      const featureHit = features.some(
-        (f) =>
-          /^interdict$/i.test(f.name ?? "") ||
-          (/interrupt/i.test(f.name ?? "") &&
-            /regain a use of Interrupt when you roll Initiative/i.test(f.description ?? "")),
-      )
+      // Level-gated restores (Dire Gambit, Empowered Endurance, Master Warmage) live on
+      // the feature as resourceRefreshOnInitiative — never on the pool itself.
       if (
-        (featureHit || subclassHit) &&
-        resourceKey === "interrupt" &&
-        row.uses.rechargeOnInitiative !== 1
+        resourceKey === "risk_dice" ||
+        resourceKey === "endurance_dice" ||
+        resourceKey === "arcane_surge"
       ) {
-        changed = true
-        return { ...row, uses: { ...row.uses, rechargeOnInitiative: 1 } }
+        if (row.uses.rechargeOnInitiative != null) {
+          changed = true
+          return { ...row, uses: stripInitiative(row.uses) }
+        }
+        return row
       }
       return row
     })

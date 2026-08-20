@@ -55,6 +55,18 @@ describe.skipIf(!hasDriveFixture)("Warmage Drive import wiring", () => {
 
     const master = classFeature(content, "Master Warmage")
     expect(chars(master).filter((c) => c.type === "uses")).toHaveLength(0)
+    expect(
+      (master?.linkedModifiers ?? []).some((mod) =>
+        (mod.activation?.effects ?? []).some(
+          (effect) =>
+            effect.resourceRefreshOnInitiative === true &&
+            effect.classResourceKey === "arcane_surge" &&
+            effect.resourceRefreshCap === 1,
+        ),
+      ),
+    ).toBe(true)
+    const rows = collectImportModifierReview(content)
+    expect(rows.find((row) => row.featureName === "Master Warmage")?.status).toBe("wired")
   })
 
   it("Warmage Tricks does not get a false spells_known characteristic", () => {
@@ -191,7 +203,6 @@ describe.skipIf(!hasDriveFixture)("Warmage Drive import wiring", () => {
     const structuralNames = [
       "Reliable Cantrip",
       "Arcane Surge Improvement",
-      "Master Warmage",
       "Spell Sculpting",
       "High Stakes",
       "Card Reading",

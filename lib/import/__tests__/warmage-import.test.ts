@@ -134,7 +134,7 @@ describe("Warmage enrichment sanitize", () => {
 
     expect(sanitized.class_resources?.some((r) => r.resource_key === "arcane_surge")).toBe(true)
     const surge = sanitized.class_resources?.find((r) => r.resource_key === "arcane_surge")
-    expect(surge?.uses.rechargeOnInitiative).toBe(1)
+    expect(surge?.uses.rechargeOnInitiative).toBeUndefined()
 
     const spell = sanitized.classes?.[0]?.features?.find((f) => f.name === "Spellcasting")
     const grants = (spell?.mechanics ?? []).flatMap((m) => {

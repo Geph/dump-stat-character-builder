@@ -46,7 +46,12 @@ describe("sheet-toggle-registry", () => {
 
   it("resolves KibblesTasty Psion play toggles and action activation", () => {
     expect(getSheetToggleDefinition("full_awakening_active")?.label).toBe("Full Awakening")
-    expect(getSheetToggleDefinition("mind_rider_active")?.label).toBe("Mind Rider")
+    expect(getSheetToggleDefinition("mind_rider_active")).toMatchObject({
+      label: "Mind Rider",
+      noteLabel: "Target creature",
+      notePlaceholder: "Creature name",
+    })
+    expect(getSheetToggleDefinition("mind_rider_active")?.hint).toMatch(/Advantage/)
     expect(isKnownSheetToggleId("full_awakening_active")).toBe(true)
     expect(sheetToggleIdActivatedByAction({ name: "Full Awakening" })).toBe("full_awakening_active")
     expect(sheetToggleIdActivatedByAction({ name: "Mind Rider" })).toBe("mind_rider_active")

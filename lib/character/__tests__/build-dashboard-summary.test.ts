@@ -73,6 +73,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
       activeConditions: ["Poisoned"],
       exhaustionLevel: 0,
       activeSheetToggleIds: [],
+      sheetToggleNotes: {},
       usedResourcesById: {},
       usedActionUsesById: {},
       usedSpellSlotsByKey: {},

@@ -36,6 +36,8 @@ export type CharacterSheetPlayState = {
   activeConditions: string[]
   exhaustionLevel: number
   activeSheetToggleIds: SheetToggleKey[]
+  /** Player-entered context for reminder toggles, keyed by toggle id (e.g. Mind Rider target). */
+  sheetToggleNotes: Record<string, string>
   usedResourcesById: Record<string, number>
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>
@@ -77,6 +79,7 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     activeConditions: [],
     exhaustionLevel: 0,
     activeSheetToggleIds: [],
+    sheetToggleNotes: {},
     usedResourcesById: {},
     usedActionUsesById: {},
     usedSpellSlotsByKey: {},
@@ -114,6 +117,20 @@ function normalizeResourceDieSides(
   )
 }
 
+function normalizeSheetToggleNotes(
+  raw: Record<string, string> | null | undefined,
+): Record<string, string> {
+  if (!raw || typeof raw !== "object") return {}
+  return Object.fromEntries(
+    Object.entries(raw)
+      .filter(
+        ([key, value]) =>
+          key.trim().length > 0 && typeof value === "string" && value.trim().length > 0,
+      )
+      .map(([key, value]) => [key, value.trim().slice(0, 200)]),
+  )
+}
+
 export function normalizeSheetPlayState(
   raw: Partial<CharacterSheetPlayState> | null | undefined,
 ): CharacterSheetPlayState {
@@ -128,6 +145,7 @@ export function normalizeSheetPlayState(
     activeSheetToggleIds: Array.isArray(raw.activeSheetToggleIds)
       ? raw.activeSheetToggleIds.filter((entry): entry is string => typeof entry === "string")
       : base.activeSheetToggleIds,
+    sheetToggleNotes: normalizeSheetToggleNotes(raw.sheetToggleNotes),
     usedResourcesById:
       raw.usedResourcesById && typeof raw.usedResourcesById === "object"
         ? { ...raw.usedResourcesById }

@@ -320,9 +320,17 @@ describe("enrichPsionArchetypeFeatures", () => {
       .find((c) => c.type === "resource_ability_menu")
     expect((morphMenu as { options?: unknown[] })?.options?.length).toBeGreaterThanOrEqual(5)
 
-    const rider = byName["Mind Rider"] as { casting_time?: string; description?: string }
+    const rider = byName["Mind Rider"] as unknown as {
+      casting_time?: string
+      description?: string
+      linkedModifiers?: { characteristics?: { type?: string; parentPowerNames?: string[] }[] }[]
+    }
     expect(rider.casting_time).toBe("1 action")
     expect(rider.description).toMatch(/Mind Rider/i)
+    const mindRiderAlert = rider.linkedModifiers
+      ?.flatMap((m) => m.characteristics ?? [])
+      .find((c) => c.type === "power_rider")
+    expect(mindRiderAlert?.parentPowerNames).toEqual(["Mind Rider"])
 
     const regrowth = byName["Psionic Regrowth"] as unknown as {
       casting_time?: string

@@ -245,7 +245,9 @@ export interface FeatureEffect {
   /** class_resource reset: refresh when finishing a rest. */
   resourceRefreshOnRest?: "short_rest" | "long_rest" | "short_or_long_rest" | null
   /** class_resource reset: cap formula instead of fixed cap (e.g. half level). */
-  resourceRefreshFormula?: "half_level" | "full" | null
+  resourceRefreshFormula?: "half_level" | "half_level_down" | "full" | null
+  /** Initiative/rest refresh that can fire only once per long rest (Persistent Rage, Uncanny Metabolism). */
+  resourceRefreshOncePerLongRest?: boolean
   /** class_resource: regain all when using another named class feature. */
   regainAllOnLinkedFeatureUse?: boolean
   linkedFeatureName?: string | null
@@ -628,7 +630,7 @@ export interface RestRechargeRule {
   /** Uses restored on this rest; omit for full pool. */
   amount?: number | null
   /** Formula-based restore when amount is not a fixed literal. */
-  amountFormula?: "half_class_level_round_up" | "ability_modifier" | null
+  amountFormula?: "half_class_level_round_up" | "half_class_level_round_down" | "ability_modifier" | null
   /** Ability whose modifier is used when amountFormula is ability_modifier. */
   amountFormulaAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
   /** Cap how many times this recharge fires per long rest (e.g. once per long rest on short rest). */

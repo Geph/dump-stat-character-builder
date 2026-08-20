@@ -350,6 +350,41 @@ export function resolveSpellCastCost(params: {
   const pool = getPointPoolSpellcasting(params.spellcasting)
 
   if (!pool) {
+    const hasSpellUses = resolveClassResourcesForClass({
+      id: "",
+      name: "",
+      ...params.classRow,
+    }).some((row) => row.id === "spell_uses" || row.id.endsWith("_spell_uses"))
+
+    if (hasSpellUses && params.spellLevel > 0) {
+      const baseCost = 1
+      const totalCost = baseCost + metamagicCost
+      let canCast = true
+      let blockReason: SpellCastCostBlockReason | undefined
+
+      if (totalCost > params.availablePoints) {
+        canCast = false
+        blockReason = "insufficient_points"
+      } else if (metamagicCost > metamagicCap) {
+        canCast = false
+        blockReason = "metamagic_over_proficiency_cap"
+      }
+
+      return applyHitDiceGate({
+        mode: "resource",
+        castKind: "resource",
+        baseCost,
+        metamagicCost,
+        hitDiceCost,
+        totalCost,
+        canCast,
+        blockReason,
+        resourceKey: "spell_uses",
+        resourceDisplayName: formatResourceKeyDisplayName("spell_uses"),
+        metamagicCap,
+      })
+    }
+
     let canCast = true
     let blockReason: SpellCastCostBlockReason | undefined
 

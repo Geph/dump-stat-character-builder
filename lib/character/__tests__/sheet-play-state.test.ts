@@ -8,6 +8,7 @@ import {
 describe("sheet play-state resource die overrides", () => {
   it("defaults mutable resource die state to an empty map", () => {
     expect(defaultSheetPlayState().resourceDieSidesByKey).toEqual({})
+    expect(defaultSheetPlayState().sheetToggleNotes).toEqual({})
     expect(defaultSheetPlayState().mutationDie).toBeNull()
     expect(defaultSheetPlayState().fleshWarpAllyBenefitCounts).toEqual({})
     expect(defaultSheetPlayState().illusionTokens).toEqual([])
@@ -22,6 +23,16 @@ describe("sheet play-state resource die overrides", () => {
       },
     })
     expect(state.resourceDieSidesByKey).toEqual({ rampage_die: 8 })
+  })
+
+  it("normalizes persisted reminder-toggle notes", () => {
+    const state = normalizeSheetPlayState({
+      sheetToggleNotes: {
+        mind_rider_active: "  Friendly owl  ",
+        empty: "   ",
+      },
+    })
+    expect(state.sheetToggleNotes).toEqual({ mind_rider_active: "Friendly owl" })
   })
 
   it("normalizes mutation die, ally benefits, and illusion tokens", () => {

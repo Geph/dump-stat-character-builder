@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { Feature } from "@/lib/types"
 
 function loadSeed(relativePath: string): ImportContent {
   return JSON.parse(
@@ -67,6 +68,26 @@ describe("non-SRD seed class resources", () => {
     expect(inventorKeys.filter((key) => key.includes("reagent"))).toEqual([])
   })
 
+  it("ships both Bomb modes with their runtime ability rules", () => {
+    const seed = loadSeed("mage-hand-press/magehandpress-alchemist-class.json")
+    const alchemist = seed.classes?.find((entry) => entry.name === "Alchemist")
+    const bombs = alchemist?.features
+      ?.flatMap((feature) => feature.linkedModifiers ?? [])
+      .flatMap((instance) => instance.characteristics ?? [])
+      .filter((characteristic) => characteristic.type === "special_attack")
+      .filter((characteristic) => characteristic.attackName === "Bomb")
+
+    expect(bombs?.some((attack) => attack.attackVariant === "attack")).toBe(true)
+    expect(
+      bombs?.find((attack) => attack.attackVariant === "attack")?.damageAbilityModifier,
+    ).toBe("attack")
+    expect(bombs?.find((attack) => attack.attackVariant === "explode")).toMatchObject({
+      alternateSaveDCAbility: "INT",
+      damageAbilityModifier: "INT",
+      damageAbilityMinimum: 1,
+    })
+  })
+
   it("keeps subclass ownership on every newly reconciled resource", () => {
     const checks = [
       ["mage-hand-press/magehandpress-vagabond-class.json", "mage_brand_max_slot_level", "Mage Brand"],
@@ -103,5 +124,81 @@ describe("non-SRD seed class resources", () => {
       },
     })
     expect(dancer.get("momentum")?.uses.recharges).toBeUndefined()
+  })
+
+  it("gives Captain Battle Dice short and long rest plus initiative", () => {
+    const battle = resourceMap(loadSeed("mage-hand-press/magehandpress-captain-class.json")).get(
+      "battle_dice",
+    )
+    expect(battle?.uses.rechargeOnInitiative).toBe(true)
+    expect(battle?.uses.recharges).toEqual(
+      expect.arrayContaining([{ rest: "short_rest" }, { rest: "long_rest" }]),
+    )
+  })
+
+  it("restores one Rushed Incantation and Trinket on a short rest", () => {
+    const investigator = resourceMap(
+      loadSeed("mage-hand-press/magehandpress-investigator-class.json"),
+    )
+    for (const key of ["rushed_incantation", "trinkets"] as const) {
+      expect(investigator.get(key)?.uses.recharges).toEqual(
+        expect.arrayContaining([
+          { rest: "short_rest", amount: 1 },
+          { rest: "long_rest" },
+        ]),
+      )
+    }
+  })
+
+  it("wires free Green Magic spend and rest hooks", () => {
+    const seed = loadSeed("mage-hand-press/magehandpress-witch-class.json")
+    const green = seed.subclasses?.find((row) => row.name === "Green Magic")
+    const sacrificial = green?.features?.find((feature) => feature.name === "Sacrificial Familiar") as
+      | Feature
+      | undefined
+    const vital = green?.features?.find((feature) => feature.name === "Vital Nourishment") as
+      | Feature
+      | undefined
+    expect(sacrificial?.activation?.reaction).toBe(true)
+    expect(vital?.limitedUses).toMatchObject({
+      type: "fixed",
+      fixedAmount: 1,
+      recharges: [{ rest: "long_rest" }],
+    })
+    const tempHp = (vital?.linkedModifiers ?? [])
+      .flatMap((mod) => mod.activation?.effects ?? [])
+      .find((effect) => effect.kind === "grant_temp_hp")
+    expect(tempHp).toMatchObject({
+      healMode: "character_level",
+      healAbility: "CHA",
+    })
+  })
+
+  it("hooks White Magic Remedy to the Remedy Dice pool", () => {
+    const seed = loadSeed("mage-hand-press/magehandpress-witch-class.json")
+    const remedy = seed.subclasses
+      ?.find((row) => row.name === "White Magic")
+      ?.features?.find((feature) => feature.name === "Remedy") as Feature | undefined
+    expect(remedy?.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "remedy_dice",
+      classResourceCostMode: "up_to_ability_modifier",
+      classResourceCostAbility: "CHA",
+    })
+  })
+
+  it("keeps Dire Gambit / Master Warmage / Empowered Endurance off the pool", () => {
+    expect(
+      resourceMap(loadSeed("mage-hand-press/magehandpress-gunslinger-class.json")).get("risk_dice")
+        ?.uses.rechargeOnInitiative,
+    ).toBeUndefined()
+    expect(
+      resourceMap(loadSeed("mage-hand-press/magehandpress-warmage-class.json")).get("arcane_surge")
+        ?.uses.rechargeOnInitiative,
+    ).toBeUndefined()
+    expect(
+      resourceMap(loadSeed("kibbles-tasty/kibbles-warden-class.json")).get("endurance_dice")
+        ?.uses.rechargeOnInitiative,
+    ).toBeUndefined()
   })
 })

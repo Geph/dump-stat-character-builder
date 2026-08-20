@@ -108,6 +108,9 @@ export function resolveRechargeRuleAmount(
   if (rule.amountFormula === "half_class_level_round_up" && classLevel != null) {
     return Math.max(1, Math.ceil(classLevel / 2))
   }
+  if (rule.amountFormula === "half_class_level_round_down" && classLevel != null) {
+    return Math.max(0, Math.floor(classLevel / 2))
+  }
   if (rule.amountFormula === "ability_modifier" && rule.amountFormulaAbility && abilityModifiers) {
     const key = rule.amountFormulaAbility.toLowerCase()
     return Math.max(0, abilityModifiers[key] ?? 0)

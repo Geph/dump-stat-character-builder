@@ -138,9 +138,9 @@ Vercel is **not recommended** (no persistent MySQL on the same project).
 
 ## Local card art (optional)
 
-In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1**, **species portraits** and potentially more I may have added since writing this. Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally, you can also import jsons of art sources from external URL's.
+In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1**, **species portraits** and potentially more I may have added since writing this. Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally; you can also import JSONs of art sources from external URLs.
 
-This README is the policy. Drop-folder notes live next to the masters:
+**What is safe to commit** is documented in [CONTRIBUTING.md](CONTRIBUTING.md#what-not-to-commit). Drop-folder notes live next to the masters:
 
 | Drop folder | Optimized output |
 |-------------|------------------|

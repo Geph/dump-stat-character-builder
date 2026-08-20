@@ -3,6 +3,7 @@ import { buildClassResourceDieSidesMap } from "@/lib/character/resolve-class-res
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import {
   type AttackRollModifiersCharacteristic,
+  type BonusDamageRiderEntry,
   type BonusDamageRidersCharacteristic,
   type CharacteristicModifier,
   type DamageRollModifiersCharacteristic,
@@ -118,6 +119,17 @@ function describeAttackEntry(entry: RollModifierEntry): string {
   return parts.join(". ")
 }
 
+function describeRiderOption(rider: BonusDamageRiderEntry): string {
+  const costs: string[] = []
+  if (rider.costDice) costs.push(rider.costDice)
+  if (rider.costResourceKey) {
+    costs.push(
+      `${Math.max(1, rider.costResourceAmount ?? 1)} ${rider.costResourceKey.replace(/_/g, " ")}`,
+    )
+  }
+  return costs.length ? `${rider.name} (${costs.join(" + ")})` : rider.name
+}
+
 function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
@@ -204,7 +216,7 @@ function collectAppliedModifiers(
       } else if (riderMod.riders?.length) {
         applied.push({
           name: mod.label ?? "On-hit options",
-          description: riderMod.riders.map((rider) => rider.name).join(", "),
+          description: `Pick on the Combat tab: ${riderMod.riders.map(describeRiderOption).join(", ")}`,
           sourceType: readModifierSource(mod)?.sourceType,
         })
       }

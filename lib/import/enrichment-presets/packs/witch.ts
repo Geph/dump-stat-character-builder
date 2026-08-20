@@ -1,5 +1,7 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
+import { effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { modId } from "@/lib/compendium/modifier-instance-builders"
 
 /** Hexes Known column → incremental cantrip picks (not cumulative counts per tier). */
 export const WITCH_HEX_GRANTS = [
@@ -318,8 +320,78 @@ export const WITCH_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { action: true, bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "remedy_dice",
+          classResourceAmount: 1,
+          classResourceCostMode: "up_to_ability_modifier",
+          classResourceCostAbility: "CHA",
+        },
+      },
+      {
         op: "appendDescription",
         text: "Remedy Dice pool is class_resources.remedy_dice (multiply_level, long rest) — expend dice to heal; CHA mod caps dice spent per use.",
+      },
+    ],
+  },
+  {
+    id: "witch.subclass.sacrificial_familiar",
+    pack: "witch",
+    target: "subclass_feature",
+    match: { subclassClassName: /^witch$/i, name: /^sacrificial familiar$/i },
+    operations: [
+      { op: "setActivation", activation: { reaction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "witch.subclass.vital_nourishment",
+    pack: "witch",
+    target: "subclass_feature",
+    match: { subclassClassName: /^witch$/i, name: /^vital nourishment$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "vital_nourishment",
+          catalogRefId: effectCatalogRefId("grant_temp_hp"),
+          effects: [
+            {
+              id: modId("vital_nourishment"),
+              kind: "grant_temp_hp",
+              tempHpTrigger: "on_action",
+              healMode: "character_level",
+              healLevelMultiplier: 1,
+              healAbility: "CHA",
+              healTarget: "choose_ally",
+              label: "After a Long Rest: up to 6 creatures gain Temp HP = Witch level + CHA",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "witch.subclass.primal_ally",
+    pack: "witch",
+    target: "subclass_feature",
+    match: { subclassClassName: /^witch$/i, name: /^primal ally$/i },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Familiar Hit Point maximum uses 3 × Witch level instead of the usual 2 × Witch level.",
       },
     ],
   },

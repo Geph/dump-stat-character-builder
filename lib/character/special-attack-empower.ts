@@ -17,6 +17,41 @@ export type SpecialAttackEmpower = {
   radiusFeetPerResource: number | null
 }
 
+export type OverloadedCharge = {
+  resourceCost: number
+  effectiveSpend: number
+  canAfford: boolean
+}
+
+/** Mad Bomber: spend PB real Reagents, then apply two generated Reagents beyond the normal cap. */
+export function resolveOverloadedCharge(
+  proficiencyBonus: number,
+  availableResources: number,
+): OverloadedCharge {
+  const resourceCost = Math.max(1, proficiencyBonus)
+  return {
+    resourceCost,
+    effectiveSpend: resourceCost + 2,
+    canAfford: availableResources >= resourceCost,
+  }
+}
+
+/** Resolve level-scaled base damage while preserving the authored attack profile. */
+export function resolveSpecialAttackAtLevel(
+  attack: SpecialAttackCharacteristic,
+  classLevel: number,
+): SpecialAttackCharacteristic {
+  const tier = [...(attack.damageByLevel ?? [])]
+    .filter((entry) => entry.level <= classLevel && entry.mode === "dice")
+    .sort((a, b) => b.level - a.level)[0]
+  if (!tier) return attack
+  return {
+    ...attack,
+    damageDiceCount: tier.dieCount ?? attack.damageDiceCount,
+    damageDieType: tier.dieType ?? attack.damageDieType,
+  }
+}
+
 function parseDiceExpression(value: string): { count: number; sides: number } | null {
   const match = value.trim().match(/^(\d*)d(\d+)$/i)
   if (!match) return null

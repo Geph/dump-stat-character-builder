@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   applyInitiativeResourceRecharge,
+  applyMinimumResourceRemaining,
   applySheetRest,
   applyUsesRest,
   shouldResetSpellSlotsOnRest,
@@ -19,6 +20,15 @@ const resolveContext = {
     CHA: 0,
   },
 }
+
+describe("minimum resource refill", () => {
+  it("refills Philosopher's Stone Reagents to six only when below six", () => {
+    expect(applyMinimumResourceRemaining(15, 20, 6)).toBe(14)
+    expect(applyMinimumResourceRemaining(14, 20, 6)).toBe(14)
+    expect(applyMinimumResourceRemaining(2, 20, 6)).toBe(2)
+    expect(applyMinimumResourceRemaining(3, 4, 6)).toBe(0)
+  })
+})
 
 describe("shouldResetSpellSlotsOnRest", () => {
   const fullTable: SpellSlotTable = {

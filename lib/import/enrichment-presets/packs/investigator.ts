@@ -2,7 +2,11 @@ import { createModifierInstanceId, syncModifierRefs } from "@/lib/compendium/lin
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { Feature, UsesConfig } from "@/lib/types"
+import type { Feature, RestRechargeRule, RechargeRule, UsesConfig } from "@/lib/types"
+
+function isRestRechargeRule(rule: RechargeRule): rule is RestRechargeRule {
+  return rule.kind !== "real_time" && "rest" in rule
+}
 
 const TRINKETS_KEY = "trinkets"
 
@@ -201,6 +205,39 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
             linkedModifiers,
           }) as typeof ability
         }),
+      },
+    }
+  }
+
+  const patchPoolRecharges = <T extends { resource_key?: string; uses?: UsesConfig }>(row: T): T => {
+    const key = row.resource_key ?? ""
+    if (key !== "rushed_incantation" && key !== "trinkets") return row
+    const uses = row.uses
+    if (!uses) return row
+    const recharges = [...(uses.recharges ?? [])]
+    const nextRecharges = recharges.map((rule) =>
+      isRestRechargeRule(rule) && rule.rest === "short_rest" && rule.amount == null
+        ? { ...rule, amount: 1 }
+        : rule,
+    )
+    if (!nextRecharges.some((rule) => isRestRechargeRule(rule) && rule.rest === "short_rest")) {
+      nextRecharges.unshift({ rest: "short_rest", amount: 1 })
+    }
+    if (!nextRecharges.some((rule) => isRestRechargeRule(rule) && rule.rest === "long_rest")) {
+      nextRecharges.push({ rest: "long_rest" })
+    }
+    return { ...row, uses: { ...uses, recharges: nextRecharges } }
+  }
+
+  if (next.class_resources?.length) {
+    next = { ...next, class_resources: next.class_resources.map(patchPoolRecharges) }
+  }
+  if (next.import_proposals?.class_resources?.length) {
+    next = {
+      ...next,
+      import_proposals: {
+        ...next.import_proposals,
+        class_resources: next.import_proposals.class_resources.map(patchPoolRecharges),
       },
     }
   }

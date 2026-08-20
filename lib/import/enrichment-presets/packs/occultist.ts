@@ -363,4 +363,44 @@ export function sanitizeOccultistImportContent(content: ImportContent): ImportCo
 }
 
 // Structural import guidance belongs in the extraction prompt/registry, never player-facing prose.
-export const OCCULTIST_PRESETS: EnrichmentPreset[] = []
+export const OCCULTIST_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "occultist.class.traditional_expertise",
+    pack: "occultist",
+    target: "class_feature",
+    match: { className: /occultist/i, name: /^traditional expertise$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "traditional_expertise",
+          catalogRefId: "cat_char_skills",
+          characteristics: [
+            {
+              id: "mod_traditional_expertise",
+              type: "skills",
+              entries: [
+                { skill: "Animal Handling" },
+                { skill: "Arcana" },
+                { skill: "Medicine" },
+                { skill: "Nature" },
+                { skill: "Religion" },
+                { skill: "Survival" },
+              ],
+              choiceCount: 1,
+              grantExpertise: true,
+              label: "Traditional Expertise",
+            },
+          ],
+        },
+      },
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Use when you make a Wisdom check: expend a spell slot to gain Advantage on that check.",
+      },
+    ],
+  },
+]

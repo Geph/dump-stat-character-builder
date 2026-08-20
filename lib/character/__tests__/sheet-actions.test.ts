@@ -381,6 +381,65 @@ describe("collectSheetActions", () => {
     expect(force?.sourceLabel).toBe("Telekinesis Discipline")
   })
 
+  it("keeps both Bomb modes and resolves their class-level damage", () => {
+    const baseAttack = {
+      properties: [],
+      damageTypes: ["Fire"],
+      damageDiceCount: 1,
+      damageDieType: "d10" as const,
+      damageByLevel: [
+        { level: 1, mode: "dice" as const, dieCount: 1, dieType: "d10" as const },
+        { level: 5, mode: "dice" as const, dieCount: 2, dieType: "d10" as const },
+      ],
+    }
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 1,
+              name: "Bombs",
+              description: "Create and throw Bombs.",
+              activation: { action: true },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_bomb",
+                  catalogRefId: "cat_char_special_attack",
+                  characteristics: [
+                    {
+                      ...baseAttack,
+                      id: "bomb_attack",
+                      type: "special_attack",
+                      attackVariant: "attack",
+                      attackProfile: "ranged",
+                    },
+                    {
+                      ...baseAttack,
+                      id: "bomb_explode",
+                      type: "special_attack",
+                      attackVariant: "explode",
+                      attackProfile: "force_save",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          5,
+        ),
+      ],
+      species: null,
+      customAbilities: [],
+    })
+
+    const bomb = actions.find((action) => action.name === "Bombs")
+    expect(bomb?.specialAttacks?.map((profile) => profile.attackVariant)).toEqual([
+      "attack",
+      "explode",
+    ])
+    expect(bomb?.specialAttacks?.map((profile) => profile.damageDiceCount)).toEqual([2, 2])
+  })
+
   it("lists Action Surge on the combat tab only", () => {
     const actions = collectSheetActions({
       classDetails: [
@@ -753,5 +812,247 @@ describe("collectSheetActions", () => {
     expect(bardic?.healEffects?.some((effect) => effect.kind === "modify_creature")).toBe(true)
     const song = actions.find((action) => action.name === "Encouraging Song")
     expect(song?.healEffects?.some((effect) => effect.kind === "grant_inspiration")).toBe(true)
+  })
+})
+
+describe("triggered activations", () => {
+  it("cards a no-action-required spend and does not charge the action economy", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 5,
+            name: "Font of Inspiration",
+            description:
+              "You can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
+            limitedUses: { type: "class_resource", classResourceKey: "bardic_inspiration" },
+          } as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const font = actions.find((action) => action.name === "Font of Inspiration")
+    expect(font?.trigger).toBe("No action required")
+    expect(font?.spendsEconomy).toBe(false)
+  })
+
+  it("cards a drop-to-0 escape hatch that has uses but no action cost", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 9,
+              name: "Cheat Death",
+              description:
+                "When you are reduced to 0 hit points, you can instead drop to 1 hit point.",
+              limitedUses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long" }] },
+            } as unknown as Feature,
+          ],
+          20,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Cheat Death")?.trigger).toBe(
+      "When reduced to 0 HP",
+    )
+  })
+
+  it("leaves features with a real action cost out of the triggered bucket", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Second Wind",
+            description: "As a Bonus Action, you regain hit points when you fail to press on.",
+            limitedUses: { type: "fixed", fixedAmount: 2 },
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const secondWind = actions.find((action) => action.name === "Second Wind")
+    expect(secondWind?.kinds).toEqual(["bonus"])
+    expect(secondWind?.trigger ?? null).toBeNull()
+  })
+
+  it("ignores a trigger phrase when nothing is spent", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Blessed Strikes",
+            description: "When you hit a creature with a cantrip, it takes extra radiant damage.",
+          } as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.map((action) => action.name)).not.toContain("Blessed Strikes")
+  })
+
+  it("does not read an action cost out of a phrase that rules one out", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 10,
+              name: "Divine Intervention",
+              description:
+                "As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast.",
+              limitedUses: { type: "fixed", fixedAmount: 1 },
+            } as unknown as Feature,
+          ],
+          20,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Divine Intervention")?.kinds).not.toContain(
+      "reaction",
+    )
+  })
+})
+
+describe("on-hit rider pickers", () => {
+  const cunningStrike = {
+    level: 5,
+    name: "Cunning Strike",
+    description: "When you deal Sneak Attack damage, you can add one Cunning Strike effect.",
+    linkedModifiers: [
+      {
+        instanceId: "modinst_cunning",
+        catalogRefId: "cat_char_bonus_damage_riders",
+        characteristics: [
+          {
+            id: "mod_cunning",
+            type: "bonus_damage_riders",
+            riders: [
+              { name: "Poison", costDice: "1d6", saveAbility: "Constitution", conditionOnFailedSave: "Poisoned" },
+              { name: "Trip", costDice: "1d6", saveAbility: "Dexterity", conditionOnFailedSave: "Prone" },
+              { name: "Withdraw", costDice: "1d6", description: "Move half your Speed." },
+            ],
+          },
+        ],
+      },
+    ],
+  } as unknown as Feature
+
+  it("exposes riders as pickable options with their dice cost", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([cunningStrike], 20)],
+      species: null,
+    })
+    const strike = actions.find((action) => action.name === "Cunning Strike")
+    expect(strike?.trigger).toBe("On a hit")
+    expect(strike?.category).toBe("combat")
+    expect(strike?.menuOptions?.map((option) => option.name)).toEqual([
+      "Poison",
+      "Trip",
+      "Withdraw",
+    ])
+    expect(strike?.menuOptions?.[0]?.costLabel).toBe("1d6")
+    expect(strike?.menuOptions?.[0]?.description).toContain("Constitution save or Poisoned")
+  })
+
+  it("charges the authored resource amount for an on-hit trigger spend", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 17,
+              name: "Quivering Palm",
+              description:
+                "When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start imperceptible vibrations.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_qp",
+                  catalogRefId: "cat_char_on_hit_trigger",
+                  characteristics: [
+                    {
+                      id: "mod_qp",
+                      type: "on_hit_trigger",
+                      spendResourceKey: "focus_points",
+                      spendResourceAmount: 4,
+                    },
+                  ],
+                },
+              ],
+            } as unknown as Feature,
+          ],
+          20,
+        ),
+      ],
+      species: null,
+    })
+    const palm = actions.find((action) => action.name === "Quivering Palm")
+    expect(palm?.classResourceKey).toBe("focus_points")
+    expect(palm?.limitedUses?.classResourceAmount).toBe(4)
+  })
+})
+
+describe("combat / utility tab classification", () => {
+  it("files reactions on the Combat tab even without combat vocabulary", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 7,
+              name: "Countercharm",
+              description:
+                "You can take a Reaction to start a performance; allies have Advantage on saves against being Frightened or Charmed.",
+            } as Feature,
+          ],
+          20,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Countercharm")?.category).toBe("combat")
+  })
+
+  it("files a Bonus Action that spends a pool on the Combat tab", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Bardic Inspiration",
+            description:
+              "As a Bonus Action, you can inspire another creature within 60 feet who can see or hear you.",
+            limitedUses: { type: "class_resource", classResourceKey: "bardic_inspiration" },
+          } as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Bardic Inspiration")?.category).toBe("combat")
+  })
+
+  it("keeps a downtime Bonus Action on the Abilities tab", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 20,
+              name: "Magnum Opus",
+              description:
+                "As a Bonus Action while crafting in your workshop, you can finish a legendary item.",
+              limitedUses: { type: "fixed", fixedAmount: 1 },
+            } as unknown as Feature,
+          ],
+          20,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Magnum Opus")?.category).toBe("utility")
   })
 })

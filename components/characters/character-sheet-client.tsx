@@ -210,6 +210,7 @@ import {
   applySheetToggleChange,
   clearExclusiveSheetToggleGroup,
   END_WEAPON_MORPH_TOGGLE_ID,
+  getSheetToggleDefinition,
   GUARDIAN_TACTICS_TOGGLES,
   inactiveSheetToggleLabel,
   PRIMORDIAL_ASPECT_TOGGLES,
@@ -268,7 +269,20 @@ import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-button
 import { SheetRestChooser } from "@/components/character-sheet/sheet-rest-chooser"
 import { BannerStatusMenu } from "@/components/character-sheet/banner-status-menu"
 import { SheetRestOverlay } from "@/components/character-sheet/sheet-rest-overlay"
-import { applySheetRest, applyInitiativeResourceRecharge } from "@/lib/character/sheet-rest"
+import {
+  applySheetRest,
+  applyInitiativeResourceRecharge,
+  applyMinimumResourceRemaining,
+  pactSlotRestoreCount,
+  restoreExpendedSpellSlots,
+  restoreSpellSlotsByCombinedLevel,
+  charnelTouchRestoreFromSlot,
+  spendLowestAvailableSpellSlot,
+} from "@/lib/character/sheet-rest"
+import {
+  applyFeatureResourceRefresh,
+  collectResourceRefreshEffects,
+} from "@/lib/character/collect-resource-refresh-effects"
 import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
 import { weaponTargetFromEquipment } from "@/lib/builder/weapon-property-prerequisite"
@@ -639,6 +653,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [activeConditions, setActiveConditions] = useState<string[]>([])
   const [exhaustionLevel, setExhaustionLevel] = useState(0)
   const [activeSheetToggleIds, setActiveSheetToggleIds] = useState<string[]>([])
+  const [sheetToggleNotes, setSheetToggleNotes] = useState<Record<string, string>>({})
   const [sessionHydrated, setSessionHydrated] = useState(false)
   const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
@@ -772,6 +787,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setActiveConditions(playState.activeConditions)
         setExhaustionLevel(playState.exhaustionLevel)
         setActiveSheetToggleIds(playState.activeSheetToggleIds)
+        setSheetToggleNotes(playState.sheetToggleNotes)
         setUsedResourcesById(playState.usedResourcesById)
         setUsedActionUsesById(playState.usedActionUsesById)
         setUsedSpellSlotsByKey(playState.usedSpellSlotsByKey)
@@ -882,6 +898,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         activeConditions,
         exhaustionLevel,
         activeSheetToggleIds,
+        sheetToggleNotes,
         usedResourcesById,
         usedActionUsesById,
         usedSpellSlotsByKey,
@@ -912,6 +929,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     activeConditions,
     exhaustionLevel,
     activeSheetToggleIds,
+    sheetToggleNotes,
     usedResourcesById,
     usedActionUsesById,
     usedSpellSlotsByKey,
@@ -1456,13 +1474,20 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (hasGuardianTactics) dynamic.push(...GUARDIAN_TACTICS_TOGGLES)
     // Always available for exclusive-group activation from Weapon Morph Use menu.
     dynamic.push(...WEAPON_MORPH_TOGGLES)
+    const mindRiderToggle = getSheetToggleDefinition("mind_rider_active")
+    if (
+      mindRiderToggle &&
+      customAbilities.some((ability) => /^mind rider$/i.test(ability.name ?? ""))
+    ) {
+      dynamic.push(mindRiderToggle)
+    }
     dynamic.push(...magicItemToggleDefinitions(magicItemPowers, equipmentById))
     for (const entry of classDetails) {
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.class?.new_toggles))
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.subclass?.new_toggles))
     }
     return buildCharacterSheetToggleDefinitions(referencedSheetToggleIds, dynamic)
-  }, [classDetails, referencedSheetToggleIds, magicItemPowers, equipmentById])
+  }, [classDetails, referencedSheetToggleIds, magicItemPowers, equipmentById, customAbilities])
 
   const manualSheetToggles = useMemo(
     () =>
@@ -1570,13 +1595,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [])
 
   const renderManualToggleButton = useCallback(
-    (toggle: { id: string; label: string }) => {
+    (toggle: SheetToggleDefinition) => {
       const active = activeSheetToggleIds.includes(toggle.id)
       const isRagingToggle = toggle.id === "while_raging"
       const isInnateSorceryToggle = toggle.id === "while_innate_sorcery_active"
       const label = active ? toggle.label : inactiveSheetToggleLabel(toggle.label)
       const RagingIcon = active ? Angry : Smile
-      return (
+      const toggleButton = (
         <button
           key={toggle.id}
           type="button"
@@ -1605,8 +1630,45 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           )}
         </button>
       )
+      if (!toggle.noteLabel) {
+        return toggleButton
+      }
+      return (
+        <div
+          key={toggle.id}
+          className="flex min-w-[14rem] flex-col gap-1 rounded-lg border border-border bg-card/70 p-2"
+        >
+          {toggleButton}
+          {active ? (
+            <>
+              <label className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                {toggle.noteLabel}
+                <input
+                  type="text"
+                  value={sheetToggleNotes[toggle.id] ?? ""}
+                  maxLength={200}
+                  placeholder={toggle.notePlaceholder}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setSheetToggleNotes((previous) => {
+                      const next = { ...previous }
+                      if (value) next[toggle.id] = value
+                      else delete next[toggle.id]
+                      return next
+                    })
+                  }}
+                  className="mt-1 min-h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-normal normal-case tracking-normal text-foreground"
+                />
+              </label>
+              {toggle.hint ? (
+                <p className="text-[10px] leading-snug text-muted-foreground">{toggle.hint}</p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      )
     },
-    [activeSheetToggleIds, toggleSheetToggle],
+    [activeSheetToggleIds, sheetToggleNotes, toggleSheetToggle],
   )
 
   const buildCurrentPlayState = useCallback(
@@ -1615,6 +1677,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         activeConditions,
         exhaustionLevel,
         activeSheetToggleIds,
+        sheetToggleNotes,
         usedResourcesById,
         usedActionUsesById,
         usedSpellSlotsByKey,
@@ -1642,6 +1705,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       activeConditions,
       exhaustionLevel,
       activeSheetToggleIds,
+      sheetToggleNotes,
       usedResourcesById,
       usedActionUsesById,
       usedSpellSlotsByKey,
@@ -2041,11 +2105,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     if (!selectedSpell) return null
 
     const spellResourceCost = spellResourceCastCosts.get(selectedSpell.id) ?? null
+    const pointPoolKey = pointPoolClassDetail?.class
+      ? getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)?.resource_key
+      : null
+    const martyrSpellUses = classDetails.some((entry) =>
+      resolveClassResourcesForClass(entry.class ?? { id: "", name: "", class_resources: null }).some(
+        (row) => row.id === "spell_uses" || row.id.endsWith("_spell_uses"),
+      ),
+    )
     const pointsState = availablePointsForResourceKey(
       spellResourceCost?.resourceKey ??
-        (pointPoolClassDetail?.class
-          ? getPointPoolSpellcasting(pointPoolClassDetail.class.spellcasting)?.resource_key
-          : null) ??
+        pointPoolKey ??
+        (martyrSpellUses ? "spell_uses" : null) ??
         sorceryPointsState?.resourceKey,
     )
     const availablePoints = pointsState.available
@@ -2365,11 +2436,69 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     ])
   }, [])
 
-  const handleInitiativeRoll = useCallback(() => {
-    setUsedResourcesById((prev) =>
-      applyInitiativeResourceRecharge(prev, spendableResourceEntries, usesResolveContext),
+  const philosophersStoneReagentEntry = useMemo(() => {
+    const hasFeature = classDetails.some(
+      (entry) =>
+        /^alchemist$/i.test(entry.class?.name ?? "") &&
+        entry.row.level >= 20 &&
+        (entry.class?.features ?? []).some((feature) =>
+          /^philosopher[’']?s stone$/i.test(feature.name ?? ""),
+        ),
     )
-  }, [spendableResourceEntries, usesResolveContext])
+    if (!hasFeature) return null
+    return (
+      spendableResourceEntries.find(
+        (entry) => /^reagents$/i.test(entry.name) || entry.id.endsWith("_reagents"),
+      ) ?? null
+    )
+  }, [classDetails, spendableResourceEntries])
+
+  const resourceRefreshEffects = useMemo(
+    () => collectResourceRefreshEffects(classDetails, modifierCatalog),
+    [classDetails, modifierCatalog],
+  )
+
+  const handleInitiativeRoll = useCallback(() => {
+    const afterPool = applyInitiativeResourceRecharge(
+      usedResourcesById,
+      spendableResourceEntries,
+      usesResolveContext,
+    )
+    const refreshed = applyFeatureResourceRefresh({
+      usedResourcesById: afterPool,
+      resourceEntries: spendableResourceEntries,
+      resolveContext: usesResolveContext,
+      effects: resourceRefreshEffects,
+      trigger: "initiative",
+      rechargeCapsByResourceId,
+    })
+    let next = refreshed.usedResourcesById
+    if (philosophersStoneReagentEntry) {
+      const max =
+        resolveUsesAtLevel(
+          philosophersStoneReagentEntry.uses,
+          philosophersStoneReagentEntry.classLevel,
+          usesResolveContext,
+        ) ?? 0
+      next = {
+        ...next,
+        [philosophersStoneReagentEntry.id]: applyMinimumResourceRemaining(
+          next[philosophersStoneReagentEntry.id] ?? 0,
+          max,
+          6,
+        ),
+      }
+    }
+    setUsedResourcesById(next)
+    setRechargeCapsByResourceId(refreshed.rechargeCapsByResourceId)
+  }, [
+    usedResourcesById,
+    spendableResourceEntries,
+    usesResolveContext,
+    philosophersStoneReagentEntry,
+    resourceRefreshEffects,
+    rechargeCapsByResourceId,
+  ])
 
   const turnStartTriggers = useMemo(
     () => collectTurnStartTriggers(classDetails, modifierCatalog),
@@ -2538,6 +2667,16 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const handleTurnStart = useCallback(() => {
     setActionEconomySpent(emptyActionEconomySpent())
+    // Full Awakening lasts until the start of your next turn.
+    setActiveSheetToggleIds((prev) =>
+      prev.includes("full_awakening_active")
+        ? prev.filter((id) => id !== "full_awakening_active")
+        : prev,
+    )
+    // Flesh Warp Mutation Die clears at the start of the caster's next turn.
+    setMutationDie((prev) =>
+      prev?.clearHint === "start_of_caster_next_turn" ? null : prev,
+    )
     if (hasRampageDie) {
       const advanced = advanceRampageDieTurn({
         state: rampageDieState,
@@ -2603,6 +2742,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         sheetActions,
         resolveContext: usesResolveContext,
         rechargeCapsByResourceId,
+        resourceRefreshEffects,
       })
       setUsedSpellSlotsByKey(result.usedSpellSlotsByKey)
       setUsedResourcesById(result.usedResourcesById)
@@ -2656,10 +2796,115 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       sheetActions,
       usesResolveContext,
       rechargeCapsByResourceId,
+      resourceRefreshEffects,
       classDetails,
       usedHitDiceByClassId,
       resourceDieSidesByKey.rampage_die,
     ],
+  )
+
+  const handleRestorePactSlots = useCallback(
+    (mode: "half_round_up" | "all") => {
+      const pactTable = spellSlotTables.find((table) => table.type === "pact")
+      if (pactTable) {
+        const key = spellSlotTableKey(pactTable)
+        const restoreCount = pactSlotRestoreCount(pactTable.slotsByLevel, mode)
+        setUsedSpellSlotsByKey((prev) => ({
+          ...prev,
+          [key]: restoreExpendedSpellSlots(
+            prev[key] ?? pactTable.slotsByLevel.map(() => 0),
+            restoreCount,
+          ),
+        }))
+      }
+      const pactResource = resourceEntries.find(
+        (entry) =>
+          entry.id === "pact_magic_slots" || entry.id.endsWith("_pact_magic_slots"),
+      )
+      if (!pactResource) return
+      const max =
+        resolveUsesAtLevel(pactResource.uses, pactResource.classLevel, usesResolveContext) ?? 0
+      const restore =
+        mode === "all" ? max : Math.min(max, Math.max(1, Math.ceil(max / 2)))
+      setUsedResourcesById((prev) => {
+        const used = prev[pactResource.id] ?? 0
+        return { ...prev, [pactResource.id]: Math.max(0, used - restore) }
+      })
+    },
+    [spellSlotTables, resourceEntries, usesResolveContext],
+  )
+
+  const handleRestoreSpellSlotsByCombinedLevel = useCallback(
+    (classLevel: number, maxSlotLevel: number) => {
+      const budget = Math.max(1, Math.ceil(classLevel / 2))
+      setUsedSpellSlotsByKey((prev) => {
+        const next = { ...prev }
+        for (const table of spellSlotTables) {
+          if (table.type === "pact") continue
+          const key = spellSlotTableKey(table)
+          next[key] = restoreSpellSlotsByCombinedLevel(
+            prev[key] ?? table.slotsByLevel.map(() => 0),
+            budget,
+            maxSlotLevel,
+          )
+        }
+        return next
+      })
+    },
+    [spellSlotTables],
+  )
+
+  const handleRestoreResourceFromSpellSlot = useCallback(
+    (spec: {
+      resourceKey: string
+      classId?: string | null
+      ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+    }) => {
+      const table = spellSlotTables.find((row) => row.type !== "pact") ?? spellSlotTables[0]
+      if (!table) return null
+      const key = spellSlotTableKey(table)
+      const usedSlots = usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)
+      let spentLevel: number | null = null
+      const nextUsedSlots = [...usedSlots]
+      for (let index = 0; index < table.slotsByLevel.length; index += 1) {
+        if ((nextUsedSlots[index] ?? 0) < (table.slotsByLevel[index] ?? 0)) {
+          nextUsedSlots[index] = (nextUsedSlots[index] ?? 0) + 1
+          spentLevel = index + 1
+          break
+        }
+      }
+      if (spentLevel == null) return null
+      const resource = resourceEntries.find(
+        (entry) =>
+          entry.id === spec.resourceKey ||
+          entry.id === `${spec.classId ?? ""}_${spec.resourceKey}` ||
+          entry.id.endsWith(`_${spec.resourceKey}`),
+      )
+      if (!resource) return null
+      const abilityMod = usesResolveContext.abilityModifiers?.[spec.ability] ?? 0
+      const restore = charnelTouchRestoreFromSlot(abilityMod, spentLevel)
+      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: nextUsedSlots }))
+      setUsedResourcesById((prev) => {
+        const used = prev[resource.id] ?? 0
+        return { ...prev, [resource.id]: Math.max(0, used - restore) }
+      })
+      return `Spent a ${spentLevel}-level slot; restored ${restore} ${resource.name}`
+    },
+    [spellSlotTables, usedSpellSlotsByKey, resourceEntries, usesResolveContext],
+  )
+
+  const handleSpendSpellSlot = useCallback(
+    (minSpellLevel: number) => {
+      const table = spellSlotTables.find((row) => row.type !== "pact") ?? spellSlotTables[0]
+      if (!table) return null
+      const key = spellSlotTableKey(table)
+      const usedSlots = usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)
+      const spent = spendLowestAvailableSpellSlot(usedSlots, table.slotsByLevel, minSpellLevel)
+      if (!spent) return null
+      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: spent.nextUsed }))
+      return `Spent a ${spent.spentLevel}-level slot for Advantage on a Wisdom check`
+    },
+    [spellSlotTables, usedSpellSlotsByKey],
   )
 
   const openConditionMenu = () => {
@@ -3503,7 +3748,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => setLevelUpOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-border bg-card font-bold text-sm hover:border-primary transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-lemon text-lemon-foreground font-bold text-sm hover:brightness-110 transition-all"
               title="Level up"
             >
               <Award className="w-4 h-4" />
@@ -4579,6 +4824,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     }
                     allyCandidates={allyCandidates}
                     healContext={healContext}
+                    onRestorePactSlots={handleRestorePactSlots}
+                    onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
+                    onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
+                    onSpendSpellSlot={handleSpendSpellSlot}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
@@ -4824,6 +5073,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         allyCandidates={allyCandidates}
                         healContext={healContext}
                         singleColumn={false}
+                        onRestorePactSlots={handleRestorePactSlots}
+                        onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
+                        onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
+                        onSpendSpellSlot={handleSpendSpellSlot}
                       />
                     </div>
                     {!equippedWeaponCards.length && !combatActions.length ? (

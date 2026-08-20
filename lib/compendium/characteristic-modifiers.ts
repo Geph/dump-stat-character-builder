@@ -716,6 +716,12 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   radiusIncreaseFeetPerResource?: number | null
   /** Explode save DC uses higher of STR or DEX mod when set. */
   saveDCAbilityChoice?: "STR" | "DEX" | "higher_str_dex" | null
+  /** Optional alternate save DC ability the character may use instead (Alchemist INT). */
+  alternateSaveDCAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  /** Ability modifier added to damage; "attack" reuses the attack's governing modifier. */
+  damageAbilityModifier?: "attack" | "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  /** Minimum value when adding damageAbilityModifier (Intelligent Explosions: minimum +1). */
+  damageAbilityMinimum?: number | null
   /** Omit positive ability modifier from damage (Explode). */
   omitPositiveAbilityModFromDamage?: boolean
 }
@@ -1129,6 +1135,8 @@ export interface ResourceAbilityMenuOption {
   name: string
   description?: string
   resourceCost?: number
+  /** Action economy spent by this specific option when the parent feature offers mixed timings. */
+  actionKind?: "action" | "bonus" | "reaction"
   /** Spend this many Hit Point Dice when this menu option is used. */
   hitDiceCost?: number | null
   /** Waive resourceCost when character's element specialization matches. */

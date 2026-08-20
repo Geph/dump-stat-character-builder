@@ -174,10 +174,21 @@ describe("KibblesTasty Warden enrichment sanitize", () => {
     expect(sanitized.import_proposals?.custom_abilities?.[0]?.ability_role).toBe("knack")
   })
 
-  it("sets endurance_dice rechargeOnInitiative from Empowered Endurance", () => {
+  it("wires Empowered Endurance as a feature-gated restore instead of pool initiative recharge", () => {
     const enriched = applyImportEnrichmentPresets(sampleKibblesWarden())
     const dice = enriched.class_resources?.find((r) => r.resource_key === "endurance_dice")
-    expect(dice?.uses.rechargeOnInitiative).toBe(1)
+    expect(dice?.uses.rechargeOnInitiative).toBeUndefined()
+    const feature = enriched.classes?.[0]?.features?.find((f) => f.name === "Empowered Endurance")
+    expect(
+      (feature?.linkedModifiers ?? []).some((mod) =>
+        (mod.activation?.effects ?? []).some(
+          (effect) =>
+            effect.resourceRefreshOnInitiative === true &&
+            effect.classResourceKey === "endurance_dice" &&
+            effect.resourceRefreshCap === 1,
+        ),
+      ),
+    ).toBe(true)
   })
 
   it("audits clean after sanitize", () => {

@@ -90,7 +90,17 @@ describe("Gunslinger enrichment", () => {
     expect(
       (enriched.class_resources?.[0]?.uses as { rechargeOnInitiative?: boolean | number })
         ?.rechargeOnInitiative,
-    ).toBe(1)
+    ).toBeUndefined()
+
+    const dire = enriched.classes?.[0]?.features?.find((f) => f.name === "Dire Gambit") as Feature
+    const direRefresh = (dire.linkedModifiers ?? []).flatMap(
+      (mod) => mod.activation?.effects ?? [],
+    ).find((effect) => effect.resourceRefreshOnInitiative)
+    expect(direRefresh).toMatchObject({
+      classResourceKey: "risk_dice",
+      classResourceAmount: 1,
+      resourceRefreshOnInitiative: true,
+    })
 
     const names = enriched.import_proposals?.custom_abilities?.map((a) => a.name) ?? []
     expect(names).toContain("Skin of Your Teeth")

@@ -117,7 +117,6 @@ function ensureArcaneSurgeResource(
           { level: 11, count: 3 },
         ],
         recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
-        rechargeOnInitiative: 1,
       },
     },
   ]
@@ -418,8 +417,27 @@ export const WARMAGE_PRESETS: EnrichmentPreset[] = [
     match: { className: /warmage/i, name: /^master warmage$/i },
     operations: [
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "master_warmage_init",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: "mod_master_warmage_init",
+              kind: "class_resource",
+              classResourceKey: "arcane_surge",
+              classResourceChange: "reset",
+              resourceRefreshOnInitiative: true,
+              resourceRefreshCap: 1,
+              label: "Regain Arcane Surge until you have 1 on Initiative",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
-        text: "When you roll Initiative with 0 Arcane Surge uses, regain 1 (uses.rechargeOnInitiative: 1 on arcane_surge).",
+        text: "When you roll Initiative with 0 Arcane Surge uses, regain 1 (feature-gated; not on the pool at earlier levels).",
       },
     ],
   },

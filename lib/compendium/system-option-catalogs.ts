@@ -116,6 +116,20 @@ export function buildDefaultMetamagicOptions(): ModifierCatalogEntry[] {
       description:
         "When you cast a spell that can target only one creature and doesn't have a range of self, you can spend Sorcery Points equal to the spell's level to target a second creature within range.",
     },
+    {
+      name: "Heightened Spell",
+      group: "Metamagic",
+      summary: "Cost: 2 SP · One target has Disadvantage on its save",
+      description:
+        "When you cast a spell that forces a creature to make a saving throw, you can spend 2 Sorcery Points to give one target of the spell Disadvantage on its first saving throw against the spell.",
+    },
+    {
+      name: "Quickened Spell",
+      group: "Metamagic",
+      summary: "Cost: 2 SP · Cast with a Bonus Action",
+      description:
+        "When you cast a spell that has a casting time of an action, you can spend 2 Sorcery Points to change the casting time to a Bonus Action for this casting.",
+    },
   ]
   return entries.map((entry, index) =>
     optionEntry(`cat_metamagic_${index}`, entry.name, entry.summary!, entry.description!, entry.group as string),

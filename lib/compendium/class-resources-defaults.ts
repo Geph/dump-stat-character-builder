@@ -2,11 +2,14 @@ import type { ClassResource } from "@/lib/types"
 import { spellSlotResourceUsesForCasterType } from "@/lib/compendium/spell-slots"
 
 const LONG_REST = [{ rest: "long_rest" as const }]
-const SHORT_REST = [{ rest: "short_rest" as const }]
 const SHORT_OR_LONG_REST = [{ rest: "short_rest" as const }, { rest: "long_rest" as const }]
+const SHORT_PLUS_ONE_AND_LONG = [
+  { rest: "short_rest" as const, amount: 1 },
+  { rest: "long_rest" as const },
+]
 
 const CHANNEL_DIVINITY_DESCRIPTION =
-  "Spent when you use Channel Divinity or a feature that requires it. Cleric options include Preserve Life and Turn Undead; Paladin options include Sacred Weapon and similar oath features. Recharges on a short or long rest."
+        "Spent when you use Channel Divinity or a feature that requires it. Cleric options include Preserve Life and Turn Undead; Paladin options include Sacred Weapon and similar oath features. Regain 1 expended use on a Short Rest and all expended uses on a Long Rest."
 
 const SPELL_SLOTS_FULL: ClassResource = {
   id: "spell_slots",
@@ -40,16 +43,17 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "rage",
       name: "Rage",
       description:
-        "Spent when you use the Rage feature (Bonus Action) to enter a Rage for 1 minute. While raging: resistance to Bludgeoning, Piercing, and Slashing; bonus damage on Strength attacks; advantage on Strength checks and saves. 2 uses at level 1, scaling to 5 at level 17. Recharges on a long rest.",
+        "Spent when you use the Rage feature (Bonus Action) to enter a Rage. 2 uses at level 1, 3 at 3, 4 at 6, 5 at 12, 6 at 17. Regain 1 expended use on a Short Rest and all expended uses on a Long Rest.",
       uses: {
         type: "at_level",
         atLevelMode: "tier",
-        recharges: LONG_REST,
+        recharges: SHORT_PLUS_ONE_AND_LONG,
         atLevelTable: [
           { level: 1, count: 2 },
-          { level: 6, count: 3 },
-          { level: 12, count: 4 },
-          { level: 17, count: 5 },
+          { level: 3, count: 3 },
+          { level: 6, count: 4 },
+          { level: 12, count: 5 },
+          { level: 17, count: 6 },
         ],
       },
     },
@@ -59,11 +63,12 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "bardic_inspiration",
       name: "Bardic Inspiration",
       description:
-        "Spent when you grant Bardic Inspiration to a creature (Bonus Action). The inspiration die starts at d6 and becomes d8 at level 5, d10 at level 10, and d12 at level 15. Uses equal to Charisma modifier (minimum 1). Recharges on a long rest.",
+        "Spent when you grant Bardic Inspiration to a creature (Bonus Action). The inspiration die starts at d6 and becomes d8 at level 5, d10 at level 10, and d12 at level 15. Uses equal to Charisma modifier (minimum 1). Recharges on a long rest. Font of Inspiration (level 5): also recharges on a short rest, and you can expend a spell slot to regain one use.",
       uses: {
         type: "ability_modifier",
         abilityModifier: "CHA",
         recharges: LONG_REST,
+        restoreBySpellSlot: { minSpellLevel: 1, restores: 1 },
         dieType: "d6",
         dieSidesByLevel: [
           { level: 1, count: 6 },
@@ -83,7 +88,7 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       uses: {
         type: "at_level",
         atLevelMode: "tier",
-        recharges: SHORT_OR_LONG_REST,
+        recharges: SHORT_PLUS_ONE_AND_LONG,
         atLevelTable: [
           { level: 2, count: 2 },
           { level: 6, count: 3 },
@@ -98,15 +103,15 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "wild_shape",
       name: "Wild Shape",
       description:
-        "Spent when you use Wild Shape (Bonus Action) to assume a Beast form. 2 uses at level 2, 3 at level 4, 4 at level 10. Recharges on a long rest.",
+        "Spent when you use Wild Shape (Bonus Action) to assume a Beast form. 2 uses at level 2, 3 at 6, 4 at 17. Regain 1 expended use on a Short Rest and all expended uses on a Long Rest.",
       uses: {
         type: "at_level",
         atLevelMode: "tier",
-        recharges: LONG_REST,
+        recharges: SHORT_PLUS_ONE_AND_LONG,
         atLevelTable: [
           { level: 2, count: 2 },
-          { level: 4, count: 3 },
-          { level: 10, count: 4 },
+          { level: 6, count: 3 },
+          { level: 17, count: 4 },
         ],
       },
     },
@@ -117,8 +122,17 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "second_wind",
       name: "Second Wind",
       description:
-        "Spent when you use Second Wind (Bonus Action) to regain Hit Points (1d10 + Fighter level). 2 uses per short rest.",
-      uses: { type: "fixed", fixedAmount: 2, recharges: SHORT_REST },
+        "Spent when you use Second Wind (Bonus Action) to regain Hit Points (1d10 + Fighter level). 2 uses at level 1, 3 at 4, 4 at 10. Regain 1 expended use on a Short Rest and all expended uses on a Long Rest.",
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        recharges: SHORT_PLUS_ONE_AND_LONG,
+        atLevelTable: [
+          { level: 1, count: 2 },
+          { level: 4, count: 3 },
+          { level: 10, count: 4 },
+        ],
+      },
     },
   ],
   Monk: [
@@ -140,7 +154,15 @@ export const SRD_CLASS_RESOURCES_BY_NAME: Record<string, ClassResource[]> = {
       id: "channel_divinity",
       name: "Channel Divinity",
       description: CHANNEL_DIVINITY_DESCRIPTION,
-      uses: { type: "fixed", fixedAmount: 2, recharges: SHORT_OR_LONG_REST },
+      uses: {
+        type: "at_level",
+        atLevelMode: "tier",
+        recharges: SHORT_PLUS_ONE_AND_LONG,
+        atLevelTable: [
+          { level: 3, count: 2 },
+          { level: 11, count: 3 },
+        ],
+      },
     },
     {
       id: "lay_on_hands",

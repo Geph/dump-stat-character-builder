@@ -1620,17 +1620,28 @@ function resourceResetOnInitiative(
   resourceKey: string,
   cap?: number,
   label?: string,
+  options?: { oncePerLongRest?: boolean; restoreAmount?: number },
 ): LinkedModifierInstance {
-  return fxInstance(`modinst_init_refresh_${resourceKey}`, CLASS_RESOURCE_CATALOG_ID, {
+  const suffix =
+    cap != null
+      ? `_until${cap}`
+      : options?.oncePerLongRest
+        ? "_once"
+        : options?.restoreAmount != null
+          ? `_amt${options.restoreAmount}`
+          : ""
+  return fxInstance(`modinst_init_refresh_${resourceKey}${suffix}`, CLASS_RESOURCE_CATALOG_ID, {
     onInitiative: true,
     effects: [
       {
-        id: modId(`init_refresh_${resourceKey}`),
+        id: modId(`init_refresh_${resourceKey}${suffix}`),
         kind: "class_resource",
         classResourceKey: resourceKey,
         classResourceChange: "reset",
         resourceRefreshOnInitiative: true,
         resourceRefreshCap: cap ?? null,
+        classResourceAmount: options?.restoreAmount ?? null,
+        resourceRefreshOncePerLongRest: options?.oncePerLongRest ?? false,
         label,
       },
     ],
@@ -1660,6 +1671,7 @@ function resourceResetHalfLevel(
   resourceKey: string,
   rest: "short_rest" | "long_rest" | "short_or_long_rest",
   label?: string,
+  round: "up" | "down" = "up",
 ): LinkedModifierInstance {
   return fxInstance(`modinst_half_refresh_${resourceKey}`, CLASS_RESOURCE_CATALOG_ID, {
     effects: [
@@ -1669,7 +1681,7 @@ function resourceResetHalfLevel(
         classResourceKey: resourceKey,
         classResourceChange: "reset",
         resourceRefreshOnRest: rest,
-        resourceRefreshFormula: "half_level",
+        resourceRefreshFormula: round === "down" ? "half_level_down" : "half_level",
         label,
       },
     ],
@@ -2174,7 +2186,10 @@ function intimidatingPresence(): LinkedModifierInstance[] {
 
 function naturesVeil(): LinkedModifierInstance[] {
   return [
-    usesPool({ type: "proficiency", recharges: [{ rest: "long_rest" }] }, "Nature's Veil"),
+    usesPool(
+      { type: "ability_modifier", abilityModifier: "WIS", recharges: [{ rest: "long_rest" }] },
+      "Nature's Veil",
+    ),
     fxInstance("modinst_natures_veil", MODIFY_CREATURE_CATALOG_ID, {
       bonusAction: true,
       effects: [
@@ -2210,6 +2225,57 @@ function fastHandsMenu(): LinkedModifierInstance {
           resourceCost: 0,
           description:
             "Take the Utilize action, or take the Magic action to use a magic item that requires that action.",
+        },
+      ],
+    },
+  ])
+}
+
+function psiWarriorPowerMenu(): LinkedModifierInstance {
+  return charInstance("modinst_psi_warrior_powers", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+    {
+      id: modId("psi_warrior_powers"),
+      type: "resource_ability_menu",
+      resourceKey: "psionic_energy_dice",
+      options: [
+        {
+          name: "Protective Field",
+          resourceCost: 1,
+          actionKind: "reaction",
+          description:
+            "When you or a creature you can see within 30 feet takes damage, expend a Psionic Energy Die to reduce the damage by the number rolled + your Intelligence modifier.",
+        },
+        {
+          name: "Psionic Strike",
+          resourceCost: 1,
+          description:
+            "Once per turn when you hit a target with a weapon, expend a Psionic Energy Die to deal extra Psychic damage equal to the number rolled + your Intelligence modifier.",
+        },
+        {
+          name: "Telekinetic Movement",
+          resourceCost: 1,
+          actionKind: "action",
+          description:
+            "Magic action: move one Large or smaller object or willing creature you can see within 30 feet up to 30 feet.",
+        },
+      ],
+    },
+  ])
+}
+
+function soulknifePowerMenu(): LinkedModifierInstance {
+  return charInstance("modinst_soulknife_powers", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+    {
+      id: modId("soulknife_powers"),
+      type: "resource_ability_menu",
+      resourceKey: "psionic_energy_dice",
+      options: [
+        {
+          name: "Psychic Whispers",
+          resourceCost: 1,
+          actionKind: "action",
+          description:
+            "Magic action: expend a Psionic Energy Die to speak telepathically with up to PB creatures for a number of hours equal to the number rolled.",
         },
       ],
     },
@@ -2403,9 +2469,9 @@ function replicateMagicItemPreset(): LinkedModifierInstance[] {
 function mysticArcanumPreset(): LinkedModifierInstance[] {
   return innateArcanumPresetForClass("Warlock", [
     { spellLevel: 6, classLevel: 11 },
-    { spellLevel: 7, classLevel: 11 },
-    { spellLevel: 8, classLevel: 11 },
-    { spellLevel: 9, classLevel: 11 },
+    { spellLevel: 7, classLevel: 13 },
+    { spellLevel: 8, classLevel: 15 },
+    { spellLevel: 9, classLevel: 17 },
   ])
 }
 
@@ -2657,7 +2723,17 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Scholar": [skillChoice(1, "Scholar skill proficiency")],
   "*::Slippery Mind": [savingThrows(["Wisdom", "Charisma"], "WIS & CHA saves")],
-  "*::Disciplined Survivor": [savingThrows(ALL_SAVES, "All saving throws")],
+  "*::Disciplined Survivor": [
+    savingThrows(ALL_SAVES, "All saving throws"),
+    usesPool(
+      {
+        type: "class_resource",
+        classResourceKey: "focus_points",
+        classResourceAmount: 1,
+      },
+      "Reroll a failed save (1 Focus Point)",
+    ),
+  ],
   "*::Martial Arts": {
     linkedModifiers: [
       unarmedDieByLevel(monkMartialArtsDieScaling(), "Martial Arts die"),
@@ -2694,7 +2770,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Stroke of Luck": [
     checkRollFloor("stroke_of_luck", { category: "other", below: 19, setTo: 20 }),
-    usesPool({ type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] }, "Stroke of Luck"),
+    usesPool(
+      { type: "fixed", fixedAmount: 1, recharges: [{ rest: "short_rest" }, { rest: "long_rest" }] },
+      "Stroke of Luck",
+    ),
   ],
   "*::Improved Critical": [
     criticalHitRangeByLevel(19, [{ level: 15, minimum: 18 }], "Critical hit on 19–20 (18–20 at level 15+)"),
@@ -2773,6 +2852,14 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Radiant Strikes": [extraDamageOnHit("radiant_strikes", "2d8")],
   "*::Wholeness of Body": [
     healSelfBonusAction("wholeness_of_body", { healAbility: "WIS", label: "Martial Arts die + WIS" }),
+    usesPool(
+      {
+        type: "ability_modifier",
+        abilityModifier: "WIS",
+        recharges: [{ rest: "long_rest" }],
+      },
+      "Wholeness of Body",
+    ),
   ],
   "*::Dragon Wings": {
     activation: { bonusAction: true },
@@ -2790,7 +2877,31 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Evasion": [evasion()],
   "*::Elusive": [elusive()],
   "*::Dark One's Blessing": [grantTempHpOnKill("Dark One's Blessing")],
-  "*::Tireless": [grantTempHpPool("Tireless temp HP")],
+  "*::Tireless": [
+    usesPool(
+      {
+        type: "ability_modifier",
+        abilityModifier: "WIS",
+        recharges: [{ rest: "long_rest" }],
+      },
+      "Tireless",
+    ),
+    fxInstance("modinst_tireless_temp_hp", GRANT_TEMP_HP_CATALOG_ID, {
+      action: true,
+      effects: [
+        {
+          id: modId("tireless_temp_hp"),
+          kind: "grant_temp_hp",
+          tempHpTrigger: "on_action",
+          healMode: "dice",
+          healDiceCount: 1,
+          healDieType: "d8",
+          healAbility: "WIS",
+          label: "Tireless: 1d8 + WIS temp HP",
+        },
+      ],
+    }),
+  ],
   "*::Aura of Protection": [
     auraPreset("aura_protection", {
       radiusFeet: 10,
@@ -2822,7 +2933,24 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Paladin's Smite": [alwaysPreparedSpells("Divine Smite")],
-  "*::Favored Enemy": [alwaysPreparedSpells("Hunter's Mark")],
+  "*::Favored Enemy": [
+    alwaysPreparedSpells("Hunter's Mark"),
+    usesPool(
+      {
+        type: "at_level",
+        atLevelMode: "tier",
+        recharges: [{ rest: "long_rest" }],
+        atLevelTable: [
+          { level: 1, count: 2 },
+          { level: 5, count: 3 },
+          { level: 9, count: 4 },
+          { level: 13, count: 5 },
+          { level: 17, count: 6 },
+        ],
+      },
+      "Favored Enemy (Hunter's Mark without a slot)",
+    ),
+  ],
   "*::Faithful Steed": [
     spellsKnownChar("faithful_steed", {
       alwaysPrepared: true,
@@ -2877,7 +3005,11 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
       ),
     ],
   },
-  "*::Persistent Rage": [resourceResetOnInitiative("rage", undefined, "Regain all Rage uses on Initiative")],
+  "*::Persistent Rage": [
+    resourceResetOnInitiative("rage", undefined, "Regain all Rage uses on Initiative", {
+      oncePerLongRest: true,
+    }),
+  ],
   "*::Font of Inspiration": [
     resourceResetOnRest("bardic_inspiration", "short_or_long_rest", "Regain all BI on Short/Long Rest"),
   ],
@@ -3003,10 +3135,18 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     linkedModifiers: [movementHalfSpeedOnExistingFeature("tactical_shift", "Second Wind")],
   },
   "*::Sorcerous Restoration": {
-    linkedModifiers: [resourceResetHalfLevel("sorcery_points", "short_rest", "Regain half level SP")],
+    linkedModifiers: [
+      resourceResetHalfLevel("sorcery_points", "short_rest", "Regain half Sorcerer level SP (round down)", "down"),
+    ],
   },
   "*::Magical Cunning": {
-    linkedModifiers: [resourceResetHalfLevel("pact_slots", "short_rest", "Regain half level pact slots")],
+    activation: { action: true, noEconomyCost: true },
+    linkedModifiers: [
+      usesPool(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Magical Cunning",
+      ),
+    ],
   },
   "*::Divine Intervention": {
     linkedModifiers: [
@@ -3213,7 +3353,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           {
             id: modId("eldritch_master"),
             kind: "class_resource",
-            classResourceKey: "pact_slots",
+            classResourceKey: "pact_magic_slots",
             classResourceChange: "reset",
             regainAllOnLinkedFeatureUse: true,
             linkedFeatureName: "Magical Cunning",
@@ -3225,12 +3365,15 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
 
   // —— Wizard school & spellbook ——
   "*::Arcane Recovery": {
+    activation: { action: true, noEconomyCost: true },
     linkedModifiers: [
       usesPool(
         {
-          type: "special",
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
           specialDescription:
-            "Once per Short Rest: recover spell slots totaling half Wizard level (rounded up), none above 5th level.",
+            "When you finish a Short Rest, recover spell slots totaling half Wizard level (rounded up), none of 6th level or higher. Once per Long Rest.",
         },
         "Arcane Recovery",
       ),
@@ -3576,9 +3719,23 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Archdruid": {
+    activation: { action: true, noEconomyCost: true },
     linkedModifiers: [
-      resourceResetOnInitiative("wild_shape", undefined, "Evergreen Wild Shape — regain uses on Initiative"),
-      usesPool({ type: "unlimited" }, "Unlimited Wild Shape at level 20"),
+      resourceResetOnInitiative(
+        "wild_shape",
+        1,
+        "Evergreen Wild Shape — regain 1 Wild Shape on Initiative if you have none",
+      ),
+      usesPool(
+        {
+          type: "fixed",
+          fixedAmount: 1,
+          recharges: [{ rest: "long_rest" }],
+          specialDescription:
+            "Nature Magician: convert unexpended Wild Shape uses into one spell slot (2 spell levels per use). Once per Long Rest.",
+        },
+        "Nature Magician",
+      ),
     ],
   },
   "*::Natural Recovery": {
@@ -3622,7 +3779,9 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   // —— Monk focus upgrades ——
   "*::Uncanny Metabolism": {
     linkedModifiers: [
-      resourceResetOnInitiative("focus_points", undefined, "Regain all Focus Points on Initiative"),
+      resourceResetOnInitiative("focus_points", undefined, "Regain all Focus Points on Initiative", {
+        oncePerLongRest: true,
+      }),
       healSelfBonusAction("uncanny_metabolism_heal"),
     ],
   },
@@ -3670,6 +3829,34 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           },
         ],
       }),
+    ],
+  },
+  "*::Deflect Attacks": {
+    activation: { reaction: true },
+    linkedModifiers: [
+      charInstance("modinst_deflect_attacks_menu", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+        {
+          id: modId("deflect_attacks_menu"),
+          type: "resource_ability_menu",
+          resourceKey: "focus_points",
+          options: [
+            {
+              name: "Reduce Damage",
+              resourceCost: 0,
+              actionKind: "reaction",
+              description:
+                "Reduce the attack's Bludgeoning, Piercing, or Slashing damage by 1d10 + DEX + Monk level.",
+            },
+            {
+              name: "Redirect Attack",
+              resourceCost: 1,
+              actionKind: "reaction",
+              description:
+                "If the reduction drops the damage to 0, spend 1 Focus Point to redirect the attack.",
+            },
+          ],
+        },
+      ]),
     ],
   },
   "*::Deflect Energy": {
@@ -3967,11 +4154,17 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   },
   "*::Hurl Through Hell": {
     linkedModifiers: [
+      usesPoolWithRestore(
+        { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+        "Hurl Through Hell",
+        undefined,
+        { minSpellLevel: 1, restores: 1 },
+      ),
       onHitTriggerPreset("hurl_through_hell", {
         appliesTo: "Attack roll",
         effectCatalogRefId: FORCE_SAVE_CATALOG_ID,
       }),
-      extraDamageOnHit("hurl_through_hell_damage", "10d10"),
+      extraDamageOnHit("hurl_through_hell_damage", "8d10"),
     ],
   },
 
@@ -4862,6 +5055,10 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   "*::Mantle of Inspiration": {
     activation: { bonusAction: true },
     linkedModifiers: [
+      usesPool(
+        { type: "class_resource", classResourceKey: "bardic_inspiration", classResourceAmount: 1 },
+        "Mantle of Inspiration",
+      ),
       fxInstance("modinst_mantle_inspiration", GRANT_TEMP_HP_CATALOG_ID, {
         bonusAction: true,
         effects: [
@@ -5205,6 +5402,59 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         },
         "Psionic Energy Dice",
       ),
+    ],
+  },
+  "Fighter::Psi Warrior::Psionic Power": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "psionic_energy_dice",
+          classResourceAmount: 1,
+        },
+        "Psionic Energy Dice",
+      ),
+      psiWarriorPowerMenu(),
+    ],
+  },
+  "Fighter::Psi Knight::Psionic Power": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "psionic_energy_dice",
+          classResourceAmount: 1,
+        },
+        "Psionic Energy Dice",
+      ),
+      psiWarriorPowerMenu(),
+    ],
+  },
+  "Rogue::Soulknife::Psionic Power": {
+    linkedModifiers: [
+      usesPool(
+        {
+          type: "class_resource",
+          classResourceKey: "psionic_energy_dice",
+          classResourceAmount: 1,
+        },
+        "Psionic Energy Dice",
+      ),
+      failedRollTriggerPreset("psi_bolstered_knack_ability", {
+        rollKind: "ability",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        spendResourceKey: "psionic_energy_dice",
+        refundResourceOnStillFailed: true,
+        label: "Psi-Bolstered Knack: add Energy Die to a failed ability check",
+      }),
+      failedRollTriggerPreset("psi_bolstered_knack_skill", {
+        rollKind: "skill",
+        effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
+        spendResourceKey: "psionic_energy_dice",
+        refundResourceOnStillFailed: true,
+        label: "Psi-Bolstered Knack: add Energy Die to a failed skill check",
+      }),
+      soulknifePowerMenu(),
     ],
   },
   "*::Telekinetic Adept": {
@@ -6215,6 +6465,33 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         rollKind: "attack",
         effectCatalogRefId: CHECK_ROLL_MODIFIER_CATALOG_ID,
         spendResourceKey: "psionic_energy_dice",
+      }),
+      charInstance("modinst_psychic_teleportation", RESOURCE_ABILITY_MENU_CATALOG_ID, [
+        {
+          id: modId("psychic_teleportation"),
+          type: "resource_ability_menu",
+          resourceKey: "psionic_energy_dice",
+          options: [
+            {
+              name: "Psychic Teleportation",
+              resourceCost: 1,
+              actionKind: "bonus",
+              description:
+                "Bonus Action: expend a Psionic Energy Die and teleport up to 10 × the number rolled feet to an unoccupied space you can see.",
+            },
+          ],
+        },
+      ]),
+      fxInstance("modinst_psychic_teleportation_move", FEAT_MODIFIER_CATALOG.movementOption, {
+        bonusAction: true,
+        effects: [
+          {
+            id: modId("psychic_teleportation_move"),
+            kind: "movement_option",
+            movementTeleport: true,
+            label: "Psychic Teleportation: teleport up to 10 × Energy Die feet",
+          },
+        ],
       }),
     ],
   },

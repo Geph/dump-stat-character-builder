@@ -2,16 +2,25 @@ import { featureChoiceKey } from "@/lib/builder/choices"
 import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-talents"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
+import {
+  hasManeuverSpendText,
+  inferClassResourceSpendFromText,
+  inferredSpendToLimitedUses,
+} from "@/lib/character/infer-class-resource-spend"
+import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import {
   resolveUsesConfig,
+  type BonusDamageRiderEntry,
+  type BonusDamageRidersCharacteristic,
   type CharacteristicModifier,
   type SpecialAttackCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
+import { resolveSpecialAttackAtLevel } from "@/lib/character/special-attack-empower"
 import {
   inferGrantInspirationEffect,
   shouldCollectTargetableEffect,
@@ -28,6 +37,11 @@ export type SheetActionEntry = {
   name: string
   sourceLabel: string
   kinds: ActionEconomyKind[]
+  /**
+   * Event that lets the player use this without paying an Action, Bonus Action, or Reaction
+   * (e.g. "On a hit", "No action required"). Set only when there is no action-economy cost.
+   */
+  trigger?: string | null
   category: SheetActionCategory
   limitedUses: UsesConfig | null | undefined
   classLevel: number
@@ -43,6 +57,8 @@ export type SheetActionEntry = {
   psionicAugments?: PsionicAugmentsConfig | null
   /** Structured attack/damage profile when this action is a special attack power. */
   specialAttack?: SpecialAttackCharacteristic | null
+  /** All selectable profiles when one action supports multiple modes (Bomb Attack / Explode). */
+  specialAttacks?: SpecialAttackCharacteristic[]
   castingTime?: string | null
   range?: string | null
   components?: string[] | null
@@ -63,6 +79,22 @@ export type SheetActionEntry = {
    * (Reckless Attack and similar free declarations).
    */
   spendsEconomy?: boolean
+  /** Magical Cunning: restore Pact Magic slots when this action is used. */
+  restorePactSlotsOnUse?: "half_round_up" | "all"
+  /** Arcane Recovery: restore expended slots by combined level (half class level, round up). */
+  restoreSpellSlotsOnUse?: {
+    mode: "combined_level_half_up"
+    maxSlotLevel: number
+  }
+  /** Dark Arcana: spend a spell slot to refill a class resource. */
+  restoreResourceFromSpellSlotOnUse?: {
+    resourceKey: string
+    ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+  }
+  /** Traditional Expertise: expend a spell slot when this action is used. */
+  spendSpellSlotOnUse?: {
+    minSpellLevel: number
+  }
   /** Persistent editable notes requested by player_note characteristics. */
   playerNotes?: SheetPlayerNote[]
   /** Mundane item linkers that can be changed by the player (Dead Space, etc.). */
@@ -86,8 +118,11 @@ export type SheetActionMenuOption = {
   name: string
   description?: string
   resourceCost?: number
+  actionKind?: ActionEconomyKind
   hitDiceCost?: number | null
   unlocksAtLevel?: number | null
+  /** Cost paid in dice rather than a tracked pool (e.g. "1d6 Sneak Attack die"). */
+  costLabel?: string | null
 }
 
 export type SheetActionTalentAlert = {
@@ -149,20 +184,35 @@ const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
   // class-resource-display → modifier-catalog → feature-sheet-display → this file).
   "second_wind",
   "psi_points",
+  "battle_dice",
+  "risk_dice",
+  "exploit_dice",
+  "endurance_dice",
+  "charnel_touch",
+  "dances",
+  "arcane_surge",
+  "spell_uses",
+  "remedy_dice",
+  "interrupt",
+  "focus_points",
 ])
 
 /** Description phrasings that imply an action-economy cost when no structured activation exists. */
 const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
   { re: /\bas a bonus action\b/i, kind: "bonus" },
+  { re: /\ba bonus action\b/i, kind: "bonus" },
   { re: /\bas a reaction\b/i, kind: "reaction" },
   { re: /\btake a reaction\b/i, kind: "reaction" },
+  { re: /\ba reaction\b/i, kind: "reaction" },
   { re: /\bas an? (?:magic )?action\b/i, kind: "action" },
+  { re: /\bas a magic action\b/i, kind: "action" },
 ]
 
 function kindsFromCastingTime(castingTime: string | null | undefined): ActionEconomyKind[] {
   if (!castingTime) return []
   const text = castingTime.toLowerCase()
   const kinds = new Set<ActionEconomyKind>()
+  if (/\bno\s+action\b/.test(text)) return []
   if (/\bbonus\s+action\b/.test(text)) kinds.add("bonus")
   if (/\breaction\b/.test(text)) kinds.add("reaction")
   if (/\b(?:magic\s+)?action\b/.test(text) && !/\bbonus\s+action\b/.test(text)) kinds.add("action")
@@ -258,15 +308,185 @@ function resolveItemLimitedUses(item: ActivatableItem): UsesConfig | null | unde
   return resolveUsesConfig(characteristics, item.limitedUses)
 }
 
+function classResourceKeysForClass(
+  cls: CharacterClassDetail["class"] | null | undefined,
+): string[] {
+  if (!cls) return []
+  return resolveClassResourcesForClass(cls).map((row) => row.id)
+}
+
+/** Trigger characteristics that declare their own class-resource spend (Stunning Strike, Quivering Palm). */
+const TRIGGER_SPEND_CHARACTERISTIC_TYPES = new Set<CharacteristicModifier["type"]>([
+  "on_hit_trigger",
+  "failed_roll_trigger",
+  "saving_throw_trigger",
+  "d20_test_reaction",
+])
+
+/**
+ * Build a spend config from a trigger characteristic so the sheet card charges the authored
+ * amount (Quivering Palm's 4 Focus Points) instead of defaulting to 1.
+ */
+function limitedUsesFromTriggerSpend(item: ActivatableItem): UsesConfig | null {
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (!TRIGGER_SPEND_CHARACTERISTIC_TYPES.has(characteristic.type)) continue
+      const spend = characteristic as {
+        spendResourceKey?: string | null
+        spendResourceAmount?: number | null
+      }
+      if (!spend.spendResourceKey) continue
+      return {
+        type: "class_resource",
+        classResourceKey: spend.spendResourceKey,
+        classResourceAmount: Math.max(1, spend.spendResourceAmount ?? 1),
+      }
+    }
+  }
+  return null
+}
+
+function resolveLimitedUsesWithInference(
+  item: ActivatableItem,
+  availableKeys: readonly string[],
+  extraText?: string | null,
+): UsesConfig | null | undefined {
+  const existing = resolveItemLimitedUses(item)
+  if (existing) return existing
+  const fromTrigger = limitedUsesFromTriggerSpend(item)
+  if (fromTrigger) return fromTrigger
+  const spend = inferClassResourceSpendFromText(
+    `${item.description ?? ""} ${extraText ?? ""}`,
+    availableKeys,
+  )
+  return spend ? inferredSpendToLimitedUses(spend) : existing
+}
+
+function haystackForItem(item: ActivatableItem, extraText?: string | null): string {
+  return `${item.description ?? ""} ${extraText ?? ""}`
+}
+
+function fallbackKindsForResourceSpend(
+  kinds: ActionEconomyKind[],
+  limitedUses: UsesConfig | null | undefined,
+  text: string,
+): { kinds: ActionEconomyKind[]; spendsEconomy: boolean | undefined } {
+  if (kinds.length) return { kinds, spendsEconomy: undefined }
+  if (limitedUses?.type === "class_resource" || hasManeuverSpendText(text)) {
+    return { kinds: ["action"], spendsEconomy: false }
+  }
+  return { kinds, spendsEconomy: undefined }
+}
+
+function featureUnlocked(
+  classDetails: CharacterClassDetail[],
+  name: RegExp,
+): boolean {
+  for (const entry of classDetails) {
+    const level = entry.row.level ?? 0
+    for (const feature of [
+      ...((entry.class?.features ?? []) as Feature[]),
+      ...((entry.subclass?.features ?? []) as Feature[]),
+    ]) {
+      if (name.test(feature.name ?? "") && (feature.level ?? 1) <= level) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Phrasings that mention an action economy only to rule it out ("a spell that doesn't require a
+ * Reaction to cast"). Stripped before pattern matching so they don't invent an action cost.
+ */
+const NEGATED_ACTION_RE =
+  /\b(?:(?:does|do|did)(?:n'?t| not)\s+(?:require|need|cost|use|take)|without\s+(?:using|expending|spending|taking))\s+(?:an?\s+)?(?:bonus\s+action|reaction|magic\s+action|action)\b/gi
+
 /** Last-resort detection of an action-economy cost from the feature/trait prose. */
 function kindsFromText(description: string | null | undefined): ActionEconomyKind[] {
   if (!description) return []
-  const text = stripHtml(description)
+  const text = stripHtml(description).replace(NEGATED_ACTION_RE, " ")
   const kinds = new Set<ActionEconomyKind>()
   for (const { re, kind } of ACTION_TEXT_PATTERNS) {
     if (re.test(text)) kinds.add(kind)
   }
   return [...kinds]
+}
+
+/**
+ * Events that let a player elect to spend a resource without paying an Action, Bonus Action,
+ * or Reaction (Font of Inspiration, Stroke of Luck, Hurl Through Hell). First match wins.
+ */
+const TRIGGER_TEXT_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\bno action required\b/i, label: "No action required" },
+  { re: /\bwithout (?:using|expending|spending) an action\b/i, label: "No action required" },
+  { re: /\breduced to 0 hit points\b/i, label: "When reduced to 0 HP" },
+  { re: /\b(?:when|whenever) you roll initiative\b/i, label: "When you roll Initiative" },
+  { re: /\b(?:when|whenever|if) you (?:hit|score a critical hit)\b/i, label: "On a hit" },
+  { re: /\b(?:when|whenever|if) you deal sneak attack damage\b/i, label: "On a hit" },
+  { re: /\b(?:when|whenever|if) (?:you|the attack) (?:fail|miss)/i, label: "When you fail a roll" },
+  {
+    re: /\b(?:when|whenever) you make an? (?:ability check|saving throw|attack roll|d20 test)\b/i,
+    label: "When you make a D20 Test",
+  },
+  { re: /\b(?:when|whenever) you cast a spell\b/i, label: "When you cast a spell" },
+]
+
+/** Prose that declares an optional expenditure ("you can expend a spell slot"). */
+const TRIGGERED_SPEND_TEXT_RE =
+  /\b(?:expend|spend|forgo)\s+(?:a|an|one|two|three|four|five|your|up to|\d+)\b/i
+
+/** Wiring that proves the trigger is an elective spend rather than an automatic rider. */
+function hasTriggeredSpendSignal(item: ActivatableItem): boolean {
+  const uses = item.limitedUses
+  if (uses && uses.type !== "unlimited") return true
+  if (item.activation?.spendClassResourceKey) return true
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      if ((effect as { kind?: string }).kind === "class_resource") return true
+    }
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type === "uses" || characteristic.type === "bonus_damage_riders") {
+        return true
+      }
+      if (
+        TRIGGER_SPEND_CHARACTERISTIC_TYPES.has(characteristic.type) &&
+        (characteristic as { spendResourceKey?: string | null }).spendResourceKey
+      ) {
+        return true
+      }
+    }
+  }
+  return TRIGGERED_SPEND_TEXT_RE.test(stripHtml(item.description ?? ""))
+}
+
+function triggerLabelFromWiring(item: ActivatableItem): string | null {
+  if (item.activation?.onInitiative) return "When you roll Initiative"
+  if (item.activation?.onFailedSave) return "When you fail a save"
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type === "bonus_damage_riders" || characteristic.type === "on_hit_trigger") {
+        return "On a hit"
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Label for a feature that fires off an event and lets the player spend something, but costs no
+ * action economy. These need a sheet card so the spend is trackable, yet they must not be filed
+ * under Action / Bonus Action / Reaction. Returns null when the feature already has an action cost.
+ */
+export function resolveTriggeredActivationLabel(item: ActivatableItem): string | null {
+  if (explicitActionKinds(item).length) return null
+  if (!hasTriggeredSpendSignal(item)) return null
+  const fromWiring = triggerLabelFromWiring(item)
+  if (fromWiring) return fromWiring
+  const text = stripHtml(item.description ?? "")
+  for (const { re, label } of TRIGGER_TEXT_PATTERNS) {
+    if (re.test(text)) return label
+  }
+  return null
 }
 
 /** Decide whether an action belongs on the Combat tab or the Abilities & Skills (utility) tab. */
@@ -289,7 +509,34 @@ function classifyActionCategory(
     }
   }
   const haystack = `${item.name} ${stripHtml(item.description ?? "")}`
-  return COMBAT_TEXT_RE.test(haystack) ? "combat" : "utility"
+  if (COMBAT_TEXT_RE.test(haystack)) return "combat"
+
+  // A Reaction only exists inside the turn order, and a Bonus Action that burns a limited pool
+  // is nearly always a fight resource (Bardic Inspiration, Nature's Veil, Dragon Wings) even when
+  // its rules text never says "attack" or "damage".
+  const kinds = explicitActionKinds(item)
+  if (kinds.includes("reaction")) return "combat"
+  if (kinds.includes("bonus") && spendsLimitedPool(item) && !UTILITY_ONLY_TEXT_RE.test(haystack)) {
+    return "combat"
+  }
+  return "utility"
+}
+
+/** Downtime / exploration wording that keeps a resource-spending Bonus Action off the Combat tab. */
+const UTILITY_ONLY_TEXT_RE =
+  /\b(?:craft(?:ing|ed|s)?|forge|forging|downtime|workshop|artisan|smith'?s tools|between adventures|over the course of|8 hours|during a (?:short|long) rest|while you travel|travel(?:ing)? pace)\b/i
+
+/** True when using the item draws down a finite pool (its own uses or a class resource). */
+function spendsLimitedPool(item: ActivatableItem): boolean {
+  const uses = item.limitedUses
+  if (uses && uses.type !== "unlimited") return true
+  if (item.activation?.spendClassResourceKey) return true
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type === "uses") return true
+    }
+  }
+  return false
 }
 
 /** Find the class resource key consumed by an activatable item (feature or trait). */
@@ -309,17 +556,18 @@ function resolveActionResourceKey(item: ActivatableItem): string | null {
   return null
 }
 
-function resolveSpecialAttack(
+function resolveSpecialAttacks(
   item: ActivatableItem,
   classLevel?: number,
-): SpecialAttackCharacteristic | null {
+): SpecialAttackCharacteristic[] {
+  const attacks: SpecialAttackCharacteristic[] = []
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "special_attack") {
-        const attack = characteristic as SpecialAttackCharacteristic
+        let attack = characteristic as SpecialAttackCharacteristic
         // Earthshatter: 5 ft → 10 ft at Warden 14.
         if (/^earthshatter$/i.test(item.name) && (classLevel ?? 0) >= 14) {
-          return {
+          attack = {
             ...attack,
             areaLengthFeet: 10,
             rangeFeet: 10,
@@ -328,26 +576,76 @@ function resolveSpecialAttack(
               "Earthshatter — replace one Attack; 10-foot slam (Warden 14+)",
           }
         }
-        return attack
+        attacks.push(resolveSpecialAttackAtLevel(attack, classLevel ?? 1))
       }
     }
   }
-  return null
+  return attacks
+}
+
+function resolveSpecialAttack(
+  item: ActivatableItem,
+  classLevel?: number,
+): SpecialAttackCharacteristic | null {
+  return resolveSpecialAttacks(item, classLevel)[0] ?? null
+}
+
+function describeRiderCost(rider: BonusDamageRiderEntry): string | null {
+  const parts: string[] = []
+  if (rider.costDice) parts.push(rider.costDice)
+  if (rider.costResourceKey) {
+    parts.push(
+      `${Math.max(1, rider.costResourceAmount ?? 1)} ${rider.costResourceKey.replace(/_/g, " ")}`,
+    )
+  }
+  return parts.length ? parts.join(" + ") : null
+}
+
+function describeRider(rider: BonusDamageRiderEntry): string | undefined {
+  const parts: string[] = []
+  if (rider.description) parts.push(rider.description)
+  if (rider.saveAbility) {
+    parts.push(
+      rider.conditionOnFailedSave
+        ? `${rider.saveAbility} save or ${rider.conditionOnFailedSave}`
+        : `${rider.saveAbility} save`,
+    )
+  }
+  return parts.length ? parts.join(" · ") : undefined
 }
 
 function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
   const options: SheetActionMenuOption[] = []
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
-      if (characteristic.type !== "resource_ability_menu") continue
-      for (const option of characteristic.options ?? []) {
-        options.push({
-          name: option.name,
-          description: option.description,
-          resourceCost: option.resourceCost,
-          hitDiceCost: option.hitDiceCost ?? null,
-          unlocksAtLevel: option.unlocksAtLevel ?? null,
-        })
+      if (characteristic.type === "resource_ability_menu") {
+        for (const option of characteristic.options ?? []) {
+          options.push({
+            name: option.name,
+            description: option.description,
+            resourceCost: option.resourceCost,
+            actionKind: option.actionKind,
+            hitDiceCost: option.hitDiceCost ?? null,
+            unlocksAtLevel: option.unlocksAtLevel ?? null,
+          })
+        }
+        continue
+      }
+      // On-hit riders (Cunning Strike, Brutal Strike, Vex/Topple-style picks) are choices the
+      // player makes when the attack lands, so they belong on the same picker as resource menus.
+      if (characteristic.type === "bonus_damage_riders") {
+        for (const rider of (characteristic as BonusDamageRidersCharacteristic).riders ?? []) {
+          if (!rider.name) continue
+          options.push({
+            name: rider.name,
+            description: describeRider(rider),
+            resourceCost: rider.costResourceKey
+              ? Math.max(1, rider.costResourceAmount ?? 1)
+              : undefined,
+            unlocksAtLevel: rider.unlocksAtLevel ?? null,
+            costLabel: describeRiderCost(rider),
+          })
+        }
       }
     }
   }
@@ -399,8 +697,8 @@ type ActivatableItem = {
 
 export type { ActivatableItem }
 
-/** Derive action-economy kinds from structured activation, modifiers, or prose. */
-export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
+/** Action-economy kinds a feature actually declares, ignoring the triggered-spend fallback. */
+function explicitActionKinds(item: ActivatableItem): ActionEconomyKind[] {
   const baseKinds = activationKinds(item.activation)
   const linkedKinds = baseKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
   const fromText = baseKinds.length || linkedKinds.length ? [] : kindsFromText(item.description)
@@ -421,6 +719,15 @@ export function inferActivatableActionKinds(item: ActivatableItem): ActionEconom
   // Reckless Attack and similar free declarations (pre-enrichment DB rows).
   if (/^reckless attack$/i.test(item.name.trim())) return ["action"]
   return []
+}
+
+/** Derive action-economy kinds from structured activation, modifiers, or prose. */
+export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
+  const explicit = explicitActionKinds(item)
+  if (explicit.length) return explicit
+  // Triggered spends have no action-economy cost; "action" only keeps them inside the
+  // existing action pipeline — the panel re-buckets them under Triggered.
+  return resolveTriggeredActivationLabel(item) ? ["action"] : []
 }
 
 function resolveSpendsEconomy(item: ActivatableItem): boolean | undefined {
@@ -576,17 +883,26 @@ function pushActivatableItemActions(
   idPrefix: string,
   classId: string | null,
   hitDieSides?: number | null,
+  availableResourceKeys: readonly string[] = [],
 ) {
   if ((feature.level ?? 1) > levelCap) return
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
   const movementExpansions = collectMovementOptionExpansions(feature)
   const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
-  const limitedUses = resolveItemLimitedUses(feature)
+  const limitedUses = resolveLimitedUsesWithInference(feature, availableResourceKeys)
+  const itemWithUses: ActivatableItem = { ...feature, limitedUses }
 
   if (!suppressParent) {
-    const kinds = inferActivatableActionKinds(feature)
+    const inferredKinds = inferActivatableActionKinds(feature)
+    const fallback = fallbackKindsForResourceSpend(
+      inferredKinds,
+      limitedUses,
+      haystackForItem(feature),
+    )
+    const kinds = fallback.kinds
+    const trigger = resolveTriggeredActivationLabel(itemWithUses)
     if (kinds.length) {
-      const inferredCategory = inferActivatableActionCategory(feature)
+      const inferredCategory = inferActivatableActionCategory(itemWithUses)
       const category: SheetActionCategory =
         display.combatActions && !display.abilitiesActions
           ? "combat"
@@ -606,18 +922,20 @@ function pushActivatableItemActions(
           name: feature.name,
           sourceLabel,
           kinds,
+          trigger,
           category,
           limitedUses,
           classLevel: levelCap,
           description: feature.description ?? null,
           classId,
-          classResourceKey: resolveActionResourceKey(feature),
+          classResourceKey: resolveActionResourceKey(itemWithUses),
           specialAttack: resolveSpecialAttack(feature, levelCap),
+          specialAttacks: resolveSpecialAttacks(feature, levelCap),
           menuOptions: menuOptions.length ? menuOptions : undefined,
           spendHitDice: resolveSpendHitDice(feature),
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
-          spendsEconomy: resolveSpendsEconomy(feature),
+          spendsEconomy: trigger ? false : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           psionicAugments: resolvePsionicAugments({
@@ -643,7 +961,7 @@ function pushActivatableItemActions(
       classLevel: levelCap,
       description: expansion.description,
       classId,
-      classResourceKey: resolveActionResourceKey(feature),
+      classResourceKey: resolveActionResourceKey(itemWithUses),
       spendHitDice: resolveSpendHitDice(feature),
       hitDieSides: hitDieSides ?? null,
       healEffects: expansion.healEffects,
@@ -661,6 +979,7 @@ function pushPickedChoiceOptionActions(
   classId: string | null,
   featureChoicePicks: Record<string, string[]> | undefined,
   hitDieSides?: number | null,
+  availableResourceKeys: readonly string[] = [],
 ) {
   if (!classId || !featureChoicePicks) return
   if (!feature.isChoice || !feature.choices?.options?.length) return
@@ -685,6 +1004,7 @@ function pushPickedChoiceOptionActions(
       `${idPrefix}:opt`,
       classId,
       hitDieSides,
+      availableResourceKeys,
     )
   }
 }
@@ -698,6 +1018,7 @@ function pushFeatureActions(
   classId: string | null,
   featureChoicePicks?: Record<string, string[]>,
   hitDieSides?: number | null,
+  availableResourceKeys: readonly string[] = [],
 ) {
   for (const feature of features ?? []) {
     pushActivatableItemActions(
@@ -708,6 +1029,7 @@ function pushFeatureActions(
       idPrefix,
       classId,
       hitDieSides,
+      availableResourceKeys,
     )
     pushPickedChoiceOptionActions(
       actions,
@@ -718,12 +1040,22 @@ function pushFeatureActions(
       classId,
       featureChoicePicks,
       hitDieSides,
+      availableResourceKeys,
     )
   }
 }
 
+function customAbilityHaystack(ability: CustomAbility): string {
+  return `${ability.description ?? ""} ${ability.execution ?? ""} ${ability.casting_time ?? ""}`
+}
+
 function isCustomAbilityAction(ability: CustomAbility): boolean {
-  if (ability.ability_role === "discipline" || ability.ability_role === "talent_pool") {
+  if (ability.ability_role === "talent_pool") return false
+  const haystack = customAbilityHaystack(ability)
+  const hasSpend = hasManeuverSpendText(haystack)
+  if (ability.ability_role === "discipline") {
+    if (hasSpend || ability.execution || ability.casting_time) return true
+    if (isDisciplinePackageAbility(ability)) return false
     return false
   }
   if (ability.ability_role === "psionic_power") return true
@@ -739,6 +1071,7 @@ function isCustomAbilityAction(ability: CustomAbility): boolean {
   }
   if (kindsFromLinkedModifiers(item.linkedModifiers).length) return true
   if (kindsFromText(item.description).length) return true
+  if (hasSpend) return true
   return false
 }
 
@@ -758,11 +1091,27 @@ function preferCombatForAbility(ability: CustomAbility, item: ActivatableItem): 
   return false
 }
 
+function resourceKeysForAbility(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+  fallbackKeys: readonly string[],
+): string[] {
+  const ownerId =
+    ability.attached_to_type === "class" ? (ability.attached_to_id ?? null) : null
+  const owner = ownerId
+    ? classDetails.find((entry) => entry.row.class_id === ownerId)
+    : null
+  if (owner?.class) return classResourceKeysForClass(owner.class)
+  return [...fallbackKeys]
+}
+
 function pushCustomAbilityActions(
   actions: SheetActionEntry[],
   abilities: CustomAbility[] | undefined,
   levelCap: number,
   classId: string | null,
+  classDetails: CharacterClassDetail[] = [],
+  fallbackResourceKeys: readonly string[] = [],
 ) {
   const seenPowerNames = new Set<string>()
 
@@ -770,20 +1119,36 @@ function pushCustomAbilityActions(
     if (!isCustomAbilityAction(ability)) continue
     if (ability.level_requirement != null && ability.level_requirement > levelCap) continue
 
+    const availableKeys = resourceKeysForAbility(ability, classDetails, fallbackResourceKeys)
+    const haystack = customAbilityHaystack(ability)
+    const limitedUses = resolveLimitedUsesWithInference(
+      {
+        name: ability.name,
+        description: ability.description,
+        limitedUses: ability.uses,
+        linkedModifiers: ability.linked_modifiers ?? undefined,
+      },
+      availableKeys,
+      `${ability.execution ?? ""} ${ability.casting_time ?? ""}`,
+    )
     const item: ActivatableItem = {
       name: ability.name,
       description: ability.description,
-      limitedUses: ability.uses,
+      limitedUses,
       linkedModifiers: ability.linked_modifiers ?? undefined,
     }
 
     const castingKinds = kindsFromCastingTime(ability.casting_time ?? ability.execution)
     const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
-    const kinds = castingKinds.length
+    const textKinds =
+      castingKinds.length || linkedKinds.length ? [] : kindsFromText(item.description)
+    const inferredKinds = castingKinds.length
       ? castingKinds
       : linkedKinds.length
         ? linkedKinds
-        : kindsFromText(item.description)
+        : textKinds
+    const fallback = fallbackKindsForResourceSpend(inferredKinds, limitedUses, haystack)
+    const kinds = [...fallback.kinds]
 
     if (!kinds.length && ability.ability_role === "psionic_power") {
       kinds.push("action")
@@ -795,6 +1160,8 @@ function pushCustomAbilityActions(
 
     seenPowerNames.add(normalizePickName(ability.name))
     const healEffects = resolveHealEffects(item)
+    const ownerClassId =
+      ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId
     actions.push({
       id: `ability:${ability.id}`,
       name: ability.name,
@@ -803,21 +1170,23 @@ function pushCustomAbilityActions(
       category: classifyActionCategory(item, {
         preferCombat: preferCombatForAbility(ability, item),
       }),
-      limitedUses: ability.uses,
+      limitedUses,
       classLevel: levelCap,
       description: ability.description ?? null,
-      classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
+      classId: ownerClassId,
       classResourceKey: resolveActionResourceKey(item),
       customAbilityId: ability.id,
       abilityRole: ability.ability_role ?? null,
       psionicAugments: resolvePsionicAugments(ability),
-      specialAttack: resolveSpecialAttack(item),
+      specialAttack: resolveSpecialAttack(item, levelCap),
+      specialAttacks: resolveSpecialAttacks(item, levelCap),
       castingTime: ability.casting_time ?? ability.execution ?? null,
       range: ability.range ?? null,
       components: ability.components ?? null,
       duration: ability.duration ?? null,
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
+      spendsEconomy: fallback.spendsEconomy,
     })
   }
 
@@ -852,13 +1221,19 @@ function pushCustomAbilityActions(
         description: entry.description ?? entry.summary ?? null,
         linkedModifiers,
       }
+      const powerText = `${entry.description ?? ""} ${entry.summary ?? ""}`
+      const powerKeys = resourceKeysForAbility(ability, classDetails, fallbackResourceKeys)
+      const limitedUses = resolveLimitedUsesWithInference(item, powerKeys, entry.summary)
+      const itemWithUses: ActivatableItem = { ...item, limitedUses }
       const castingKinds = kindsFromCastingTime(entry.summary)
       const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(linkedModifiers)
-      const kinds = castingKinds.length
+      const inferredKinds = castingKinds.length
         ? castingKinds
         : linkedKinds.length
           ? linkedKinds
           : kindsFromText(item.description)
+      const fallback = fallbackKindsForResourceSpend(inferredKinds, limitedUses, powerText)
+      const kinds = [...fallback.kinds]
       if (!kinds.length && (isPowerGroup || hasSpecialAttack)) {
         kinds.push("action")
       }
@@ -870,20 +1245,22 @@ function pushCustomAbilityActions(
         name: entryName,
         sourceLabel: ability.name,
         kinds,
-        category: classifyActionCategory(item, { preferCombat: true }),
-        limitedUses: null,
+        category: classifyActionCategory(itemWithUses, { preferCombat: true }),
+        limitedUses,
         classLevel: levelCap,
         description: entry.description ?? entry.summary ?? null,
         classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
-        classResourceKey: resolveActionResourceKey(item),
+        classResourceKey: resolveActionResourceKey(itemWithUses),
         customAbilityId: ability.id,
         psionicAugments: resolvePsionicAugments({
           name: entryName,
           description: entry.description ?? entry.summary ?? null,
           psionic_augments: null,
         }),
-        specialAttack: resolveSpecialAttack(item),
+        specialAttack: resolveSpecialAttack(item, levelCap),
+        specialAttacks: resolveSpecialAttacks(item, levelCap),
         castingTime: entry.summary?.match(/\b\d+\s+(?:bonus\s+)?action\b/i)?.[0] ?? null,
+        spendsEconomy: fallback.spendsEconomy,
       })
     }
   }
@@ -1113,6 +1490,7 @@ export function collectSheetActions(params: {
   for (const entry of params.classDetails) {
     const className = entry.class?.name ?? "Class"
     const hitDieSides = entry.class?.hit_die ?? null
+    const resourceKeys = classResourceKeysForClass(entry.class)
     pushFeatureActions(
       actions,
       entry.class?.features as Feature[] | undefined,
@@ -1122,6 +1500,7 @@ export function collectSheetActions(params: {
       entry.row.class_id,
       featureChoicePicks,
       hitDieSides,
+      resourceKeys,
     )
     if (entry.subclass) {
       pushFeatureActions(
@@ -1133,6 +1512,7 @@ export function collectSheetActions(params: {
         entry.row.class_id,
         featureChoicePicks,
         hitDieSides,
+        resourceKeys,
       )
     }
   }
@@ -1162,7 +1542,19 @@ export function collectSheetActions(params: {
   }
 
   if (params.customAbilities?.length) {
-    pushCustomAbilityActions(actions, params.customAbilities, Math.max(totalLevel, 1), null)
+    const soleClassId =
+      params.classDetails.length === 1 ? params.classDetails[0]?.row.class_id ?? null : null
+    const allResourceKeys = params.classDetails.flatMap((entry) =>
+      classResourceKeysForClass(entry.class),
+    )
+    pushCustomAbilityActions(
+      actions,
+      params.customAbilities,
+      Math.max(totalLevel, 1),
+      soleClassId,
+      params.classDetails,
+      allResourceKeys,
+    )
   }
 
   const withRiders = attachTalentAlertsToActions(actions, [
@@ -1170,12 +1562,40 @@ export function collectSheetActions(params: {
     ...collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
   ])
 
+  const restorePactSlotsOnUse: NonNullable<SheetActionEntry["restorePactSlotsOnUse"]> =
+    featureUnlocked(params.classDetails, /^eldritch master$/i) ? "all" : "half_round_up"
+
   const seen = new Set<string>()
-  return withRiders.filter((action) => {
-    if (seen.has(action.id)) return false
-    seen.add(action.id)
-    return true
-  })
+  return withRiders
+    .map((action) => {
+      if (/^magical cunning$/i.test(action.name)) {
+        return { ...action, restorePactSlotsOnUse }
+      }
+      if (/^arcane recovery$/i.test(action.name)) {
+        return {
+          ...action,
+          restoreSpellSlotsOnUse: { mode: "combined_level_half_up" as const, maxSlotLevel: 5 },
+        }
+      }
+      if (/^dark arcana$/i.test(action.name)) {
+        return {
+          ...action,
+          restoreResourceFromSpellSlotOnUse: {
+            resourceKey: "charnel_touch",
+            ability: "INT" as const,
+          },
+        }
+      }
+      if (/^traditional expertise$/i.test(action.name)) {
+        return { ...action, spendSpellSlotOnUse: { minSpellLevel: 1 } }
+      }
+      return action
+    })
+    .filter((action) => {
+      if (seen.has(action.id)) return false
+      seen.add(action.id)
+      return true
+    })
 }
 
 export const ACTION_KIND_LABELS: Record<ActionEconomyKind, string> = {

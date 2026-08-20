@@ -106,6 +106,10 @@ export type EnrichmentOperation =
       label: string
       category: string
       descriptionGate?: RegExp
+      /** Also expose the parsed recipes as a resource-spending sheet action menu. */
+      resourceKey?: string
+      /** Add matching refund options for destroying already-crafted items. */
+      includeDistillOptions?: boolean
     }
   | { op: "parseCompanionStatBlock" }
   | {

@@ -55,6 +55,12 @@ const FIGHTER_PSIONIC_ENERGY_DICE: ClassResource = {
     type: "at_level",
     atLevelMode: "tier",
     dieType: "d6",
+    dieSidesByLevel: [
+      { level: 3, count: 6 },
+      { level: 5, count: 8 },
+      { level: 11, count: 10 },
+      { level: 17, count: 12 },
+    ],
     recharges: [
       { rest: "short_rest", amount: 1 },
       { rest: "long_rest" },
@@ -79,6 +85,12 @@ const ROGUE_PSIONIC_ENERGY_DICE: ClassResource = {
     type: "at_level",
     atLevelMode: "tier",
     dieType: "d6",
+    dieSidesByLevel: [
+      { level: 3, count: 6 },
+      { level: 5, count: 8 },
+      { level: 11, count: 10 },
+      { level: 17, count: 12 },
+    ],
     recharges: [
       { rest: "short_rest", amount: 1 },
       { rest: "long_rest" },

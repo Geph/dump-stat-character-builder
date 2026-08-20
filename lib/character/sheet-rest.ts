@@ -15,6 +15,10 @@ import {
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
+import {
+  applyFeatureResourceRefresh,
+  type ResourceRefreshEffect,
+} from "@/lib/character/collect-resource-refresh-effects"
 
 export function shouldResetSpellSlotsOnRest(table: SpellSlotTable, rest: RestType): boolean {
   if (rest === "long_rest") return true
@@ -91,6 +95,89 @@ export function applyInitiativeResourceRecharge(
   return next
 }
 
+/** Spend the lowest available spell slot at or above `minSpellLevel`. */
+export function spendLowestAvailableSpellSlot(
+  usedByLevel: number[],
+  slotsByLevel: number[],
+  minSpellLevel = 1,
+): { nextUsed: number[]; spentLevel: number } | null {
+  const nextUsed = [...usedByLevel]
+  const floor = Math.max(1, minSpellLevel)
+  for (let index = floor - 1; index < slotsByLevel.length; index += 1) {
+    const max = slotsByLevel[index] ?? 0
+    const used = nextUsed[index] ?? 0
+    if (used < max) {
+      nextUsed[index] = used + 1
+      return { nextUsed, spentLevel: index + 1 }
+    }
+  }
+  return null
+}
+
+/** Restore expended spell slots, preferring lower levels first. */
+export function restoreExpendedSpellSlots(
+  usedByLevel: number[],
+  restoreCount: number | "all",
+): number[] {
+  if (restoreCount === "all") return usedByLevel.map(() => 0)
+  let remaining = Math.max(0, restoreCount)
+  return usedByLevel.map((used) => {
+    if (remaining <= 0) return used
+    const restore = Math.min(used, remaining)
+    remaining -= restore
+    return used - restore
+  })
+}
+
+/**
+ * Arcane Recovery: restore expended slots whose combined level is at most `budget`,
+ * none above `maxSlotLevel`. Prefers higher-level expended slots.
+ */
+export function restoreSpellSlotsByCombinedLevel(
+  usedByLevel: number[],
+  budget: number,
+  maxSlotLevel: number,
+): number[] {
+  const next = [...usedByLevel]
+  let remaining = Math.max(0, budget)
+  const cap = Math.min(Math.max(1, maxSlotLevel), next.length)
+  for (let level = cap; level >= 1; level -= 1) {
+    const index = level - 1
+    while ((next[index] ?? 0) > 0 && remaining >= level) {
+      next[index] -= 1
+      remaining -= level
+    }
+  }
+  return next
+}
+
+/** Dark Arcana expected value: INT modifier + 4 (average d8) per slot level. */
+export function charnelTouchRestoreFromSlot(intMod: number, slotLevel: number): number {
+  return Math.max(1, intMod + 4 * Math.max(1, slotLevel))
+}
+
+/** Magical Cunning restores half of max Pact slots (rounded up), or all with Eldritch Master. */
+export function pactSlotRestoreCount(
+  maxSlotsByLevel: number[],
+  mode: "half_round_up" | "all",
+): number | "all" {
+  if (mode === "all") return "all"
+  const max = maxSlotsByLevel.reduce((sum, value) => sum + value, 0)
+  return Math.max(1, Math.ceil(max / 2))
+}
+
+/** Refill a spent-use tracker until at least `minimumRemaining` uses remain. */
+export function applyMinimumResourceRemaining(
+  currentUsed: number,
+  max: number,
+  minimumRemaining: number,
+): number {
+  if (max <= 0 || minimumRemaining <= 0) return currentUsed
+  const remaining = Math.max(0, max - currentUsed)
+  if (remaining >= minimumRemaining) return currentUsed
+  return Math.max(0, max - Math.min(max, minimumRemaining))
+}
+
 export type ApplySheetRestParams = {
   rest: RestType
   maxHp: number
@@ -103,6 +190,7 @@ export type ApplySheetRestParams = {
   sheetActions: SheetActionEntry[]
   resolveContext: ResolveUsesContext
   rechargeCapsByResourceId?: Record<string, number>
+  resourceRefreshEffects?: ResourceRefreshEffect[]
 }
 
 export type SheetRestResult = {
@@ -135,6 +223,7 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     sheetActions,
     resolveContext,
     rechargeCapsByResourceId = {},
+    resourceRefreshEffects = [],
   } = params
 
   const summary: string[] = []
@@ -174,6 +263,28 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
       summary.push(
         `Restored ${entry.name} (${restored} use${restored === 1 ? "" : "s"})`,
       )
+    }
+  }
+
+  if (resourceRefreshEffects.length && (rest === "short_rest" || rest === "long_rest")) {
+    const beforeRefresh = { ...nextResources }
+    const refreshed = applyFeatureResourceRefresh({
+      usedResourcesById: nextResources,
+      resourceEntries,
+      resolveContext,
+      effects: resourceRefreshEffects,
+      trigger: rest,
+      rechargeCapsByResourceId: nextRechargeCaps,
+    })
+    Object.assign(nextResources, refreshed.usedResourcesById)
+    Object.assign(nextRechargeCaps, refreshed.rechargeCapsByResourceId)
+    for (const entry of resourceEntries) {
+      const restored = (beforeRefresh[entry.id] ?? 0) - (nextResources[entry.id] ?? 0)
+      if (restored > 0 && !summary.some((line) => line.includes(entry.name))) {
+        summary.push(
+          `Restored ${entry.name} (${restored} use${restored === 1 ? "" : "s"})`,
+        )
+      }
     }
   }
 

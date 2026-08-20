@@ -507,6 +507,31 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     ],
   },
   {
+    resourceKey: "remedy_dice",
+    namePattern: /remedy\s*dice/i,
+    displayName: "Remedy Dice",
+    definition:
+      "White Magic Witch pool of dice spent to heal. Pool equals Witch level; CHA modifier caps dice spent per use. Recharges on a Long Rest.",
+    defaultUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+    spendPatterns: [
+      /\bexpend\s+(?:one|an?|1|\d+)\s+remedy\s+dice?\b/i,
+      /\bexpend\s+(?:up\s+to\s+)?(?:your\s+\w+\s+modifier(?:\s+in)?\s+)?remedy\s+dice\b/i,
+      /\bspend\s+(?:one|an?|1|\d+)\s+remedy\s+dice?\b/i,
+    ],
+    proposeFromText: true,
+    textProposalUses: {
+      type: "at_level",
+      atLevelMode: "multiply_level",
+      atLevelTable: [{ level: 1, count: 1 }],
+      recharges: [{ rest: "long_rest" }],
+    },
+  },
+  {
     resourceKey: "alchemy_points",
     namePattern: /alchemy\s*points?/i,
     displayName: "Alchemy Points",
@@ -631,6 +656,8 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
       recharges: [{ rest: "long_rest" }],
     },
     spendPatterns: [
+      /\bexpend\s+(\d+)\s+charnel\s+touch\s+points?\b/i,
+      /\bspend\s+(\d+)\s+charnel\s+touch\s+points?\b/i,
       /\bexpend[^.]{0,40}charnel\s+touch\b/i,
       /\bcharnel\s+touch\s+points?[^.]{0,40}\bexpend/i,
     ],

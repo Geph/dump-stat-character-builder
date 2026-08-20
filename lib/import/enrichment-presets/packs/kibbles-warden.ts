@@ -244,4 +244,50 @@ export function sanitizeKibblesWardenImportContent(content: ImportContent): Impo
 }
 
 // Structural import guidance belongs in the extraction prompt/registry, never player-facing prose.
-export const KIBBLES_WARDEN_PRESETS: EnrichmentPreset[] = []
+export const KIBBLES_WARDEN_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "kibbles_warden.class.endurance_dice",
+    pack: "kibbles_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^endurance dice$/i },
+    operations: [
+      {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "endurance_dice",
+          classResourceAmount: 1,
+        },
+      },
+      { op: "setActivation", activation: { noEconomyCost: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "kibbles_warden.class.empowered_endurance",
+    pack: "kibbles_warden",
+    target: "class_feature",
+    match: { className: /warden/i, name: /^empowered endurance$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "empowered_endurance_init",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: "mod_empowered_endurance_init",
+              kind: "class_resource",
+              classResourceKey: "endurance_dice",
+              classResourceChange: "reset",
+              resourceRefreshOnInitiative: true,
+              resourceRefreshCap: 1,
+              label: "Regain Endurance Dice until you have 1 on Initiative",
+            },
+          ],
+        },
+      },
+    ],
+  },
+]

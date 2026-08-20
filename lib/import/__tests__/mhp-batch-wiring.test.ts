@@ -67,7 +67,7 @@ describe("MHP batch wiring (Risk / Martyr / Thralls / Warden)", () => {
     expect(feature?.limitedUses?.classResourceKey).toBe("risk_dice")
   })
 
-  it("sets Risk Dice rechargeOnInitiative when Dire Gambit is present", () => {
+  it("wires Dire Gambit as a feature-gated Risk Die restore instead of pool initiative recharge", () => {
     const content = applyImportEnrichmentPresets(
       {
         classes: [
@@ -86,6 +86,7 @@ describe("MHP batch wiring (Risk / Martyr / Thralls / Warden)", () => {
               atLevelMode: "tier",
               atLevelTable: [{ level: 2, count: 4 }],
               recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
+              rechargeOnInitiative: 1,
             },
           },
         ],
@@ -95,7 +96,17 @@ describe("MHP batch wiring (Risk / Martyr / Thralls / Warden)", () => {
     expect(
       (content.class_resources?.[0]?.uses as { rechargeOnInitiative?: boolean | number })
         ?.rechargeOnInitiative,
-    ).toBe(1)
+    ).toBeUndefined()
+    const dire = content.classes?.[0]?.features?.find((f) => f.name === "Dire Gambit") as Feature
+    expect(
+      (dire.linkedModifiers ?? []).some((mod) =>
+        (mod.activation?.effects ?? []).some(
+          (effect) =>
+            effect.resourceRefreshOnInitiative === true &&
+            effect.classResourceKey === "risk_dice",
+        ),
+      ),
+    ).toBe(true)
   })
 
   it("parses Martyr Spell Uses and Necromancer thrall caps including CR fractions", () => {

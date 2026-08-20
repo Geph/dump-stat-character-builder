@@ -37,6 +37,7 @@ import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
 import { applyResourceToResourceRestore } from "@/lib/character/resource-conversion"
 import {
   formatEmpowerEffect,
+  resolveOverloadedCharge,
   resolveSpecialAttackEmpower,
 } from "@/lib/character/special-attack-empower"
 import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
@@ -103,6 +104,18 @@ type SheetActionsPanelProps = {
   healContext?: HealResolveContext | null
   /** Force a single card column (e.g. narrow combat right rail). */
   singleColumn?: boolean
+  /** Magical Cunning restores Pact Magic slots when used. */
+  onRestorePactSlots?: (mode: "half_round_up" | "all") => void
+  /** Arcane Recovery restores expended slots by combined level. */
+  onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
+  /** Dark Arcana: spend a slot to refill a class resource. */
+  onRestoreResourceFromSpellSlot?: (spec: {
+    resourceKey: string
+    classId?: string | null
+    ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+  }) => string | null
+  /** Traditional Expertise: expend a spell slot for Advantage on a Wisdom check. */
+  onSpendSpellSlot?: (minSpellLevel: number) => string | null
   playerNoteValues?: Record<string, string[]>
   onPlayerNoteChange?: (key: string, value: string) => void
   onEquipmentChoiceChange?: (key: string, value: string) => void
@@ -147,6 +160,61 @@ function attackModifierFromContext(ctx: ResolveUsesContext): number {
   return Math.max(int, wis, cha)
 }
 
+function abilityModifierFromContext(
+  ctx: ResolveUsesContext,
+  ability: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA",
+): number {
+  return ctx.abilityModifiers?.[ability] ?? 0
+}
+
+function specialAttackModifier(
+  attack: SpecialAttackCharacteristic,
+  ctx: ResolveUsesContext,
+): number {
+  if (attack.properties.some((property) => /finesse/i.test(property))) {
+    return Math.max(
+      abilityModifierFromContext(ctx, "STR"),
+      abilityModifierFromContext(ctx, "DEX"),
+    )
+  }
+  return attackModifierFromContext(ctx)
+}
+
+function specialAttackSaveModifier(
+  attack: SpecialAttackCharacteristic,
+  ctx: ResolveUsesContext,
+): number {
+  let modifier =
+    attack.saveDCAbilityChoice === "higher_str_dex"
+      ? Math.max(
+          abilityModifierFromContext(ctx, "STR"),
+          abilityModifierFromContext(ctx, "DEX"),
+        )
+      : attack.saveDCAbilityChoice
+        ? abilityModifierFromContext(ctx, attack.saveDCAbilityChoice)
+        : specialAttackModifier(attack, ctx)
+  if (attack.alternateSaveDCAbility) {
+    modifier = Math.max(
+      modifier,
+      abilityModifierFromContext(ctx, attack.alternateSaveDCAbility),
+    )
+  }
+  return modifier
+}
+
+function specialAttackDamageModifier(
+  attack: SpecialAttackCharacteristic,
+  ctx: ResolveUsesContext,
+): number {
+  const configured = attack.damageAbilityModifier
+  if (!configured) return 0
+  const modifier =
+    configured === "attack"
+      ? specialAttackModifier(attack, ctx)
+      : abilityModifierFromContext(ctx, configured)
+  return Math.max(attack.damageAbilityMinimum ?? Number.NEGATIVE_INFINITY, modifier)
+}
+
 function UseDots({
   usage,
   label,
@@ -188,10 +256,12 @@ function ActionRollStep({
   action,
   specialAttack,
   attackMod,
+  saveModifier,
   proficiencyBonus,
   damageModifier,
   damageModifierNote = null,
   bonusDice = null,
+  radiusBonusFeet = 0,
   psiSpent,
   hitDiceSpent,
   augmentSummary,
@@ -200,11 +270,13 @@ function ActionRollStep({
   action: SheetActionEntry
   specialAttack: SpecialAttackCharacteristic
   attackMod: number
+  saveModifier: number
   proficiencyBonus: number
   damageModifier: number
   damageModifierNote?: string | null
   /** Extra damage dice bought with a resource (e.g. Prime Bomb Reagents). */
   bonusDice?: { count: number; sides: number; label: string } | null
+  radiusBonusFeet?: number
   psiSpent: number
   hitDiceSpent: number
   augmentSummary: string | null
@@ -219,9 +291,11 @@ function ActionRollStep({
     specialAttack.attackProfile === "melee" || specialAttack.attackProfile === "ranged"
   const saveAbility = specialAttack.saveAbility?.trim() || null
   const saveDc =
-    specialAttack.saveDCBase != null
-      ? specialAttack.saveDCBase
-      : 8 + proficiencyBonus + attackMod
+    (specialAttack.saveDCBase ?? 8) + proficiencyBonus + saveModifier
+  const effectiveRadius =
+    specialAttack.areaLengthFeet != null
+      ? specialAttack.areaLengthFeet + Math.max(0, radiusBonusFeet)
+      : null
 
   const sides =
     action.hitDieSides != null && action.hitDieSides > 0
@@ -311,6 +385,11 @@ function ActionRollStep({
         ) : null}
         {extraDice ? (
           <p className="text-xs font-semibold text-primary">{extraDice.label}</p>
+        ) : null}
+        {effectiveRadius != null && specialAttack.areaShape ? (
+          <p className="text-xs font-semibold text-primary">
+            {effectiveRadius}-foot-radius {specialAttack.areaShape}
+          </p>
         ) : null}
       </div>
 
@@ -409,6 +488,10 @@ function ActionDetailOverlay({
   playerNoteValues = {},
   onPlayerNoteChange,
   onEquipmentChoiceChange,
+  onRestorePactSlots,
+  onRestoreSpellSlotsByCombinedLevel,
+  onRestoreResourceFromSpellSlot,
+  onSpendSpellSlot,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -448,12 +531,26 @@ function ActionDetailOverlay({
   playerNoteValues?: Record<string, string[]>
   onPlayerNoteChange?: (key: string, value: string) => void
   onEquipmentChoiceChange?: (key: string, value: string) => void
+  onRestorePactSlots?: (mode: "half_round_up" | "all") => void
+  onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
+  onRestoreResourceFromSpellSlot?: (spec: {
+    resourceKey: string
+    classId?: string | null
+    ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+  }) => string | null
+  onSpendSpellSlot?: (minSpellLevel: number) => string | null
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
   const [empowerSpend, setEmpowerSpend] = useState(0)
+  const [overloadedChargeActive, setOverloadedChargeActive] = useState(false)
+  const attackProfiles =
+    action.specialAttacks?.length ? action.specialAttacks : action.specialAttack ? [action.specialAttack] : []
+  const [selectedAttackProfileId, setSelectedAttackProfileId] = useState<string | null>(
+    attackProfiles[0]?.id ?? null,
+  )
   const [pendingHealEffects, setPendingHealEffects] = useState<FeatureEffect[]>([])
   const [applyingHeal, setApplyingHeal] = useState(false)
   const menuOptions = (action.menuOptions ?? []).filter(
@@ -473,7 +570,10 @@ function ActionDetailOverlay({
         })
       : null)
 
-  const specialAttack = action.specialAttack ?? null
+  const specialAttack =
+    attackProfiles.find((profile) => profile.id === selectedAttackProfileId) ??
+    attackProfiles[0] ??
+    null
   const psiCost = psionicAugments
     ? totalPsionicAugmentCost(psionicAugments, augmentSelections)
     : 0
@@ -502,11 +602,17 @@ function ActionDetailOverlay({
             ] ?? 0,
           ) * configuredResourceCost
         : configuredResourceCost
+  // Menu options own their exact cost. A negative cost is a refund operation such as
+  // distilling an Alchemist potion back into its original Reagents.
+  const selectedResourceCost = selectedOption?.resourceCost
   const resourceSpend =
-    resourceCostMode === "fixed"
-      ? configuredResourceCost
-      : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
-  const chargeExhausted = usage != null && usage.max - usage.used < resourceSpend
+    selectedResourceCost != null
+      ? selectedResourceCost
+      : resourceCostMode === "fixed"
+        ? configuredResourceCost
+        : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+  const chargeExhausted =
+    usage != null && resourceSpend > 0 && usage.max - usage.used < resourceSpend
 
   const empower = resolveSpecialAttackEmpower(specialAttack, action.classLevel)
   // The rider spends its own pool (Reagents, for a Bomb), which is usually not the pool the action
@@ -514,7 +620,7 @@ function ActionDetailOverlay({
   const empowerPool = empower
     ? (resolveResourcePool?.(empower.resourceKey, action.classId) ?? null)
     : null
-  const empowerMax = Math.min(
+  const baseEmpowerMax = Math.min(
     empower?.maxSpend ?? 0,
     empowerPool
       ? Math.max(
@@ -525,7 +631,24 @@ function ActionDetailOverlay({
         )
       : 0,
   )
-  const empowerApplied = Math.max(0, Math.min(empowerSpend, empowerMax))
+  const overloadedChargeKnown = Boolean(
+    empower &&
+      action.relatedTalentAlerts?.some((alert) => /^overloaded charge$/i.test(alert.name)),
+  )
+  const overloadedCharge = resolveOverloadedCharge(
+    resolveContext.proficiencyBonus ?? 2,
+    empowerPool ? empowerPool.max - empowerPool.used : 0,
+  )
+  const overloadedChargeCost = overloadedCharge.resourceCost
+  const overloadedChargeSpend = overloadedCharge.effectiveSpend
+  const overloadedChargeAffordable =
+    overloadedChargeKnown && empowerPool != null && overloadedCharge.canAfford
+  const empowerApplied =
+    overloadedChargeActive && overloadedChargeAffordable
+      ? overloadedChargeSpend
+      : Math.max(0, Math.min(empowerSpend, baseEmpowerMax))
+  const empowerResourceCost =
+    overloadedChargeActive && overloadedChargeAffordable ? overloadedChargeCost : empowerApplied
 
   const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
   const canAffordHitDice = hitDiceNeeded <= 0 || hitDiceNeeded <= hitDiceRemaining
@@ -536,6 +659,7 @@ function ActionDetailOverlay({
     canAffordHitDice &&
     (psiCost === 0 || Boolean(psiResourceId)) &&
     (hitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
+    (!overloadedChargeActive || overloadedChargeAffordable) &&
     (menuOptions.length === 0 || Boolean(selectedMenuOption))
 
   useEffect(() => {
@@ -544,6 +668,8 @@ function ActionDetailOverlay({
     setUseFeedback(null)
     setResourceSpendAmount(1)
     setEmpowerSpend(0)
+    setOverloadedChargeActive(false)
+    setSelectedAttackProfileId(attackProfiles[0]?.id ?? null)
     setSelectedMenuOption(menuOptions[0]?.name ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
@@ -558,28 +684,73 @@ function ActionDetailOverlay({
         return
       }
     }
+    let spentSlotMessage: string | null = null
+    if (action.spendSpellSlotOnUse && onSpendSpellSlot) {
+      spentSlotMessage = onSpendSpellSlot(action.spendSpellSlotOnUse.minSpellLevel)
+      if (!spentSlotMessage) {
+        setUseFeedback("No spell slot available")
+        return
+      }
+    }
 
     const spendViaAugments = psiCost > 0
     const sharesEmpowerPool =
       empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
     if (usage && !spendViaAugments) {
-      usage.setUsed(usage.used + resourceSpend + (sharesEmpowerPool ? empowerApplied : 0))
+      usage.setUsed(usage.used + resourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
     }
-    if (empowerPool && empowerApplied > 0 && !sharesEmpowerPool) {
-      empowerPool.setUsed(empowerPool.used + empowerApplied)
+    if (empowerPool && empowerResourceCost > 0 && !sharesEmpowerPool) {
+      empowerPool.setUsed(empowerPool.used + empowerResourceCost)
     }
     if (spendViaAugments) {
       onSpendPsi(psiCost)
     }
 
     const parts: string[] = []
+    if (action.restorePactSlotsOnUse && onRestorePactSlots) {
+      onRestorePactSlots(action.restorePactSlotsOnUse)
+      parts.push(
+        action.restorePactSlotsOnUse === "all"
+          ? "Restored all Pact Magic slots"
+          : "Restored half of Pact Magic slots (rounded up)",
+      )
+    }
+    if (action.restoreSpellSlotsOnUse && onRestoreSpellSlotsByCombinedLevel) {
+      onRestoreSpellSlotsByCombinedLevel(
+        action.classLevel,
+        action.restoreSpellSlotsOnUse.maxSlotLevel,
+      )
+      parts.push(
+        `Recovered spell slots totaling half Wizard level (max ${action.restoreSpellSlotsOnUse.maxSlotLevel}th)`,
+      )
+    }
+    if (action.restoreResourceFromSpellSlotOnUse && onRestoreResourceFromSpellSlot) {
+      const restored = onRestoreResourceFromSpellSlot({
+        resourceKey: action.restoreResourceFromSpellSlotOnUse.resourceKey,
+        classId: action.classId,
+        ability: action.restoreResourceFromSpellSlotOnUse.ability,
+      })
+      parts.push(restored ?? "No expended spell slot to convert")
+    }
+    if (spentSlotMessage) {
+      parts.push(spentSlotMessage)
+    }
     if (empower && empowerApplied > 0) {
       parts.push(
-        `Spent ${empowerApplied} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} · ${formatEmpowerEffect(empower, empowerApplied)}`,
+        overloadedChargeActive
+          ? `Overloaded Charge: spent ${empowerResourceCost} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} for ${formatEmpowerEffect(empower, empowerApplied)}`
+          : `Spent ${empowerResourceCost} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} · ${formatEmpowerEffect(empower, empowerApplied)}`,
       )
     }
     if (selectedOption) {
-      parts.push(selectedOption.name)
+      parts.push(
+        selectedOption.costLabel
+          ? `${selectedOption.name} (${selectedOption.costLabel})`
+          : selectedOption.name,
+      )
+      if (resourceSpend < 0) {
+        parts.push(`Recovered ${Math.abs(resourceSpend)} ${usage?.resourceName ?? "resource"}`)
+      }
     }
 
     const morphToggleId = selectedOption
@@ -625,7 +796,8 @@ function ActionDetailOverlay({
     }
 
     if (action.spendsEconomy !== false && onMarkEconomy) {
-      for (const kind of action.kinds) {
+      const economyKinds = selectedOption?.actionKind ? [selectedOption.actionKind] : action.kinds
+      for (const kind of economyKinds) {
         onMarkEconomy(kind)
       }
     }
@@ -635,7 +807,9 @@ function ActionDetailOverlay({
     if (hitDiceNeeded > 0) parts.push(`Spent ${hitDiceNeeded} Hit Dice`)
     if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
     if (augmentSummary) parts.push(augmentSummary)
-    if (usage && !spendViaAugments) parts.push("Marked one use")
+    if (usage && !spendViaAugments && resourceSpend > 0) {
+      parts.push(`Spent ${resourceSpend} ${usage.resourceName ?? "resource"}`)
+    }
 
     const targetable = collectTargetableEffects(action.healEffects)
     const needsAllyPick = targetable.some((entry) => entry.policy === "choose_ally")
@@ -792,6 +966,19 @@ function ActionDetailOverlay({
     action.abilityRole === "psionic_power" && (specialAttack?.damageDiceCount ?? 0) > 0
       ? empoweredPsionicsBonus
       : 0
+  const selectedAttackModifier = specialAttack
+    ? specialAttackModifier(specialAttack, resolveContext)
+    : attackModifierFromContext(resolveContext)
+  const selectedSaveModifier = specialAttack
+    ? specialAttackSaveModifier(specialAttack, resolveContext)
+    : selectedAttackModifier
+  const selectedDamageModifier = specialAttack
+    ? specialAttackDamageModifier(specialAttack, resolveContext)
+    : 0
+  const radiusBonusFeet =
+    empower?.radiusFeetPerResource && empowerApplied > 0
+      ? empower.radiusFeetPerResource * empowerApplied
+      : 0
 
   return (
     <motion.div
@@ -814,7 +1001,9 @@ function ActionDetailOverlay({
             <p className="text-xs text-muted-foreground">
               {action.sourceLabel}
               {" · "}
-              {action.kinds.map((kind) => ACTION_KIND_LABELS[kind]).join(", ")}
+              {action.trigger
+                ? action.trigger
+                : action.kinds.map((kind) => ACTION_KIND_LABELS[kind]).join(", ")}
             </p>
           </div>
           <button
@@ -831,11 +1020,16 @@ function ActionDetailOverlay({
           <ActionRollStep
             action={action}
             specialAttack={specialAttack}
-            attackMod={attackModifierFromContext(resolveContext)}
+            attackMod={selectedAttackModifier}
+            saveModifier={selectedSaveModifier}
             proficiencyBonus={resolveContext.proficiencyBonus ?? 0}
-            damageModifier={vengeanceDamageMod + empoweredPsionicsDamageMod}
+            damageModifier={
+              selectedDamageModifier + vengeanceDamageMod + empoweredPsionicsDamageMod
+            }
             damageModifierNote={
-              empoweredPsionicsDamageMod > 0
+              specialAttack.damageAbilityModifier === "INT"
+                ? `Intelligent Explosions (+${selectedDamageModifier} INT, minimum +1)`
+                : empoweredPsionicsDamageMod > 0
                 ? `Empowered Psionics (+${empoweredPsionicsDamageMod} INT)`
                 : null
             }
@@ -848,6 +1042,7 @@ function ActionDetailOverlay({
                   }
                 : null
             }
+            radiusBonusFeet={radiusBonusFeet}
             psiSpent={psiCost}
             hitDiceSpent={hitDiceNeeded}
             augmentSummary={augmentSummary}
@@ -899,6 +1094,43 @@ function ActionDetailOverlay({
         ) : (
           <>
             <div className="p-4 space-y-3">
+              {attackProfiles.length > 1 ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    Attack mode
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {attackProfiles.map((profile) => {
+                      const selected = profile.id === specialAttack?.id
+                      const label =
+                        profile.attackVariant === "explode"
+                          ? "Explode"
+                          : profile.attackVariant === "attack"
+                            ? "Attack"
+                            : profile.label || profile.attackName || "Use"
+                      return (
+                        <button
+                          key={profile.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAttackProfileId(profile.id)
+                            setEmpowerSpend(0)
+                            setOverloadedChargeActive(false)
+                          }}
+                          className={cn(
+                            "rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                            selected
+                              ? "border-primary bg-primary/10 text-foreground"
+                              : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
               {usage ? (
                 <p className="text-xs font-semibold text-foreground">
                   {usage.resourceName ? `${usage.resourceName}: ` : "Uses: "}
@@ -907,7 +1139,8 @@ function ActionDetailOverlay({
                   </span>
                 </p>
               ) : null}
-              {hitDiceNeeded > 0 || menuOptions.length > 0 ? (
+              {hitDiceNeeded > 0 ||
+              menuOptions.some((option) => (option.hitDiceCost ?? 0) > 0) ? (
                 <p className="text-xs text-muted-foreground">
                   Hit Dice available:{" "}
                   <span className="tabular-nums font-semibold text-foreground">
@@ -942,6 +1175,8 @@ function ActionDetailOverlay({
                           <span className="font-semibold text-foreground">{option.name}</span>
                           {cost > 0 ? (
                             <span className="ml-2 text-muted-foreground">{cost} Hit Dice</span>
+                          ) : option.costLabel ? (
+                            <span className="ml-2 text-muted-foreground">{option.costLabel}</span>
                           ) : null}
                           {option.description ? (
                             <RichTextContent
@@ -1083,7 +1318,10 @@ function ActionDetailOverlay({
             </div>
 
             <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
-              {usage && action.classResourceKey && resourceCostMode !== "fixed" ? (
+              {usage &&
+              action.classResourceKey &&
+              selectedResourceCost == null &&
+              resourceCostMode !== "fixed" ? (
                 <label className="flex items-center justify-between gap-3 text-xs font-semibold text-foreground">
                   Resource spend
                   <input
@@ -1114,7 +1352,7 @@ function ActionDetailOverlay({
                       Empower with {empowerPool.resourceName ?? empower.resourceKey.replace(/_/g, " ")}
                     </p>
                     <p className="text-[10px] tabular-nums text-muted-foreground">
-                      {empowerPool.max - empowerPool.used} left · max {empower.maxSpend} per use
+                      {empowerPool.max - empowerPool.used} left · normal max {empower.maxSpend} per use
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -1122,20 +1360,39 @@ function ActionDetailOverlay({
                       <button
                         key={spend}
                         type="button"
-                        disabled={spend > empowerMax}
-                        onClick={() => setEmpowerSpend(spend)}
+                        disabled={spend > baseEmpowerMax || overloadedChargeActive}
+                        onClick={() => {
+                          setOverloadedChargeActive(false)
+                          setEmpowerSpend(spend)
+                        }}
                         className={cn(
                           "min-w-9 rounded-lg border px-2 py-1 text-xs font-semibold tabular-nums transition-colors",
                           spend === empowerApplied
                             ? "border-primary bg-primary/15 text-foreground"
                             : "border-border hover:border-primary/40",
-                          spend > empowerMax && "opacity-40",
+                          (spend > baseEmpowerMax || overloadedChargeActive) && "opacity-40",
                         )}
                       >
                         {spend}
                       </button>
                     ))}
                   </div>
+                  {overloadedChargeKnown ? (
+                    <button
+                      type="button"
+                      disabled={!overloadedChargeAffordable}
+                      onClick={() => setOverloadedChargeActive((active) => !active)}
+                      className={cn(
+                        "w-full rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                        overloadedChargeActive
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      Overloaded Charge: spend {overloadedChargeCost} for +{overloadedChargeSpend}d
+                      {empower.dieSides}
+                    </button>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     {formatEmpowerEffect(empower, empowerApplied)}
                   </p>
@@ -1181,9 +1438,15 @@ function ActionDetailOverlay({
                 className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Use {action.name}
-                {usage && action.classResourceKey ? ` (${resourceSpend} ${usage.resourceName ?? "resource"})` : ""}
+                {usage && action.classResourceKey
+                  ? resourceSpend < 0
+                    ? ` (refund ${Math.abs(resourceSpend)} ${usage.resourceName ?? "resource"})`
+                    : resourceSpend > 0
+                      ? ` (${resourceSpend} ${usage.resourceName ?? "resource"})`
+                      : ""
+                  : ""}
                 {empower && empowerApplied > 0
-                  ? ` (+${empowerApplied} ${empowerPool?.resourceName ?? "resource"})`
+                  ? ` (+${empowerResourceCost} ${empowerPool?.resourceName ?? "resource"})`
                   : ""}
                 {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
@@ -1228,6 +1491,10 @@ export function SheetActionsPanel({
   playerNoteValues = {},
   onPlayerNoteChange,
   onEquipmentChoiceChange,
+  onRestorePactSlots,
+  onRestoreSpellSlotsByCombinedLevel,
+  onRestoreResourceFromSpellSlot,
+  onSpendSpellSlot,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -1377,7 +1644,16 @@ export function SheetActionsPanel({
     bonus: [],
     reaction: [],
   }
+  // Triggered entries cost no action economy, so they get their own bucket rather than being
+  // filed under Action / Bonus Action / Reaction.
+  const triggeredEntries: SheetActionEntry[] = []
   for (const entry of actions) {
+    if (entry.trigger) {
+      if (!triggeredEntries.some((existing) => existing.id === entry.id)) {
+        triggeredEntries.push(entry)
+      }
+      continue
+    }
     for (const kind of entry.kinds) {
       if (!grouped[kind].some((existing) => existing.id === entry.id)) {
         grouped[kind].push(entry)
@@ -1388,6 +1664,95 @@ export function SheetActionsPanel({
   const openAction = openActionId
     ? actions.find((entry) => entry.id === openActionId) ?? null
     : null
+
+  const renderEntryCard = (entry: SheetActionEntry, keyPrefix: string) => {
+    const usage = usageFor(entry)
+    const usesClassResource = Boolean(entry.classResourceKey)
+    const interactive = !incapacitated
+    return (
+      <div
+        key={`${keyPrefix}-${entry.id}`}
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        onClick={interactive ? () => setOpenActionId(entry.id) : undefined}
+        onKeyDown={
+          interactive
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setOpenActionId(entry.id)
+                }
+              }
+            : undefined
+        }
+        className={cn(
+          "relative flex flex-col gap-2 rounded border px-2 py-1.5",
+          usesClassResource ? SHEET_ACTION_CARD.classResource : SHEET_ACTION_CARD.default,
+          interactive &&
+            (usesClassResource
+              ? cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.classResourceHover)
+              : cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.defaultHover)),
+          incapacitated ? "opacity-50" : "",
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground truncate">{entry.name}</p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {entry.trigger ? `${entry.trigger} · ` : ""}
+              {entry.sourceLabel}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {entry.relatedTalentAlerts?.length ? (
+              <span
+                className="rounded p-0.5 text-amber-600 dark:text-amber-400"
+                title={entry.relatedTalentAlerts
+                  .map((alert) => `${alert.name}: ${alert.summary}`)
+                  .join(" · ")}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+            ) : null}
+          </div>
+        </div>
+        {usage && usesClassResource ? (
+          <span className="text-[10px] tabular-nums text-muted-foreground">
+            Costs{" "}
+            {entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
+              ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
+              : entry.limitedUses?.classResourceCostMode === "up_to_ability_modifier"
+                ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
+                : entry.limitedUses?.classResourceAmount ?? 1}
+            {usage.resourceName ? ` ${usage.resourceName}` : ""}
+          </span>
+        ) : usage ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              {usage.max - usage.used} / {usage.max}
+              {usage.resourceName ? (
+                <span className="ml-1 text-muted-foreground/70">{usage.resourceName}</span>
+              ) : null}
+            </span>
+            <UseDots
+              usage={usage}
+              label={entry.name}
+              tone={usesClassResource ? "classResource" : "default"}
+            />
+          </div>
+        ) : entry.menuOptions?.length ? (
+          <span className="text-[10px] text-muted-foreground">
+            {entry.menuOptions.length} options
+          </span>
+        ) : null}
+      </div>
+    )
+  }
+
+  const gridClass = cn(
+    "grid gap-2",
+    singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  )
 
   return (
     <div className="space-y-3">
@@ -1404,99 +1769,22 @@ export function SheetActionsPanel({
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
               {ACTION_KIND_LABELS[kind]}
             </p>
-            <div
-              className={cn(
-                "grid gap-2",
-                singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-              )}
-            >
-              {entries.map((entry) => {
-                const usage = usageFor(entry)
-                const usesClassResource = Boolean(entry.classResourceKey)
-                const interactive = !incapacitated
-                return (
-                  <div
-                    key={`${kind}-${entry.id}`}
-                    role={interactive ? "button" : undefined}
-                    tabIndex={interactive ? 0 : undefined}
-                    onClick={interactive ? () => setOpenActionId(entry.id) : undefined}
-                    onKeyDown={
-                      interactive
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault()
-                              setOpenActionId(entry.id)
-                            }
-                          }
-                        : undefined
-                    }
-                    className={cn(
-                      "relative flex flex-col gap-2 rounded border px-2 py-1.5",
-                      usesClassResource
-                        ? SHEET_ACTION_CARD.classResource
-                        : SHEET_ACTION_CARD.default,
-                      interactive &&
-                        (usesClassResource
-                          ? cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.classResourceHover)
-                          : cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.defaultHover)),
-                      incapacitated ? "opacity-50" : "",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">{entry.name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">
-                          {entry.sourceLabel}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        {entry.relatedTalentAlerts?.length ? (
-                          <span
-                            className="rounded p-0.5 text-amber-600 dark:text-amber-400"
-                            title={entry.relatedTalentAlerts
-                              .map((alert) => `${alert.name}: ${alert.summary}`)
-                              .join(" · ")}
-                          >
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    {usage && usesClassResource ? (
-                      <span className="text-[10px] tabular-nums text-muted-foreground">
-                        Costs{" "}
-                        {entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
-                          ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
-                          : entry.limitedUses?.classResourceCostMode ===
-                              "up_to_ability_modifier"
-                            ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
-                            : entry.limitedUses?.classResourceAmount ?? 1}
-                        {usage.resourceName ? ` ${usage.resourceName}` : ""}
-                      </span>
-                    ) : usage ? (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] tabular-nums text-muted-foreground">
-                          {usage.max - usage.used} / {usage.max}
-                          {usage.resourceName ? (
-                            <span className="ml-1 text-muted-foreground/70">
-                              {usage.resourceName}
-                            </span>
-                          ) : null}
-                        </span>
-                        <UseDots
-                          usage={usage}
-                          label={entry.name}
-                          tone={usesClassResource ? "classResource" : "default"}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
+            <div className={gridClass}>
+              {entries.map((entry) => renderEntryCard(entry, kind))}
             </div>
           </div>
         )
       })}
+      {triggeredEntries.length ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+            Triggered (no action)
+          </p>
+          <div className={gridClass}>
+            {triggeredEntries.map((entry) => renderEntryCard(entry, "triggered"))}
+          </div>
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {openAction ? (
@@ -1536,6 +1824,10 @@ export function SheetActionsPanel({
             playerNoteValues={playerNoteValues}
             onPlayerNoteChange={onPlayerNoteChange}
             onEquipmentChoiceChange={onEquipmentChoiceChange}
+            onRestorePactSlots={onRestorePactSlots}
+            onRestoreSpellSlotsByCombinedLevel={onRestoreSpellSlotsByCombinedLevel}
+            onRestoreResourceFromSpellSlot={onRestoreResourceFromSpellSlot}
+            onSpendSpellSlot={onSpendSpellSlot}
           />
         ) : null}
       </AnimatePresence>

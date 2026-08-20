@@ -76,6 +76,22 @@ describe("metamagicOptionsForCharacter", () => {
       spellLevel: 3,
     })
     expect(options.some((row) => row.name === "Twinned Spell" && row.cost === 3)).toBe(true)
+    const heightenedId = buildCatalogFeatPickId(METAMAGIC_OPTIONS_CATALOG_ID, "cat_metamagic_8")
+    const quickenedId = buildCatalogFeatPickId(METAMAGIC_OPTIONS_CATALOG_ID, "cat_metamagic_9")
+    const extra = metamagicOptionsForCharacter({
+      featIds: [heightenedId, quickenedId],
+      feats: [],
+      customAbilities: [
+        {
+          id: METAMAGIC_OPTIONS_CATALOG_ID,
+          name: "Metamagic Options",
+          modifier_catalog: buildDefaultMetamagicOptions(),
+        } as import("@/lib/types").CustomAbility,
+      ],
+      spellLevel: 3,
+    })
+    expect(extra.some((row) => row.name === "Heightened Spell" && row.cost === 2)).toBe(true)
+    expect(extra.some((row) => row.name === "Quickened Spell" && row.cost === 2)).toBe(true)
   })
 
   it("does not treat Manipulate Magic itself as a Metamagic option", () => {

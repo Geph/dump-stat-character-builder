@@ -389,20 +389,6 @@ export const SRD_CLASS_RESOURCE_FEATURE_PRESETS: Record<string, ResourceFeatureP
         ]),
       ],
     },
-    {
-      featureName: "Metamagic",
-      resourceKey: "sorcery_points",
-      linkedModifiers: [
-        modInstance("modinst_metamagic", CLASS_RESOURCE_FX_CATALOG.classResource, [
-          fx("fx_metamagic_spend", {
-            kind: "class_resource",
-            classResourceKey: "sorcery_points",
-            classResourceChange: "reduce",
-            classResourceAmount: 1,
-          }),
-        ]),
-      ],
-    },
   ],
   Rogue: [
     {

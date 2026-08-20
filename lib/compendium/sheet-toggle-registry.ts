@@ -6,6 +6,11 @@ export type SheetToggleDefinition = {
   sourceType: SheetToggleSourceType
   sourceId?: string
   defaultActive?: boolean
+  /** Optional explanation shown beside a runtime reminder toggle. */
+  hint?: string
+  /** Label for a persisted free-text note attached to this toggle (for example, a target). */
+  noteLabel?: string
+  notePlaceholder?: string
   /** When set, activating this toggle deactivates other toggles in the same group. */
   exclusiveGroup?: string
 }
@@ -87,7 +92,15 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
     sourceType: "class_feature",
   },
   { id: "full_awakening_active", label: "Full Awakening", sourceType: "class_feature" },
-  { id: "mind_rider_active", label: "Mind Rider", sourceType: "class_feature" },
+  {
+    id: "mind_rider_active",
+    label: "Mind Rider",
+    sourceType: "class_feature",
+    hint:
+      "Name the willing creature whose senses you are using. You are blind and deaf to your own senses; that creature has Advantage on Intelligence, Wisdom, and Charisma saves.",
+    noteLabel: "Target creature",
+    notePlaceholder: "Creature name",
+  },
   {
     id: "swollen_muscles_active",
     label: "Swollen Muscles (STR = INT)",

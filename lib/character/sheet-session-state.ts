@@ -50,6 +50,7 @@ export function buildSheetPlayStateFromSheet(params: {
   activeConditions: string[]
   exhaustionLevel: number
   activeSheetToggleIds: SheetToggleKey[]
+  sheetToggleNotes: CharacterSheetPlayState["sheetToggleNotes"]
   usedResourcesById: Record<string, number>
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>

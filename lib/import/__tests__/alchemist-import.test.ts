@@ -588,6 +588,17 @@ describe("enrichImportContentModifiers integration", () => {
     const brewingChars = (brewing?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
     expect(brewingChars.some((char) => char.type === "craftable_items")).toBe(true)
     expect(brewingChars.some((char) => char.type === "held_items_cap")).toBe(true)
+    const brewingMenu = brewingChars.find((char) => char.type === "resource_ability_menu")
+    expect(brewing?.activation?.action).toBe(true)
+    expect(brewingMenu).toMatchObject({ resourceKey: "reagents" })
+    expect(
+      (brewingMenu as { options?: { name?: string; resourceCost?: number }[] })?.options,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Brew Potion of Healing", resourceCost: 1 }),
+        expect.objectContaining({ name: "Distill Potion of Healing", resourceCost: -1 }),
+      ]),
+    )
 
     const bombs = enriched.classes?.[0]?.features?.find((f) => f.name === "Bombs") as
       | import("@/lib/types").Feature
@@ -783,8 +794,22 @@ describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
 
     const rez = enrichSubclassFeature("Alchemical Resurrection")
     expect(rez.activation?.action).toBe(true)
+    expect(rez.activation?.bonusAction).toBe(true)
     const rezChars = (rez.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
     expect(rezChars.some((char) => char.type === "craftable_items")).toBe(true)
+    const rezMenu = rezChars.find((char) => char.type === "resource_ability_menu")
+    expect(rezMenu).toMatchObject({
+      options: expect.arrayContaining([
+        expect.objectContaining({
+          name: "Create Potion of Resurrection",
+          actionKind: "action",
+        }),
+        expect.objectContaining({
+          name: "Administer Potion of Resurrection",
+          actionKind: "bonus",
+        }),
+      ]),
+    })
   })
 
   it("wires Mutated Blood rest-swappable ability bump", () => {
@@ -799,6 +824,80 @@ describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
     const strMods = feature.choices?.options?.[0]?.linkedModifiers ?? []
     const chars = strMods.flatMap((mod) => mod.characteristics ?? [])
     expect(chars.some((char) => char.type === "ability_scores")).toBe(true)
+  })
+
+  it("wires Mutagens and every missing Reagent-spending subclass interaction", () => {
+    const mutagens = enrichSubclassFeature("Mutagens", "Mutagenist")
+    expect(mutagens.activation?.bonusAction).toBe(true)
+    expect(
+      (mutagens.linkedModifiers ?? [])
+        .flatMap((mod) => mod.characteristics ?? [])
+        .find((char) => char.type === "resource_ability_menu"),
+    ).toMatchObject({
+      options: expect.arrayContaining([
+        expect.objectContaining({ name: "Strength Mutagen", resourceCost: 0 }),
+        expect.objectContaining({ name: "Dexterity Mutagen", resourceCost: 0 }),
+        expect.objectContaining({ name: "Constitution Mutagen", resourceCost: 0 }),
+      ]),
+    })
+
+    const romance = enrichSubclassFeature("Alchemical Romance", "Amorist")
+    const romanceMenu = (romance.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "resource_ability_menu")
+    expect(romanceMenu).toMatchObject({
+      resourceKey: "reagents",
+      options: expect.arrayContaining([
+        expect.objectContaining({ name: "Spend 1 Reagent", resourceCost: 1 }),
+        expect.objectContaining({ name: "Spend 4 Reagents", resourceCost: 4 }),
+      ]),
+    })
+
+    const bottled = enrichSubclassFeature("Bottled Oozes", "Ooze Rancher")
+    expect(bottled.activation?.bonusAction).toBe(true)
+    const bottledMenu = (bottled.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "resource_ability_menu")
+    expect(
+      (bottledMenu as { options?: { resourceCost?: number }[] })?.options?.map(
+        (option) => option.resourceCost,
+      ),
+    ).toEqual([2, 4, 4, 6])
+
+    const restoring = enrichSubclassFeature("Restoring the Golem", "Xenoalchemist")
+    expect(restoring.activation?.action).toBe(true)
+    expect(restoring.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "reagents",
+      classResourceAmount: 1,
+    })
+  })
+
+  it("wires remaining bonus-action and reaction subclass buttons", () => {
+    expect(enrichSubclassFeature("It's Alive!", "Xenoalchemist").activation?.bonusAction).toBe(true)
+    const recycler = enrichSubclassFeature("Arcane Recycler", "Dynamo Engineer")
+    expect(recycler.activation?.reaction).toBe(true)
+    expect(recycler.limitedUses).toMatchObject({ type: "fixed", fixedAmount: 1 })
+    expect(
+      (recycler.linkedModifiers ?? [])
+        .flatMap((mod) => mod.characteristics ?? [])
+        .find((char) => char.type === "resource_ability_menu"),
+    ).toMatchObject({
+      resourceKey: "spell_dynamos",
+      options: [
+        expect.objectContaining({
+          name: "Capture triggering spell",
+          resourceCost: -1,
+          actionKind: "reaction",
+        }),
+      ],
+    })
+    const slime = enrichSubclassFeature("Sacrificial Slime", "Ooze Rancher")
+    expect(slime.activation?.reaction).toBe(true)
+    expect(slime.limitedUses).toMatchObject({
+      type: "ability_modifier",
+      abilityModifier: "INT",
+    })
   })
 
   it("wires Counter-Discharge, Timed Demolition, Elemental Oozes", () => {
